@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-05T01:24:30.199Z",
-  "revision": "51bfa7756ce7f6313350eaaaf70d6a5cec4dc8b5",
-  "tree": "ddc8a59b7a671c1d87cfa01e33b6c0892bdc44be",
+  "createdAt": "2026-11-05T04:15:21.376Z",
+  "revision": "38d5e1e8123d7f71ce1b22e172b267eb806389fb",
+  "tree": "597e4096ef8f5c6d02c5abe01d6063bb173a706a",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/operations/pendingAuthorizationBridge.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/b4bhr7bs/tmp/test-intent-vitest-52351-1793841865699.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/operations/pendingAuthorizationBridge.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/8fl_qenw/tmp/test-intent-vitest-13839-1793852118132.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 1376
+      "durationMs": 926
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts#DE3 the person's own BUTTON request keeps its dialog on arrival",
       "file": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:4790f409d5c71c8fc37b4dd682b6171d5948979ddac74f2fa2168c06751ded49",
+      "contentDigest": "sha256:ee4894947aca0afd3839ebadd10239acdfee11a1c9ffe455f939a4c98ac0f13c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts#DE3 the person's own PALETTE request keeps its dialog on arrival",
       "file": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:4790f409d5c71c8fc37b4dd682b6171d5948979ddac74f2fa2168c06751ded49",
+      "contentDigest": "sha256:ee4894947aca0afd3839ebadd10239acdfee11a1c9ffe455f939a4c98ac0f13c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -59,7 +59,7 @@
       "id": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts#DE3 the person's own undefined request keeps its dialog on arrival",
       "file": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:4790f409d5c71c8fc37b4dd682b6171d5948979ddac74f2fa2168c06751ded49",
+      "contentDigest": "sha256:ee4894947aca0afd3839ebadd10239acdfee11a1c9ffe455f939a4c98ac0f13c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -78,11 +78,11 @@
     "patches": [],
     "runs": [
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/operations/pendingAuthorizationBridge.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/b4bhr7bs/tmp/test-intent-vitest-52351-1793841868611.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/operations/pendingAuthorizationBridge.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/8fl_qenw/tmp/test-intent-vitest-13839-1793852120371.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 1286,
-        "output": "JSON report written to /home/elias/.cache/am/b4bhr7bs/tmp/test-intent-vitest-52351-1793841868611.json\n\n"
+        "durationMs": 770,
+        "output": "JSON report written to /home/elias/.cache/am/8fl_qenw/tmp/test-intent-vitest-13839-1793852120371.json\n\n"
       }
     ],
     "checks": [
@@ -103,5 +103,5 @@
       }
     ]
   },
-  "digest": "sha256:a7135e7e2919f10533108537bdb419151cf82639dea8ff5a33208ac8e924366b"
+  "digest": "sha256:451bde9a7b50152ada35e2424c5899c1061ea19e26ee364327546b0dc2e2283d"
 }

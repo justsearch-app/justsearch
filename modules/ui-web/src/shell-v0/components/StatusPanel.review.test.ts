@@ -54,13 +54,16 @@ function key(target: EventTarget, init: KeyboardEventInit) {
 function agent(id: string, extra: Partial<AuthorizationPrompt> = {}) {
   const reject = vi.fn(async () => {});
   // The engine still holds it with the same details unless a case says otherwise.
-  const live = async () => ({ operationId: prompt.operationId, argsSummary: prompt.argsSummary });
+  const live = async () => ({ operationId: prompt.operationId, argsSummary: prompt.argsSummary, requestedBy: prompt.requestedBy });
   const prompt: AuthorizationPrompt = { pendingId: id, operationId: 'core.ingest-files', gateBehavior: 'INLINE_CONFIRM',
     riskTier: 'MEDIUM', argsSummary: '/home/me/Downloads', requestedBy: 'Claude Desktop', arrival: 'needs-you', live: true,
     askedAt: new Date(Date.now() - 60_000).toISOString(), expiresAt: new Date(Date.now() + 4 * 60_000).toISOString(), reject,
     refresh: live, ...extra };
   return { decision: requestAuthorization(prompt), reject, prompt };
 }
+/** The complete live details of an `agent()` request as the engine reads them, with what a case changes. */
+const details = (extra: Partial<AuthorizationPrompt> = {}): Partial<AuthorizationPrompt> => ({ operationId: 'core.ingest-files',
+  argsSummary: '/home/me/Downloads', requestedBy: 'Claude Desktop', ...extra });
 /** A live-details read the case resolves or fails itself. */
 function deferred<T>() {
   let resolve!: (value: T) => void; let reject!: (error: unknown) => void;
@@ -211,7 +214,7 @@ describe('DE3 the review shows what the person needs to decide', () => {
 
 describe('DE3 fresh live details', () => {
   it('opening the review reads the live details again and shows them', async () => {
-    const refresh = vi.fn(async () => ({ argsSummary: '/home/me/Downloads/old-exports' }));
+    const refresh = vi.fn(async () => details({ argsSummary: '/home/me/Downloads/old-exports' }));
     agent('fresh', { refresh }); await flush();
     await openReview('authorization:fresh');
     expect(refresh).toHaveBeenCalledTimes(1);
@@ -250,19 +253,19 @@ describe('DE3 fresh live details', () => {
   });
 
   it('an Allow in the list reads the live details as part of the press: unavailable or different details are refused, matching ones allow', async () => {
-    const refresh = vi.fn(async (): Promise<Partial<AuthorizationPrompt> | null> => ({ argsSummary: '/home/me/Downloads' }));
+    const refresh = vi.fn(async (): Promise<Partial<AuthorizationPrompt> | null> => details());
     const { decision } = agent('listed', { refresh }); await openPanel(); await arm();
     refresh.mockRejectedValueOnce(new TypeError('HTTP 503'));
     rowButton('authorization:listed', 'Allow').click(); await flush();
     expect(refresh).toHaveBeenCalledTimes(1);
     expect(await settled(decision)).toBe('waiting');
     expect(row('authorization:listed')!.querySelector('[role="alert"]')!.textContent).toBe(UNAVAILABLE);
-    refresh.mockResolvedValueOnce({ argsSummary: '/home/me' });
+    refresh.mockResolvedValueOnce(details({ argsSummary: '/home/me' }));
     rowButton('authorization:listed', 'Allow').click(); await flush();
     expect(await settled(decision), 'different details are not what the person allowed').toBe('waiting');
     expect(row('authorization:listed')!.querySelector('[role="alert"]')!.textContent).toBe('Its details changed, so it was not allowed. Check them and answer again.');
     expect(row('authorization:listed')!.querySelector('.detail')!.textContent, 'the current details are shown').toBe('/home/me');
-    refresh.mockResolvedValue({ argsSummary: '/home/me' });
+    refresh.mockResolvedValue(details({ argsSummary: '/home/me' }));
     rowButton('authorization:listed', 'Allow').click(); await flush();
     expect(await settled(decision), 'the changed request re-arms before it can be allowed').toBe('waiting');
     await arm(); rowButton('authorization:listed', 'Allow').click(); await flush();
@@ -294,10 +297,118 @@ describe('DE3 fresh live details', () => {
     expect(refresh).toHaveBeenCalledTimes(1);
     expect(await settled(decision)).toBe('waiting');
     expect(host.shadowRoot!.querySelector('dialog [role="alert"]')!.textContent).toBe(UNAVAILABLE);
-    refresh.mockResolvedValueOnce({ operationId: 'core.ingest-files' });
+    refresh.mockResolvedValueOnce(details());
     await approve();
     await expect(decision).resolves.toEqual({ approved: true, allowAlways: false });
   });
+});
+
+describe('DE3 only present, well-formed details that match what was shown allow it', () => {
+  const CHANGED = 'Its details changed, so it was not allowed. Check them and answer again.';
+  const alert = (id: string) => row(`authorization:${id}`)!.querySelector('[role="alert"]')?.textContent;
+  it.each([
+    ['an empty answer', {}],
+    ['no operation', { argsSummary: '/home/me/Downloads', requestedBy: 'Claude Desktop' }],
+    ['an empty operation', details({ operationId: '' })],
+    ['no arguments', { operationId: 'core.ingest-files', requestedBy: 'Claude Desktop' }],
+    ['no requester', { operationId: 'core.ingest-files', argsSummary: '/home/me/Downloads' }],
+    ['an operation that is not text', { ...details(), operationId: 42 }],
+    ['arguments that are not text', { ...details(), argsSummary: { path: '/home/me/Downloads' } }],
+    ['a requester that is not text', { ...details(), requestedBy: ['Claude Desktop'] }],
+    ['a list', [details()]],
+    ['plain text', 'core.ingest-files'],
+  ])('a live read with %s refuses the Allow as unavailable, sends nothing, and the request stays answerable', async (_, read) => {
+    const refresh = vi.fn(async (): Promise<Partial<AuthorizationPrompt> | null> => read as Partial<AuthorizationPrompt>);
+    const { decision, reject } = agent('bad', { refresh }); await openPanel(); await arm();
+    rowButton('authorization:bad', 'Allow').click(); await flush();
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(await settled(decision), 'nothing is allowed on details that are not all there').toBe('waiting');
+    expect(alert('bad')).toBe(UNAVAILABLE);
+    expect(reject, 'and nothing is denied for it').not.toHaveBeenCalled();
+    expect(row('authorization:bad')!.querySelector('.detail')!.textContent, 'what was shown stays shown').toBe('/home/me/Downloads');
+    refresh.mockResolvedValue(details());
+    rowButton('authorization:bad', 'Allow').click(); await flush();
+    await expect(decision, 'still answerable: complete matching details allow it').resolves.toEqual({ approved: true, allowAlways: false });
+  });
+
+  it.each([
+    ['another operation', details({ operationId: 'core.delete-files' })],
+    ['other arguments', details({ argsSummary: '/home/me' })],
+    ['another requester', details({ requestedBy: 'Some Other Agent' })],
+  ])('a live read with %s refuses the Allow as changed and sends nothing', async (_, read) => {
+    const refresh = vi.fn(async (): Promise<Partial<AuthorizationPrompt> | null> => read);
+    const { decision, reject } = agent('other', { refresh }); await openPanel(); await arm();
+    rowButton('authorization:other', 'Allow').click(); await flush();
+    expect(await settled(decision)).toBe('waiting');
+    expect(alert('other')).toBe(CHANGED);
+    expect(reject).not.toHaveBeenCalled();
+  });
+});
+
+describe('C12 one decision in flight per request', () => {
+  const CANCEL_FAILED = 'The request could not be cancelled. Try again.';
+  async function typedApprove() {
+    const control = host.shadowRoot!.querySelector('[data-testid="authorization-approve"]')!.shadowRoot!.querySelector('jf-control')!;
+    await (control as HTMLElement & { updateComplete: Promise<unknown> }).updateComplete;
+    control.shadowRoot!.querySelector<HTMLButtonElement>('button')!.click(); await flush();
+  }
+  async function typedDeny() {
+    const control = host.shadowRoot!.querySelector('[data-testid="authorization-deny"]')!.shadowRoot!.querySelector('jf-control')!;
+    await (control as HTMLElement & { updateComplete: Promise<unknown> }).updateComplete;
+    control.shadowRoot!.querySelector<HTMLButtonElement>('button')!.click(); await flush();
+  }
+  /** Where the person answers: the list row, the panel review, or the typed security dialog. */
+  const where = {
+    list: {
+      open: async () => { await openPanel(); await arm(); },
+      allow: async (id: string) => { rowButton(`authorization:${id}`, 'Allow').click(); await flush(); },
+      deny: async (id: string) => { rowButton(`authorization:${id}`, 'Deny').click(); await flush(); },
+      alert: (id: string) => row(`authorization:${id}`)?.querySelector('[role="alert"]')?.textContent,
+    },
+    review: {
+      open: async (id: string) => { await openReview(`authorization:${id}`); await arm(); },
+      allow: async () => { press(answer('allow')); await flush(); },
+      deny: async () => { press(answer('deny')); await flush(); },
+      alert: () => review()?.querySelector('[role="alert"]')?.textContent,
+    },
+    'security dialog': {
+      open: async (id: string) => {
+        await openPanel(); rowButton(`authorization:${id}`, 'Review').click(); await flush();
+        const input = host.shadowRoot!.querySelector<HTMLInputElement>('[data-testid="authorization-typed-input"]')!;
+        input.value = 'core.ingest-files'; input.dispatchEvent(new Event('input')); await flush(); await arm();
+      },
+      allow: typedApprove,
+      deny: typedDeny,
+      alert: () => host.shadowRoot!.querySelector('dialog [role="alert"]')?.textContent,
+    },
+  } as const;
+
+  it.each(Object.keys(where) as (keyof typeof where)[])(
+    'in the %s, a Deny pressed while an Allow still reads the live details abandons it: when the Deny fails, the late read allows nothing',
+    async (place) => {
+      const at = where[place];
+      const typed = place === 'security dialog';
+      const read = deferred<Partial<AuthorizationPrompt> | null>();
+      // The review's own read on opening comes back at once; the Allow's read is slow.
+      const refresh = vi.fn(async (): Promise<Partial<AuthorizationPrompt> | null> => details());
+      const { decision, reject } = agent('race', { refresh, ...(typed ? { gateBehavior: 'TYPED_CONFIRM', riskTier: 'HIGH' } : {}) });
+      reject.mockRejectedValueOnce(new Error('HTTP 503'));
+      await flush(); await at.open('race');
+      const before = refresh.mock.calls.length;
+      refresh.mockImplementationOnce(() => read.promise);
+      await at.allow('race');
+      expect(refresh, 'the Allow reads the live details').toHaveBeenCalledTimes(before + 1);
+      await at.deny('race');
+      expect(reject, 'the Deny is sent').toHaveBeenCalledTimes(1);
+      expect(at.alert('race')).toBe(CANCEL_FAILED);
+      read.resolve(details()); await flush();
+      expect(await settled(decision), 'the abandoned Allow sends nothing after the person pressed Deny').toBe('waiting');
+      expect(at.alert('race'), 'the failed Deny is still what the person is told').toBe(CANCEL_FAILED);
+      expect(host.statusRequests(), 'the request stays answerable').toHaveLength(1);
+      await at.deny('race');
+      expect(reject).toHaveBeenCalledTimes(2);
+      await expect(decision, 'the last press decides').resolves.toEqual({ approved: false, allowAlways: false });
+    });
 });
 
 describe('DE3/DE8 answers', () => {

@@ -51,7 +51,7 @@ interface PendingAuthorizationPayload {
   readonly sourceTier?: string;
   readonly riskTier?: string;
   readonly gateBehavior?: string;
-  /** Which transport's gate produced it; agent and other-app transports wait in Needs you (DE3). */
+  /** Which transport's gate produced it; all but the person's own window gestures wait in Needs you (DE3). */
   readonly transport?: string;
   /** ISO-8601, or epoch seconds/milliseconds depending on the stream's date encoding. */
   readonly createdAt?: string | number;
@@ -63,8 +63,12 @@ function isoTime(value: string | number | undefined): string | undefined {
   return new Date(value < 1e11 ? value * 1000 : value).toISOString();
 }
 
-/** Requests from agents and other apps, as opposed to the person's own action in a window. */
-const AGENT_TRANSPORTS = new Set(['MCP', 'AGENT_LOOP', 'WORKFLOW', 'LLM_EMISSION']);
+/**
+ * The person's own gesture in an app window (the Engine grants these only with window authority). Every
+ * other named source — agents, outside HTTP callers, other apps, schedules, the backend itself, and any
+ * source added later — is not the person's action here: it waits in Needs you (DE3).
+ */
+const OWN_TRANSPORTS = new Set(['BUTTON', 'PALETTE', 'RAIL']);
 
 /**
  * B2 — the retained side of the same pending store: the advisory stream's snapshot keeps every
@@ -238,7 +242,7 @@ async function presentAndExecute(
     ...(detail.argsSummary ? { argsSummary: detail.argsSummary } : {}),
     ...(detail.rationale ? { purpose: detail.rationale } : {}),
     ...(detail.requestedBy ? { requestedBy: detail.requestedBy } : {}),
-    ...(payload.transport && AGENT_TRANSPORTS.has(payload.transport) ? {
+    ...(payload.transport && !OWN_TRANSPORTS.has(payload.transport) ? {
       // DE3 — an agent's request waits in Needs you; its review reads the live details again.
       arrival: 'needs-you' as const, live,
       ...(isoTime(payload.createdAt) ? { askedAt: isoTime(payload.createdAt)! } : {}),

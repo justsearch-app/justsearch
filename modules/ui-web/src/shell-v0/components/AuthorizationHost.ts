@@ -62,6 +62,8 @@ interface AuthorizeItem {
   readonly resolve: (decision: AuthorizationDecision) => void;
   /** Needs-you requests: when the panel may accept an answer (arrival, each review opening, changed details). */
   readyAt?: number;
+  /** The person's latest press on it: an Allow still reading live details is abandoned by any later press. */
+  attempt?: number;
 }
 
 /** What the status panel shows and may do for one waiting request. */
@@ -91,6 +93,26 @@ const DETAILS_CHANGED = 'Its details changed, so it was not allowed. Check them 
 
 /** The live details read for an agent's request, as `refresh` reports them. */
 type FreshDetails = Awaited<ReturnType<NonNullable<AuthorizationPrompt['refresh']>>>;
+
+const FRESH_FIELDS = ['operationId', 'gateBehavior', 'riskTier', 'argsSummary', 'expiresAt', 'requestedBy'] as const;
+
+/**
+ * DE3 — live details that may answer an Allow: an object naming the operation, every other field text or
+ * absent; empty text counts as absent. Anything else (an empty or malformed answer) is unavailable.
+ */
+function wellFormed(fresh: unknown): Partial<Record<(typeof FRESH_FIELDS)[number], string>> | undefined {
+  if (!fresh || typeof fresh !== 'object' || Array.isArray(fresh)) return undefined;
+  const raw = fresh as Record<string, unknown>;
+  if (typeof raw.operationId !== 'string' || !raw.operationId) return undefined;
+  const out: Partial<Record<(typeof FRESH_FIELDS)[number], string>> = {};
+  for (const key of FRESH_FIELDS) {
+    const value = raw[key];
+    if (value === undefined || value === null || value === '') continue;
+    if (typeof value !== 'string') return undefined;
+    out[key] = value;
+  }
+  return out;
+}
 
 export class AuthorizationHost extends JfElement {
   static properties = {
@@ -347,6 +369,8 @@ export class AuthorizationHost extends JfElement {
       this.requestUpdate();
       return 'unavailable';
     }
+    // A later press (a Deny) abandons this read: what it finds then answers and shows nothing.
+    const attempt = item.attempt;
     this.checking.add(item);
     this.requestUpdate();
     let fresh: FreshDetails | undefined;
@@ -359,16 +383,22 @@ export class AuthorizationHost extends JfElement {
       fresh = undefined;
     } finally {
       clearTimeout(timer);
-      this.checking.delete(item);
+      if (item.attempt === attempt) this.checking.delete(item);
       this.requestUpdate();
     }
     const id = item.prompt.pendingId;
-    if (!this.holds(item) || this.decided.has(id)) return 'stale';
+    if (!this.holds(item) || this.decided.has(id) || item.attempt !== attempt) return 'stale';
     if (fresh === null) { this.cancelMatching(prompt => prompt.pendingId === id); return 'gone'; }
-    if (fresh === undefined) { this.answerErrors.set(item, DETAILS_UNAVAILABLE); return 'unavailable'; }
-    const defined = Object.entries(fresh).filter(([, value]) => value !== undefined);
-    const changed = defined.some(([key, value]) => item.prompt[key as keyof AuthorizationPrompt] !== value);
-    item.prompt = { ...item.prompt, ...Object.fromEntries(defined) };
+    const details = wellFormed(fresh);
+    const shown = (key: 'argsSummary' | 'requestedBy'): string | undefined => item.prompt[key] || undefined;
+    // What was shown and the live details lack (its arguments, who asked) is a partial answer, not a match.
+    if (!details || (shown('argsSummary') && !details.argsSummary) || (shown('requestedBy') && !details.requestedBy)) {
+      this.answerErrors.set(item, DETAILS_UNAVAILABLE);
+      return 'unavailable';
+    }
+    const changed = Object.entries(details).some(([key, value]) =>
+      (item.prompt[key as keyof AuthorizationPrompt] || undefined) !== value);
+    item.prompt = { ...item.prompt, ...details };
     this.answerErrors.delete(item);
     if (changed) {
       // Different details under the person's pointer: nothing done before they show can answer them.
@@ -651,8 +681,13 @@ export class AuthorizationHost extends JfElement {
     const expired = (): boolean => !!item.prompt.expiresAt && Date.parse(item.prompt.expiresAt) <= Date.now();
     if (this.decided.has(id) || this.rejecting.has(item) || !this.holds(item) || (approved && this.checking.has(item))) return;
     if (expired()) { this.cancelMatching(prompt => prompt.pendingId === id); return; }
+    // One decision in flight per request (C12): this press abandons an Allow still reading live details,
+    // so only the person's last press can reach the backend.
+    const attempt = item.attempt = (item.attempt ?? 0) + 1;
+    this.checking.delete(item);
     if (approved && item.prompt.arrival === 'needs-you') {
       const read = await this.readFresh(item);
+      if (item.attempt !== attempt) return;
       if (read === 'changed') this.answerErrors.set(item, DETAILS_CHANGED);
       this.requestUpdate();
       if (read !== 'fresh' || this.decided.has(id) || this.rejecting.has(item) || !this.holds(item)) return;

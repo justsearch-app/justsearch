@@ -40,6 +40,14 @@ vi.mock('../components/advisory/ephemeralToast.js', () => ({
 vi.mock('../utils/statusPoll.js', () => ({ subscribeStatus: () => () => {} }));
 
 import { startPendingAuthorizationBridge } from './pendingAuthorizationBridge.js';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+/** DE3 — the person's own gestures in an app window; the Engine grants them only with window authority. */
+const OWN_TRANSPORTS = ['BUTTON', 'PALETTE', 'RAIL'];
+/** Every other source the Engine names (TransportTag), and one it may add later. */
+const OUTSIDE_TRANSPORTS = ['MCP', 'AGENT_LOOP', 'WORKFLOW', 'LLM_EMISSION', 'HTTP_API', 'URL_BAR', 'URL_DEEPLINK',
+  'PLUGIN_EMITTED', 'SCHEDULED', 'RULE_ENGINE', 'SYSTEM_INTERNAL', 'NOT_YET_KNOWN'];
 import type { SseEnvelope } from '../streaming/envelope-types.js';
 import { MultiplexedStream } from '../streaming/MultiplexedStream.js';
 import { SHELL_EVENT_STREAM_IDS } from '../streaming/shellEventStreamIds.js';
@@ -452,7 +460,7 @@ describe('pendingAuthorizationBridge (tempdoc 655)', () => {
     stop();
   });
 
-  it.each(['MCP', 'AGENT_LOOP', 'WORKFLOW', 'LLM_EMISSION'])('DE3 a %s request waits in Needs you, announced as a live arrival', async (transport) => {
+  it.each(OUTSIDE_TRANSPORTS)('DE3 a %s request waits in Needs you, announced as a live arrival', async (transport) => {
     peekPendingMock.mockResolvedValue(detailFor('agent', { requestedBy: 'Claude Desktop' }));
     requestAuthorizationMock.mockReturnValue(new Promise(() => {}));
     const stop = startPendingAuthorizationBridge('http://test', { multiplex: multiplexOn(fakeEs) });
@@ -463,7 +471,7 @@ describe('pendingAuthorizationBridge (tempdoc 655)', () => {
     stop();
   });
 
-  it.each(['BUTTON', 'PALETTE', undefined])('DE3 the person\'s own %s request keeps its dialog on arrival', async (transport) => {
+  it.each([...OWN_TRANSPORTS, undefined])('DE3 the person\'s own %s request keeps its dialog on arrival', async (transport) => {
     peekPendingMock.mockResolvedValue(detailFor('own'));
     requestAuthorizationMock.mockReturnValue(new Promise(() => {}));
     const stop = startPendingAuthorizationBridge('http://test', { multiplex: multiplexOn(fakeEs) });
@@ -473,6 +481,17 @@ describe('pendingAuthorizationBridge (tempdoc 655)', () => {
     expect(prompt).toMatchObject({ pendingId: 'own' });
     expect(prompt.arrival).toBeUndefined();
     stop();
+  });
+
+  it('DE3 every source the Engine can name is pinned: only window gestures keep a dialog', () => {
+    // The Engine's own list of sources; a value added there must be placed here deliberately.
+    const java = readFileSync(resolve(import.meta.dirname,
+      '../../../../app-agent-api/src/main/java/io/justsearch/agent/api/registry/TransportTag.java'), 'utf8');
+    const code = java.replace(/\/\*[\s\S]*?\*\//g, '');
+    const body = code.slice(code.indexOf('public enum TransportTag {') + 'public enum TransportTag {'.length);
+    const named = [...body.slice(0, body.indexOf('}')).matchAll(/\b([A-Z][A-Z_]+)\b/g)].map(m => m[1]);
+    expect(named.length).toBeGreaterThan(10);
+    expect([...named].sort()).toEqual([...OWN_TRANSPORTS, ...OUTSIDE_TRANSPORTS.filter(t => t !== 'NOT_YET_KNOWN')].sort());
   });
 
   it('DE3 a request rediscovered after a reload waits in Needs you without counting as a live arrival', async () => {

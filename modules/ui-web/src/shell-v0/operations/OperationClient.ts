@@ -492,7 +492,12 @@ export class OperationClient {
         res.status,
       );
     }
-    return (await res.json()) as PendingAuthorizationDetail;
+    const body: unknown = await res.json();
+    // A 200 that names no request is unreadable, not "gone": only a 404 says it no longer waits.
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      throw new OperationError(`Pending ${pendingId} answered without its details`, 'FETCH_FAILED', res.status);
+    }
+    return body as PendingAuthorizationDetail;
   }
 
   /**

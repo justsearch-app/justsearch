@@ -23,6 +23,12 @@ details read for that press that still match, and a failed read sends nothing; e
 reviewed Allow/Deny re-arms when the request under it changes; a restored in-app approval is not
 announced. Those checks fail on c42cb3591c and pass now.
 
+Final repair (after the independent check of 38d5e1e812): only present, well-formed live details that
+equal what was shown allow an agent's request; a Deny abandons an Allow still reading them, so the
+backend receives only the last press; every source but the person's own window gestures waits in
+Needs you; each queued elicitation prompt answers its own caller and stays modal after a remount.
+Those checks fail on 38d5e1e812 and pass now.
+
 All added checks are durable. The reflective lookup of `ResourceApiModule.historyOutcome` in the
 Java check is fail-before compatibility scaffolding: on the baseline it reads the recorded outcome,
 which is what that route returned there. No independent acceptance is claimed by this builder.
@@ -394,6 +400,225 @@ which is what that route returned there. No independent acceptance is claimed by
         }
       ],
       "evidence": "gates/test-intent/evidence/shell-s3a2-review-repair-adapted.json"
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "An agent's request is allowed only on live details that are present, well-formed and equal to what was shown: a read with no or an empty operation, without the shown arguments or requester, with a field that is not text, or that is not an object at all (empty, a list, plain text) refuses the Allow as unavailable; nothing is sent (no approval, no denial), what was shown stays shown, and complete matching details then allow it.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Allow proceeds only when the read returns details that are present, well-formed and equal to what was shown (operation, arguments, requester); empty, partial, malformed or different details refuse the answer (\"Its current details are unavailable…\" / \"Its details changed…\") and the request stays answerable.",
+          "location": "task t-20261103-shell request (S3a2 final repair brief from the independent check of 38d5e1e812, 2026-11-05)"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s3a2-review-repair2.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#a live read with an empty answer refuses the Allow as unavailable, sends nothing, and the request stays answerable",
+        "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#a live read with no operation refuses the Allow as unavailable, sends nothing, and the request stays answerable",
+        "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#a live read with an empty operation refuses the Allow as unavailable, sends nothing, and the request stays answerable",
+        "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#a live read with no arguments refuses the Allow as unavailable, sends nothing, and the request stays answerable",
+        "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#a live read with no requester refuses the Allow as unavailable, sends nothing, and the request stays answerable",
+        "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#a live read with arguments that are not text refuses the Allow as unavailable, sends nothing, and the request stays answerable",
+        "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#a live read with a list refuses the Allow as unavailable, sends nothing, and the request stays answerable",
+        "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#a live read with plain text refuses the Allow as unavailable, sends nothing, and the request stays answerable"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "One decision in flight per request, in the list, the panel review and the typed security dialog: a Deny pressed while an Allow still reads the live details abandons that Allow; when the Deny fails ('could not be cancelled'), the Allow's late read sends nothing and does not replace that message, the request stays answerable, and the person's next Deny ends it.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "one decision in flight per request; pressing Deny aborts a pending Allow before its approve is sent; an Allow whose read finishes after a Deny press never sends; what the backend finally receives is what the person pressed last (or nothing, if the last press failed).",
+          "location": "task t-20261103-shell request (S3a2 final repair brief from the independent check of 38d5e1e812, 2026-11-05)"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "C12",
+          "quote": "One decision, one execution: the same authorization reached from the panel, a dialog and an MCP announcement executes once; repeated clicks are idempotent; expired, withdrawn or superseded requests cannot execute and leave the panel.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s3a2-review-repair2.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#in the list, a Deny pressed while an Allow still reads the live details abandons it: when the Deny fails, the late read allows nothing",
+        "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#in the review, a Deny pressed while an Allow still reads the live details abandons it: when the Deny fails, the late read allows nothing",
+        "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#in the security dialog, a Deny pressed while an Allow still reads the live details abandons it: when the Deny fails, the late read allows nothing"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Every source the Engine names other than the person's own window gestures (BUTTON, PALETTE, RAIL) — HTTP_API, URL_BAR, URL_DEEPLINK, PLUGIN_EMITTED, SCHEDULED, RULE_ENGINE, SYSTEM_INTERNAL, and a source added later — waits in Needs you as a live, announced arrival instead of opening a dialog (MCP, AGENT_LOOP, WORKFLOW and LLM_EMISSION already did).",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "every backend pending-authorization source (MCP, AGENT_LOOP, WORKFLOW, LLM_EMISSION, HTTP_API and any other present in the code) goes to Needs you with one live announcement; only plugin consent the person's own action triggered opens at once. Pin every source in a test (parameterised).",
+          "location": "task t-20261103-shell request (S3a2 final repair brief from the independent check of 38d5e1e812, 2026-11-05)"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s3a2-review-repair2.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts#DE3 a HTTP_API request waits in Needs you, announced as a live arrival",
+        "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts#DE3 a URL_BAR request waits in Needs you, announced as a live arrival",
+        "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts#DE3 a URL_DEEPLINK request waits in Needs you, announced as a live arrival",
+        "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts#DE3 a PLUGIN_EMITTED request waits in Needs you, announced as a live arrival",
+        "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts#DE3 a SCHEDULED request waits in Needs you, announced as a live arrival",
+        "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts#DE3 a RULE_ENGINE request waits in Needs you, announced as a live arrival",
+        "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts#DE3 a SYSTEM_INTERNAL request waits in Needs you, announced as a live arrival",
+        "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts#DE3 a NOT_YET_KNOWN request waits in Needs you, announced as a live arrival"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/ElicitHost.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Two queued required elicitation prompts each answer on a deliberate Submit, whether the host stays mounted, is re-attached, or is replaced by a new host after navigating away: the first resolves with its data, the second is shown next and its Submit resolves its own caller, and nothing is left on screen.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "the second prompt answers on a deliberate Submit and its caller resolves.",
+          "location": "task t-20261103-shell request (S3a2 final repair brief from the independent check of 38d5e1e812, 2026-11-05)"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "C2",
+          "quote": "queued ElicitHost prompts survive navigation and remount; required prompts never resolve as cancelled unintentionally; callers never hang",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s3a2-review-repair2.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/ElicitHost.test.ts#C2 two queued required prompts each answer on a deliberate Submit when the host stays mounted; neither caller hangs",
+        "modules/ui-web/src/shell-v0/components/ElicitHost.test.ts#C2 two queued required prompts each answer on a deliberate Submit when the host is re-attached after navigating away; neither caller hangs",
+        "modules/ui-web/src/shell-v0/components/ElicitHost.test.ts#C2 two queued required prompts each answer on a deliberate Submit when the host is replaced by a new host after navigating away; neither caller hangs"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts",
+        "modules/ui-web/src/shell-v0/components/ElicitHost.queue-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "In real Chromium, against the engine's routes: a live-details read answering 200 with an empty body, no operation, no arguments, no requester, a malformed operation or null allows nothing, says the details are unavailable and leaves the request answerable (a complete read then allows it once); a Deny pressed 100 ms after an Allow whose read is slow, answered 503 by the reject route, leaves no approval sent after the read returns, and the next Deny ends the request. Two queued required elicitation prompts answer on deliberate Submit clicks, staying modal after the host is re-attached or replaced. The authorization page harness gains a cancellable live-agent request (Deny sent over HTTP) and raw or slow pending-store answers; the elicitation page is new.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Allow proceeds only when the read returns details that are present, well-formed and equal to what was shown (operation, arguments, requester); empty, partial, malformed or different details refuse the answer (\"Its current details are unavailable…\" / \"Its details changed…\") and the request stays answerable.",
+          "location": "task t-20261103-shell request (S3a2 final repair brief from the independent check of 38d5e1e812, 2026-11-05)"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "one decision in flight per request; pressing Deny aborts a pending Allow before its approve is sent; an Allow whose read finishes after a Deny press never sends; what the backend finally receives is what the person pressed last (or nothing, if the last press failed).",
+          "location": "task t-20261103-shell request (S3a2 final repair brief from the independent check of 38d5e1e812, 2026-11-05)"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "the second prompt answers on a deliberate Submit and its caller resolves.",
+          "location": "task t-20261103-shell request (S3a2 final repair brief from the independent check of 38d5e1e812, 2026-11-05)"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "C2",
+          "quote": "queued ElicitHost prompts survive navigation and remount; required prompts never resolve as cancelled unintentionally; callers never hang",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s3a2-review-repair2-chromium.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#DE3 a live-details read answering 200 with an empty body allows nothing and the request stays answerable",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#DE3 a live-details read answering 200 with no operation allows nothing and the request stays answerable",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#DE3 a live-details read answering 200 with no arguments allows nothing and the request stays answerable",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#DE3 a live-details read answering 200 with no requester allows nothing and the request stays answerable",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#DE3 a live-details read answering 200 with a malformed operation allows nothing and the request stays answerable",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#DE3 a live-details read answering 200 with a null body allows nothing and the request stays answerable",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#C12 a Deny pressed 100 ms after an Allow whose read is slow abandons that Allow: the failed Deny leaves nothing sent",
+        "modules/ui-web/src/shell-v0/components/ElicitHost.queue-lockdown.test.ts#C2 two queued required prompts each answer on a deliberate Submit when the host stays mounted",
+        "modules/ui-web/src/shell-v0/components/ElicitHost.queue-lockdown.test.ts#C2 two queued required prompts each answer on a deliberate Submit when the host is re-attached after navigating away and back",
+        "modules/ui-web/src/shell-v0/components/ElicitHost.queue-lockdown.test.ts#C2 two queued required prompts each answer on a deliberate Submit when the host is replaced by a new host after navigating away and back"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts",
+        "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Preservation: a live read naming another operation, other arguments or another requester refuses the Allow as changed and sends nothing; the person's own RAIL request keeps its dialog on arrival; every TransportTag value the Engine defines is placed as either a window gesture or an outside source. Pass before and after.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Allow proceeds only when the read returns details that are present, well-formed and equal to what was shown (operation, arguments, requester); empty, partial, malformed or different details refuse the answer (\"Its current details are unavailable…\" / \"Its details changed…\") and the request stays answerable.",
+          "location": "task t-20261103-shell request (S3a2 final repair brief from the independent check of 38d5e1e812, 2026-11-05)"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "every backend pending-authorization source (MCP, AGENT_LOOP, WORKFLOW, LLM_EMISSION, HTTP_API and any other present in the code) goes to Needs you with one live announcement; only plugin consent the person's own action triggered opens at once. Pin every source in a test (parameterised).",
+          "location": "task t-20261103-shell request (S3a2 final repair brief from the independent check of 38d5e1e812, 2026-11-05)"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s3a2-review-repair2-preservation.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#a live read with another operation refuses the Allow as changed and sends nothing",
+        "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#a live read with other arguments refuses the Allow as changed and sends nothing",
+        "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#a live read with another requester refuses the Allow as changed and sends nothing",
+        "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts#DE3 the person's own RAIL request keeps its dialog on arrival",
+        "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts#DE3 every source the Engine can name is pinned: only window gestures keep a dialog"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "input re-encoding"
+      ],
+      "whatMoved": "The live-details reads the existing checks feed in become complete reads (operation, arguments and requester as the engine's pending route returns them, via a details() helper), because a partial read is now refused. In the Chromium harness, the live agent's read also maps requestedBy and the pending-store mock returns it. Kept oracle: opening the review shows the fresh arguments; an unavailable or different read is refused and a matching one allows once; the typed dialog's Approve reads first; every other assertion unchanged.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Allow proceeds only when the read returns details that are present, well-formed and equal to what was shown (operation, arguments, requester); empty, partial, malformed or different details refuse the answer (\"Its current details are unavailable…\" / \"Its details changed…\") and the request stays answerable.",
+          "location": "task t-20261103-shell request (S3a2 final repair brief from the independent check of 38d5e1e812, 2026-11-05)"
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "A live read whose operation or requester is not text refuses the Allow as unavailable, sends nothing and leaves the request answerable. Not claimed as fail-before by assertion: on 38d5e1e812 these reads are taken as changed details and the status model then throws (id.split / who.replace is not a function), so the check fails there with an exception.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Allow proceeds only when the read returns details that are present, well-formed and equal to what was shown (operation, arguments, requester); empty, partial, malformed or different details refuse the answer (\"Its current details are unavailable…\" / \"Its details changed…\") and the request stays answerable.",
+          "location": "task t-20261103-shell request (S3a2 final repair brief from the independent check of 38d5e1e812, 2026-11-05)"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s3a2-review-repair2.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#a live read with an operation that is not text refuses the Allow as unavailable, sends nothing, and the request stays answerable",
+        "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#a live read with a requester that is not text refuses the Allow as unavailable, sends nothing, and the request stays answerable"
+      ]
     }
   ]
 }

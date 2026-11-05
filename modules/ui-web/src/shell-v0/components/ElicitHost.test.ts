@@ -165,4 +165,29 @@ describe('<jf-elicit-host> — schema-only request renders inputs (543-fwd)', ()
     await settle();
     expect(listPendingElicits()).toHaveLength(0); // dequeued via handleCancel
   });
+
+  it.each(['stays mounted', 'is re-attached after navigating away', 'is replaced by a new host after navigating away'] as const)(
+    'C2 two queued required prompts each answer on a deliberate Submit when the host %s; neither caller hangs', async (how) => {
+      const schema = { type: 'object', properties: { a: { type: 'string' } } } as const;
+      const first = elicit({ title: 'First', schema, cancelLabel: null, initialData: { a: 'one' } });
+      const second = elicit({ title: 'Second', schema, cancelLabel: null, initialData: { a: 'two' } });
+      await settle();
+      if (how !== 'stays mounted') {
+        host.remove(); await settle();
+        if (how !== 'is re-attached after navigating away') host = document.createElement('jf-elicit-host');
+        document.body.appendChild(host); await settle();
+      }
+      const title = () => host.shadowRoot?.querySelector('h2')?.textContent;
+      expect(title()).toBe('First');
+      await activateJfButton(host.shadowRoot?.querySelector('jf-button.submit'));
+      expect(await first).toEqual({ a: 'one' });
+      await settle();
+      expect(title(), 'the second prompt is shown next').toBe('Second');
+      await activateJfButton(host.shadowRoot?.querySelector('jf-button.submit'));
+      await settle();
+      const answered = await Promise.race([second, new Promise(resolve => setTimeout(() => resolve('still waiting'), 100))]);
+      expect(answered, 'its Submit answers the second prompt').toEqual({ a: 'two' });
+      expect(listPendingElicits()).toHaveLength(0);
+      expect(title(), 'nothing is left on screen').toBeUndefined();
+    });
 });

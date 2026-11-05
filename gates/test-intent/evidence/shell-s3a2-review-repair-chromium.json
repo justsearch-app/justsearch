@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-05T03:03:48.559Z",
-  "revision": "c42cb3591ca441526a9f6779c6ff95459d40168e",
-  "tree": "dc421c14796959c60a53cdbf1dbd805c74740c7e",
+  "createdAt": "2026-11-05T04:18:26.525Z",
+  "revision": "38d5e1e8123d7f71ce1b22e172b267eb806389fb",
+  "tree": "3e91c5bf9361a152820a6f861cf1d3a44b4fe936",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/u635vwnv/tmp/test-intent-vitest-34722-1793847738346.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/8fl_qenw/tmp/test-intent-vitest-15262-1793852191871.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 46859
+      "durationMs": 60905
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#DE3 an Allow pressed while the review is still reading the live details sends nothing; unavailable details stay answerable",
       "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:baed4d3c5afaf1e081b8dce6afee50995ff0529e5ba41f02585102bedee25969",
+      "contentDigest": "sha256:a48172e9978de317b38358bfabcf207ae022adf8eacc55ef451fc460d55974e0",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#DE3 the list Allow reads the live details as part of the press: unavailable or different details allow nothing",
       "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:baed4d3c5afaf1e081b8dce6afee50995ff0529e5ba41f02585102bedee25969",
+      "contentDigest": "sha256:a48172e9978de317b38358bfabcf207ae022adf8eacc55ef451fc460d55974e0",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -59,7 +59,7 @@
       "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#DE3 a typed request's Approve in the security check reads the live details as part of the press",
       "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:baed4d3c5afaf1e081b8dce6afee50995ff0529e5ba41f02585102bedee25969",
+      "contentDigest": "sha256:a48172e9978de317b38358bfabcf207ae022adf8eacc55ef451fc460d55974e0",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -74,7 +74,7 @@
       "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#C12 a native double-click on the first row's Allow answers only the first request",
       "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:baed4d3c5afaf1e081b8dce6afee50995ff0529e5ba41f02585102bedee25969",
+      "contentDigest": "sha256:a48172e9978de317b38358bfabcf207ae022adf8eacc55ef451fc460d55974e0",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -89,7 +89,7 @@
       "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#C12 a click where the next row moved in answers nothing; a fresh click after the delay answers it once",
       "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:baed4d3c5afaf1e081b8dce6afee50995ff0529e5ba41f02585102bedee25969",
+      "contentDigest": "sha256:a48172e9978de317b38358bfabcf207ae022adf8eacc55ef451fc460d55974e0",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -108,40 +108,40 @@
     "patches": [],
     "runs": [
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/u635vwnv/tmp/test-intent-vitest-34722-1793847786590.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/8fl_qenw/tmp/test-intent-vitest-15262-1793852254076.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 41642,
-        "output": "JSON report written to /home/elias/.cache/am/u635vwnv/tmp/test-intent-vitest-34722-1793847786590.json\n\n"
+        "durationMs": 52192,
+        "output": "JSON report written to /home/elias/.cache/am/8fl_qenw/tmp/test-intent-vitest-15262-1793852254076.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#DE3 an Allow pressed while the review is still reading the live details sends nothing; unavailable details stay answerable",
         "classification": "assertion",
-        "detail": "DE3 an Allow pressed while the review is still reading the live details sends nothing; unavailable details stay answerable:  AssertionError: an Allow before the details came back sends nothing: expected [ { pendingId: 'pick', …(1) } ] to deeply equal []\n    at /home/elias/.cache/am/u635vwnv/tmp/test-intent-before-UmnZ8E/modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts:464:71\n    at file"
+        "detail": "DE3 an Allow pressed while the review is still reading the live details sends nothing; unavailable details stay answerable:  AssertionError: an Allow before the details came back sends nothing: expected [ { pendingId: 'pick', …(1) } ] to deeply equal []\n    at /home/elias/.cache/am/8fl_qenw/tmp/test-intent-before-50lGRq/modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts:469:71\n    at file"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#DE3 the list Allow reads the live details as part of the press: unavailable or different details allow nothing",
         "classification": "assertion",
-        "detail": "DE3 the list Allow reads the live details as part of the press: unavailable or different details allow nothing:  AssertionError: unavailable details allow nothing: expected [ { pendingId: 'listed', …(1) } ] to deeply equal []\n    at /home/elias/.cache/am/u635vwnv/tmp/test-intent-before-UmnZ8E/modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts:490:53\n    at file:///home/elias/d"
+        "detail": "DE3 the list Allow reads the live details as part of the press: unavailable or different details allow nothing:  AssertionError: unavailable details allow nothing: expected [ { pendingId: 'listed', …(1) } ] to deeply equal []\n    at /home/elias/.cache/am/8fl_qenw/tmp/test-intent-before-50lGRq/modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts:495:53\n    at file:///home/elias/d"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#DE3 a typed request's Approve in the security check reads the live details as part of the press",
         "classification": "assertion",
-        "detail": "DE3 a typed request's Approve in the security check reads the live details as part of the press:  AssertionError: the security check allows nothing on unavailable details: expected [ { pendingId: 'typed-check', …(1) } ] to deeply equal []\n    at /home/elias/.cache/am/u635vwnv/tmp/test-intent-before-UmnZ8E/modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts:517:76"
+        "detail": "DE3 a typed request's Approve in the security check reads the live details as part of the press:  AssertionError: the security check allows nothing on unavailable details: expected [ { pendingId: 'typed-check', …(1) } ] to deeply equal []\n    at /home/elias/.cache/am/8fl_qenw/tmp/test-intent-before-50lGRq/modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts:522:76"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#C12 a native double-click on the first row's Allow answers only the first request",
         "classification": "assertion",
-        "detail": "C12 a native double-click on the first row's Allow answers only the first request:  AssertionError: expected [ 'first', 'second' ] to deeply equal [ 'first' ]\n    at /home/elias/.cache/am/u635vwnv/tmp/test-intent-before-UmnZ8E/modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts:540:44\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-"
+        "detail": "C12 a native double-click on the first row's Allow answers only the first request:  AssertionError: expected [ 'first', 'second' ] to deeply equal [ 'first' ]\n    at /home/elias/.cache/am/8fl_qenw/tmp/test-intent-before-50lGRq/modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts:545:44\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#C12 a click where the next row moved in answers nothing; a fresh click after the delay answers it once",
         "classification": "assertion",
-        "detail": "C12 a click where the next row moved in answers nothing; a fresh click after the delay answers it once:  AssertionError: expected [ 'first', 'second' ] to deeply equal [ 'first' ]\n    at /home/elias/.cache/am/u635vwnv/tmp/test-intent-before-UmnZ8E/modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts:556:44\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-"
+        "detail": "C12 a click where the next row moved in answers nothing; a fresh click after the delay answers it once:  AssertionError: expected [ 'first', 'second' ] to deeply equal [ 'first' ]\n    at /home/elias/.cache/am/8fl_qenw/tmp/test-intent-before-50lGRq/modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts:561:44\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-"
       }
     ]
   },
-  "digest": "sha256:192a4a7169c6a59413dd5813a5a2cf0fe02bfd4ed2ffc53741e12038315f95ac"
+  "digest": "sha256:53c64260003cccaad41f927ae9a14d54b323f68c6e1e571e5cc9db4ab2403692"
 }

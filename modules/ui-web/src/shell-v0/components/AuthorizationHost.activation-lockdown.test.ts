@@ -22,7 +22,7 @@ declare global {
     consentState(): ConsentState;
     requestApproval(id: string, typed: boolean): void;
     requestAgent(id: string, typed: boolean): void;
-    requestLiveAgent(id: string, typed: boolean): void;
+    requestLiveAgent(id: string, typed: boolean, cancellable?: boolean): void;
     answers: Record<string, boolean>;
   }
 }
@@ -69,14 +69,15 @@ beforeAll(async () => {
             };
             // An outside agent's request as the pending bridge presents it: its live details are read
             // from the engine's pending store, and an approval is sent over HTTP.
-            window.requestLiveAgent = (id, typed) => {
+            // \`cancellable\`: a Deny is sent to the engine's reject route first, as the bridge does.
+            window.requestLiveAgent = (id, typed, cancellable) => {
               void requestAuthorization({ pendingId: id, operationId: 'core.' + id, gateBehavior: typed ? 'TYPED_CONFIRM' : 'INLINE_CONFIRM',
                 riskTier: typed ? 'HIGH' : 'MEDIUM', requestedBy: 'Claude Desktop', argsSummary: '/home/me/' + id,
-                arrival: 'needs-you', live: true,
+                arrival: 'needs-you', live: true, ...(cancellable ? { reject: () => client.rejectPending(id) } : {}),
                 refresh: async () => {
                   const fresh = await client.peekPending(id);
                   return fresh && { operationId: fresh.operationId, gateBehavior: fresh.gateBehavior, riskTier: fresh.riskTier,
-                    argsSummary: fresh.argsSummary };
+                    argsSummary: fresh.argsSummary, requestedBy: fresh.requestedBy };
                 } })
                 .then(decision => { window.answers[id] = decision.approved;
                   return decision.approved ? client.approveByPendingId(id, decision.allowAlways) : null; });
@@ -424,19 +425,23 @@ it.each(looks)('X1/X2 the panel review in %s at %s×%s fits without sideways ove
   if (process.env.REVIEW_SHOTS) await page.screenshot({ path: path.join(process.env.REVIEW_SHOTS, `review-${look}-${width}x${height}.png`) });
 }, 30_000);
 
-/** How the engine's pending store answers a live-details read: its details, a failure, or a slow failure. */
-type Pending = 'same' | 'changed' | 503 | 'slow-503';
+/**
+ * How the engine's pending store answers a live-details read: its details, a failure, a slow failure,
+ * its details slowly, or a given body.
+ */
+type Pending = 'same' | 'changed' | 503 | 'slow-503' | 'slow-same' | { body: unknown };
 async function pendingStore(page: Page, answers: Record<string, Pending>): Promise<string[]> {
   const reads: string[] = [];
   await page.route('**/api/authorizations/pending/*', async route => {
     const id = decodeURIComponent(new URL(route.request().url()).pathname.split('/').pop()!);
     reads.push(id);
     const answer = answers[id] ?? 'same';
-    if (answer === 'slow-503') await new Promise(resolve => setTimeout(resolve, 1_500));
+    if (typeof answer === 'object') return route.fulfill({ json: answer.body });
+    if (answer === 'slow-503' || answer === 'slow-same') await new Promise(resolve => setTimeout(resolve, 1_500));
     if (answer === 503 || answer === 'slow-503') return route.fulfill({ status: 503, json: {} });
     const typed = id.startsWith('typed');
     return route.fulfill({ json: { pendingId: id, operationId: 'core.' + id, gateBehavior: typed ? 'TYPED_CONFIRM' : 'INLINE_CONFIRM',
-      riskTier: typed ? 'HIGH' : 'MEDIUM', argsSummary: answer === 'changed' ? '/home/me' : '/home/me/' + id } });
+      riskTier: typed ? 'HIGH' : 'MEDIUM', argsSummary: answer === 'changed' ? '/home/me' : '/home/me/' + id, requestedBy: 'Claude Desktop' } });
   });
   return reads;
 }
@@ -572,3 +577,76 @@ it("C12 Enter held on the first row's Allow answers at most one request", async 
   expect(sent.length).toBeLessThanOrEqual(1);
   expect(await panelRow(page, 'second').count(), 'the second request still waits').toBe(1);
 });
+
+/** The engine's reject route: every Deny it receives, answered with `status` (503 refuses it). */
+async function rejections(page: Page, status: { code: number }): Promise<string[]> {
+  const received: string[] = [];
+  await page.route('**/api/authorizations/reject', route => {
+    received.push((route.request().postDataJSON() as { pendingId: string }).pendingId);
+    return status.code === 200 ? route.fulfill({ json: { rejected: true } }) : route.fulfill({ status: status.code, json: {} });
+  });
+  return received;
+}
+
+it.each([
+  ['an empty body', {}],
+  ['no operation', { pendingId: 'bad', argsSummary: '/home/me/bad', requestedBy: 'Claude Desktop' }],
+  ['no arguments', { pendingId: 'bad', operationId: 'core.bad', requestedBy: 'Claude Desktop' }],
+  ['no requester', { pendingId: 'bad', operationId: 'core.bad', argsSummary: '/home/me/bad' }],
+  ['a malformed operation', { pendingId: 'bad', operationId: 7, argsSummary: '/home/me/bad', requestedBy: 'Claude Desktop' }],
+  ['a null body', null],
+] as const)('DE3 a live-details read answering 200 with %s allows nothing and the request stays answerable', async (_, body) => {
+  const page = await opened();
+  const sent = await approvals(page);
+  const answers: Record<string, Pending> = { bad: { body } };
+  await pendingStore(page, answers);
+  await page.evaluate(() => window.requestLiveAgent('bad', false));
+  await openList(page);
+  await page.waitForTimeout(600);
+  const allow = panelRow(page, 'bad').getByRole('button', { name: 'Allow', exact: true });
+  await allow.click();
+  await page.waitForTimeout(600);
+  expect(sent, 'nothing is allowed on details that are not all there').toEqual([]);
+  expect(await page.evaluate(() => window.answers)).toEqual({});
+  expect((await panelRow(page, 'bad').getByRole('alert').allTextContents()).join(''), 'and the request stays listed, saying why')
+    .toContain('details are unavailable');
+  answers.bad = 'same';
+  // The message moved the row's controls: a fresh press after the arming delay.
+  await page.waitForTimeout(450);
+  await allow.click();
+  await expect.poll(() => sent.map(request => request.pendingId), { message: 'still answerable' }).toEqual(['bad']);
+}, 30_000);
+
+it('C12 a Deny pressed 100 ms after an Allow whose read is slow abandons that Allow: the failed Deny leaves nothing sent', async () => {
+  const page = await opened();
+  const sent = await approvals(page);
+  const answers: Record<string, Pending> = { race: 'same' };
+  const reads = await pendingStore(page, answers);
+  const status = { code: 503 };
+  const denied = await rejections(page, status);
+  await page.evaluate(() => window.requestLiveAgent('race', false, true));
+  await openList(page);
+  await panelRow(page, 'race').getByRole('button', { name: 'Review' }).click();
+  const review = page.locator('jf-status-pill jf-status-panel [data-testid="status-review"]');
+  await review.waitFor();
+  await expect.poll(() => reads.length).toBeGreaterThanOrEqual(1);
+  await page.waitForTimeout(600);
+  answers.race = 'slow-same';
+  const before = reads.length;
+  await review.locator('[data-answer="allow"]').click();
+  await expect.poll(() => reads.length, { message: 'the Allow reads the details' }).toBeGreaterThan(before);
+  await page.waitForTimeout(100);
+  await review.locator('[data-answer="deny"]').click();
+  await expect.poll(() => denied).toEqual(['race']);
+  await expect.poll(() => review.getByRole('alert').textContent()).toContain('could not be cancelled');
+  // The Allow's slow read has come back by now.
+  await page.waitForTimeout(1_900);
+  expect(sent, 'an Allow abandoned by a later Deny never sends').toEqual([]);
+  expect(await page.evaluate(() => window.answers)).toEqual({});
+  expect(await review.getByRole('alert').textContent()).toContain('could not be cancelled');
+  status.code = 200;
+  await review.locator('[data-answer="deny"]').click();
+  await expect.poll(() => page.evaluate(() => window.answers), { message: 'the last press decides' }).toEqual({ race: false });
+  expect(denied).toEqual(['race', 'race']);
+  expect(sent).toEqual([]);
+}, 30_000);
