@@ -4415,6 +4415,7 @@ public final class WorkerIngestService {
       throw new WorkerServiceException(WorkerServiceException.Status.CANCELLED, "Generation capture cancelled");
     }
     if (!awaitRecordedGenerationBeforeTraversal(recorded, ctx)) return;
+    jobQueue.allowsIngestionBoundary(JobQueue.IngestionBoundary.TRAVERSAL, recorded.operationKey(), null);
     scanRoot(recorded.request(), sink, ctx, recorded);
   }
 

@@ -233,6 +233,9 @@ final class WorkerScanOps {
         new SimpleFileVisitor<Path>() {
           @Override
           public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+            if (request.recordedEpoch() != null) {
+              jobQueue.allowsIngestionBoundary(JobQueue.IngestionBoundary.TRAVERSAL, request.scanId(), null);
+            }
             if (request.singleFile()) throw new IOException("Recorded file changed kind during enumeration");
             // Review S5. Before this, the ONLY cancel poll in the whole walk was inside the
             // batch-flush branch below — so a scan only noticed a cancel once it had admitted a
@@ -303,6 +306,9 @@ final class WorkerScanOps {
                 return FileVisitResult.CONTINUE;
               }
               // 813 Slice B: the walk already holds the size — no extra stat.
+              if (request.captureMode() == WorkerIngestService.RecordedScanMode.CAPTURED) {
+                jobQueue.allowsIngestionBoundary(JobQueue.IngestionBoundary.HASHING, request.scanId(), null);
+              }
               String sourceHash = request.captureMode() == WorkerIngestService.RecordedScanMode.CAPTURED
                   ? io.justsearch.indexerworker.loop.SourceContentHash.sha256WithinRoot(file, root) : null;
               batch.add(new JobQueue.EnqueueEntry(file, attrs.size(), request.provenance(), sourceHash)

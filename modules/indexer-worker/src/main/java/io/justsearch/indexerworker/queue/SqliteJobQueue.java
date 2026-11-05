@@ -284,7 +284,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   public int enqueueRecordedEntries(String operationKey, long epoch,
       List<EnqueueEntry> entries, String collection) {
     if (!hasSufficientDiskSpace()) throw new IllegalStateException("Recorded queue admission is unavailable");
-    var sources = observeAdmissionSources(entries);
+    var sources = observeAdmissionSources(entries, operationKey);
     return accessRecordedWalk(() -> SqliteIngestionWalkOps.enqueueRecorded(
         connection, operationKey, epoch, entries, collection, System.currentTimeMillis(), sources), true);
   }
@@ -309,7 +309,10 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     List<EnqueueEntry> witnessedEntries = new ArrayList<>(entries.size());
     try {
       for (EnqueueEntry entry : entries) {
-        if (entry.plannedSourceSha256() == null) requireSourceAccess(entry);
+        if (entry.plannedSourceSha256() == null) {
+          allowsIngestionBoundary(IngestionBoundary.HASHING, operationKey, null);
+          requireSourceAccess(entry);
+        }
         String hash = entry.plannedSourceSha256() == null
             ? io.justsearch.indexerworker.loop.SourceContentHash.sha256WithinRoot(entry.path(), entry.ingestionRoot())
             : entry.plannedSourceSha256();
@@ -594,6 +597,29 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     }
   }
 
+  private volatile java.util.function.Supplier<Set<String>> retainedWalks = Set::of;
+
+  @Override
+  public void useRecordedWalkRetention(java.util.function.Supplier<Set<String>> retained) {
+    retainedWalks = Objects.requireNonNull(retained);
+  }
+
+  @Override
+  public java.util.Optional<io.justsearch.app.api.indexing.SourceOrigin> sourceOrigin(String id) {
+    return accessRecordedWalk(() -> SqliteSourceOrigins.load(connection, id), false);
+  }
+
+  private void installRetentionFence(Set<String> retained) throws SQLException {
+    org.sqlite.Function.create(connection, "import_child_retained", new org.sqlite.Function() {
+      @Override protected void xFunc() throws SQLException {
+        String key = value_text(0);
+        result(key != null && retained.contains(key) ? 1 : 0);
+      }
+    });
+  }
+
+  private java.time.Clock retentionClock = java.time.Clock.systemUTC();
+
   private volatile java.util.function.UnaryOperator<String> sourceOriginOperation = key -> key;
   private volatile java.util.function.Supplier<List<IngestCollectionPolicy.RootBinding>> sourceOriginRoots;
 
@@ -767,6 +793,13 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   /** Recorded membership is fenced from open; the supplied authority is checked per unit claim. */
   public SqliteJobQueue(Path dbPath, java.util.function.Function<String, RecordedClaimDecision> recordedClaimPolicy) {
     this(dbPath, recordedClaimPolicy, DEFAULT_MAX_ATTEMPTS, null);
+  }
+
+  /** Deterministic retention ageing without changing admission timestamps or retry policy. */
+  public SqliteJobQueue(Path dbPath, java.util.function.Function<String, RecordedClaimDecision> recordedClaimPolicy,
+      java.time.Clock retentionClock) {
+    this(dbPath, recordedClaimPolicy);
+    this.retentionClock = Objects.requireNonNull(retentionClock, "retentionClock");
   }
 
   /**
@@ -2638,7 +2671,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
     var declared = !exactCollection && unitRevision == null && (collection == null || collection.isBlank())
         ? declaredCollectionRoots.get() : List.<IngestCollectionPolicy.RootBinding>of();
-    var sources = unitRevision == null ? observeAdmissionSources(entries) : Map.<JobQueue.EnqueueEntry, AdmissionSource>of();
+    var sources = unitRevision == null ? observeAdmissionSources(entries, null) : Map.<JobQueue.EnqueueEntry, AdmissionSource>of();
     lockTimed();
     try {
       ensureOpen();
@@ -2901,7 +2934,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     if (!hasSufficientDiskSpace()) throw new IllegalStateException("Insufficient sync disk space");
     var declared = collection == null || collection.isBlank()
         ? declaredCollectionRoots.get() : List.<IngestCollectionPolicy.RootBinding>of();
-    var sources = observeAdmissionSources(entries);
+    var sources = observeAdmissionSources(entries, null);
     lockTimed();
     try {
       ensureOpen();
@@ -3029,7 +3062,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                 && Objects.equals(PathNormalizer.normalizeKey(Path.of(intent.scope().prefix())),
                     PathNormalizer.normalizeKey(entry.ingestionRoot()));
             // Replay already observed its correction witness; never spend a second source read.
-            var observation = !replay && withinIntent ? observeAdmissionSource(entry) : null;
+            var observation = !replay && withinIntent ? observeAdmissionSource(entry, null) : null;
             var sources = observation == null ? Map.<JobQueue.EnqueueEntry,AdmissionSource>of() : Map.of(entry,observation);
             if (maintenance && withinIntent && preservesRetirementMaintenanceWork(entry, effective, true,
                 observation, orders, deletes)) {covered++;continue;}
@@ -3216,12 +3249,13 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     }
   }
 
-  private AdmissionSource observeAdmissionSource(JobQueue.EnqueueEntry entry) {
+  private AdmissionSource observeAdmissionSource(JobQueue.EnqueueEntry entry, String operationKey) {
     if (entry == null || entry.path() == null || entry.plannedSourceSha256() != null) return null;
     try {
       requireSourceAccess(entry);
       var before = io.justsearch.indexerworker.loop.FileFreshnessSnapshot.capture(entry.path());
       if (!before.regularFile()) return null;
+      allowsIngestionBoundary(IngestionBoundary.HASHING, operationKey, null);
       String hash = io.justsearch.indexerworker.loop.SourceContentHash.admissionIdentity(
           entry.path(), entry.ingestionRoot());
       if (hash == null) return null;
@@ -3233,10 +3267,10 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   }
 
   private Map<JobQueue.EnqueueEntry, AdmissionSource> observeAdmissionSources(
-      List<JobQueue.EnqueueEntry> entries) {
+      List<JobQueue.EnqueueEntry> entries, String operationKey) {
     Map<JobQueue.EnqueueEntry, AdmissionSource> sources = new HashMap<>();
     for (var entry : entries) {
-      var source = observeAdmissionSource(entry);
+      var source = observeAdmissionSource(entry, operationKey);
       if (source != null) sources.put(entry, source);
     }
     return sources;
@@ -3490,6 +3524,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         }
         String observedHash = null;
         try {
+          allowsIngestionBoundary(IngestionBoundary.HASHING, scanId, null);
           observedHash = entry.plannedSourceSha256() == null
               ? io.justsearch.indexerworker.loop.SourceContentHash.sha256WithinRoot(sourcePath, sourceRoot)
               : io.justsearch.indexerworker.loop.SourceContentHash.admissionIdentity(entry.path(), entry.ingestionRoot());
@@ -4452,7 +4487,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       log.warn("Refusing to re-enqueue {}: insufficient free disk space", entry.path());
       return new JobQueue.ReenqueueResult(0, null);
     }
-    var source = observeAdmissionSource(entry);
+    var source = observeAdmissionSource(entry, null);
     lockTimed();
     try {
       ensureOpen();
@@ -6225,9 +6260,11 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
    */
   @Override
   public int cleanupOldJobs(int retentionDays) {
+    var retainedImports = Set.copyOf(retainedWalks.get());
     lock.lock();
     try {
       ensureOpen();
+      installRetentionFence(retainedImports);
 
       var retained = retainedRootScopes(retirementReplayOps());
       var retainedDeletes = releaseRecovery != null && releaseRecovery.retiringBuild()
@@ -6238,12 +6275,13 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
               || latestDelete(retainedDeletes,value_text(0),value_text(2)) > 0 ? 1 : 0);
         }
       });
-      long cutoff = System.currentTimeMillis() - (retentionDays * 24L * 60L * 60L * 1000L);
+      long cutoff = retentionClock.millis() - (retentionDays * 24L * 60L * 60L * 1000L);
 
       // Original exact receipts still settle native replay or authorize FAILED recovery.
       // Release them only after the recovery checkpoint is conclusively gone.
       String jobsWhere = """
           state IN ('DONE', 'FAILED', 'RETRY_EXHAUSTED') AND last_updated < ?
+            AND import_child_retained(scan_id)=0
             AND (walk_seen_epoch IS NULL OR EXISTS (SELECT 1 FROM ingestion_walk_progress p
               WHERE p.operation_key = jobs.scan_id AND p.sealed_at IS NOT NULL AND p.acknowledged_revision = p.revision))
           """ + " AND release_root_retained(path,unit_revision,collection)=0" + (Files.notExists(Release030RecoveryState.path(dbPath), LinkOption.NOFOLLOW_LINKS)
@@ -6275,11 +6313,13 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
   @Override
   public int cleanupOldLedgerEvents(int retentionDays) {
+    var retainedImports = Set.copyOf(retainedWalks.get());
     lock.lock();
     try {
       ensureOpen();
-      long cutoff = System.currentTimeMillis() - (retentionDays * 24L * 60L * 60L * 1000L);
-      String ledgerWhere = "observed_at < ? AND "
+      installRetentionFence(retainedImports);
+      long cutoff = retentionClock.millis() - (retentionDays * 24L * 60L * 60L * 1000L);
+      String ledgerWhere = "observed_at < ? AND import_child_retained(operation_key)=0 AND "
           + "(operation_key IS NULL OR EXISTS (SELECT 1 FROM ingestion_walk_progress p "
           + "WHERE p.operation_key = ingestion_ledger.operation_key AND p.sealed_at IS NOT NULL "
           + "AND p.acknowledged_revision = p.revision))"
@@ -6319,7 +6359,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   }
 
   private void pruneAcknowledgedWalks(long cutoff) throws SQLException {
-    String pruneWhere = "sealed_at < ? AND acknowledged_revision = revision "
+    String pruneWhere = "sealed_at < ? AND acknowledged_revision = revision AND import_child_retained(operation_key)=0 "
         + "AND NOT EXISTS (SELECT 1 FROM jobs WHERE jobs.scan_id = ingestion_walk_progress.operation_key) "
         + "AND NOT EXISTS (SELECT 1 FROM ingestion_ledger WHERE ingestion_ledger.operation_key = ingestion_walk_progress.operation_key)";
     validateRetentionCandidates("SELECT operation_key FROM ingestion_walk_progress WHERE " + pruneWhere, cutoff);
@@ -6890,7 +6930,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   public boolean enqueueReappearedFile(JobQueue.EnqueueEntry entry, String collection) {
     var declared = collection == null || collection.isBlank()
         ? declaredCollectionRoots.get() : List.<IngestCollectionPolicy.RootBinding>of();
-    var sources = observeAdmissionSources(List.of(entry));
+    var sources = observeAdmissionSources(List.of(entry), null);
     lock.lock();
     try {
       ensureOpen();
