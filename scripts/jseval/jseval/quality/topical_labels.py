@@ -1,7 +1,7 @@
 """Labels for the real-use collection's topical queries (P5c): pool, excerpt, judge, sample,
-second judge, spot check, accept, freeze.
+second judge, accept, freeze.
 
-Topical queries ask for all files about a topic. The judge question and the owner's sheet ask:
+Topical queries ask for all files about a topic. The judge question asks:
 "Would a person running this search want this file among the results?" Grades 0-3 (0 unrelated,
 1 touches the topic but not wanted, 2 wanted, 3 clearly central); the frozen labels are binary at
 the fixed cutoff grade >= 2, judged zeros kept, raw grades kept as audit data.
@@ -14,27 +14,26 @@ the fixed cutoff grade >= 2, judged zeros kept, raw grades kept as audit data.
                   written from (capped at 10). Runs inside the core's exclusive window.
 ``excerpts``      a configuration-neutral excerpt per pooled pair from the pooled index's
                   extracted text: name, first ~600 characters, the two non-overlapping
-                  ~600-character windows with the highest query-term overlap. Judges and owner see
+                  ~600-character windows with the highest query-term overlap. Both judges see
                   exactly this text.
 ``judge``         the primary judge: ``claude -p`` on the Claude subscription (``claude-opus-5-5``),
                   up to 5 documents per call in randomized order; per-pair checkpoints bound to
                   their identity; pausable.
 ``project``       calls and wall time still to go, from the recorded calls.
-``sample``        the fixed, seeded 150-pair agreement sample (no sheet: no owner grades it).
+``sample``        the fixed, seeded 150-pair agreement sample for the second judge.
 ``second-judge``  an independent judge of another model family, ``gpt-6.1-sol`` through
                   ``codex exec`` on the ChatGPT subscription, grades exactly the sample's pairs
                   with the same rubric, excerpts and batching. Each run uses a fresh CODEX_HOME
                   holding only the tool's config and a copy of the ChatGPT login, verified to
                   expose no tool and no MCP server before the first call.
-``spot``          the owner's 5-pair spot check, drawn from the judges' disagreements by a
-                  recorded seed, as a plain-text sheet without grades.
 ``accept``        the decision (rule fixed below, before any grade): the judges agree on the binary
-                  label for >= 80% of the 150 pairs, and the owner does not side against the
-                  primary judge on 4 or 5 of the 5 spot pairs. Recorded once per revision.
+                  label for >= 80% of the 150 pairs, unrounded. Recorded once per revision.
 ``freeze``        canonical binary qrels through the collection writer, after a passing decision
                   of the latest decided revision.
 
-Limit (named): labels are agreement on the excerpt; an answer outside it can be missed. No
+Limit (named): no human checked the labels. They are model-graded and cross-checked on a sample
+by a second model family, which may share blind spots. Labels are agreement on the excerpt;
+an answer outside it can be missed. No
 German compound-splitting rule exists in this codebase, so query terms match whole tokens of the
 existing tokenizer (``duplicate_prevalence.tokenize_near_duplicate``).
 """
@@ -88,18 +87,13 @@ SEED = 20261105
 CUTOFF = 2  # binary label: relevant when grade >= CUTOFF
 NO_RELEVANT = "no relevant document in pool"
 
-# Agreement sample, second judge and spot check, fixed before anyone sees a grade (design 5-6).
+# Agreement sample and second judge, fixed before anyone sees a grade (design 5-6).
 SAMPLE_SIZE = 150
 PER_QUERY = 2
 BOUNDARY_MIN = 30  # pairs graded 1 or 2
 PASS_MARK = 0.80  # judges' binary agreement on the sample, unrounded
 MAX_REVISION = 1  # at most one rubric/prompt revision
 SECOND_MODEL = "gpt-6.1-sol"
-SPOT_SIZE = 5
-SPOT_QUOTA = 2  # at least this many of each disagreement direction, and of German queries
-SPOT_AGAINST_FAIL = 4  # owner against the primary judge on this many spot pairs: FAIL
-ANSWERS = ("yes", "no", "unsure")
-QUESTION = "Would you want this file among the results for this search?"
 
 PIPELINES = ("keyword", "dense", "hybrid")
 DENSE_PIPELINE = {"sparseEnabled": False, "denseEnabled": True, "spladeEnabled": False,
@@ -1068,7 +1062,7 @@ def projection(c: Collection | None = None, concurrency: tuple[int, ...] = (1, 4
     return out
 
 
-# --------------------------------------------------------------------------- sample and sheet
+# --------------------------------------------------------------------------- sample
 
 
 def population(c: Collection, pools: dict, done: dict) -> list[dict]:
@@ -1154,68 +1148,10 @@ def _check_sample_halves(pairs: list[dict]) -> None:
                          f"{SAMPLE_SIZE // 2} relevant and {SAMPLE_SIZE // 2} not-relevant")
 
 
-def sheet_header(name: str, n: int) -> str:
-    return (f"Search-result sheet {name}: {n} pairs.\n"
-            "For each block, read the search and the file excerpt (text from the file, shown as data),\n"
-            f"then write yes, no or unsure after \"Answer:\". Question: {QUESTION}\n"
-            "Edit only the Answer lines; do not change, move or delete anything else.\n")
-
-
-def render_block(pid: str, query: str, excerpt_text: str, answer: str = "") -> str:
-    return (f"=== {pid} ===\nSearch: {' '.join(query.split())}\n"
-            f"File excerpt:\n{excerpt_text}\n{QUESTION}\nAnswer: {answer}".rstrip() + f"\n=== end {pid} ===\n")
-
-
-def render_sheet(name: str, pairs: list[dict], c: Collection, ex: dict) -> str:
-    return sheet_header(name, len(pairs)) + "".join(
-        "\n" + render_block(p["id"], c.queries[p["qid"]].text, ex[p["qid"]][p["doc"]]["excerpt"])
-        for p in pairs)
-
-
-BLOCK = re.compile(r"^=== (\S+) ===\n.*?^=== end \1 ===(?:\n|\Z)", re.M | re.S)
-
-
-def parse_sheet(text: str, name: str, pairs: list[dict], c: Collection, ex: dict) -> dict:
-    """``{"answers": {id: yes|no|unsure}, "unanswered": [ids]}``; refuses missing, duplicate,
-    unknown or altered blocks, answers outside yes/no/unsure and changed text outside blocks."""
-    text = text.replace("\r\n", "\n")
-    by_id = {p["id"]: p for p in pairs}
-    found = list(BLOCK.finditer(text))
-    ids = [m.group(1) for m in found]
-    if dup := sorted({i for i in ids if ids.count(i) > 1}):
-        raise LabelError(f"duplicate blocks: {', '.join(dup)}")
-    if unknown := sorted(set(ids) - set(by_id)):
-        raise LabelError(f"unknown or altered block ids: {', '.join(unknown)}")
-    if missing := sorted(set(by_id) - set(ids)):
-        raise LabelError(f"missing blocks: {', '.join(missing)}")
-    answers, unanswered = {}, []
-    for m in found:
-        pid = m.group(1)
-        lines = m.group(0).rstrip("\n").split("\n")
-        at = [i for i, line in enumerate(lines) if line.startswith("Answer:")]
-        if len(at) != 1:
-            raise LabelError(f"altered block {pid}: expected one Answer line")
-        answer = lines[at[0]][len("Answer:"):].strip().lower()
-        lines[at[0]] = "Answer:"
-        p = by_id[pid]
-        if "\n".join(lines) + "\n" != render_block(pid, c.queries[p["qid"]].text,
-                                                    ex[p["qid"]][p["doc"]]["excerpt"]):
-            raise LabelError(f"altered block {pid}: only its Answer line may change")
-        if not answer:
-            unanswered.append(pid)
-        elif answer not in ANSWERS:
-            raise LabelError(f"block {pid}: answer must be yes, no or unsure")
-        else:
-            answers[pid] = answer
-    if BLOCK.sub("", text).split() != BLOCK.sub("", render_sheet(name, pairs, c, ex)).split():
-        raise LabelError("text outside the blocks was changed")
-    return {"answers": answers, "unanswered": sorted(unanswered)}
-
-
-def _sample_path(revision: int, kind: str = "b1") -> Path:
-    """``b1`` the agreement sample (the name of the drawn first batch), ``spot`` the spot check."""
+def _sample_path(revision: int) -> Path:
+    """``b1`` is the agreement sample (the name of the drawn first batch)."""
     _check_revision(revision)
-    return WORK / "samples" / f"r{revision}-{kind}.json"
+    return WORK / "samples" / f"r{revision}-b1.json"
 
 
 def labels_sha256(done: dict) -> str:
@@ -1259,7 +1195,7 @@ def load_sample(revision: int, done: dict) -> dict:
     return record
 
 
-# --------------------------------------------------------------------------- second judge and spot check
+# --------------------------------------------------------------------------- second judge
 
 
 def paired(pairs: list[dict], second: dict) -> list[dict]:
@@ -1277,61 +1213,8 @@ def judge_agreement(rows: list[dict]) -> dict:
             "pass_mark": PASS_MARK}
 
 
-def _spot_type(r: dict) -> tuple[str, str]:
-    if r["label"] == r["second_label"]:
-        return "agree", r["lang"]
-    return ("primary_only" if r["label"] else "second_only"), r["lang"]
-
-
-def _spot_score(types: Counter) -> int:
-    """Quota points: up to ``SPOT_QUOTA`` each for both disagreement directions and German."""
-    return sum(min(SPOT_QUOTA, sum(v for t, v in types.items() if test(t))) for test in (
-        lambda t: t[0] == "primary_only", lambda t: t[0] == "second_only", lambda t: t[1] == "de"))
-
-
-def _best_score(have: Counter, avail: Counter, slots: int) -> int:
-    """The best quota score reachable by adding ``slots`` pairs of the available types."""
-    types = sorted(avail)
-
-    def best(i: int, left: int, got: Counter) -> int:
-        if i == len(types):
-            return _spot_score(got) if left == 0 else -1
-        return max(best(i + 1, left - x, got + Counter({types[i]: x}))
-                   for x in range(min(avail[types[i]], left) + 1))
-    return best(0, slots, have)
-
-
-def select_spot(rows: list[dict], seed: str) -> list[dict]:
-    """The owner's ``SPOT_SIZE`` spot pairs, deterministic from ``seed`` and independent of input
-    order: disagreements first, at least ``SPOT_QUOTA`` the primary calls relevant and the second
-    not, ``SPOT_QUOTA`` the other way, and ``SPOT_QUOTA`` German queries (each where available);
-    with fewer than ``SPOT_SIZE`` disagreements, all of them plus primary grade-1/2 boundary
-    pairs. Within the quotas, pairs come in seeded random order."""
-    order = sorted(rows, key=lambda r: (r["qid"], r["doc"]))
-    rng = random.Random(seed)
-    rng.shuffle(order)
-    disagree = [r for r in order if r["label"] != r["second_label"]]
-    if len(disagree) >= SPOT_SIZE:
-        chosen, pool = [], disagree
-    else:
-        chosen = disagree
-        pool = [r for r in order if r["label"] == r["second_label"] and r["grade"] in (1, 2)]
-    if len(chosen) + len(pool) < SPOT_SIZE:
-        raise LabelError(f"fewer than {SPOT_SIZE} disagreement or boundary pairs for the spot check")
-    have = Counter(map(_spot_type, chosen))
-    target = _best_score(have, Counter(map(_spot_type, pool)), SPOT_SIZE - len(chosen))
-    for i, r in enumerate(pool):
-        if len(chosen) == SPOT_SIZE:
-            break
-        trial = have + Counter([_spot_type(r)])
-        if _best_score(trial, Counter(map(_spot_type, pool[i + 1:])), SPOT_SIZE - len(chosen) - 1) == target:
-            chosen, have = chosen + [r], trial
-    rng.shuffle(chosen)
-    return [{**r, "id": f"S{n}", "spot_type": "/".join(_spot_type(r))} for n, r in enumerate(chosen, 1)]
-
-
 def _state(revision: int):
-    """Everything a spot check or decision is bound to, verified."""
+    """Everything a decision is bound to, verified."""
     after = _revision_after(revision)
     c, _ = _collection()
     pools = load_pools(c)
@@ -1342,56 +1225,18 @@ def _state(revision: int):
     return c, pools, ex, done, record, second, paired(record["pairs"], second)
 
 
-def spot(revision: int = 0) -> int:
-    """Draws the owner's spot check once the second judge has graded every sample pair."""
-    _cleanup_codex_homes()
-    c, _, ex, done, record, second, rows = _state(revision)
-    path = _sample_path(revision, "spot")
-    if path.exists():
-        raise LabelError(f"{path.name} exists: a drawn spot check is fixed")
-    seed = f"{SEED}:{revision}:spot"
-    pairs = select_spot(rows, seed)
-    sheet = render_sheet(path.stem, pairs, c, ex)
-    agreement = judge_agreement(rows)
-    _write_json(path, {"name": path.stem, "seed": seed, "revision": revision, "sample": record["name"],
-                       "labels_sha256": labels_sha256(done), "second_sha256": labels_sha256(second),
-                       "agreement": agreement, "pairs": pairs, "sheet_sha256": sha256_text(sheet)})
-    sheet_path = path.with_suffix(".sheet.txt")
-    atomic_write_text(sheet_path, sheet)
-    print(canonical_json({"sheet": str(sheet_path), "pairs": len(pairs), "agreement": agreement,
-                          "owner_check_decides": agreement["agreement"] >= PASS_MARK}))
-    return 0
-
-
-def spot_result(pairs: list[dict], answers: dict[str, str]) -> dict:
-    """How often the owner sided against the primary judge (a yes/no answer unlike its label)."""
-    against = sum(1 for p in pairs if answers.get(p["id"]) in ("yes", "no")
-                  and (answers[p["id"]] == "yes") != (p["label"] == 1))
-    return {"pairs": len(pairs), "against_primary": against, "fail_at": SPOT_AGAINST_FAIL,
-            "answers": dict(sorted(Counter(answers.get(p["id"]) or "unanswered" for p in pairs).items())),
-            "by_type": dict(sorted(Counter(p["spot_type"] for p in pairs).items()))}
-
-
 # --------------------------------------------------------------------------- acceptance
 
 
-def decide(agreement: dict, spot_check: dict | None) -> dict:
+def decide(agreement: dict) -> dict:
     """The fixed rule (design 6): PASS when the judges agree on the binary label for at least
-    ``PASS_MARK`` of the sample pairs (unrounded) and the owner does not side against the primary
-    judge on ``SPOT_AGAINST_FAIL`` or more spot pairs; otherwise FAIL. Below the mark the spot
-    check is not needed."""
+    ``PASS_MARK`` of the sample pairs (unrounded); otherwise FAIL."""
     share = agreement["agreement"]
     if share is None or share < PASS_MARK:
         return {"outcome": "FAIL", "reason": f"judges agree on {agreement['agree']} of {agreement['pairs']} "
                                              f"pairs (< {PASS_MARK})"}
-    if spot_check is None:
-        raise LabelError("the judges agree; the owner's spot check decides next: run spot, answer its sheet")
-    if spot_check["against_primary"] >= SPOT_AGAINST_FAIL:
-        return {"outcome": "FAIL", "reason": f"the owner sided against the primary judge on "
-                                             f"{spot_check['against_primary']} of {spot_check['pairs']} spot pairs"}
     return {"outcome": "PASS", "reason": f"judges agree on {agreement['agree']} of {agreement['pairs']} pairs "
-                                         f"(>= {PASS_MARK}); owner against the primary judge on "
-                                         f"{spot_check['against_primary']} of {spot_check['pairs']} (information)"}
+                                         f"(>= {PASS_MARK})"}
 
 
 def agreement_report(rows: list[dict]) -> dict:
@@ -1401,7 +1246,7 @@ def agreement_report(rows: list[dict]) -> dict:
                         f"second_{'relevant' if r['second_label'] else 'not_relevant'}" for r in rows)
     split = Counter(f"{r['lang']}/grade_{r['grade']}" for r in rows if r["label"] != r["second_label"])
     return {"confusion": dict(sorted(confusion.items())), "disagreements": dict(sorted(split.items())),
-            "note": "information only; the decision is the judges' agreement and the owner's spot check"}
+            "note": "information only; the decision is the judges' agreement"}
 
 
 def _acceptance_path(revision: int) -> Path:
@@ -1422,33 +1267,22 @@ def _record_decision(revision: int, result: dict) -> None:
         os.unlink(tmp)
 
 
-def accept(revision: int = 0, sheet: Path | None = None) -> dict:
+def accept(revision: int = 0) -> dict:
     _cleanup_codex_homes()
     _check_revision(revision)
     if _acceptance_path(revision).exists():
         raise LabelError(f"revision {revision} is decided ({_acceptance_path(revision).name}); "
                          "a recorded decision is final")
-    c, _, ex, done, record, second, rows = _state(revision)
+    _, _, _, done, record, second, rows = _state(revision)
     agreement = judge_agreement(rows)
-    path = _sample_path(revision, "spot")
-    spot_check = None
-    if path.exists():
-        drawn = _json(path)
-        if drawn["labels_sha256"] != labels_sha256(done) or drawn["second_sha256"] != labels_sha256(second):
-            raise LabelError(f"{drawn['name']}: the judges' grades changed since the spot check was drawn")
-        text = (sheet or path.with_suffix(".sheet.txt")).read_text(encoding="utf-8")
-        parsed = parse_sheet(text, drawn["name"], drawn["pairs"], c, ex)
-        if parsed["unanswered"] and agreement["agreement"] >= PASS_MARK:
-            raise LabelError(f"answer every spot block (unanswered: {', '.join(parsed['unanswered'])})")
-        spot_check = spot_result(drawn["pairs"], parsed["answers"])
-    result = decide(agreement, spot_check)
+    result = decide(agreement)
     if result["outcome"] == "FAIL":
         result["next"] = ("revise the rubric/prompt once, re-label everything, draw a new sample and "
                           "judge it again with the second judge" if revision < MAX_REVISION
                           else "stop and report to the user")
     result.update(revision=revision, labels_sha256=labels_sha256(done), second_sha256=labels_sha256(second),
                   template_sha256=sha256_text(template()), at=time.time(), sample=record["name"],
-                  agreement=agreement, spot_check=spot_check, report=agreement_report(rows))
+                  agreement=agreement, report=agreement_report(rows))
     _record_decision(revision, result)
     return result
 
@@ -1511,8 +1345,8 @@ def freeze(revision: int = 0) -> int:
         "second_judge": {"model": SECOND_MODEL, "via": "codex exec (ChatGPT subscription)",
                          "sample": decision["sample"]},
         "agreement": decision["agreement"],
-        "spot_check": {**decision["spot_check"], "role": "information unless the owner sides against "
-                                                         f"the primary judge on {SPOT_AGAINST_FAIL} or more"},
+        "human_check": "No human checked the labels. They are model-graded and cross-checked on a sample "
+                       "by a second model family, which may share blind spots.",
         "excluded": raw["excluded"], "queries": audit})
     print(canonical_json(counts))
     return 0
@@ -1538,7 +1372,7 @@ def main(argv=None) -> int:
         p.add_argument("--revision", type=int, default=0)
         p.add_argument("--max-seconds", type=float, default=6 * 3600)
     steps.add_parser("project")
-    for name in ("sample", "spot", "accept", "freeze"):
+    for name in ("sample", "accept", "freeze"):
         steps.add_parser(name).add_argument("--revision", type=int, default=0)
     args = parser.parse_args(argv)
     try:
@@ -1560,11 +1394,9 @@ def main(argv=None) -> int:
             return 0
         if args.step == "sample":
             return sample(args.revision)
-        if args.step == "spot":
-            return spot(args.revision)
         if args.step == "accept":
             result = accept(args.revision)
-            print(canonical_json({k: result[k] for k in ("outcome", "reason", "agreement", "spot_check")}))
+            print(canonical_json({k: result[k] for k in ("outcome", "reason", "agreement")}))
             return 0
         return freeze(args.revision)
     except LabelError as e:
