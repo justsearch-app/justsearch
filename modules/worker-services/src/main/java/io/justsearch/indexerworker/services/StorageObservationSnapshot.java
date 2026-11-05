@@ -112,6 +112,7 @@ public final class StorageObservationSnapshot {
   public SourceEnvelope envelope(Path source, String originId) {
     validateForPublication();
     if (!observed) return new SourceEnvelope(originId, StorageStatus.NOT_OBSERVED, null, null);
+    if (source == null) return new SourceEnvelope(originId, StorageStatus.UNKNOWN, null, null);
     var mount = LinuxRootIdentityLease.selectMount(mounts, source.toAbsolutePath().normalize());
     String key = mount == null ? null : keys.get(mount);
     return key == null ? new SourceEnvelope(originId, StorageStatus.UNKNOWN, null, null)

@@ -11,6 +11,9 @@ import java.util.UUID;
 public record SourceEnvelope(String originId, StorageStatus storageStatus, String storageMount,
     String storageKey) {
   public static final String VERSION = "1";
+  public static final java.util.Set<String> FIELDS = java.util.Set.of(SchemaFields.ORIGIN_ID,
+      SchemaFields.STORAGE_STATUS, SchemaFields.STORAGE_MOUNT, SchemaFields.STORAGE_KEY,
+      SchemaFields.ENVELOPE_VERSION);
   public enum StorageStatus { KNOWN, UNKNOWN, NOT_OBSERVED }
 
   /** Missing/unsupported envelopes are legacy. Incomplete storage evidence cannot mean known. */
@@ -46,6 +49,30 @@ public record SourceEnvelope(String originId, StorageStatus storageStatus, Strin
       fields.put(SchemaFields.STORAGE_KEY, storageKey);
     }
     return Map.copyOf(fields);
+  }
+
+  /** Disagreement never upgrades either row's evidence. Legacy stays legacy. */
+  public static Optional<SourceEnvelope> restrictive(Optional<SourceEnvelope> left,
+      Optional<SourceEnvelope> right) {
+    if (left.isEmpty() || right.isEmpty()) return Optional.empty();
+    var a = left.orElseThrow();
+    var b = right.orElseThrow();
+    String origin = java.util.Objects.equals(a.originId, b.originId) ? a.originId : null;
+    boolean storage = a.storageStatus == b.storageStatus
+        && java.util.Objects.equals(a.storageMount, b.storageMount)
+        && java.util.Objects.equals(a.storageKey, b.storageKey);
+    return Optional.of(new SourceEnvelope(origin, storage ? a.storageStatus : StorageStatus.UNKNOWN,
+        storage ? a.storageMount : null, storage ? a.storageKey : null));
+  }
+
+  /** A replacement also clears evidence omitted by unknown/not-observed envelopes. */
+  public Map<String, Object> patch() {
+    var patch = new HashMap<String, Object>();
+    patch.put(SchemaFields.ORIGIN_ID, null);
+    patch.put(SchemaFields.STORAGE_MOUNT, null);
+    patch.put(SchemaFields.STORAGE_KEY, null);
+    patch.putAll(fields());
+    return patch;
   }
 
   private static boolean canonicalUuid(String id) {

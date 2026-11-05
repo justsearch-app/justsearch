@@ -31,6 +31,16 @@ public interface JobQueue extends Closeable {
   /** Existing durable declaration for this admission; absence never creates approval evidence. */
   default Optional<String> sourceOriginId(IndexJob claim) { return Optional.empty(); }
 
+  /** Current in-memory declarations and operation identity, supplied by their existing owners. */
+  default void useSourceOriginAuthority(java.util.function.UnaryOperator<String> operationOwner,
+      java.util.function.Supplier<List<io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding>> roots) {}
+
+  /** Destination owner: a containing watched declaration, the former import if still inside it,
+   * otherwise the exact destination file (no origin record). */
+  default Optional<String> movedSourceOriginId(Path destination, String formerOriginId) {
+    return Optional.empty();
+  }
+
   /** Declared ownership for hintless maintenance admissions; recorded plans remain authoritative. */
   default void useDeclaredCollectionRoots(
       java.util.function.Supplier<List<io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding>> roots) {}

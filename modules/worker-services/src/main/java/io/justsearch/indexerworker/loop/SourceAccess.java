@@ -11,8 +11,8 @@ import java.nio.file.attribute.BasicFileAttributes;
 public final class SourceAccess {
   private SourceAccess() {}
 
-  public static void requireSafeAncestors(Path file, Path root) throws IOException {
-    if (root == null) return;
+  public static Path requireSafeAncestors(Path file, Path root) throws IOException {
+    if (root == null) return null;
     Path source = file.toAbsolutePath().normalize();
     Path boundary = root.toAbsolutePath().normalize();
     if (!source.startsWith(boundary)) throw new IOException("Source is outside its ingestion boundary");
@@ -25,7 +25,7 @@ public final class SourceAccess {
       try {
         attrs = Files.readAttributes(current, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
       } catch (java.nio.file.NoSuchFileException absent) {
-        return;
+        return null;
       }
       if (current.equals(boundary) && attrs.isSymbolicLink()) {
         throw new IOException("Ingestion boundary is a symbolic link");
@@ -33,7 +33,7 @@ public final class SourceAccess {
       Path real = current.toRealPath();
       if (realRoot == null) realRoot = real;
       if (!real.startsWith(realRoot)) throw new IOException("Source ancestor escaped its ingestion boundary");
-      if (current.equals(parent)) return;
+      if (current.equals(parent)) return real;
       current = current.resolve(boundary.relativize(parent).getName(current.getNameCount() - boundary.getNameCount()));
     }
   }

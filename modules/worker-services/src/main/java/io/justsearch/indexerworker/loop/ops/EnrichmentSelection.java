@@ -2,6 +2,7 @@
 package io.justsearch.indexerworker.loop.ops;
 
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
+import io.justsearch.adapters.lucene.runtime.DocumentFieldOps.PendingDocumentKind;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -11,9 +12,11 @@ import java.util.Set;
 
 /** Scheduler-owned document-ID cursors. Deadline and text deferrals retain their suffix. */
 public final class EnrichmentSelection {
-  private final Map<String, String> cursors = new HashMap<>();
-  private final Map<String, DocumentFieldOps.PendingIdPage> pages = new HashMap<>();
-  private final Map<String, Set<String>> examined = new HashMap<>();
+  private record Lane(String stage, PendingDocumentKind kind) {}
+
+  private final Map<Lane, String> cursors = new HashMap<>();
+  private final Map<Lane, DocumentFieldOps.PendingIdPage> pages = new HashMap<>();
+  private final Map<Lane, Set<String>> examined = new HashMap<>();
 
   public void clear() {
     cursors.clear();
@@ -25,12 +28,15 @@ public final class EnrichmentSelection {
     examined.clear();
   }
 
-  private List<String> readPage(DocumentFieldOps fields, String stage, int limit, boolean excludeChunks)
+  private List<String> readPage(DocumentFieldOps fields, String stage, int limit, PendingDocumentKind kind)
       throws IOException {
-    if (pages.containsKey(stage)) throw new IllegalStateException("Stage already paged: " + stage);
-    var page = fields.queryPendingPage(stage, limit, excludeChunks, cursors.get(stage));
-    pages.put(stage, page);
-    if (page.ids().isEmpty()) cursors.remove(stage);
+    var lane = new Lane(stage, kind);
+    if (pages.containsKey(lane)) throw new IllegalStateException("Stage already paged: " + stage);
+    var page = kind == PendingDocumentKind.CHUNK
+        ? fields.queryPendingPage(stage, limit, kind, cursors.get(lane))
+        : fields.queryPendingPage(stage, limit, kind == PendingDocumentKind.PARENT, cursors.get(lane));
+    pages.put(lane, page);
+    if (page.ids().isEmpty()) cursors.remove(lane);
     return page.ids();
   }
 
@@ -47,14 +53,15 @@ public final class EnrichmentSelection {
       for (String id : page.ids()) {
         var input = inputs.get(id);
         if (excluded.contains(id) || (read.contains(id)
-            && (input == null || !"PENDING".equals(input.fields().get(stage))))) seen.add(id);
+            && (input == null || !"PENDING".equals(input.fields().get(stage.stage()))))) seen.add(id);
       }
     });
     advance();
   }
 
   void examined(String id, EnrichmentAccounting.Stage stage) {
-    examined.computeIfAbsent(stage.status, ignored -> new HashSet<>()).add(id);
+    pages.keySet().stream().filter(lane -> lane.stage().equals(stage.status))
+        .forEach(lane -> examined.computeIfAbsent(lane, ignored -> new HashSet<>()).add(id));
     advance();
   }
 
@@ -73,6 +80,12 @@ public final class EnrichmentSelection {
   static List<String> page(EnrichmentSelection selection, DocumentFieldOps fields,
       String stage, int limit, boolean excludeChunks) throws IOException {
     if (selection == null) return fields.queryPendingPage(stage, limit, excludeChunks, null).ids();
-    return selection.readPage(fields, stage, limit, excludeChunks);
+    return selection.readPage(fields, stage, limit, excludeChunks
+        ? PendingDocumentKind.PARENT : PendingDocumentKind.ALL);
+  }
+  static List<String> page(EnrichmentSelection selection, DocumentFieldOps fields,
+      String stage, int limit, PendingDocumentKind kind) throws IOException {
+    if (selection == null) return fields.queryPendingPage(stage, limit, kind, null).ids();
+    return selection.readPage(fields, stage, limit, kind);
   }
 }

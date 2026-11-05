@@ -2,7 +2,7 @@
 
 JSEVAL_QUALITY_RUN_REAL=1 enables the expensive check. JSEVAL_QUALITY_ENGINE_ROOT
 may select a clean shared before-clone, to exercise an unchanged engine while the
-runner itself is uncommitted. It must have its own prepared installDist receipt.
+runner itself is uncommitted. It must have its own snapshot (run quality prepare there).
 """
 import json
 import os
@@ -24,12 +24,14 @@ pytestmark = pytest.mark.skipif(os.environ.get('JSEVAL_QUALITY_RUN_REAL') != '1'
                                 reason='set JSEVAL_QUALITY_RUN_REAL=1 for isolated CPU acceptance')
 
 
-def test_real_cpu_baseline_check_errors_and_window(monkeypatch):
+def test_real_cpu_baseline_check_errors_and_window(monkeypatch, real_inputs):
     import ir_datasets
     from jseval._paths import shared_models_dir
     engine = Path(os.environ.get('JSEVAL_QUALITY_ENGINE_ROOT', index.REPO_ROOT))
     assert backend.source_identity(engine)[1] is None, 'real acceptance needs a clean engine checkout'
-    backend.require_prepared(engine)
+    # Its own snapshot, installed from exactly its sources (quality prepare installs one).
+    from jseval.quality import distribution
+    distribution.current(engine, list(backend.source_identity(engine)))
     # The clean checkout supplies engine binaries; exercise this harness's
     # admission implementation even when that checkout predates the new caps.
     bind_command = backend.bind_command

@@ -162,6 +162,50 @@ public final class DocumentFieldOps {
             SchemaFields.SPLADE_STATUS, SchemaFields.NER_STATUS, SchemaFields.VDU_STATUS).contains(field);
   }
 
+  /** Conservative source evidence from one reader, including a partially published family.
+   * Independently backed children and orphaned chunks retain their own evidence. */
+  public java.util.Optional<io.justsearch.indexing.SourceEnvelope> sourceEnvelope(String docId) throws IOException {
+    if (docId == null || docId.isBlank()) return java.util.Optional.empty();
+    return bridge.withSearcher(searcher -> {
+      var selected = searcher.search(new TermQuery(new Term(idField, docId)), 1);
+      if (selected.scoreDocs.length == 0) return java.util.Optional.empty();
+      var fields = new java.util.HashSet<String>(io.justsearch.indexing.SourceEnvelope.FIELDS);
+      fields.addAll(Set.of(idField, SchemaFields.PATH, SchemaFields.IS_CHUNK, SchemaFields.PARENT_DOC_ID));
+      var stored = searcher.storedFields();
+      var row = SearchResultFormatter.extractFromStoredFields(stored, selected.scoreDocs[0].doc, false, fields);
+      var evidence = io.justsearch.indexing.SourceEnvelope.decode(row);
+      String parent = "true".equals(row.get(SchemaFields.IS_CHUNK)) ? row.get(SchemaFields.PARENT_DOC_ID) : docId;
+      if (parent == null) return evidence;
+      var owner = searcher.search(new TermQuery(new Term(idField, parent)), 1);
+      if (owner.scoreDocs.length == 0) return evidence;
+      var ownerFields = SearchResultFormatter.extractFromStoredFields(stored, owner.scoreDocs[0].doc, false, fields);
+      String source = ownerFields.get(SchemaFields.PATH);
+      if (source == null || source.isBlank()) source = parent;
+      String ownPath = row.get(SchemaFields.PATH);
+      if (!parent.equals(docId) && ownPath != null && !ownPath.isBlank() && !ownPath.equals(source)) return evidence;
+      evidence = io.justsearch.indexing.SourceEnvelope.restrictive(evidence,
+          io.justsearch.indexing.SourceEnvelope.decode(ownerFields));
+      Query query = new BooleanQuery.Builder()
+          .add(new TermQuery(new Term(SchemaFields.PARENT_DOC_ID, parent)), BooleanClause.Occur.FILTER)
+          .add(new TermQuery(new Term(SchemaFields.IS_CHUNK, "true")), BooleanClause.Occur.FILTER).build();
+      org.apache.lucene.search.ScoreDoc after = null;
+      while (true) {
+        var page = searcher.searchAfter(after, query, 1024);
+        if (page.scoreDocs.length == 0) break;
+        for (var hit : page.scoreDocs) {
+          var child = SearchResultFormatter.extractFromStoredFields(stored, hit.doc, false, fields);
+          String path = child.get(SchemaFields.PATH);
+          if (path == null || path.isBlank() || path.equals(source)) {
+            evidence = io.justsearch.indexing.SourceEnvelope.restrictive(evidence,
+                io.justsearch.indexing.SourceEnvelope.decode(child));
+          }
+        }
+        after = page.scoreDocs[page.scoreDocs.length - 1];
+      }
+      return evidence;
+    });
+  }
+
   /** Stored parent identity used to seed/rebuild the Worker document-identity store. */
   public record StoredDocumentIdentity(String docId, String docUid) {}
 
@@ -862,18 +906,30 @@ public final class DocumentFieldOps {
     return queryDocIdsByField(field, value, limit, false);
   }
 
+  public enum PendingDocumentKind { ALL, PARENT, CHUNK }
+
   public record PendingIdPage(List<String> ids, boolean exhausted) {}
 
   /** One bounded, ID-ordered keyset page. Exclusions are examined by the caller, so an
    * excluded or poison head cannot pin the sweep. The key survives reader replacement. */
   public PendingIdPage queryPendingPage(
       String field, int limit, boolean excludeChunks, String afterId) throws IOException {
+    return queryPendingPage(field, limit, excludeChunks ? PendingDocumentKind.PARENT
+        : PendingDocumentKind.ALL, afterId);
+  }
+
+  public PendingIdPage queryPendingPage(
+      String field, int limit, PendingDocumentKind kind, String afterId) throws IOException {
+    java.util.Objects.requireNonNull(kind);
     if (limit <= 0) throw new IllegalArgumentException("Page size must be positive");
     return bridge.withSearcher(searcher -> {
       var query = new BooleanQuery.Builder()
           .add(new TermQuery(new Term(field, "PENDING")), BooleanClause.Occur.FILTER);
-      if (excludeChunks) query.add(new TermQuery(new Term(SchemaFields.IS_CHUNK, "true")),
-          BooleanClause.Occur.MUST_NOT);
+      if (kind != PendingDocumentKind.ALL) {
+        query.add(new TermQuery(new Term(SchemaFields.IS_CHUNK, "true")),
+            kind == PendingDocumentKind.CHUNK ? BooleanClause.Occur.FILTER
+                : BooleanClause.Occur.MUST_NOT);
+      }
       if (afterId != null) query.add(org.apache.lucene.search.TermRangeQuery.newStringRange(
           idField, afterId, null, false, false), BooleanClause.Occur.FILTER);
       var sort = new org.apache.lucene.search.Sort(

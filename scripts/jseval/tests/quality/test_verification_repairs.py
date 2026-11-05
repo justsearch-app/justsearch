@@ -12,6 +12,8 @@ import time
 from unittest.mock import Mock
 
 import pytest
+
+from .conftest import ready_distribution
 from click.testing import CliRunner
 
 from jseval import _paths, backend
@@ -65,6 +67,7 @@ def test_admission_refusal_is_the_command_outcome(tmp_path, monkeypatch, real_ad
     r = make_run(c, request_config=run.refined_request())
     monkeypatch.setattr(backend, 'source_identity', lambda _: (r.header.commit, None))
     monkeypatch.setattr(backend, 'require_prepared', lambda *a: None)
+    ready_distribution(monkeypatch)
     monkeypatch.setattr(backend, 'bind_command', lambda _, command: command)
     monkeypatch.setattr(run.platform, 'processor', lambda: 'test CPU')
     monkeypatch.setattr(run.collections, 'resolve_collection', lambda _: (c, config_for(c)))
@@ -149,7 +152,8 @@ def test_enron_relative_recipe_resolves_from_current_checkout(tmp_path, monkeypa
 
 def test_prepared_check_works_while_another_prepare_waits_for_gradle(tmp_path, monkeypatch):
     """Real Gradle slot boundary, with a harmless gradlew standing in for compilation."""
-    slot = shutil.which('js-gradle-slot')
+    from .conftest import REAL
+    slot = REAL['which']('js-gradle-slot')  # the real wrapper, not the quality tests' stand-in
     if slot is None:
         pytest.skip('js-gradle-slot is not installed')
     root = tmp_path/'repo'
@@ -222,7 +226,8 @@ def test_killed_prepare_supervisor_cannot_publish(collection, config, tmp_path, 
     cfg = replace(config, repo_root=index.REPO_ROOT, documents_dir=source, cache_root=tmp_path/'cache')
     monkeypatch.setenv('JS_ADMISSION_DIR', str(tmp_path/'admission'))
     monkeypatch.delenv('JS_ADMISSION_TOKEN', raising=False)
-    monkeypatch.setattr(index.IndexConfig, 'environment', lambda _: env_for(cfg))
+    pinned = env_for(cfg)
+    monkeypatch.setattr(index.IndexConfig, 'environment', lambda _: dict(pinned))
     monkeypatch.setattr(index, '_under_cache', lambda p: p)
     # Keep the real pausable supervisor and worker, replacing only engine calls.
     script = '''

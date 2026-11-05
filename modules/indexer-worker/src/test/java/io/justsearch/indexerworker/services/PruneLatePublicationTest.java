@@ -233,7 +233,8 @@ final class PruneLatePublicationTest extends LuceneExecutorTestBase {
         throw new java.io.UncheckedIOException(new IOException("injected after the move"));
       }
       return moved;
-    }).when(coordinator).updateDocumentPaths(from, to);
+    }).when(coordinator).updateDocumentPaths(org.mockito.ArgumentMatchers.eq(from),
+        org.mockito.ArgumentMatchers.eq(to), org.mockito.ArgumentMatchers.anyMap());
     RunningRuntime target = mock(RunningRuntime.class);
     when(target.indexingCoordinator()).thenReturn(coordinator);
     when(target.documentFieldOps()).thenReturn(runtime.documentFieldOps());

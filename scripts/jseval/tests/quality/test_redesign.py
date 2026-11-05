@@ -12,6 +12,8 @@ from unittest.mock import Mock
 import httpx
 import pytest
 
+from .conftest import ready_distribution
+
 from jseval import backend, index_identity
 from jseval.quality import compare, index, report
 from .helpers import config_for, make_collection, make_run
@@ -33,10 +35,13 @@ def cached_handle(tmp_path, monkeypatch):
     index._write(data/'quality-owner.json', owner)
     index._write(tmp_path/'entry.json', {'owner': owner})
     lock = (tmp_path/'data.quality.lock').open('a+')
-    h = index.IndexHandle(c, index.IndexConfig(), 'key', tmp_path, data, 'cached', {}, {}, lock)
+    h = index.IndexHandle(c, index.IndexConfig(), 'key', tmp_path, data, 'cached', {},
+                          {index.DISTRIBUTION_ENV: 'd' * 64}, lock)
     proc = Mock()
     proc.poll.return_value = None
     monkeypatch.setattr(backend, 'require_prepared', lambda *a: None)
+    ready_distribution(monkeypatch)
+    monkeypatch.setattr(index, '_select_distribution', lambda *a: 'd' * 64)
     monkeypatch.setattr(backend, 'start_backend', Mock(return_value=backend.BackendInfo(proc, data)))
     monkeypatch.setattr(backend, 'stop_backend', Mock())
     monkeypatch.setattr(index, '_launch_env', lambda *a: {})
@@ -235,6 +240,8 @@ def test_background_adoption_quarantines_only_content_failure(tmp_path, monkeypa
     data = root/'data'
     data.mkdir(parents=True)
     cfg = index.IndexConfig(repo_root=tmp_path, models_dir=tmp_path/'models', timeout_sec=30)
+    (tmp_path/'models/onnx').mkdir(parents=True)
+    (tmp_path/'models/onnx/model.onnx').write_bytes(b'model')
     owner = index._population_owner(c, 'key')
     index._write(data/'quality-owner.json', owner)
     entry = {'owner': owner, 'witness': {}}
@@ -245,6 +252,7 @@ def test_background_adoption_quarantines_only_content_failure(tmp_path, monkeypa
     monkeypatch.setattr(index, '_materialize', lambda *a: c)
     monkeypatch.setattr(index, 'compute_index_key', lambda *a: ('key', {}))
     monkeypatch.setattr(backend, 'require_prepared', lambda *a: None)
+    ready_distribution(monkeypatch)
     proc = Mock()
     proc.poll.return_value = None
     launch = Mock(return_value=backend.BackendInfo(proc, data))

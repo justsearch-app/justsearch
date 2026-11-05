@@ -429,11 +429,16 @@ public final class IndexingCoordinator {
 
   /** Pass-through convenience. Takes {@link #dispatchLock} to serialize with RMW ops. */
   public int updateDocumentPaths(String oldPath, String newPath) {
+    return updateDocumentPaths(oldPath, newPath, Map.of());
+  }
+
+  /** Move and destination provenance are one serialized source publication. */
+  public int updateDocumentPaths(String oldPath, String newPath, Map<String, Object> envelope) {
     acquireReadLockTimed();
     try {
       dispatchLock.lock();
       try {
-        return writeOps.get().updateDocumentPaths(oldPath, newPath);
+        return writeOps.get().updateDocumentPaths(oldPath, newPath, envelope);
       } finally {
         dispatchLock.unlock();
       }
