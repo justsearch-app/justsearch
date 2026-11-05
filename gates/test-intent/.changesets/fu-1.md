@@ -121,9 +121,9 @@ author-session: 01a1aa00-ad69-78c2-ab99-03e4e933309c
 }
 ```
 
-## Verification commands
+## Initial verification commands
 
-The orchestrator explicitly requested no evidence JSON and no commit from this builder.
+The initial builder assignment explicitly requested no evidence JSON and no commit.
 The evidence references above reserve the verifier's files; they are not builder pass claims.
 The test-intent gate therefore still needs execution evidence and independent acceptance.
 No `.agents/preflight` exists in this checkout.
@@ -213,5 +213,73 @@ The legitimate-policy check separately covers stable literal exclusions, globs a
 - `git diff --check`: passed. All edits remain uncommitted. Shared dev stack untouched;
   independent verifier evidence/acceptance and the owned end-to-end fixture remain outside
   this builder's completed checks.
+
+Evidence commands (repair with --before at the merge base, preservation without):
+
+The previous log shows that the base compiled and executed all repair cases. The runner
+reported the parameterized cases as `not-found` because their default display names lacked
+the method name, then classified those absent selections as `compile` after matching
+`compileTestJava` in the build output. All seven parameterized methods now use the existing
+`{displayName} [{index}] {arguments}` convention, preserving every input and assertion while
+making the XML cases resolvable by `path#method`. No before-patch is needed: the base already
+has every directly referenced API. The worker's missing eligible-files getter is deliberately
+observed through `assertDoesNotThrow` reflection, so its absence remains an assertion failure.
+
+This follow-up authorizes the builder to generate both evidence JSON files through the runner.
+The acceptance records remain reserved for the independent acceptor.
+
+Both commands are executed from a shared candidate clone under
+`$TMPDIR/fu1-evidence-candidate`, with this changeset and the edited engine test copied in.
+The unmodified evidence runner owns its detached before-worktree under `$TMPDIR`; that
+worktree's Git metadata belongs to the temporary clone. Generated JSON is copied back
+unchanged into this worktree's `gates/test-intent/evidence/`. This uses the runner's own
+before-state setup rather than a manually prepared shared before clone. Each checkout has
+its own build folders and test profiles; shared resources are Gradle caches, daemon, and
+the machine's Gradle slot/admission locks. The shared dev stack is untouched.
+
+```bash
+env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot node scripts/governance/gates/test-intent/run-evidence.mjs \
+  --out gates/test-intent/evidence/fu-1.json \
+  --before b21749f0e07917daceb0df14e57bd2e9163cb91b \
+  --check modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIncompleteCoverageTest.java#D1PeriodicCoverageClearsPersistedWarning \
+  --check modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIncompleteCoverageTest.java#D2VerifyFolderClearsPersistedWarning \
+  --check modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIncompleteCoverageTest.java#D3RecordedReindexClearsPersistedWarning \
+  --check modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIncompleteCoverageTest.java#D4OneRepairedFileCannotClearButWholeRootCan \
+  --check modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIncompleteCoverageTest.java#D5LegacyReindexRejectsUnverifiedResponseIndependentlyOfSkipped \
+  --check modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIncompleteCoverageTest.java#R3RepeatedIncompleteObservationInvalidatesOlderCleanCompletion \
+  --check modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIncompleteCoverageTest.java#R6EmptyRepairedRootCompletesWithoutTimestamp \
+  --check modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIncompleteCoverageTest.java#R2LegitimatePolicyAndOwnershipExclusionsPermitWholeEligibleCoverage \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SyncCoverageEvidenceTest.java#R1EmptyMessageExceptionIsAnExplicitSyncFailure \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SyncCoverageEvidenceTest.java#R1CancelledAndInterruptedWalksNeverCompleteCoverage \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SyncCoverageEvidenceTest.java#R6UnchangedEligibleFilesRemainCoverageEvidenceWithoutAdmission
+```
+
+```bash
+env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot node scripts/governance/gates/test-intent/run-evidence.mjs \
+  --out gates/test-intent/evidence/fu-1-preservation.json \
+  --check modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIncompleteCoverageTest.java#R1NonqualifyingSyncCannotClear \
+  --check modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIncompleteCoverageTest.java#R2RestrictedRecordedScopeCannotClear \
+  --check modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIncompleteCoverageTest.java#R2LiteralPolicyChangedDuringEnumerationCannotClear \
+  --check modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIncompleteCoverageTest.java#R4RemovedRegistrationRejectsAResultAwaitingApplication \
+  --check modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIncompleteCoverageTest.java#R5ReloadWhileUnreadableRetainsWarningAndBootAfterRepairClears \
+  --check modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIncompleteCoverageTest.java#R8SuccessfulSyncLeavesOtherWalkErrorsAndUnrelatedRootsAlone
+```
+
+## Follow-up evidence results
+
+- Repair evidence command: exit 0; all 11 named selectors executed and passed on the
+  candidate (21 cases, none skipped). Every selector failed by assertion on
+  `b21749f0e07917daceb0df14e57bd2e9163cb91b`, without any compatibility patch.
+  The base engine run executed 18 cases with 15 assertion failures; R3's boot case
+  supplies that method's fail-before, while its other three routes already passed.
+  The base worker run executed three cases with three assertion failures.
+- Preservation evidence command: exit 0; all six named selectors executed and passed
+  (15 cases, none skipped). Both referenced evidence JSON files were generated by
+  the unmodified runner and copied back unchanged.
+- The only test changes are the seven parameterized display-name annotations;
+  inputs, preconditions, fixture code and every assertion are byte-for-byte unchanged.
+- `.agents/preflight` is absent. No production files or acceptance records changed;
+  nothing was committed. Logs: `tmp/fu1-evidence-run/fu1-builder-repair.log` and
+  `tmp/fu1-evidence-run/fu1-builder-preservation.log`.
 
 ## Acceptance records

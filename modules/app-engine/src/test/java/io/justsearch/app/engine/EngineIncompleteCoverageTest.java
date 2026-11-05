@@ -47,9 +47,9 @@ final class EngineIncompleteCoverageTest {
 
   @Test void D1PeriodicCoverageClearsPersistedWarning() throws Exception { recovery("periodic", false, false); }
   @Test void D2VerifyFolderClearsPersistedWarning() throws Exception { recovery("verify", false, false); }
-  @ParameterizedTest @ValueSource(booleans = {false, true})
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}") @ValueSource(booleans = {false, true})
   void D3RecordedReindexClearsPersistedWarning(boolean force) throws Exception { recovery("recorded", force, false); }
-  @ParameterizedTest @ValueSource(strings = {"periodic", "verify", "recorded"})
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}") @ValueSource(strings = {"periodic", "verify", "recorded"})
   void D4OneRepairedFileCannotClearButWholeRootCan(String route) throws Exception { recovery(route, true, true); }
 
   private void recovery(String route, boolean force, boolean repairOne) throws Exception {
@@ -81,7 +81,7 @@ final class EngineIncompleteCoverageTest {
     }
   }
 
-  @ParameterizedTest @ValueSource(strings = {"skipped", "deferred", "unverified", "failed", "missing", "wrong-volume", "interrupted"})
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}") @ValueSource(strings = {"skipped", "deferred", "unverified", "failed", "missing", "wrong-volume", "interrupted"})
   void R1NonqualifyingSyncCannotClear(String result) throws Exception {
     try (var fixture = new Fixture(directory)) {
       fixture.addIncomplete();
@@ -105,7 +105,7 @@ final class EngineIncompleteCoverageTest {
     }
   }
 
-  @ParameterizedTest @ValueSource(strings = {"file", "subtree", "extra-exclusion", "policy-changed"})
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}") @ValueSource(strings = {"file", "subtree", "extra-exclusion", "policy-changed"})
   void R2RestrictedRecordedScopeCannotClear(String restriction) throws Exception {
     try (var fixture = new Fixture(directory)) {
       fixture.addIncomplete();
@@ -143,7 +143,7 @@ final class EngineIncompleteCoverageTest {
     }
   }
 
-  @ParameterizedTest @ValueSource(strings = {"periodic", "verify", "recorded", "boot"})
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}") @ValueSource(strings = {"periodic", "verify", "recorded", "boot"})
   void R3RepeatedIncompleteObservationInvalidatesOlderCleanCompletion(String producer) throws Exception {
     try (var fixture = new Fixture(directory)) {
       fixture.addIncomplete();
@@ -232,7 +232,7 @@ final class EngineIncompleteCoverageTest {
     }
   }
 
-  @ParameterizedTest @ValueSource(strings = {"periodic", "verify", "recorded"})
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}") @ValueSource(strings = {"periodic", "verify", "recorded"})
   void R6EmptyRepairedRootCompletesWithoutTimestamp(String route) throws Exception {
     try (var fixture = new Fixture(directory)) {
       fixture.addIncomplete(); fixture.repair();
@@ -245,7 +245,7 @@ final class EngineIncompleteCoverageTest {
     }
   }
 
-  @ParameterizedTest @ValueSource(strings = {"ownership", "glob", "literal"})
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}") @ValueSource(strings = {"ownership", "glob", "literal"})
   void R2LegitimatePolicyAndOwnershipExclusionsPermitWholeEligibleCoverage(String exclusion) throws Exception {
     try (var fixture = new Fixture(directory)) {
       fixture.addIncomplete(); fixture.repair();
