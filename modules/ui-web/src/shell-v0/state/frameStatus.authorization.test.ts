@@ -31,6 +31,7 @@ it('Earlier names an expired request instead of saying approval requested', () =
     id: 'expired', classId: 'authorization.pending', occurredAt: new Date(now - 600_000).toISOString(),
     renderHint: 'REQUIRES_ACK', classExtras: { pendingId: 'expired', operationId: 'core.apply-excludes',
       expiresAt: new Date(now - 1000).toISOString() },
+    diagnosticsLink: null, provenance: null, primaryAction: null, primaryActionKind: null, bodyI18nKey: null,
   } } as AdvisoryRecord;
   const model = deriveFrameStatus({ ai: null, now, contactLostAt: null, advisories: [advisory] });
   expect(model.sections.needs).toHaveLength(0);
@@ -51,6 +52,7 @@ it('Earlier names automatic denial for both terminal ledger expiry and a stale k
       id: 'expired', classId: 'authorization.pending', occurredAt: new Date(now - 600_000).toISOString(),
       renderHint: 'REQUIRES_ACK', classExtras: { pendingId: 'expired', operationId: 'core.apply-excludes',
         expiresAt: new Date(now - 1000).toISOString() },
+      diagnosticsLink: null, provenance: null, primaryAction: null, primaryActionKind: null, bodyI18nKey: null,
     } } as AdvisoryRecord;
     const model = deriveFrameStatus({ ai: null, now, contactLostAt: null, advisories: [advisory],
       activity: unifiedActivity([gate('expiry', 'expired', disposition, -1000)], []),
@@ -79,6 +81,7 @@ it('an expired advisory and its keyed gate produce exactly one Earlier row', () 
     id: 'expired', classId: 'authorization.pending', occurredAt: new Date(now - 600_000).toISOString(),
     renderHint: 'REQUIRES_ACK', classExtras: { pendingId: 'expired', operationId: 'core.apply-excludes',
       expiresAt: new Date(now - 1000).toISOString() },
+    diagnosticsLink: null, provenance: null, primaryAction: null, primaryActionKind: null, bodyI18nKey: null,
   } } as AdvisoryRecord;
   for (const disposition of ['GATED', 'EXPIRED']) {
     const model = deriveFrameStatus({ ai: null, now, contactLostAt: null, advisories: [advisory],
