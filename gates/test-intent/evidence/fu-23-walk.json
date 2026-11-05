@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-05T12:55:26.240Z",
-  "revision": "49b3196bbace9328685595c56d8463de03f0dfb6",
-  "tree": "ea7e6b5638ab17336acf471a6a1d4a711014968d",
+  "createdAt": "2026-11-05T14:09:46.279Z",
+  "revision": "7fcd703006e6f5c93e3d27d0a947f8ce023529f2",
+  "tree": "8401f4dc7c43e9bfc6ebcf2dfaf8f257d9960752",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.LostRootVolumeRecordTest.recordWalkSkipsVanishedEntriesButKeepsExistingMatchesAndOtherFailures\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.LostRootVolumeRecordTest.recordWalkSkipsVanishedEntriesButKeepsExistingMatchesAndOtherFailures\" --tests \"io.justsearch.indexerworker.server.LostRootVolumeRecordTest.duplicateExistingRecordFilesStillFail\" --tests \"io.justsearch.indexerworker.server.LostRootVolumeRecordTest.absentRequiredRecordStillFails\" --tests \"io.justsearch.indexerworker.server.LostRootVolumeRecordTest.malformedExistingPropertiesStillFail\" --tests \"io.justsearch.indexerworker.server.LostRootVolumeRecordTest.deletedEntireDataRootMustNotMasqueradeAsEmptyRecord\" --tests \"io.justsearch.indexerworker.server.LostRootVolumeRecordTest.existingDirectoryWithRecordNameMustNotDisappearFromOracle\" --tests \"io.justsearch.indexerworker.server.LostRootVolumeRecordTest.validPropertiesRemainFilteredByRootAndVolumePrefix\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2906
+      "durationMs": 10205
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/LostRootVolumeRecordTest.java#recordWalkSkipsVanishedEntriesButKeepsExistingMatchesAndOtherFailures",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/LostRootVolumeRecordTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:d97bf366b92a7d5f7bf356cbb284986710c7d0342a709b80490d18e48d475159",
+      "contentDigest": "sha256:47d0e493735a6578b6f6fecfc501506683aa2b7172146d62997b58ec31b80d17",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -39,8 +39,98 @@
           "status": "passed"
         }
       ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/LostRootVolumeRecordTest.java#duplicateExistingRecordFilesStillFail",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/LostRootVolumeRecordTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:47d0e493735a6578b6f6fecfc501506683aa2b7172146d62997b58ec31b80d17",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "duplicateExistingRecordFilesStillFail()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/LostRootVolumeRecordTest.java#absentRequiredRecordStillFails",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/LostRootVolumeRecordTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:47d0e493735a6578b6f6fecfc501506683aa2b7172146d62997b58ec31b80d17",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "absentRequiredRecordStillFails()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/LostRootVolumeRecordTest.java#malformedExistingPropertiesStillFail",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/LostRootVolumeRecordTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:47d0e493735a6578b6f6fecfc501506683aa2b7172146d62997b58ec31b80d17",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "malformedExistingPropertiesStillFail()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/LostRootVolumeRecordTest.java#deletedEntireDataRootMustNotMasqueradeAsEmptyRecord",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/LostRootVolumeRecordTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:47d0e493735a6578b6f6fecfc501506683aa2b7172146d62997b58ec31b80d17",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "deletedEntireDataRootMustNotMasqueradeAsEmptyRecord()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/LostRootVolumeRecordTest.java#existingDirectoryWithRecordNameMustNotDisappearFromOracle",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/LostRootVolumeRecordTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:47d0e493735a6578b6f6fecfc501506683aa2b7172146d62997b58ec31b80d17",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "existingDirectoryWithRecordNameMustNotDisappearFromOracle()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/LostRootVolumeRecordTest.java#validPropertiesRemainFilteredByRootAndVolumePrefix",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/LostRootVolumeRecordTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:47d0e493735a6578b6f6fecfc501506683aa2b7172146d62997b58ec31b80d17",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "validPropertiesRemainFilteredByRootAndVolumePrefix()",
+          "status": "passed"
+        }
+      ]
     }
   ],
   "failBefore": null,
-  "digest": "sha256:6e867e0a315bf29b1b0cc23afcfeebeb7046b68f2fcbcc86671aeafd2a1c1c50"
+  "digest": "sha256:fcea141b0f96618f36ef89181a631ab9ab7e63568c9fe209b3b948cbca360e01"
 }

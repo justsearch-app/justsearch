@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-05T12:55:20.198Z",
-  "revision": "49b3196bbace9328685595c56d8463de03f0dfb6",
-  "tree": "690bc6dd2eddbf9598b8b6d1f8c7fba6a3864018",
+  "createdAt": "2026-11-05T14:09:32.137Z",
+  "revision": "7fcd703006e6f5c93e3d27d0a947f8ce023529f2",
+  "tree": "59b14fc720333205ac0b06874421b6b85e9309c4",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.loop.IndexingLoopPauseAcknowledgementTest.pauseBetweenLeaseAndPollRemainsPausingThroughPublicationAndResumeDrainsRetry\" --tests \"io.justsearch.indexerworker.loop.IndexingLoopPauseAcknowledgementTest.pauseBeforeLeaseClaimsNothingUntilResume\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 12208
+      "durationMs": 10168
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopPauseAcknowledgementTest.java#pauseBetweenLeaseAndPollRemainsPausingThroughPublicationAndResumeDrainsRetry",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopPauseAcknowledgementTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:34e4d0989cc8c1447852f7517363130ccd00b7b6dd92965cfeaa2e77035db44b",
+      "contentDigest": "sha256:bd016be00e409481156f50a3880d9533fee491129e3b9a4f44cb249725b633a4",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopPauseAcknowledgementTest.java#pauseBeforeLeaseClaimsNothingUntilResume",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopPauseAcknowledgementTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:34e4d0989cc8c1447852f7517363130ccd00b7b6dd92965cfeaa2e77035db44b",
+      "contentDigest": "sha256:bd016be00e409481156f50a3880d9533fee491129e3b9a4f44cb249725b633a4",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -57,5 +57,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:cf7f4ca9ef635cc429ad8f256b6e0e9a2e92b4b4e1b256157e7e0fb0d1893a42"
+  "digest": "sha256:8020f77ae58d4135d45242ac34e4758d15c7e08b06ca4d912334a7f182fb8900"
 }
