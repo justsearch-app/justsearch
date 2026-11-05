@@ -66,7 +66,7 @@ every edited or added test file on the candidate.
 Top-bar follow-up: `shell-s3c-topbar-repaired.json` records the redirect repair against
 `c8b58b5e25cf509dac9313d6085054a70508c46f`; `shell-s3c-topbar-preserved.json` re-runs the other
 five checks in the edited Chromium file against their original before-state. At 600 px notices and
-actions now share two rows inside the bar; the full notice stays available when its text is clamped.
+actions then shared two rows inside the bar with tooltip text when clamped. The font-metrics repair below supersedes that placement and clamping expectation.
 Both evidence runs use temporary shared clones and copied dependencies, with the unchanged producer.
 
 Font-metrics repair: the baseline 1fc4f0bcec passes 24 default-font Chromium checks. DejaVu Sans
@@ -80,6 +80,13 @@ checks against their original baseline 7ed8454d85; `shell-s3c-fonts-repaired.jso
 both edited Chromium files. The unchanged producer uses a temporary Git adapter for shared clones
 and a Node adapter limiting Vitest to four workers. All checkouts use copied dependencies, private
 Vite ports and owned headless Chromium processes; no shared service is touched.
+
+L17 follow-up: `shell-s3c-purpose-repaired.json` records the plain-purpose regression against
+`c0fbb88825e7f1024fe77a7649c6337f9f08f44a`; `shell-s3c-purpose-l17-repaired.json` refreshes the
+original engine-text/requester checks against 7ed8454d85; `shell-s3c-purpose-preserved.json` reruns
+every check in the edited AuthorizationHost test file. The unchanged producer again uses temporary
+shared clones and copied dependencies. The placement retirement below cites the orchestrator
+decision; its replacement checks keep their existing font-metrics evidence.
 
 Recorded reason (L12, orchestrator decision): `pendingAuthorizationBridge.test.ts` pinned that a
 broadcast with no source keeps its dialog on arrival. The brief retires that: such a request is not
@@ -254,9 +261,8 @@ the person's own action, so it waits in Needs you. The own-transport cases of th
         }
       ],
       "repaired": true,
-      "evidence": "gates/test-intent/evidence/shell-s3c-repaired.json",
+      "evidence": "gates/test-intent/evidence/shell-s3c-purpose-l17-repaired.json",
       "newChecks": [
-        "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts#renders risk, args summary, and an irreversibility warning when provided; never the Engine's gate text",
         "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts#a typed agent request says who asks, what happens and what to type, with no internal names",
         "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts#the agent in Search is named as such",
         "modules/ui-web/src/shell-v0/components/AuthorizationArrival.scope.test.ts#C protected dialog consent names operation and access scope for requester undefined",
@@ -277,7 +283,7 @@ the person's own action, so it waits in Needs you. The own-transport cases of th
         }
       ],
       "conflictSearch": "decision records searched for a conflict (docs/decisions, \"ceremony\", \"typed\", \"authorization\"): the typed confirmation word stays the operation id and the dialog stays modal in the top layer; none other.",
-      "note": "Retired expectations: the dialog shows the prompt's `purpose` (the Engine's gate message) as `authorization-purpose`; the risk reads the raw tier ('HIGH'); the dialog's 'always allow' line names the internal id ('core.ingest-files')."
+      "note": "Retired expectations: the dialog shows Engine diagnostics in `purpose` as `authorization-purpose`; the risk reads the raw tier ('HIGH'); the dialog's 'always allow' line names the internal id ('core.ingest-files'). A plain-language purpose remains visible, as the L17 follow-up below records."
     },
     {
       "items": [
@@ -475,11 +481,11 @@ the person's own action, so it waits in Needs you. The own-transport cases of th
         "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts"
       ],
       "class": "New",
-      "behaviour": "Redirect notices name windows plainly (Opened System instead of Health), retaining an id only when no plain name is available. Placement is adapted by the orchestrator decision recorded below.",
+      "behaviour": "Redirect notices name windows plainly (Opened System instead of Health), retaining an id only when no plain name is available. Placement follows the orchestrator decision recorded below: beside the pill within two lines, otherwise under the top bar.",
       "sources": [
         {
           "kind": "owner-words",
-          "quote": "Expected: the notice fits inside the top bar at 1280×800, 900×800 and 600×400 — at most two lines, else truncated with its full text as tooltip and accessible name; never taller than the bar; the switcher stays centred (±2 px) while it shows; the unknown-address notice keeps working as the candidate made it. Also: the notice names windows by their plain names (\"Opened System instead of Health\"), never internal ids; when a window has no plain name, use its id as today.",
+          "quote": "Also: the notice names windows by their plain names (\"Opened System instead of Health\"), never internal ids; when a window has no plain name, use its id as today.",
           "location": "task t-20261103-shell request (S3c bounded top-bar notice repair brief, 2026-11-05)"
         }
       ],
@@ -493,37 +499,19 @@ the person's own action, so it waits in Needs you. The own-transport cases of th
       "items": [
         "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts"
       ],
-      "class": "Adaptation",
-      "moved": [
-        "instrumentation",
-        "input re-encoding"
-      ],
-      "whatMoved": "Adaptation of this PR's own new, never-shipped redirect placement check, on the orchestrator's decision after builder-4 (not an owner decision). The obsolete inside-the-bar/two-line/truncation oracle becomes full readability with conditional placement: beside when the words fit within two lines, otherwise under the top bar. The check independently probes the inline slot, checks visible full text and no overlap with pill or switcher, and returns from 600 to 1280 px. Every centring, pill and action assertion stays; default and wide-font variants add 900×700 coverage. Serves X2 and C1.",
+      "class": "Obsolete",
       "sources": [
         {
           "kind": "delegated-choice",
           "delegationQuote": "Decide what you can judge better than the user, which is most work: scope, scenarios, fixing now or deferring, design options, retries, restarting or resuming work the host stopped.",
           "delegationLocation": "task t-20261103-shell user turn (working agreement, Deciding)",
           "delegationScope": "The orchestrator's bounded repair of this PR's own unshipped top-bar notice placement check; preserve all centring, pill and action assertions.",
-          "choice": "Orchestrator decision after builder-4: replace the redirect-notice placement assertions with full readability; beside the pill when at most two lines fit, otherwise under the bar; never cover the pill or switcher; keep centring within 2 px, an uncut pill and every offered action. This is the orchestrator's decision, not the owner's.",
+          "choice": "Orchestrator decision after builder-4: the notice is readable in full; beside the pill within two lines, otherwise under the top bar; never covering the pill or switcher; switcher centred ±2 px. This is the orchestrator's decision, not the owner's.",
           "label": "agent choice (orchestrator decision)"
-        },
-        {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261103-shell",
-          "scenario": "X2",
-          "quote": "Sizes 1280×800, 900×800, 600×400: nothing overflows sideways",
-          "label": "agent-drafted, owner-adopted"
-        },
-        {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261103-shell",
-          "scenario": "C1",
-          "quote": "unknown destinations … show at the place of the action … or in the pill; never silently dropped",
-          "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/shell-s3c-fonts-repaired.json"
+      "removedChecks": "In Shell.s3c-lockdown.test.ts, 'redirect notices stay inside the bar in at most two lines with a centred switcher at every size': the unconditional two-line height cap, top/bottom bounds and paintedInside expectations within the bar, truncation with full tooltip/accessible name, and the action staying inside the bar. Those placement expectations from the earlier bounded top-bar brief (also quoted by former entry 19) are superseded. Centring within 2 px, an uncut pill, readable notice and every offered action remain required. Replacement default/wide-font readability checks and their evidence are in the following New entry.",
+      "conflictSearch": "decision records searched for a conflict (docs/decisions/*.md; notice, top bar, redirect, centre/center, clamp): none requires notices or their actions to stay inside the bar, a universal two-line cap, or truncation instead of full readability."
     },
     {
       "items": [
@@ -601,6 +589,61 @@ the person's own action, so it waits in Needs you. The own-transport cases of th
       "newChecks": [
         "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts",
         "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts"
+      ],
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Expected: show the purpose when it contains no engine text; hide only engine text (gate and tier names like TYPED_CONFIRM / UNTRUSTED, internal operation ids, raw JSON). The typed phrase, top layer and every other plain-words change stay.",
+          "location": "task t-20261103-shell request (S3c exact L17 and changeset repairs builder brief, 2026-11-05)"
+        }
+      ],
+      "removedChecks": "In 'renders risk, args summary, and an irreversibility warning when provided; never the Engine's gate text', the assertion that the plain purpose 'Rebuild the entire index' is absent. Only that erroneous expectation is retired; risk, arguments, irreversibility, decision, engine-text hiding and typed-phrase checks remain.",
+      "conflictSearch": "decision records searched for a conflict (docs/decisions/*.md; purpose, ceremony, typed, authorization): none requires hiding a purpose already in plain words. Typed confirmation and top-layer protection remain unchanged."
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "The protected dialog retains the plain purpose Rebuild the entire index, together with its typed phrase and security header. The enriched-prompt check also retains its risk, arguments, irreversibility and Deny assertions. Plain bracketed descriptions and lower-case trust words are retained too.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Expected: show the purpose when it contains no engine text; hide only engine text (gate and tier names like TYPED_CONFIRM / UNTRUSTED, internal operation ids, raw JSON). The typed phrase, top layer and every other plain-words change stay.",
+          "location": "task t-20261103-shell request (S3c exact L17 and changeset repairs builder brief, 2026-11-05)"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s3c-purpose-repaired.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts#renders risk, args summary, and an irreversibility warning when provided; never the Engine's gate text",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts#a plain-language purpose stays visible in the protected dialog",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts#keeps plain words with brackets and lower-case trust words"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Preservation: hide purposes containing gate/tier diagnostics, internal operation ids or raw JSON while retaining the exact typed phrase. Every check in the edited AuthorizationHost test file is rerun.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Expected: show the purpose when it contains no engine text; hide only engine text (gate and tier names like TYPED_CONFIRM / UNTRUSTED, internal operation ids, raw JSON). The typed phrase, top layer and every other plain-words change stay.",
+          "location": "task t-20261103-shell request (S3c exact L17 and changeset repairs builder brief, 2026-11-05)"
+        }
+      ],
+      "repaired": false,
+      "evidence": "gates/test-intent/evidence/shell-s3c-purpose-preserved.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts"
       ]
     }
   ]

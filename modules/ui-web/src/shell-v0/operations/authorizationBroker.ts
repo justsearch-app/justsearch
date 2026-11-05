@@ -51,8 +51,8 @@ export interface AuthorizationPrompt {
   /** Display-safe raw-argument summary or complete bounded frozen target/scope metadata. */
   readonly argsSummary?: string;
   /**
-   * Why the gate fired, as the Engine worded it (the 428 message or the pending's rationale). Engine
-   * text: never shown in the security dialog, which says what happens in plain words (L17).
+   * Why the gate fired (the 428 message or the pending's rationale). The security dialog shows it
+   * when it is plain words; Engine diagnostics, internal names and raw JSON are hidden (L17).
    */
   readonly purpose?: string;
   /** Words the requester wrote (an agent suggestion's rationale): shown as written by it, not checked by JustSearch. */

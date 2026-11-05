@@ -1,0 +1,107 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-05T19:34:17.805Z",
+  "revision": "c0fbb88825e7f1024fe77a7649c6337f9f08f44a",
+  "tree": "d9534977fb7a0196fc18db56d76be92685aea574",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/AuthorizationHost.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/z5a08b_a/tmp/test-intent-vitest-4-1793907246452.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 4265
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts#renders risk, args summary, and an irreversibility warning when provided; never the Engine's gate text",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:94a6ac8fa06de1aeb121b4367bb96c6abb2a713dd5d1b0b8bbcfdb8f66cd16d6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "<jf-authorization-host> enriched prompt (tempdoc 550 P1) renders risk, args summary, and an irreversibility warning when provided; never the Engine's gate text",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts#a plain-language purpose stays visible in the protected dialog",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:94a6ac8fa06de1aeb121b4367bb96c6abb2a713dd5d1b0b8bbcfdb8f66cd16d6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "<jf-authorization-host> L17 plain words in the protected dialog a plain-language purpose stays visible in the protected dialog",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts#keeps plain words with brackets and lower-case trust words",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:94a6ac8fa06de1aeb121b4367bb96c6abb2a713dd5d1b0b8bbcfdb8f66cd16d6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "<jf-authorization-host> L17 plain words in the protected dialog keeps plain words with brackets and lower-case trust words",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "c0fbb88825e7f1024fe77a7649c6337f9f08f44a",
+    "revision": "c0fbb88825e7f1024fe77a7649c6337f9f08f44a",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/AuthorizationHost.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/z5a08b_a/tmp/test-intent-vitest-4-1793907255625.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1506,
+        "output": "JSON report written to /home/elias/.cache/am/z5a08b_a/tmp/test-intent-vitest-4-1793907255625.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts#renders risk, args summary, and an irreversibility warning when provided; never the Engine's gate text",
+        "classification": "assertion",
+        "detail": "<jf-authorization-host> enriched prompt (tempdoc 550 P1) renders risk, args summary, and an irreversibility warning when provided; never the Engine's gate text:  AssertionError: expected undefined to be 'Rebuild the entire index' // Object.is equality\n    at /home/elias/.cache/am/z5a08b_a/tmp/test-intent-before-YYtRg9/modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts:81:86\n    at file:///home/elias/.cache/am/z5a08b_a/tmp/test-intent-before-YYt"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts#a plain-language purpose stays visible in the protected dialog",
+        "classification": "assertion",
+        "detail": "<jf-authorization-host> L17 plain words in the protected dialog a plain-language purpose stays visible in the protected dialog:  AssertionError: expected undefined to be 'Rebuild the entire index' // Object.is equality\n    at /home/elias/.cache/am/z5a08b_a/tmp/test-intent-before-YYtRg9/modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts:107:88\n    at file:///home/elias/.cache/am/z5a08b_a/tmp/test-intent-before-YY"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts#keeps plain words with brackets and lower-case trust words",
+        "classification": "assertion",
+        "detail": "<jf-authorization-host> L17 plain words in the protected dialog keeps plain words with brackets and lower-case trust words:  AssertionError: expected undefined to be 'Rebuild [the untrusted documents]' // Object.is equality\n    at /home/elias/.cache/am/z5a08b_a/tmp/test-intent-before-YYtRg9/modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts:136:88\n    at file:///home/elias/.cache/am/z5a08b_a/tmp/test-intent-"
+      }
+    ]
+  },
+  "digest": "sha256:7d07a37f659178769e9ab6d8bca11d6996c92abcc5ea92ee248a53763a6d2f62"
+}

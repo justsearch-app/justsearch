@@ -76,9 +76,9 @@ describe('<jf-authorization-host> enriched prompt (tempdoc 550 P1)', () => {
     });
     await settle();
     const root = host.shadowRoot!;
-    // L17 — the risk in words; the Engine's own gate text (`purpose`) is not shown.
+    // L17 — plain purpose and risk stay readable; Engine diagnostics are checked separately below.
     expect(root.querySelector('[data-testid="authorization-risk"]')?.textContent).toContain('High risk');
-    expect(root.querySelector('dialog')?.textContent).not.toContain('Rebuild the entire index');
+    expect(root.querySelector('[data-testid="authorization-purpose"]')?.textContent).toBe('Rebuild the entire index');
     expect(root.querySelector('[data-testid="authorization-args"]')?.textContent).toContain('scope');
     expect(root.querySelector('[data-testid="authorization-irreversible"]')).not.toBeNull();
     await activateJfButton(root.querySelector('[data-testid="authorization-deny"]'));
@@ -97,6 +97,47 @@ describe('<jf-authorization-host> enriched prompt (tempdoc 550 P1)', () => {
 });
 
 describe('<jf-authorization-host> L17 plain words in the protected dialog', () => {
+  it('a plain-language purpose stays visible in the protected dialog', async () => {
+    const decision = requestAuthorization({ pendingId: 'pa-purpose', operationId: 'core.bulk-reindex',
+      gateBehavior: 'TYPED_CONFIRM', arrival: 'needs-you', requestedBy: 'Claude Desktop',
+      purpose: 'Rebuild the entire index' });
+    host.reviewStatusRequest('pa-purpose');
+    await settle();
+    const dialog = host.shadowRoot!.querySelector('dialog')!;
+    expect(dialog.querySelector('[data-testid="authorization-purpose"]')?.textContent).toBe('Rebuild the entire index');
+    expect(dialog.querySelector('#authorization-typed-label')?.textContent).toContain('core.bulk-reindex');
+    expect(dialog.querySelector('[data-testid="security-check-header"]')?.textContent).toContain('JustSearch security check');
+    await activateJfButton(dialog.querySelector('[data-testid="authorization-deny"]'));
+    await expect(decision).resolves.toEqual({ approved: false, allowAlways: false });
+  });
+
+  it.each([
+    'TYPED_CONFIRM', 'INLINE_CONFIRM', 'UNTRUSTED', 'TRUSTED', 'HIGH',
+    'gate=typed', 'sourceTier=untrusted',
+    'Run core.bulk-reindex', 'Run vendor.rebuild-index', 'Then run core.recover-component',
+    '{"scope":"all"}', '["all"]', 'Rebuild {"scope":"all"}', 'Rebuild ["all"]',
+  ])('hides an engine purpose: %s', async (purpose) => {
+    const decision = requestAuthorization({ pendingId: 'pa-engine-purpose', operationId: 'vendor.rebuild-index',
+      gateBehavior: 'TYPED_CONFIRM', purpose });
+    await settle();
+    const dialog = host.shadowRoot!.querySelector('dialog')!;
+    expect(dialog.querySelector('[data-testid="authorization-purpose"]')).toBeNull();
+    expect(dialog.querySelector('#authorization-typed-label')?.textContent).toContain('vendor.rebuild-index');
+    await activateJfButton(dialog.querySelector('[data-testid="authorization-deny"]'));
+    await expect(decision).resolves.toEqual({ approved: false, allowAlways: false });
+  });
+
+  it('keeps plain words with brackets and lower-case trust words', async () => {
+    const purpose = 'Rebuild [the untrusted documents]';
+    const decision = requestAuthorization({ pendingId: 'pa-plain-brackets', operationId: 'core.bulk-reindex',
+      gateBehavior: 'TYPED_CONFIRM', purpose });
+    await settle();
+    const dialog = host.shadowRoot!.querySelector('dialog')!;
+    expect(dialog.querySelector('[data-testid="authorization-purpose"]')?.textContent).toBe(purpose);
+    await activateJfButton(dialog.querySelector('[data-testid="authorization-deny"]'));
+    await expect(decision).resolves.toEqual({ approved: false, allowAlways: false });
+  });
+
   it('a typed agent request says who asks, what happens and what to type, with no internal names', async () => {
     const decision = requestAuthorization({
       pendingId: 'pa-plain', operationId: 'core.bulk-reindex', gateBehavior: 'TYPED_CONFIRM', riskTier: 'HIGH',

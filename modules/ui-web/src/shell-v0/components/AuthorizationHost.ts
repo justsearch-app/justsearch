@@ -804,10 +804,23 @@ export class AuthorizationHost extends JfElement {
     return prompt.arrival === 'needs-you' ? { who: 'an agent on this computer', detail: '' } : null;
   }
 
+  /** Keep authored plain words, excluding the Engine's gate diagnostics and raw payloads. */
+  private static plainPurpose(prompt: AuthorizationPrompt): string | undefined {
+    const purpose = prompt.purpose?.trim();
+    if (!purpose || purpose.includes(prompt.operationId) ||
+        /\b(?:AUTO|INLINE_CONFIRM|TYPED_CONFIRM|DENY|CORE|TRUSTED_PLUGIN|UNTRUSTED_PLUGIN|TRUSTED|UNTRUSTED|LOW|MEDIUM|HIGH)\b|\b(?:gate|sourceTier|riskTier)\s*=|\b(?:core|vop)\.[\w.-]+/.test(purpose)) return undefined;
+    try {
+      JSON.parse(purpose.match(/\{.*\}|\[.*\]/s)?.[0] ?? purpose);
+      return undefined;
+    } catch {
+      return purpose;
+    }
+  }
+
   /**
    * L17 — the protected dialog in plain words (ref-12): the question names who asks and the action by
-   * its name, then what it acts on, its risk and whether it can be undone. The Engine's own gate text
-   * (`purpose`) and internal names stay out; the typed phrase is still the exact operation id.
+   * its name, then its plain-language purpose, what it acts on, its risk and whether it can be undone.
+   * Engine diagnostics and internal names stay out; the typed phrase is still the exact operation id.
    */
   private renderAuthorizeBody(prompt: AuthorizationPrompt): TemplateResult {
     const { operationId, gateBehavior } = prompt;
@@ -815,10 +828,14 @@ export class AuthorizationHost extends JfElement {
     const matches = !typedGate || this.typed === operationId;
     const label = present({ kind: 'operation', id: operationId }).label;
     const asker = AuthorizationHost.asker(prompt);
+    const purpose = AuthorizationHost.plainPurpose(prompt);
     return html`
       <h3>${asker ? `Let ${asker.who} run “${label}”?` : `Run “${label}”?`}</h3>
       ${asker
         ? html`<p class="rationale" data-testid="authorization-requested-by">Asked by ${asker.who}${asker.detail}</p>`
+        : ''}
+      ${purpose
+        ? html`<p class="rationale" data-testid="authorization-purpose">${purpose}</p>`
         : ''}
       ${prompt.argsSummary
         ? html`<p class="description" data-testid="authorization-args">It acts on <code>${prompt.argsSummary}</code></p>`
