@@ -1234,3 +1234,14 @@ Band focus repair: `shell-s3b-band-focus-repaired.json` compares the themed Libr
   "note": "Round 3 on e502a22fc9: New 22, Adaptation 13, Obsolete 4, Incidental 1; 302 checks pass; repaired checks fail before by assertion (12 against origin/main, 11 against round 2). Earlier rounds: round 1 accepted with product failures since repaired; round 2 rejected one Adaptation (generic invocation oracle), restored here. Transcribed by the orchestrator from the verifier's answer (Codex sandbox)."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1ab8b-75ab-7c10-bb32-758afcba670c",
+  "verdict": "accept",
+  "digest": "sha256:d9bc9d80c772c7256b1036731984251e90e7f4488295eb4c9476ede7bffc65bd",
+  "note": "After the band-focus repair on 0cfda84fe3: the periodic-update, Escape and Keep it checks fail before by assertion and pass after; frozen customization unchanged (226 existing tests on both versions, declaration updates, editing, presentation validation, the bundled plugin window). Transcribed by the orchestrator from the verifier's answer (Codex sandbox)."
+}
+```
