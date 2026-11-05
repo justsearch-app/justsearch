@@ -20,6 +20,7 @@
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
 import type { JsonSchema, UISchemaElement } from '@jsonforms/core';
+import type { JsonFormsRendererBase } from '../renderers/JsonFormsRendererBase.js';
 import { createChildRenderer } from '../renderers/layouts/layoutDispatch.js';
 import type { RendererUserConfig } from '../renderers/userConfig.js';
 import { nestedLandmarkRole } from '../display/landmarks.js';
@@ -109,6 +110,7 @@ export class DeclaredSurface extends JfElement {
   declare userConfig: RendererUserConfig | undefined;
   /** 594 Move 1b — the observed-state snapshot a factual chip projects from (one authority). */
   declare aiState: AiState | null;
+  private childRenderer: JsonFormsRendererBase | null = null;
   private unsubAiState: (() => void) | null = null;
 
   // 569 §14 — the engine OWNS the overflow clip of a declared adaptive strip (no author CSS clip).
@@ -222,7 +224,7 @@ export class DeclaredSurface extends JfElement {
 
   override render(): TemplateResult {
     const decl = this.declaration;
-    const child = createChildRenderer(
+    const child = this.childRenderer = createChildRenderer(
       decl.uischema,
       decl.schema,
       '',
@@ -230,6 +232,7 @@ export class DeclaredSurface extends JfElement {
       this.enabled,
       this.handleChildChange,
       this.userConfig,
+      this.childRenderer,
     );
     // Co-projected facet (569 Move 3): the landmark role is DERIVED, never authored. This engine
     // always renders NESTED inside the shell STAGE (already role="main"), so it uses the nested

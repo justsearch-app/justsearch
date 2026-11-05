@@ -34,6 +34,7 @@
 
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
+import { deepActiveElement } from '../utils/keyboardHandler.js';
 import { operationConsequence } from './operationConsequence.js';
 import './ConfirmBand.js';
 
@@ -67,6 +68,8 @@ export class ActionButton extends JfElement {
     confirmStage: { state: true },
     typedConfirm: { state: true },
   } as const;
+
+  private returnFocusAfterInvoke = false;
 
   declare operationId: string;
   declare label: string;
@@ -219,6 +222,7 @@ export class ActionButton extends JfElement {
     if (this.disabled || this.pending) {
       return;
     }
+    this.returnFocusAfterInvoke = this.confirmStage === 'awaiting-confirm';
     this.dispatchEvent(
       new CustomEvent<ActionInvokeEventDetail>('action-invoke', {
         detail: { operationId: this.operationId, risk: this.risk },
@@ -229,6 +233,16 @@ export class ActionButton extends JfElement {
     this.confirmStage = 'idle';
     this.typedConfirm = '';
   };
+
+  protected override updated(): void {
+    if (!this.returnFocusAfterInvoke || this.pending) return;
+    this.returnFocusAfterInvoke = false;
+    // The band closes on invocation; the opener may stay disabled until the host finishes.
+    // Restore it once enabled, unless the person has already moved to another control.
+    if (deepActiveElement() === this.ownerDocument.body) {
+      this.shadowRoot?.querySelector<HTMLButtonElement>('button.invoke')?.focus({ preventScroll: true });
+    }
+  }
 
   private readonly cancelConfirm = (): void => {
     this.confirmStage = 'idle';

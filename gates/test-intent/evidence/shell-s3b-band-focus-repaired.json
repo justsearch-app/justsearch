@@ -1,0 +1,107 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-05T11:46:39.872Z",
+  "revision": "0cfda84fe3d2b4c06a13f0995c40bfa78b3542b3",
+  "tree": "1103ccddc113a249e53d2bc21c46526123807bb5",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/LibrarySurface.bandFocus-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/66rx_7bw/tmp/test-intent-vitest-5-1793879185390.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 6804
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.bandFocus-lockdown.test.ts#folder band keeps its identity, keyboard answer and opener through status updates (themed=true)",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.bandFocus-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9f0c803d3497e55994cd54580aeff1c5cc77232cc412cc186a13341cf895d8a4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "folder band keeps its identity, keyboard answer and opener through status updates (themed=true)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.bandFocus-lockdown.test.ts#collection band keeps its identity and answer when another source arrives and restores its opener on every close",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.bandFocus-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9f0c803d3497e55994cd54580aeff1c5cc77232cc412cc186a13341cf895d8a4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "collection band keeps its identity and answer when another source arrives and restores its opener on every close",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.bandFocus-lockdown.test.ts#failed-file band stays with its file across refreshes and errors and restores its opener",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.bandFocus-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9f0c803d3497e55994cd54580aeff1c5cc77232cc412cc186a13341cf895d8a4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "failed-file band stays with its file across refreshes and errors and restores its opener",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "0cfda84fe3d2b4c06a13f0995c40bfa78b3542b3",
+    "revision": "0cfda84fe3d2b4c06a13f0995c40bfa78b3542b3",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/LibrarySurface.bandFocus-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/66rx_7bw/tmp/test-intent-vitest-5-1793879194302.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 5045,
+        "output": "JSON report written to /home/elias/.cache/am/66rx_7bw/tmp/test-intent-vitest-5-1793879194302.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.bandFocus-lockdown.test.ts#folder band keeps its identity, keyboard answer and opener through status updates (themed=true)",
+        "classification": "assertion",
+        "detail": "folder band keeps its identity, keyboard answer and opener through status updates (themed=true):  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/66rx_7bw/tmp/test-intent-before-fPsthm/modules/ui-web/src/shell-v0/views/LibrarySurface.bandFocus-lockdown.test.ts:134:63\n    at file:///home/elias/.cache/am/66rx_7bw/tmp/test-intent-before-fPsthm/modules/ui"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.bandFocus-lockdown.test.ts#collection band keeps its identity and answer when another source arrives and restores its opener on every close",
+        "classification": "assertion",
+        "detail": "collection band keeps its identity and answer when another source arrives and restores its opener on every close:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/66rx_7bw/tmp/test-intent-before-fPsthm/modules/ui-web/src/shell-v0/views/LibrarySurface.bandFocus-lockdown.test.ts:163:66\n    at file:///home/elias/.cache/am/66rx_7bw/tmp/test-intent-before-fPsthm/modules/ui"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.bandFocus-lockdown.test.ts#failed-file band stays with its file across refreshes and errors and restores its opener",
+        "classification": "assertion",
+        "detail": "failed-file band stays with its file across refreshes and errors and restores its opener:  AssertionError: the same band still belongs to the target file: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/66rx_7bw/tmp/test-intent-before-fPsthm/modules/ui-web/src/shell-v0/views/LibrarySurface.bandFocus-lockdown.test.ts:192:57\n    at file:///home/elias/.cache/am/6"
+      }
+    ]
+  },
+  "digest": "sha256:adba8b91dd17930bf9145d7ed9501022267673982b3484fc5a3986dc36480f5e"
+}

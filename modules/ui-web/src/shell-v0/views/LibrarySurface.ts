@@ -2112,7 +2112,7 @@ export class LibrarySurface extends JfElement {
         </div>
         ${sources.length > 0
           ? html`<div class="cards">
-              ${sources.map((s) => this.renderOtherSourceCard(s))}
+              ${repeat(sources, source => source.collection, source => this.renderOtherSourceCard(source))}
             </div>`
           : nothing}
         ${truncated

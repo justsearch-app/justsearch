@@ -1,0 +1,58 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-05T11:47:13.394Z",
+  "revision": "0cfda84fe3d2b4c06a13f0995c40bfa78b3542b3",
+  "tree": "a3297407c86ba7f8ea145759c4d58fc6603c9247",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/LibrarySurface.bandFocus-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/66rx_7bw/tmp/test-intent-vitest-3-1793879226967.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 6426
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.bandFocus-lockdown.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.bandFocus-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9f0c803d3497e55994cd54580aeff1c5cc77232cc412cc186a13341cf895d8a4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "folder band keeps its identity, keyboard answer and opener through status updates (themed=false)",
+          "status": "passed"
+        },
+        {
+          "name": "folder band keeps its identity, keyboard answer and opener through status updates (themed=true)",
+          "status": "passed"
+        },
+        {
+          "name": "collection band keeps its identity and answer when another source arrives and restores its opener on every close",
+          "status": "passed"
+        },
+        {
+          "name": "failed-file band stays with its file across refreshes and errors and restores its opener",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:12b364f35944844eb3a99d1279a7109ac567a6ca510adbcbe74f59941cc6ac13"
+}

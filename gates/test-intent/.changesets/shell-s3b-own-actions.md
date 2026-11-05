@@ -53,6 +53,8 @@ the prior repaired browser assertions against their original b1b5ae0f3c baseline
 command adapters use shared clones, private dependency copies and `--maxWorkers=4`; no source git
 metadata, shared dev stack or another session's service is used. No existing assertion is weakened.
 
+Band focus repair: `shell-s3b-band-focus-repaired.json` compares the themed Library, collection and failed-file browser assertions with `0cfda84fe3d2b4c06a13f0995c40bfa78b3542b3`. `shell-s3b-band-focus-all.json` re-executes every check in the new test file. Status snapshots alternate idle/indexing, with twenty refreshed root payloads; list insertions and failed-file refresh errors exercise identity as well as focus. Evidence uses isolated Chromium, private Vite ports/caches, shared temporary clones and private dependency copies. Temporary Git/Node adapters create before-state shared clones and limit Vitest to four workers; the evidence producer and source Git metadata stay unchanged.
+
 ```json
 {
   "entries": [
@@ -1175,6 +1177,45 @@ metadata, shared dev stack or another session's service is used. No existing ass
         "modules/ui-web/src/shell-v0/components/OpButton.ownReceipts.test.ts",
         "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts",
         "modules/ui-web/src/shell-v0/views/LibrarySurface.gapDecision.test.ts"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.bandFocus-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Real Chromium: the declared Library band and its opener retain identity through twenty alternating idle/indexing status snapshots and refreshed row payloads; Shift+Tab keeps Remove Notes focused, Escape and Keep it restore the opener, and Enter confirms once. Collection arrival before an open band and failed-file refresh/error/recovery preserve the band and focused answer. Every surviving opener regains focus on cancel and after an asynchronous action closes its band. A removed folder retains the existing Add folder focus fallback because its opener no longer exists.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Expected: the Library folder band keeps its identity and the focused control across row updates (status refreshes, indexing progress); focus moves to \"Keep it\" only when the band opens; Escape, Keep it, and the band closing because the action finished return focus to the control that opened it (\"Remove from library\"), also after any number of row updates. Do the same for any other band rendered inside a frequently updating list (collections, the failed-files list).",
+          "location": "task t-20261103-shell request (bounded band focus repair on 0cfda84fe3, 2026-11-05)"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s3b-band-focus-repaired.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.bandFocus-lockdown.test.ts#folder band keeps its identity, keyboard answer and opener through status updates (themed=true)",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.bandFocus-lockdown.test.ts#collection band keeps its identity and answer when another source arrives and restores its opener on every close",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.bandFocus-lockdown.test.ts#failed-file band stays with its file across refreshes and errors and restores its opener"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.bandFocus-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Re-executed every check in the new Chromium file, including the fallback Library renderer, against the candidate. The fallback already preserves its folder row and opener during status updates; the check also exercises Escape, Keep it and one confirmation.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Expected: the Library folder band keeps its identity and the focused control across row updates (status refreshes, indexing progress); focus moves to \"Keep it\" only when the band opens; Escape, Keep it, and the band closing because the action finished return focus to the control that opened it (\"Remove from library\"), also after any number of row updates. Do the same for any other band rendered inside a frequently updating list (collections, the failed-files list).",
+          "location": "task t-20261103-shell request (bounded band focus repair on 0cfda84fe3, 2026-11-05)"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s3b-band-focus-all.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.bandFocus-lockdown.test.ts"
       ]
     }
   ]

@@ -106,7 +106,15 @@ export class ConfirmBand extends JfElement {
   }
 
   override disconnectedCallback(): void {
-    if (ConfirmBand.openBands.get(this.ownerDocument) === this) ConfirmBand.openBands.delete(this.ownerDocument);
+    if (ConfirmBand.openBands.get(this.ownerDocument) === this) {
+      ConfirmBand.openBands.delete(this.ownerDocument);
+      // Closing after the host finishes an action also restores the opener, when it survives.
+      // Wait for the host's render; never steal focus from another band or a deliberate target.
+      queueMicrotask(() => {
+        if (!ConfirmBand.openBands.has(this.ownerDocument) && this.opener?.isConnected
+          && deepActiveElement() === this.ownerDocument.body) this.opener.focus({ preventScroll: true });
+      });
+    }
     this.removeEventListener('keydown', this.onKeyDown, true);
     super.disconnectedCallback();
   }
