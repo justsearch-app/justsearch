@@ -1487,6 +1487,8 @@ export class BrainSurface extends JfElement {
     const pictureFiles = this.modelPresence?.packages?.find(p => p.id === 'chat')?.complete
       ?? this.planPreview?.components?.find(c => c.id === 'chat')?.state === 'installed';
     const pictureMismatch = mmproj === true && pictureChoice === false && this.pictureApplied === null;
+    // A receipt supersedes the pre-switch observation until the next runtime snapshot.
+    const pictureTransitionTarget = this.pendingActions.has('picture-switch') ? this.pictureTargetEnabled : this.pictureApplied;
     features.pictures = {
       id: 'pictures', label: 'Text in scans and images', selected: pictureMismatch || pictureChoice,
       installed: features.chat.installed, active: this.pictureApplied ?? mmproj,
@@ -1494,7 +1496,7 @@ export class BrainSurface extends JfElement {
       state: !live ? 'Unknown — checking AI status' : !installed ? features.chat.availability === 'unavailable'
         ? 'Text in scans and images is unavailable on this computer'
         : 'Text in scans and images comes with the answer model’s files; it is not a separate download'
-        : this.pendingActions.has('picture-switch') ? this.pictureTargetEnabled ? 'Starting picture reading…' : 'Stopping picture reading…'
+        : pictureTransitionTarget !== null ? pictureTransitionTarget ? 'Starting picture reading…' : 'Stopping picture reading…'
         : this.pictureUncertain ? 'Unknown — checking picture reading after an interrupted change'
         : !this.settingsRead || !this.rerankerSettings?.witness ? PICTURE_CHOICE_UNKNOWN
         : pictureOverride === false ? 'Off — operator controlled'
@@ -1518,7 +1520,8 @@ export class BrainSurface extends JfElement {
 
   private renderBrainSentence(verdict: AiEngineVerdict, installed: boolean, features: Record<BrainFeatureId, BrainFeature>, readingPictures: boolean | null): TemplateResult {
     const parts = composeBrainSentence(verdict, installed, features, readingPictures, this.aiKnown());
-    if (features.pictures.state === PICTURE_CHOICE_UNKNOWN || features.pictures.state === PICTURE_MODEL_UNAVAILABLE) {
+    if (features.pictures.state === PICTURE_CHOICE_UNKNOWN || features.pictures.state === PICTURE_MODEL_UNAVAILABLE
+        || features.pictures.state === 'Starting picture reading…' || features.pictures.state === 'Stopping picture reading…') {
       const picturePart = parts.find(part => part.feature === 'pictures');
       if (picturePart) picturePart.text = `. ${features.pictures.state}`;
     }
