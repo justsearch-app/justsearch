@@ -220,83 +220,83 @@ ancestor evidence publishes unknown storage.
 
 ## Verification commands
 
-Repair (assertion failures on the base, then pass on the candidate). Run from a temporary shared
-candidate clone, with changed files copied in, so the runner's internal before worktree writes
-only that clone's Git metadata. Copy the resulting evidence back:
+B1 repair: the first two OrdinaryScanOriginTest checks pass on base 7588c01d38 and fail
+by assertion on pre-repair HEAD 76da02586c (UUIDv4 lookup throws; no committed parent/chunks).
+The store-failure guard applies to P1b-ii's resolver: it passes on pre-repair HEAD and must
+also pass after repair. The base has no resolver, so that guard is not a base preservation check.
+All three must pass after repair. The tests use isolated SQLite/Lucene resources; the real
+ScanRoot entry point and production extractor/writer run, with only the sandbox's missing
+root-volume witness controlled and a parser adapter reading the actual fixture file.
+
+Use separate shared clones inside $TMPDIR, with the same OrdinaryScanOriginTest.java copied
+into each test tree. Each checkout uses its own default build directories. Run the following
+from each of the base, pre-repair and repaired trees, in the background, one at a time:
 
 ```bash
-env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot node scripts/governance/gates/test-intent/run-evidence.mjs \
-  --before 7588c01d3822c1d58358c22e28b8f4c52f6ef632 \
-  --out gates/test-intent/evidence/redesign-p1b-ii.json \
-  --check modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SourceOwnerPublicationTest.java#unchangedLegacyReadmissionChangesEveryOwnerAfterReopenWithoutExtraction \
-  --check modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SourceOwnerPublicationTest.java#deepestWatchedOwnerOverridesImportAndLaterImportReplacesEarlierApproval \
-  --check modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SourceOwnerPublicationTest.java#deepestWatchedDeclarationWinsEvenForFreshImportPublication \
-  --check modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SourceOwnerPublicationTest.java#movePreservesIdentityAndReobservesDestinationEnvelopeWithIndependentChildren \
-  --check modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SourceOwnerPublicationTest.java#metadataPatchUpdatesTheWholeSourceAndClearsUnknownEvidence \
-  --check modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SourceOwnerPublicationTest.java#failureAfterParentFailsPublicationReadsRestrictivelyAndNextAdmissionConverges \
-  --check modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java#gatedImportPublishesItsParentOriginOnAllRowsIncludingReopenedReplay \
-  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/JobBatchExtractorForcedPathTest.java#unforcedPathTakesTheUnchangedBranch \
-  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/JobBatchExtractorForcedPathTest.java#sameCollectionTagStillTakesTheUnchangedBranch \
-  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/JobBatchExtractorForcedPathTest.java#blankClaimCollectionMatchesIndexedDefaultCollection \
-  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/JobBatchExtractorForcedPathTest.java#preP3KeyForTheSameShapeSilentlyFailsToForce \
-  --check modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/AsciiFirstUtf8QueuedRestartTest.java#newlyIndexedAsciiFirstUtf8SurvivesRestart \
-  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ExtractionFidelityIndexingTest.java#ordinaryIngestionRepairsHistoricalExtractionAndStaysCurrentAfterReopening \
-  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ExtractionFidelityIndexingTest.java#missingSourceEvidenceRepairsUnchangedContent \
-  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingDocumentOpsScalarIntegrationTest.java#changedFileReplacesScoreAndForcedUnchangedLegacyFileAcquiresOne \
-  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/LegacyChunkBackfillTest.java#completeLegacyScanBackfillsWithoutExtractionOrEmbeddingAndSurvivesReopen \
-  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/SourceWitnessCertificationTest.java#unmodifiedShortcutReadsContentOnlyOnce \
-  --check modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SourceOwnerPublicationTest.java#unchangedReadmissionUpdatesTheServingLexicalProjectionWithoutParsing
+env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:app-engine:test \
+  --tests '*OrdinaryScanOriginTest.missingOrdinaryV4ScanOperationStaysUnknownInsteadOfThrowing' \
+  --tests '*OrdinaryScanOriginTest.actualOrdinaryScanPublishesParentAndChunksWithUnknownOrigin' \
+  -PskipWebBuild=true
 ```
 
-Preservation (run the same selection in the shared before clone and candidate; the runner's
---before mode requires failures, so this command has no --before):
+Focused P1b-ii and P1b-i provenance and preservation checks, including the recorded-operation
+failure guard (whole classes also select nested/parameterized cases):
 
 ```bash
-env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot node scripts/governance/gates/test-intent/run-evidence.mjs \
-  --out gates/test-intent/evidence/redesign-p1b-ii-preservation.json \
-  --check modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SourceOwnerPublicationTest.java#unchangedReadmissionKeepsTheCompleteSourceProbeBudget \
-  --check modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SourceEnvelopeSparsePreservationTest.java#sourceWideBatchRetainsLegacyChunkSparsePostings \
-  --check modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SourceOwnerPublicationTest.java#supersededClaimReleasedAfterSuccessorCannotRestoreItsOwner \
-  --check modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/RestoredMtimeQueuedRestartTest.java \
-  --check modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/Release030ReplayRetentionTest.java#committedNativeFileRecoveredAsUnchangedKeepsItsAdmission \
-  --check modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/IndexedSourceMaintenanceTest.java#C17RenameReplaysAfterIdentityRekeyAndReplacesDestinationPublishedBeforeTheFence \
-  --check modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/IndexedSourceMaintenanceTest.java#C20RefusedOrEqualNormalizedMappingLeavesDestinationAndIdentityUntouched \
-  --check modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobQueueMigrationTest.java#futureSchemaIsRefusedBeforeDdlAndDatabaseBytesRemainUnchanged \
-  --check modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobQueueMigrationTest.java#futureVersionInWalIsRefusedBeforeWritableOpen \
-  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/rag/ChunkDocumentWriterTest.java#supplementaryChunksAreExactAndPendingAfterFreshWriteRegenerationAndReopen \
-  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/rag/ChunkDocumentWriterTest.java#canonicalZeroChunkDeclarationsQualifyFreshAndReopenedLibraries \
-  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/rag/ChunkDocumentWriterTest.java#invalidPlanIsRefusedBeforeParentAndLexicalPublication \
-  --check modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetMovePublicationTest.java#C21AcceptedPhysicalMoveReplacesHistoricOrRacingDestinationFamily \
-  --check modules/indexing/src/test/java/io/justsearch/indexing/SourceEnvelopeUnknownOriginTest.java#versionedEnvelopeWithoutOriginIsUnknownOriginRatherThanLegacy \
-  --check modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/SourceOriginLookupTest.java#importsResolveOnlyTheirOperationAndNormalizedRootAfterReopen \
-  --check modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/SourceOriginLookupTest.java#watchedAdmissionsUseDeclaredRootAndMissingRecordsStayAbsent \
-  --check modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/SourceOriginMigrationTest.java#freshAndV26QueuesHaveDurableOriginStorage \
-  --check modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/SourceOriginMigrationTest.java#failedV27MigrationRollsBackTableAndVersion \
-  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/SourceEnvelopePublicationTest.java#normalPublicationCarriesEnvelopeToTargetActiveAndEveryChunk \
-  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/SourceEnvelopePublicationTest.java#regeneratedChunksCopyTheExistingParentsCompleteEnvelope \
-  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/SourceEnvelopePublicationTest.java#unreadableParentEnvelopeCannotDeleteOrPublishReplacementChunks \
-  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/SourceWitnessCertificationTest.java#unstableShortcutDefersWithoutExtractionAndRetryPublishesNewBytes \
-  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/SourceStoragePublicationTest.java#topologyChangesNeverCommitStaleKnownStorage \
-  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/SourceStoragePublicationTest.java#unchangedTopologyKeepsDiscoveryIndependentOfSourceCount \
-  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/SourceStoragePublicationTest.java#selfConsistentDeviceEvidenceDeterminesCommittedStorage \
-  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/services/StorageObservationSnapshotTest.java#effectiveMountAndBindSubtreesHaveIndependentKeys \
-  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/services/StorageObservationSnapshotTest.java#uncertainEffectiveMountNeverFallsBackToAncestor \
-  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/services/StorageObservationSnapshotTest.java#uuidAndDeviceDiscoveryDoNotGrowWithUnchangedSourceCount \
-  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/services/StorageObservationSnapshotTest.java#changedOrUnreadableTopologyBeforeAndBetweenSourcesCannotReturnStaleKnown \
-  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/services/StorageObservationSnapshotTest.java#ambiguousAndMalformedUuidAliasesCannotIdentifyADevice \
-  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/services/StorageObservationSnapshotTest.java#nonLinuxObservationDoesNotInventStorage \
-  --check modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SourceEnvelopePreservationTest.java#catalogKeepsEnvelopeThroughEnrichmentAndMetadataPatches \
-  --check modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SourceEnvelopePreservationTest.java#envelopeAdditionsUseBothExistingParityCertificationPaths \
-  --check modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SourceEnvelopePreservationTest.java#malformedEnvelopeNeverDecodesKnown \
-  --check modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SourceEnvelopePreservationTest.java#populatedLegacyIndexOpensAndStampsNewFingerprintOnlyAfterSuccessfulCommit
+env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew \
+  :modules:adapters-lucene:test \
+  --tests 'io.justsearch.adapters.lucene.runtime.SourceEnvelopePreservationTest' \
+  --tests 'io.justsearch.adapters.lucene.runtime.SourceEnvelopeSparsePreservationTest' \
+  :modules:app-engine:test \
+  --tests 'io.justsearch.app.engine.EngineForgetMovePublicationTest' \
+  --tests 'io.justsearch.app.engine.OrdinaryScanOriginTest' \
+  --tests 'io.justsearch.app.engine.RecordedIngestionCoordinatorTest' \
+  :modules:indexer-worker:test \
+  --tests 'io.justsearch.indexerworker.loop.AsciiFirstUtf8QueuedRestartTest' \
+  --tests 'io.justsearch.indexerworker.loop.RestoredMtimeQueuedRestartTest' \
+  --tests 'io.justsearch.indexerworker.loop.SourceOwnerPublicationTest' \
+  --tests 'io.justsearch.indexerworker.queue.JobQueueMigrationTest' \
+  --tests 'io.justsearch.indexerworker.queue.SourceOriginLookupTest' \
+  --tests 'io.justsearch.indexerworker.queue.SourceOriginMigrationTest' \
+  --tests 'io.justsearch.indexerworker.server.Release030ReplayRetentionTest' \
+  --tests 'io.justsearch.indexerworker.services.IndexedSourceMaintenanceTest' \
+  --tests 'io.justsearch.indexerworker.services.PruneLatePublicationTest' \
+  :modules:indexing:test \
+  --tests 'io.justsearch.indexing.SourceEnvelopeUnknownOriginTest' \
+  :modules:worker-services:test \
+  --tests 'io.justsearch.indexerworker.loop.ExtractionFidelityIndexingTest' \
+  --tests 'io.justsearch.indexerworker.loop.IndexingDocumentOpsScalarIntegrationTest' \
+  --tests 'io.justsearch.indexerworker.loop.IndexingLoopTest' \
+  --tests 'io.justsearch.indexerworker.loop.JobBatchExtractorForcedPathTest' \
+  --tests 'io.justsearch.indexerworker.loop.LegacyChunkBackfillTest' \
+  --tests 'io.justsearch.indexerworker.loop.SourceEnvelopePublicationTest' \
+  --tests 'io.justsearch.indexerworker.loop.SourceStoragePublicationTest' \
+  --tests 'io.justsearch.indexerworker.loop.SourceWitnessCertificationTest' \
+  --tests 'io.justsearch.indexerworker.rag.ChunkDocumentWriterTest' \
+  --tests 'io.justsearch.indexerworker.services.StorageObservationSnapshotTest' \
+  -PskipWebBuild=true --continue
 ```
 
-The builder runs Gradle through js-gradle-slot, one background invocation at a time. Module suites:
+The resolver has one invocation, SqliteJobQueue.sourceOriginId, used by JobBatchWriter's
+publication envelope for normal and metadata-only publications. A null scan id skips it;
+ordinary UUIDv4 and older opaque scan ids retain the original key for the existing origin
+lookup. Canonical UUIDv7 keys still query the operation store, whose failures propagate.
+Moves use movedSourceOriginId without invoking this resolver. No other resolver caller exists.
+
+Module suites and repository gates (background, sequential):
 
 ```bash
-js-gradle-slot ./gradlew :modules:indexing:test :modules:worker-core:test :modules:indexer-worker:test :modules:worker-services:test :modules:adapters-lucene:test :modules:app-engine:test -PskipWebBuild=true --continue
+env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:indexing:test :modules:worker-core:test :modules:indexer-worker:test :modules:worker-services:test :modules:adapters-lucene:test :modules:app-engine:test -PskipWebBuild=true --continue
+env -u DISPLAY -u WAYLAND_DISPLAY node scripts/dev/java-prepush.mjs --unreferenced
 node scripts/governance/run.mjs --gate test-intent --mode gate
-node scripts/dev/java-prepush.mjs --unreferenced
 ```
+
+OrdinaryScanOriginTest is an isolated new test source (exempt from test-intent entries).
+Its three checks are missingOrdinaryV4ScanOperationStaysUnknownInsteadOfThrowing,
+actualOrdinaryScanPublishesParentAndChunksWithUnknownOrigin, and
+recordedOperationLookupFailureStillSurfaces. The B1 repair assignment supplies their
+expectations: ordinary scans keep watched-root lookup or origin unknown; failures for a
+recorded operation still surface. Execution evidence JSON and acceptance records are left
+to the orchestrator/verifier, per the B1 assignment.
 
 ## Acceptance records

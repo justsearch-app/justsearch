@@ -21,6 +21,7 @@ import io.justsearch.app.api.operations.CanonicalOperationArguments;
 import io.justsearch.app.api.operations.OperationAttemptRunner;
 import io.justsearch.app.api.operations.OperationAttemptRunner.Reconciliation;
 import io.justsearch.app.api.operations.OperationReceipt;
+import io.justsearch.app.api.operations.OperationKeys;
 import io.justsearch.app.api.operations.OperationRecord;
 import io.justsearch.app.api.operations.OperationState;
 import io.justsearch.app.api.operations.OperationStore;
@@ -460,11 +461,16 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
       CheckedBulkRuntime bulkRuntime, CheckedGapAcceptance gapAcceptance) throws IOException {
     synchronized (lock) {
       if (attached != null) throw new IOException("Recorded ingestion still owns its prior queue");
-      queue.useSourceOriginAuthority(key -> operations.find(key).map(row -> {
-        if (row.descriptor().kind() != OperationKind.INGEST || row.descriptor().operationRef() != null) return key;
-        try { return RecordedIngestChild.parentKey(row.descriptor()); }
-        catch (IllegalArgumentException invalid) { return key; }
-      }).orElse(key), authority.roots()::snapshotBindings);
+      queue.useSourceOriginAuthority(key -> {
+        // Ordinary walks use scan ids, not recorded-operation keys. Keep their existing lookup.
+        try { OperationKeys.timestampMillis(key); }
+        catch (IllegalArgumentException ordinaryScan) { return key; }
+        return operations.find(key).map(row -> {
+          if (row.descriptor().kind() != OperationKind.INGEST || row.descriptor().operationRef() != null) return key;
+          try { return RecordedIngestChild.parentKey(row.descriptor()); }
+          catch (IllegalArgumentException invalid) { return key; }
+        }).orElse(key);
+      }, authority.roots()::snapshotBindings);
       Attached physical = new Attached(queue, generation, online, bulkRuntime, gapAcceptance);
       attached = physical;
       try {
