@@ -22,9 +22,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Repair round 3 of "Remove files" (design D4), on real files in a temporary models folder only: a
- * captured file is deleted only through a handle checked to be that file, never by name after the
- * last check (where there is no such handle the file is kept); and a new file that appears at a
+ * Repair round 3 of "Remove files" (design D4), on real files in a temporary models folder only: on
+ * a platform without directory handles a captured file swapped after its last check is kept, never
+ * deleted (POSIX checks the entry and then unlinks it by name relative to the checked removal
+ * folder's handle, which the decided threat model accepts: programs under the user's own account
+ * are trusted); and a new file that appears at a
  * canonical place after its own file was captured is kept, reported, and keeps the removal from
  * being reported as complete, also after a crash.
  */

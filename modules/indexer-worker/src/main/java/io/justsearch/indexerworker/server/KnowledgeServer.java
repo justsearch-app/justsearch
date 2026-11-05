@@ -786,12 +786,16 @@ public final class KnowledgeServer implements Closeable {
    * session: the serving view's, a retired view's that issued work (forked leases included) has not
    * released, a recovery's, a candidate's, a preparing, composing or rejected owner, or a boot or
    * failed composition surface not yet retired. Read from the owners themselves at the call, never
-   * from a health observation. Empty while a composition or swap holds the runtime lock: nothing
-   * can be confirmed then, and the caller refuses.
+   * from a health observation. Empty while a composition or swap holds the runtime lock, and while
+   * the boot model composition has not finished (it composes on its own thread without that lock,
+   * and a reranker it is opening belongs to no owner yet): nothing can be confirmed then, and the
+   * caller refuses.
    */
   public java.util.Optional<Boolean> rerankerSessionHeld() {
     if (!runtimeSwapLock.tryLock()) return java.util.Optional.empty();
     try {
+      CompletableFuture<Void> boot = deferredModelInit;
+      if (boot != null ? !boot.isDone() : running) return java.util.Optional.empty();
       var index = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<EncoderSet, Boolean>());
       var query = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<QueryRoleSet, Boolean>());
       retainedOwners(index, query);

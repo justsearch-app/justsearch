@@ -63,6 +63,26 @@ final class RerankerRemovalQueryOwnersTest {
   }
 
   @Test
+  void nothingIsConfirmedWhileTheBootModelCompositionIsStillRunning(@TempDir Path dir)
+      throws Exception {
+    try (var f = new KnowledgeServerQuerySettingsOwnerTest.QueryFixture(dir, 4096L)) {
+      // The boot composition opens its models on its own thread, outside the runtime lock; a
+      // reranker it is opening belongs to no owner yet.
+      var boot = new java.util.concurrent.CompletableFuture<Void>();
+      f.server.deferredModelInit = boot;
+      try {
+        assertEquals(Optional.empty(), f.server.rerankerSessionHeld(),
+            "unknown while the boot composition runs: the removal refuses");
+      } finally {
+        boot.complete(null); // closing the server waits for the boot composition
+      }
+
+      assertEquals(Optional.of(true), f.server.rerankerSessionHeld(),
+          "once it finished, the owners answer: the serving view holds Best match first");
+    }
+  }
+
+  @Test
   void aForkedChildLeaseKeepsBestMatchFirstInUseAfterItsParentIsReleased(@TempDir Path dir)
       throws Exception {
     try (var f = new KnowledgeServerQuerySettingsOwnerTest.QueryFixture(dir, 4096L);
