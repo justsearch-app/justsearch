@@ -652,3 +652,14 @@ which is what that route returned there. No independent acceptance is claimed by
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1aa52-cfff-70a2-846b-8515de48718b",
+  "verdict": "accept",
+  "digest": "sha256:6084485a8891710e197196aa487d33fa24010e618fd3d6d05d8f708e358cff11",
+  "note": "After the security repair on fcccb2528c: missing, null, number and object arguments in either read refuse and send nothing; matching empty strings allow (14 unit, 14 Chromium cases); entry 20's type checks fail before by assertion and are marked repaired; all 45 Chromium checks pass. Earlier rounds: round 1 and 2 accepted the changeset with product failures since repaired; round 3 rejected entry 20. Transcribed by the orchestrator from the verifier's answer (Codex sandbox)."
+}
+```
