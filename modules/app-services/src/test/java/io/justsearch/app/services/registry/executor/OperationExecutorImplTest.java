@@ -1885,6 +1885,33 @@ final class OperationExecutorImplTest {
     assertEquals("core.test-medium", sink.get(0).operationId());
   }
 
+  @Test
+  void gateIdentityExistsBeforePublicationAndSurvivesTheConfirmation() throws Exception {
+    HandlerRegistry handlers = new HandlerRegistry();
+    OperationRef id = new OperationRef("core.test-medium");
+    handlers.register(id, (args, engineContext) -> OperationResult.success("ran"));
+    var sink = new ArrayList<io.justsearch.app.observability.operations.AuthorizationOutcomeEntry>();
+    OperationDispatcher executor = latticeExecutorWithGateSink(handlers, new ConsentCapsuleService(), sink);
+    Operation op = makeMediumOp(id);
+    InvocationProvenance untrusted =
+        InvocationProvenance.fromEngineContext(
+            io.justsearch.app.services.TestEngineContexts.forTransport(TransportTag.LLM_EMISSION),
+            ExecutorTag.UI, Instant.now(), Optional.empty());
+
+    var required = assertThrows(
+        ConfirmationRequiredException.class,
+        () -> executor.dispatch(op, "{}", untrusted, Optional.empty(), io.justsearch.app.services.TestEngineContexts.forProvenance(untrusted)),
+        "the gate still throws — the emit is additive, fail-closed preserved");
+    assertEquals(1, sink.size(), "the gate firing was recorded");
+    assertEquals(
+        io.justsearch.app.observability.operations.AuthorizationDisposition.GATED,
+        sink.get(0).disposition());
+    var wire = io.justsearch.app.observability.ledger.ActionLedgerProjection.toWireRow(
+        io.justsearch.app.observability.ledger.ActionLedgerProjection.projectGate(sink.getFirst()));
+    org.junit.jupiter.api.Assertions.assertNotNull(wire.get("pendingId"), "every new waiting row must have an exact request identity");
+    assertEquals(required.getClass().getMethod("pendingId").invoke(required), wire.get("pendingId"));
+  }
+
   /** A capsule-satisfied gate records APPROVED and proceeds to the handler. */
   @Test
   void capsuleApprovalEmitsApprovedOutcome() {

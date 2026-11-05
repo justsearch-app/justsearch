@@ -355,7 +355,7 @@ class AuthorizationControllerTest {
   @Test
   void approve_lateAdmissionFailureAfterConsume_isUnsafeAndPendingIsConsumed() {
     ConsentCapsuleService failingCapsuleService = mock(ConsentCapsuleService.class);
-    when(failingCapsuleService.mint(anyString(), anyString(), any(SourceTier.class)))
+    when(failingCapsuleService.mint(anyString(), anyString(), any(SourceTier.class), anyString()))
         .thenThrow(
             new io.justsearch.app.api.EngineAdmissionException(
                 io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT, 1));
@@ -375,7 +375,7 @@ class AuthorizationControllerTest {
     assertTrue(
         pendingStore.peek(pendingId).isEmpty(),
         "late failure must not restore the consumed pending");
-    verify(failingCapsuleService).mint(anyString(), anyString(), any(SourceTier.class));
+    verify(failingCapsuleService).mint(anyString(), anyString(), any(SourceTier.class), anyString());
     verifyNoInteractions(dispatcher);
   }
 

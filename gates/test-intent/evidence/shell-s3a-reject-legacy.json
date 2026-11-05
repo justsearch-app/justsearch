@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-04T20:55:49.286Z",
+  "revision": "30e7b40b0d605059b5e160ed56bdbb546451fa26",
+  "tree": "757a5c08bea129898d71452b50efa564803484bd",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/frameStatus.authorization.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/pm5ur1ee/tmp/test-intent-vitest-175-1793825745115.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 4170
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.authorization.test.ts#legacy gate rows without a pending id never hide an answered row for the same operation",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.authorization.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:237e5634d90bf557d1af126a590ae8700c969bee0c19e93a49e847b24c0eb10c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "legacy gate rows without a pending id never hide an answered row for the same operation",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:91fd34b7113dac54151b3559a0109b86a4d03311a2062bbab32260e384f20247"
+}

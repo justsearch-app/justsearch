@@ -38,4 +38,11 @@ public record PendingAuthorizationEvent(
     GateBehavior gateBehavior,
     Instant createdAt,
     Instant expiresAt,
-    TransportTag transport) {}
+    TransportTag transport,
+    String disposition) {
+  public PendingAuthorizationEvent(String pendingId, String operationId, SourceTier sourceTier,
+      RiskTier riskTier, GateBehavior gateBehavior, Instant createdAt, Instant expiresAt,
+      TransportTag transport) {
+    this(pendingId, operationId, sourceTier, riskTier, gateBehavior, createdAt, expiresAt, transport, "GATED");
+  }
+}

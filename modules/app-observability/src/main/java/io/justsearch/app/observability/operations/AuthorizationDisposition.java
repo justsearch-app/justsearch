@@ -17,5 +17,7 @@ public enum AuthorizationDisposition {
   /** The gate produced a categorical DENY — dispatch refused outright. */
   DENIED,
   /** A non-AUTO gate fired and was satisfied by a valid consent capsule — dispatch proceeded. */
-  APPROVED
+  APPROVED,
+  /** An unanswered authorization reached its deadline. */
+  EXPIRED
 }

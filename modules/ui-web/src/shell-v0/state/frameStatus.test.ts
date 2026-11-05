@@ -117,7 +117,8 @@ describe('frame status projection', () => {
     const m = derive({ authorizations: [request], advisories: [broadcast] });
     expect(m.sections.needs.map(f => f.id)).toEqual(['authorization:exact-target1']);
     expect(m.sections.needs[0]!.actions).toEqual([{ kind: 'authorization', target: 'exact-target1', label: 'Review request' }]);
-    // L4b — while the request waits it lives in Needs you only, never also as an Earlier row.
+    // L4b/L5: while waiting, its broadcast cannot duplicate the request in Earlier.
+    expect(m.sections.earlier.find(f => f.id === 'advisory:auth-adv')).toBeUndefined();
     expect(m.sections.earlier.map(f => f.id)).not.toContain('advisory:auth-adv');
     // Answered elsewhere / withdrawn: the request leaves, the history stays inert.
     const answered = derive({ authorizations: [], advisories: [broadcast] });
@@ -145,19 +146,22 @@ describe('frame status projection', () => {
   it('L4b an MCP request also recorded as a GATED ledger row waits in Needs you only; the row joins Earlier once it is answered or expires', () => {
     // The real shapes: PendingAuthorizationAdvisoryProjector's advisory (classExtras pendingId,
     // operationId, riskTier, gateBehavior, expiresAt) and ActionLedgerProjection.toWireRow's gate row
-    // for the same firing (no pending id), projected by the ledger client the controller uses.
+    // for the same firing (the exact pending id), projected by the ledger client the controller uses.
+    // The older row predates request identity and must remain visible.
     const expiresAt = new Date(now + 120_000).toISOString();
     const request = { pendingId: '7f1c2a9e-mcp', operationId: 'core.ingest-files', expiresAt };
     const broadcast: AdvisoryRecord = { key: '7f1c2a9e-mcp', origin: 'stream', acknowledged: false, sourceRenderHint: 'REQUIRES_ACK', event: {
       id: '7f1c2a9e-mcp', classId: 'authorization.pending', occurredAt: new Date(now - 1_000).toISOString(), renderHint: 'REQUIRES_ACK',
       classExtras: { pendingId: '7f1c2a9e-mcp', operationId: 'core.ingest-files', riskTier: 'MEDIUM', gateBehavior: 'CONFIRM', expiresAt },
       diagnosticsLink: null, provenance: null, primaryAction: null, bodyI18nKey: null } };
-    const row = (occurredAt: string, disposition: string): BackendLedgerEntry => ({ id: `gate:${occurredAt}:core.ingest-files:${disposition}`,
+    const row = (occurredAt: string, disposition: string, pendingId?: string): BackendLedgerEntry => ({ id: `gate:${occurredAt}:core.ingest-files:${disposition}`,
       kind: 'gate', occurredAt, originator: 'agent', transport: 'MCP', operationId: 'core.ingest-files', outcome: disposition,
-      disposition, gateBehavior: 'CONFIRM', sourceTier: 'USER' } as BackendLedgerEntry);
-    const gated = projectBackend(row(new Date(now - 1_000).toISOString(), 'GATED'));
+      disposition, gateBehavior: 'CONFIRM', sourceTier: 'USER', ...(pendingId ? { pendingId } : {}) } as BackendLedgerEntry);
+    const gated = projectBackend(row(new Date(now - 1_000).toISOString(), 'GATED', request.pendingId));
     const earlierGate = projectBackend(row(new Date(now - 3_600_000).toISOString(), 'GATED'));
-    const requested = (m: ReturnType<typeof derive>) => m.sections.earlier.filter(f => f.title.startsWith('Approval requested')).map(f => f.id);
+    // Observe the same gate history rows independent of their terminal outcome wording.
+    const requested = (m: ReturnType<typeof derive>) => m.sections.earlier
+      .filter(f => f.id === `activity:${gated.id}` || f.id === `activity:${earlierGate.id}`).map(f => f.id);
     const waiting = derive({ authorizations: [request], advisories: [broadcast], activity: [earlierGate, gated] });
     expect(waiting.sections.needs.map(f => f.id)).toEqual(['authorization:7f1c2a9e-mcp']);
     // The earlier, already answered request for the same operation stays history.

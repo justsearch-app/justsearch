@@ -24,6 +24,9 @@ public interface ConsentCapsuleAuthority {
   @FunctionalInterface
   interface Consumption {
     void publish();
+
+    /** Exact pending decision already recorded by the approval store, when present. */
+    default String pendingId() { return null; }
   }
 
   /**
@@ -33,6 +36,17 @@ public interface ConsentCapsuleAuthority {
    * ({@code != TRUSTED}) grants, leaving a user's own pending approval intact.
    */
   String mint(String operationId, String argumentsJson, SourceTier sourceTier);
+
+  /** Mint after the pending store has published this exact approval decision. */
+  default String mint(String operationId, String argumentsJson, SourceTier sourceTier, String pendingId) {
+    return mint(operationId, argumentsJson, sourceTier);
+  }
+
+  /** Mint prepared consent after the pending store has published this approval. */
+  default String mintPrepared(String operationId, String argumentsJson, SourceTier sourceTier,
+      String operationKey, java.util.UUID preparationNonce, String pendingId) {
+    return mintPrepared(operationId, argumentsJson, sourceTier, operationKey, preparationNonce);
+  }
 
   /**
    * Mints a capsule of unknown provenance — defaults to the strictest, most-revocable posture

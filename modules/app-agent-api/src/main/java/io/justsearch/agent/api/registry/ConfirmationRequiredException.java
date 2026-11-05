@@ -28,6 +28,7 @@ public final class ConfirmationRequiredException extends RuntimeException {
   private final String operationKey;
   private final java.util.UUID preparationNonce;
   private final OperationApprovalPreview approvalPreview;
+  private final String pendingId;
 
   public ConfirmationRequiredException(
       OperationRef operationRef,
@@ -46,6 +47,14 @@ public final class ConfirmationRequiredException extends RuntimeException {
   public ConfirmationRequiredException(OperationRef operationRef, GateBehavior gateBehavior,
       ConfirmStrategy declaredStrategy, SourceTier sourceTier, String operationKey, java.util.UUID preparationNonce,
       OperationApprovalPreview approvalPreview) {
+    this(operationRef, gateBehavior, declaredStrategy, sourceTier, operationKey, preparationNonce,
+        approvalPreview, "pa-" + java.util.UUID.randomUUID().toString().replace("-", ""));
+  }
+
+  /** Preserve request identity when enriching a frozen preparation's approval preview. */
+  public ConfirmationRequiredException(OperationRef operationRef, GateBehavior gateBehavior,
+      ConfirmStrategy declaredStrategy, SourceTier sourceTier, String operationKey,
+      java.util.UUID preparationNonce, OperationApprovalPreview approvalPreview, String pendingId) {
     super(
         "Confirmation required for operation "
             + Objects.requireNonNull(operationRef, "operationRef").value()
@@ -60,7 +69,10 @@ public final class ConfirmationRequiredException extends RuntimeException {
     this.preparationNonce = preparationNonce;
     if (approvalPreview != null) Objects.requireNonNull(preparationNonce, "preparationNonce");
     this.approvalPreview = approvalPreview;
+    this.pendingId = Objects.requireNonNull(pendingId, "pendingId");
   }
+
+  public String pendingId() { return pendingId; }
 
   public OperationApprovalPreview approvalPreview() { return approvalPreview; }
 

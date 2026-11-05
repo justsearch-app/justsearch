@@ -1,0 +1,61 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-04T20:22:18.664Z",
+  "revision": "ea4e44dfb50f827e46d7dde82d18ac0e2186d37d",
+  "tree": "11de925733b626504c359efe3e235c7aec5fe79a",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.mcp.McpOperationKeyTest.approvalRetainsKeyAndPublicArguments\" --tests \"io.justsearch.ui.api.mcp.McpOperationKeyTest.preparedGateRetainsServerMintedKeyAndNonceWithoutCallerKey\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 8398
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpOperationKeyTest.java#approvalRetainsKeyAndPublicArguments",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpOperationKeyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:754cf32e2400686bd4058e590389b545323b0a67606a55261836e13b0da86055",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "approvalRetainsKeyAndPublicArguments()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpOperationKeyTest.java#preparedGateRetainsServerMintedKeyAndNonceWithoutCallerKey",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpOperationKeyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:754cf32e2400686bd4058e590389b545323b0a67606a55261836e13b0da86055",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "preparedGateRetainsServerMintedKeyAndNonceWithoutCallerKey()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:17b7658ffcb8c6f30b1b4c239110e145eb4617e00ccbc01ee377572816449ebe"
+}

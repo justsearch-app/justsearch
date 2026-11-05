@@ -219,8 +219,14 @@ public sealed interface ActionEvent
       String operationId,
       String disposition,
       String gateBehavior,
-      String sourceTier)
+      String sourceTier,
+      Optional<String> pendingId)
       implements ActionEvent {
+    public Gate(String id, Instant occurredAt, String originator, String transport,
+        String operationId, String disposition, String gateBehavior, String sourceTier) {
+      this(id, occurredAt, originator, transport, operationId, disposition, gateBehavior, sourceTier,
+          Optional.empty());
+    }
     @Override
     public ActionEventKind kind() {
       return ActionEventKind.GATE;

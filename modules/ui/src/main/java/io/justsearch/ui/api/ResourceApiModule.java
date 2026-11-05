@@ -435,6 +435,7 @@ final class ResourceApiModule implements ApiModule {
 
     // Tempdoc 550 Slice A1 (Authorize face): mint a consent capsule on user approval.
     app.post("/api/authorizations/approve", authorizationController::handleApprove, ActivityRole.USER_ACTION);
+    app.post("/api/authorizations/reject", authorizationController::handleReject, ActivityRole.USER_ACTION);
     // Tempdoc 655 fix pass: point-to-point fetch of a pending's decision content by id — the
     // SSE broadcast deliberately omits it (privacy boundary); this is where a subscriber fetches
     // it before presenting the approval ceremony.

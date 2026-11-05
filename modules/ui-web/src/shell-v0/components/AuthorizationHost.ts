@@ -104,6 +104,8 @@ export class AuthorizationHost extends JfElement {
    * and listed in the status panel, and only Review (or the next prompt) presents a ceremony again.
    */
   private dismissed = false;
+  private rejecting: CeremonyItem | null = null;
+  private rejectionError = '';
 
   constructor() {
     super();
@@ -357,6 +359,7 @@ export class AuthorizationHost extends JfElement {
 
   /** Make `item` the presented prompt (or none) with fresh state; nothing done before it can answer it. */
   private show(item: CeremonyItem | null): void {
+    this.rejectionError = '';
     this.active = item;
     this.typed = '';
     this.allowAlways = false;
@@ -464,15 +467,33 @@ export class AuthorizationHost extends JfElement {
     return prompt.riskTier !== 'HIGH' && prompt.allowAlwaysSupported !== false;
   }
 
-  private decide(approved: boolean, expectedId: string): void {
+  private async decide(approved: boolean, expectedId: string): Promise<void> {
     const current = this.active;
-    if (current?.kind !== 'authorize' || current.prompt.pendingId !== expectedId) return;
+    if (current?.kind !== 'authorize' || current.prompt.pendingId !== expectedId || this.rejecting === current) return;
     if (current?.kind === 'authorize') {
       if (this.decided.has(current.prompt.pendingId)) return;
       if (current.prompt.expiresAt && Date.parse(current.prompt.expiresAt) <= Date.now()) {
         this.cancelMatching(prompt => prompt.pendingId === current.prompt.pendingId); return;
       }
       if (approved && current.prompt.gateBehavior === 'TYPED_CONFIRM' && this.typed !== current.prompt.operationId) return;
+      if (!approved && current.prompt.reject) {
+        this.rejecting = current;
+        this.rejectionError = '';
+        this.requestUpdate();
+        try {
+          await current.prompt.reject();
+        } catch {
+          if (this.active === current) this.rejectionError = 'The request could not be cancelled. Try again.';
+          return;
+        } finally {
+          if (this.rejecting === current) this.rejecting = null;
+          this.requestUpdate();
+        }
+        if (this.active !== current) {
+          this.cancelMatching(prompt => prompt.pendingId === current.prompt.pendingId);
+          return;
+        }
+      }
       this.decided.add(current.prompt.pendingId);
       if (this.decided.size > 500) this.decided.delete(this.decided.values().next().value!);
     }
@@ -598,8 +619,9 @@ export class AuthorizationHost extends JfElement {
             Always allow this action (don't ask again)
           </label>`
         : ''}
+      ${this.rejectionError ? html`<p role="alert">${this.rejectionError}</p>` : ''}
       <div class="actions">
-        <jf-button class="deny" variant="danger" data-testid="authorization-deny" label="Deny" .onActivate=${() => this.decide(false, prompt.pendingId)}>
+        <jf-button ?disabled=${this.rejecting === this.active} class="deny" variant="danger" data-testid="authorization-deny" label="Deny" .onActivate=${() => this.decide(false, prompt.pendingId)}>
           Deny
         </jf-button>
         <jf-button
@@ -607,7 +629,7 @@ export class AuthorizationHost extends JfElement {
           variant="primary"
           data-testid="authorization-approve"
           label="Approve"
-          ?disabled=${!matches}
+          ?disabled=${!matches || this.rejecting === this.active}
           .onActivate=${() => this.decide(true, prompt.pendingId)}
         >
           Approve

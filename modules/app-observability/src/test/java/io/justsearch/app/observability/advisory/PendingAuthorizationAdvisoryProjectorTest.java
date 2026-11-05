@@ -109,4 +109,20 @@ final class PendingAuthorizationAdvisoryProjectorTest {
     var ev = event("pa-abc123");
     assertEquals(projector.dedupKey(ev), projector.dedupKey(ev));
   }
+  @Test
+  void terminalDecisionsDoNotAnnounceAnotherApprovalRequest() throws Exception {
+    for (String disposition : java.util.List.of("DENIED", "APPROVED", "EXPIRED")) {
+      PendingAuthorizationEvent terminal;
+      try {
+        terminal = PendingAuthorizationEvent.class.getConstructor(String.class, String.class,
+            SourceTier.class, RiskTier.class, GateBehavior.class, Instant.class, Instant.class,
+            TransportTag.class, String.class).newInstance("pa-terminal", "core.ingest-files",
+                SourceTier.UNTRUSTED, RiskTier.MEDIUM, GateBehavior.TYPED_CONFIRM, T0,
+                T0.plusSeconds(300), TransportTag.MCP, disposition);
+      } catch (NoSuchMethodException beforeLifecycleEvents) {
+        terminal = event("pa-terminal");
+      }
+      assertTrue(projector.project(terminal).isEmpty(), "terminal " + disposition + " must not request approval");
+    }
+  }
 }

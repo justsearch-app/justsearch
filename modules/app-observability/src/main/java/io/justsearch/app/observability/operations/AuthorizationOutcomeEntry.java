@@ -37,7 +37,13 @@ public record AuthorizationOutcomeEntry(
     RiskTier riskTier,
     GateBehavior gateBehavior,
     AuthorizationDisposition disposition,
-    Instant occurredAt) {
+    Instant occurredAt,
+    String pendingId) {
+
+  public AuthorizationOutcomeEntry(String operationId, TransportTag transport, SourceTier sourceTier,
+      RiskTier riskTier, GateBehavior gateBehavior, AuthorizationDisposition disposition, Instant occurredAt) {
+    this(operationId, transport, sourceTier, riskTier, gateBehavior, disposition, occurredAt, null);
+  }
 
   public AuthorizationOutcomeEntry {
     Objects.requireNonNull(operationId, "operationId");

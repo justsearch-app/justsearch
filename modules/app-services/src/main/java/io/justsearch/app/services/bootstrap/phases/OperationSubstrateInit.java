@@ -221,6 +221,7 @@ public final class OperationSubstrateInit {
     io.justsearch.app.observability.operations.PendingAuthorizationChangeRegistry
         pendingAuthorizationChangeRegistry =
             new io.justsearch.app.observability.operations.PendingAuthorizationChangeRegistry();
+    pendingAuthorizationStore.setLifecycleSinks(authorizationOutcomeStore, pendingAuthorizationChangeRegistry);
     // Tempdoc 655 long-term design pass: one bootstrap-time subscription onto the registry both
     // transports already broadcast into — mirrors HealthRecoveryProjector's wiring shape below.
     // Both MCP and browser-originated gates get advisory coverage for free; no edits needed at
