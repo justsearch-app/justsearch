@@ -348,3 +348,14 @@ owned temporary SQLite files and build/test directories, plus the shared Gradle 
 and its admission slots. They do not start the dev stack, use a GPU, or touch ~/.justsearch.
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "d39abd9d-eeb9-425d-bc72-6e89fca78097",
+  "verdict": "accept",
+  "digest": "sha256:37eec189dd0238aeca5884cacc9dd534e92bef1b40f9a1d0315fe3c5e84bf7b9",
+  "note": "Claude acceptor on 28f5ad3faf: all seven entries accept (RE6, M7, M28 repaired; P12 primitive; version pins 6->7 and 27->28 New with fail-before; Adaptation); evidence by run-evidence validated. Behaviour: Claude verifier 23db5bbe on 799fdb505c (R-E, migrations, rollback, mixed upgrade, older-binary refusal, evaluator, inert hooks; 13,844 cases 0 failures)."
+}
+```
