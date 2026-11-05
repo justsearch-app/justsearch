@@ -8,6 +8,8 @@ import sys
 from unittest.mock import Mock
 
 import pytest
+
+from .conftest import ready_distribution
 from click.testing import CliRunner
 
 from jseval import _paths, backend, index_identity
@@ -85,6 +87,7 @@ def test_quality_requests_ten_minute_drain(tmp_path, monkeypatch):
     c = make_collection()
     monkeypatch.setattr(backend, 'source_identity', lambda _: ('commit', None))
     monkeypatch.setattr(backend, 'require_prepared', lambda *a: None)
+    ready_distribution(monkeypatch)
     monkeypatch.setattr(backend, 'bind_command', lambda _, cmd: cmd)
     monkeypatch.setattr(run.platform, 'processor', lambda: 'test CPU')
     monkeypatch.setattr(run.collections, 'resolve_collection', lambda _: (c, config_for(c)))

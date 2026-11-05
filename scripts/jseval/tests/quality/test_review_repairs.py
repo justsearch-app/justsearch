@@ -11,6 +11,8 @@ from unittest.mock import Mock
 
 import pytest
 
+from .conftest import ready_distribution
+
 from jseval import backend
 from jseval.quality import collections, compare, index, run
 from jseval.quality.types import Outcome
@@ -24,7 +26,8 @@ def test_preparation_confirmation_and_teardown_stay_admitted_and_reuse_engine(
     cfg = replace(config, repo_root=index.REPO_ROOT, documents_dir=source, cache_root=tmp_path/'cache')
     monkeypatch.setenv('JS_ADMISSION_DIR', str(tmp_path/'admission'))
     monkeypatch.delenv('JS_ADMISSION_TOKEN', raising=False)
-    monkeypatch.setattr(index.IndexConfig, 'environment', lambda _: env_for(cfg))
+    pinned = env_for(cfg)
+    monkeypatch.setattr(index.IndexConfig, 'environment', lambda _: dict(pinned))
     monkeypatch.setattr(index, '_under_cache', lambda p: p)
     # Boundaries use the real pausable supervisor and locks, with a tiny engine fixture.
     script = '''
@@ -113,69 +116,6 @@ def test_teardown_failure_cannot_publish_preparation_success(tmp_path, monkeypat
     with pytest.raises(index.IndexRefused, match='teardown failed'):
         h.close()
     assert lock.closed
-
-
-def test_cached_preparation_refreshes_distribution_after_query_only_edit(
-        collection, config, tmp_path, monkeypatch):
-    c, source = collection
-    cfg = replace(config, documents_dir=source, cache_root=tmp_path/'cache')
-    (cfg.repo_root/'.gitignore').write_text('build/\n')
-    env = env_for(cfg)
-    query_code = cfg.repo_root / next(p for p in index.QUERY_TIME_ONLY
-                                    if p.endswith('KnowledgeSearchEngine.java'))
-    query_code.parent.mkdir(parents=True)
-    query_code.write_text('// original query code\n')
-    monkeypatch.setattr(backend, 'source_identity', lambda _: ('commit', index._file_hash(query_code)))
-    dist = cfg.repo_root/'modules/ui/build/install/ui'
-    (dist/'bin').mkdir(parents=True)
-    (dist/'bin/ui').touch()
-    receipt = dist/'.jseval-source.json'
-    index._write(receipt, list(backend.source_identity(cfg.repo_root)))
-    key, _ = index.compute_index_key(c, cfg, env)
-    root = tmp_path/'entry'
-    data = root/'data'
-    data.mkdir(parents=True)
-    owner = index._population_owner(c, key)
-    index._write(data/'quality-owner.json', owner)
-    entry = {'owner': owner, 'witness': {'generation': 'original'}}
-    index._write(root/'entry.json', entry)
-    index.write_collection(c, root/'collection')
-    from jseval.quality.run import _serial_config
-    index._write(root/'build.json', {'config': _serial_config(cfg), 'env': env,
-                                    'key': key, 'data': str(data), 'adopted': True,
-                                    'parent': index._process(os.getpid())})
-    query_code.write_text('// changed query code\n')
-    assert index.compute_index_key(c, cfg, env)[0] == key
-    with pytest.raises(RuntimeError, match='stale'):
-        backend.require_prepared(cfg.repo_root)
-    events = []
-    def install(repo, launch_env):
-        events.append('install')
-        assert repo == cfg.repo_root
-        assert launch_env['JUSTSEARCH_MODELS_DIR'] == str(cfg.models_dir)
-        index._write(receipt, list(backend.source_identity(repo)))
-    def start(**kwargs):
-        events.append('start')
-        backend.require_prepared(cfg.repo_root)
-        assert kwargs['prepared_only'] is True
-        assert kwargs['startup_admission'] is False
-        return backend.BackendInfo(Mock(), data)
-    monkeypatch.setattr(backend, '_install_distribution', install)
-    monkeypatch.setattr(backend, 'start_backend', start)
-    monkeypatch.setattr(backend, 'stop_backend', lambda *a, **kw: events.append('stop'))
-    monkeypatch.setattr(index, 'add_watched_root', Mock(side_effect=AssertionError('cached index reingested')))
-    monkeypatch.setattr(index, 'witness', lambda *a: entry['witness'])
-    def confirm(handle, adopted_entry):
-        events.append('confirm')
-        assert adopted_entry == entry
-        assert handle.index_build == 'cached'
-        return index.index_identity.ConfirmResult(True, [], {})
-    monkeypatch.setattr(index, '_confirm', confirm)
-    (root/'stop').touch()
-    index._build(root)
-    assert events == ['install', 'start', 'confirm', 'stop']
-    assert index._json(root/'entry.json') == entry
-    assert not (root/'prepared.json').exists()
 
 
 def test_unsettled_runs_cannot_pass_or_be_stored(tmp_path):
@@ -279,6 +219,7 @@ root=Path(sys.argv[1])
 c=collections.load_collection(root/'collection')
 index.IndexConfig.environment=lambda _: {}
 index.compute_index_key=lambda *a: ('key',{})
+index._select_distribution=lambda *a: sys.argv[2]
 index._under_cache=lambda p:p
 original=subprocess.Popen
 admission=Path(index.__file__).resolve().parents[3]/'dev/admission.py'
@@ -294,7 +235,8 @@ os._exit(0)
 '''
     c = make_collection()
     collections.write_collection(c, tmp_path/'collection')
-    subprocess.run([sys.executable, '-c', script, str(tmp_path)], check=True, timeout=10)
+    subprocess.run([sys.executable, '-c', script, str(tmp_path), index._select_distribution()],
+                   check=True, timeout=10)
     monkeypatch.setattr(index.IndexConfig, 'environment', lambda _: {})
     monkeypatch.setattr(index, 'compute_index_key', lambda *a: ('key', {}))
     monkeypatch.setattr(index, '_under_cache', lambda p: p)
@@ -334,9 +276,10 @@ def test_owned_startup_failure_preserves_index_on_health_failure(tmp_path, monke
     index._write(data/'quality-owner.json', owner)
     index._write(root/'entry.json', {'owner': owner})
     lock = (root/'data.quality.lock').open('a+')
-    h = index.IndexHandle(c, index.IndexConfig(), 'key', root, data, 'cached', {}, {}, lock)
+    h = index.IndexHandle(c, index.IndexConfig(), 'key', root, data, 'cached', {}, {index.DISTRIBUTION_ENV: index._select_distribution()}, lock)
     missing = RuntimeError('not ready: install distribution missing')
     monkeypatch.setattr(backend, 'require_prepared', Mock(side_effect=missing if distribution_missing else None))
+    ready_distribution(monkeypatch)
     monkeypatch.setattr(backend, 'start_backend', Mock(side_effect=RuntimeError('engine failed health')))
     with pytest.raises((RuntimeError, index.IndexRefused)):
         h.wait(prepared_only=True)

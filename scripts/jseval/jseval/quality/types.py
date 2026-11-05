@@ -445,6 +445,9 @@ class RunHeader:
     hardware: Mapping[str, Any] = field(default_factory=dict)
     budget: Mapping[str, Any] = field(default_factory=dict)
     request_config_sha256: str = ""
+    # One digest per index-key component (distribution, harness, jdk, ocr, models, runtime...):
+    # what the index was built from, with no machine paths. Empty for records that predate it.
+    identity: Mapping[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         for name in ("collection", "collection_version", "index_key", "commit", "started"):
@@ -460,6 +463,10 @@ class RunHeader:
             _mapping(getattr(self, name), name)
         _need(all(isinstance(k, str) and isinstance(v, str) for k, v in self.model_hashes.items()),
               "model_hashes must map model names to hash strings")
+        _mapping(self.identity, "identity")
+        _need(all(isinstance(k, str) and isinstance(v, str) and re.fullmatch(r"[0-9a-f]{64}", v)
+                  for k, v in self.identity.items()),
+              "identity must map key components to SHA-256 digests")
         legs = _legs(self.expected_legs, "expected_served.legs")
         _need(bool(legs), "expected_served.legs must name at least one leg")
         object.__setattr__(self, "expected_legs", legs)
@@ -487,6 +494,7 @@ class RunHeader:
                                     "reranker": self.expected_reranker},
                 "candidate": {"commit": self.commit, "dirty_hash": self.dirty_hash},
                 "model_hashes": dict(self.model_hashes),
+                "identity": dict(self.identity),
                 "hardware": dict(self.hardware),
                 "started": self.started, "ended": self.ended,
                 "budget": dict(self.budget)}
@@ -508,6 +516,7 @@ class RunHeader:
                    expected_legs=served["legs"], expected_reranker=served["reranker"],
                    commit=cand["commit"], dirty_hash=cand["dirty_hash"],
                    model_hashes=d["model_hashes"],
+                   identity=d["identity"] if "identity" in d else {},
                    hardware=d["hardware"] if "hardware" in d else {},
                    started=d["started"], ended=d.get("ended"),
                    budget=d["budget"] if "budget" in d else {})

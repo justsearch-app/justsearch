@@ -9,6 +9,8 @@ from unittest.mock import Mock
 import httpx
 import pytest
 
+from .conftest import ready_distribution
+
 from jseval import backend
 from jseval.quality import compare, run
 from jseval.quality.types import Outcome, Served, sha256_text
@@ -137,6 +139,7 @@ def test_missing_prepared_index_never_spawns_or_creates_data(tmp_path, monkeypat
     monkeypatch.setattr(index,'compute_index_key',lambda *args: ('key',{}))
     monkeypatch.setattr(index,'_under_cache',lambda p:p)
     monkeypatch.setattr(backend,'require_prepared',lambda *args:None)
+    ready_distribution(monkeypatch)
     spawn = Mock(side_effect=AssertionError('prepared-only must never start a build'))
     monkeypatch.setattr(index.subprocess,'Popen',spawn)
     with pytest.raises(index.IndexRefused,match='not ready'):
@@ -153,6 +156,7 @@ def test_corrupt_prepared_entry_is_not_ready_and_never_rebuilds(tmp_path, monkey
     monkeypatch.setattr(index,'compute_index_key',lambda *args:('key',{}))
     monkeypatch.setattr(index,'_under_cache',lambda p:p)
     monkeypatch.setattr(backend,'require_prepared',lambda *args:None)
+    ready_distribution(monkeypatch)
     root=tmp_path/sha256_text(c.name)/'key'
     root.mkdir(parents=True)
     (root/'entry.json').write_text('{broken')
@@ -167,6 +171,7 @@ def test_execute_estimate_guard_runs_before_reservation(tmp_path, monkeypatch):
     c=make_collection()
     monkeypatch.setattr(backend,'source_identity',lambda _:('a'*40,None))
     monkeypatch.setattr(backend,'require_prepared',lambda *_:None)
+    ready_distribution(monkeypatch)
     monkeypatch.setattr(run.collections,'resolve_collection',lambda _: (c,config_for(c)))
     handle=Mock()
     handle.__enter__=Mock(return_value=handle)
@@ -193,6 +198,7 @@ def test_collection_probe_rankings_remain_evidence_not_comparison_input(tmp_path
     handle = Mock(index_key='prepared-key', index_population=c.index_population(),
                   index_build='cached', index_cache_key='prepared-key',
                   model_hashes=dict(fixture.header.model_hashes), env={},
+                  components={'runtime': {}}, identity={'models': 'a' * 64},
                   index_state={'settled': True, 'probes': [{'ranked': ['d001', 'd000']}]},
                   base_url='http://engine')
     monkeypatch.setattr(run, 'require_exclusive', lambda _: None)

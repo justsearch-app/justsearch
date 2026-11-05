@@ -25,7 +25,7 @@ import psutil
 
 from .. import backend
 from .._paths import REPO_ROOT
-from . import collections, compare, index, known_answers, report, scoring
+from . import collections, compare, distribution, index, known_answers, report, scoring
 from .types import (Outcome, QueryResult, RunHeader, RunRecord, Served,
                     atomic_write_text, canonical_json, sha256_text)
 
@@ -256,10 +256,9 @@ def _collection_worker(plan: dict, item: dict, deadline: float) -> None:
             started=utc(), ended=None, expected_legs=expected_legs(plan['mode']),
             expected_reranker='skipped' if plan['mode'] in ('text', 'vector') else 'executed',
             index_build=handle.index_build, index_cache_key=handle.index_cache_key,
-            index_state={**handle.index_state, 'runtime': {
-                k: v for k, v in handle.env.items()
-                if k not in index.OPERATIONAL_ENV and k not in
-                ('JUSTSEARCH_REPO_ROOT', 'JUSTSEARCH_MODELS_DIR')}}, hardware=plan['hardware'],
+            # Location-independent: path-valued settings appear as the digest of their content.
+            index_state={**handle.index_state, 'runtime': handle.components['runtime']},
+            identity=handle.identity, hardware=plan['hardware'],
             budget={'window_seconds': plan['budget']})
         # started includes this collection's backend start and confirmation for estimation.
         header = replace(header, started=datetime.fromtimestamp(
@@ -356,7 +355,11 @@ def execute(action: str, refs: tuple[str, ...], *, baseline_dir: Path,
     if dirty:
         raise RunRefused(f'candidate tree is dirty ({dirty[:12]}); no trusted quality verdict')
     require_budget(CLEANUP_SECONDS, window_seconds, full_suite=full_suite)
-    backend.require_prepared(repo_root)
+    # Scoring measures the checkout: its own installed snapshot, before any engine starts.
+    try:
+        distribution.current(repo_root, [commit, dirty])
+    except distribution.DistributionRefused as e:
+        raise RunRefused(str(e)) from None
     loaded = []
     totals, startups, footprints = [], [], []
     pending = {}

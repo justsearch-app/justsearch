@@ -77,10 +77,10 @@ def test_witnesses_never_read_binary_or_restricted_originals(tmp_path, monkeypat
 
 def test_layout_and_witnesses_key_collection(tmp_path, monkeypatch):
     c = Collection('key', 'en', {}, {}, {'d': 'Notes/Name.md'}, {'d': sha256_text('words')})
-    monkeypatch.setattr(index, 'tree_hash', lambda _: 'fixed tree')
-    monkeypatch.setattr(index, 'model_hashes', lambda _: {'model': 'fixed model'})
-    cfg = index.IndexConfig(repo_root=tmp_path)
-    env = {'JUSTSEARCH_MODELS_DIR': str(tmp_path)}
+    from .conftest import pinned_env
+    monkeypatch.setattr(index.inputs, 'model_hashes', lambda _: {'model': 'fixed model'})
+    cfg = index.IndexConfig(repo_root=tmp_path, models_dir=tmp_path)
+    env = pinned_env(cfg)
     opaque = index.compute_index_key(c, cfg, env)[0]
     for metadata in [{'layout': 'as-is'}, {'witness_formats': ['md']}, {'witness_formats': ['txt']}]:
         changed = replace(c, metadata=metadata, version='')
@@ -106,11 +106,10 @@ longest=max(eligible,key=lambda d:((out/'documents'/m.documents[d]).stat().st_si
 samples=sorted(set([longest]+sorted(eligible)[:2]))
 if hasattr(index,'_witness_documents'):
  assert index._witness_documents(c,m,out/'documents',3)==(longest,samples)
-index.tree_hash=lambda _: 'fixed-source-tree'
-index.model_hashes=lambda _: {'model':'fixed-model'}
-key,components=index.compute_index_key(c,index.IndexConfig(),{'JUSTSEARCH_MODELS_DIR':'/fixed/models'})
+# The index key itself changed schema by design; the collection's own identity must not.
 print(json.dumps({'version':c.version,'metadata':c.metadata,'counts':c.counts(),
- 'manifest':m.documents,'samples':samples,'longest':longest,'key':key,'components':components},sort_keys=True))
+ 'manifest':m.documents,'samples':samples,'longest':longest,
+ 'documents':c.document_identity()},sort_keys=True))
 '''
     roots = [Path(before), Path(index.REPO_ROOT)]
     snapshots = []

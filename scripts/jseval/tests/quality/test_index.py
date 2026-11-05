@@ -12,8 +12,9 @@ import time
 import httpx
 import pytest
 
-from jseval.quality import index as ix
+from jseval.quality import distribution, index as ix
 from jseval.quality.types import Collection, QueryText, sha256_text
+from .conftest import pinned_env, write_checkout
 
 
 @pytest.fixture
@@ -44,7 +45,7 @@ def config(tmp_path):
 
 
 def env_for(config):
-    return {"JUSTSEARCH_MODELS_DIR": str(config.models_dir), "JUSTSEARCH_SPLADE_ENABLED": "false"}
+    return pinned_env(config)
 
 
 @pytest.mark.parametrize('all_markdown', [False, True])
@@ -63,23 +64,21 @@ def test_legacy_witness_selection_keeps_custom_extensions(collection, config, tm
     assert samples == sorted(c.documents)
 
 
-def test_key_ignores_head_and_reviewed_request_file_but_hashes_every_other_input(collection, config):
+def test_key_follows_the_snapshot_not_the_source_tree(collection, config, tmp_path):
     c, _ = collection
-    key = lambda: ix.compute_index_key(c, config, env_for(config))[0]
+    env = env_for(config)
+    key = lambda e=env: ix.compute_index_key(c, config, e)[0]
     first = key()
-    # Even a repository without HEAD can key its actual tree bytes.
-    excluded = config.repo_root / next(p for p in ix.QUERY_TIME_ONLY if p.endswith("KnowledgeSearchEngine.java"))
-    excluded.parent.mkdir(parents=True)
-    excluded.write_text("request change")
-    assert key() == first
-    shape = config.repo_root / "modules/indexing/ChunkSplitter.java"
-    shape.parent.mkdir(parents=True)
-    shape.write_text(" ")
-    assert key() != first
-    shape.unlink()
-    assert key() == first
+    # Source edits outside the snapshot (any file of the checkout) never key the index.
+    query = config.repo_root / "modules/app-services/src/main/java/KnowledgeSearchEngine.java"
+    query.parent.mkdir(parents=True)
+    query.write_text("request change")
     (config.repo_root / "shape.java").write_text("shape ")
-    assert key() != first
+    assert key() == first
+    # Different distribution bytes are a different snapshot, so a different key.
+    other = write_checkout(tmp_path / "other", jar=b"one changed byte")
+    changed = {**env, ix.DISTRIBUTION_ENV: distribution.create(other, ["other", None])}
+    assert key(changed) != first
 
 
 def test_model_bytes_runtime_collection_and_content_invalidate(collection, config):
@@ -90,34 +89,10 @@ def test_model_bytes_runtime_collection_and_content_invalidate(collection, confi
     model.write_bytes(b"same size changed!")
     assert ix.compute_index_key(c, config, env)[0] != key
     model.write_bytes(b"model actual bytes")
+    assert ix.compute_index_key(c, config, env)[0] == key
     assert ix.compute_index_key(c, config, {**env, "JUSTSEARCH_CHUNK_SIZE": "123"})[0] != key
     assert ix.compute_index_key(replace(c, name="other", version=""), config, env)[0] != key
     assert ix.compute_index_key(replace(c, content={d: sha256_text("edited") for d in c.documents}, version=""), config, env)[0] != key
-
-
-@pytest.mark.parametrize("name", ["corpus.py", "real_use_queries.py", "index.py", "collections.py"])
-def test_harness_edits_keep_key_but_index_inputs_change_it(collection, config, name):
-    c, source = collection
-    path = config.repo_root / "scripts/jseval/jseval/quality" / name
-    path.parent.mkdir(parents=True)
-    path.write_text("original")
-    key = ix.compute_index_key(c, config, env_for(config))[0]
-    path.write_text("edited")
-    changed = ix.compute_index_key(c, config, env_for(config))[0]
-    assert (changed == key) == (name in ("corpus.py", "real_use_queries.py"))
-    # Document bytes remain pinned independently of the harness source exclusions (K1).
-    doc = next(iter(c.documents))
-    document = source / c.documents[doc]
-    document.write_bytes(document.read_bytes() + b"edited")
-    updated = replace(c, content={**c.content, doc: sha256_text(document.read_text())}, version="")
-    assert ix.compute_index_key(updated, config, env_for(config))[0] != changed
-
-
-def test_tracked_deletion_changes_key(collection, config):
-    subprocess.run(["git", "add", "."], cwd=config.repo_root, check=True)
-    before = ix.tree_hash(config.repo_root)
-    (config.repo_root / "shape.java").unlink()
-    assert ix.tree_hash(config.repo_root) != before
 
 
 def test_opaque_materialization_roundtrip_and_content_guard(collection, config, tmp_path):
@@ -149,7 +124,8 @@ def test_source_digest_is_checked_before_publish(collection, config, tmp_path):
 
 def test_foreign_and_unowned_data_folders_refused_before_launcher(collection, config, tmp_path, monkeypatch):
     c, _ = collection
-    monkeypatch.setattr(ix.IndexConfig, "environment", lambda _: env_for(config))
+    env = env_for(config)
+    monkeypatch.setattr(ix.IndexConfig, "environment", lambda _: dict(env))
     monkeypatch.setattr(ix, "_under_cache", lambda p: p)
     data = tmp_path / "data"
     data.mkdir()
@@ -166,7 +142,8 @@ def test_foreign_and_unowned_data_folders_refused_before_launcher(collection, co
 @pytest.mark.parametrize("module_name", ["jseval.quality.index", "__main__"])
 def test_interrupted_build_is_fresh_and_partial_data_is_not_adopted(collection, config, tmp_path, monkeypatch, module_name):
     c, _ = collection
-    monkeypatch.setattr(ix.IndexConfig, "environment", lambda _: env_for(config))
+    env = env_for(config)
+    monkeypatch.setattr(ix.IndexConfig, "environment", lambda _: dict(env))
     monkeypatch.setattr(ix, "_under_cache", lambda p: p)
     monkeypatch.setattr(ix, "__name__", module_name)
     captured = []
@@ -177,7 +154,7 @@ def test_interrupted_build_is_fresh_and_partial_data_is_not_adopted(collection, 
         def poll(self):
             return 0
     monkeypatch.setattr(ix.subprocess, "Popen", lambda command, **kw:
-                        real_popen(command, **kw) if command[0] == "git" else FakeProcess(command, **kw))
+                        FakeProcess(command, **kw) if "pausable" in command else real_popen(command, **kw))
     cfg = replace(config, cache_root=tmp_path / "cache")
     with ix.prepare_index(c, cfg) as handle:
         assert handle.index_build == "fresh"
@@ -234,7 +211,9 @@ def test_population_and_completeness_fail_closed(collection):
 
 def test_confirm_without_running_backend_refuses(collection, config, tmp_path):
     c, _ = collection
-    handle = ix.IndexHandle(c, config, "key", tmp_path, tmp_path, "fresh", {}, {}, None)
+    env = env_for(config)
+    key, components = ix.compute_index_key(c, config, env)
+    handle = ix.IndexHandle(c, config, key, tmp_path, tmp_path, "fresh", components, env, None)
     result = ix.confirm(handle)
     assert not result.ok and "no live serving backend" in result.failures[0]
 
@@ -265,7 +244,7 @@ def test_confirm_allows_query_time_ranking_changes_but_rejects_shape_and_content
     handle = ix.IndexHandle(c, cfg, key, root, data, "cached", components, env, None,
                            _backend=SimpleNamespace(proc=SimpleNamespace(poll=lambda: None)),
                            base_url="http://engine")
-    query_file = cfg.repo_root / next(p for p in ix.QUERY_TIME_ONLY if p.endswith("KnowledgeSearchEngine.java"))
+    query_file = cfg.repo_root / "modules/app-services/src/main/java/KnowledgeSearchEngine.java"
     query_file.parent.mkdir(parents=True)
     query_file.write_text("changed fusion weight")
     assert ix.confirm(handle).ok
@@ -287,9 +266,10 @@ def test_confirm_allows_query_time_ranking_changes_but_rejects_shape_and_content
     refused = ix.confirm(handle)
     assert not refused.ok and "witness differs: content" in refused.failures
     current["content"] = dict(c.content)
-    (cfg.repo_root / "shape.java").write_text("new index shape")
-    refused = ix.confirm(handle)
-    assert not refused.ok and any("index-shaping inputs changed" in f for f in refused.failures)
+    # A changed input refuses at once, as not-ready, and is no evidence against the entry.
+    (cfg.models_dir / "onnx/model.onnx").write_bytes(b"new index shape")
+    with pytest.raises(ix.InputUnavailable, match="index-shaping inputs changed"):
+        ix.confirm(handle)
 
 
 @pytest.mark.parametrize("rank,ok", [(0, True), (2, True), (3, False)])
@@ -339,7 +319,7 @@ def _stand_in_gradle_slot(monkeypatch):
 
 
 def _startup_queue(monkeypatch, *, real):
-    """Hold this build at its launcher boundary, before installDist/engine start.
+    """Hold this build at its launcher boundary, before the engine starts from its snapshot.
 
     The real variant continues through the normal CPU launcher after admission
     resumes it. The small process check ends at that boundary without an engine.
@@ -348,24 +328,25 @@ def _startup_queue(monkeypatch, *, real):
     script = '''
 import sys, time
 from pathlib import Path
-from jseval.quality import index as ix
+from jseval.quality import distribution, index as ix
 root = Path(sys.argv[1])
 real = sys.argv[2] == "True"
-original = ix.backend._install_distribution
-def queued(repo, env):
+distribution.ROOT = Path(sys.argv[3])
+original = ix.backend.start_backend
+def queued(**kw):
     (root / "startup-queued").touch()
     while not (root / "startup-release").exists():
         time.sleep(.05)
     if real:
-        original(repo, env)
-    else:
-        raise RuntimeError("fixture resumed queued startup")
-ix.backend._install_distribution = queued
+        return original(**kw)
+    raise RuntimeError("fixture resumed queued startup")
+ix.backend.start_backend = queued
 ix._build(root)
 '''
     def launch(command, **kwargs):
         if "pausable" in command and command[-2] == "build":
-            command = command[:-5] + [sys.executable, "-c", script, command[-1], str(real)]
+            command = command[:-5] + [sys.executable, "-c", script, command[-1], str(real),
+                                      str(distribution.ROOT)]
         return popen(command, **kwargs)
     monkeypatch.setattr(ix.subprocess, "Popen", launch)
 
@@ -399,7 +380,7 @@ def test_startup_pause_exclusive_drains_queued_backend(collection, config, tmp_p
     cfg = replace(config, repo_root=ix.REPO_ROOT, documents_dir=source,
                   cache_root=tmp_path / "cache")
     monkeypatch.setattr(ix, "_under_cache", lambda p: p)
-    _stand_in_gradle_slot(monkeypatch)  # never invoked: the fixture stops before installDist
+    _stand_in_gradle_slot(monkeypatch)  # never invoked: the snapshot is already selected
     _startup_queue(monkeypatch, real=False)
     with pytest.raises(ix.IndexRefused, match='fixture resumed queued startup'), ix.prepare_index(c, cfg) as handle:
         _startup_pause_exclusive(handle, admission_dir)
@@ -410,7 +391,7 @@ def test_startup_pause_exclusive_drains_queued_backend(collection, config, tmp_p
 
 @pytest.mark.skipif(os.environ.get("JSEVAL_QUALITY_INDEX_REAL") != "1",
                     reason="set JSEVAL_QUALITY_INDEX_REAL=1 for the real CPU engine lifecycle")
-def test_real_cpu_official_subset_agreement_pause_and_foreign_population(monkeypatch):
+def test_real_cpu_official_subset_agreement_pause_and_foreign_population(monkeypatch, real_inputs):
     import ir_datasets
     from jseval.quality.collections import write_collection
     from jseval.quality.types import document_text
@@ -584,25 +565,39 @@ def test_witness_reads_live_manifest_content_chunks_and_raw_search_paths(collect
 
 
 def test_gpu_selection_is_inherited_and_keyed_and_lifecycle_paths_override_inherited_state(
-        collection, config, monkeypatch):
+        collection, config, monkeypatch, tmp_path):
     c, _ = collection
     monkeypatch.setenv("JUSTSEARCH_DATA_DIR", "/foreign/data")
     monkeypatch.setenv("JUSTSEARCH_INDEX_BASE_PATH", "/foreign/index")
     monkeypatch.setenv("JUSTSEARCH_SPLADE_ENABLED", "true")
-    monkeypatch.setattr(ix.shutil, "which", lambda _: "/usr/bin/slot")
     monkeypatch.setenv("JUSTSEARCH_GPU_ENABLED", "false")
-    cpu_key, _ = ix.compute_index_key(c, config)
+    cpu_key, _ = ix.compute_index_key(c, config, pinned_env(config))
+    natives = tmp_path / "cuda"
+    natives.mkdir()
+    (natives / "libcudart.so.12").write_bytes(b"cuda")
     monkeypatch.setenv("JUSTSEARCH_GPU_ENABLED", "true")
+    monkeypatch.setenv("JUSTSEARCH_ONNXRUNTIME_NATIVE_PATH", str(natives))
     monkeypatch.setenv("JUSTSEARCH_RERANK_GPU_ENABLED", "true")
-    env = config.environment()
+    env = pinned_env(config)
     # The caller's GPU selection reaches the engine and shapes the reusable index key.
     assert env["JUSTSEARCH_GPU_ENABLED"] == env["JUSTSEARCH_RERANK_GPU_ENABLED"] == "true"
-    assert ix.compute_index_key(c, config)[0] != cpu_key
+    gpu_key, components = ix.compute_index_key(c, config, env)
+    assert gpu_key != cpu_key
+    # The selected native directory is keyed by content, not by its path.
+    assert components["runtime"]["JUSTSEARCH_ONNXRUNTIME_NATIVE_PATH"] == {"tree": sha256_text(
+        ix.canonical_json({"libcudart.so.12": sha256_text("cuda")}))}
+    (natives / "libcudart.so.12").write_bytes(b"other cuda")
+    assert ix.compute_index_key(c, config, env)[0] != gpu_key
     assert env["JUSTSEARCH_SPLADE_ENABLED"] == env["JUSTSEARCH_RAG_CHUNK_SPLADE_ENABLED"] == "false"
     assert "JUSTSEARCH_DATA_DIR" not in env and "JUSTSEARCH_INDEX_BASE_PATH" not in env
     launch = ix._launch_env(config, Path("/owned/data"), env)
     assert launch["JUSTSEARCH_HOME"] == "/owned/data"
     assert launch["JUSTSEARCH_INDEX_BASE_PATH"] == "/owned/data/index/default"
+    # Code and repo resources come from the snapshot, never the checkout.
+    snapshot = distribution.path(env[ix.DISTRIBUTION_ENV])
+    assert launch["JUSTSEARCH_REPO_ROOT"] == str(snapshot)
+    assert launch["JUSTSEARCH_SSOT_PATH"] == str(snapshot / "SSOT")
+    assert launch["JUSTSEARCH_CONFIG"].startswith(str(snapshot) + "/")
 
 
 def test_external_runtime_model_bytes_invalidate_key(collection, config, tmp_path):

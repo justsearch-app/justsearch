@@ -70,12 +70,45 @@ through pausable background admission and may wait for the Gradle slot. Scoring
 never builds or repairs an index and refuses missing, corrupt or stale inputs
 as **not ready**. Re-run preparation outside the exclusive window.
 
-An index is keyed and owned by the collection's document identity: population
-(count, manifest and content digests), layout and witness formats. Stored
-collection data under `jseval/quality/config/` and `jseval/quality/recipes/` is
-not part of the source key. Editing queries or judgments therefore reuses the
-prepared index; changing a document, the layout or the witness formats builds a
-new one. `prepare` also accepts a corpus-only collection without scored queries.
+An index is owned by the collection's document identity: population (count,
+manifest and content digests), layout and witness formats. Editing queries or
+judgments therefore reuses the prepared index; changing a document, the layout
+or the witness formats builds a new one. `prepare` also accepts a corpus-only
+collection without scored queries.
+
+The index is keyed by what can change its contents, each by content, never by
+where it lives:
+
+- the **distribution snapshot**: after `installDist`, preparation copies the
+  install folder, the runtime resources the engine reads through its repo root
+  (`SSOT/`, the headless `application.yaml`) and the eval launch scripts into a
+  read-only snapshot under `~/.cache/justsearch-quality/dists/`. Unchanged
+  files share one copy. The engine and its extraction children run from the
+  snapshot, never from the build folder. Its digest covers every file;
+- the preparation harness modules as loaded (materialization, ingestion,
+  launch, witness and identity code; not scoring, comparison, reporting, query
+  or label code);
+- the JDK (resolved once and passed as `JAVA_HOME`), JVM options, the ORT/CUDA
+  native folders and `LD_LIBRARY_PATH`, the tesseract executable, its libraries
+  and language data (resolved once and passed explicitly), the model packages,
+  and every other `JUSTSEARCH_*` setting (path settings as the content they
+  point to).
+
+So a docs, web-UI, CI or jseval scoring/report/query/label edit, a rebase over
+such changes or a second worktree at the same tree adopts the existing index.
+Preparation then runs one incremental `installDist`; when the snapshot digest
+is unchanged, the index is reused. A Java edit, a dependency, `SSOT/` or
+`application.yaml` change, a model file, the JDK, OCR runtime, native folders,
+a runtime setting or the preparation harness builds a new index. An input that
+cannot be resolved, hashed or validated is refused with its reason: automatic
+GPU discovery (set `JUSTSEARCH_GPU_ENABLED=false`, or `true` with
+`JUSTSEARCH_ONNXRUNTIME_NATIVE_PATH`), JVM argument files, VM option files,
+agents, `LD_PRELOAD`, an extraction-command override or any option value not on
+the allow-list, a missing or unreadable model, snapshot or OCR file. Such a
+refusal never quarantines a cached index. Snapshots that are not newest for a
+checkout, not used by a cache entry and not running are pruned. Indexes keyed
+before this identity (`jseval.quality.index.v1`) are never adopted; an
+explicitly chosen data folder from then is refused by name.
 `baseline`, `check` and `score` refuse such a collection. A config's
 `pending_kinds` names query kinds stored without judgments until a later
 labelling pass. Those queries are counted as pending and excluded from scoring.
@@ -88,8 +121,12 @@ checkout for shared materialized datasets.
 `check` sends the Search window's ordinary refined request: search syntax,
 50 results, excerpts and the same four facets, with mode and pipeline left to
 the engine. `ablate` labels explicit text/vector/hybrid runs as sensitivity
-information. Runs require a clean candidate and a distribution built for it;
-model files and index population are verified. HTTP failures and reranker
+information. Runs require a clean candidate and the snapshot installed from
+exactly its sources: a checkout edited since its last `prepare` (committed or
+not) is refused as a stale distribution before any engine starts, and so is a
+snapshot whose bytes no longer match its digest. Model files and index
+population are verified. Run headers record one digest per identity component
+(`identity`) and the runtime settings without machine paths. HTTP failures and reranker
 loading, contention, deadline or inference drops invalidate the run. Identical
 by-design skips in both arms remain comparable, with their reasons recorded.
 
