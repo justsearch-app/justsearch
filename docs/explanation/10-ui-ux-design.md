@@ -188,6 +188,29 @@ transitions and action feedback are announced to screen readers. The panel updat
 while open, preserving expanded details; switching windows closes it. The Help surface
 supplies keyboard guidance.
 
+#### Notices outside the window
+
+The app interrupts only when the person is not looking. With the window focused nothing
+leaves the app, wherever in it they are: the pill, its announcement and the panel are the
+notice. In the background (the window hidden, minimised or not focused) one desktop
+notification is shown for each live event: an agent request arriving, or long work
+finishing (the events the pill shows as just finished) or failing. Startup snapshots,
+reconnects and anything found late never notify. A notification says who and what in the
+words of the panel's first line, with a request's deadline; it never carries argument
+values, file contents or failure messages. Clicking it brings the app forward and opens the
+panel on that item, or the review for an agent request; a dialog that must be answered first
+stays on top, and the panel does not open over it.
+
+The taskbar or dock badge counts Needs you, updates live and clears at zero. Windows has no
+badge count, so the taskbar shows the count as an overlay on the icon; a platform with
+neither shows nothing. Settings › General › Notifications chooses Off, On (the default) or On
+with sound. Off stops notifications and sound; the badge stays because it is passive. In a
+plain browser there are no desktop notifications and no permission prompt.
+
+`state/noticePolicy.ts` is the one routing decision. The shell delivers the notification
+(`modules/shell/src-tauri/src/notices.rs`) because the notification plugin cannot report a
+click on desktop; it also shows each event id once, however many windows report it.
+
 #### Confirming and undoing
 
 Reversible beats confirmed. The person's own risky actions follow three tiers:
@@ -240,8 +263,7 @@ A request from an agent — an outside app over MCP (named by the name it gives,
 Claude Desktop), the agent in Search, or an agent's suggestion — opens no dialog when it
 arrives. It appears under Needs you, the pill shows the count, and screen readers hear it
 once, assertively; a request found again after a reload or reconnect is listed without an
-announcement. When the window is in the background the arrival also raises a desktop
-notification.
+announcement.
 
 A row offers Allow, Deny and Review. Review opens the request inside the panel (back link
 “What's going on”): who asked and when, the question, its consequence lines (the exact

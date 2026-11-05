@@ -28,6 +28,9 @@ import { presentAiEngineVerdict, type AiEngineVerdictPresentation } from '../sta
 import { isIndexingObservation } from '../state/readinessNotice.js';
 import { resolvePathLazy } from '../hooks/resolvePathLazy.js';
 import { needsTypedConfirm } from '../components/acceptPendingEffect.js';
+import { agentRequestNotice, needsYouCount, routeDesktopNotice, workFailedNotice, workFinishedNotice, type DesktopNotice } from '../state/noticePolicy.js';
+import { getNotifications } from '../state/notificationsState.js';
+import { setTaskbarBadge } from '../../utils/taskbarBadge.js';
 
 /** Which observation a needs-you row comes from (C6: only an observed source can announce an arrival). */
 function needsSource(id: string): string {
@@ -95,6 +98,8 @@ export class FrameStatusController implements ReactiveController {
   private readonly announced = new Set<string>();
   /** Sources observed in the previous refresh; only these can announce a needs-you arrival. */
   private observedSources = new Set<string>();
+  /** The count last given to the taskbar; null until this controller has observed one. */
+  private badge: number | null = null;
 
   constructor(private readonly host: StatusHost) {
     this.model = deriveFrameStatus({ ai: null, now: Date.now(), contactLostAt: null });
@@ -155,6 +160,13 @@ export class FrameStatusController implements ReactiveController {
       }
       initial = false;
       this.refresh();
+    });
+  }
+  /** DE5 — a live event leaves the app only when the policy says so, and never after teardown. */
+  private notifyDesktop(notice: DesktopNotice): void {
+    void isWindowFocused().then(focused => {
+      const route = routeDesktopNotice(notice, { notifications: getNotifications(), focused });
+      if (route && this.connected) void sendDesktopNotification({ id: notice.id, title: notice.title, ...(notice.body ? { body: notice.body } : {}), ...route });
     });
   }
   private showTransient(key: string): void {
@@ -229,11 +241,13 @@ export class FrameStatusController implements ReactiveController {
           completeTask(operation.invocationTaskId, outcome.state === 'complete' ? 'succeeded' : 'failed');
         }
         // Initial snapshots and late-discovered terminal receipts never announce a completion.
-        if (operation.outcome && ['accepted', 'running'].includes(operation.outcome.state)
-          && operation.outcome.phase !== 'awaiting_acceptance' && outcome.state === 'complete' && outcome.phase !== 'awaiting_acceptance') {
+        const wasRunning = operation.outcome && ['accepted', 'running'].includes(operation.outcome.state)
+          && operation.outcome.phase !== 'awaiting_acceptance' && outcome.phase !== 'awaiting_acceptance';
+        if (wasRunning && outcome.state === 'complete') {
           this.finished = { title: `${operation.label} finished`, at: Date.now() };
           emitEphemeralToast({ message: this.finished.title, classId: 'core.verdict.settled' });
-        }
+          this.notifyDesktop(workFinishedNotice(this.finished.title, `operation:${key}`));
+        } else if (wasRunning && outcome.state === 'failed') this.notifyDesktop(workFailedNotice(`${operation.label} failed`, `operation:${key}`));
       } catch {
         if (current() && this.operations.get(key) === operation) this.operations.set(key, { ...operation, fresh: false });
       }
@@ -320,6 +334,7 @@ export class FrameStatusController implements ReactiveController {
       if (!this.finished || this.finished.title !== 'Search is up to date' || now - this.finished.at >= FINISHED_DWELL_MS) {
         this.finished = { title: 'Search is up to date', at: now };
         emitEphemeralToast({ message: this.finished.title, classId: 'core.verdict.settled' });
+        this.notifyDesktop(workFinishedNotice(this.finished.title));
       }
     }
     if (this.ai?.snapshotLive && this.ai.aiEngine.kind === 'installing') this.installing = true;
@@ -328,7 +343,11 @@ export class FrameStatusController implements ReactiveController {
       if (this.ai.aiEngine.kind === 'online') {
         this.finished = { title: 'AI install complete', at: now };
         emitEphemeralToast({ message: 'AI install complete', classId: 'core.ai-engine.settled' });
-      } else emitEphemeralToast({ message: 'AI install failed', classId: 'core.ai-engine.failed' });
+        this.notifyDesktop(workFinishedNotice('AI install complete'));
+      } else {
+        emitEphemeralToast({ message: 'AI install failed', classId: 'core.ai-engine.failed' });
+        this.notifyDesktop(workFailedNotice('AI install failed'));
+      }
     }
     // 595 §15.1 — one verdict announcer and its AI-engine sibling, moved from the retired status
     // bar into this always-mounted owner. Indexing transitions speak through the indexing announcer.
@@ -378,12 +397,11 @@ export class FrameStatusController implements ReactiveController {
     if (arrivals.length) {
       this.assertive = arrivals.length === 1 ? `Needs you: ${arrivals[0]!.title}.` : `${arrivals.length} agent requests need you.`;
       this.assertiveKey = arrivals.map(row => row.id).join('|');
-      const first = arrivals[0]!;
-      void isWindowFocused().then(focused => {
-        if (!focused && this.connected) void sendDesktopNotification(first.title, first.detail);
-      });
+      for (const row of arrivals) this.notifyDesktop(agentRequestNotice(row, true));
     }
     this.needsKey = needsKey;
+    const count = needsYouCount(next);
+    if (count !== this.badge) { this.badge = count; void setTaskbarBadge(count); }
     // R1 — while a more urgent state holds the pill, a hover or focus pause cannot extend a notice
     // past its window; an engine wait notice ends at once while the engine is unreachable.
     const placement = (key: string | null): ReturnType<typeof transientPlacement> => transientPlacement(next.pill,

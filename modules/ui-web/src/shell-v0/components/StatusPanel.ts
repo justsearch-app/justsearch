@@ -287,6 +287,14 @@ export class StatusPanel extends JfElement {
     if (row.review?.open) this.action(row.review.open);
     void this.updateComplete.then(() => this.shadowRoot?.querySelector<HTMLElement>('.review h2')?.focus());
   }
+  /** Bring one row into view and put focus on it (a clicked desktop notification). */
+  revealRow(id: string): void {
+    void this.updateComplete.then(() => {
+      const row = this.shadowRoot?.querySelector<HTMLElement>(`article[data-fact="${CSS.escape(id)}"]`);
+      row?.scrollIntoView({ block: 'nearest' });
+      row?.querySelector<HTMLElement>('button')?.focus();
+    });
+  }
   /** Back to the list; the request keeps waiting. True when a review was open (Escape uses this). */
   back(): boolean {
     const id = this.reviewing;

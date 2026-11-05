@@ -280,6 +280,8 @@ export interface UserStateV2Storage {
   readonly surfaceMode?: 'glass' | 'solid';
   /** Tempdoc 874 — the Search v3 chat-column width preset. Cross-profile, FE-only (no backend setting). */
   readonly chatWidth?: 'narrow' | 'default' | 'wide';
+  /** DE5 — the Notifications choice. Cross-profile, FE-only; absent means On. */
+  readonly notifications?: 'off' | 'on' | 'sound';
 }
 
 /**
@@ -318,6 +320,8 @@ export interface UserStateV1 {
   readonly surfaceMode?: 'glass' | 'solid';
   /** Tempdoc 874 — Search v3 chat-column width preset (cross-profile, FE-only). */
   readonly chatWidth?: 'narrow' | 'default' | 'wide';
+  /** DE5 — the Notifications choice. Cross-profile, FE-only; absent means On. */
+  readonly notifications?: 'off' | 'on' | 'sound';
 }
 
 /** 569 §19 Seam 6 — one entry in the presentation apply history. */
@@ -417,6 +421,7 @@ function viewFromStorage(storage: UserStateV2Storage): UserStateV1 {
       : {}),
     ...(storage.surfaceMode !== undefined ? { surfaceMode: storage.surfaceMode } : {}),
     ...(storage.chatWidth !== undefined ? { chatWidth: storage.chatWidth } : {}),
+    ...(storage.notifications !== undefined ? { notifications: storage.notifications } : {}),
   };
 }
 
@@ -463,6 +468,7 @@ function storageFromView(view: UserStateV1): UserStateV2Storage {
       : {}),
     ...(view.surfaceMode !== undefined ? { surfaceMode: view.surfaceMode } : {}),
     ...(view.chatWidth !== undefined ? { chatWidth: view.chatWidth } : {}),
+    ...(view.notifications !== undefined ? { notifications: view.notifications } : {}),
   };
 }
 
@@ -1000,6 +1006,13 @@ function validateV2(candidate: unknown): UserStateV2Storage | null {
       ? rawChatWidth
       : undefined;
 
+  // DE5 — the Notifications choice (cross-profile); only the three valid literals survive.
+  const rawNotifications = c['notifications'];
+  const notifications: 'off' | 'on' | 'sound' | undefined =
+    rawNotifications === 'off' || rawNotifications === 'on' || rawNotifications === 'sound'
+      ? rawNotifications
+      : undefined;
+
   // 569 §19 Seam 6 — presentation apply history (cross-profile); malformed entries dropped.
   const rawHistory = c['presentationHistory'];
   let presentationHistory: PresentationHistoryEntry[] | undefined;
@@ -1027,6 +1040,7 @@ function validateV2(candidate: unknown): UserStateV2Storage | null {
     ...(walkthroughState !== undefined ? { walkthroughState } : {}),
     ...(surfaceMode !== undefined ? { surfaceMode } : {}),
     ...(chatWidth !== undefined ? { chatWidth } : {}),
+    ...(notifications !== undefined ? { notifications } : {}),
   };
 }
 

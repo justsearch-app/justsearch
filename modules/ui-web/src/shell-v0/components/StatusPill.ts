@@ -21,6 +21,7 @@ import { emitEphemeralToast } from './advisory/ephemeralToast.js';
 import type { MultiplexedStream } from '../streaming/MultiplexedStream.js';
 import './StatusBadge.js';
 import './SystemNotice.js';
+import { installNoticeActivationBridge } from '../router/tauriBridge.js';
 import { transientPlacement, toastActionAvailable, folderName, STATUS_REVIEW_EVENT, type StatusAction } from '../state/frameStatus.js';
 import type { AdvisoryStore, AdvisoryRecord } from './advisory/AdvisoryStore.js';
 import type { AuthorizationHost } from './AuthorizationHost.js';
@@ -136,6 +137,7 @@ export class StatusPill extends JfElement {
     connectedPill = this;
     document.addEventListener('keydown', this.keydown);
     document.addEventListener(STATUS_REVIEW_EVENT, this.reviewRequest);
+    this.stopNoticeActivation = installNoticeActivationBridge(id => document.dispatchEvent(new CustomEvent(STATUS_REVIEW_EVENT, { detail: id })));
     this.status.setMultiplex(this.multiplex);
     window.addEventListener('blur', this.windowBlur);
     document.addEventListener('visibilitychange', this.visibility);
@@ -149,6 +151,7 @@ export class StatusPill extends JfElement {
     if (connectedPill === this) connectedPill = null;
     document.removeEventListener('keydown', this.keydown);
     document.removeEventListener(STATUS_REVIEW_EVENT, this.reviewRequest);
+    this.stopNoticeActivation?.(); this.stopNoticeActivation = undefined;
     window.removeEventListener('blur', this.windowBlur);
     document.removeEventListener('visibilitychange', this.visibility);
     this.narrowQuery?.removeEventListener('change', this.narrowChange);
@@ -239,10 +242,15 @@ export class StatusPill extends JfElement {
     if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 's'
       && !isTypingTarget(deepActiveElement())) { event.preventDefault(); this.toggle(); }
   };
-  /** Open the panel on one Needs-you row's review (a waiting run's Review); a typed one opens its dialog. */
+  /**
+   * Open the panel on one row: a Needs-you row's review (a waiting run's Review, a clicked desktop
+   * notification), a typed one's dialog, or any other row in its place. A row that has left the
+   * panel still opens the panel, so the click lands on what is true now.
+   */
   private readonly reviewRequest = (event: Event): void => {
     const id = (event as CustomEvent<string>).detail;
-    const row = this.status.model.sections.needs.find(fact => fact.id === id);
+    const rows = Object.values(this.status.model.sections).flat();
+    const row = rows.find(fact => fact.id === id) ?? rows.find(fact => fact.title === id);
     if (modalOwnsFocus()) return;
     const typed = row?.review?.typed ? row.actions?.find(action => action.kind === 'authorization') : undefined;
     if (typed) { void this.act(typed); return; }
@@ -250,8 +258,10 @@ export class StatusPill extends JfElement {
     void this.updateComplete.then(() => {
       const panel = this.shadowRoot?.querySelector<StatusPanel>('jf-status-panel');
       if (row?.review && this.open) panel?.openReview(row);
+      else if (row && this.open) panel?.revealRow(row.id);
     });
   };
+  private stopNoticeActivation: (() => void) | undefined;
   private readonly executing = new Set<string>();
   private async act(action: StatusAction): Promise<void> {
     if (action.kind === 'background-runs') { this.close(); openRetrospectiveAt('inbox'); return; }
