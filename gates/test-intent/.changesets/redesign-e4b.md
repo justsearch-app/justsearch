@@ -459,3 +459,14 @@ assertions and parameter values are unchanged. The repair run transplants these 
 7a5ee0004c1dd2b3e7ed7cd71e3fc61eb02f7329; no compatibility patch or production overlay is needed.
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1ab90-cc84-70d3-b76c-42c7ad5119db",
+  "verdict": "accept",
+  "digest": "sha256:d08808a32efff906eb2e31e67c7cbcdff40c2b263527bac2bf2cf2d8bcf8145e",
+  "note": "Codex verifier-3 on 93d6ef1495: narrow D11 repair passes (five gauge cases; disambiguation-only idle with activity true); 65 focused checks pass; entries 1-12 accept; all four evidence files validate. Full scenario verification: verifier-2 01a1ab2a on 121d48e580 (all other E4b scenarios pass)."
+}
+```
