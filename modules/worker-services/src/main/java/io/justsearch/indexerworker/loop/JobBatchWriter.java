@@ -150,6 +150,7 @@ public final class JobBatchWriter {
     // Set once this write may have published rows: a prune scanning meanwhile judges the file again.
     String publishedPath = null;
     try {
+      jobQueue.allowsIngestionBoundary(JobQueue.IngestionBoundary.PUBLICATION, ex.claim().scanId(), ex.claim());
       if (!jobQueue.ownsClaimForPublication(ex.claim())) {
         stageRecorder.record("write", 0, IngestionReasonCodes.LOST_CLAIM_OWNERSHIP);
         log.info("Discarding superseded publication for {}: {}", ex.filePath(),

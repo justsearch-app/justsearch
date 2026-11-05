@@ -307,6 +307,7 @@ public final class JobBatchExtractor {
         batchStats.recordFailed();
         return null;
       }
+      jobQueue.allowsIngestionBoundary(JobQueue.IngestionBoundary.HASHING, claim.scanId(), claim);
       requireReadableSource(claim);
       String sourceSha256 = SourceContentHash.sha256WithinRoot(filePath, claim.ingestionRoot());
       if (staleResolver.tryHandleStale(filePath, envelope, collection, null, "after hashing", provenance, claim)) {
@@ -343,6 +344,7 @@ public final class JobBatchExtractor {
       ValidatedExtractionArtifact artifact;
       try {
         // W1.5 — inlined what used to be extractContent + validateArtifact wrappers.
+        jobQueue.allowsIngestionBoundary(JobQueue.IngestionBoundary.EXTRACTION, claim.scanId(), claim);
         requireReadableSource(claim);
         ExtractionArtifact rawArtifact = contentExtractor.extractArtifact(filePath);
         String sourcePathHash = envelope != null ? envelope.pathHash() : null;
@@ -354,6 +356,7 @@ public final class JobBatchExtractor {
 
       String sourceSha256AfterExtraction;
       try {
+        jobQueue.allowsIngestionBoundary(JobQueue.IngestionBoundary.HASHING, claim.scanId(), claim);
         requireReadableSource(claim);
         sourceSha256AfterExtraction = SourceContentHash.sha256WithinRoot(filePath, claim.ingestionRoot());
       } catch (IOException changedDuringExtraction) {

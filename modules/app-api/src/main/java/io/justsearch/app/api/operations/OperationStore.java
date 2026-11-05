@@ -246,6 +246,11 @@ public interface OperationStore extends AutoCloseable {
    */
   AutoCloseable subscribeCompletions(java.util.function.Consumer<OperationRecord> listener);
 
+  /** Private import approval projection. This read neither renews nor activates a binding. */
+  default java.util.Optional<ImportApprovalState> importApprovalState(long id) {
+    return java.util.Optional.empty();
+  }
+
   /** Open rows for owner-scoped reconciliation, in acceptance order. */
   java.util.List<OperationRecord> openRecords();
 
