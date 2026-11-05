@@ -23,6 +23,13 @@
 
 import { subscribeStatus } from '../utils/statusPoll.js';
 
+/**
+ * How long a newly presented request ignores its answers, in the security dialog and in the status
+ * panel's review: the second press of a double-click, a repeated activation or a key's auto-repeat
+ * that presented it cannot also answer it. A deliberate answer is a press that starts after this delay.
+ */
+export const ARMING_DELAY_MS = 400;
+
 /** What the ceremony needs to render a consistent approve/deny prompt for a gated action. */
 export interface AuthorizationPrompt {
   /** Backend-issued id; the only thing the approval references. */
@@ -68,6 +75,23 @@ export interface AuthorizationPrompt {
    * such ceremonies are never drained by a run conclusion.
    */
   readonly owningRunId?: string;
+  /**
+   * DE3 — the request came from an agent or another app, not from the person's own action: it waits
+   * in the status panel's Needs you (announced once) instead of opening a dialog on arrival. The panel
+   * reviews and answers it; a typed request's Review opens the protected security dialog.
+   */
+  readonly arrival?: 'needs-you';
+  /** When the request was made (ISO-8601), for "asked 1 min ago". */
+  readonly askedAt?: string;
+  /** Whether this window saw the request arrive live (announced), as opposed to rediscovering it. */
+  readonly live?: boolean;
+  /**
+   * Read the request's live details again when the person reviews it. Resolves the fresh fields, null
+   * when the request is no longer waiting; rejects when the details are unavailable (the request is
+   * then denied: nobody decides on details that could not be checked).
+   */
+  readonly refresh?: () => Promise<Partial<Pick<AuthorizationPrompt, 'operationId' | 'gateBehavior' | 'riskTier'
+    | 'argsSummary' | 'expiresAt' | 'requestedBy'>> | null>;
 }
 
 /**

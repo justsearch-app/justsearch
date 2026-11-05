@@ -98,7 +98,7 @@ public final class ActionLedgerProjection {
 
   /**
    * A trust-gate decision — the gate firing the 538 audit reads. {@code disposition} ∈
-   * GATED/DENIED/APPROVED is the outcome union for this kind.
+   * GATED/DENIED/APPROVED/EXPIRED/WITHDRAWN is the outcome union for this kind.
    */
   public static ActionEvent projectGate(AuthorizationOutcomeEntry gate) {
     return new ActionEvent.Gate(

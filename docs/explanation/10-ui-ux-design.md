@@ -187,6 +187,49 @@ transitions and action feedback are announced to screen readers. The panel updat
 while open, preserving expanded details; switching windows closes it. The Help surface
 supplies keyboard guidance.
 
+#### Requests from agents and other apps
+
+A request from an agent — an outside app over MCP (named by the name it gives, such as
+Claude Desktop), the agent in Search, or an agent's suggestion — opens no dialog when it
+arrives. It appears under Needs you, the pill shows the count, and screen readers hear it
+once, assertively; a request found again after a reload or reconnect is listed without an
+announcement. When the window is in the background the arrival also raises a desktop
+notification.
+
+A row offers Allow, Deny and Review. Review opens the request inside the panel (back link
+“What's going on”): who asked and when, the question, its consequence lines (the exact
+target the engine will act on, the risk, whether it can be undone), the requester's own
+words marked “Written by …, not checked by JustSearch” where it gave any, the deadline and
+what happens then (“Denied automatically in 4 min”, or that it waits), and Allow this time
+and Deny. Keys 1 and 2 answer from inside the review; they never act in a text field,
+during IME composition, on key repeat, with a modifier or while another modal is open.
+Escape goes back to the list and the request keeps waiting. Opening a review reads the
+request's live details again: a request that no longer waits leaves the review, and one
+whose details cannot be read is denied. “Always allow” is offered only where the engine
+keeps it — never for high-risk operations and never for the agent in Search. A newly shown
+row or review ignores answers for 400 ms, so the click that showed it cannot also answer it.
+
+Deny cancels the request in the engine; if that fails, the panel says the request could not
+be cancelled and it stays answerable. The panel, the dialog and an MCP announcement all
+answer the same request through one decision: it executes at most once, and an expired,
+withdrawn or already answered request cannot execute.
+
+Requests that need typing (high-risk operations, and agent suggestions that need typed
+confirmation) are listed the same way, but answering them opens the protected security
+dialog (Review, or Allow suggestion for a suggestion). Plugin permission requests that the
+reader's own action started (installing or enabling a plugin) open it at once. That dialog is a native modal `<dialog>` in the
+browser's top layer, headed “JustSearch security check”, with a teal border; skins and
+plugins cannot restyle or cover it. For plugin permissions, “Allow once” is the primary
+answer. A confirmation the reader's own command needs opens at once too: the security
+dialog when it must be typed, otherwise a small dialog that leaves the page usable.
+
+When copies of one agent request share an operation key, answering one answers all of
+them: the answered request is recorded with its decision and the others as withdrawn, so
+Earlier shows one row per decision. An agent reading the outcome of that key
+(`justsearch_operation_outcome`) and `GET /api/operation-history/{operationKey}` give the
+same answer: waiting, denied by the user, or denied automatically once the deadline passed
+unanswered.
+
 ### Progress vocabulary (status panel, Health, folder rows)
 
 Every surface that reports indexing progress uses one set of words, and derives its

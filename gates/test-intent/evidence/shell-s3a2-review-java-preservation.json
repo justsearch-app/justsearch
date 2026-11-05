@@ -1,0 +1,66 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-05T01:32:15.621Z",
+  "revision": "51bfa7756ce7f6313350eaaaf70d6a5cec4dc8b5",
+  "tree": "96a4ac53947903fc94a228d36f6b233b0a2374bc",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.McpAuthorizationDecisionHttpTest.anExpiredCopyLeavesTheKeyOpenWhileAnotherCopyStillWaits\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 6622
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/McpAuthorizationDecisionHttpTest.java#anExpiredCopyLeavesTheKeyOpenWhileAnotherCopyStillWaits",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/McpAuthorizationDecisionHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:66395ffbf081de25ea57fec6a7ddead44f1827307fe27ae09ac2b121d80f2ba2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anExpiredCopyLeavesTheKeyOpenWhileAnotherCopyStillWaits()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "51bfa7756c",
+    "revision": "51bfa7756ce7f6313350eaaaf70d6a5cec4dc8b5",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.McpAuthorizationDecisionHttpTest.anExpiredCopyLeavesTheKeyOpenWhileAnotherCopyStillWaits\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 8240
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/McpAuthorizationDecisionHttpTest.java#anExpiredCopyLeavesTheKeyOpenWhileAnotherCopyStillWaits",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:ebdb747b96da321c47184b3ef8a0c33667908e1b33b5a33c7092c0304786b65a"
+}

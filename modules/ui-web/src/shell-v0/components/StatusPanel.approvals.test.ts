@@ -24,6 +24,8 @@ async function activate(el: Element | null) {
   // A newly presented prompt ignores activation until its arming delay has passed.
   await control.updateComplete; vi.advanceTimersByTime(400); control.shadowRoot!.querySelector<HTMLButtonElement>('button')!.click(); await flush();
 }
+/** C12 — a listed answer arms after its row has stood still for the arming delay. */
+function arm() { vi.advanceTimersByTime(400); }
 function action(label: string) { return [...panel().shadowRoot!.querySelectorAll<HTMLButtonElement>('article button')].find(b => b.textContent!.trim() === label)!; }
 function seed(risk: string) {
   seedOps({ schemaVersion: '1', catalogVersion: 1, namespace: 'core', primitive: 'Operation', entries: [{
@@ -43,10 +45,10 @@ afterEach(() => { pill.remove(); host.remove(); __resetAiStateForTest(); __reset
   for (const r of listPendingConsentRequests()) resolveConsentRequest(r.id, 'deny'); vi.unstubAllGlobals(); vi.useRealTimers(); });
 describe('Needs you (moved from proposed-effect cards and agent activity)', () => {
   it('accept executes once and records acceptance; reject records rejection without applying', async () => {
-    proposeEffect({ kind: 'open-modal', modalId: 'm1' }, CORE_PROVENANCE, 'agent'); await flush();
+    proposeEffect({ kind: 'open-modal', modalId: 'm1' }, CORE_PROVENANCE, 'agent'); await flush(); arm();
     action('Allow suggestion').click(); action('Allow suggestion').click(); await flush();
     expect(listPending()).toHaveLength(0); expect(listJournal()).toHaveLength(2); expect(listJournal()[1]!.pendingOutcome).toBe('accepted');
-    proposeEffect({ kind: 'navigate', to: '#elsewhere' }, CORE_PROVENANCE, 'agent'); await flush(); action('Reject').click(); await flush();
+    proposeEffect({ kind: 'navigate', to: '#elsewhere' }, CORE_PROVENANCE, 'agent'); await flush(); arm(); action('Reject').click(); await flush();
     expect(listPending()).toHaveLength(0); expect(listJournal()).toHaveLength(3); expect(listJournal()[2]!.pendingOutcome).toBe('rejected');
   });
   it('multiple proposals preserve rationale and rank the least-confident first without inventing confidence', async () => {
@@ -62,7 +64,7 @@ describe('Needs you (moved from proposed-effect cards and agent activity)', () =
     seed(risk); const invoke = vi.fn(); document.addEventListener('jf-invoke-operation', invoke);
     try {
       proposeEffect({ kind: 'invoke-operation', operationId: 'core.reindex', args: { exact: 'target' } }, CORE_PROVENANCE, originator);
-      await flush(); action('Allow suggestion').click(); await flush();
+      await flush(); arm(); action('Allow suggestion').click(); await flush();
       expect(invoke).not.toHaveBeenCalled(); expect(host.active?.kind).toBe('authorize');
       const input = host.shadowRoot!.querySelector<HTMLInputElement>('input[type="text"]')!;
       const approve = () => host.shadowRoot!.querySelector('[data-testid="authorization-approve"]');
@@ -78,7 +80,7 @@ describe('Needs you (moved from proposed-effect cards and agent activity)', () =
     seed('MEDIUM'); const invoke = vi.fn(); document.addEventListener('jf-invoke-operation', invoke);
     try {
       proposeEffect({ kind: 'invoke-operation', operationId: 'core.reindex', args: {} }, CORE_PROVENANCE, 'user'); await flush();
-      action('Allow suggestion').click(); await flush(); expect(host.active).toBeNull(); expect(invoke).toHaveBeenCalledTimes(1);
+      arm(); action('Allow suggestion').click(); await flush(); expect(host.active).toBeNull(); expect(invoke).toHaveBeenCalledTimes(1);
       expect((invoke.mock.calls[0]![0] as CustomEvent).detail.confirmationToken).toBeUndefined();
     } finally { document.removeEventListener('jf-invoke-operation', invoke); }
   });

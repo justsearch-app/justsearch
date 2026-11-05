@@ -1,0 +1,323 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-05T07:02:13.910Z",
+  "revision": "ae182f7c4c98b4ff183716cabd2cd7bd8517c5be",
+  "tree": "75d40f5baa67405dacf0f63bb2ded6b970634ba6",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/AuthorizationArrival.scope.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/1ohsl9z5/tmp/test-intent-vitest-10740-1793862063559.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2724
+    },
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/1ohsl9z5/tmp/test-intent-vitest-10740-1793862066285.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 67624
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationArrival.scope.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationArrival.scope.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8bb457c3057b0fac90d5521773b0f5e86c420e88428b83562c66fb2ed86067f9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "A five live MCP TYPED_CONFIRM arrivals announce once each when their advisory arrives first",
+          "status": "passed"
+        },
+        {
+          "name": "A five live MCP INLINE_CONFIRM arrivals announce once each when their advisory arrives first",
+          "status": "passed"
+        },
+        {
+          "name": "A a live MCP typed arrival announces once when the event arrives first",
+          "status": "passed"
+        },
+        {
+          "name": "A a live AGENT_LOOP typed arrival announces once when the event arrives first",
+          "status": "passed"
+        },
+        {
+          "name": "A a live WORKFLOW typed arrival announces once when the event arrives first",
+          "status": "passed"
+        },
+        {
+          "name": "A a live LLM_EMISSION typed arrival announces once when the event arrives first",
+          "status": "passed"
+        },
+        {
+          "name": "A a live HTTP_API typed arrival announces once when the event arrives first",
+          "status": "passed"
+        },
+        {
+          "name": "A a live URL_BAR typed arrival announces once when the event arrives first",
+          "status": "passed"
+        },
+        {
+          "name": "A a live URL_DEEPLINK typed arrival announces once when the event arrives first",
+          "status": "passed"
+        },
+        {
+          "name": "A a live PLUGIN_EMITTED typed arrival announces once when the event arrives first",
+          "status": "passed"
+        },
+        {
+          "name": "A a live SCHEDULED typed arrival announces once when the event arrives first",
+          "status": "passed"
+        },
+        {
+          "name": "A a live RULE_ENGINE typed arrival announces once when the event arrives first",
+          "status": "passed"
+        },
+        {
+          "name": "A a live SYSTEM_INTERNAL typed arrival announces once when the event arrives first",
+          "status": "passed"
+        },
+        {
+          "name": "A a live NOT_YET_KNOWN typed arrival announces once when the event arrives first",
+          "status": "passed"
+        },
+        {
+          "name": "A reload, reconnect snapshots and a later window restore requests silently",
+          "status": "passed"
+        },
+        {
+          "name": "C panel consent names operation and access scope for requester undefined",
+          "status": "passed"
+        },
+        {
+          "name": "C panel consent names operation and access scope for requester Claude Desktop",
+          "status": "passed"
+        },
+        {
+          "name": "C protected dialog consent names operation and access scope for requester undefined",
+          "status": "passed"
+        },
+        {
+          "name": "C protected dialog consent names operation and access scope for requester Claude Desktop",
+          "status": "passed"
+        },
+        {
+          "name": "C durable offering remains suppressed for {\"riskTier\":\"HIGH\"}",
+          "status": "passed"
+        },
+        {
+          "name": "C durable offering remains suppressed for {\"riskTier\":\"MEDIUM\",\"allowAlwaysSupported\":false}",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:16edcc8d98f58358e98fcf466d4790077c018b4cb6a46b1c8586ac1621b60d08",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a native double-click on Allow always grants only the first plugin, across reload",
+          "status": "passed"
+        },
+        {
+          "name": "repeated native activation of the same button answers one prompt",
+          "status": "passed"
+        },
+        {
+          "name": "Enter pressed and held on the next prompt before it arms answers nothing",
+          "status": "passed"
+        },
+        {
+          "name": "a fresh Enter press after the delay answers the next prompt exactly once",
+          "status": "passed"
+        },
+        {
+          "name": "a deliberate click after the delay answers the next prompt exactly once",
+          "status": "passed"
+        },
+        {
+          "name": "S1 a checkbox click on the next approval’s Always allow 30 ms after it appears does not tick it; a later deliberate Approve sends allowAlways false",
+          "status": "passed"
+        },
+        {
+          "name": "S1 a label click on the next approval’s Always allow 30 ms after it appears does not tick it; a later deliberate Approve sends allowAlways false",
+          "status": "passed"
+        },
+        {
+          "name": "S1 a deliberate click on Always allow after arming ticks it and the approval sends allowAlways true",
+          "status": "passed"
+        },
+        {
+          "name": "S1 a key pressed in the next typed approval before it arms, and its auto-repeat after, enters nothing; typing after it arms does",
+          "status": "passed"
+        },
+        {
+          "name": "S2 a typed ceremony closed by Escape releases modality; the pill opens the panel and Review reopens it in its modality",
+          "status": "passed"
+        },
+        {
+          "name": "S2 a typed ceremony closed by dialog.close() releases modality; the pill opens the panel and Review reopens it in its modality",
+          "status": "passed"
+        },
+        {
+          "name": "S2 a capability ceremony closed by Escape releases modality; the pill opens the panel and Review reopens it in its modality",
+          "status": "passed"
+        },
+        {
+          "name": "S2 a capability ceremony closed by dialog.close() releases modality; the pill opens the panel and Review reopens it in its modality",
+          "status": "passed"
+        },
+        {
+          "name": "S2 a lightweight ceremony closed by dialog.close() releases modality; the pill opens the panel and Review reopens it in its modality",
+          "status": "passed"
+        },
+        {
+          "name": "DE4 typed → capability → agent-typed: each protected request opens in the top layer above a skin overlay; an agent request opens no dialog on arrival",
+          "status": "passed"
+        },
+        {
+          "name": "DE4 typed → agent-typed → capability: each protected request opens in the top layer above a skin overlay; an agent request opens no dialog on arrival",
+          "status": "passed"
+        },
+        {
+          "name": "DE4 capability → typed → agent-typed: each protected request opens in the top layer above a skin overlay; an agent request opens no dialog on arrival",
+          "status": "passed"
+        },
+        {
+          "name": "DE4 capability → agent-typed → typed: each protected request opens in the top layer above a skin overlay; an agent request opens no dialog on arrival",
+          "status": "passed"
+        },
+        {
+          "name": "DE4 agent-typed → typed → capability: each protected request opens in the top layer above a skin overlay; an agent request opens no dialog on arrival",
+          "status": "passed"
+        },
+        {
+          "name": "DE4 agent-typed → capability → typed: each protected request opens in the top layer above a skin overlay; an agent request opens no dialog on arrival",
+          "status": "passed"
+        },
+        {
+          "name": "X1/X2 the panel review in dark at 1280×800 fits without sideways overflow",
+          "status": "passed"
+        },
+        {
+          "name": "X1/X2 the panel review in dark at 900×800 fits without sideways overflow",
+          "status": "passed"
+        },
+        {
+          "name": "X1/X2 the panel review in dark at 600×400 fits without sideways overflow",
+          "status": "passed"
+        },
+        {
+          "name": "X1/X2 the panel review in light at 1280×800 fits without sideways overflow",
+          "status": "passed"
+        },
+        {
+          "name": "X1/X2 the panel review in light at 900×800 fits without sideways overflow",
+          "status": "passed"
+        },
+        {
+          "name": "X1/X2 the panel review in light at 600×400 fits without sideways overflow",
+          "status": "passed"
+        },
+        {
+          "name": "X1/X2 the panel review in forced at 1280×800 fits without sideways overflow",
+          "status": "passed"
+        },
+        {
+          "name": "X1/X2 the panel review in forced at 900×800 fits without sideways overflow",
+          "status": "passed"
+        },
+        {
+          "name": "X1/X2 the panel review in forced at 600×400 fits without sideways overflow",
+          "status": "passed"
+        },
+        {
+          "name": "DE3 an Allow pressed while the review is still reading the live details sends nothing; unavailable details stay answerable",
+          "status": "passed"
+        },
+        {
+          "name": "DE3 the list Allow reads the live details as part of the press: unavailable or different details allow nothing",
+          "status": "passed"
+        },
+        {
+          "name": "DE3 a typed request's Approve in the security check reads the live details as part of the press",
+          "status": "passed"
+        },
+        {
+          "name": "C12 a native double-click on the first row's Allow answers only the first request",
+          "status": "passed"
+        },
+        {
+          "name": "C12 a click where the next row moved in answers nothing; a fresh click after the delay answers it once",
+          "status": "passed"
+        },
+        {
+          "name": "C12 Enter held on the first row's Allow answers at most one request",
+          "status": "passed"
+        },
+        {
+          "name": "DE3 initial and fresh pending details with no arguments refuse Allow, send no approval, and stay answerable",
+          "status": "passed"
+        },
+        {
+          "name": "DE3 initial and fresh pending details with null arguments refuse Allow, send no approval, and stay answerable",
+          "status": "passed"
+        },
+        {
+          "name": "DE3 initial and fresh pending details with non-text arguments refuse Allow, send no approval, and stay answerable",
+          "status": "passed"
+        },
+        {
+          "name": "DE3 a live-details read answering 200 with an empty body allows nothing and the request stays answerable",
+          "status": "passed"
+        },
+        {
+          "name": "DE3 a live-details read answering 200 with no operation allows nothing and the request stays answerable",
+          "status": "passed"
+        },
+        {
+          "name": "DE3 a live-details read answering 200 with no arguments allows nothing and the request stays answerable",
+          "status": "passed"
+        },
+        {
+          "name": "DE3 a live-details read answering 200 with no requester allows nothing and the request stays answerable",
+          "status": "passed"
+        },
+        {
+          "name": "DE3 a live-details read answering 200 with a malformed operation allows nothing and the request stays answerable",
+          "status": "passed"
+        },
+        {
+          "name": "DE3 a live-details read answering 200 with a null body allows nothing and the request stays answerable",
+          "status": "passed"
+        },
+        {
+          "name": "C12 a Deny pressed 100 ms after an Allow whose read is slow abandons that Allow: the failed Deny leaves nothing sent",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:5e57799d96de989d05b06604c9d92f65b32f56d81c800409f498f69833585904"
+}

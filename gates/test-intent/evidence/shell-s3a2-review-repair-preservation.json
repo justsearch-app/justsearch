@@ -1,0 +1,67 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-05T06:55:48.865Z",
+  "revision": "ae182f7c4c98b4ff183716cabd2cd7bd8517c5be",
+  "tree": "4fdf1b91763b98c1ded2d1ccc39352f0bb9bbb94",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/1ohsl9z5/tmp/test-intent-vitest-4102-1793861621216.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 66983
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#C12 Enter held on the first row's Allow answers at most one request",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:16edcc8d98f58358e98fcf466d4790077c018b4cb6a46b1c8586ac1621b60d08",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C12 Enter held on the first row's Allow answers at most one request",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "c42cb3591ca441526a9f6779c6ff95459d40168e",
+    "revision": "c42cb3591ca441526a9f6779c6ff95459d40168e",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/1ohsl9z5/tmp/test-intent-vitest-4102-1793861690292.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 57907,
+        "output": "JSON report written to /home/elias/.cache/am/1ohsl9z5/tmp/test-intent-vitest-4102-1793861690292.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#C12 Enter held on the first row's Allow answers at most one request",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:4bcff714196776a0cbafc4dbd5c56a04b9ae8fb39b585b72a40b0934f0848d67"
+}

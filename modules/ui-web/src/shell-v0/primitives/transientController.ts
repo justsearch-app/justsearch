@@ -42,6 +42,11 @@ export interface TransientOptions {
    */
   dismissExclude?: (path: EventTarget[]) => boolean;
   /**
+   * Optional (only consulted when `managesDismiss`): Escape asks this first; returning true means the
+   * overlay handled the key itself (e.g. a panel stepping back from a nested view) and stays open.
+   */
+  escape?: () => boolean;
+  /**
    * 574 §25 Edge 5 (the controller-shrink) — POPOVER MODE. When supplied, the controller drives this
    * element's native Popover API (the element must carry `popover="auto"`) for **single-open + light-dismiss
    * by the platform** instead of the arbiter + `managesDismiss` triad: {@link open} calls `showPopover()`
@@ -65,7 +70,7 @@ export class TransientController implements ReactiveController {
     if (!path.includes(this.hostEl)) this.opts.close();
   };
   private readonly onKeyDown = (e: KeyboardEvent): void => {
-    if (e.key === 'Escape') this.opts.close();
+    if (e.key === 'Escape' && !this.opts.escape?.()) this.opts.close();
   };
 
   /** Popover mode: the UA closed the popover (Escape / outside-click / peer-open / our hidePopover) → sync
