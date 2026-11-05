@@ -359,13 +359,16 @@ def execute(action: str, refs: tuple[str, ...], *, baseline_dir: Path,
     backend.require_prepared(repo_root)
     loaded = []
     totals, startups, footprints = [], [], []
+    pending = {}
     for ref in refs or (FULL_COLLECTIONS if full_suite else DEFAULT_COLLECTIONS):
         c, qc = collections.resolve_collection(ref)
         if action == 'check' and not full_suite and c.name == 'miracl-fr':
             raise RunRefused('MIRACL fr belongs to quality full-suite with an explicit window')
-        known_answers.check(c, qc)
+        # Refuses a collection without scored queries (K2); pending ones are counted, not run.
+        pending[c.name] = known_answers.check(c, qc).pending
+        c = collections.scored_collection(c, qc)
         if not c.queries:
-            raise RunRefused(f'{c.name}: zero queries')
+            raise RunRefused(f'{c.name}: no scored queries')
         cfg = index.IndexConfig(repo_root=repo_root, models_dir=models_dir,
                                 documents_dir=documents_dir, cache_root=cache_root)
         # Read-only prepared check happens before taking the gate; no worker/build fallback.
@@ -471,7 +474,8 @@ def execute(action: str, refs: tuple[str, ...], *, baseline_dir: Path,
     surface = 'Search window refined request' if mode is None else f'explicit-mode ablation {mode}'
     summary = {'outcome': outcome.value, 'surface': surface, 'request': request,
                'estimate_seconds': estimate, 'collection_seconds': times, 'details': details,
-               'overlap_planned': overlap, 'syntax_refusals': refusals}
+               'overlap_planned': overlap, 'syntax_refusals': refusals,
+               'pending_labels': pending}
     _write_json(out/'summary.json', summary)
     atomic_write_text(out/'summary.md',
         f"# {outcome.value}: {surface}\n\n{details}\n\n"
@@ -481,9 +485,12 @@ def execute(action: str, refs: tuple[str, ...], *, baseline_dir: Path,
         + "\n".join(f"- {name}: {elapsed:.1f}s" for name, elapsed in times.items())
         + "\n\n" + "\n".join(f"{name} syntax refusals ({len(ids)}): " + (', '.join(ids) or 'none')
                                   for name, ids in refusals.items())
+        + "".join(f"\n\n{name}: {n} queries pending labels, excluded from scoring"
+                  for name, n in pending.items() if n)
         + "\n\nPer-query rankings, served legs, reranker status/reason and errors: `*/run.jsonl`.\n"
         + "Comparison reports: `*/run.md`. Effective runtime and model hashes are in each run header.\n")
-    line = f'{outcome.value} {surface}: {report.compact(details, 3000)}; ' + ', '.join(f'{c} {s:.1f}s' for c,s in times.items()) + f'; report {out}'
+    waiting = ''.join(f'; {name}: {n} queries pending labels, not scored' for name, n in pending.items() if n)
+    line = f'{outcome.value} {surface}: {report.compact(details, 3000)}; ' + ', '.join(f'{c} {s:.1f}s' for c,s in times.items()) + waiting + f'; report {out}'
     return outcome, ' '.join(line.split())
 
 

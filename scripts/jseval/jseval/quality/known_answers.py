@@ -3,8 +3,9 @@
 1. Counts: queries, judgments, positives, grades and documents equal the values pinned in the
    collection's config (taken from the official source), so a dropped positive is caught even when
    the stored digests were recomputed.
-2. Integrity: every query has a relevant judgment, judgments and queries cover the same ids, and
-   every judged document is in the manifest.
+2. Integrity: every scored query has a relevant judgment, judgments and scored queries cover the
+   same ids, every judged document is in the manifest, and no query of a kind the config declares
+   pending labels has a judgment yet (K2: pending queries are stored, counted, never scored).
 3. Constructed rankings through the real scorer, per query: the ideal grade order scores 1.0, an
    all non-relevant ranking scores 0, and a mixed ranking matches an independent closed-form
    computation; plus one fixed ranking whose value was computed by hand.
@@ -17,7 +18,7 @@ from dataclasses import dataclass
 from typing import Mapping
 
 from . import scoring
-from .collections import QualityConfig
+from .collections import QualityConfig, pending_queries, scored_collection
 from .types import Collection
 
 TOLERANCE = 1e-12
@@ -45,6 +46,7 @@ class KnownAnswerReport:
     version: str
     checks: int
     counts: Mapping
+    pending: int = 0
 
 
 def reference_metrics(grades: Mapping[str, int], ranking: list[str], k: int = 10) -> dict:
@@ -79,16 +81,24 @@ def _constructed(c: Collection) -> dict[str, dict[str, list[str]]]:
     return {"ideal": ideal, "non-relevant": nonrel, "mixed": mixed}
 
 
-def check(c: Collection, cfg: QualityConfig) -> KnownAnswerReport:
+def check(c: Collection, cfg: QualityConfig, *, require_scored: bool = True) -> KnownAnswerReport:
+    """``require_scored=False`` admits a corpus-only collection (no scored queries) for index
+    preparation; baseline, check and score keep the default and refuse it."""
     reasons: list[str] = []
-    counts = c.counts()
+    pending = pending_queries(c, cfg)
+    counts = {**c.counts(), "pending": len(pending)}
     for key, want in cfg.expected.items():
         if counts.get(key) != want:
             reasons.append(f"expected {key} {want}, found {counts.get(key)}")
     if c.name != cfg.collection:
         reasons.append(f"collection is {c.name!r}, config is for {cfg.collection!r}")
-    if not c.queries:
-        reasons.append("zero queries")
+    judged_pending = [q for q in pending if q in c.judgments]
+    if judged_pending:
+        reasons.append(f"{len(judged_pending)} queries of a pending kind already have judgments "
+                       f"(e.g. {judged_pending[0]}); remove the kind from pending_kinds")
+    c = scored_collection(c, cfg)
+    if require_scored and not c.queries:
+        reasons.append("no scored queries" + (f" ({len(pending)} pending labels)" if pending else ""))
     if set(c.queries) != set(c.judgments):
         reasons.append(f"{len(set(c.queries) ^ set(c.judgments))} query ids are in only one of "
                        "queries and judgments")
@@ -126,4 +136,4 @@ def check(c: Collection, cfg: QualityConfig) -> KnownAnswerReport:
                 reasons.append(f"{qid}: non-relevant ranking scored {scored[qid]}")
     if reasons:
         raise KnownAnswerFailure(c.name, reasons)
-    return KnownAnswerReport(c.name, c.version, checks, counts)
+    return KnownAnswerReport(c.name, c.version, checks, counts, len(pending))

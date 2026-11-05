@@ -1,0 +1,3463 @@
+{
+ "documents": 1000,
+ "kept": {
+  "ru-0093e1c8406013c0d1e45530": [
+   "target:ki-191"
+  ],
+  "ru-0120ede492c5211cb409a162": [
+   "target-cluster:cl-0233",
+   "topical:tp-059"
+  ],
+  "ru-013cc6e289a2ea87b5626aa0": [
+   "target-cluster:cl-0234",
+   "topical:tp-012"
+  ],
+  "ru-01c17870524ed0be28212332": [
+   "target:ki-123"
+  ],
+  "ru-025e32cf7947fc703e11c396": [
+   "topical:tp-089"
+  ],
+  "ru-02758dfa9aa8d88e4780e1a6": [
+   "target:ki-122"
+  ],
+  "ru-02a9aa98d13c7784a326ce74": [
+   "topical:tp-046"
+  ],
+  "ru-02ff37f1a0409f83891a6d93": [
+   "topical:tp-115"
+  ],
+  "ru-0329c4deaa82ced4e6cb74e3": [
+   "topical:tp-066"
+  ],
+  "ru-0333f1f3e3660ea13b339b8c": [
+   "target-cluster:cl-0003",
+   "target-cluster:cl-0092",
+   "topical:tp-060"
+  ],
+  "ru-0384b160b5597235ea4702ac": [
+   "topical:tp-099"
+  ],
+  "ru-03def27fe0f9f64606a45b14": [
+   "topical:tp-013"
+  ],
+  "ru-04321217233f77b8c8385012": [
+   "target:ki-051"
+  ],
+  "ru-04d17b863566d39ce5e20096": [
+   "topical:tp-041"
+  ],
+  "ru-04f62eee57037f99c255cee7": [
+   "target-cluster:cl-0004",
+   "topical:tp-097"
+  ],
+  "ru-059c29aabf8a8502511b175b": [
+   "target-cluster:cl-0247",
+   "topical:tp-014"
+  ],
+  "ru-05d73ae61ab0cbc71a33b849": [
+   "target:ki-138"
+  ],
+  "ru-05f6856e87522f45163bed8b": [
+   "topical:tp-082"
+  ],
+  "ru-0602b124ec1be325406e411a": [
+   "topical:tp-061"
+  ],
+  "ru-065737f359249f5e3e6bf511": [
+   "topical:tp-067"
+  ],
+  "ru-06c181575a5d0c615d8e8b82": [
+   "target:ki-189"
+  ],
+  "ru-0713cd3fdf42db6a84d0e792": [
+   "target-cluster:cl-0002",
+   "target-cluster:cl-0005",
+   "topical:tp-116"
+  ],
+  "ru-07b90afd74ea43394344f6d2": [
+   "target-cluster:cl-0028",
+   "target:ki-070",
+   "topical:tp-052"
+  ],
+  "ru-07cbc5d1debd925d659cb454": [
+   "target-cluster:cl-0257",
+   "topical:tp-031"
+  ],
+  "ru-083c20c631bf5f0bd2ed6cc3": [
+   "topical:tp-032"
+  ],
+  "ru-086dabc88ce29c0954407ba4": [
+   "topical:tp-046"
+  ],
+  "ru-08c43f5d75b2f0bb106d68ef": [
+   "topical:tp-031"
+  ],
+  "ru-094174a424357122760ab1ff": [
+   "topical:tp-053"
+  ],
+  "ru-096a1fd2f71acc350a9c4972": [
+   "topical:tp-084"
+  ],
+  "ru-09a5e06cfdb8f06ec12e3750": [
+   "topical:tp-065"
+  ],
+  "ru-09a8214366e01b55ad1f6607": [
+   "topical:tp-031"
+  ],
+  "ru-0a4c88a011f0725f6425d2b1": [
+   "topical:tp-039"
+  ],
+  "ru-0a7f999e90f24f14adaf08a6": [
+   "topical:tp-032"
+  ],
+  "ru-0abf15de533a61010233e096": [
+   "target-cluster:cl-0169",
+   "target:ki-086",
+   "topical:tp-104"
+  ],
+  "ru-0ae0c875bb0e6b6539143199": [
+   "target-cluster:cl-0316"
+  ],
+  "ru-0b2be76d4f499f86f35b41a0": [
+   "topical:tp-087"
+  ],
+  "ru-0c65563aff07ddacfb0af9c4": [
+   "target:ki-146"
+  ],
+  "ru-0c6c56f73ab7a16a98bfbbce": [
+   "target-cluster:cl-0234"
+  ],
+  "ru-0dd5f0d657acbf80aed8b1d3": [
+   "target-cluster:cl-0024",
+   "topical:tp-011"
+  ],
+  "ru-0ea53a18746717fff719e6bb": [
+   "topical:tp-091"
+  ],
+  "ru-0f218f0fab1280a86ba1928c": [
+   "topical:tp-022"
+  ],
+  "ru-0f30536e83f8955aa43083a3": [
+   "topical:tp-043"
+  ],
+  "ru-0ff10c34c172415dec77c07a": [
+   "target-cluster:cl-0359",
+   "topical:tp-044"
+  ],
+  "ru-11083af44aa5ec6d731160ed": [
+   "target-cluster:cl-0266"
+  ],
+  "ru-11d789e8461c7aef4b819398": [
+   "topical:tp-117"
+  ],
+  "ru-11e230b2793b03760b3c12c6": [
+   "topical:tp-054"
+  ],
+  "ru-1217905616e80a45d2582e6d": [
+   "topical:tp-089"
+  ],
+  "ru-12b0e56339b246268b3f42a9": [
+   "target-cluster:cl-0261",
+   "topical:tp-048"
+  ],
+  "ru-1343edd0474891f5f667c43d": [
+   "topical:tp-118"
+  ],
+  "ru-1353c367a521d871ba77bca7": [
+   "topical:tp-044"
+  ],
+  "ru-1375f7a98350f89fc042f5ab": [
+   "topical:tp-106"
+  ],
+  "ru-13f2b687136f778a7e5e332e": [
+   "topical:tp-130"
+  ],
+  "ru-14913361fb0eb1bf85008769": [
+   "topical:tp-082"
+  ],
+  "ru-159f015ce9111597e3acba69": [
+   "topical:tp-095"
+  ],
+  "ru-15c33bf47cb13482b4754391": [
+   "target-cluster:cl-0278",
+   "target:ki-009"
+  ],
+  "ru-15e08b5eb40ab56124ad473f": [
+   "target-cluster:cl-0076"
+  ],
+  "ru-17164a3d74e1db088e563aae": [
+   "topical:tp-119"
+  ],
+  "ru-172515c6e25897b69e246144": [
+   "topical:tp-044"
+  ],
+  "ru-173ac78baaf222fa0e4b35a4": [
+   "topical:tp-025"
+  ],
+  "ru-1744a04ae17c0caa6d07e265": [
+   "topical:tp-055"
+  ],
+  "ru-17b55f6c91cf4567a9c04972": [
+   "target-cluster:cl-0303",
+   "target:ki-003"
+  ],
+  "ru-183885a6f5e716ca257b188d": [
+   "topical:tp-105"
+  ],
+  "ru-18db76a959909dc27b72b7fb": [
+   "target-cluster:cl-0237"
+  ],
+  "ru-18e0a2a9df64ff123103fb4d": [
+   "topical:tp-109"
+  ],
+  "ru-1911eda51bef534c6af2fa02": [
+   "topical:tp-105"
+  ],
+  "ru-196537902fd652f1f9ad077f": [
+   "topical:tp-021"
+  ],
+  "ru-19dce6fa4355c0f9c7bc9da5": [
+   "topical:tp-093"
+  ],
+  "ru-19eacefe0e66795ca46a318f": [
+   "target-cluster:cl-0007"
+  ],
+  "ru-19fcc60eae07f8b2f5cd34d0": [
+   "topical:tp-110"
+  ],
+  "ru-1a2e1fb4220e2928ea370151": [
+   "target:ki-184"
+  ],
+  "ru-1a37723c318bb95a113f4487": [
+   "target-cluster:cl-0261",
+   "topical:tp-043"
+  ],
+  "ru-1a43638f2a3edd22fd601463": [
+   "topical:tp-035"
+  ],
+  "ru-1a81d90d11d08e43303aafa4": [
+   "target-cluster:cl-0392"
+  ],
+  "ru-1addc2a8ba44561040961be1": [
+   "target-cluster:cl-0003",
+   "target-cluster:cl-0092",
+   "target:ki-073",
+   "topical:tp-060"
+  ],
+  "ru-1ade640d18949e2a2a351bb0": [
+   "target-cluster:cl-0228",
+   "topical:tp-020"
+  ],
+  "ru-1ae8cc75503230dc7e2ee8cf": [
+   "topical:tp-089"
+  ],
+  "ru-1aef7c93e7a6045ddf9801d7": [
+   "target-cluster:cl-0316",
+   "target:ki-002"
+  ],
+  "ru-1b2546b4ba0705c837107c80": [
+   "topical:tp-120"
+  ],
+  "ru-1b58686e93a592bfa39df86f": [
+   "target-cluster:cl-0021",
+   "topical:tp-008"
+  ],
+  "ru-1b686ae80b483450f3b1d05b": [
+   "target-cluster:cl-0206"
+  ],
+  "ru-1bc99e76126fde0f3cc2c214": [
+   "topical:tp-114"
+  ],
+  "ru-1c6de7dd1977c5ca5100ba3a": [
+   "topical:tp-098"
+  ],
+  "ru-1cbf80ab6dc505099d576dd3": [
+   "target:ki-049"
+  ],
+  "ru-1d081aaecd23de80b8279730": [
+   "target:ki-182"
+  ],
+  "ru-1de52180a7b802ac35553766": [
+   "topical:tp-090"
+  ],
+  "ru-1e457f4e390a831bb74f8d89": [
+   "topical:tp-106"
+  ],
+  "ru-1e69203bdd906acb945ed3fa": [
+   "topical:tp-020"
+  ],
+  "ru-1edbf7f85c8e6caa7a60cc9f": [
+   "target-cluster:cl-0020",
+   "target:ki-036",
+   "topical:tp-007"
+  ],
+  "ru-1f25abb1a47ffad0285ce255": [
+   "target-cluster:cl-0261"
+  ],
+  "ru-1fb99cc38206eee6c2730a23": [
+   "topical:tp-041"
+  ],
+  "ru-1fd51fb2220d3f8587be2a8c": [
+   "topical:tp-119"
+  ],
+  "ru-2068387693ca66e22c12e2c4": [
+   "target-cluster:cl-0261",
+   "topical:tp-043"
+  ],
+  "ru-20c8d7a12e56975340cb6441": [
+   "target:ki-066"
+  ],
+  "ru-225f880ef274314851997a16": [
+   "target-cluster:cl-0125"
+  ],
+  "ru-2296fdb29bb715af09621f35": [
+   "topical:tp-121"
+  ],
+  "ru-229f53928e9d3ea6da7849ab": [
+   "topical:tp-087"
+  ],
+  "ru-238128618dc1df0b9f1d1981": [
+   "target:ki-177"
+  ],
+  "ru-23af8464d4cb16e1ec0cd666": [
+   "topical:tp-026"
+  ],
+  "ru-243f43ad5bc1be4cd2f3aec4": [
+   "topical:tp-036"
+  ],
+  "ru-245b4365070bff7d81e9b75d": [
+   "topical:tp-066"
+  ],
+  "ru-245fb923511e661a4c23cf3a": [
+   "topical:tp-023"
+  ],
+  "ru-2515b54fb8f155852e4d3d39": [
+   "topical:tp-068"
+  ],
+  "ru-2569fe569fc8309677f1a16d": [
+   "target-cluster:cl-0342"
+  ],
+  "ru-25c68e8b1179bb713610bd6d": [
+   "topical:tp-022"
+  ],
+  "ru-25db4b4bb960bc2e85f0b5e3": [
+   "target-cluster:cl-0268"
+  ],
+  "ru-2674c8c38719127be0e8cb3d": [
+   "topical:tp-088"
+  ],
+  "ru-2685d20f5250d3e5a4d54d67": [
+   "topical:tp-022"
+  ],
+  "ru-26f9f9d050dc8ed0f4b3d405": [
+   "topical:tp-069"
+  ],
+  "ru-273fffc352fa878c999ba6d3": [
+   "target-cluster:cl-0261",
+   "topical:tp-048"
+  ],
+  "ru-280eaab5eba4e56c25772f5e": [
+   "topical:tp-050"
+  ],
+  "ru-2839966daa3b0f6b0e3c951a": [
+   "topical:tp-079"
+  ],
+  "ru-295d6834068f759cb586e2ff": [
+   "target-cluster:cl-0233",
+   "topical:tp-059"
+  ],
+  "ru-296312b433c16e2ebf7c8ba3": [
+   "target-cluster:cl-0233",
+   "target:ki-114",
+   "topical:tp-059"
+  ],
+  "ru-29bb3b7ffb241fc127b00bc1": [
+   "topical:tp-055"
+  ],
+  "ru-2a87cc3b01f1fc42a167f763": [
+   "topical:tp-089"
+  ],
+  "ru-2b11663b3c8f9c8f0db8057a": [
+   "target:ki-046"
+  ],
+  "ru-2b7f643e62b95d6df7094112": [
+   "topical:tp-070"
+  ],
+  "ru-2bca4ccc7ff36e7ef48d954f": [
+   "target:ki-137"
+  ],
+  "ru-2c72a514384c4a8414b82497": [
+   "target:ki-192"
+  ],
+  "ru-2d4393a2810493ff1e70b95d": [
+   "target-cluster:cl-0251",
+   "topical:tp-014"
+  ],
+  "ru-2d5f9eb62ed02364c1952ec9": [
+   "topical:tp-015"
+  ],
+  "ru-2de2c0b93f6062edf9803809": [
+   "topical:tp-071"
+  ],
+  "ru-2efa68e5e1a0dfc8277a1b47": [
+   "target:ki-183",
+   "topical:tp-093"
+  ],
+  "ru-2f10915e16afe98bc7b51889": [
+   "target-cluster:cl-0207",
+   "target:ki-077"
+  ],
+  "ru-2f15c447fe95ac0f28251715": [
+   "topical:tp-122"
+  ],
+  "ru-2ff0f9292b7582511c3a7d16": [
+   "target:ki-133"
+  ],
+  "ru-302c67a17219ee7072ca07e5": [
+   "target-cluster:cl-0047",
+   "topical:tp-023"
+  ],
+  "ru-303aa4f28eea44c92641a9a6": [
+   "target-cluster:cl-0003",
+   "target-cluster:cl-0092",
+   "topical:tp-060"
+  ],
+  "ru-311175e16ca1c70ac5a23ab1": [
+   "topical:tp-091"
+  ],
+  "ru-3163e5ee4b8d28adc9e51de2": [
+   "topical:tp-090"
+  ],
+  "ru-31643471071a2efd399339fc": [
+   "topical:tp-046"
+  ],
+  "ru-318569c853a6129c0fe5e875": [
+   "target-cluster:cl-0022",
+   "topical:tp-001",
+   "topical:tp-009",
+   "topical:tp-123"
+  ],
+  "ru-31a8b87494c6e1358ed4b2b5": [
+   "target-cluster:cl-0230",
+   "topical:tp-062"
+  ],
+  "ru-32305362845536f81533f473": [
+   "topical:tp-072"
+  ],
+  "ru-324457059dbff131d845ddbd": [
+   "target-cluster:cl-0356",
+   "target:ki-025"
+  ],
+  "ru-32587661329bf9ac3d4754a2": [
+   "target-cluster:cl-0033",
+   "target:ki-079",
+   "topical:tp-054"
+  ],
+  "ru-327af4cc6f83c6543eb3eb43": [
+   "target:ki-193"
+  ],
+  "ru-32833302170827144ea4ce86": [
+   "topical:tp-037"
+  ],
+  "ru-33570c0824522f636f3284fa": [
+   "target-cluster:cl-0193",
+   "target:ki-092",
+   "topical:tp-079"
+  ],
+  "ru-33772f41a643283552721ec7": [
+   "topical:tp-121"
+  ],
+  "ru-339065d469db0defa15af578": [
+   "topical:tp-106"
+  ],
+  "ru-33f7890c3b11d51c4ec21688": [
+   "target-cluster:cl-0191"
+  ],
+  "ru-34766b71cf9af2169a6ade62": [
+   "target-cluster:cl-0009",
+   "target-cluster:cl-0047",
+   "target:ki-093",
+   "topical:tp-079"
+  ],
+  "ru-34bdd577d90cd0fc24ba9990": [
+   "target:ki-057"
+  ],
+  "ru-350c69d93e62a67e954b11a8": [
+   "target-cluster:cl-0375",
+   "target:ki-033"
+  ],
+  "ru-3511b9d1d764366da2f49150": [
+   "topical:tp-074"
+  ],
+  "ru-363b42b1d9e20e6998be4b27": [
+   "topical:tp-075"
+  ],
+  "ru-365573e56c80cc48f74b52eb": [
+   "topical:tp-046"
+  ],
+  "ru-369d9362390778a2efdfe3b7": [
+   "topical:tp-026"
+  ],
+  "ru-36a8f90cff3b35436c88c78f": [
+   "topical:tp-102"
+  ],
+  "ru-3752ea9c5efa25a4c4723296": [
+   "topical:tp-086"
+  ],
+  "ru-375358c361474deef09d8e4f": [
+   "target:ki-064"
+  ],
+  "ru-378752e720e84cfdb9f8eebc": [
+   "topical:tp-103"
+  ],
+  "ru-37f384eb73e0148f041652a3": [
+   "topical:tp-102"
+  ],
+  "ru-3833b8d9e749569f3eec8a46": [
+   "target:ki-065"
+  ],
+  "ru-3842b338600c476bb4d051d7": [
+   "topical:tp-124"
+  ],
+  "ru-38723f8839b9ab866ee62bd3": [
+   "topical:tp-075"
+  ],
+  "ru-396d3cdef35ef17dd6732b2c": [
+   "topical:tp-132"
+  ],
+  "ru-39793f0d94b024eb5869d2de": [
+   "target-cluster:cl-0010",
+   "target-cluster:cl-0359",
+   "target:ki-014",
+   "topical:tp-002",
+   "topical:tp-044"
+  ],
+  "ru-39c14805960dd87550c447bd": [
+   "target-cluster:cl-0001",
+   "target-cluster:cl-0011",
+   "target-cluster:cl-0023",
+   "target:ki-038",
+   "topical:tp-003",
+   "topical:tp-010"
+  ],
+  "ru-39ddc4180f2495999e6788c7": [
+   "target-cluster:cl-0076",
+   "target:ki-097"
+  ],
+  "ru-3a45b6370a1ff4525c66bfe0": [
+   "target-cluster:cl-0368"
+  ],
+  "ru-3abdf1c52cdf2176200657f4": [
+   "target-cluster:cl-0392"
+  ],
+  "ru-3ae01f4abc94a7d0ce55d97f": [
+   "target-cluster:cl-0355"
+  ],
+  "ru-3b67166f4d0520566455dcef": [
+   "target-cluster:cl-0345"
+  ],
+  "ru-3b6b2a7644c2d10d16fdc8e7": [
+   "topical:tp-054"
+  ],
+  "ru-3b9d311a7f67587541677cef": [
+   "target-cluster:cl-0291",
+   "target:ki-032"
+  ],
+  "ru-3bf5d89d96ae4aa02079b928": [
+   "target-cluster:cl-0065",
+   "topical:tp-107"
+  ],
+  "ru-3c18b38d2fcf51da25016751": [
+   "topical:tp-036"
+  ],
+  "ru-3c5811e5f46c50ff5df92a9c": [
+   "target:ki-162"
+  ],
+  "ru-3c8e9b15490054093ae06899": [
+   "topical:tp-098"
+  ],
+  "ru-3cb179303f827bef13c8dcd0": [
+   "topical:tp-105"
+  ],
+  "ru-3cc899f8173506a2aa6d82e6": [
+   "target:ki-160"
+  ],
+  "ru-3cd0e56a937b0f59b6b463ab": [
+   "topical:tp-098"
+  ],
+  "ru-3cf8f1ee3ca9480c6f6dd88d": [
+   "topical:tp-069"
+  ],
+  "ru-3d0baddbba93169c2c50b012": [
+   "target-cluster:cl-0169",
+   "topical:tp-054"
+  ],
+  "ru-3dfff694a26d0aa52da92a13": [
+   "target:ki-047"
+  ],
+  "ru-3e76dc32976654bb55109de4": [
+   "target-cluster:cl-0173",
+   "target:ki-085",
+   "topical:tp-101"
+  ],
+  "ru-3ec8fca5f456943d0ad550e6": [
+   "target-cluster:cl-0092",
+   "topical:tp-111"
+  ],
+  "ru-3ed33b32ecd1dadf02b474fc": [
+   "topical:tp-092"
+  ],
+  "ru-3eecd25cad35b679857b3927": [
+   "topical:tp-056"
+  ],
+  "ru-3f1b104197a54a595970bb56": [
+   "topical:tp-122"
+  ],
+  "ru-3fc2c74802125356038b4ea6": [
+   "target-cluster:cl-0348"
+  ],
+  "ru-40530db418e229ec89fcef30": [
+   "target:ki-155"
+  ],
+  "ru-4098bfc5b78159808a233d0e": [
+   "topical:tp-086"
+  ],
+  "ru-40a74f3d96b5901a0da61367": [
+   "topical:tp-061"
+  ],
+  "ru-40f8bd995ac1333e436a1457": [
+   "target:ki-188"
+  ],
+  "ru-40fd2e74a8c142c3fd50e2cc": [
+   "topical:tp-099"
+  ],
+  "ru-416da22e800b17f020cb9567": [
+   "topical:tp-073"
+  ],
+  "ru-422dc18684ddced870f5f83e": [
+   "target-cluster:cl-0237",
+   "target:ki-113"
+  ],
+  "ru-42f1010da5766abd92e7de92": [
+   "target-cluster:cl-0375"
+  ],
+  "ru-42fc77ae6e7bb14c3e5f6cf3": [
+   "target:ki-126",
+   "topical:tp-112"
+  ],
+  "ru-4304de73327e1823e8e676c9": [
+   "topical:tp-079"
+  ],
+  "ru-431136314542c8c30324df9a": [
+   "target:ki-169"
+  ],
+  "ru-431144dd88688f5a1b73f4da": [
+   "topical:tp-025"
+  ],
+  "ru-4359b766478e4b5257108c4c": [
+   "topical:tp-038"
+  ],
+  "ru-43bb96cc5f3163593a271592": [
+   "topical:tp-088"
+  ],
+  "ru-442bcac309f659c55213a0fc": [
+   "topical:tp-107"
+  ],
+  "ru-44b342dedc2baf886a3e7309": [
+   "topical:tp-085"
+  ],
+  "ru-4543fcbca82f57e1b97549bf": [
+   "topical:tp-109"
+  ],
+  "ru-454535ccdac4dcec86503177": [
+   "target-cluster:cl-0145",
+   "target:ki-067",
+   "topical:tp-026"
+  ],
+  "ru-469f15fde4b4d10dda145afa": [
+   "topical:tp-041"
+  ],
+  "ru-46a587763ca3f13c67926656": [
+   "topical:tp-040"
+  ],
+  "ru-472fffa515719eea20e40b82": [
+   "topical:tp-126"
+  ],
+  "ru-479619e3f1b05162419e5871": [
+   "target-cluster:cl-0304",
+   "target:ki-026"
+  ],
+  "ru-47dcce08b1c4246e8acf8403": [
+   "target-cluster:cl-0247"
+  ],
+  "ru-47ef32bb310f0fe440850124": [
+   "target-cluster:cl-0361",
+   "target:ki-029"
+  ],
+  "ru-48b8a9a42bf4e3580138a00a": [
+   "target:ki-050"
+  ],
+  "ru-497bf4ca3092736832440b94": [
+   "topical:tp-104"
+  ],
+  "ru-4988ec388316587ce8858c6b": [
+   "topical:tp-080"
+  ],
+  "ru-4a321f857bbec3d559bbf04f": [
+   "topical:tp-063"
+  ],
+  "ru-4a66b455dcb391716e1f19c6": [
+   "target-cluster:cl-0055",
+   "topical:tp-023"
+  ],
+  "ru-4a999640583b45afaad72779": [
+   "topical:tp-071"
+  ],
+  "ru-4abc916065b354f295e30489": [
+   "target-cluster:cl-0261",
+   "topical:tp-048"
+  ],
+  "ru-4b2c0cd2ab2dd118423b4d8e": [
+   "target:ki-196"
+  ],
+  "ru-4b8d32cd992ccff35ee59138": [
+   "target-cluster:cl-0058",
+   "target:ki-090"
+  ],
+  "ru-4c0c56b38ddc845f3fdf66eb": [
+   "target:ki-058"
+  ],
+  "ru-4c5a9a335794c24c48c3a27e": [
+   "target:ki-141",
+   "topical:tp-117"
+  ],
+  "ru-4c6be8adfda5ee15b88bcd3f": [
+   "topical:tp-013"
+  ],
+  "ru-4c8131f556dddda4d9e0b842": [
+   "topical:tp-093"
+  ],
+  "ru-4d021a3944156d2860f52f21": [
+   "target-cluster:cl-0226"
+  ],
+  "ru-4d150cac5e1ae52032145f1b": [
+   "target:ki-042"
+  ],
+  "ru-4d371870caacffddebfae1bc": [
+   "target-cluster:cl-0024",
+   "topical:tp-011"
+  ],
+  "ru-4ddf6dfebcac23b317bbb1fc": [
+   "target-cluster:cl-0053",
+   "topical:tp-051"
+  ],
+  "ru-4df8fbbfc460b31bdf913b9e": [
+   "topical:tp-043"
+  ],
+  "ru-4e951aae63fb4a7047fb6b4a": [
+   "target-cluster:cl-0268",
+   "target:ki-027"
+  ],
+  "ru-4f37b344b15ff3910930dd2f": [
+   "topical:tp-075"
+  ],
+  "ru-5015dc4e570c60576cfd0f79": [
+   "topical:tp-026"
+  ],
+  "ru-503267ff0c22c0843f9c76f1": [
+   "target-cluster:cl-0007",
+   "target:ki-115"
+  ],
+  "ru-50961a790cab08a9490bb180": [
+   "target-cluster:cl-0173"
+  ],
+  "ru-51aeb611a1bf75efda035bc0": [
+   "target-cluster:cl-0389",
+   "target:ki-006"
+  ],
+  "ru-5207be003bceb8a999956326": [
+   "target:ki-061"
+  ],
+  "ru-5215928dc3d0744c94aebfd2": [
+   "target-cluster:cl-0074"
+  ],
+  "ru-52cd4df75dc7707fea62415f": [
+   "target-cluster:cl-0261",
+   "target:ki-005",
+   "topical:tp-048"
+  ],
+  "ru-52cee303b20c2d6e69e2f79f": [
+   "target-cluster:cl-0092",
+   "topical:tp-111"
+  ],
+  "ru-52fdffadc79117885f98c8ba": [
+   "topical:tp-094"
+  ],
+  "ru-53822da586ffc0a84706ccd3": [
+   "topical:tp-073"
+  ],
+  "ru-53879c6ba30711bd7b5213c2": [
+   "topical:tp-057"
+  ],
+  "ru-53bd78d7935149d7469215b4": [
+   "topical:tp-070"
+  ],
+  "ru-5438451665b2e882b8208d30": [
+   "topical:tp-118"
+  ],
+  "ru-54a414ad22c727f6c6a80268": [
+   "target-cluster:cl-0193",
+   "topical:tp-027"
+  ],
+  "ru-557a550130d4b3fe5788ced8": [
+   "target:ki-151"
+  ],
+  "ru-55832eb3ec5ea05c9dee3d6d": [
+   "target-cluster:cl-0311",
+   "target:ki-008",
+   "topical:tp-074"
+  ],
+  "ru-563edefa093049b4643e9d28": [
+   "target-cluster:cl-0245"
+  ],
+  "ru-565e2295f58fa6e4b049a362": [
+   "target:ki-129"
+  ],
+  "ru-57195d7c2407f44623f5705e": [
+   "topical:tp-023"
+  ],
+  "ru-57539db98758aaf42f3461ab": [
+   "target-cluster:cl-0027",
+   "topical:tp-080"
+  ],
+  "ru-5773ee11ca8002550073a0bc": [
+   "topical:tp-042"
+  ],
+  "ru-57862fda5f6bbed9233d6288": [
+   "topical:tp-127"
+  ],
+  "ru-57911abdf6d2969ba6f1d884": [
+   "target:ki-172"
+  ],
+  "ru-5795b254087f75f25a41a4c3": [
+   "topical:tp-032"
+  ],
+  "ru-5873e279d66cd05a413ac185": [
+   "target-cluster:cl-0092",
+   "topical:tp-060"
+  ],
+  "ru-5915166680e6c55a7682ba6a": [
+   "topical:tp-108"
+  ],
+  "ru-599fa333f1677440f6892b1b": [
+   "target-cluster:cl-0234"
+  ],
+  "ru-5a23a38a5660a86e4003573b": [
+   "target:ki-055"
+  ],
+  "ru-5a2a1d3a02d6e012876b7079": [
+   "topical:tp-122"
+  ],
+  "ru-5a9e69cc0161da78f12e103c": [
+   "target-cluster:cl-0261"
+  ],
+  "ru-5b324d17c1352de106b9102e": [
+   "topical:tp-128"
+  ],
+  "ru-5b90f45967d0a43080d23a3c": [
+   "target-cluster:cl-0028",
+   "topical:tp-028"
+  ],
+  "ru-5bbbbdd164a0c3aa462f722d": [
+   "target:ki-159"
+  ],
+  "ru-5bbdc66cb47babf3ab1946ed": [
+   "topical:tp-018"
+  ],
+  "ru-5c59bb95483f25545206ebca": [
+   "target:ki-048",
+   "topical:tp-131"
+  ],
+  "ru-5c5fd8fde68f61c2ed6a422e": [
+   "topical:tp-129"
+  ],
+  "ru-5c79dee7f09853e58e889365": [
+   "target-cluster:cl-0058"
+  ],
+  "ru-5c8708468e92069f6c8b7083": [
+   "target-cluster:cl-0192"
+  ],
+  "ru-5ca5a203951e9aaa5a166dbb": [
+   "topical:tp-034"
+  ],
+  "ru-5cb6cfe893f7f802d67a16e4": [
+   "topical:tp-038"
+  ],
+  "ru-5d2b6fcfacc9df047f3ebe0c": [
+   "topical:tp-108"
+  ],
+  "ru-5d5ed328043db12d01dae8b9": [
+   "topical:tp-021"
+  ],
+  "ru-5d703fde5abb84edde0918e6": [
+   "target-cluster:cl-0065",
+   "target:ki-082",
+   "topical:tp-058"
+  ],
+  "ru-5d9d8fba275bb5e8e51e0812": [
+   "topical:tp-057"
+  ],
+  "ru-5dba7f3bcc13c1c700f81dcf": [
+   "target-cluster:cl-0025",
+   "target:ki-068",
+   "topical:tp-027"
+  ],
+  "ru-5dc43f3fc39878f6805d496a": [
+   "target-cluster:cl-0393"
+  ],
+  "ru-5de7dd1c083d7c0978277741": [
+   "target-cluster:cl-0251",
+   "target:ki-101",
+   "topical:tp-014"
+  ],
+  "ru-5e08f975aaf902fede8497cd": [
+   "topical:tp-040"
+  ],
+  "ru-5e33e4f8ee8453e911a086e3": [
+   "topical:tp-028"
+  ],
+  "ru-5e5cd703719edcf9692d7fd9": [
+   "topical:tp-097"
+  ],
+  "ru-5ec03d681fd9a4c0d399b2ab": [
+   "target:ki-149"
+  ],
+  "ru-5ec2382a6a62d1ca506b6787": [
+   "topical:tp-030"
+  ],
+  "ru-5ec5b72e2a703a87e07af665": [
+   "topical:tp-026"
+  ],
+  "ru-5ec64bf2ee4a758d5ad5e8f0": [
+   "target-cluster:cl-0153",
+   "target:ki-080"
+  ],
+  "ru-5ed934a0eaf74c8a2684e6ab": [
+   "topical:tp-057"
+  ],
+  "ru-5edf4bdff0f3413993920e25": [
+   "target-cluster:cl-0368"
+  ],
+  "ru-5ef563083f6fac3769ee2add": [
+   "topical:tp-106"
+  ],
+  "ru-5f1c3fe94a875715a7d05f2f": [
+   "target:ki-124"
+  ],
+  "ru-5f85e0775a55684dd52302b5": [
+   "topical:tp-073"
+  ],
+  "ru-6034434309da0ce026f65860": [
+   "target-cluster:cl-0024",
+   "target:ki-034",
+   "topical:tp-011"
+  ],
+  "ru-60598d8dcc2203927ee664cb": [
+   "target-cluster:cl-0355"
+  ],
+  "ru-6059b7553cea96a0dd3d3daa": [
+   "target-cluster:cl-0247"
+  ],
+  "ru-61bb2d7693abb05225a504eb": [
+   "topical:tp-094"
+  ],
+  "ru-623df575e80c6b20a14a874a": [
+   "target:ki-178"
+  ],
+  "ru-62834b46baaa26535e96c021": [
+   "target-cluster:cl-0244",
+   "topical:tp-015"
+  ],
+  "ru-63417cb4e90dedc113a591a4": [
+   "target-cluster:cl-0177",
+   "topical:tp-101"
+  ],
+  "ru-634e009fd1ab4cb8baa6d6e8": [
+   "target:ki-052"
+  ],
+  "ru-63fc55a6958e1774de829c7e": [
+   "topical:tp-086"
+  ],
+  "ru-6400142603cafb38a93c4344": [
+   "target-cluster:cl-0290",
+   "target:ki-012"
+  ],
+  "ru-64da07dd6f9f91e4f867a56c": [
+   "topical:tp-107"
+  ],
+  "ru-64e1537bad6d31a6ef471a88": [
+   "topical:tp-028"
+  ],
+  "ru-64e34d7fb2183b0fb38f886f": [
+   "topical:tp-025"
+  ],
+  "ru-65004ff365ba7ab0c09835d1": [
+   "target-cluster:cl-0393"
+  ],
+  "ru-6553d91ed43fced57c08e1ae": [
+   "target-cluster:cl-0245",
+   "target:ki-107"
+  ],
+  "ru-656d91d210c0893f37a2e60d": [
+   "target-cluster:cl-0191",
+   "target:ki-094"
+  ],
+  "ru-65b5add3e5d723aa3108ab75": [
+   "topical:tp-039"
+  ],
+  "ru-65d0d3a33ca28ec1a5bb67fe": [
+   "topical:tp-078"
+  ],
+  "ru-6634f55c994fbf6649065aba": [
+   "topical:tp-102"
+  ],
+  "ru-663954d2af4d34e847398d2e": [
+   "target-cluster:cl-0300",
+   "target:ki-028",
+   "topical:tp-050"
+  ],
+  "ru-6639d596f0bb2459e17d412d": [
+   "topical:tp-091"
+  ],
+  "ru-668ec8659bec07d857c0dc29": [
+   "topical:tp-049"
+  ],
+  "ru-668fd034de0eb9b19f1d545c": [
+   "topical:tp-056"
+  ],
+  "ru-67719081c75e22a40448fdaa": [
+   "target:ki-148"
+  ],
+  "ru-677d7da974a87c0a4e79310c": [
+   "topical:tp-051"
+  ],
+  "ru-678cd3b61f29732ce8652f50": [
+   "topical:tp-061"
+  ],
+  "ru-67bd7f5d19707d9af9cbf990": [
+   "target-cluster:cl-0322"
+  ],
+  "ru-67bdf7d3ba91ac1a0b30a3c9": [
+   "topical:tp-095"
+  ],
+  "ru-67ea4051029ce5f0ee973b8a": [
+   "topical:tp-121"
+  ],
+  "ru-685219a30e23ff0338889939": [
+   "target-cluster:cl-0176",
+   "topical:tp-101"
+  ],
+  "ru-687ca44fcc508d8a6dadee07": [
+   "topical:tp-082"
+  ],
+  "ru-6901e3e5e044940bc046f739": [
+   "topical:tp-021"
+  ],
+  "ru-69109c2b4d6bb6dca0644d57": [
+   "target-cluster:cl-0368",
+   "target:ki-013"
+  ],
+  "ru-694f66707fb409e6db438148": [
+   "target-cluster:cl-0228",
+   "topical:tp-019"
+  ],
+  "ru-699a4a8c867525f3b6b621a5": [
+   "topical:tp-022"
+  ],
+  "ru-69de880ff6ee3c6789b18599": [
+   "target-cluster:cl-0355",
+   "target:ki-019"
+  ],
+  "ru-6a2cccd732162c3b3d9337bb": [
+   "target-cluster:cl-0347"
+  ],
+  "ru-6a51e0c0415001ce6b8e15fd": [
+   "topical:tp-032"
+  ],
+  "ru-6a93e658ee588d58d0a958cc": [
+   "topical:tp-070"
+  ],
+  "ru-6ac08e98aef8628be1ae28b8": [
+   "target:ki-136"
+  ],
+  "ru-6b84f33c3ffaaf77bc06bd94": [
+   "topical:tp-054"
+  ],
+  "ru-6b915f10e74292fbb89401e3": [
+   "target-cluster:cl-0206",
+   "target:ki-096"
+  ],
+  "ru-6ba15b5becb47536cbfc73fa": [
+   "topical:tp-128"
+  ],
+  "ru-6bda37578d3cb7809dbb662a": [
+   "topical:tp-104"
+  ],
+  "ru-6bf646bdbce527588bb4b585": [
+   "topical:tp-035"
+  ],
+  "ru-6bfb8a1e2231d3c909aa3190": [
+   "topical:tp-013"
+  ],
+  "ru-6c3b25b5b440a96e786d8a30": [
+   "topical:tp-129"
+  ],
+  "ru-6c5dff8c533fd20b36652476": [
+   "target-cluster:cl-0125",
+   "target:ki-084"
+  ],
+  "ru-6d5f6b4ae8fc26783f249917": [
+   "topical:tp-113"
+  ],
+  "ru-6df526bbf6218841f08873b7": [
+   "target-cluster:cl-0251"
+  ],
+  "ru-6e473865da193fb317c88f5a": [
+   "target-cluster:cl-0311"
+  ],
+  "ru-6ed90af4bc7345ab44c4e41f": [
+   "target-cluster:cl-0261"
+  ],
+  "ru-6edbcdc7758ea8b5b2ccd53d": [
+   "topical:tp-024"
+  ],
+  "ru-6f341c56cea5636ebae7fbaf": [
+   "target:ki-127"
+  ],
+  "ru-6f697a43f75cc9040eaeafa1": [
+   "target-cluster:cl-0363",
+   "target:ki-010"
+  ],
+  "ru-6fa581e611a24bc8ed18a854": [
+   "target:ki-164"
+  ],
+  "ru-6fcb426d03756292c555c03e": [
+   "topical:tp-067"
+  ],
+  "ru-7022f05015eb93b242e09309": [
+   "target:ki-150"
+  ],
+  "ru-70695167485cf4f0e16d8287": [
+   "topical:tp-051"
+  ],
+  "ru-707e6866e82ec5aa19d08728": [
+   "target-cluster:cl-0261"
+  ],
+  "ru-70f74fff820b54191df4f51a": [
+   "topical:tp-063"
+  ],
+  "ru-7156968c32bb945c97b5b151": [
+   "topical:tp-037"
+  ],
+  "ru-71e35dac1dd1ddaf1b241ea4": [
+   "target-cluster:cl-0322"
+  ],
+  "ru-735141d946233bf2206d3d5b": [
+   "topical:tp-049"
+  ],
+  "ru-73824ab0ce405aa6b1af6831": [
+   "topical:tp-018"
+  ],
+  "ru-73931cc5e904f42e4fe98d0c": [
+   "target:ki-158"
+  ],
+  "ru-73a431e9237abccf432ababb": [
+   "topical:tp-025"
+  ],
+  "ru-744e5793edf90e208671194c": [
+   "target:ki-063"
+  ],
+  "ru-7478ec570dd6866527144f7f": [
+   "topical:tp-098"
+  ],
+  "ru-747ebf160441315529181476": [
+   "topical:tp-071"
+  ],
+  "ru-749f14031b00fff6219e849c": [
+   "topical:tp-105"
+  ],
+  "ru-75fa93e6ec95681803904d0f": [
+   "target:ki-135"
+  ],
+  "ru-7649baa72365cdfabedd2560": [
+   "target-cluster:cl-0237",
+   "topical:tp-012"
+  ],
+  "ru-7702d627699d3aa0aa72eabc": [
+   "topical:tp-084"
+  ],
+  "ru-771e7b82013142c093431a16": [
+   "target-cluster:cl-0020",
+   "topical:tp-007"
+  ],
+  "ru-77554bb106b88227d164df12": [
+   "target:ki-121"
+  ],
+  "ru-7760d89a5b5e053021e98d69": [
+   "target-cluster:cl-0300",
+   "topical:tp-050"
+  ],
+  "ru-7838f394cedeb4f3a62e9e9c": [
+   "topical:tp-095"
+  ],
+  "ru-7931882ced72b2144c29028d": [
+   "target-cluster:cl-0372",
+   "target:ki-020"
+  ],
+  "ru-7971be62e12066c151cc636a": [
+   "topical:tp-128"
+  ],
+  "ru-798fc799e41ebf8852f60540": [
+   "topical:tp-043"
+  ],
+  "ru-79d3e6c5936bc5db0e376ecf": [
+   "target-cluster:cl-0393",
+   "target:ki-007",
+   "topical:tp-036"
+  ],
+  "ru-7a54f7538a8a6a7819b226f1": [
+   "topical:tp-072"
+  ],
+  "ru-7a55f2b77f92f3f0452b82a3": [
+   "topical:tp-065"
+  ],
+  "ru-7a9e168c0e2bc2b01e3954c7": [
+   "target-cluster:cl-0237"
+  ],
+  "ru-7aa3a0717ba058def9a439bb": [
+   "topical:tp-093"
+  ],
+  "ru-7ab00f13037eba1fa61cdd0f": [
+   "topical:tp-098"
+  ],
+  "ru-7b09865449e56528076a087e": [
+   "target:ki-163"
+  ],
+  "ru-7b5e5022ef2a33139d1b4342": [
+   "target-cluster:cl-0230",
+   "target:ki-105",
+   "topical:tp-062"
+  ],
+  "ru-7b76e716b2911c4b1d56dcb2": [
+   "topical:tp-097"
+  ],
+  "ru-7c05aabf4f1873b900089526": [
+   "target:ki-165"
+  ],
+  "ru-7c2beb067c74f4e66fd2d431": [
+   "topical:tp-086"
+  ],
+  "ru-7c8b89acc0dffe0afcf36f40": [
+   "target:ki-194"
+  ],
+  "ru-7ca143c91e35e2d4dee9c8f7": [
+   "topical:tp-058"
+  ],
+  "ru-7d4ced7b9aeb27ded778719d": [
+   "topical:tp-107"
+  ],
+  "ru-7e7299e937721ba30a8c55cd": [
+   "topical:tp-110"
+  ],
+  "ru-7e7e874c38b106bdd3fc3068": [
+   "topical:tp-084"
+  ],
+  "ru-7ebf172864b11aab8410a1f7": [
+   "topical:tp-024"
+  ],
+  "ru-7ec70d586860157c65bdf06a": [
+   "topical:tp-036"
+  ],
+  "ru-7f6ba5391ce96752f19060ac": [
+   "target-cluster:cl-0304"
+  ],
+  "ru-80b8ecfcecc4e9021294db81": [
+   "target-cluster:cl-0360"
+  ],
+  "ru-819dcfeee8e80b2ae3fc0750": [
+   "target:ki-168"
+  ],
+  "ru-81ad9f8f6bda19f7ee531a1f": [
+   "target:ki-180"
+  ],
+  "ru-81bd2007d24682c6a5d4094c": [
+   "topical:tp-108"
+  ],
+  "ru-81ce89eaa243293883589941": [
+   "target-cluster:cl-0266"
+  ],
+  "ru-8208810a38313683bb5bbc20": [
+   "target:ki-045"
+  ],
+  "ru-828308ed35c3588ed3fcea6c": [
+   "target-cluster:cl-0027"
+  ],
+  "ru-8286ab73b4bf7a0cc1c29a07": [
+   "target-cluster:cl-0025",
+   "topical:tp-080"
+  ],
+  "ru-829f724cf21bf886722998d2": [
+   "topical:tp-078"
+  ],
+  "ru-82b017d5d05f84b5393a59dd": [
+   "topical:tp-032"
+  ],
+  "ru-847bde9969e285a6e70bac95": [
+   "topical:tp-103"
+  ],
+  "ru-8486f936ba26b8aa9404473f": [
+   "topical:tp-068"
+  ],
+  "ru-854356c5e0b5168ee60709c3": [
+   "topical:tp-052"
+  ],
+  "ru-85461ec0e1928e35f5edb325": [
+   "topical:tp-051"
+  ],
+  "ru-8561032e2f93a2d577f798b9": [
+   "topical:tp-051"
+  ],
+  "ru-8590faa2d21c6710686aae0e": [
+   "target-cluster:cl-0291"
+  ],
+  "ru-85c110469a544322c66196b8": [
+   "target-cluster:cl-0392",
+   "target:ki-030"
+  ],
+  "ru-85e0f440f04cafa7d12f0341": [
+   "target:ki-185"
+  ],
+  "ru-8647ab772659c04ddc4ac5f1": [
+   "topical:tp-024"
+  ],
+  "ru-867bf7bc9150c9e2a6f59100": [
+   "topical:tp-092"
+  ],
+  "ru-87098dc87f0fe59dc5934043": [
+   "target-cluster:cl-0248"
+  ],
+  "ru-872ea020a09d8d85a3e3cc5f": [
+   "target-cluster:cl-0321"
+  ],
+  "ru-8731169720df10d03e2a2133": [
+   "topical:tp-088"
+  ],
+  "ru-8810b8db9231f36bd52ac40a": [
+   "topical:tp-130"
+  ],
+  "ru-8923444ba0a3b7da9a5701f3": [
+   "target-cluster:cl-0303",
+   "topical:tp-004"
+  ],
+  "ru-89b66afe930ed4189090d1c9": [
+   "topical:tp-088"
+  ],
+  "ru-89ceae15c98382ac494b54a7": [
+   "target-cluster:cl-0004",
+   "target:ki-116",
+   "topical:tp-097"
+  ],
+  "ru-89d0f9979e41adede6074100": [
+   "topical:tp-112"
+  ],
+  "ru-89dc77c8000f1402ec144942": [
+   "topical:tp-052"
+  ],
+  "ru-8a8c114b7fbd5e2048363730": [
+   "target-cluster:cl-0024",
+   "topical:tp-011"
+  ],
+  "ru-8b3b184f4cdc5ab3a0586404": [
+   "target-cluster:cl-0248"
+  ],
+  "ru-8b9e97815410c7cf40f3c154": [
+   "topical:tp-066"
+  ],
+  "ru-8baccb4d28490d3f28e9f8d3": [
+   "target:ki-040",
+   "topical:tp-087"
+  ],
+  "ru-8bc44c55caf771f5814b7e8a": [
+   "target:ki-174"
+  ],
+  "ru-8cec63e3b684093bf01581f9": [
+   "target-cluster:cl-0055",
+   "target:ki-083",
+   "topical:tp-075"
+  ],
+  "ru-8d028e14b6855ce8cb5ad357": [
+   "target-cluster:cl-0300",
+   "topical:tp-050"
+  ],
+  "ru-8dc77abc96212d807809429f": [
+   "target:ki-176"
+  ],
+  "ru-8e04a2e3c37a0661355c7038": [
+   "topical:tp-022"
+  ],
+  "ru-8f11750e8fccebe3db43301a": [
+   "target-cluster:cl-0022",
+   "topical:tp-001",
+   "topical:tp-009",
+   "topical:tp-123"
+  ],
+  "ru-8f85fe260a557cb36e534e33": [
+   "topical:tp-051"
+  ],
+  "ru-8fa95d1ddde67e2cca074a45": [
+   "target:ki-125"
+  ],
+  "ru-8fca7d5a5d0c23bf8b2106d8": [
+   "topical:tp-031"
+  ],
+  "ru-8fe2dd7c19870dcdb8581a49": [
+   "topical:tp-075"
+  ],
+  "ru-9010ed69e6b28edede358526": [
+   "topical:tp-083"
+  ],
+  "ru-90ae17778336f4cc9bd624c5": [
+   "topical:tp-110"
+  ],
+  "ru-90fa79438260a5ce33e751a6": [
+   "target-cluster:cl-0029",
+   "topical:tp-027"
+  ],
+  "ru-9172c6e8c50fd2a677cea6c9": [
+   "target-cluster:cl-0018",
+   "target:ki-170",
+   "topical:tp-005",
+   "topical:tp-064"
+  ],
+  "ru-9176af3263f1c91b45f2fcaf": [
+   "target-cluster:cl-0026",
+   "target:ki-074",
+   "topical:tp-018"
+  ],
+  "ru-91a1d39c58a82563a976af23": [
+   "target-cluster:cl-0228",
+   "target:ki-099",
+   "topical:tp-019"
+  ],
+  "ru-91f5b9cee7ca0107478c63cd": [
+   "target-cluster:cl-0290"
+  ],
+  "ru-922238e6b0f9daff7ecd105a": [
+   "topical:tp-097"
+  ],
+  "ru-92d66347d06075971fcac4e6": [
+   "topical:tp-027"
+  ],
+  "ru-92f646236b5e4af49d13254b": [
+   "topical:tp-103"
+  ],
+  "ru-931b6640d296570b93b0f475": [
+   "topical:tp-115"
+  ],
+  "ru-933b2b864d3f855a93672785": [
+   "target:ki-157"
+  ],
+  "ru-93469b4e452353780af3f8f7": [
+   "topical:tp-091"
+  ],
+  "ru-934c63ea37ed99f1de80649c": [
+   "topical:tp-083"
+  ],
+  "ru-93aa0d1e5da73200214aa6df": [
+   "topical:tp-013"
+  ],
+  "ru-93ba9ed1a113330d99ba4a0a": [
+   "target-cluster:cl-0228",
+   "topical:tp-020"
+  ],
+  "ru-93ca892cf00ef236324a6d99": [
+   "target-cluster:cl-0029",
+   "topical:tp-080"
+  ],
+  "ru-93ea88c48470c1cb6fe79c30": [
+   "target-cluster:cl-0228",
+   "topical:tp-020"
+  ],
+  "ru-948c7e4e402db2e9a9547014": [
+   "topical:tp-109"
+  ],
+  "ru-94b39c4e92027ba5fdefa8c8": [
+   "topical:tp-029"
+  ],
+  "ru-95eafd2a4885c1d59692508f": [
+   "topical:tp-087"
+  ],
+  "ru-964ae22be7cd6cb506411c90": [
+   "target-cluster:cl-0268"
+  ],
+  "ru-966edfb157b598c2ae82510a": [
+   "target:ki-054"
+  ],
+  "ru-96aedf4521dc4097f6de57e4": [
+   "topical:tp-106"
+  ],
+  "ru-970738ba0f4788ec41c17c6c": [
+   "topical:tp-098"
+  ],
+  "ru-9758c53949233952cf88b166": [
+   "topical:tp-068"
+  ],
+  "ru-979c6764eddb5cc095c1e99d": [
+   "target-cluster:cl-0026",
+   "topical:tp-078"
+  ],
+  "ru-97a6982e04cab17592ce337e": [
+   "topical:tp-040"
+  ],
+  "ru-97ecd257404e6910eaf59101": [
+   "target-cluster:cl-0153",
+   "topical:tp-085"
+  ],
+  "ru-98692b80a4b6ddceae81efbe": [
+   "target:ki-153"
+  ],
+  "ru-987d7aa42e6d1258f7235e1e": [
+   "topical:tp-120"
+  ],
+  "ru-98861bde70d4bda16388f46d": [
+   "target:ki-041"
+  ],
+  "ru-98b12c85e11b0871099836d5": [
+   "target:ki-119"
+  ],
+  "ru-993c6d8a3bf528f34002188a": [
+   "topical:tp-114"
+  ],
+  "ru-99db38713c33bef49cd79786": [
+   "target-cluster:cl-0009",
+   "topical:tp-080"
+  ],
+  "ru-9a052f6c164e2719ac210a47": [
+   "topical:tp-102"
+  ],
+  "ru-9a0daf3a7446d7da71964a50": [
+   "topical:tp-126"
+  ],
+  "ru-9a9cf6015dea84f85b8cdf31": [
+   "target:ki-044"
+  ],
+  "ru-9b082bd8ff65fc9b911377c4": [
+   "topical:tp-091"
+  ],
+  "ru-9c17911a7a5caa7550af9c32": [
+   "target:ki-056"
+  ],
+  "ru-9c6e1b135f9eac907ec65cb4": [
+   "target-cluster:cl-0145"
+  ],
+  "ru-9e48061da34457f4e01071d3": [
+   "topical:tp-105"
+  ],
+  "ru-9e503b9740bf147def26e3bb": [
+   "target-cluster:cl-0361"
+  ],
+  "ru-9e607a99e1461c26efa92c07": [
+   "target-cluster:cl-0018",
+   "topical:tp-005",
+   "topical:tp-064"
+  ],
+  "ru-9efe2721a1b861edf47387a3": [
+   "topical:tp-129"
+  ],
+  "ru-a0614284b0a7334e53a38dac": [
+   "topical:tp-086"
+  ],
+  "ru-a0c418c087cccc696d624834": [
+   "topical:tp-020"
+  ],
+  "ru-a0e31daafc9f9c44d29ba3e3": [
+   "topical:tp-056"
+  ],
+  "ru-a10023f20904d04da3646f8e": [
+   "target-cluster:cl-0230",
+   "topical:tp-062"
+  ],
+  "ru-a1248c05c0b45b23d1e8a616": [
+   "target-cluster:cl-0233",
+   "topical:tp-059"
+  ],
+  "ru-a124c9d35a0180d779ef8fec": [
+   "topical:tp-124"
+  ],
+  "ru-a13c231b2a5e75bb836300ee": [
+   "topical:tp-093"
+  ],
+  "ru-a187db40e8c4e89201fec91c": [
+   "target-cluster:cl-0025",
+   "topical:tp-075"
+  ],
+  "ru-a28457707922ed8532179a2b": [
+   "target-cluster:cl-0024",
+   "topical:tp-011"
+  ],
+  "ru-a3927f00061446500a501cbd": [
+   "target-cluster:cl-0228",
+   "topical:tp-019"
+  ],
+  "ru-a39f975984b8cd0109d14f55": [
+   "target-cluster:cl-0228",
+   "topical:tp-020"
+  ],
+  "ru-a3ca5e76e82d696b4785fc9b": [
+   "topical:tp-031"
+  ],
+  "ru-a3e289bd9bc75defd4d77840": [
+   "target-cluster:cl-0226"
+  ],
+  "ru-a46feed6853e39736e32c971": [
+   "topical:tp-024"
+  ],
+  "ru-a471915f57033a3cb49a1da8": [
+   "topical:tp-132"
+  ],
+  "ru-a4ffe9c1bda21256ccdfcafd": [
+   "topical:tp-049"
+  ],
+  "ru-a50dcb329dac2ea36a764061": [
+   "topical:tp-063"
+  ],
+  "ru-a5f7ea0a2a8d5d8e5447259b": [
+   "target:ki-039"
+  ],
+  "ru-a63e23ab743f4b4039df8530": [
+   "target-cluster:cl-0311"
+  ],
+  "ru-a69e9a44904cb70173c734fc": [
+   "topical:tp-090"
+  ],
+  "ru-a6e9b202827997608db7fc4d": [
+   "target-cluster:cl-0356"
+  ],
+  "ru-a708c87bed9d2fc25b5bbf19": [
+   "topical:tp-064"
+  ],
+  "ru-a75cb5f6cbecad5d8129d4ec": [
+   "topical:tp-028"
+  ],
+  "ru-a7763e6bf6ebc68d56ef08af": [
+   "topical:tp-131"
+  ],
+  "ru-a79e206aa7efdf701bcf0cb2": [
+   "target-cluster:cl-0342",
+   "target:ki-018"
+  ],
+  "ru-a7b7d74be2ad89faab3df522": [
+   "target-cluster:cl-0351"
+  ],
+  "ru-a7f793bd44a3d7e4c273bb36": [
+   "target-cluster:cl-0026",
+   "topical:tp-078"
+  ],
+  "ru-a8382cc244e477529ea0de01": [
+   "target-cluster:cl-0252"
+  ],
+  "ru-a8406865323a0a58cc5b827c": [
+   "topical:tp-034"
+  ],
+  "ru-a8a25b125c90956025920e51": [
+   "topical:tp-085"
+  ],
+  "ru-a8df84dd1fad60ff19d43165": [
+   "target-cluster:cl-0027",
+   "target:ki-072",
+   "topical:tp-029"
+  ],
+  "ru-a932b0c354d1671de0f5acaf": [
+   "target:ki-118"
+  ],
+  "ru-a949c6900bc601a69a757241": [
+   "topical:tp-092"
+  ],
+  "ru-a9642284b396c377ca6dd012": [
+   "topical:tp-116"
+  ],
+  "ru-a9a5b7c845e34dbe84a6b729": [
+   "topical:tp-081"
+  ],
+  "ru-a9f5485995f120fe0a315c3e": [
+   "target-cluster:cl-0226"
+  ],
+  "ru-aa3bfa0ac6d3eff7fc1f8ff0": [
+   "topical:tp-079"
+  ],
+  "ru-aa92f5d674a36e72edea71a4": [
+   "target-cluster:cl-0390",
+   "topical:tp-035"
+  ],
+  "ru-ab4ec981ffaa6f4632362bbd": [
+   "topical:tp-037"
+  ],
+  "ru-ab726cccae877b8b551d6ba3": [
+   "topical:tp-104"
+  ],
+  "ru-ab72c14c0b02aa5b52a13fbe": [
+   "target-cluster:cl-0348",
+   "target:ki-017"
+  ],
+  "ru-ab919638e8955b0024f8f12f": [
+   "target-cluster:cl-0066",
+   "topical:tp-058"
+  ],
+  "ru-ab94c4befae8a83b12abaaa2": [
+   "topical:tp-030"
+  ],
+  "ru-abaf5e0a9dfbb5cc0b49ac8e": [
+   "target-cluster:cl-0244"
+  ],
+  "ru-ac0ca3eed68e466aca4f0313": [
+   "topical:tp-078"
+  ],
+  "ru-ac4209a547bc1a5409b71bae": [
+   "topical:tp-094"
+  ],
+  "ru-ad101fd289ea0c3e835bd2e0": [
+   "topical:tp-088"
+  ],
+  "ru-ad29545b946ba8e6baedcf94": [
+   "target:ki-187"
+  ],
+  "ru-ad6e8cea0be7456d25f6184f": [
+   "topical:tp-034"
+  ],
+  "ru-adc276527c869f0e9ccb3aa2": [
+   "topical:tp-042"
+  ],
+  "ru-ade90c33e32a8082da5f7f3e": [
+   "topical:tp-050"
+  ],
+  "ru-ae14df0c0a69ca1febaf2d13": [
+   "target-cluster:cl-0240"
+  ],
+  "ru-af1c3fad03d3fd153b0cbeeb": [
+   "topical:tp-110"
+  ],
+  "ru-af228054e2e6a0261d5b99fd": [
+   "target:ki-139",
+   "topical:tp-113"
+  ],
+  "ru-afa8a56f66de68a42b60d44c": [
+   "target-cluster:cl-0092",
+   "topical:tp-111"
+  ],
+  "ru-afc652b303d4e61a25a01e05": [
+   "topical:tp-092"
+  ],
+  "ru-b031ea0c6645d20b392467a3": [
+   "target:ki-167"
+  ],
+  "ru-b0593840df58825293fbd2e3": [
+   "target-cluster:cl-0001",
+   "target-cluster:cl-0011",
+   "target-cluster:cl-0023",
+   "topical:tp-003",
+   "topical:tp-010"
+  ],
+  "ru-b1cf4653551514469a8bc1e4": [
+   "topical:tp-055"
+  ],
+  "ru-b250d0af2df45b56290219a0": [
+   "target:ki-059"
+  ],
+  "ru-b2daf5df7c841a5cfb9691fc": [
+   "topical:tp-083"
+  ],
+  "ru-b3507c69ce4e01cc048da55b": [
+   "target-cluster:cl-0351",
+   "target:ki-022"
+  ],
+  "ru-b38f15c975ff19bfc208dfcd": [
+   "topical:tp-026"
+  ],
+  "ru-b3a05a23f9033bcfa32213e2": [
+   "target-cluster:cl-0351"
+  ],
+  "ru-b3b4a9ce8cbfaa8a0359b98d": [
+   "topical:tp-118"
+  ],
+  "ru-b4b715396b46aebf4744daa6": [
+   "target-cluster:cl-0372"
+  ],
+  "ru-b532e55122dc69e80bc390ef": [
+   "topical:tp-120"
+  ],
+  "ru-b6133f22820676222a477a95": [
+   "target-cluster:cl-0025"
+  ],
+  "ru-b6d29c9f8f3e42b1a4da4f32": [
+   "target-cluster:cl-0278"
+  ],
+  "ru-b75a5dff58e16b54e188abde": [
+   "topical:tp-074"
+  ],
+  "ru-b8749061666b3583d2fa7ba9": [
+   "target-cluster:cl-0389"
+  ],
+  "ru-b8ae15251f4201937125b9b4": [
+   "target:ki-130"
+  ],
+  "ru-b91512eb317a163a2780c911": [
+   "topical:tp-065"
+  ],
+  "ru-b955ac2a49bcbd185702776b": [
+   "target:ki-161"
+  ],
+  "ru-b978b171c6d550b9871e3c16": [
+   "target-cluster:cl-0019",
+   "topical:tp-006",
+   "topical:tp-108"
+  ],
+  "ru-b9a39848e23191cccd16bd0c": [
+   "target-cluster:cl-0074",
+   "target:ki-091"
+  ],
+  "ru-b9b0e3df682ed5efcf78073b": [
+   "topical:tp-099"
+  ],
+  "ru-b9c0177d32d4c723dd08187e": [
+   "target-cluster:cl-0360"
+  ],
+  "ru-b9f504f9d960bd15716ec91d": [
+   "target-cluster:cl-0248",
+   "target:ki-108",
+   "topical:tp-015"
+  ],
+  "ru-ba23272ef8f4a4fa7efa45d3": [
+   "topical:tp-067"
+  ],
+  "ru-ba54334538e82d8881b8d96f": [
+   "target-cluster:cl-0010",
+   "target-cluster:cl-0359",
+   "topical:tp-002",
+   "topical:tp-044"
+  ],
+  "ru-ba5a08211298474ce2918775": [
+   "target-cluster:cl-0024",
+   "topical:tp-011"
+  ],
+  "ru-bbebda46a70af95b47bf3896": [
+   "target-cluster:cl-0234",
+   "target:ki-110",
+   "topical:tp-012"
+  ],
+  "ru-bc1bfb0a90b8c56eedbf9499": [
+   "target-cluster:cl-0247",
+   "target:ki-112",
+   "topical:tp-014"
+  ],
+  "ru-bc5086ea94f96772e63c902b": [
+   "target-cluster:cl-0347"
+  ],
+  "ru-bc5959a37ed038cc99e78a29": [
+   "target-cluster:cl-0390",
+   "target:ki-021",
+   "topical:tp-036"
+  ],
+  "ru-bcaa33a85b61fad744e06104": [
+   "target-cluster:cl-0228",
+   "topical:tp-019"
+  ],
+  "ru-bd3439d38477d78df4ae86b9": [
+   "topical:tp-028"
+  ],
+  "ru-bd90b721bbc66a6981908fb3": [
+   "target-cluster:cl-0390",
+   "topical:tp-035"
+  ],
+  "ru-bda887feb7cdda66838979fd": [
+   "target:ki-140"
+  ],
+  "ru-bdd52373524442f1b50076eb": [
+   "topical:tp-037"
+  ],
+  "ru-be9981bfad32e1537f96bbe7": [
+   "topical:tp-097"
+  ],
+  "ru-bee39dbe8ddcb9d74f4730ef": [
+   "topical:tp-036"
+  ],
+  "ru-bf2bda4a113ddba8920f5bc4": [
+   "target-cluster:cl-0389"
+  ],
+  "ru-bf4b22370c5d41c699ee8e93": [
+   "topical:tp-081"
+  ],
+  "ru-bf82e6c620263199adf209e7": [
+   "target-cluster:cl-0026",
+   "topical:tp-018"
+  ],
+  "ru-c00ac1e60724e80aff3ce189": [
+   "target:ki-156"
+  ],
+  "ru-c0449cbe01e357ab633e9f80": [
+   "topical:tp-082"
+  ],
+  "ru-c09315f7f15ec477ffaaaec5": [
+   "target-cluster:cl-0342"
+  ],
+  "ru-c0c3dc9af6225ccff92c01ff": [
+   "topical:tp-063"
+  ],
+  "ru-c0ddcf54b327d4ac48ccb25b": [
+   "target-cluster:cl-0176",
+   "target:ki-078"
+  ],
+  "ru-c0e80d408f7438393b985205": [
+   "target-cluster:cl-0348"
+  ],
+  "ru-c0e8863fecd2e47c5494a53e": [
+   "target-cluster:cl-0261"
+  ],
+  "ru-c115bb57e9aab6aacbdf7ec3": [
+   "topical:tp-124"
+  ],
+  "ru-c13745bf757fb539ab90781b": [
+   "topical:tp-092"
+  ],
+  "ru-c1c4589e2827d2b63cc43fd9": [
+   "topical:tp-037"
+  ],
+  "ru-c1ff9ce07b9808ada4fb682b": [
+   "target:ki-171"
+  ],
+  "ru-c2b34824c99df88e9828778b": [
+   "target:ki-152"
+  ],
+  "ru-c4edff9dff31c8d16b14f9ac": [
+   "topical:tp-029"
+  ],
+  "ru-c580d0a1d537d0c4ed5ff01d": [
+   "topical:tp-095"
+  ],
+  "ru-c63d88df838d317563d18eb6": [
+   "target-cluster:cl-0029",
+   "target:ki-076",
+   "topical:tp-027"
+  ],
+  "ru-c66f6b9c2dbc692f3a48c843": [
+   "target:ki-062"
+  ],
+  "ru-c67e61b43425868fcf391ad2": [
+   "target:ki-145"
+  ],
+  "ru-c6901d2940eb83b0a5409723": [
+   "topical:tp-041"
+  ],
+  "ru-c69846cdc0437dc48946852f": [
+   "topical:tp-049"
+  ],
+  "ru-c85a4160969e871717eacb70": [
+   "target:ki-043"
+  ],
+  "ru-c87f0c9a6cee3a491d8aa863": [
+   "target-cluster:cl-0374"
+  ],
+  "ru-c8904fc94639f99bd296ce7b": [
+   "target-cluster:cl-0092",
+   "topical:tp-111"
+  ],
+  "ru-c8bdd80f153f5a0766193ce5": [
+   "target-cluster:cl-0356"
+  ],
+  "ru-c920aab4606d9af842aded4b": [
+   "target-cluster:cl-0228",
+   "topical:tp-021"
+  ],
+  "ru-c92514573efc743c694fec6a": [
+   "topical:tp-040"
+  ],
+  "ru-ca2cfebcb4c2f4a023068589": [
+   "topical:tp-032"
+  ],
+  "ru-caa3c95fd50014b1eb7771fe": [
+   "target-cluster:cl-0028",
+   "topical:tp-081"
+  ],
+  "ru-cad62cea4b234ca0d3648253": [
+   "topical:tp-069"
+  ],
+  "ru-caed2b9edb0a1ea7ba580961": [
+   "target:ki-190"
+  ],
+  "ru-cafa2fc63aa872e1e952708c": [
+   "target-cluster:cl-0261"
+  ],
+  "ru-cb0c23d4e8a9df324de33760": [
+   "topical:tp-030"
+  ],
+  "ru-cbeb56cda3dbcb69688b912c": [
+   "topical:tp-028"
+  ],
+  "ru-cc85d3a1ab18b0cdf5c9a782": [
+   "target-cluster:cl-0278"
+  ],
+  "ru-cc95924ed4a06ea64c008c10": [
+   "topical:tp-127"
+  ],
+  "ru-cc9befd8adaf7d6a9262e2be": [
+   "topical:tp-025"
+  ],
+  "ru-cca9a72bc6c676ead0b2b474": [
+   "topical:tp-081"
+  ],
+  "ru-ccaf20d52eadd8071376a46e": [
+   "target:ki-186",
+   "topical:tp-095"
+  ],
+  "ru-ccf787f17e79e4f255bcd6e7": [
+   "topical:tp-022"
+  ],
+  "ru-cea51b3a8a5cc00eb89dfbb9": [
+   "topical:tp-052"
+  ],
+  "ru-cedf179b1275e3c0f8d79cb1": [
+   "topical:tp-083"
+  ],
+  "ru-cf65815e7e01c68b1c04c03e": [
+   "target-cluster:cl-0240"
+  ],
+  "ru-d02fb721a57ec6aec9726712": [
+   "topical:tp-058"
+  ],
+  "ru-d0380e3353976e781d5e58f6": [
+   "target-cluster:cl-0024",
+   "topical:tp-011"
+  ],
+  "ru-d0a375585d496d0b50e9038d": [
+   "target-cluster:cl-0238"
+  ],
+  "ru-d0aca3a8cc830dbc6060dfa1": [
+   "topical:tp-049"
+  ],
+  "ru-d0b41f4496c01a5fd829a160": [
+   "target-cluster:cl-0024",
+   "topical:tp-011"
+  ],
+  "ru-d14c0ae1c8220f2623722abf": [
+   "topical:tp-056"
+  ],
+  "ru-d14fb3020596c36e6e7db5b0": [
+   "target-cluster:cl-0252",
+   "target:ki-102",
+   "topical:tp-015"
+  ],
+  "ru-d1c55970bd7d5565360186b7": [
+   "topical:tp-053"
+  ],
+  "ru-d1dffc7d72dc5710ffd248d6": [
+   "target-cluster:cl-0361"
+  ],
+  "ru-d1fa73158ad376ce75ec9ce5": [
+   "topical:tp-050"
+  ],
+  "ru-d21d5f152c7d4d40445d0e8f": [
+   "topical:tp-057"
+  ],
+  "ru-d2a666d2f7f88f08d0ff51b9": [
+   "topical:tp-126"
+  ],
+  "ru-d2ca61ace0a4e9df98862616": [
+   "topical:tp-041"
+  ],
+  "ru-d3aa32ce3c317a5f4791101e": [
+   "topical:tp-023"
+  ],
+  "ru-d4aa5fd663331c56f1acc399": [
+   "target-cluster:cl-0316"
+  ],
+  "ru-d5231031a8af253d4c7a36ad": [
+   "target-cluster:cl-0244",
+   "target:ki-104"
+  ],
+  "ru-d65ed0f047bd94f1b32e46ca": [
+   "topical:tp-095"
+  ],
+  "ru-d67f94f5f2c5f78ff4d22d2b": [
+   "target:ki-175"
+  ],
+  "ru-d6e148bb275138f8501a76fe": [
+   "topical:tp-024"
+  ],
+  "ru-d7034eb58c17e476e4566025": [
+   "topical:tp-102"
+  ],
+  "ru-d7675cb40d0d83c5b24e1d98": [
+   "target-cluster:cl-0021",
+   "target:ki-035",
+   "topical:tp-008"
+  ],
+  "ru-d7fbd0f1b906567225d67536": [
+   "topical:tp-089"
+  ],
+  "ru-d8469348bba5203a88f5c722": [
+   "topical:tp-040"
+  ],
+  "ru-d854565fd647be5d1dbe5bd8": [
+   "topical:tp-099"
+  ],
+  "ru-d86dfc559dc6b77130ffcb8c": [
+   "topical:tp-103"
+  ],
+  "ru-d87e0d4c8ba232f836179b21": [
+   "topical:tp-030"
+  ],
+  "ru-d8dc43579e4d9197985a6b14": [
+   "target:ki-060"
+  ],
+  "ru-d9513fef5bdd7996255a246b": [
+   "target-cluster:cl-0360",
+   "target:ki-024"
+  ],
+  "ru-da36c533c8393421ac150081": [
+   "topical:tp-035"
+  ],
+  "ru-da50d06ecfece73af7cf406d": [
+   "topical:tp-042"
+  ],
+  "ru-da814b81f425c0ba07374051": [
+   "target-cluster:cl-0066",
+   "target:ki-089",
+   "topical:tp-107"
+  ],
+  "ru-dafd70376b123c5e90ab37b9": [
+   "topical:tp-024"
+  ],
+  "ru-db8135bd066f1a80d32b3ee8": [
+   "topical:tp-027"
+  ],
+  "ru-db8744bf3c290dae88cdd73f": [
+   "target:ki-179"
+  ],
+  "ru-db9765d2af0497208bfed949": [
+   "target-cluster:cl-0033",
+   "topical:tp-104"
+  ],
+  "ru-dbdbc2e4064b820f0135bcea": [
+   "topical:tp-079"
+  ],
+  "ru-dd41e2418b3ab844f41f5d19": [
+   "target-cluster:cl-0261"
+  ],
+  "ru-dd4f81876eaead862bc36160": [
+   "target-cluster:cl-0234",
+   "topical:tp-013"
+  ],
+  "ru-ddf7be145d8348eebc6c02fb": [
+   "topical:tp-056"
+  ],
+  "ru-de809b30705dba00368f8264": [
+   "target-cluster:cl-0022",
+   "target:ki-037",
+   "topical:tp-009",
+   "topical:tp-123"
+  ],
+  "ru-dea6cbb21e05cbca416db0d4": [
+   "target:ki-143"
+  ],
+  "ru-df24ab6e24521f0cb662c28a": [
+   "target-cluster:cl-0099",
+   "target:ki-069",
+   "topical:tp-018"
+  ],
+  "ru-df31a6fa91b74a467c9677b2": [
+   "topical:tp-081"
+  ],
+  "ru-df48493872c43fd7e4b5586d": [
+   "target:ki-128"
+  ],
+  "ru-df7ade0f69e6191756314d0c": [
+   "target-cluster:cl-0226",
+   "target:ki-106"
+  ],
+  "ru-dfc3e2364f27d91dec070f9f": [
+   "target:ki-166"
+  ],
+  "ru-dffec99943cbb0311853fb40": [
+   "target-cluster:cl-0027",
+   "topical:tp-081"
+  ],
+  "ru-e002dd6bc2026a4e64282008": [
+   "target-cluster:cl-0177",
+   "target:ki-081"
+  ],
+  "ru-e03f451a2de9bb5265041b56": [
+   "topical:tp-115"
+  ],
+  "ru-e07c3d7803009eaaf6c4fe33": [
+   "topical:tp-040"
+  ],
+  "ru-e0a964f11daebf90c9f00739": [
+   "target-cluster:cl-0028",
+   "topical:tp-082"
+  ],
+  "ru-e2339cb54da450d45ceed651": [
+   "target-cluster:cl-0249",
+   "target:ki-111"
+  ],
+  "ru-e2919aa3fc1ce574f3ae5f61": [
+   "target:ki-195",
+   "topical:tp-093"
+  ],
+  "ru-e2cb6e5848be63271d9d57fc": [
+   "topical:tp-057"
+  ],
+  "ru-e3b0fa5bc9198d0db3a1cd61": [
+   "target-cluster:cl-0303",
+   "topical:tp-004"
+  ],
+  "ru-e3e933d0f284fd1e9aaf9529": [
+   "target:ki-154"
+  ],
+  "ru-e47a7548441ad15c30668830": [
+   "target-cluster:cl-0321",
+   "target:ki-001"
+  ],
+  "ru-e498fc94dee3ce4f7217971f": [
+   "topical:tp-037"
+  ],
+  "ru-e4a6cdc102f0610fb8a5bb85": [
+   "topical:tp-030"
+  ],
+  "ru-e4c21a6d0e8b716f965bbc22": [
+   "target-cluster:cl-0245",
+   "topical:tp-014"
+  ],
+  "ru-e573d16ddce014c777838458": [
+   "topical:tp-112"
+  ],
+  "ru-e5b1d389d4b5157ddfb2416f": [
+   "target-cluster:cl-0261"
+  ],
+  "ru-e5fc4c442fe0a8d5036fcdfc": [
+   "topical:tp-013"
+  ],
+  "ru-e6722c0def8307f56f30317b": [
+   "topical:tp-018"
+  ],
+  "ru-e6ed62ce0a9bb9fadc6bd095": [
+   "target-cluster:cl-0019",
+   "target:ki-181",
+   "topical:tp-006",
+   "topical:tp-108"
+  ],
+  "ru-e72cbcb18a626380abb1bc14": [
+   "target-cluster:cl-0245",
+   "topical:tp-015"
+  ],
+  "ru-e74245b4c5e2b9f6eb3b7ebc": [
+   "target-cluster:cl-0002",
+   "target-cluster:cl-0005",
+   "target:ki-117",
+   "topical:tp-116"
+  ],
+  "ru-e750d0bde7fd80d526b3e5a0": [
+   "topical:tp-039"
+  ],
+  "ru-e87ea068edb4d61d571743a1": [
+   "target-cluster:cl-0029",
+   "topical:tp-080"
+  ],
+  "ru-e905e338c38c7434d5d18549": [
+   "topical:tp-061"
+  ],
+  "ru-e968181dec7a51ad80bf91ee": [
+   "topical:tp-055"
+  ],
+  "ru-e9a73a58ede5f561f914e6b0": [
+   "target-cluster:cl-0257",
+   "target:ki-100"
+  ],
+  "ru-e9bdf06a8cc629a88b80c50e": [
+   "topical:tp-072"
+  ],
+  "ru-e9d01f392c9dbbf0cf53e3ab": [
+   "topical:tp-089"
+  ],
+  "ru-e9eac3e3e2dbbdb84c48d273": [
+   "topical:tp-119"
+  ],
+  "ru-ea587a8866f66089aa1f82ca": [
+   "topical:tp-049"
+  ],
+  "ru-eacb9e426c1ba5f75be62869": [
+   "target:ki-144"
+  ],
+  "ru-eacef617c5ad45072d54e56e": [
+   "topical:tp-109"
+  ],
+  "ru-ead24390ffc6ad0fc3b2e7f0": [
+   "topical:tp-039"
+  ],
+  "ru-eb42cacf8fb91c8ed5b6ee67": [
+   "topical:tp-012"
+  ],
+  "ru-ebb2666927c674479b82ed4d": [
+   "target-cluster:cl-0228",
+   "topical:tp-021"
+  ],
+  "ru-ebd1851d4800a1edc6caa3a9": [
+   "topical:tp-092"
+  ],
+  "ru-ec24973274736d03754a87fc": [
+   "target:ki-132",
+   "topical:tp-113"
+  ],
+  "ru-ec2fdc91707f95c33222aa3a": [
+   "topical:tp-087"
+  ],
+  "ru-ec42e68b38c4f5e8e4e941dc": [
+   "topical:tp-101"
+  ],
+  "ru-ec48af929114c011ad12f49a": [
+   "target-cluster:cl-0240",
+   "target:ki-109",
+   "topical:tp-012"
+  ],
+  "ru-ec5c613fcc4dcf9174f6ee10": [
+   "topical:tp-091"
+  ],
+  "ru-ec822d33f8711509f09cab5e": [
+   "target-cluster:cl-0240"
+  ],
+  "ru-ed0f55d1bad52efa7c2fe64b": [
+   "topical:tp-083"
+  ],
+  "ru-ed6061779b46ca3ba7b53cfa": [
+   "target-cluster:cl-0374",
+   "target:ki-023"
+  ],
+  "ru-edd2e40c5084abf2983012f5": [
+   "topical:tp-031"
+  ],
+  "ru-edf9b355f707ccf7115d8b0b": [
+   "target-cluster:cl-0238",
+   "target:ki-103",
+   "topical:tp-012"
+  ],
+  "ru-ee8f4577c0563e52d04ec05e": [
+   "target-cluster:cl-0053",
+   "target:ki-088",
+   "topical:tp-088"
+  ],
+  "ru-eed1d946c3fdc5b1797d7c53": [
+   "target:ki-131"
+  ],
+  "ru-ef4abd2d6351a4a861e8fb52": [
+   "target-cluster:cl-0230",
+   "topical:tp-062"
+  ],
+  "ru-ef70ccac43beedd7ee682983": [
+   "target:ki-173"
+  ],
+  "ru-efdead9015d8acdecf466f6c": [
+   "target-cluster:cl-0099",
+   "topical:tp-078"
+  ],
+  "ru-eff3a148955afd59de1a2822": [
+   "target-cluster:cl-0345",
+   "target:ki-015"
+  ],
+  "ru-f068493be749da6397c6067b": [
+   "topical:tp-101"
+  ],
+  "ru-f070f870433e410f3d157d69": [
+   "topical:tp-065"
+  ],
+  "ru-f078381a762c310df799f970": [
+   "topical:tp-101"
+  ],
+  "ru-f0ed0b7d5bf12027f3579533": [
+   "target-cluster:cl-0345"
+  ],
+  "ru-f0edf6a915b78c0f1fa6aef0": [
+   "target-cluster:cl-0321"
+  ],
+  "ru-f11fd5088e16b050222de5a4": [
+   "target-cluster:cl-0251"
+  ],
+  "ru-f14674448a8d4d49f0b7ae42": [
+   "topical:tp-043"
+  ],
+  "ru-f1a5919285b7dd5b2aeb5697": [
+   "topical:tp-064"
+  ],
+  "ru-f1cb32de3b86adbd46b95317": [
+   "target-cluster:cl-0228",
+   "topical:tp-019"
+  ],
+  "ru-f226e8580d2dd22f0f0a5bf8": [
+   "target-cluster:cl-0363"
+  ],
+  "ru-f234a72a567d46af6ded0ded": [
+   "topical:tp-114"
+  ],
+  "ru-f240cde0111d6c3eda92cf6a": [
+   "topical:tp-025"
+  ],
+  "ru-f25615da38f03cb8448ff182": [
+   "topical:tp-042"
+  ],
+  "ru-f286915605677f12a03ec8fc": [
+   "target-cluster:cl-0290"
+  ],
+  "ru-f2eecb1d183b661a7c2306a0": [
+   "topical:tp-082"
+  ],
+  "ru-f323085705d8c0e3517fb260": [
+   "target:ki-120"
+  ],
+  "ru-f33c2cf6cf4bb59105122169": [
+   "topical:tp-055"
+  ],
+  "ru-f3501d03632a043105f81a76": [
+   "target-cluster:cl-0237"
+  ],
+  "ru-f399158a953f930f9017bda5": [
+   "topical:tp-015"
+  ],
+  "ru-f3db5f1839aebbc38351fa34": [
+   "target-cluster:cl-0228",
+   "topical:tp-019"
+  ],
+  "ru-f4538b1adcfa4a1f5a5e1077": [
+   "topical:tp-131"
+  ],
+  "ru-f4f37e34ef54d14f4fdc1c09": [
+   "topical:tp-087"
+  ],
+  "ru-f57c523952949ebebd42c000": [
+   "target-cluster:cl-0247"
+  ],
+  "ru-f5dcf9382c274401fd567535": [
+   "topical:tp-117"
+  ],
+  "ru-f60007326b72b397076c30c7": [
+   "topical:tp-044"
+  ],
+  "ru-f6019897765ae6724e68fb72": [
+   "topical:tp-103"
+  ],
+  "ru-f74703e6331658d3da254b8c": [
+   "topical:tp-112"
+  ],
+  "ru-f7471ba271a8621d0eaa65f3": [
+   "target-cluster:cl-0237"
+  ],
+  "ru-f77bc75295d15277bc992a3a": [
+   "topical:tp-058"
+  ],
+  "ru-f7ca752570d4503f317269b4": [
+   "topical:tp-127"
+  ],
+  "ru-f7f3b24abdd014a8c9ef298b": [
+   "target-cluster:cl-0375"
+  ],
+  "ru-f873cdd63aeb88ed5d78c155": [
+   "topical:tp-038"
+  ],
+  "ru-f8ab11e66bca8f4f933fb92a": [
+   "target-cluster:cl-0347",
+   "target:ki-031"
+  ],
+  "ru-f8c19c1005a134c1170f6fbb": [
+   "topical:tp-035"
+  ],
+  "ru-f8ecd7f504c17b9f382fdccb": [
+   "topical:tp-083"
+  ],
+  "ru-f92d8093ce673c3429d78a91": [
+   "topical:tp-114"
+  ],
+  "ru-f9834917602b9ca1d46c6469": [
+   "target-cluster:cl-0207"
+  ],
+  "ru-fa7c45d46de985ba3f960c85": [
+   "topical:tp-099"
+  ],
+  "ru-fb74b1762fc5c5801b5ff876": [
+   "topical:tp-023"
+  ],
+  "ru-fbce76dbcda97e046efad980": [
+   "target-cluster:cl-0291"
+  ],
+  "ru-fc0c446a60108cc715f63f21": [
+   "topical:tp-132"
+  ],
+  "ru-fc0e2a2b1b3531b2598eb991": [
+   "target-cluster:cl-0266",
+   "target:ki-004"
+  ],
+  "ru-fcbd93a92cb20fef05e9dbdd": [
+   "topical:tp-103"
+  ],
+  "ru-fcf0f570eb099e6793178e63": [
+   "target-cluster:cl-0304"
+  ],
+  "ru-fd3ff9c9e6cc5a66672f58d6": [
+   "topical:tp-053"
+  ],
+  "ru-fda6089aca25011d2a91270e": [
+   "target-cluster:cl-0322",
+   "target:ki-016"
+  ],
+  "ru-fe464acecae0a62269623a69": [
+   "topical:tp-053"
+  ],
+  "ru-fef337b88e84e568e29a6cbc": [
+   "topical:tp-030"
+  ],
+  "ru-ff0c7a2026a0ee68681b452f": [
+   "target-cluster:cl-0249",
+   "topical:tp-014"
+  ],
+  "ru-ff2d5b3542c9fa3a40dd1583": [
+   "topical:tp-113"
+  ],
+  "ru-ff8acaa61035c80c699af125": [
+   "target-cluster:cl-0192",
+   "target:ki-098"
+  ]
+ },
+ "ocr_evidence": "second build visual-extraction route (ocr_full, ocr_selective)",
+ "ocr_routed_in_population": [
+  "ru-004d7eebb245a9581e93d673",
+  "ru-010bd79f3de80d128ecbe786",
+  "ru-016bf92952ca5169ae0f21d1",
+  "ru-01beb5507094061833d95762",
+  "ru-024d9a4b99570476da10e8b5",
+  "ru-02a4335950a14e73ed76c252",
+  "ru-02a49a4fc3d6aca199aeef0e",
+  "ru-02c882ef0fc41d168752fa9b",
+  "ru-045d836e6e829ed9f7db250b",
+  "ru-049ae261997e5ed47f786bc0",
+  "ru-05e9482aaff22e09a55bf8ff",
+  "ru-0602b124ec1be325406e411a",
+  "ru-07a1fecc46a68ffacefc34c5",
+  "ru-09d32823d5407f1458836e8c",
+  "ru-09d443b8e1ca621c7e023e5b",
+  "ru-09e2ca9b3b654115fdb45ab0",
+  "ru-0a2fd5546f7cbf6d1835773b",
+  "ru-0a54c2c2fdc29972b1177bac",
+  "ru-0a8d028ce17235d71c584e32",
+  "ru-0c0bac36bbf87b212a74e7ad",
+  "ru-0d02f78e582fea8429e4fbde",
+  "ru-0d6e53f191614802766ad846",
+  "ru-0df1b858fe33cd5e82d197b5",
+  "ru-0ff10c34c172415dec77c07a",
+  "ru-11083af44aa5ec6d731160ed",
+  "ru-123cd9ec983c55341fb383ca",
+  "ru-12dca96093d21ae4229df697",
+  "ru-134117273abeed3b76d87fe5",
+  "ru-1353c367a521d871ba77bca7",
+  "ru-13e1da73a4aed37a5d4525e1",
+  "ru-15ad455ea49aeb4945f1ee33",
+  "ru-15c33bf47cb13482b4754391",
+  "ru-15fe5d31b5f8edf9400587bc",
+  "ru-1615c968864388c04dd0cdcd",
+  "ru-16266ca2ffab36dba59a1f13",
+  "ru-16bf785f7ea8c7fe7a3bf82b",
+  "ru-171f814a546dce4653c7130c",
+  "ru-172515c6e25897b69e246144",
+  "ru-180364800b374d525fda64e5",
+  "ru-19032bcc0ac42f12b159020b",
+  "ru-1a347b5239a5d3bd750b30c3",
+  "ru-1a43638f2a3edd22fd601463",
+  "ru-1aef7c93e7a6045ddf9801d7",
+  "ru-1b140cf0bced6a4a241214cf",
+  "ru-1b46f5e075817018dfe1dd1b",
+  "ru-1c31d094e5841b88177cb6ec",
+  "ru-1cbe34e080b8c796ddc37f50",
+  "ru-1e457f4e390a831bb74f8d89",
+  "ru-1e8b765684ff303fdc3282b5",
+  "ru-1ece61d231d933f2991e6e93",
+  "ru-1ef104897ccca923c064c854",
+  "ru-1fa4e22b25ca76c213c1dc71",
+  "ru-1fd51fb2220d3f8587be2a8c",
+  "ru-23a7f18735569acb74b70820",
+  "ru-23b11dee6580cb974ca3f640",
+  "ru-24302cb055301b7e9482c8cc",
+  "ru-2471cfe69648f4545f32f048",
+  "ru-24d806f6fb4ceab97c2ade71",
+  "ru-2569fe569fc8309677f1a16d",
+  "ru-25db4b4bb960bc2e85f0b5e3",
+  "ru-26f1072e28b3e30417a2025c",
+  "ru-27cd6c4230619555392c33b3",
+  "ru-291286bdd4f8198daa6ba94e",
+  "ru-2b71c3031e5e30221b135a1b",
+  "ru-2bf844e7838a4fb81542f483",
+  "ru-2c738b681f4d2261d08bc0e9",
+  "ru-2ca80b0cf92e8bbe7a49cbc9",
+  "ru-2d5da1f26a6e99c95c624a4a",
+  "ru-2da694254145eaae432c59f9",
+  "ru-2db87d6ee6868f6b2f47bb9f",
+  "ru-2dc7451e720ec416c084d490",
+  "ru-2de2c0b93f6062edf9803809",
+  "ru-2e48b56885a0b14319db4729",
+  "ru-2e603c790bc4e600719d81c7",
+  "ru-2e92aadd0fb79858e8ea58ea",
+  "ru-2f1a5f6537cf9eda4913a16a",
+  "ru-3007705aa501f2aaa6f109f1",
+  "ru-3051bdf339fb97b7ea109dc5",
+  "ru-30bcc536707f4d084666abba",
+  "ru-324457059dbff131d845ddbd",
+  "ru-33e005ccb96dd579a95e31c0",
+  "ru-34f294ebfa093d2b38a9399d",
+  "ru-350c69d93e62a67e954b11a8",
+  "ru-35371015616007aa0565d590",
+  "ru-35999d1624d0d7be54e8a140",
+  "ru-3659442c614225c3f7fc36c5",
+  "ru-371e850059786e3aca6a986d",
+  "ru-372d1008a0f014d01dda7c5d",
+  "ru-37a06f6c8c0250c7677cb1a6",
+  "ru-37c21eb86febaf17d86e8ba7",
+  "ru-38dce31387e4f3520408ff1a",
+  "ru-39793f0d94b024eb5869d2de",
+  "ru-3a4749679dc8dc71f0b9e8bc",
+  "ru-3a5677f1b5e9d3dbc17e0bc8",
+  "ru-3abdf1c52cdf2176200657f4",
+  "ru-3b67166f4d0520566455dcef",
+  "ru-3b6af2edca644e16e236b1cc",
+  "ru-3ba678d71b6eb84bc7229daa",
+  "ru-3bac81fa6f743df7fdf9ddbc",
+  "ru-3c6ca988eddaf995c9fd6abc",
+  "ru-3d3bc21737201ea2d42a5c06",
+  "ru-3e4770e2889a67e434c4ca61",
+  "ru-3eecd25cad35b679857b3927",
+  "ru-3fc2c74802125356038b4ea6",
+  "ru-405a5f0fe38239d4fd021342",
+  "ru-40a74f3d96b5901a0da61367",
+  "ru-413473d92e0f8fd699003f73",
+  "ru-419753de93a87a59dcf2a5ce",
+  "ru-41ea571772a704fd151d91fd",
+  "ru-423ec85db099cf2ac5f075b9",
+  "ru-43aabae55630446c188b8f3d",
+  "ru-43bde7e9d4fbb5d17fa1d53c",
+  "ru-4517e7164fd0c4dd1b8dde36",
+  "ru-4606664eff23bb45849fa418",
+  "ru-4619d271b4af08c66ae88aee",
+  "ru-467753293be9fdea31fb8301",
+  "ru-479619e3f1b05162419e5871",
+  "ru-47ef32bb310f0fe440850124",
+  "ru-47fd3a3a5ee4c94198a54363",
+  "ru-4957c8d20dc1e2a814be52fa",
+  "ru-4963bef59d3c54932d4414cb",
+  "ru-49f9b28a2ddd696dc70b12b7",
+  "ru-4c77c9c05223e33a745dacf6",
+  "ru-4cc3ff9e75f2f1a783247113",
+  "ru-4cdf9d2d16156e866de6e850",
+  "ru-4f0bbcc2def2959dc76774cd",
+  "ru-4f29e01fce19e9182531e59b",
+  "ru-4f670dfa440851a9412bd4be",
+  "ru-50350753f80bc35bcc436ae9",
+  "ru-51aeb611a1bf75efda035bc0",
+  "ru-5305cc9708153ffd78b9ca7d",
+  "ru-53fcf39fe9d2b9a3c05ca7c9",
+  "ru-557a550130d4b3fe5788ced8",
+  "ru-55e9d2abc903e743155254d3",
+  "ru-57084ecb54ec8a703589eaf2",
+  "ru-571f7e55eecc0a86838a9e38",
+  "ru-5772063c7a6973f53f8ae56c",
+  "ru-57d7c52db7ec61f631823fcd",
+  "ru-57dc925d87c8b0198fa6365e",
+  "ru-5819427b8ced9f17fe528e43",
+  "ru-586d960444822710e47bfc02",
+  "ru-589e3c7ed6566eb98fcb33fb",
+  "ru-58aaf282d387d3f18d29c650",
+  "ru-58b4a75a7303d752707685af",
+  "ru-597cb8bb7e7a869a9c53a49c",
+  "ru-5a438667c4ecefbed9da207c",
+  "ru-5abf65b42a160868569a8018",
+  "ru-5b808b7ea5cc64689483c3b9",
+  "ru-5d82e99cf735fb38753b9479",
+  "ru-5edf4bdff0f3413993920e25",
+  "ru-5eed6d236174afdd580f44f6",
+  "ru-5f85e0775a55684dd52302b5",
+  "ru-60598d8dcc2203927ee664cb",
+  "ru-617c0f9b99cb28f3abc4c083",
+  "ru-62ca7317a5810cb2677bffd1",
+  "ru-639e9993fbc5c5f7304b13fc",
+  "ru-6439802ef43e6d7c1dce535d",
+  "ru-648df7dc1380af871668f31d",
+  "ru-6512d2e2bf9e1d4fe5bde29d",
+  "ru-6550d981dbe6b6c7466fbae5",
+  "ru-658770cefb1b6883133013ec",
+  "ru-65f0aa5edc246285317cd4f7",
+  "ru-6641a6be23080b63f821ba4c",
+  "ru-6642fcdc6525b67f2d302947",
+  "ru-667fdef3f917754eb0c7bcad",
+  "ru-668fd034de0eb9b19f1d545c",
+  "ru-66f41cc0cc8c975a28553551",
+  "ru-678cd3b61f29732ce8652f50",
+  "ru-67bd7f5d19707d9af9cbf990",
+  "ru-681c02c73714f5771d70b375",
+  "ru-6884d8b4d9b98d4aa38fbfdd",
+  "ru-688f117ef4f22e1019e68c6b",
+  "ru-69109c2b4d6bb6dca0644d57",
+  "ru-69b7cb6c65a3a82f857966c0",
+  "ru-69c820e3a6b0460e46d50cf1",
+  "ru-6a2cccd732162c3b3d9337bb",
+  "ru-6bf646bdbce527588bb4b585",
+  "ru-6c3b25b5b440a96e786d8a30",
+  "ru-6c4e7375d9eb3622843ae3bf",
+  "ru-6d5d45fe3789cadfe20d7cd7",
+  "ru-6d811cf464af5910b706617f",
+  "ru-6e473865da193fb317c88f5a",
+  "ru-6e88dd06344ef5f74993d169",
+  "ru-6f524833a41c415710539986",
+  "ru-70200302fb91c283ba408e5e",
+  "ru-7156968c32bb945c97b5b151",
+  "ru-719decd82850355f11693ab7",
+  "ru-71dccb1c99ee8b8269895f96",
+  "ru-72a26a0023c8ac947c3240c1",
+  "ru-768539730acf64a541a3da6b",
+  "ru-77554bb106b88227d164df12",
+  "ru-77af984a55cc806ce57d4529",
+  "ru-77b62a5742d151f5971d117f",
+  "ru-7931882ced72b2144c29028d",
+  "ru-79d3e6c5936bc5db0e376ecf",
+  "ru-7a90077327d308ff4385cfb7",
+  "ru-7c7aedefb9b330466ac0f478",
+  "ru-7cda4f7c02ef76814fe483d8",
+  "ru-7ec70d586860157c65bdf06a",
+  "ru-7fa738bd06b74a67a0873ba3",
+  "ru-81ce89eaa243293883589941",
+  "ru-81d5ed12d53efcd5bc66ecab",
+  "ru-82023c4a71bbf2c426e2b98a",
+  "ru-82cc22dde014faff0e13af8f",
+  "ru-830b85c0dd78f9cde488cfcb",
+  "ru-847bde9969e285a6e70bac95",
+  "ru-850e8bf89730608b6e106754",
+  "ru-850fbcf45228b0bd4f397b71",
+  "ru-86b4afe37300b4f8c5d394f7",
+  "ru-872ea020a09d8d85a3e3cc5f",
+  "ru-88662ce192fdc2b0d3abd79a",
+  "ru-8aa5438520d76ed43ccadbd7",
+  "ru-8c399ca071182fc891951f19",
+  "ru-8d6ae01cd4c9abae836f89f4",
+  "ru-8dbbeba3769b862da8aa5c9d",
+  "ru-8f4caf397e001b06bb599d9d",
+  "ru-8f96a38935a9673f9f9dde84",
+  "ru-8fcb0ff304d0b1d771c2a30d",
+  "ru-90b88933bd9327239e1a80eb",
+  "ru-911256c2d7b6b8ea44eeac83",
+  "ru-91f5b9cee7ca0107478c63cd",
+  "ru-92580948a2c7f54bb0441f63",
+  "ru-9292a0061a5450839339a903",
+  "ru-92f3029ae8f77902bef45c0a",
+  "ru-938ccb016594bb3952495d50",
+  "ru-94b01e0860c180349cdeab62",
+  "ru-964ae22be7cd6cb506411c90",
+  "ru-96aedf4521dc4097f6de57e4",
+  "ru-97e2a12ddd3ecc147e4048dc",
+  "ru-98692b80a4b6ddceae81efbe",
+  "ru-99da6e62dd01c516e99d008e",
+  "ru-9aa1a18f6a341f1128aaa192",
+  "ru-9af4b989ec14c7d0de12bee7",
+  "ru-9afa0c90ded2e07c6daa9682",
+  "ru-9ca882c92303ef761ce4f11b",
+  "ru-9e1db6d2541d8d53b0db811c",
+  "ru-9e33f0ada6f4f774001f64cc",
+  "ru-9e503b9740bf147def26e3bb",
+  "ru-9e55f70fdf135f7713865ef3",
+  "ru-9ee089fa691e2ce7adb6e0bc",
+  "ru-9f5d108ee06e154d6b1bed5f",
+  "ru-9fbadf28e8e083f0c5866585",
+  "ru-a00984f5f657ebbf1bb794a8",
+  "ru-a0e31daafc9f9c44d29ba3e3",
+  "ru-a344b0c4af6095e6a47cd738",
+  "ru-a4644959da40a1a9b72e3e1c",
+  "ru-a4e9725b7ba6c15add6aa844",
+  "ru-a722952972c721fdeb3853b9",
+  "ru-a79e206aa7efdf701bcf0cb2",
+  "ru-a959289a92956b62235e4e19",
+  "ru-a9be0bb77e0398178fc9c833",
+  "ru-aa769a23d6574126cb07fd3c",
+  "ru-aa8d3faa9b0f9af9ea99c0db",
+  "ru-aa92f5d674a36e72edea71a4",
+  "ru-ab4ec981ffaa6f4632362bbd",
+  "ru-ab68f5ce5e9787712b878578",
+  "ru-ab72c14c0b02aa5b52a13fbe",
+  "ru-abd94a9d808aba5e4955ef62",
+  "ru-acf6d3d61fe693cab0572d7e",
+  "ru-ade90c33e32a8082da5f7f3e",
+  "ru-ae1d77d0a3cb724d56b7b590",
+  "ru-ae436e892bb0428100acd868",
+  "ru-ae5f8e381cfc9274bc7a1e39",
+  "ru-b031ea0c6645d20b392467a3",
+  "ru-b034ddd9ed25b396ab074a16",
+  "ru-b03dae3d4c6dc6ff909bc2cb",
+  "ru-b3507c69ce4e01cc048da55b",
+  "ru-b38874685b84a4b2df7630a9",
+  "ru-b41e07fab6ac670efd547f1a",
+  "ru-b488ad5f313460a50d021f68",
+  "ru-b48d18a237017928408a8897",
+  "ru-b4b715396b46aebf4744daa6",
+  "ru-b533492bdfef9c3d67676ec8",
+  "ru-b61abc37745859e5f1ba5d5b",
+  "ru-b6337b4e49c53c9bbd438b94",
+  "ru-b6997f4bf99644b944e9cd58",
+  "ru-b6d29c9f8f3e42b1a4da4f32",
+  "ru-b8749061666b3583d2fa7ba9",
+  "ru-b8ab31faa651d691b3d6b4e9",
+  "ru-b8b8672d2d6e75c3fa1e4ae4",
+  "ru-b8c40225d4269cd37eaab56f",
+  "ru-b955ac2a49bcbd185702776b",
+  "ru-b98a3254605a035cfb4f4a93",
+  "ru-b9c0177d32d4c723dd08187e",
+  "ru-ba54334538e82d8881b8d96f",
+  "ru-ba718cec9dc81355ebe3b44c",
+  "ru-bc5086ea94f96772e63c902b",
+  "ru-bd3247828ca83d740f6b3b11",
+  "ru-bd90b721bbc66a6981908fb3",
+  "ru-be65ad30b12614c7df685e9e",
+  "ru-bec41fd62f321d31f1380cf5",
+  "ru-bee39dbe8ddcb9d74f4730ef",
+  "ru-bf2bda4a113ddba8920f5bc4",
+  "ru-bfe90ebdd9839f9672f2a621",
+  "ru-bff127d9974880a6d665ede1",
+  "ru-c00ac1e60724e80aff3ce189",
+  "ru-c09315f7f15ec477ffaaaec5",
+  "ru-c12de04d88b29fddeeea44e5",
+  "ru-c1341497fe4e9c21d55e5423",
+  "ru-c1891b0ee4e274d788435519",
+  "ru-c22a3af5d4c3fd0f6d6cf0e9",
+  "ru-c28ac5814dcb4e4f63e02834",
+  "ru-c4badf14980e2d4e8bcba3f0",
+  "ru-c4d6c9d7d0dd074b38794c0c",
+  "ru-c51acb3d199451b7f931a152",
+  "ru-c550c73a00fdb96fbae683a6",
+  "ru-c5908947c46a170567cecca1",
+  "ru-c724b49daac55c72fa576fe3",
+  "ru-c85af2625a457c86518f0fa2",
+  "ru-c87f0c9a6cee3a491d8aa863",
+  "ru-c8e512b00d36a7f9c41f2462",
+  "ru-c99f50ff3878abb7a8f49a79",
+  "ru-c9ec38312e7981d95ad77b25",
+  "ru-ca2b130720075b090b4072e1",
+  "ru-cb066972f723a96be123ff95",
+  "ru-cb4ee0388a568a795bbc3a59",
+  "ru-cbe8005ee825f573a571c5d5",
+  "ru-cc2d836a09c3c26f0f4a1e6e",
+  "ru-cc4035f408ad5d0ec93fb80f",
+  "ru-cc85d3a1ab18b0cdf5c9a782",
+  "ru-cdfbbda60fba15fe09a1ac70",
+  "ru-cf732090cd66cd9b03ebdf46",
+  "ru-cfbe115a35073275e1092f9e",
+  "ru-cfd44d8ec50f418f5798e4c8",
+  "ru-d05062188e43faeeee8c3152",
+  "ru-d13ae3548dff2cac9a772980",
+  "ru-d14c0ae1c8220f2623722abf",
+  "ru-d158d44aa699010a19bee523",
+  "ru-d1dffc7d72dc5710ffd248d6",
+  "ru-d237b91a9f98bd5ca7e2bd74",
+  "ru-d2d8c074d171a7f449ed9fae",
+  "ru-d3060cdfee1cc6d61de85a86",
+  "ru-d33e4e9ccea64461b4e0502b",
+  "ru-d3696e4c622b32d19cf4a37e",
+  "ru-d38234957d0e314cba1d994f",
+  "ru-d411bb5aa74c11438a4c0743",
+  "ru-d4aa5fd663331c56f1acc399",
+  "ru-d6b705ba4e7cef106ecc9598",
+  "ru-d756e3bd7077a906d1396ee2",
+  "ru-d88b2e7d7c8ac5d8a1929406",
+  "ru-d90f1e52309b4c7ccea49767",
+  "ru-d9513fef5bdd7996255a246b",
+  "ru-da36c533c8393421ac150081",
+  "ru-dabe003ddd74ed537cbc3c6d",
+  "ru-db6cd026a546e7c5f4bb3b07",
+  "ru-dc5114269382143db9cefed1",
+  "ru-ddf7be145d8348eebc6c02fb",
+  "ru-dfbac081d032a5ac92ffb654",
+  "ru-e01f8eaece249eac63e7679f",
+  "ru-e17826f8f022ae8500897ac4",
+  "ru-e17d86e23a3df180eb084a29",
+  "ru-e206f8aae5cb86dded6c100e",
+  "ru-e2627a02005091353ea2a54d",
+  "ru-e34864b9aa31e8116a306aa6",
+  "ru-e38163016572de86cee8cc64",
+  "ru-e47a7548441ad15c30668830",
+  "ru-e4a4b49420054549ecbc6f36",
+  "ru-e5d0e8921cfcb7689bcb889c",
+  "ru-e5eb73f10586e8eeb52f1c01",
+  "ru-e669b881a15472459eeecf9b",
+  "ru-e6bc544efaa8f1cf5b81880a",
+  "ru-e6e8a14f9ae870ffc5942801",
+  "ru-e709398e1e4c90a2a86d35cb",
+  "ru-e905e338c38c7434d5d18549",
+  "ru-e9647b0c196e4537b3dab4df",
+  "ru-e9a87280423f9aae4c2db7d7",
+  "ru-e9d36858642fc593a64e37ef",
+  "ru-ec5ff5e47b340a64a813b710",
+  "ru-ecbf91bc96cefab8eef29fed",
+  "ru-ed912f6d87658eea71ac29ae",
+  "ru-edbb1f97fec067a5be999f12",
+  "ru-ee55c2467dde7cfda4725916",
+  "ru-eedccc09e62720a5953631d7",
+  "ru-ef543a743ade6c29e1da2a69",
+  "ru-efad5b9a82b3c915501004c0",
+  "ru-f06198fd0bd34da795a73d27",
+  "ru-f0edf6a915b78c0f1fa6aef0",
+  "ru-f231c6c0b965d80d9070950e",
+  "ru-f234a72a567d46af6ded0ded",
+  "ru-f266acd5f8a2128ea6fc41ba",
+  "ru-f29f757b2d6097a75b12791a",
+  "ru-f2f952b897c735552f5f23cb",
+  "ru-f35de7b90f6c5f5b79367835",
+  "ru-f36afe90d48100fa1acc3438",
+  "ru-f37a23da17f2ea1a04f9eda6",
+  "ru-f3852a109b24fce039d2c81c",
+  "ru-f4c603b96c1cfe07ff369f1f",
+  "ru-f58b51f62d36c60f9c3c1eff",
+  "ru-f60007326b72b397076c30c7",
+  "ru-f6019897765ae6724e68fb72",
+  "ru-f6f0d73627b14d9720b900b9",
+  "ru-f88dc9c9afd3286fed199027",
+  "ru-f8ab11e66bca8f4f933fb92a",
+  "ru-f8c19c1005a134c1170f6fbb",
+  "ru-f8d2c30eec66046bf5859748",
+  "ru-f8d537e6b1c4399ece958865",
+  "ru-f8fe3a7312d97be12e01ff2c",
+  "ru-f96121b540b061f5d75a9fe5",
+  "ru-fc0e2a2b1b3531b2598eb991",
+  "ru-fc51a9b8f3d131373636822e",
+  "ru-fcbfdf3dcda12f25987d4110",
+  "ru-fcd695244670f45a54a4201c",
+  "ru-fcf0f570eb099e6793178e63",
+  "ru-fda6089aca25011d2a91270e",
+  "ru-fe659057f329f307fb811f4e",
+  "ru-feb59894d54ec8145e63a6e2",
+  "ru-ffa98c5e2ba7043a60ebcc51"
+ ],
+ "ocr_routed_in_subset": [
+  "ru-0602b124ec1be325406e411a",
+  "ru-0ff10c34c172415dec77c07a",
+  "ru-11083af44aa5ec6d731160ed",
+  "ru-1353c367a521d871ba77bca7",
+  "ru-15c33bf47cb13482b4754391",
+  "ru-172515c6e25897b69e246144",
+  "ru-1a43638f2a3edd22fd601463",
+  "ru-1aef7c93e7a6045ddf9801d7",
+  "ru-1e457f4e390a831bb74f8d89",
+  "ru-1fd51fb2220d3f8587be2a8c",
+  "ru-2569fe569fc8309677f1a16d",
+  "ru-25db4b4bb960bc2e85f0b5e3",
+  "ru-2de2c0b93f6062edf9803809",
+  "ru-324457059dbff131d845ddbd",
+  "ru-350c69d93e62a67e954b11a8",
+  "ru-39793f0d94b024eb5869d2de",
+  "ru-3abdf1c52cdf2176200657f4",
+  "ru-3b67166f4d0520566455dcef",
+  "ru-3eecd25cad35b679857b3927",
+  "ru-3fc2c74802125356038b4ea6",
+  "ru-40a74f3d96b5901a0da61367",
+  "ru-479619e3f1b05162419e5871",
+  "ru-47ef32bb310f0fe440850124",
+  "ru-51aeb611a1bf75efda035bc0",
+  "ru-557a550130d4b3fe5788ced8",
+  "ru-5edf4bdff0f3413993920e25",
+  "ru-5f85e0775a55684dd52302b5",
+  "ru-60598d8dcc2203927ee664cb",
+  "ru-668fd034de0eb9b19f1d545c",
+  "ru-678cd3b61f29732ce8652f50",
+  "ru-67bd7f5d19707d9af9cbf990",
+  "ru-69109c2b4d6bb6dca0644d57",
+  "ru-6a2cccd732162c3b3d9337bb",
+  "ru-6bf646bdbce527588bb4b585",
+  "ru-6c3b25b5b440a96e786d8a30",
+  "ru-6e473865da193fb317c88f5a",
+  "ru-7156968c32bb945c97b5b151",
+  "ru-77554bb106b88227d164df12",
+  "ru-7931882ced72b2144c29028d",
+  "ru-79d3e6c5936bc5db0e376ecf",
+  "ru-7ec70d586860157c65bdf06a",
+  "ru-81ce89eaa243293883589941",
+  "ru-847bde9969e285a6e70bac95",
+  "ru-872ea020a09d8d85a3e3cc5f",
+  "ru-91f5b9cee7ca0107478c63cd",
+  "ru-964ae22be7cd6cb506411c90",
+  "ru-96aedf4521dc4097f6de57e4",
+  "ru-98692b80a4b6ddceae81efbe",
+  "ru-9e503b9740bf147def26e3bb",
+  "ru-a0e31daafc9f9c44d29ba3e3",
+  "ru-a79e206aa7efdf701bcf0cb2",
+  "ru-aa92f5d674a36e72edea71a4",
+  "ru-ab4ec981ffaa6f4632362bbd",
+  "ru-ab72c14c0b02aa5b52a13fbe",
+  "ru-ade90c33e32a8082da5f7f3e",
+  "ru-b031ea0c6645d20b392467a3",
+  "ru-b3507c69ce4e01cc048da55b",
+  "ru-b4b715396b46aebf4744daa6",
+  "ru-b6d29c9f8f3e42b1a4da4f32",
+  "ru-b8749061666b3583d2fa7ba9",
+  "ru-b955ac2a49bcbd185702776b",
+  "ru-b9c0177d32d4c723dd08187e",
+  "ru-ba54334538e82d8881b8d96f",
+  "ru-bc5086ea94f96772e63c902b",
+  "ru-bd90b721bbc66a6981908fb3",
+  "ru-bee39dbe8ddcb9d74f4730ef",
+  "ru-bf2bda4a113ddba8920f5bc4",
+  "ru-c00ac1e60724e80aff3ce189",
+  "ru-c09315f7f15ec477ffaaaec5",
+  "ru-c87f0c9a6cee3a491d8aa863",
+  "ru-cc85d3a1ab18b0cdf5c9a782",
+  "ru-d14c0ae1c8220f2623722abf",
+  "ru-d1dffc7d72dc5710ffd248d6",
+  "ru-d4aa5fd663331c56f1acc399",
+  "ru-d9513fef5bdd7996255a246b",
+  "ru-da36c533c8393421ac150081",
+  "ru-ddf7be145d8348eebc6c02fb",
+  "ru-e47a7548441ad15c30668830",
+  "ru-e905e338c38c7434d5d18549",
+  "ru-f0edf6a915b78c0f1fa6aef0",
+  "ru-f234a72a567d46af6ded0ded",
+  "ru-f60007326b72b397076c30c7",
+  "ru-f6019897765ae6724e68fb72",
+  "ru-f8ab11e66bca8f4f933fb92a",
+  "ru-f8c19c1005a134c1170f6fbb",
+  "ru-fc0e2a2b1b3531b2598eb991",
+  "ru-fcf0f570eb099e6793178e63",
+  "ru-fda6089aca25011d2a91270e"
+ ],
+ "population": 2890,
+ "sampled": [
+  "ru-01567f92527b351b5ef09743",
+  "ru-017673460164474fb00ab5ca",
+  "ru-02051bf5e7674272335d8b61",
+  "ru-03ad5df56611860b05d9048c",
+  "ru-0733649f485a3f56ec501735",
+  "ru-0779b93dfce5ac2c3b2268a8",
+  "ru-0921bbe4fa6105e361325c28",
+  "ru-093fb1b01a3f219d10346f49",
+  "ru-094e90fa6950aac7cb93d1ea",
+  "ru-0d20e77fdb33b97e0800e496",
+  "ru-0dc527f706712be9f065c428",
+  "ru-10a56d8cb890ad789c701966",
+  "ru-1133eab85e1a829135715e80",
+  "ru-1197a2db3da20ce4b7952db1",
+  "ru-11f134129d9adb25b089da0a",
+  "ru-12a6e2af324b0a9a6529482e",
+  "ru-137034535649889d76d5c061",
+  "ru-13ccc85ca587bb6a7a23a0dd",
+  "ru-13f1bafecb49da85fdf8299f",
+  "ru-154e4340d05e53109e463327",
+  "ru-16723553e75e3edd78141fb5",
+  "ru-16925364cb9af4b72dee420a",
+  "ru-18ba23f956a5ca7a44d6a791",
+  "ru-19116c5a0eb9722db1922f76",
+  "ru-1a159929b7eb46e32dca6f64",
+  "ru-1b181f8ea4d522134fb955ec",
+  "ru-1b29dc4425dc4732bd71ed14",
+  "ru-1bfdc3f57f47d23a0bc0907b",
+  "ru-1d1b3bdf487aa36901ffe294",
+  "ru-1e5d7395ff21d55f648bc36c",
+  "ru-1e8447f27800e40cfceaee52",
+  "ru-1f68debcf05b36322dd646d1",
+  "ru-1fd92394e9012d9380f67e73",
+  "ru-20d34ebf6f4f12e4dbe853c6",
+  "ru-21477163a67cb9b7908ad7b2",
+  "ru-21a92ad15ba4feabf5adb79c",
+  "ru-23e5e3d9a4f3ae626a7367a1",
+  "ru-24520c1d0ee7bca62fc8595b",
+  "ru-2458c332fa162ede8eb89478",
+  "ru-25498940562de4b38faa95aa",
+  "ru-2571d3f97cfb8f4dac1be109",
+  "ru-269e10223fbb23cc4093580f",
+  "ru-27e42182c6b85a92dae8f839",
+  "ru-2a437465f5c01cfe8ebb2191",
+  "ru-2bcc736851a9bfdbe5b42c24",
+  "ru-2c2b7c4fc280a5460632fce8",
+  "ru-2ead85f7a4acc07f950c639f",
+  "ru-2f370b0c0a4fe86e3616af6a",
+  "ru-2fb3feeafe44f6fafa793689",
+  "ru-306b9aacf00dc2ddf1cc4ff6",
+  "ru-311c46b590c53bdbb3d416ed",
+  "ru-324670e39d7d883884568983",
+  "ru-346e06c626179f7cb76c57d0",
+  "ru-354fc9c0cfbf85a244e956db",
+  "ru-3643e8ed98ee2f53f322624b",
+  "ru-367390b4ef223a4a7f38a1bc",
+  "ru-3705ad32d4bd99690c41c756",
+  "ru-3872d946fdf0b621391f4b4e",
+  "ru-39c34bb06678d5b4b2b8dc9d",
+  "ru-3a10045f5ac180fc992cbae5",
+  "ru-3a408dad43ade8a06e8eeccd",
+  "ru-3aab345121112d30f4d453d3",
+  "ru-3dc9801563ba0de7b73d3434",
+  "ru-3e39a8632a3f9522bc586790",
+  "ru-3ec1bc0587cdcca729dc8a38",
+  "ru-3fc322ccefeea4305e823321",
+  "ru-4019cfda1c0281f4bb79f210",
+  "ru-40f594f1858a83363a3c74cd",
+  "ru-41a3e2d0c2cdab55eaf002cd",
+  "ru-445ca8e0125b53c866f23f87",
+  "ru-452be556f64fc68cee18a1af",
+  "ru-456e8b9aff592d1bde18f3b6",
+  "ru-45c1562d97acff65f15e24ea",
+  "ru-4850a149b281c3faf6530461",
+  "ru-495253ebdc649327d2e675f6",
+  "ru-49df285c62f00f123ae323a2",
+  "ru-4b2ccd412258fb4b0fb41f4d",
+  "ru-4bbab228bedc1e30c25dfc82",
+  "ru-513054cf99ac5adf2060e3b7",
+  "ru-55289c8f16d4fed5a173f1a4",
+  "ru-5575b4ba46fd1ce419b2b4dc",
+  "ru-559b25362615a8bbb7c3b89a",
+  "ru-56c3db518344ccb64dd71112",
+  "ru-576ed6693b5a3c7aa4aa517a",
+  "ru-58af52bab8f710ca12b1db7d",
+  "ru-58c397a01ac9d757bfcc5f98",
+  "ru-5a52cfbbc52517403f45176d",
+  "ru-5c0859360ac743184c2d35e9",
+  "ru-5c5a8cd94df89dbaeaf36fee",
+  "ru-5e12896a8fcb2f57b97c422a",
+  "ru-5e29f2d5c1b41ba303c7f069",
+  "ru-5e6dd967e195eb1912d4eac4",
+  "ru-5f69829d766e40a78e1a8b1a",
+  "ru-63a2d898090a4e63fef3a8c5",
+  "ru-646f23281245f0f45ade888a",
+  "ru-647adb9568ccfaa67ea7e543",
+  "ru-658870e9ca91b3a7c9964057",
+  "ru-6681dab875a2cb5f00103008",
+  "ru-66cf63122475afddefbccf07",
+  "ru-66de1978146f089eae424f81",
+  "ru-682be8eab6b634ddf538062b",
+  "ru-6a14099c9f2c18906348a00c",
+  "ru-6eb64c1fdfee9c5e9d3d0b80",
+  "ru-71532bf8ab647d27c8a001c5",
+  "ru-7299c8e17f2995052f26c039",
+  "ru-763946e70af04130bc0654b9",
+  "ru-76bb95c71d1f79bf724eff5d",
+  "ru-77b0b0dd53276ef5b3960df0",
+  "ru-7875141d5cf3e4c028aba30f",
+  "ru-7912c745418ad1b3ffef1e83",
+  "ru-79a2fd0df7af070d985a7783",
+  "ru-79a57a8cda29b69ec6f039d4",
+  "ru-79c1cb1cbcc77676d50b75ba",
+  "ru-79c78ddc6577b7f1f30493f0",
+  "ru-7a45f212fa27026ef496598a",
+  "ru-7c3ff1bf8bac07799bb15a8b",
+  "ru-7f81cebee44a0940a6f9298d",
+  "ru-807c3ce37d5d6e6c3e009a75",
+  "ru-80c73e124203eaf03a61322b",
+  "ru-8243f061f2caaeeb6f586cf1",
+  "ru-83ed8af8760d23d667fa2411",
+  "ru-8457f141680e0f54fc9984db",
+  "ru-85d17f7f65da806046093a70",
+  "ru-863f4b5e5dbaae6002a9c21f",
+  "ru-87a9438ea13ae6ce7f740074",
+  "ru-892d968beef4a6d56d823ae5",
+  "ru-89a34261f41a2335c07b9622",
+  "ru-8a313e1d077229518256b9a8",
+  "ru-8c31a6536312241c7fff1b55",
+  "ru-8d607d0a4b0c880610b2ca6b",
+  "ru-8e786197803bf153215f94f3",
+  "ru-8f1c3211043d89c4846ce0b6",
+  "ru-8f554db237ac4a24c3ec50e8",
+  "ru-9019f9362daaa9d1dacffe5f",
+  "ru-9293eb91ba19778896e00de7",
+  "ru-92cb9323ac978ed67369b77d",
+  "ru-933c2c60a131f3fdd15ed0e2",
+  "ru-939b2ce6ed7f9e14c5fc4686",
+  "ru-94f6ba30b2c5b5d4f2623629",
+  "ru-95ca263df2113f1f239c6c73",
+  "ru-966523d5b7154dc78ae19c80",
+  "ru-96b09d2108c6170933f2ce7e",
+  "ru-96b137d7ffc997a8eb2ae6ff",
+  "ru-96d0f1852c8901d88f376ede",
+  "ru-971978bd5fb20f902c718e27",
+  "ru-9943ea14daffe005da8e5661",
+  "ru-99c635057f5b355aa525ad92",
+  "ru-9b7701fd59fa1f9c9a1a1e7a",
+  "ru-9efd150883f63ad4d0ac6c6d",
+  "ru-a0ba695ab8fbf272d165f10e",
+  "ru-a34be2ad90a97d94b9b61751",
+  "ru-a3940768b51650ab6b913009",
+  "ru-a568497aa80c94a473448c2d",
+  "ru-a683151203ca5fbc32e12d1b",
+  "ru-a6d5ce2b89e3a185f9ef14ce",
+  "ru-a8fcafe5bd4e82019d7612f5",
+  "ru-a9df900cc98ec367b2c337df",
+  "ru-abb82d22a178fde623c97e6d",
+  "ru-ac038fa8a2809688822d5f6c",
+  "ru-ac0b4bc441181306b6fa286b",
+  "ru-ace9172ed9e6920f80948ad5",
+  "ru-adcc4e707032d7a149143cfb",
+  "ru-aed466a15eecfe6cfb527804",
+  "ru-b10b21e213fe41731850b073",
+  "ru-b34ebed9b68bdf25843db26f",
+  "ru-b46414879d067eb7635ff580",
+  "ru-b51a64c1fd7f8c413a702ec9",
+  "ru-b944284bd849de7d23f7959e",
+  "ru-b9e8bd71372eea0251a9b916",
+  "ru-bae820d5df2ecc2d02cbc62f",
+  "ru-bc79821717797aa69f01ec12",
+  "ru-bd16f1797b5998c3accaf2b2",
+  "ru-bf5d30f17ecd47057e77e4c4",
+  "ru-c13c34a4998350a1cf46ee07",
+  "ru-c1421e2980bb1054ef168eb8",
+  "ru-c3a057b29a25790a730941b5",
+  "ru-c3a356d2447fe0b1d9c5d50e",
+  "ru-c4aedc97d0e45beb8470ba01",
+  "ru-c93a8c257c48f38d4b8e9f72",
+  "ru-cbab3926343bcd72b7cc6f34",
+  "ru-ce34215117a6961de3e2b94c",
+  "ru-ce64c2e00fb40d0f741c3f88",
+  "ru-ceabab8eb828c6f9a4459414",
+  "ru-cee901a6ff41e7f06753588b",
+  "ru-cfb63338f955aa6bf5d32e92",
+  "ru-d11fbf2e7b69507765ec4804",
+  "ru-d16807375bc548049ef51fbc",
+  "ru-d1df6d50d74da75a5d14e367",
+  "ru-d1ef609e643ad3bed7ec508c",
+  "ru-d22d8b221e8fee75263cac2c",
+  "ru-d315c6c33d9f905a4c8396c3",
+  "ru-d3f4d6c6d346b9b9776c827e",
+  "ru-d4b504666dffc01b6d59127d",
+  "ru-d510c60f203d121f6cfcfa77",
+  "ru-d5556d42079491a87f477b43",
+  "ru-d5cb95fb4e1f40b2c1a47c17",
+  "ru-d6f4c6b52a6b4aebe870d350",
+  "ru-d7832e9fc48e5a29d2eec5f7",
+  "ru-d78d7fc92cd30b78ae61768f",
+  "ru-d81fdb06eb387ae78f01835e",
+  "ru-d955e0ae2cfbd9f7baa5f4c0",
+  "ru-d9d81352c070e6da7be4f42e",
+  "ru-dd100e728198d3ced8d62aa8",
+  "ru-dd731cf8f2638ff62e18626e",
+  "ru-dea3439501b457c3d4ec57bc",
+  "ru-e0cecaf5362fcf409db911b5",
+  "ru-e1b43bfeb2713df64df20976",
+  "ru-e20c78382c705a692cbb6c05",
+  "ru-e38b605f486de379e30448c8",
+  "ru-e658c8a0aa21c5920ca4fb67",
+  "ru-e6ba5c30d7f29b2b61cf1f9b",
+  "ru-e7864354fca787ee4d6ce8a4",
+  "ru-e84a1d38529e4e0c76969a3e",
+  "ru-e890f4d6d6d61e6ccebc682f",
+  "ru-e9949e2fb4c68ecc00c820e0",
+  "ru-e9f629d17bd6b3d2e562ee9d",
+  "ru-ebddce13e37ff94efaec4615",
+  "ru-ecac92be577a871de7345d3f",
+  "ru-ee5f52dd954b9f4e390ebd43",
+  "ru-eeed2deb79184e78081be3db",
+  "ru-ef27295e49e4b74681cb6e4d",
+  "ru-ef994f289254d3791fc6caba",
+  "ru-f05309b6c0140bc79f405f16",
+  "ru-f13ec97fb13795393789c93e",
+  "ru-f18bb449446465a27f25da8d",
+  "ru-f2c7f556d731b764dd2804de",
+  "ru-f562dfc586fc4c49d2c5d9d4",
+  "ru-f5d96d0e8ea444022396f758",
+  "ru-f68280f74f66adfb1252447d",
+  "ru-f8ecfabacacef128092bad85",
+  "ru-f9cf4b2a601d742a3b18084f",
+  "ru-fb271c4db6617f2674e078ce",
+  "ru-fb5d7bc61dfe806cf6e368cd",
+  "ru-fc232e1942f7a3aa6d260039",
+  "ru-fc879068af4621eb59ebc893",
+  "ru-fcbadc92323a31f4032ede93",
+  "ru-fdb5a59b1a7d94ad4e7b9765",
+  "ru-febc28543d3bc06b075aff9c",
+  "ru-ff87392d4474e5990c819760",
+  "ru-ffec6ed0b169838f40994826"
+ ],
+ "seed": 20261104,
+ "size": 1000,
+ "strata": {
+  "bundestag/pdf/de": {
+   "full": 426,
+   "kept": 153,
+   "sampled": 32,
+   "share_full": 0.1474,
+   "share_subset": 0.185,
+   "subset": 185,
+   "targets": 32
+  },
+  "enron/eml/en": {
+   "full": 500,
+   "kept": 69,
+   "sampled": 44,
+   "share_full": 0.173,
+   "share_subset": 0.113,
+   "subset": 113,
+   "targets": 32
+  },
+  "eurlex/html/de": {
+   "full": 210,
+   "kept": 120,
+   "sampled": 9,
+   "share_full": 0.0727,
+   "share_subset": 0.129,
+   "subset": 129,
+   "targets": 9
+  },
+  "eurlex/html/en": {
+   "full": 210,
+   "kept": 103,
+   "sampled": 14,
+   "share_full": 0.0727,
+   "share_subset": 0.117,
+   "subset": 117,
+   "targets": 14
+  },
+  "eurlex/pdf/de": {
+   "full": 5,
+   "kept": 5,
+   "sampled": 0,
+   "share_full": 0.0017,
+   "share_subset": 0.005,
+   "subset": 5,
+   "targets": 5
+  },
+  "eurlex/pdf/en": {
+   "full": 5,
+   "kept": 5,
+   "sampled": 0,
+   "share_full": 0.0017,
+   "share_subset": 0.005,
+   "subset": 5,
+   "targets": 0
+  },
+  "govdata/csv/de": {
+   "full": 40,
+   "kept": 20,
+   "sampled": 0,
+   "share_full": 0.0138,
+   "share_subset": 0.02,
+   "subset": 20,
+   "targets": 0
+  },
+  "govdata/xlsx/de": {
+   "full": 160,
+   "kept": 106,
+   "sampled": 16,
+   "share_full": 0.0554,
+   "share_subset": 0.122,
+   "subset": 122,
+   "targets": 16
+  },
+  "govdocs1/csv/en": {
+   "full": 10,
+   "kept": 7,
+   "sampled": 3,
+   "share_full": 0.0035,
+   "share_subset": 0.01,
+   "subset": 10,
+   "targets": 5
+  },
+  "govdocs1/doc/en": {
+   "full": 181,
+   "kept": 24,
+   "sampled": 4,
+   "share_full": 0.0626,
+   "share_subset": 0.028,
+   "subset": 28,
+   "targets": 4
+  },
+  "govdocs1/html/en": {
+   "full": 102,
+   "kept": 13,
+   "sampled": 4,
+   "share_full": 0.0353,
+   "share_subset": 0.017,
+   "subset": 17,
+   "targets": 4
+  },
+  "govdocs1/pdf/en": {
+   "full": 401,
+   "kept": 27,
+   "sampled": 52,
+   "share_full": 0.1388,
+   "share_subset": 0.079,
+   "subset": 79,
+   "targets": 4
+  },
+  "govdocs1/ppt/en": {
+   "full": 130,
+   "kept": 14,
+   "sampled": 5,
+   "share_full": 0.045,
+   "share_subset": 0.019,
+   "subset": 19,
+   "targets": 5
+  },
+  "govdocs1/txt/en": {
+   "full": 40,
+   "kept": 8,
+   "sampled": 4,
+   "share_full": 0.0138,
+   "share_subset": 0.012,
+   "subset": 12,
+   "targets": 4
+  },
+  "govdocs1/xls/en": {
+   "full": 93,
+   "kept": 13,
+   "sampled": 4,
+   "share_full": 0.0322,
+   "share_subset": 0.017,
+   "subset": 17,
+   "targets": 4
+  },
+  "safedocs/pdf/de": {
+   "full": 197,
+   "kept": 23,
+   "sampled": 22,
+   "share_full": 0.0682,
+   "share_subset": 0.045,
+   "subset": 45,
+   "targets": 22
+  },
+  "wikipedia/html/de": {
+   "full": 27,
+   "kept": 8,
+   "sampled": 6,
+   "share_full": 0.0093,
+   "share_subset": 0.014,
+   "subset": 14,
+   "targets": 6
+  },
+  "wikipedia/html/en": {
+   "full": 62,
+   "kept": 18,
+   "sampled": 9,
+   "share_full": 0.0215,
+   "share_subset": 0.027,
+   "subset": 27,
+   "targets": 9
+  },
+  "wikipedia/md/de": {
+   "full": 28,
+   "kept": 6,
+   "sampled": 5,
+   "share_full": 0.0097,
+   "share_subset": 0.011,
+   "subset": 11,
+   "targets": 5
+  },
+  "wikipedia/md/en": {
+   "full": 63,
+   "kept": 18,
+   "sampled": 7,
+   "share_full": 0.0218,
+   "share_subset": 0.025,
+   "subset": 25,
+   "targets": 7
+  }
+ }
+}

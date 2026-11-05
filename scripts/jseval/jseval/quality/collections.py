@@ -86,6 +86,9 @@ class QualityConfig:
     top: int = 5
     layout: str = "opaque"
     witness_formats: tuple[str, ...] | None = None
+    # Query kinds stored without judgments until a later labelling pass (``groups.kind``).
+    # They are excluded from scoring and counted as pending; a labelled kind leaves this list.
+    pending_kinds: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if self.layout not in ("opaque", "as-is"):
@@ -127,7 +130,8 @@ class QualityConfig:
                    min_group_size=int(d.get("min_group_size", 20)),
                    most_changed=int(rep.get("most_changed", 10)), top=int(rep.get("top", 5)),
                    layout=d.get("layout", "opaque"),
-                   witness_formats=tuple(d["witness_formats"]) if "witness_formats" in d else None)
+                   witness_formats=tuple(d["witness_formats"]) if "witness_formats" in d else None,
+                   pending_kinds=tuple(d.get("pending_kinds") or ()))
 
 
 def known_aliases() -> list[str]:
@@ -540,6 +544,25 @@ def ancestor_versions(c: Collection) -> list[str]:
         out.append(prior.version)
         judgments = {q: dict(d) for q, d in judgments.items()}
     return out
+
+
+def pending_queries(c: Collection, cfg: QualityConfig) -> list[str]:
+    """Query ids whose kind the config declares pending labels (K2), sorted."""
+    return sorted(q for q, t in c.queries.items() if t.groups.get("kind") in cfg.pending_kinds)
+
+
+def scored_collection(c: Collection, cfg: QualityConfig) -> Collection:
+    """``c`` without its pending queries: the queries baseline, check and score measure.
+
+    Documents, content and metadata are unchanged, so the index key and data-folder owner
+    (document identity, K1) are the same as for the stored collection.
+    """
+    pending = set(pending_queries(c, cfg))
+    if not pending:
+        return c
+    return Collection(c.name, c.language, {q: t for q, t in c.queries.items() if q not in pending},
+                      {q: d for q, d in c.judgments.items() if q not in pending},
+                      dict(c.documents), dict(c.content), dict(c.metadata))
 
 
 def query_group(c: Collection, qid: str, by: Iterable[str]) -> str:

@@ -8,6 +8,7 @@ directory. check/baseline use the refined Search request on prepared indexes; ab
 """
 from __future__ import annotations
 
+from dataclasses import replace
 import functools
 import json
 import subprocess
@@ -43,11 +44,17 @@ def _never_crash(command):
     return run
 
 
-def _checked_collection(ctx, ref: str):
-    """Resolve a collection and run its known-answer checks; any failure stops with exit 2."""
+def _checked_collection(ctx, ref: str, *, scored: bool = True):
+    """Resolve a collection and run its known-answer checks; any failure stops with exit 2.
+
+    ``scored`` (score, compare) returns only the scored queries and refuses a collection that
+    has none; otherwise (known-answers, prepare) the whole stored collection, corpus-only too.
+    """
     try:
         c, cfg = qcoll.resolve_collection(ref)
-        ka = known_answers.check(c, cfg)
+        ka = known_answers.check(c, cfg, require_scored=scored)
+        if scored:
+            c = qcoll.scored_collection(c, cfg)
     except (qcoll.CollectionError, known_answers.KnownAnswerFailure) as e:
         _invalid(ctx, str(e))
     except Exception as e:  # ir_datasets missing files, unreadable source: never a pass
@@ -90,9 +97,10 @@ def cmd_corpus_materialize(recipe, out):
 @_never_crash
 def cmd_known_answers(ctx, collection: str) -> None:
     """Run the known-answer checks of COLLECTION (counts, constructed rankings)."""
-    c, _cfg, ka = _checked_collection(ctx, collection)
+    c, _cfg, ka = _checked_collection(ctx, collection, scored=False)
     counts = ka.counts
-    click.echo(f"PASS {c.name} known answers: {ka.checks} checks; {counts['queries']} queries, "
+    click.echo(f"PASS {c.name} known answers: {ka.checks} checks; {counts['queries']} queries"
+               + (f" ({ka.pending} pending labels, not scored)" if ka.pending else "") + ", "
                f"{counts['judgments']} judgments ({counts['positives']} positive), "
                f"{counts['documents']} documents; version {c.version[:16]}")
 
@@ -255,6 +263,26 @@ def cmd_ablate(ctx, **kwargs):
     _execute_quality(ctx, 'ablate', **kwargs)
 
 
+def _prepare_timeout_sec(ref: str, qcfg) -> float | None:
+    """The collection config's ``prepare_timeout_sec`` (background-preparation deadline), if any.
+
+    Read from the same config file ``resolve_collection`` uses (a stored collection's own
+    ``quality.config.json``, else the packaged ``config/<collection>.json``). The deadline is a
+    lifecycle setting, never an index-key input; collections without it keep ``IndexConfig``'s.
+    """
+    own = Path(ref) / 'quality.config.json'
+    path = own if (Path(ref) / 'collection.v1.json').is_file() and own.is_file() \
+        else qcoll.CONFIG_DIR / f'{qcfg.collection}.json'
+    if not path.is_file():
+        return None
+    value = json.loads(path.read_text(encoding='utf-8')).get('prepare_timeout_sec')
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0:
+        raise qcoll.CollectionError(f'{path}: prepare_timeout_sec must be a positive number of seconds')
+    return float(value)
+
+
 @quality_group.command('prepare')
 @click.argument('collection')
 @click.option('--documents-dir', type=click.Path(file_okay=False, path_type=Path))
@@ -266,8 +294,15 @@ def cmd_ablate(ctx, **kwargs):
 def cmd_prepare(ctx, collection, documents_dir, models_dir, cache_root):
     """Build/confirm an index through pausable background admission, outside scoring."""
     from ..quality.index import IndexConfig, IndexRefused, prepare_index
-    c, _cfg, _ka = _checked_collection(ctx, collection)
+    # The index depends on documents only (K1): a corpus-only collection prepares too (K2).
+    c, qcfg, _ka = _checked_collection(ctx, collection, scored=False)
     cfg = IndexConfig(documents_dir=documents_dir, models_dir=models_dir, cache_root=cache_root)
+    try:
+        timeout_sec = _prepare_timeout_sec(collection, qcfg)
+    except (qcoll.CollectionError, ValueError) as e:
+        _invalid(ctx, str(e))
+    if timeout_sec is not None:
+        cfg = replace(cfg, timeout_sec=timeout_sec)
     try:
         with prepare_index(c, cfg) as handle:
             handle.wait()

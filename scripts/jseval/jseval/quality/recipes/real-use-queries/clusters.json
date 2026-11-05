@@ -1,0 +1,8207 @@
+{
+ "clusters": [
+  {
+   "evidence": {
+    "normalized_sha256": "1871d517f00fdc1e8a6de7a0752e76539d043e4a2ec25bbd6a0a7b62db7d31f0"
+   },
+   "id": "cl-0001",
+   "kind": "content-exact",
+   "members": [
+    "ru-39c14805960dd87550c447bd",
+    "ru-b0593840df58825293fbd2e3"
+   ]
+  },
+  {
+   "evidence": {
+    "normalized_sha256": "c8eaca821bbff962acfa4d9bb0efc0b2b2cfa29e6e165e2b2f3c4f70ff406a74"
+   },
+   "id": "cl-0002",
+   "kind": "content-exact",
+   "members": [
+    "ru-0713cd3fdf42db6a84d0e792",
+    "ru-e74245b4c5e2b9f6eb3b7ebc"
+   ]
+  },
+  {
+   "evidence": {
+    "jaccard_5shingle": {
+     "ru-0333f1f3e3660ea13b339b8c ru-1addc2a8ba44561040961be1": 0.996,
+     "ru-0333f1f3e3660ea13b339b8c ru-303aa4f28eea44c92641a9a6": 0.9937,
+     "ru-1addc2a8ba44561040961be1 ru-303aa4f28eea44c92641a9a6": 0.9962
+    },
+    "max_hamming": 6
+   },
+   "id": "cl-0003",
+   "kind": "near-duplicate",
+   "members": [
+    "ru-0333f1f3e3660ea13b339b8c",
+    "ru-1addc2a8ba44561040961be1",
+    "ru-303aa4f28eea44c92641a9a6"
+   ]
+  },
+  {
+   "evidence": {
+    "jaccard_5shingle": {
+     "ru-04f62eee57037f99c255cee7 ru-89ceae15c98382ac494b54a7": 0.9692
+    },
+    "max_hamming": 6
+   },
+   "id": "cl-0004",
+   "kind": "near-duplicate",
+   "members": [
+    "ru-04f62eee57037f99c255cee7",
+    "ru-89ceae15c98382ac494b54a7"
+   ]
+  },
+  {
+   "evidence": {
+    "jaccard_5shingle": {
+     "ru-0713cd3fdf42db6a84d0e792 ru-e74245b4c5e2b9f6eb3b7ebc": 1.0
+    },
+    "max_hamming": 6
+   },
+   "id": "cl-0005",
+   "kind": "near-duplicate",
+   "members": [
+    "ru-0713cd3fdf42db6a84d0e792",
+    "ru-e74245b4c5e2b9f6eb3b7ebc"
+   ]
+  },
+  {
+   "evidence": {
+    "jaccard_5shingle": {
+     "ru-086dabc88ce29c0954407ba4 ru-31643471071a2efd399339fc": 0.8235
+    },
+    "max_hamming": 6
+   },
+   "id": "cl-0006",
+   "kind": "near-duplicate",
+   "members": [
+    "ru-086dabc88ce29c0954407ba4",
+    "ru-31643471071a2efd399339fc"
+   ]
+  },
+  {
+   "evidence": {
+    "jaccard_5shingle": {
+     "ru-19eacefe0e66795ca46a318f ru-503267ff0c22c0843f9c76f1": 0.6522
+    },
+    "max_hamming": 6
+   },
+   "id": "cl-0007",
+   "kind": "near-duplicate",
+   "members": [
+    "ru-19eacefe0e66795ca46a318f",
+    "ru-503267ff0c22c0843f9c76f1"
+   ]
+  },
+  {
+   "evidence": {
+    "jaccard_5shingle": {
+     "ru-318569c853a6129c0fe5e875 ru-8f11750e8fccebe3db43301a": 0.8644
+    },
+    "max_hamming": 6
+   },
+   "id": "cl-0008",
+   "kind": "near-duplicate",
+   "members": [
+    "ru-318569c853a6129c0fe5e875",
+    "ru-8f11750e8fccebe3db43301a"
+   ]
+  },
+  {
+   "evidence": {
+    "jaccard_5shingle": {
+     "ru-34766b71cf9af2169a6ade62 ru-99db38713c33bef49cd79786": 0.5542
+    },
+    "max_hamming": 6
+   },
+   "id": "cl-0009",
+   "kind": "near-duplicate",
+   "members": [
+    "ru-34766b71cf9af2169a6ade62",
+    "ru-99db38713c33bef49cd79786"
+   ]
+  },
+  {
+   "evidence": {
+    "jaccard_5shingle": {
+     "ru-39793f0d94b024eb5869d2de ru-ba54334538e82d8881b8d96f": 0.8481
+    },
+    "max_hamming": 6
+   },
+   "id": "cl-0010",
+   "kind": "near-duplicate",
+   "members": [
+    "ru-39793f0d94b024eb5869d2de",
+    "ru-ba54334538e82d8881b8d96f"
+   ]
+  },
+  {
+   "evidence": {
+    "jaccard_5shingle": {
+     "ru-39c14805960dd87550c447bd ru-b0593840df58825293fbd2e3": 1.0
+    },
+    "max_hamming": 6
+   },
+   "id": "cl-0011",
+   "kind": "near-duplicate",
+   "members": [
+    "ru-39c14805960dd87550c447bd",
+    "ru-b0593840df58825293fbd2e3"
+   ]
+  },
+  {
+   "evidence": {
+    "jaccard_5shingle": {
+     "ru-3ec8fca5f456943d0ad550e6 ru-afa8a56f66de68a42b60d44c": 0.9957,
+     "ru-3ec8fca5f456943d0ad550e6 ru-c8904fc94639f99bd296ce7b": 0.9966,
+     "ru-afa8a56f66de68a42b60d44c ru-c8904fc94639f99bd296ce7b": 0.9939
+    },
+    "max_hamming": 6
+   },
+   "id": "cl-0012",
+   "kind": "near-duplicate",
+   "members": [
+    "ru-3ec8fca5f456943d0ad550e6",
+    "ru-afa8a56f66de68a42b60d44c",
+    "ru-c8904fc94639f99bd296ce7b"
+   ]
+  },
+  {
+   "evidence": {
+    "jaccard_5shingle": {
+     "ru-5bbdc66cb47babf3ab1946ed ru-73824ab0ce405aa6b1af6831": 0.7371
+    },
+    "max_hamming": 6
+   },
+   "id": "cl-0013",
+   "kind": "near-duplicate",
+   "members": [
+    "ru-5bbdc66cb47babf3ab1946ed",
+    "ru-73824ab0ce405aa6b1af6831"
+   ]
+  },
+  {
+   "evidence": {
+    "jaccard_5shingle": {
+     "ru-694f66707fb409e6db438148 ru-a39f975984b8cd0109d14f55": 0.6017
+    },
+    "max_hamming": 6
+   },
+   "id": "cl-0014",
+   "kind": "near-duplicate",
+   "members": [
+    "ru-694f66707fb409e6db438148",
+    "ru-a39f975984b8cd0109d14f55"
+   ]
+  },
+  {
+   "evidence": {
+    "jaccard_5shingle": {
+     "ru-829f724cf21bf886722998d2 ru-979c6764eddb5cc095c1e99d": 0.6552
+    },
+    "max_hamming": 6
+   },
+   "id": "cl-0015",
+   "kind": "near-duplicate",
+   "members": [
+    "ru-829f724cf21bf886722998d2",
+    "ru-979c6764eddb5cc095c1e99d"
+   ]
+  },
+  {
+   "evidence": {
+    "jaccard_5shingle": {
+     "ru-8923444ba0a3b7da9a5701f3 ru-e3b0fa5bc9198d0db3a1cd61": 0.8966
+    },
+    "max_hamming": 6
+   },
+   "id": "cl-0016",
+   "kind": "near-duplicate",
+   "members": [
+    "ru-8923444ba0a3b7da9a5701f3",
+    "ru-e3b0fa5bc9198d0db3a1cd61"
+   ]
+  },
+  {
+   "evidence": {
+    "jaccard_5shingle": {
+     "ru-9010ed69e6b28edede358526 ru-b2daf5df7c841a5cfb9691fc": 0.8288,
+     "ru-9010ed69e6b28edede358526 ru-fd2de9c0bd21f7e583e433b2": 0.8233,
+     "ru-b2daf5df7c841a5cfb9691fc ru-cedf179b1275e3c0f8d79cb1": 0.8325,
+     "ru-b2daf5df7c841a5cfb9691fc ru-fd2de9c0bd21f7e583e433b2": 0.8325,
+     "ru-cedf179b1275e3c0f8d79cb1 ru-fd2de9c0bd21f7e583e433b2": 0.8288
+    },
+    "max_hamming": 6
+   },
+   "id": "cl-0017",
+   "kind": "near-duplicate",
+   "members": [
+    "ru-9010ed69e6b28edede358526",
+    "ru-b2daf5df7c841a5cfb9691fc",
+    "ru-cedf179b1275e3c0f8d79cb1",
+    "ru-fd2de9c0bd21f7e583e433b2"
+   ]
+  },
+  {
+   "evidence": {
+    "jaccard_5shingle": {
+     "ru-9172c6e8c50fd2a677cea6c9 ru-9e607a99e1461c26efa92c07": 0.9984
+    },
+    "max_hamming": 6
+   },
+   "id": "cl-0018",
+   "kind": "near-duplicate",
+   "members": [
+    "ru-9172c6e8c50fd2a677cea6c9",
+    "ru-9e607a99e1461c26efa92c07"
+   ]
+  },
+  {
+   "evidence": {
+    "jaccard_5shingle": {
+     "ru-b978b171c6d550b9871e3c16 ru-e6ed62ce0a9bb9fadc6bd095": 0.9995
+    },
+    "max_hamming": 6
+   },
+   "id": "cl-0019",
+   "kind": "near-duplicate",
+   "members": [
+    "ru-b978b171c6d550b9871e3c16",
+    "ru-e6ed62ce0a9bb9fadc6bd095"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "california update--0717.01"
+   },
+   "id": "cl-0020",
+   "kind": "enron-thread",
+   "members": [
+    "ru-1edbf7f85c8e6caa7a60cc9f",
+    "ru-771e7b82013142c093431a16"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "challenge friends to planters crunch time football!"
+   },
+   "id": "cl-0021",
+   "kind": "enron-thread",
+   "members": [
+    "ru-1b58686e93a592bfa39df86f",
+    "ru-d7675cb40d0d83c5b24e1d98"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "demand ken lay donate proceeds from enron stock sales"
+   },
+   "id": "cl-0022",
+   "kind": "enron-thread",
+   "members": [
+    "ru-318569c853a6129c0fe5e875",
+    "ru-8f11750e8fccebe3db43301a",
+    "ru-de809b30705dba00368f8264"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "gisb ratification ballot"
+   },
+   "id": "cl-0023",
+   "kind": "enron-thread",
+   "members": [
+    "ru-39c14805960dd87550c447bd",
+    "ru-b0593840df58825293fbd2e3"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "untitled message"
+   },
+   "id": "cl-0024",
+   "kind": "enron-thread",
+   "members": [
+    "ru-0dd5f0d657acbf80aed8b1d3",
+    "ru-4d371870caacffddebfae1bc",
+    "ru-6034434309da0ce026f65860",
+    "ru-8a8c114b7fbd5e2048363730",
+    "ru-a28457707922ed8532179a2b",
+    "ru-ba5a08211298474ce2918775",
+    "ru-d0380e3353976e781d5e58f6",
+    "ru-d0b41f4496c01a5fd829a160"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0001"
+   },
+   "id": "cl-0025",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-5dba7f3bcc13c1c700f81dcf",
+    "ru-8286ab73b4bf7a0cc1c29a07",
+    "ru-a187db40e8c4e89201fec91c",
+    "ru-b6133f22820676222a477a95"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0002"
+   },
+   "id": "cl-0026",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-9176af3263f1c91b45f2fcaf",
+    "ru-979c6764eddb5cc095c1e99d",
+    "ru-a7f793bd44a3d7e4c273bb36",
+    "ru-bf82e6c620263199adf209e7"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0003"
+   },
+   "id": "cl-0027",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-57539db98758aaf42f3461ab",
+    "ru-828308ed35c3588ed3fcea6c",
+    "ru-a8df84dd1fad60ff19d43165",
+    "ru-dffec99943cbb0311853fb40"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0004"
+   },
+   "id": "cl-0028",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-07b90afd74ea43394344f6d2",
+    "ru-5b90f45967d0a43080d23a3c",
+    "ru-caa3c95fd50014b1eb7771fe",
+    "ru-e0a964f11daebf90c9f00739"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0005"
+   },
+   "id": "cl-0029",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-90fa79438260a5ce33e751a6",
+    "ru-93ca892cf00ef236324a6d99",
+    "ru-c63d88df838d317563d18eb6",
+    "ru-e87ea068edb4d61d571743a1"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0006"
+   },
+   "id": "cl-0030",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-55cc0ad58c9f3dfc8c0441ca",
+    "ru-96506ddd76337c9ef54982f5"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0007"
+   },
+   "id": "cl-0031",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-06c5f28f70ada554871f52ab",
+    "ru-b71759c95212242b75e5bc02"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0008"
+   },
+   "id": "cl-0032",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-a11963c6115e9485bbf31aa6",
+    "ru-d21ef72ba5ae7eb5b54809aa"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0009"
+   },
+   "id": "cl-0033",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-32587661329bf9ac3d4754a2",
+    "ru-db9765d2af0497208bfed949"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0010"
+   },
+   "id": "cl-0034",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-66271830a9b42dc46b844b42",
+    "ru-e9f629d17bd6b3d2e562ee9d"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0011"
+   },
+   "id": "cl-0035",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-829f724cf21bf886722998d2",
+    "ru-e6722c0def8307f56f30317b"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0012"
+   },
+   "id": "cl-0036",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-4988ec388316587ce8858c6b",
+    "ru-92d66347d06075971fcac4e6"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0013"
+   },
+   "id": "cl-0037",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-14913361fb0eb1bf85008769",
+    "ru-5e33e4f8ee8453e911a086e3"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0014"
+   },
+   "id": "cl-0038",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-99db38713c33bef49cd79786",
+    "ru-f2740c438ffdf254304d8598"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0015"
+   },
+   "id": "cl-0039",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-677d7da974a87c0a4e79310c",
+    "ru-8731169720df10d03e2a2133"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0016"
+   },
+   "id": "cl-0040",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-8f85fe260a557cb36e534e33",
+    "ru-e9d01f392c9dbbf0cf53e3ab"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0017"
+   },
+   "id": "cl-0041",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-c13745bf757fb539ab90781b",
+    "ru-d0aca3a8cc830dbc6060dfa1"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0018"
+   },
+   "id": "cl-0042",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-64e34d7fb2183b0fb38f886f",
+    "ru-aa3bfa0ac6d3eff7fc1f8ff0"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0019"
+   },
+   "id": "cl-0043",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-1ce6993c464b443d268187bf",
+    "ru-51b707db03a80731b5a9becc",
+    "ru-70f74fff820b54191df4f51a",
+    "ru-c0c3dc9af6225ccff92c01ff"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0020"
+   },
+   "id": "cl-0044",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-4a321f857bbec3d559bbf04f",
+    "ru-9cf5ebabaaa64f10eba05023",
+    "ru-a50dcb329dac2ea36a764061",
+    "ru-affb3ab55d5404b184e5d4d4"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0021"
+   },
+   "id": "cl-0045",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-9293eb91ba19778896e00de7",
+    "ru-af55dc1ca458c3ecfd266765"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0022"
+   },
+   "id": "cl-0046",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-668ec8659bec07d857c0dc29",
+    "ru-a93215b3195514c2809982a5",
+    "ru-c69846cdc0437dc48946852f",
+    "ru-ebd1851d4800a1edc6caa3a9"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0023"
+   },
+   "id": "cl-0047",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-302c67a17219ee7072ca07e5",
+    "ru-34766b71cf9af2169a6ade62"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0024"
+   },
+   "id": "cl-0048",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-365573e56c80cc48f74b52eb",
+    "ru-fd2de9c0bd21f7e583e433b2"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0025"
+   },
+   "id": "cl-0049",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-3b4a4815eded5f1ae2278222",
+    "ru-9e84b7e82dacbc594d2a547b"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0026"
+   },
+   "id": "cl-0050",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-8d7a2c62576c70a4945de41d",
+    "ru-a2779edb07f7282ae17af782"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0027"
+   },
+   "id": "cl-0051",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-2674c8c38719127be0e8cb3d",
+    "ru-8561032e2f93a2d577f798b9"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0028"
+   },
+   "id": "cl-0052",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-43bb96cc5f3163593a271592",
+    "ru-70695167485cf4f0e16d8287"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0029"
+   },
+   "id": "cl-0053",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-4ddf6dfebcac23b317bbb1fc",
+    "ru-ee8f4577c0563e52d04ec05e"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0030"
+   },
+   "id": "cl-0054",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-a8a25b125c90956025920e51",
+    "ru-b2c40e0f79fc9a1356db5c0f"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0031"
+   },
+   "id": "cl-0055",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-4a66b455dcb391716e1f19c6",
+    "ru-8cec63e3b684093bf01581f9"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0032"
+   },
+   "id": "cl-0056",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-166359e1c4dc8418686d4f50",
+    "ru-a9a5b7c845e34dbe84a6b729"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0033"
+   },
+   "id": "cl-0057",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-47ecd9961e1a799920a6084e",
+    "ru-875b7f69aaa680e07aa68736"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0034"
+   },
+   "id": "cl-0058",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-4b8d32cd992ccff35ee59138",
+    "ru-5c79dee7f09853e58e889365"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0035"
+   },
+   "id": "cl-0059",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-0c193a03ac023f989dd70d5d",
+    "ru-22fc5816b6def32d7509ad3c"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0036"
+   },
+   "id": "cl-0060",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-b5b79ab5d912faa0ce858e58",
+    "ru-ed0f55d1bad52efa7c2fe64b"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0037"
+   },
+   "id": "cl-0061",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-431144dd88688f5a1b73f4da",
+    "ru-5c91fa9426c435ec881e9975"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0038"
+   },
+   "id": "cl-0062",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-cca9a72bc6c676ead0b2b474",
+    "ru-cea51b3a8a5cc00eb89dfbb9"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0039"
+   },
+   "id": "cl-0063",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-3163e5ee4b8d28adc9e51de2",
+    "ru-3ec1bc0587cdcca729dc8a38",
+    "ru-7e8a3c3d9b664810d7c0c63c",
+    "ru-87a9438ea13ae6ce7f740074",
+    "ru-a69e9a44904cb70173c734fc",
+    "ru-d7fbd0f1b906567225d67536"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0040"
+   },
+   "id": "cl-0064",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-1217905616e80a45d2582e6d",
+    "ru-1ae8cc75503230dc7e2ee8cf",
+    "ru-237de08a89d1bde446723b6a",
+    "ru-2a87cc3b01f1fc42a167f763",
+    "ru-5683103a138c03b5aa7f8c9f",
+    "ru-82e634729ab0cee454d646f0"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0041"
+   },
+   "id": "cl-0065",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-3bf5d89d96ae4aa02079b928",
+    "ru-5d703fde5abb84edde0918e6"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0042"
+   },
+   "id": "cl-0066",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-ab919638e8955b0024f8f12f",
+    "ru-da814b81f425c0ba07374051"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0043"
+   },
+   "id": "cl-0067",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-64da07dd6f9f91e4f867a56c",
+    "ru-f77bc75295d15277bc992a3a"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0044"
+   },
+   "id": "cl-0068",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-ad101fd289ea0c3e835bd2e0",
+    "ru-df8774c3719f6c7381e70160"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0045"
+   },
+   "id": "cl-0069",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-85461ec0e1928e35f5edb325",
+    "ru-89b66afe930ed4189090d1c9"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0046"
+   },
+   "id": "cl-0070",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-363b42b1d9e20e6998be4b27",
+    "ru-fb74b1762fc5c5801b5ff876"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0047"
+   },
+   "id": "cl-0071",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-7702d627699d3aa0aa72eabc",
+    "ru-89dc77c8000f1402ec144942"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0048"
+   },
+   "id": "cl-0072",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-73824ab0ce405aa6b1af6831",
+    "ru-ac0ca3eed68e466aca4f0313"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0049"
+   },
+   "id": "cl-0073",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-6b84f33c3ffaaf77bc06bd94",
+    "ru-6bda37578d3cb7809dbb662a"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0050"
+   },
+   "id": "cl-0074",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-5215928dc3d0744c94aebfd2",
+    "ru-b9a39848e23191cccd16bd0c"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0051"
+   },
+   "id": "cl-0075",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-6818eaf49ef61b93ada94b5a",
+    "ru-8a278b1a382e180d727a886f"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0052"
+   },
+   "id": "cl-0076",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-15e08b5eb40ab56124ad473f",
+    "ru-39ddc4180f2495999e6788c7"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0053"
+   },
+   "id": "cl-0077",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-29bb3b7ffb241fc127b00bc1",
+    "ru-6634f55c994fbf6649065aba"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0054"
+   },
+   "id": "cl-0078",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-38723f8839b9ab866ee62bd3",
+    "ru-57195d7c2407f44623f5705e"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0055"
+   },
+   "id": "cl-0079",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-552a017010556ac1b65e3a8f",
+    "ru-5d44b7570c4cf61f537a9cca"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0056"
+   },
+   "id": "cl-0080",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-4980f41430b9cceba7f27f6d",
+    "ru-d879e6074da253f2e96e3264"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0057"
+   },
+   "id": "cl-0081",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-626d6892a9925970b0aa740c",
+    "ru-6c2442c0a9bc5e9598a23427"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0058"
+   },
+   "id": "cl-0082",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-7af8bdfba9d2c11f2fc46c70",
+    "ru-807382a6942b915b6a7fa5f8"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0059"
+   },
+   "id": "cl-0083",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-81d91a90ab7f9c4b341643c8",
+    "ru-8b9e97815410c7cf40f3c154"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0060"
+   },
+   "id": "cl-0084",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-9a052f6c164e2719ac210a47",
+    "ru-f33c2cf6cf4bb59105122169"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0061"
+   },
+   "id": "cl-0085",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-8e04a2e3c37a0661355c7038",
+    "ru-a79f5713370daf246a358a02"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0062"
+   },
+   "id": "cl-0086",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-687ca44fcc508d8a6dadee07",
+    "ru-a75cb5f6cbecad5d8129d4ec"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0063"
+   },
+   "id": "cl-0087",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-5bbdc66cb47babf3ab1946ed",
+    "ru-65d0d3a33ca28ec1a5bb67fe"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0064"
+   },
+   "id": "cl-0088",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-094174a424357122760ab1ff",
+    "ru-096a1fd2f71acc350a9c4972"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0065"
+   },
+   "id": "cl-0089",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-782f88990c6fc2eebff86e04",
+    "ru-c76d3c4b0793312bec2ebaa0"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0066"
+   },
+   "id": "cl-0090",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-2839966daa3b0f6b0e3c951a",
+    "ru-f240cde0111d6c3eda92cf6a"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0067"
+   },
+   "id": "cl-0091",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-c4edff9dff31c8d16b14f9ac",
+    "ru-f8ecd7f504c17b9f382fdccb"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0068"
+   },
+   "id": "cl-0092",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-0333f1f3e3660ea13b339b8c",
+    "ru-1addc2a8ba44561040961be1",
+    "ru-303aa4f28eea44c92641a9a6",
+    "ru-3ec8fca5f456943d0ad550e6",
+    "ru-52cee303b20c2d6e69e2f79f",
+    "ru-5873e279d66cd05a413ac185",
+    "ru-afa8a56f66de68a42b60d44c",
+    "ru-c8904fc94639f99bd296ce7b"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0069"
+   },
+   "id": "cl-0093",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-7ca143c91e35e2d4dee9c8f7",
+    "ru-7d4ced7b9aeb27ded778719d"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0070"
+   },
+   "id": "cl-0094",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-442bcac309f659c55213a0fc",
+    "ru-d02fb721a57ec6aec9726712"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0071"
+   },
+   "id": "cl-0095",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-09a5e06cfdb8f06ec12e3750",
+    "ru-4098bfc5b78159808a233d0e"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0072"
+   },
+   "id": "cl-0096",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-5fed97b553c257bf1f83eff2",
+    "ru-74dc5fc07fd57d9faec440ff"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0073"
+   },
+   "id": "cl-0097",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-94af8bbdafe9586c067f5435",
+    "ru-d5cb95fb4e1f40b2c1a47c17"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0074"
+   },
+   "id": "cl-0098",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-aafa024974b3210d3f8e329f",
+    "ru-d22237b3b8fe93bb6a4fb263"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0075"
+   },
+   "id": "cl-0099",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-df24ab6e24521f0cb662c28a",
+    "ru-efdead9015d8acdecf466f6c"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0076"
+   },
+   "id": "cl-0100",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-245fb923511e661a4c23cf3a",
+    "ru-4f37b344b15ff3910930dd2f"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0077"
+   },
+   "id": "cl-0101",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-7e7e874c38b106bdd3fc3068",
+    "ru-854356c5e0b5168ee60709c3"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0078"
+   },
+   "id": "cl-0102",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-a2b6668858753357d8f3d279",
+    "ru-e692a97359c0966914211cc1"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0079"
+   },
+   "id": "cl-0103",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-0511bd62e27efd1845d7563c",
+    "ru-144b55b6d071d7527d822b34"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0080"
+   },
+   "id": "cl-0104",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-6a9c857e7c33fede3c5e1285",
+    "ru-cc9befd8adaf7d6a9262e2be"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0081"
+   },
+   "id": "cl-0105",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-621a6c689ec0b704b347fd52",
+    "ru-9c8c965245eec8bce94ce455"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0082"
+   },
+   "id": "cl-0106",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-467433e3e51934392400552c",
+    "ru-f297ca2b3327af459b07971e"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0083"
+   },
+   "id": "cl-0107",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-4304de73327e1823e8e676c9",
+    "ru-73a431e9237abccf432ababb"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0084"
+   },
+   "id": "cl-0108",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-051a3f1192b152a32b1c4146",
+    "ru-173ac78baaf222fa0e4b35a4"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0085"
+   },
+   "id": "cl-0109",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-11e230b2793b03760b3c12c6",
+    "ru-ab726cccae877b8b551d6ba3"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0086"
+   },
+   "id": "cl-0110",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-12b1397b0bfb36ed00077f40",
+    "ru-1a159929b7eb46e32dca6f64"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0087"
+   },
+   "id": "cl-0111",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-602d34cf45aac3b0a5d75a2f",
+    "ru-d9ccf62ed6a471d0c0b4c7c6"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0088"
+   },
+   "id": "cl-0112",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-7a55f2b77f92f3f0452b82a3",
+    "ru-a0614284b0a7334e53a38dac"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0089"
+   },
+   "id": "cl-0113",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-8fe2dd7c19870dcdb8581a49",
+    "ru-d3aa32ce3c317a5f4791101e"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0090"
+   },
+   "id": "cl-0114",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-086dabc88ce29c0954407ba4",
+    "ru-cedf179b1275e3c0f8d79cb1"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0091"
+   },
+   "id": "cl-0115",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-03ad5df56611860b05d9048c",
+    "ru-64774759d97e0a06f4614319"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0092"
+   },
+   "id": "cl-0116",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-025e32cf7947fc703e11c396",
+    "ru-9365d11731579d85fe005ae0"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0093"
+   },
+   "id": "cl-0117",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-81f22494d487bb9c1b1dbb62",
+    "ru-e02331e8bd1259c5a92429f2"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0094"
+   },
+   "id": "cl-0118",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-bf94ed131fc00174bad4c7f0",
+    "ru-fe464acecae0a62269623a69"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0095"
+   },
+   "id": "cl-0119",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-4c2cae5ed1291a482cc13b38",
+    "ru-c9e2b50887b63cbd76159fe6"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0096"
+   },
+   "id": "cl-0120",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-5e4d3bfdc9da7204afb88f52",
+    "ru-d752b7ee59df911f81da0fd5"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0097"
+   },
+   "id": "cl-0121",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-7ebf172864b11aab8410a1f7",
+    "ru-ba5b0c9e05173a48d1f21cb3"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0098"
+   },
+   "id": "cl-0122",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-1b17b20096ffd94670171c15",
+    "ru-cde41e84b76c3ea8df960970"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0099"
+   },
+   "id": "cl-0123",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-9efd150883f63ad4d0ac6c6d",
+    "ru-c2b08c4605a1b02f8dee55c0"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0100"
+   },
+   "id": "cl-0124",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-cbab3926343bcd72b7cc6f34",
+    "ru-fb0d9b266ed59d9d43554229"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0101"
+   },
+   "id": "cl-0125",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-225f880ef274314851997a16",
+    "ru-6c5dff8c533fd20b36652476"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0102"
+   },
+   "id": "cl-0126",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-63fc55a6958e1774de829c7e",
+    "ru-be62e0c2af4eb0ffafd6dc5b"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0103"
+   },
+   "id": "cl-0127",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-9758c53949233952cf88b166",
+    "ru-e5bc2db667251a02fd96b2d7"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0104"
+   },
+   "id": "cl-0128",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-adef39cb63ab93c43a57217c",
+    "ru-ba6c59ffab2cfde9ad9d84df"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0105"
+   },
+   "id": "cl-0129",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-8486f936ba26b8aa9404473f",
+    "ru-e1fb7e9ab595a2751fc20ed0"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0106"
+   },
+   "id": "cl-0130",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-47758d9bbb229812ec412034",
+    "ru-dafd70376b123c5e90ab37b9"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0107"
+   },
+   "id": "cl-0131",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-95ca263df2113f1f239c6c73",
+    "ru-c7a9e640a384e6f16eb87d45"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0108"
+   },
+   "id": "cl-0132",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-5ec5b72e2a703a87e07af665",
+    "ru-d16807375bc548049ef51fbc"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0109"
+   },
+   "id": "cl-0133",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-19bae6289f4909fb166e907e",
+    "ru-a4a3fb8b27069dec6e6c9d9d"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0110"
+   },
+   "id": "cl-0134",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-8af91648e15d9dcc729a0b97",
+    "ru-a5279d1c77ebdb31bd818800"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0111"
+   },
+   "id": "cl-0135",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-db8135bd066f1a80d32b3ee8",
+    "ru-dbdbc2e4064b820f0135bcea"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0112"
+   },
+   "id": "cl-0136",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-8d4b86a7217cb3fa25d459a9",
+    "ru-d81fdb06eb387ae78f01835e"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0113"
+   },
+   "id": "cl-0137",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-23af8464d4cb16e1ec0cd666",
+    "ru-254a6558c20b35e7fef04596"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0114"
+   },
+   "id": "cl-0138",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-59159b71bca462ff121f5190",
+    "ru-def62bfed0db54df980f315c"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0115"
+   },
+   "id": "cl-0139",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-0329c4deaa82ced4e6cb74e3",
+    "ru-8ea88d2a087677416d4d03e7"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0116"
+   },
+   "id": "cl-0140",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-245b4365070bff7d81e9b75d",
+    "ru-d14e3d1afee1c8987f384a6a"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0117"
+   },
+   "id": "cl-0141",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-573fe8cf72735bebf6e38e1e",
+    "ru-a46feed6853e39736e32c971"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0118"
+   },
+   "id": "cl-0142",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-bd3439d38477d78df4ae86b9",
+    "ru-c0449cbe01e357ab633e9f80"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0119"
+   },
+   "id": "cl-0143",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-6d164ff06c7ec0dc27e57f41",
+    "ru-e7bf75272e23fed83651d2ec"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0120"
+   },
+   "id": "cl-0144",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-ab07a20b8125a0e935659558",
+    "ru-f3e68183e87004396249c293"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0121"
+   },
+   "id": "cl-0145",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-454535ccdac4dcec86503177",
+    "ru-9c6e1b135f9eac907ec65cb4"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0122"
+   },
+   "id": "cl-0146",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-25890ee0d94bee27da51a32d",
+    "ru-d55dc5e3ea3f8b3268e4d774"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0123"
+   },
+   "id": "cl-0147",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-1744a04ae17c0caa6d07e265",
+    "ru-d7034eb58c17e476e4566025"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0124"
+   },
+   "id": "cl-0148",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-340386bef23387186b7a0fec",
+    "ru-e2cd658d06341b8d16103c9b"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0125"
+   },
+   "id": "cl-0149",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-664ede7c0981149b9b0792dc",
+    "ru-d1ef609e643ad3bed7ec508c"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0126"
+   },
+   "id": "cl-0150",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-379ed20a80e33ce00bc8dab6",
+    "ru-dfa2447eb1fff3a74f60286a"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0127"
+   },
+   "id": "cl-0151",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-28afcb337e0b46501303f267",
+    "ru-f875b257dbe566abfe9256da"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0128"
+   },
+   "id": "cl-0152",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-670d6b9483e3504c7eb15034",
+    "ru-cf4b9ccbdf01488b125b4824"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0129"
+   },
+   "id": "cl-0153",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-5ec64bf2ee4a758d5ad5e8f0",
+    "ru-97ecd257404e6910eaf59101"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0130"
+   },
+   "id": "cl-0154",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-1f9b04d08fe661e288cb0434",
+    "ru-e60f69d76e9cc1c6628bb127"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0131"
+   },
+   "id": "cl-0155",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-05f6856e87522f45163bed8b",
+    "ru-64e1537bad6d31a6ef471a88"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0132"
+   },
+   "id": "cl-0156",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-36a8f90cff3b35436c88c78f",
+    "ru-b1cf4653551514469a8bc1e4"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0133"
+   },
+   "id": "cl-0157",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-6edbcdc7758ea8b5b2ccd53d",
+    "ru-89a06bcce080a6cc32f2a117"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0134"
+   },
+   "id": "cl-0158",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-31643471071a2efd399339fc",
+    "ru-b2daf5df7c841a5cfb9691fc"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0135"
+   },
+   "id": "cl-0159",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-6ec43e8c99cb70723ef6a862",
+    "ru-c4992eebe9eb19c59d46d3a1"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0136"
+   },
+   "id": "cl-0160",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-1de52180a7b802ac35553766",
+    "ru-83e0496503c1bee8a7c59e3b"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0137"
+   },
+   "id": "cl-0161",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-3b6b2a7644c2d10d16fdc8e7",
+    "ru-497bf4ca3092736832440b94"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0138"
+   },
+   "id": "cl-0162",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-939b2ce6ed7f9e14c5fc4686",
+    "ru-b0cad35583e0cd1fa62270db"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0139"
+   },
+   "id": "cl-0163",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-659c12fb7293502888a46f6d",
+    "ru-a5ce885501efd45f8b115346"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0140"
+   },
+   "id": "cl-0164",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-205817ee516bab97b22007aa",
+    "ru-8deafc40eee172ecea0c1e15"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0141"
+   },
+   "id": "cl-0165",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-30dfee3d3d3db35eae62077c",
+    "ru-f2c7f556d731b764dd2804de"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0142"
+   },
+   "id": "cl-0166",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-5b1f95c4bd18cbc7ee6530fc",
+    "ru-fd3ff9c9e6cc5a66672f58d6"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0143"
+   },
+   "id": "cl-0167",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-3cf8f1ee3ca9480c6f6dd88d",
+    "ru-484c8961fc91f0768e107886"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0144"
+   },
+   "id": "cl-0168",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-4bc551a53639d46f1b1af450",
+    "ru-9b499cec6ff4e6d0c707220a"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0145"
+   },
+   "id": "cl-0169",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-0abf15de533a61010233e096",
+    "ru-3d0baddbba93169c2c50b012"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0146"
+   },
+   "id": "cl-0170",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-4a16ecd45f370e823a79beb4",
+    "ru-d6e148bb275138f8501a76fe"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0147"
+   },
+   "id": "cl-0171",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-cf31b0223edf7515589e0959",
+    "ru-d1b88d1c13c387544e244c4b"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0148"
+   },
+   "id": "cl-0172",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-d817d797103af660a5253f2e",
+    "ru-f078381a762c310df799f970"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0149"
+   },
+   "id": "cl-0173",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-3e76dc32976654bb55109de4",
+    "ru-50961a790cab08a9490bb180"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0150"
+   },
+   "id": "cl-0174",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-15251b5aec9a59fe6250a551",
+    "ru-f068493be749da6397c6067b"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0151"
+   },
+   "id": "cl-0175",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-a979eaff74da13bcb4c4c652",
+    "ru-ec42e68b38c4f5e8e4e941dc"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0152"
+   },
+   "id": "cl-0176",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-685219a30e23ff0338889939",
+    "ru-c0ddcf54b327d4ac48ccb25b"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0153"
+   },
+   "id": "cl-0177",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-63417cb4e90dedc113a591a4",
+    "ru-e002dd6bc2026a4e64282008"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0154"
+   },
+   "id": "cl-0178",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-8457f141680e0f54fc9984db",
+    "ru-e6146c052edb49d7ac3f3312"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0155"
+   },
+   "id": "cl-0179",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-2439c8de64baec2c1233f9bb",
+    "ru-ffec6ed0b169838f40994826"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0156"
+   },
+   "id": "cl-0180",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-028dd8f933b3d932402dd651",
+    "ru-e54e192f2a1822c3007e23d8"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0157"
+   },
+   "id": "cl-0181",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-2f618eaa1d34b5d8267b92b2",
+    "ru-cd5d2ef3400d2acedb4e6b0d"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0158"
+   },
+   "id": "cl-0182",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-82c2765f15bfdafe279d8123",
+    "ru-a7271aa48c98ce196a7cb9df"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0159"
+   },
+   "id": "cl-0183",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-19116c5a0eb9722db1922f76",
+    "ru-da63006e10d9646db93bc823"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0160"
+   },
+   "id": "cl-0184",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-2515b54fb8f155852e4d3d39",
+    "ru-dc4e0398ec1f0d17156d9adb"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0161"
+   },
+   "id": "cl-0185",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-61cd3cd4d91d74e7205b0425",
+    "ru-c022df7bf3688efb18bb1254"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0162"
+   },
+   "id": "cl-0186",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-4b740396e5abe9b06ca2c3fb",
+    "ru-9a8a567ad70e3a5c8d489e5c"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0163"
+   },
+   "id": "cl-0187",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-8647ab772659c04ddc4ac5f1",
+    "ru-cf402475dedcfb00d0ab96a8"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0164"
+   },
+   "id": "cl-0188",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-bf4b22370c5d41c699ee8e93",
+    "ru-f4ccb66d26f1644bc42d7bf4"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0165"
+   },
+   "id": "cl-0189",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-2f165e8a42e6a4d752db111f",
+    "ru-44b342dedc2baf886a3e7309"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0166"
+   },
+   "id": "cl-0190",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-369d9362390778a2efdfe3b7",
+    "ru-b5c55f350c79037e103c49d8"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0167"
+   },
+   "id": "cl-0191",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-33f7890c3b11d51c4ec21688",
+    "ru-656d91d210c0893f37a2e60d"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0168"
+   },
+   "id": "cl-0192",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-5c8708468e92069f6c8b7083",
+    "ru-ff8acaa61035c80c699af125"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0169"
+   },
+   "id": "cl-0193",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-33570c0824522f636f3284fa",
+    "ru-54a414ad22c727f6c6a80268"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0170"
+   },
+   "id": "cl-0194",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-1b0f8178dc1c0e7d1b8f316c",
+    "ru-f2eecb1d183b661a7c2306a0"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0171"
+   },
+   "id": "cl-0195",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-346e06c626179f7cb76c57d0",
+    "ru-cad62cea4b234ca0d3648253"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0172"
+   },
+   "id": "cl-0196",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-3a10045f5ac180fc992cbae5",
+    "ru-aacb69620b2422b24313d67b"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0173"
+   },
+   "id": "cl-0197",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-3bfdf962f7eabdd3fcde2795",
+    "ru-ddcf4077467b2fa9d8781e4d"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0174"
+   },
+   "id": "cl-0198",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-3c064e9e8a9f7d4ee03637f6",
+    "ru-e5b9cc10d45ed0b31de65d69"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0175"
+   },
+   "id": "cl-0199",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-2b41719063f5033070ca5dd5",
+    "ru-a325cf553adbfa582ed4a550"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0176"
+   },
+   "id": "cl-0200",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-3eae5992da0a36b42005362e",
+    "ru-5015dc4e570c60576cfd0f79"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0177"
+   },
+   "id": "cl-0201",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-2fb3feeafe44f6fafa793689",
+    "ru-b38f15c975ff19bfc208dfcd"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0178"
+   },
+   "id": "cl-0202",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-934c63ea37ed99f1de80649c",
+    "ru-94b39c4e92027ba5fdefa8c8"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0179"
+   },
+   "id": "cl-0203",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-02a9aa98d13c7784a326ce74",
+    "ru-9010ed69e6b28edede358526"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0180"
+   },
+   "id": "cl-0204",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-37f384eb73e0148f041652a3",
+    "ru-e968181dec7a51ad80bf91ee"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0181"
+   },
+   "id": "cl-0205",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-10d860193cb35bfc9aaa019f",
+    "ru-ccf787f17e79e4f255bcd6e7"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0182"
+   },
+   "id": "cl-0206",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-1b686ae80b483450f3b1d05b",
+    "ru-6b915f10e74292fbb89401e3"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0183"
+   },
+   "id": "cl-0207",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-2f10915e16afe98bc7b51889",
+    "ru-f9834917602b9ca1d46c6469"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0184"
+   },
+   "id": "cl-0208",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-21477163a67cb9b7908ad7b2",
+    "ru-699a4a8c867525f3b6b621a5"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0185"
+   },
+   "id": "cl-0209",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-257d4a8252060d43d987ba65",
+    "ru-999520fdc55cc3d3e921ac96"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0186"
+   },
+   "id": "cl-0210",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-7b98df60615649c4ed834354",
+    "ru-d654eb42c516ece42e0d4f0f"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0187"
+   },
+   "id": "cl-0211",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-96af1762d8ad28cfe2e49227",
+    "ru-a949c6900bc601a69a757241"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0188"
+   },
+   "id": "cl-0212",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-afc652b303d4e61a25a01e05",
+    "ru-ea587a8866f66089aa1f82ca"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0189"
+   },
+   "id": "cl-0213",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-356a3697684b6a28b167ae9b",
+    "ru-d1c55970bd7d5565360186b7"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0190"
+   },
+   "id": "cl-0214",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-735141d946233bf2206d3d5b",
+    "ru-867bf7bc9150c9e2a6f59100"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0191"
+   },
+   "id": "cl-0215",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-3752ea9c5efa25a4c4723296",
+    "ru-f070f870433e410f3d157d69"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0192"
+   },
+   "id": "cl-0216",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-25c68e8b1179bb713610bd6d",
+    "ru-9dda09565e9c93b06c4d8e49"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0193"
+   },
+   "id": "cl-0217",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-2685d20f5250d3e5a4d54d67",
+    "ru-270562db2ef313ee88906329"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0194"
+   },
+   "id": "cl-0218",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-cbeb56cda3dbcb69688b912c",
+    "ru-df31a6fa91b74a467c9677b2"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0195"
+   },
+   "id": "cl-0219",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-26f9f9d050dc8ed0f4b3d405",
+    "ru-2945a10a062eaf2c695e4d25"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0196"
+   },
+   "id": "cl-0220",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-7c2beb067c74f4e66fd2d431",
+    "ru-b91512eb317a163a2780c911"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0197"
+   },
+   "id": "cl-0221",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-0b56b6eeb274a1886f398693",
+    "ru-dc373f44d5f4caebae62fc65"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0198"
+   },
+   "id": "cl-0222",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-082222a31467e74d141dba21",
+    "ru-133a48c045c95a22cae6d260"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0199"
+   },
+   "id": "cl-0223",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-0f218f0fab1280a86ba1928c",
+    "ru-fcbadc92323a31f4032ede93"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "2013R0200"
+   },
+   "id": "cl-0224",
+   "kind": "eurlex-act",
+   "members": [
+    "ru-3ed33b32ecd1dadf02b474fc",
+    "ru-a4ffe9c1bda21256ccdfcafd"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "Abfallentsorgung in Hamburg # (Q II # - j # HH) - Abfallentsorgung in Hamburg # - Anlagen der Abfallentsorgung"
+   },
+   "id": "cl-0225",
+   "kind": "govdata-series",
+   "members": [
+    "ru-2b7f643e62b95d6df7094112",
+    "ru-6a93e658ee588d58d0a958cc"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "Ausfuhr des Landes Hamburg #. Quartal # (G III # - vj # # HH) - Ausfuhr des Landes Hamburg #. Quartal #"
+   },
+   "id": "cl-0226",
+   "kind": "govdata-series",
+   "members": [
+    "ru-4d021a3944156d2860f52f21",
+    "ru-a3e289bd9bc75defd4d77840",
+    "ru-a9f5485995f120fe0a315c3e",
+    "ru-df7ade0f69e6191756314d0c"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "Bevölkerung der Bezirke in Hamburg #. Quartal # (A I # - vj # # HH) - Bevölkerung der Bezirke in Hamburg #. Quartal # - Ergebnisse der Fortschr"
+   },
+   "id": "cl-0227",
+   "kind": "govdata-series",
+   "members": [
+    "ru-196537902fd652f1f9ad077f",
+    "ru-6901e3e5e044940bc046f739"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "Die Bevölkerungsentwicklung in Hamburg #. Quartal # (A I # - vj # # HH) - Die Bevölkerungsentwicklung in Hamburg #. Quartal # - Ergebnisse der"
+   },
+   "id": "cl-0228",
+   "kind": "govdata-series",
+   "members": [
+    "ru-1ade640d18949e2a2a351bb0",
+    "ru-694f66707fb409e6db438148",
+    "ru-91a1d39c58a82563a976af23",
+    "ru-93ba9ed1a113330d99ba4a0a",
+    "ru-93ea88c48470c1cb6fe79c30",
+    "ru-a3927f00061446500a501cbd",
+    "ru-a39f975984b8cd0109d14f55",
+    "ru-bcaa33a85b61fad744e06104",
+    "ru-c920aab4606d9af842aded4b",
+    "ru-ebb2666927c674479b82ed4d",
+    "ru-f1cb32de3b86adbd46b95317",
+    "ru-f3db5f1839aebbc38351fa34"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "Die Bevölkerungsentwicklung in Hamburg #. Quartal # (A I # - vj # # HH) - Die Bevölkerungsentwicklung in Hamburg #. Quartal # - Fortschreibung"
+   },
+   "id": "cl-0229",
+   "kind": "govdata-series",
+   "members": [
+    "ru-1e69203bdd906acb945ed3fa",
+    "ru-a0c418c087cccc696d624834"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "Die Produktion des Verarbeitenden Gewerbes in Hamburg # (E I # - j # HH) - Die Produktion des Verarbeitenden Gewerbes in Hamburg # - Betriebe m"
+   },
+   "id": "cl-0230",
+   "kind": "govdata-series",
+   "members": [
+    "ru-31a8b87494c6e1358ed4b2b5",
+    "ru-7b5e5022ef2a33139d1b4342",
+    "ru-a10023f20904d04da3646f8e",
+    "ru-ef4abd2d6351a4a861e8fb52"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "Ein- und Ausfuhr des Landes Hamburg # (G III # G III # - j # HH) - Ein- und Ausfuhr des Landes Hamburg # - – nach Waren –"
+   },
+   "id": "cl-0231",
+   "kind": "govdata-series",
+   "members": [
+    "ru-0a4c88a011f0725f6425d2b1",
+    "ru-cd5ae83b3272d7b9e52db448"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "Einfuhr des Landes Hamburg #. Quartal # (G III # - vj # # HH) - Einfuhr des Landes Hamburg #. Quartal #"
+   },
+   "id": "cl-0232",
+   "kind": "govdata-series",
+   "members": [
+    "ru-367390b4ef223a4a7f38a1bc",
+    "ru-65b5add3e5d723aa3108ab75"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "Einwohnerzahlen # - XLSX"
+   },
+   "id": "cl-0233",
+   "kind": "govdata-series",
+   "members": [
+    "ru-0120ede492c5211cb409a162",
+    "ru-295d6834068f759cb586e2ff",
+    "ru-296312b433c16e2ebf7c8ba3",
+    "ru-a1248c05c0b45b23d1e8a616"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "Entwicklung von Umsatz und Beschäftigung im Einzelhandel in Hamburg April # (G I # - m # # HH) - Entwicklung von Umsatz und Beschäftigung im Einze"
+   },
+   "id": "cl-0234",
+   "kind": "govdata-series",
+   "members": [
+    "ru-013cc6e289a2ea87b5626aa0",
+    "ru-0c6c56f73ab7a16a98bfbbce",
+    "ru-599fa333f1677440f6892b1b",
+    "ru-bbebda46a70af95b47bf3896",
+    "ru-dd4f81876eaead862bc36160"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "Entwicklung von Umsatz und Beschäftigung im Einzelhandel in Hamburg August # (G I # - m # # HH) - Entwicklung von Umsatz und Beschäftigung im Einz"
+   },
+   "id": "cl-0235",
+   "kind": "govdata-series",
+   "members": [
+    "ru-03def27fe0f9f64606a45b14",
+    "ru-1197a2db3da20ce4b7952db1",
+    "ru-b4701799d94861f91d245f56",
+    "ru-e5fc4c442fe0a8d5036fcdfc"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "Entwicklung von Umsatz und Beschäftigung im Einzelhandel in Hamburg Dezember # (G I # - m # # HH) - Entwicklung von Umsatz und Beschäftigung im E"
+   },
+   "id": "cl-0236",
+   "kind": "govdata-series",
+   "members": [
+    "ru-27e82bfdd21b10366e9aee4d",
+    "ru-ee5f52dd954b9f4e390ebd43"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "Entwicklung von Umsatz und Beschäftigung im Einzelhandel in Hamburg Januar # (G I # - m # # HH) - Entwicklung von Umsatz und Beschäftigung im Einz"
+   },
+   "id": "cl-0237",
+   "kind": "govdata-series",
+   "members": [
+    "ru-18db76a959909dc27b72b7fb",
+    "ru-422dc18684ddced870f5f83e",
+    "ru-7649baa72365cdfabedd2560",
+    "ru-7a9e168c0e2bc2b01e3954c7",
+    "ru-f3501d03632a043105f81a76",
+    "ru-f7471ba271a8621d0eaa65f3"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "Entwicklung von Umsatz und Beschäftigung im Einzelhandel in Hamburg Juni # (G I # - m # # HH) - Entwicklung von Umsatz und Beschäftigung im Einzel"
+   },
+   "id": "cl-0238",
+   "kind": "govdata-series",
+   "members": [
+    "ru-d0a375585d496d0b50e9038d",
+    "ru-edf9b355f707ccf7115d8b0b"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "Entwicklung von Umsatz und Beschäftigung im Einzelhandel in Hamburg Mai # (G I # - m # # HH) - Entwicklung von Umsatz und Beschäftigung im Einzelh"
+   },
+   "id": "cl-0239",
+   "kind": "govdata-series",
+   "members": [
+    "ru-39bebb8fab72f56e196e34e6",
+    "ru-6bfb8a1e2231d3c909aa3190",
+    "ru-97d5afb6d859c7ef91527cd1"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "Entwicklung von Umsatz und Beschäftigung im Einzelhandel in Hamburg März # (G I # - m # # HH) - Entwicklung von Umsatz und Beschäftigung im Einzel"
+   },
+   "id": "cl-0240",
+   "kind": "govdata-series",
+   "members": [
+    "ru-ae14df0c0a69ca1febaf2d13",
+    "ru-cf65815e7e01c68b1c04c03e",
+    "ru-ec48af929114c011ad12f49a",
+    "ru-ec822d33f8711509f09cab5e"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "Entwicklung von Umsatz und Beschäftigung im Einzelhandel in Hamburg November # (G I # - m # # HH) - Entwicklung von Umsatz und Beschäftigung im E"
+   },
+   "id": "cl-0241",
+   "kind": "govdata-series",
+   "members": [
+    "ru-40f594f1858a83363a3c74cd",
+    "ru-42152519a752d0cbae5023d7",
+    "ru-851e6bcdc2617917a8b922c7",
+    "ru-b8a69a72657b873c32cc7222"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "Entwicklung von Umsatz und Beschäftigung im Einzelhandel in Hamburg Oktober # (G I # - m # # HH) - Entwicklung von Umsatz und Beschäftigung im Ei"
+   },
+   "id": "cl-0242",
+   "kind": "govdata-series",
+   "members": [
+    "ru-9e810da3352089a8a6d72d08",
+    "ru-acdfa8cfe1330b26f623a8ea",
+    "ru-cfba5ef37f88293b4f289bb8",
+    "ru-d2ad87d58d3ebab2334fc15d"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "Entwicklung von Umsatz und Beschäftigung im Einzelhandel in Hamburg September # (G I # - m # # HH) - Entwicklung von Umsatz und Beschäftigung im E"
+   },
+   "id": "cl-0243",
+   "kind": "govdata-series",
+   "members": [
+    "ru-4c6be8adfda5ee15b88bcd3f",
+    "ru-5a1557c703e001168f480feb",
+    "ru-93aa0d1e5da73200214aa6df",
+    "ru-c1421e2980bb1054ef168eb8"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "Entwicklung von Umsatz und Beschäftigung im Großhandel in Hamburg April # (G I # - m # # HH) - Entwicklung von Umsatz und Beschäftigung im Großhan"
+   },
+   "id": "cl-0244",
+   "kind": "govdata-series",
+   "members": [
+    "ru-62834b46baaa26535e96c021",
+    "ru-abaf5e0a9dfbb5cc0b49ac8e",
+    "ru-d5231031a8af253d4c7a36ad"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "Entwicklung von Umsatz und Beschäftigung im Großhandel in Hamburg August # (G I # - m # # HH) - Entwicklung von Umsatz und Beschäftigung im Großha"
+   },
+   "id": "cl-0245",
+   "kind": "govdata-series",
+   "members": [
+    "ru-563edefa093049b4643e9d28",
+    "ru-6553d91ed43fced57c08e1ae",
+    "ru-e4c21a6d0e8b716f965bbc22",
+    "ru-e72cbcb18a626380abb1bc14"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "Entwicklung von Umsatz und Beschäftigung im Großhandel in Hamburg Dezember # (G I # - m # # HH) - Entwicklung von Umsatz und Beschäftigung im Gro"
+   },
+   "id": "cl-0246",
+   "kind": "govdata-series",
+   "members": [
+    "ru-49505830dde0d2593deed719",
+    "ru-fcaa4eff623ac20682ddccb2"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "Entwicklung von Umsatz und Beschäftigung im Großhandel in Hamburg Februar # (G I # - m # # HH) - Entwicklung von Umsatz und Beschäftigung im Großh"
+   },
+   "id": "cl-0247",
+   "kind": "govdata-series",
+   "members": [
+    "ru-059c29aabf8a8502511b175b",
+    "ru-47dcce08b1c4246e8acf8403",
+    "ru-6059b7553cea96a0dd3d3daa",
+    "ru-bc1bfb0a90b8c56eedbf9499",
+    "ru-f57c523952949ebebd42c000"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "Entwicklung von Umsatz und Beschäftigung im Großhandel in Hamburg Januar # (G I # - m # # HH) - Entwicklung von Umsatz und Beschäftigung im Großha"
+   },
+   "id": "cl-0248",
+   "kind": "govdata-series",
+   "members": [
+    "ru-87098dc87f0fe59dc5934043",
+    "ru-8b3b184f4cdc5ab3a0586404",
+    "ru-b9f504f9d960bd15716ec91d"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "Entwicklung von Umsatz und Beschäftigung im Großhandel in Hamburg Juli # (G I # - m # # HH) - Entwicklung von Umsatz und Beschäftigung im Großhand"
+   },
+   "id": "cl-0249",
+   "kind": "govdata-series",
+   "members": [
+    "ru-e2339cb54da450d45ceed651",
+    "ru-ff0c7a2026a0ee68681b452f"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "Entwicklung von Umsatz und Beschäftigung im Großhandel in Hamburg Juni # (G I # - m # # HH) - Entwicklung von Umsatz und Beschäftigung im Großhand"
+   },
+   "id": "cl-0250",
+   "kind": "govdata-series",
+   "members": [
+    "ru-5cba91bf664e2a8d588c658d",
+    "ru-f399158a953f930f9017bda5"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "Entwicklung von Umsatz und Beschäftigung im Großhandel in Hamburg Mai # (G I # - m # # HH) - Entwicklung von Umsatz und Beschäftigung im Großhande"
+   },
+   "id": "cl-0251",
+   "kind": "govdata-series",
+   "members": [
+    "ru-2d4393a2810493ff1e70b95d",
+    "ru-5de7dd1c083d7c0978277741",
+    "ru-6df526bbf6218841f08873b7",
+    "ru-f11fd5088e16b050222de5a4"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "Entwicklung von Umsatz und Beschäftigung im Großhandel in Hamburg Oktober # (G I # - m # # HH) - Entwicklung von Umsatz und Beschäftigung im Groß"
+   },
+   "id": "cl-0252",
+   "kind": "govdata-series",
+   "members": [
+    "ru-a8382cc244e477529ea0de01",
+    "ru-d14fb3020596c36e6e7db5b0"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "Entwicklung von Umsatz und Beschäftigung im Großhandel in Hamburg September # (G I # - m # # HH) - Entwicklung von Umsatz und Beschäftigung im Gro"
+   },
+   "id": "cl-0253",
+   "kind": "govdata-series",
+   "members": [
+    "ru-13f1bafecb49da85fdf8299f",
+    "ru-2d5f9eb62ed02364c1952ec9",
+    "ru-b552d5570203c802577635da",
+    "ru-c3a356d2447fe0b1d9c5d50e"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "Sozialmonitoring Integrierte Stadtteilentwicklung Bericht # - Anhang - Upload Sozialmonitoring-Bericht_#_Ergebnistabellen"
+   },
+   "id": "cl-0254",
+   "kind": "govdata-series",
+   "members": [
+    "ru-32305362845536f81533f473",
+    "ru-7a54f7538a8a6a7819b226f1",
+    "ru-e9bdf06a8cc629a88b80c50e"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "Verarbeitendes Gewerbe sowie Bergbau und Gewinnung von Steinen und Erden in Hamburg im April # (E I # - m # # HH) - Verarbeitendes Gewerbe sowie B"
+   },
+   "id": "cl-0255",
+   "kind": "govdata-series",
+   "members": [
+    "ru-060026d851446c3b82b7348e",
+    "ru-82b017d5d05f84b5393a59dd"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "Verarbeitendes Gewerbe sowie Bergbau und Gewinnung von Steinen und Erden in Hamburg im August # (E I # - m # # HH) - Verarbeitendes Gewerbe sowie"
+   },
+   "id": "cl-0256",
+   "kind": "govdata-series",
+   "members": [
+    "ru-09a8214366e01b55ad1f6607",
+    "ru-4e8b9f80dae797267a415745",
+    "ru-bd16f1797b5998c3accaf2b2"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "Verarbeitendes Gewerbe sowie Bergbau und Gewinnung von Steinen und Erden in Hamburg im Februar # (E I # - m # # HH) - Verarbeitendes Gewerbe sowie"
+   },
+   "id": "cl-0257",
+   "kind": "govdata-series",
+   "members": [
+    "ru-07cbc5d1debd925d659cb454",
+    "ru-e9a73a58ede5f561f914e6b0"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "Verarbeitendes Gewerbe sowie Bergbau und Gewinnung von Steinen und Erden in Hamburg im Juli # (E I # - m # # HH) - Verarbeitendes Gewerbe sowie Be"
+   },
+   "id": "cl-0258",
+   "kind": "govdata-series",
+   "members": [
+    "ru-5795b254087f75f25a41a4c3",
+    "ru-a3ca5e76e82d696b4785fc9b"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "Verarbeitendes Gewerbe sowie Bergbau und Gewinnung von Steinen und Erden in Hamburg im Mai # (E I # - m # # HH) - Verarbeitendes Gewerbe sowie Ber"
+   },
+   "id": "cl-0259",
+   "kind": "govdata-series",
+   "members": [
+    "ru-083c20c631bf5f0bd2ed6cc3",
+    "ru-08c43f5d75b2f0bb106d68ef",
+    "ru-ca2cfebcb4c2f4a023068589"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "Verarbeitendes Gewerbe sowie Bergbau und Gewinnung von Steinen und Erden in Hamburg im November # (E I # - m # # HH) - Verarbeitendes Gewerbe sow"
+   },
+   "id": "cl-0260",
+   "kind": "govdata-series",
+   "members": [
+    "ru-0779b93dfce5ac2c3b2268a8",
+    "ru-6a51e0c0415001ce6b8e15fd"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "18"
+   },
+   "id": "cl-0261",
+   "kind": "plenarprotokolle",
+   "members": [
+    "ru-12b0e56339b246268b3f42a9",
+    "ru-1a37723c318bb95a113f4487",
+    "ru-1f25abb1a47ffad0285ce255",
+    "ru-2068387693ca66e22c12e2c4",
+    "ru-273fffc352fa878c999ba6d3",
+    "ru-4abc916065b354f295e30489",
+    "ru-52cd4df75dc7707fea62415f",
+    "ru-5a9e69cc0161da78f12e103c",
+    "ru-6ed90af4bc7345ab44c4e41f",
+    "ru-707e6866e82ec5aa19d08728",
+    "ru-c0e8863fecd2e47c5494a53e",
+    "ru-cafa2fc63aa872e1e952708c",
+    "ru-dd41e2418b3ab844f41f5d19",
+    "ru-e5b1d389d4b5157ddfb2416f",
+    "ru-f9ecdc011d39c48d1a4eece9"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "19"
+   },
+   "id": "cl-0262",
+   "kind": "plenarprotokolle",
+   "members": [
+    "ru-0f30536e83f8955aa43083a3",
+    "ru-41ecb92d2433f2f124850c17",
+    "ru-4df8fbbfc460b31bdf913b9e",
+    "ru-5b7f09526b0c3600acabe94a",
+    "ru-798fc799e41ebf8852f60540",
+    "ru-9615b462fa5b937ffc569139",
+    "ru-9b4d7c7ed3e8b15c3372e5eb",
+    "ru-9d9e6eb9f7423b85cc160973",
+    "ru-d2cbbecb7245265715819b71",
+    "ru-dbd6030c1e6dab02fb2f63a8",
+    "ru-f14674448a8d4d49f0b7ae42",
+    "ru-f33c95faf24343fd162ee0ee"
+   ]
+  },
+  {
+   "evidence": {
+    "key": "20"
+   },
+   "id": "cl-0263",
+   "kind": "plenarprotokolle",
+   "members": [
+    "ru-01a16e5f1b2c7f2ed2840d33",
+    "ru-145204baee04f6595989b882",
+    "ru-14f2074976ee1a8eb55c07b3",
+    "ru-16925364cb9af4b72dee420a",
+    "ru-1961edaf5fb1e268aa5cac40",
+    "ru-7e861fbd53ceb635e101484f",
+    "ru-8c31a6536312241c7fff1b55",
+    "ru-b93353168640a31c8ee42ade",
+    "ru-e7864354fca787ee4d6ce8a4"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/162",
+     "18/163",
+     "18/164"
+    ]
+   },
+   "id": "cl-0264",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-3a408dad43ade8a06e8eeccd",
+    "ru-88662ce192fdc2b0d3abd79a",
+    "ru-96b09d2108c6170933f2ce7e"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/427",
+     "18/428",
+     "18/429"
+    ]
+   },
+   "id": "cl-0265",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-d90f1e52309b4c7ccea49767",
+    "ru-dabe003ddd74ed537cbc3c6d",
+    "ru-feb59894d54ec8145e63a6e2"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/832",
+     "18/833",
+     "18/834"
+    ]
+   },
+   "id": "cl-0266",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-11083af44aa5ec6d731160ed",
+    "ru-81ce89eaa243293883589941",
+    "ru-fc0e2a2b1b3531b2598eb991"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/1004",
+     "18/1005",
+     "18/1006"
+    ]
+   },
+   "id": "cl-0267",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-123ff27041fc6aed08c8fff0",
+    "ru-8d6ae01cd4c9abae836f89f4",
+    "ru-d1fa73158ad376ce75ec9ce5"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/1186",
+     "18/1187",
+     "18/1188"
+    ]
+   },
+   "id": "cl-0268",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-25db4b4bb960bc2e85f0b5e3",
+    "ru-4e951aae63fb4a7047fb6b4a",
+    "ru-964ae22be7cd6cb506411c90"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/1243",
+     "18/1244",
+     "18/1245"
+    ]
+   },
+   "id": "cl-0269",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-01beb5507094061833d95762",
+    "ru-25498940562de4b38faa95aa",
+    "ru-5359cb79b0cebf843146209d"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/1307",
+     "18/1308",
+     "18/1309"
+    ]
+   },
+   "id": "cl-0270",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-72792851f798478db2c78cde",
+    "ru-e9fff84d37c84c9138c8ad6e",
+    "ru-fb271c4db6617f2674e078ce"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/1514",
+     "18/1515",
+     "18/1516"
+    ]
+   },
+   "id": "cl-0271",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-47fd3a3a5ee4c94198a54363",
+    "ru-54a17395dd5e77559d6c5cff",
+    "ru-e669b881a15472459eeecf9b"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/1791",
+     "18/1792",
+     "18/1793"
+    ]
+   },
+   "id": "cl-0272",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-5f85e0775a55684dd52302b5",
+    "ru-c28ac5814dcb4e4f63e02834",
+    "ru-c3a057b29a25790a730941b5"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/2056",
+     "18/2057",
+     "18/2058"
+    ]
+   },
+   "id": "cl-0273",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-3d3bc21737201ea2d42a5c06",
+    "ru-9ca882c92303ef761ce4f11b",
+    "ru-a00984f5f657ebbf1bb794a8"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/2092",
+     "18/2093",
+     "18/2094"
+    ]
+   },
+   "id": "cl-0274",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-5de96abaea7e267e961f6189",
+    "ru-8f96a38935a9673f9f9dde84",
+    "ru-c78c400b604e5899601dc28c"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/2711",
+     "18/2712",
+     "18/2713"
+    ]
+   },
+   "id": "cl-0275",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-016bf92952ca5169ae0f21d1",
+    "ru-50350753f80bc35bcc436ae9",
+    "ru-dcee03039b068edd3c4f5270"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/3150",
+     "18/3151",
+     "18/3152"
+    ]
+   },
+   "id": "cl-0276",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-269e10223fbb23cc4093580f",
+    "ru-3aab345121112d30f4d453d3",
+    "ru-f9cf4b2a601d742a3b18084f"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/3258",
+     "18/3259",
+     "18/3260"
+    ]
+   },
+   "id": "cl-0277",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-11e1bb8ec2483384c26c3d3c",
+    "ru-ac1c9e31081fb84602ec9096",
+    "ru-e715364201540423a9a10170"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/3364",
+     "18/3365",
+     "18/3366"
+    ]
+   },
+   "id": "cl-0278",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-15c33bf47cb13482b4754391",
+    "ru-b6d29c9f8f3e42b1a4da4f32",
+    "ru-cc85d3a1ab18b0cdf5c9a782"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/3425",
+     "18/3426",
+     "18/3427"
+    ]
+   },
+   "id": "cl-0279",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-3d5d303f844525d938c92abf",
+    "ru-7ff936cca9ea909b670e213a",
+    "ru-dd60383ac2ad0dd4903b1aa5"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/5407",
+     "18/5408",
+     "18/5409"
+    ]
+   },
+   "id": "cl-0280",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-446a8efc2f3989f3ea621648",
+    "ru-8b560f71b0f3e4437e36a1fe",
+    "ru-dd731cf8f2638ff62e18626e"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/5987",
+     "18/5988",
+     "18/5989"
+    ]
+   },
+   "id": "cl-0281",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-3274cdc57c470b555adf21df",
+    "ru-cfb63338f955aa6bf5d32e92",
+    "ru-dcbfdf9b17a960b9084fd07e"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/6279",
+     "18/6280",
+     "18/6281"
+    ]
+   },
+   "id": "cl-0282",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-89a34261f41a2335c07b9622",
+    "ru-984f4067235c33a084bcb61d",
+    "ru-e2069f4d96caf25b0d2bd8b1"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/6739",
+     "18/6740",
+     "18/6741"
+    ]
+   },
+   "id": "cl-0283",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-227baed512d1387ce90d3b18",
+    "ru-346d167a207011bbec97bd20",
+    "ru-cc77ea0865939de498b1cdf0"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/6775",
+     "18/6776",
+     "18/6777"
+    ]
+   },
+   "id": "cl-0284",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-2014576679361f38cd1ad765",
+    "ru-79a2fd0df7af070d985a7783",
+    "ru-a2c8de50278423f609b97bdd"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/6893",
+     "18/6894",
+     "18/6895"
+    ]
+   },
+   "id": "cl-0285",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-ab94c4befae8a83b12abaaa2",
+    "ru-bdd52373524442f1b50076eb",
+    "ru-e4a6cdc102f0610fb8a5bb85"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/7140",
+     "18/7141",
+     "18/7142"
+    ]
+   },
+   "id": "cl-0286",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-a3940768b51650ab6b913009",
+    "ru-ba16c49298018e7052c7e68a",
+    "ru-f962ee259c430c8c515618d4"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/7349",
+     "18/7350",
+     "18/7351"
+    ]
+   },
+   "id": "cl-0287",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-1fb14241f017ccbfdb024b01",
+    "ru-768539730acf64a541a3da6b",
+    "ru-ba23272ef8f4a4fa7efa45d3"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/7572",
+     "18/7573",
+     "18/7574"
+    ]
+   },
+   "id": "cl-0288",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-5ec2382a6a62d1ca506b6787",
+    "ru-cb0c23d4e8a9df324de33760",
+    "ru-d87e0d4c8ba232f836179b21"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/7749",
+     "18/7750",
+     "18/7751"
+    ]
+   },
+   "id": "cl-0289",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-273d9e3ab05f3ef68598bd04",
+    "ru-369d15cfd98370a74d994fc4",
+    "ru-b20656d89876efce26e10963"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/8309",
+     "18/8310",
+     "18/8311"
+    ]
+   },
+   "id": "cl-0290",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-6400142603cafb38a93c4344",
+    "ru-91f5b9cee7ca0107478c63cd",
+    "ru-f286915605677f12a03ec8fc"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/8552",
+     "18/8553",
+     "18/8554"
+    ]
+   },
+   "id": "cl-0291",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-3b9d311a7f67587541677cef",
+    "ru-8590faa2d21c6710686aae0e",
+    "ru-fbce76dbcda97e046efad980"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/8723",
+     "18/8724",
+     "18/8725"
+    ]
+   },
+   "id": "cl-0292",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-11f134129d9adb25b089da0a",
+    "ru-1e8447f27800e40cfceaee52",
+    "ru-26620976b7b34d1251cdb1ea"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/8988",
+     "18/8989",
+     "18/8990"
+    ]
+   },
+   "id": "cl-0293",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-7c53d63b30755217e6ecb11a",
+    "ru-aa06afa063f12aa6e1f3fe36",
+    "ru-c13c34a4998350a1cf46ee07"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/9028",
+     "18/9029",
+     "18/9030"
+    ]
+   },
+   "id": "cl-0294",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-18ae6097c8cf79059d0f7b30",
+    "ru-8f4caf397e001b06bb599d9d",
+    "ru-9fbadf28e8e083f0c5866585"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/9050",
+     "18/9051",
+     "18/9052"
+    ]
+   },
+   "id": "cl-0295",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-34365f9e5f4ac4f5b6ba104d",
+    "ru-416da22e800b17f020cb9567",
+    "ru-5f08d0320b2b0b77fb40852e"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/9262",
+     "18/9263",
+     "18/9264"
+    ]
+   },
+   "id": "cl-0296",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-0bf936f2386df0505c76e2f5",
+    "ru-3511b9d1d764366da2f49150",
+    "ru-cfe94edcb4eb511eee9e5b74"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/9357",
+     "18/9358",
+     "18/9359"
+    ]
+   },
+   "id": "cl-0297",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-53822da586ffc0a84706ccd3",
+    "ru-87de29f224b89fca37eccc3a",
+    "ru-d78d7fc92cd30b78ae61768f"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/9381",
+     "18/9382",
+     "18/9383"
+    ]
+   },
+   "id": "cl-0298",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-22a9111b59223d7b81fa020e",
+    "ru-88627ba9a25c7f3d4627ef93",
+    "ru-921dc34978b62179ffb85c62"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/9394",
+     "18/9395",
+     "18/9396"
+    ]
+   },
+   "id": "cl-0299",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-647adb9568ccfaa67ea7e543",
+    "ru-824aaea19ecf95354a29c037",
+    "ru-b11890695b3bffa1030717c5"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/9806",
+     "18/9807",
+     "18/9808"
+    ]
+   },
+   "id": "cl-0300",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-663954d2af4d34e847398d2e",
+    "ru-7760d89a5b5e053021e98d69",
+    "ru-8d028e14b6855ce8cb5ad357"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/9904",
+     "18/9905",
+     "18/9906"
+    ]
+   },
+   "id": "cl-0301",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-05bacd715fd35400c5eef08a",
+    "ru-a3f6a00064431baf17dff449",
+    "ru-fc06448c7f5c51e0e84f7bb8"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/9936",
+     "18/9937",
+     "18/9938"
+    ]
+   },
+   "id": "cl-0302",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-065737f359249f5e3e6bf511",
+    "ru-6fcb426d03756292c555c03e",
+    "ru-c6571fb7dc05e7ffd1ba25bf"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/10207",
+     "18/10208",
+     "18/10209"
+    ]
+   },
+   "id": "cl-0303",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-17b55f6c91cf4567a9c04972",
+    "ru-8923444ba0a3b7da9a5701f3",
+    "ru-e3b0fa5bc9198d0db3a1cd61"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/10404",
+     "18/10405",
+     "18/10406"
+    ]
+   },
+   "id": "cl-0304",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-479619e3f1b05162419e5871",
+    "ru-7f6ba5391ce96752f19060ac",
+    "ru-fcf0f570eb099e6793178e63"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/10425",
+     "18/10426",
+     "18/10427"
+    ]
+   },
+   "id": "cl-0305",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-b488ad5f313460a50d021f68",
+    "ru-e498fc94dee3ce4f7217971f",
+    "ru-fef337b88e84e568e29a6cbc"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/10477",
+     "18/10478",
+     "18/10479"
+    ]
+   },
+   "id": "cl-0306",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-5abf65b42a160868569a8018",
+    "ru-c45aca74e4d89354b5773406",
+    "ru-f35de7b90f6c5f5b79367835"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/10591",
+     "18/10592",
+     "18/10593"
+    ]
+   },
+   "id": "cl-0307",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-58b4a75a7303d752707685af",
+    "ru-b75a5dff58e16b54e188abde",
+    "ru-f6f0d73627b14d9720b900b9"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/10601",
+     "18/10602",
+     "18/10603"
+    ]
+   },
+   "id": "cl-0308",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-3e39a8632a3f9522bc586790",
+    "ru-d756e3bd7077a906d1396ee2",
+    "ru-dfb478409058366b982c47c8"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/10745",
+     "18/10746",
+     "18/10747"
+    ]
+   },
+   "id": "cl-0309",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-4cc3ff9e75f2f1a783247113",
+    "ru-5e70b0a4800dfa8c51949dbd",
+    "ru-a0a8f486e8afad9f9964e65f"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/11101",
+     "18/11102",
+     "18/11103"
+    ]
+   },
+   "id": "cl-0310",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-49847a5683c8f5a0cd1b6297",
+    "ru-5e12896a8fcb2f57b97c422a",
+    "ru-f8d2c30eec66046bf5859748"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/11328",
+     "18/11329",
+     "18/11330"
+    ]
+   },
+   "id": "cl-0311",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-55832eb3ec5ea05c9dee3d6d",
+    "ru-6e473865da193fb317c88f5a",
+    "ru-a63e23ab743f4b4039df8530"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/11627",
+     "18/11628",
+     "18/11629"
+    ]
+   },
+   "id": "cl-0312",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-2bcc736851a9bfdbe5b42c24",
+    "ru-316ec74863e85eb64c817bcd",
+    "ru-c1c4589e2827d2b63cc43fd9"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "18/11913",
+     "18/11914",
+     "18/11915"
+    ]
+   },
+   "id": "cl-0313",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-4517e7164fd0c4dd1b8dde36",
+    "ru-617c0f9b99cb28f3abc4c083",
+    "ru-a087c0ecb8ed8416db4f667f"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/216",
+     "19/217",
+     "19/218"
+    ]
+   },
+   "id": "cl-0314",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-8a1aa135555843514704a701",
+    "ru-bd05a54b3bafb3034c92cfb4",
+    "ru-dc94d167a222ff6e794e82cb"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/855",
+     "19/856",
+     "19/857"
+    ]
+   },
+   "id": "cl-0315",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-1e5d7395ff21d55f648bc36c",
+    "ru-41ea571772a704fd151d91fd",
+    "ru-acdb92dc43ded2cf73248eb6"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/2962",
+     "19/2963",
+     "19/2964"
+    ]
+   },
+   "id": "cl-0316",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-0ae0c875bb0e6b6539143199",
+    "ru-1aef7c93e7a6045ddf9801d7",
+    "ru-d4aa5fd663331c56f1acc399"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/3345",
+     "19/3346",
+     "19/3347"
+    ]
+   },
+   "id": "cl-0317",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-4eab4c7a029f0896b50108e5",
+    "ru-5e301d5b81a00453528d21a4",
+    "ru-ecbf91bc96cefab8eef29fed"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/4010",
+     "19/4011",
+     "19/4012"
+    ]
+   },
+   "id": "cl-0318",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-34f294ebfa093d2b38a9399d",
+    "ru-646f23281245f0f45ade888a",
+    "ru-e206f8aae5cb86dded6c100e"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/4597",
+     "19/4598",
+     "19/4599"
+    ]
+   },
+   "id": "cl-0319",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-2d71efc1c1016da0d7ea54e5",
+    "ru-405a5f0fe38239d4fd021342",
+    "ru-cbe8005ee825f573a571c5d5"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/5284",
+     "19/5285",
+     "19/5286"
+    ]
+   },
+   "id": "cl-0320",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-09e2ca9b3b654115fdb45ab0",
+    "ru-4c2ab94500a5a43f62d7e9b7",
+    "ru-ae436e892bb0428100acd868"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/5432",
+     "19/5433",
+     "19/5434"
+    ]
+   },
+   "id": "cl-0321",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-872ea020a09d8d85a3e3cc5f",
+    "ru-e47a7548441ad15c30668830",
+    "ru-f0edf6a915b78c0f1fa6aef0"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/7420",
+     "19/7421",
+     "19/7422"
+    ]
+   },
+   "id": "cl-0322",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-67bd7f5d19707d9af9cbf990",
+    "ru-71e35dac1dd1ddaf1b241ea4",
+    "ru-fda6089aca25011d2a91270e"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/7622",
+     "19/7623",
+     "19/7624"
+    ]
+   },
+   "id": "cl-0323",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-2da694254145eaae432c59f9",
+    "ru-60195f7156fce6420690b5ab",
+    "ru-a9be0bb77e0398178fc9c833"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/8782",
+     "19/8783",
+     "19/8784"
+    ]
+   },
+   "id": "cl-0324",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-15fe5d31b5f8edf9400587bc",
+    "ru-74c0d3374061cb6275972c7a",
+    "ru-8ed871d65b559dbe9999f154"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/8878",
+     "19/8879",
+     "19/8880"
+    ]
+   },
+   "id": "cl-0325",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-16266ca2ffab36dba59a1f13",
+    "ru-1d19c3950497e951af3e5961",
+    "ru-d3fe0e0db564772f7046f068"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/8993",
+     "19/8994",
+     "19/8995"
+    ]
+   },
+   "id": "cl-0326",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-372d1008a0f014d01dda7c5d",
+    "ru-d9d81352c070e6da7be4f42e",
+    "ru-f2f952b897c735552f5f23cb"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/9038",
+     "19/9039",
+     "19/9040"
+    ]
+   },
+   "id": "cl-0327",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-024d9a4b99570476da10e8b5",
+    "ru-5c5a8cd94df89dbaeaf36fee",
+    "ru-ae5f8e381cfc9274bc7a1e39"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/9485",
+     "19/9486",
+     "19/9487"
+    ]
+   },
+   "id": "cl-0328",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-23b11dee6580cb974ca3f640",
+    "ru-2dc7451e720ec416c084d490",
+    "ru-f60007326b72b397076c30c7"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/9729",
+     "19/9730",
+     "19/9731"
+    ]
+   },
+   "id": "cl-0329",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-1615c968864388c04dd0cdcd",
+    "ru-35371015616007aa0565d590",
+    "ru-a60d0f245d78dba9169eacfd"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/10659",
+     "19/10660",
+     "19/10661"
+    ]
+   },
+   "id": "cl-0330",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-2e92aadd0fb79858e8ea58ea",
+    "ru-3dc9801563ba0de7b73d3434",
+    "ru-4cdf9d2d16156e866de6e850"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/11334",
+     "19/11335",
+     "19/11336"
+    ]
+   },
+   "id": "cl-0331",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-07a1fecc46a68ffacefc34c5",
+    "ru-2471cfe69648f4545f32f048",
+    "ru-3c6ca988eddaf995c9fd6abc"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/11508",
+     "19/11509",
+     "19/11510"
+    ]
+   },
+   "id": "cl-0332",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-0608c69b36f6265e5b3c5cd3",
+    "ru-172515c6e25897b69e246144",
+    "ru-c06e23cb7892992a24f542e4"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/13365",
+     "19/13366",
+     "19/13367"
+    ]
+   },
+   "id": "cl-0333",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-11f5a822509176056b8356e9",
+    "ru-7cda4f7c02ef76814fe483d8",
+    "ru-93a4ab8c4b53d4402496ad87"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/13827",
+     "19/13828",
+     "19/13829"
+    ]
+   },
+   "id": "cl-0334",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-1b9745798bf541088515b0de",
+    "ru-283b7e186a94e8252dfe35e6",
+    "ru-bdd396392800c0660ebc862a"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/14351",
+     "19/14352",
+     "19/14353"
+    ]
+   },
+   "id": "cl-0335",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-5819427b8ced9f17fe528e43",
+    "ru-8c399ca071182fc891951f19",
+    "ru-bff127d9974880a6d665ede1"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/14397",
+     "19/14398",
+     "19/14399"
+    ]
+   },
+   "id": "cl-0336",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-7156968c32bb945c97b5b151",
+    "ru-ab4ec981ffaa6f4632362bbd",
+    "ru-b8b8672d2d6e75c3fa1e4ae4"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/14579",
+     "19/14580",
+     "19/14581"
+    ]
+   },
+   "id": "cl-0337",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-763946e70af04130bc0654b9",
+    "ru-944b31c79cb60b1d2dd91b18",
+    "ru-c550c73a00fdb96fbae683a6"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/15787",
+     "19/15788",
+     "19/15789"
+    ]
+   },
+   "id": "cl-0338",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-43bde7e9d4fbb5d17fa1d53c",
+    "ru-4f29e01fce19e9182531e59b",
+    "ru-b8f9359fa1cd1e04099f9aae"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/16225",
+     "19/16226",
+     "19/16227"
+    ]
+   },
+   "id": "cl-0339",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-46f6c8b757447af16ba2cb3a",
+    "ru-681c02c73714f5771d70b375",
+    "ru-911256c2d7b6b8ea44eeac83"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/16560",
+     "19/16561",
+     "19/16562"
+    ]
+   },
+   "id": "cl-0340",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-70200302fb91c283ba408e5e",
+    "ru-9f5d108ee06e154d6b1bed5f",
+    "ru-b034ddd9ed25b396ab074a16"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/17195",
+     "19/17196",
+     "19/17197"
+    ]
+   },
+   "id": "cl-0341",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-134117273abeed3b76d87fe5",
+    "ru-b8ab31faa651d691b3d6b4e9",
+    "ru-d0c9d69d95dc25e0a179cf99"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/17399",
+     "19/17400",
+     "19/17401"
+    ]
+   },
+   "id": "cl-0342",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-2569fe569fc8309677f1a16d",
+    "ru-a79e206aa7efdf701bcf0cb2",
+    "ru-c09315f7f15ec477ffaaaec5"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/17555",
+     "19/17556",
+     "19/17557"
+    ]
+   },
+   "id": "cl-0343",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-c12de04d88b29fddeeea44e5",
+    "ru-ef543a743ade6c29e1da2a69",
+    "ru-f266acd5f8a2128ea6fc41ba"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/18562",
+     "19/18563",
+     "19/18564"
+    ]
+   },
+   "id": "cl-0344",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-3bac81fa6f743df7fdf9ddbc",
+    "ru-cf732090cd66cd9b03ebdf46",
+    "ru-ec5ff5e47b340a64a813b710"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/18747",
+     "19/18748",
+     "19/18749"
+    ]
+   },
+   "id": "cl-0345",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-3b67166f4d0520566455dcef",
+    "ru-eff3a148955afd59de1a2822",
+    "ru-f0ed0b7d5bf12027f3579533"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/19641",
+     "19/19642",
+     "19/19643"
+    ]
+   },
+   "id": "cl-0346",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-719decd82850355f11693ab7",
+    "ru-9afa0c90ded2e07c6daa9682",
+    "ru-aea53aa440f1b3e45df73a49"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/20928",
+     "19/20929",
+     "19/20930"
+    ]
+   },
+   "id": "cl-0347",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-6a2cccd732162c3b3d9337bb",
+    "ru-bc5086ea94f96772e63c902b",
+    "ru-f8ab11e66bca8f4f933fb92a"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/21222",
+     "19/21223",
+     "19/21224"
+    ]
+   },
+   "id": "cl-0348",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-3fc2c74802125356038b4ea6",
+    "ru-ab72c14c0b02aa5b52a13fbe",
+    "ru-c0e80d408f7438393b985205"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/21831",
+     "19/21832",
+     "19/21833"
+    ]
+   },
+   "id": "cl-0349",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-2f1a5f6537cf9eda4913a16a",
+    "ru-72a26a0023c8ac947c3240c1",
+    "ru-cc4035f408ad5d0ec93fb80f"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/22155",
+     "19/22156",
+     "19/22157"
+    ]
+   },
+   "id": "cl-0350",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-0602b124ec1be325406e411a",
+    "ru-40a74f3d96b5901a0da61367",
+    "ru-678cd3b61f29732ce8652f50"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/22317",
+     "19/22318",
+     "19/22319"
+    ]
+   },
+   "id": "cl-0351",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-a7b7d74be2ad89faab3df522",
+    "ru-b3507c69ce4e01cc048da55b",
+    "ru-b3a05a23f9033bcfa32213e2"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/23276",
+     "19/23277",
+     "19/23278"
+    ]
+   },
+   "id": "cl-0352",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-667fdef3f917754eb0c7bcad",
+    "ru-e304b1e4d2edd2e876628915",
+    "ru-f18bb449446465a27f25da8d"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/23539",
+     "19/23540",
+     "19/23541"
+    ]
+   },
+   "id": "cl-0353",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-3a4749679dc8dc71f0b9e8bc",
+    "ru-53e813fac4f2fd1f1718326a",
+    "ru-e34864b9aa31e8116a306aa6"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/23767",
+     "19/23768",
+     "19/23769"
+    ]
+   },
+   "id": "cl-0354",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-3659442c614225c3f7fc36c5",
+    "ru-423ec85db099cf2ac5f075b9",
+    "ru-fe858513109f9952976118ff"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/25981",
+     "19/25982",
+     "19/25983"
+    ]
+   },
+   "id": "cl-0355",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-3ae01f4abc94a7d0ce55d97f",
+    "ru-60598d8dcc2203927ee664cb",
+    "ru-69de880ff6ee3c6789b18599"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/26063",
+     "19/26064",
+     "19/26065"
+    ]
+   },
+   "id": "cl-0356",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-324457059dbff131d845ddbd",
+    "ru-a6e9b202827997608db7fc4d",
+    "ru-c8bdd80f153f5a0766193ce5"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/26996",
+     "19/26997",
+     "19/26998"
+    ]
+   },
+   "id": "cl-0357",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-bfe90ebdd9839f9672f2a621",
+    "ru-d8c0ca6bcf5a4397485d2ab5",
+    "ru-e9949e2fb4c68ecc00c820e0"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/27377",
+     "19/27378",
+     "19/27379"
+    ]
+   },
+   "id": "cl-0358",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-045d836e6e829ed9f7db250b",
+    "ru-26f1072e28b3e30417a2025c",
+    "ru-f88dc9c9afd3286fed199027"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/29099",
+     "19/29100",
+     "19/29101"
+    ]
+   },
+   "id": "cl-0359",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-0ff10c34c172415dec77c07a",
+    "ru-39793f0d94b024eb5869d2de",
+    "ru-ba54334538e82d8881b8d96f"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/29158",
+     "19/29159",
+     "19/29160"
+    ]
+   },
+   "id": "cl-0360",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-80b8ecfcecc4e9021294db81",
+    "ru-b9c0177d32d4c723dd08187e",
+    "ru-d9513fef5bdd7996255a246b"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/29711",
+     "19/29712",
+     "19/29713"
+    ]
+   },
+   "id": "cl-0361",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-47ef32bb310f0fe440850124",
+    "ru-9e503b9740bf147def26e3bb",
+    "ru-d1dffc7d72dc5710ffd248d6"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "19/29736",
+     "19/29737",
+     "19/29738"
+    ]
+   },
+   "id": "cl-0362",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-71dccb1c99ee8b8269895f96",
+    "ru-81302a81ea3de1648ef03053",
+    "ru-e905e338c38c7434d5d18549"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "20/1",
+     "20/2"
+    ]
+   },
+   "id": "cl-0363",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-6f697a43f75cc9040eaeafa1",
+    "ru-f226e8580d2dd22f0f0a5bf8"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "20/856",
+     "20/857",
+     "20/858"
+    ]
+   },
+   "id": "cl-0364",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-b03dae3d4c6dc6ff909bc2cb",
+    "ru-c4badf14980e2d4e8bcba3f0",
+    "ru-edbb1f97fec067a5be999f12"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "20/1133",
+     "20/1134",
+     "20/1135"
+    ]
+   },
+   "id": "cl-0365",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-3c18b38d2fcf51da25016751",
+    "ru-bee39dbe8ddcb9d74f4730ef",
+    "ru-e38163016572de86cee8cc64"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "20/1605",
+     "20/1606",
+     "20/1607"
+    ]
+   },
+   "id": "cl-0366",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-09d443b8e1ca621c7e023e5b",
+    "ru-280eaab5eba4e56c25772f5e",
+    "ru-ade90c33e32a8082da5f7f3e"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "20/1631",
+     "20/1632",
+     "20/1633"
+    ]
+   },
+   "id": "cl-0367",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-71c20b145610171b57b9a127",
+    "ru-9e96dd0144661f37b45f204f",
+    "ru-d43d9323edb6c24bd2d3cfb0"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "20/1797",
+     "20/1798",
+     "20/1799"
+    ]
+   },
+   "id": "cl-0368",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-3a45b6370a1ff4525c66bfe0",
+    "ru-5edf4bdff0f3413993920e25",
+    "ru-69109c2b4d6bb6dca0644d57"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "20/2236",
+     "20/2237",
+     "20/2238"
+    ]
+   },
+   "id": "cl-0369",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-668fd034de0eb9b19f1d545c",
+    "ru-a0e31daafc9f9c44d29ba3e3",
+    "ru-cdfbbda60fba15fe09a1ac70"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "20/2378",
+     "20/2379",
+     "20/2380"
+    ]
+   },
+   "id": "cl-0370",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-6bf646bdbce527588bb4b585",
+    "ru-7ec70d586860157c65bdf06a",
+    "ru-f8c19c1005a134c1170f6fbb"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "20/2727",
+     "20/2728",
+     "20/2729"
+    ]
+   },
+   "id": "cl-0371",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-510b6d3b9da1c17f2d831d4b",
+    "ru-59682be426ed189834e58d4a",
+    "ru-9af4b989ec14c7d0de12bee7"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "20/3085",
+     "20/3086",
+     "20/3087"
+    ]
+   },
+   "id": "cl-0372",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-44261ab65988df85214e71fd",
+    "ru-7931882ced72b2144c29028d",
+    "ru-b4b715396b46aebf4744daa6"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "20/3142",
+     "20/3143",
+     "20/3144"
+    ]
+   },
+   "id": "cl-0373",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-648df7dc1380af871668f31d",
+    "ru-f3852a109b24fce039d2c81c",
+    "ru-f96121b540b061f5d75a9fe5"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "20/3765",
+     "20/3766"
+    ]
+   },
+   "id": "cl-0374",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-c87f0c9a6cee3a491d8aa863",
+    "ru-ed6061779b46ca3ba7b53cfa"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "20/4303",
+     "20/4304",
+     "20/4305"
+    ]
+   },
+   "id": "cl-0375",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-350c69d93e62a67e954b11a8",
+    "ru-42f1010da5766abd92e7de92",
+    "ru-f7f3b24abdd014a8c9ef298b"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "20/4397",
+     "20/4398",
+     "20/4399"
+    ]
+   },
+   "id": "cl-0376",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-09d32823d5407f1458836e8c",
+    "ru-0a2fd5546f7cbf6d1835773b",
+    "ru-eedccc09e62720a5953631d7"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "20/4772",
+     "20/4773",
+     "20/4774"
+    ]
+   },
+   "id": "cl-0377",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-2de2c0b93f6062edf9803809",
+    "ru-4a999640583b45afaad72779",
+    "ru-747ebf160441315529181476"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "20/4927",
+     "20/4928",
+     "20/4929"
+    ]
+   },
+   "id": "cl-0378",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-1a43638f2a3edd22fd601463",
+    "ru-243f43ad5bc1be4cd2f3aec4",
+    "ru-da36c533c8393421ac150081"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "20/5025",
+     "20/5026",
+     "20/5027"
+    ]
+   },
+   "id": "cl-0379",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-cfd44d8ec50f418f5798e4c8",
+    "ru-d14c0ae1c8220f2623722abf",
+    "ru-d9fc215fc70c12535f9b92cd"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "20/5540",
+     "20/5541",
+     "20/5542"
+    ]
+   },
+   "id": "cl-0380",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-44f78d3397bfef9b586e462d",
+    "ru-922a07d747e20ce02720537c",
+    "ru-b8c40225d4269cd37eaab56f"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "20/5582",
+     "20/5583",
+     "20/5584"
+    ]
+   },
+   "id": "cl-0381",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-32833302170827144ea4ce86",
+    "ru-49f9b28a2ddd696dc70b12b7",
+    "ru-e1036b552586db2619bc4e69"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "20/5821",
+     "20/5822",
+     "20/5823"
+    ]
+   },
+   "id": "cl-0382",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-33e005ccb96dd579a95e31c0",
+    "ru-830b85c0dd78f9cde488cfcb",
+    "ru-cefbb721dccca563d01791c2"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "20/6195",
+     "20/6196",
+     "20/6197"
+    ]
+   },
+   "id": "cl-0383",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-15ad455ea49aeb4945f1ee33",
+    "ru-413473d92e0f8fd699003f73",
+    "ru-fe659057f329f307fb811f4e"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "20/6353",
+     "20/6354",
+     "20/6355"
+    ]
+   },
+   "id": "cl-0384",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-498871580f3e08e1da187250",
+    "ru-4c77c9c05223e33a745dacf6",
+    "ru-e5d0e8921cfcb7689bcb889c"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "20/6897",
+     "20/6898",
+     "20/6899"
+    ]
+   },
+   "id": "cl-0385",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-38dce31387e4f3520408ff1a",
+    "ru-69b7cb6c65a3a82f857966c0",
+    "ru-bec41fd62f321d31f1380cf5"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "20/7190",
+     "20/7191",
+     "20/7192"
+    ]
+   },
+   "id": "cl-0386",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-2ca80b0cf92e8bbe7a49cbc9",
+    "ru-57084ecb54ec8a703589eaf2",
+    "ru-ffa98c5e2ba7043a60ebcc51"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "20/7201",
+     "20/7202",
+     "20/7203"
+    ]
+   },
+   "id": "cl-0387",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-2e48b56885a0b14319db4729",
+    "ru-aa769a23d6574126cb07fd3c",
+    "ru-e63e7f5d5af68c7ef7a434e9"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "20/7281",
+     "20/7282",
+     "20/7283"
+    ]
+   },
+   "id": "cl-0388",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-2db87d6ee6868f6b2f47bb9f",
+    "ru-4963bef59d3c54932d4414cb",
+    "ru-82cc22dde014faff0e13af8f"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "20/7335",
+     "20/7336",
+     "20/7337"
+    ]
+   },
+   "id": "cl-0389",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-51aeb611a1bf75efda035bc0",
+    "ru-b8749061666b3583d2fa7ba9",
+    "ru-bf2bda4a113ddba8920f5bc4"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "20/7611",
+     "20/7612",
+     "20/7613"
+    ]
+   },
+   "id": "cl-0390",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-aa92f5d674a36e72edea71a4",
+    "ru-bc5959a37ed038cc99e78a29",
+    "ru-bd90b721bbc66a6981908fb3"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "20/7805",
+     "20/7806",
+     "20/7807"
+    ]
+   },
+   "id": "cl-0391",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-6642fcdc6525b67f2d302947",
+    "ru-6c4e7375d9eb3622843ae3bf",
+    "ru-d6aeeffa9e1dc797854444f5"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "20/8037",
+     "20/8038",
+     "20/8039"
+    ]
+   },
+   "id": "cl-0392",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-1a81d90d11d08e43303aafa4",
+    "ru-3abdf1c52cdf2176200657f4",
+    "ru-85c110469a544322c66196b8"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "20/8248",
+     "20/8249",
+     "20/8250"
+    ]
+   },
+   "id": "cl-0393",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-5dc43f3fc39878f6805d496a",
+    "ru-65004ff365ba7ab0c09835d1",
+    "ru-79d3e6c5936bc5db0e376ecf"
+   ]
+  },
+  {
+   "evidence": {
+    "numbers": [
+     "20/8256",
+     "20/8257",
+     "20/8258"
+    ]
+   },
+   "id": "cl-0394",
+   "kind": "drucksachen-run",
+   "members": [
+    "ru-5305cc9708153ffd78b9ca7d",
+    "ru-58aaf282d387d3f18d29c650",
+    "ru-69c820e3a6b0460e46d50cf1"
+   ]
+  }
+ ],
+ "summary": {
+  "clusters": {
+   "content-exact": 2,
+   "drucksachen-run": 131,
+   "enron-thread": 5,
+   "eurlex-act": 200,
+   "govdata-series": 36,
+   "near-duplicate": 17,
+   "plenarprotokolle": 3
+  },
+  "documents": 2916,
+  "documents_in_clusters": 1004,
+  "documents_in_near_duplicate_clusters": 38,
+  "parameters": {
+   "jaccard": 0.5,
+   "max_hamming": 6,
+   "shingle_width": 5,
+   "simhash_token_cap": 20000,
+   "topic_cosine": 0.3,
+   "topic_tokens": 3000
+  },
+  "topic_groups": 147
+ },
+ "topics": [
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-18db76a959909dc27b72b7fb": 0.9927,
+     "ru-599fa333f1677440f6892b1b": 0.9756,
+     "ru-7a9e168c0e2bc2b01e3954c7": 0.985,
+     "ru-97d5afb6d859c7ef91527cd1": 0.9762,
+     "ru-ec822d33f8711509f09cab5e": 0.9782
+    },
+    "language": "de",
+    "seed": "ru-0069bf98035cb04504d3c13d"
+   },
+   "id": "tg-0001",
+   "kind": "topic",
+   "members": [
+    "ru-0069bf98035cb04504d3c13d",
+    "ru-18db76a959909dc27b72b7fb",
+    "ru-599fa333f1677440f6892b1b",
+    "ru-7a9e168c0e2bc2b01e3954c7",
+    "ru-97d5afb6d859c7ef91527cd1",
+    "ru-ec822d33f8711509f09cab5e"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-7649baa72365cdfabedd2560": 0.9902,
+     "ru-bbebda46a70af95b47bf3896": 0.9943,
+     "ru-eb42cacf8fb91c8ed5b6ee67": 0.9944,
+     "ru-ec48af929114c011ad12f49a": 0.9928,
+     "ru-edf9b355f707ccf7115d8b0b": 0.9919
+    },
+    "language": "de",
+    "seed": "ru-013cc6e289a2ea87b5626aa0"
+   },
+   "id": "tg-0002",
+   "kind": "topic",
+   "members": [
+    "ru-013cc6e289a2ea87b5626aa0",
+    "ru-7649baa72365cdfabedd2560",
+    "ru-bbebda46a70af95b47bf3896",
+    "ru-eb42cacf8fb91c8ed5b6ee67",
+    "ru-ec48af929114c011ad12f49a",
+    "ru-edf9b355f707ccf7115d8b0b"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-4c6be8adfda5ee15b88bcd3f": 0.9853,
+     "ru-6bfb8a1e2231d3c909aa3190": 0.9951,
+     "ru-93aa0d1e5da73200214aa6df": 0.9863,
+     "ru-dd4f81876eaead862bc36160": 0.99,
+     "ru-e5fc4c442fe0a8d5036fcdfc": 0.996
+    },
+    "language": "de",
+    "seed": "ru-03def27fe0f9f64606a45b14"
+   },
+   "id": "tg-0003",
+   "kind": "topic",
+   "members": [
+    "ru-03def27fe0f9f64606a45b14",
+    "ru-4c6be8adfda5ee15b88bcd3f",
+    "ru-6bfb8a1e2231d3c909aa3190",
+    "ru-93aa0d1e5da73200214aa6df",
+    "ru-dd4f81876eaead862bc36160",
+    "ru-e5fc4c442fe0a8d5036fcdfc"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-39bebb8fab72f56e196e34e6": 0.9929,
+     "ru-ae14df0c0a69ca1febaf2d13": 0.9936,
+     "ru-cf65815e7e01c68b1c04c03e": 0.9967,
+     "ru-d0a375585d496d0b50e9038d": 0.9952,
+     "ru-f7471ba271a8621d0eaa65f3": 0.993
+    },
+    "language": "de",
+    "seed": "ru-0c6c56f73ab7a16a98bfbbce"
+   },
+   "id": "tg-0004",
+   "kind": "topic",
+   "members": [
+    "ru-0c6c56f73ab7a16a98bfbbce",
+    "ru-39bebb8fab72f56e196e34e6",
+    "ru-ae14df0c0a69ca1febaf2d13",
+    "ru-cf65815e7e01c68b1c04c03e",
+    "ru-d0a375585d496d0b50e9038d",
+    "ru-f7471ba271a8621d0eaa65f3"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-9e810da3352089a8a6d72d08": 0.9765,
+     "ru-acdfa8cfe1330b26f623a8ea": 0.9874,
+     "ru-b4701799d94861f91d245f56": 0.9944,
+     "ru-c1421e2980bb1054ef168eb8": 0.9831,
+     "ru-ee5f52dd954b9f4e390ebd43": 0.9779
+    },
+    "language": "de",
+    "seed": "ru-1197a2db3da20ce4b7952db1"
+   },
+   "id": "tg-0005",
+   "kind": "topic",
+   "members": [
+    "ru-1197a2db3da20ce4b7952db1",
+    "ru-9e810da3352089a8a6d72d08",
+    "ru-acdfa8cfe1330b26f623a8ea",
+    "ru-b4701799d94861f91d245f56",
+    "ru-c1421e2980bb1054ef168eb8",
+    "ru-ee5f52dd954b9f4e390ebd43"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-40f594f1858a83363a3c74cd": 0.9542,
+     "ru-42152519a752d0cbae5023d7": 0.9509,
+     "ru-851e6bcdc2617917a8b922c7": 0.9541,
+     "ru-b8a69a72657b873c32cc7222": 0.9705,
+     "ru-cfba5ef37f88293b4f289bb8": 0.9508
+    },
+    "language": "de",
+    "seed": "ru-27e82bfdd21b10366e9aee4d"
+   },
+   "id": "tg-0006",
+   "kind": "topic",
+   "members": [
+    "ru-27e82bfdd21b10366e9aee4d",
+    "ru-40f594f1858a83363a3c74cd",
+    "ru-42152519a752d0cbae5023d7",
+    "ru-851e6bcdc2617917a8b922c7",
+    "ru-b8a69a72657b873c32cc7222",
+    "ru-cfba5ef37f88293b4f289bb8"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-49505830dde0d2593deed719": 0.5076,
+     "ru-5a1557c703e001168f480feb": 0.9563,
+     "ru-87098dc87f0fe59dc5934043": 0.4987,
+     "ru-d2ad87d58d3ebab2334fc15d": 0.9595,
+     "ru-f3501d03632a043105f81a76": 0.9966
+    },
+    "language": "de",
+    "seed": "ru-422dc18684ddced870f5f83e"
+   },
+   "id": "tg-0007",
+   "kind": "topic",
+   "members": [
+    "ru-422dc18684ddced870f5f83e",
+    "ru-49505830dde0d2593deed719",
+    "ru-5a1557c703e001168f480feb",
+    "ru-87098dc87f0fe59dc5934043",
+    "ru-d2ad87d58d3ebab2334fc15d",
+    "ru-f3501d03632a043105f81a76"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-2d4393a2810493ff1e70b95d": 0.9888,
+     "ru-5de7dd1c083d7c0978277741": 0.9914,
+     "ru-bc1bfb0a90b8c56eedbf9499": 0.9942,
+     "ru-e4c21a6d0e8b716f965bbc22": 0.9843,
+     "ru-ff0c7a2026a0ee68681b452f": 0.989
+    },
+    "language": "de",
+    "seed": "ru-059c29aabf8a8502511b175b"
+   },
+   "id": "tg-0008",
+   "kind": "topic",
+   "members": [
+    "ru-059c29aabf8a8502511b175b",
+    "ru-2d4393a2810493ff1e70b95d",
+    "ru-5de7dd1c083d7c0978277741",
+    "ru-bc1bfb0a90b8c56eedbf9499",
+    "ru-e4c21a6d0e8b716f965bbc22",
+    "ru-ff0c7a2026a0ee68681b452f"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-6059b7553cea96a0dd3d3daa": 0.9839,
+     "ru-a8382cc244e477529ea0de01": 0.9963,
+     "ru-abaf5e0a9dfbb5cc0b49ac8e": 0.9856,
+     "ru-b552d5570203c802577635da": 0.9998,
+     "ru-e2339cb54da450d45ceed651": 0.985
+    },
+    "language": "de",
+    "seed": "ru-13f1bafecb49da85fdf8299f"
+   },
+   "id": "tg-0009",
+   "kind": "topic",
+   "members": [
+    "ru-13f1bafecb49da85fdf8299f",
+    "ru-6059b7553cea96a0dd3d3daa",
+    "ru-a8382cc244e477529ea0de01",
+    "ru-abaf5e0a9dfbb5cc0b49ac8e",
+    "ru-b552d5570203c802577635da",
+    "ru-e2339cb54da450d45ceed651"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-62834b46baaa26535e96c021": 0.9719,
+     "ru-b9f504f9d960bd15716ec91d": 0.9716,
+     "ru-d14fb3020596c36e6e7db5b0": 0.9852,
+     "ru-e72cbcb18a626380abb1bc14": 0.9697,
+     "ru-f399158a953f930f9017bda5": 0.9704
+    },
+    "language": "de",
+    "seed": "ru-2d5f9eb62ed02364c1952ec9"
+   },
+   "id": "tg-0010",
+   "kind": "topic",
+   "members": [
+    "ru-2d5f9eb62ed02364c1952ec9",
+    "ru-62834b46baaa26535e96c021",
+    "ru-b9f504f9d960bd15716ec91d",
+    "ru-d14fb3020596c36e6e7db5b0",
+    "ru-e72cbcb18a626380abb1bc14",
+    "ru-f399158a953f930f9017bda5"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-63a2d898090a4e63fef3a8c5": 0.9928,
+     "ru-6553d91ed43fced57c08e1ae": 0.9936,
+     "ru-8b3b184f4cdc5ab3a0586404": 0.9896,
+     "ru-d5231031a8af253d4c7a36ad": 0.9954,
+     "ru-f57c523952949ebebd42c000": 0.9966
+    },
+    "language": "de",
+    "seed": "ru-47dcce08b1c4246e8acf8403"
+   },
+   "id": "tg-0011",
+   "kind": "topic",
+   "members": [
+    "ru-47dcce08b1c4246e8acf8403",
+    "ru-63a2d898090a4e63fef3a8c5",
+    "ru-6553d91ed43fced57c08e1ae",
+    "ru-8b3b184f4cdc5ab3a0586404",
+    "ru-d5231031a8af253d4c7a36ad",
+    "ru-f57c523952949ebebd42c000"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-5cba91bf664e2a8d588c658d": 0.824,
+     "ru-6df526bbf6218841f08873b7": 0.9853,
+     "ru-cc3d06a1b8ae58cfd3da6699": 0.8069,
+     "ru-f11fd5088e16b050222de5a4": 0.8228,
+     "ru-fcaa4eff623ac20682ddccb2": 0.7671
+    },
+    "language": "de",
+    "seed": "ru-563edefa093049b4643e9d28"
+   },
+   "id": "tg-0012",
+   "kind": "topic",
+   "members": [
+    "ru-563edefa093049b4643e9d28",
+    "ru-5cba91bf664e2a8d588c658d",
+    "ru-6df526bbf6218841f08873b7",
+    "ru-cc3d06a1b8ae58cfd3da6699",
+    "ru-f11fd5088e16b050222de5a4",
+    "ru-fcaa4eff623ac20682ddccb2"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-73824ab0ce405aa6b1af6831": 0.9895,
+     "ru-9176af3263f1c91b45f2fcaf": 0.8982,
+     "ru-bf82e6c620263199adf209e7": 0.9873,
+     "ru-df24ab6e24521f0cb662c28a": 0.4971,
+     "ru-e6722c0def8307f56f30317b": 0.988
+    },
+    "language": "de",
+    "seed": "ru-5bbdc66cb47babf3ab1946ed"
+   },
+   "id": "tg-0013",
+   "kind": "topic",
+   "members": [
+    "ru-5bbdc66cb47babf3ab1946ed",
+    "ru-73824ab0ce405aa6b1af6831",
+    "ru-9176af3263f1c91b45f2fcaf",
+    "ru-bf82e6c620263199adf209e7",
+    "ru-df24ab6e24521f0cb662c28a",
+    "ru-e6722c0def8307f56f30317b"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-91a1d39c58a82563a976af23": 0.9982,
+     "ru-a3927f00061446500a501cbd": 0.9817,
+     "ru-bcaa33a85b61fad744e06104": 0.998,
+     "ru-f1cb32de3b86adbd46b95317": 0.9979,
+     "ru-f3db5f1839aebbc38351fa34": 0.9927
+    },
+    "language": "de",
+    "seed": "ru-694f66707fb409e6db438148"
+   },
+   "id": "tg-0014",
+   "kind": "topic",
+   "members": [
+    "ru-694f66707fb409e6db438148",
+    "ru-91a1d39c58a82563a976af23",
+    "ru-a3927f00061446500a501cbd",
+    "ru-bcaa33a85b61fad744e06104",
+    "ru-f1cb32de3b86adbd46b95317",
+    "ru-f3db5f1839aebbc38351fa34"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-1ade640d18949e2a2a351bb0": 0.8967,
+     "ru-1e69203bdd906acb945ed3fa": 0.875,
+     "ru-93ea88c48470c1cb6fe79c30": 0.9026,
+     "ru-a0c418c087cccc696d624834": 0.9177,
+     "ru-a39f975984b8cd0109d14f55": 0.8992
+    },
+    "language": "de",
+    "seed": "ru-93ba9ed1a113330d99ba4a0a"
+   },
+   "id": "tg-0015",
+   "kind": "topic",
+   "members": [
+    "ru-1ade640d18949e2a2a351bb0",
+    "ru-1e69203bdd906acb945ed3fa",
+    "ru-93ba9ed1a113330d99ba4a0a",
+    "ru-93ea88c48470c1cb6fe79c30",
+    "ru-a0c418c087cccc696d624834",
+    "ru-a39f975984b8cd0109d14f55"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-367390b4ef223a4a7f38a1bc": 0.7043,
+     "ru-4d021a3944156d2860f52f21": 0.924,
+     "ru-a3e289bd9bc75defd4d77840": 0.9393,
+     "ru-df7ade0f69e6191756314d0c": 0.9353,
+     "ru-e9546f1c4399f4e263138c1a": 0.8478
+    },
+    "language": "de",
+    "seed": "ru-a9f5485995f120fe0a315c3e"
+   },
+   "id": "tg-0016",
+   "kind": "topic",
+   "members": [
+    "ru-367390b4ef223a4a7f38a1bc",
+    "ru-4d021a3944156d2860f52f21",
+    "ru-a3e289bd9bc75defd4d77840",
+    "ru-a9f5485995f120fe0a315c3e",
+    "ru-df7ade0f69e6191756314d0c",
+    "ru-e9546f1c4399f4e263138c1a"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-196537902fd652f1f9ad077f": 0.4496,
+     "ru-5d5ed328043db12d01dae8b9": 0.369,
+     "ru-6901e3e5e044940bc046f739": 0.4463,
+     "ru-ebb2666927c674479b82ed4d": 0.74
+    },
+    "language": "de",
+    "seed": "ru-c920aab4606d9af842aded4b"
+   },
+   "id": "tg-0017",
+   "kind": "topic",
+   "members": [
+    "ru-196537902fd652f1f9ad077f",
+    "ru-5d5ed328043db12d01dae8b9",
+    "ru-6901e3e5e044940bc046f739",
+    "ru-c920aab4606d9af842aded4b",
+    "ru-ebb2666927c674479b82ed4d"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-0f218f0fab1280a86ba1928c": 0.9834,
+     "ru-2685d20f5250d3e5a4d54d67": 0.9813,
+     "ru-699a4a8c867525f3b6b621a5": 0.9822,
+     "ru-8e04a2e3c37a0661355c7038": 0.9788,
+     "ru-ccf787f17e79e4f255bcd6e7": 0.9813
+    },
+    "language": "de",
+    "seed": "ru-25c68e8b1179bb713610bd6d"
+   },
+   "id": "tg-0018",
+   "kind": "topic",
+   "members": [
+    "ru-0f218f0fab1280a86ba1928c",
+    "ru-25c68e8b1179bb713610bd6d",
+    "ru-2685d20f5250d3e5a4d54d67",
+    "ru-699a4a8c867525f3b6b621a5",
+    "ru-8e04a2e3c37a0661355c7038",
+    "ru-ccf787f17e79e4f255bcd6e7"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-245fb923511e661a4c23cf3a": 0.9831,
+     "ru-4a66b455dcb391716e1f19c6": 0.9825,
+     "ru-57195d7c2407f44623f5705e": 0.9822,
+     "ru-d3aa32ce3c317a5f4791101e": 0.9821,
+     "ru-fb74b1762fc5c5801b5ff876": 0.9828
+    },
+    "language": "de",
+    "seed": "ru-302c67a17219ee7072ca07e5"
+   },
+   "id": "tg-0019",
+   "kind": "topic",
+   "members": [
+    "ru-245fb923511e661a4c23cf3a",
+    "ru-302c67a17219ee7072ca07e5",
+    "ru-4a66b455dcb391716e1f19c6",
+    "ru-57195d7c2407f44623f5705e",
+    "ru-d3aa32ce3c317a5f4791101e",
+    "ru-fb74b1762fc5c5801b5ff876"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-7ebf172864b11aab8410a1f7": 0.9827,
+     "ru-8647ab772659c04ddc4ac5f1": 0.983,
+     "ru-a46feed6853e39736e32c971": 0.9819,
+     "ru-d6e148bb275138f8501a76fe": 0.983,
+     "ru-dafd70376b123c5e90ab37b9": 0.9823
+    },
+    "language": "de",
+    "seed": "ru-6edbcdc7758ea8b5b2ccd53d"
+   },
+   "id": "tg-0020",
+   "kind": "topic",
+   "members": [
+    "ru-6edbcdc7758ea8b5b2ccd53d",
+    "ru-7ebf172864b11aab8410a1f7",
+    "ru-8647ab772659c04ddc4ac5f1",
+    "ru-a46feed6853e39736e32c971",
+    "ru-d6e148bb275138f8501a76fe",
+    "ru-dafd70376b123c5e90ab37b9"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-431144dd88688f5a1b73f4da": 0.9778,
+     "ru-64e34d7fb2183b0fb38f886f": 0.9784,
+     "ru-73a431e9237abccf432ababb": 0.9779,
+     "ru-cc9befd8adaf7d6a9262e2be": 0.9778,
+     "ru-f240cde0111d6c3eda92cf6a": 0.9785
+    },
+    "language": "de",
+    "seed": "ru-173ac78baaf222fa0e4b35a4"
+   },
+   "id": "tg-0021",
+   "kind": "topic",
+   "members": [
+    "ru-173ac78baaf222fa0e4b35a4",
+    "ru-431144dd88688f5a1b73f4da",
+    "ru-64e34d7fb2183b0fb38f886f",
+    "ru-73a431e9237abccf432ababb",
+    "ru-cc9befd8adaf7d6a9262e2be",
+    "ru-f240cde0111d6c3eda92cf6a"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-b0cad35583e0cd1fa62270db": 0.9799,
+     "ru-cf4b9ccbdf01488b125b4824": 0.9799,
+     "ru-ddcf4077467b2fa9d8781e4d": 0.98,
+     "ru-e2cd658d06341b8d16103c9b": 0.9792,
+     "ru-e54e192f2a1822c3007e23d8": 0.9793
+    },
+    "language": "de",
+    "seed": "ru-1f9b04d08fe661e288cb0434"
+   },
+   "id": "tg-0022",
+   "kind": "topic",
+   "members": [
+    "ru-1f9b04d08fe661e288cb0434",
+    "ru-b0cad35583e0cd1fa62270db",
+    "ru-cf4b9ccbdf01488b125b4824",
+    "ru-ddcf4077467b2fa9d8781e4d",
+    "ru-e2cd658d06341b8d16103c9b",
+    "ru-e54e192f2a1822c3007e23d8"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-369d9362390778a2efdfe3b7": 0.9783,
+     "ru-454535ccdac4dcec86503177": 0.9792,
+     "ru-5015dc4e570c60576cfd0f79": 0.9783,
+     "ru-5ec5b72e2a703a87e07af665": 0.9783,
+     "ru-b38f15c975ff19bfc208dfcd": 0.9791
+    },
+    "language": "de",
+    "seed": "ru-23af8464d4cb16e1ec0cd666"
+   },
+   "id": "tg-0023",
+   "kind": "topic",
+   "members": [
+    "ru-23af8464d4cb16e1ec0cd666",
+    "ru-369d9362390778a2efdfe3b7",
+    "ru-454535ccdac4dcec86503177",
+    "ru-5015dc4e570c60576cfd0f79",
+    "ru-5ec5b72e2a703a87e07af665",
+    "ru-b38f15c975ff19bfc208dfcd"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-828308ed35c3588ed3fcea6c": 0.9789,
+     "ru-8d7a2c62576c70a4945de41d": 0.979,
+     "ru-b6133f22820676222a477a95": 0.9788,
+     "ru-d21ef72ba5ae7eb5b54809aa": 0.9798,
+     "ru-f2740c438ffdf254304d8598": 0.979
+    },
+    "language": "de",
+    "seed": "ru-66271830a9b42dc46b844b42"
+   },
+   "id": "tg-0024",
+   "kind": "topic",
+   "members": [
+    "ru-66271830a9b42dc46b844b42",
+    "ru-828308ed35c3588ed3fcea6c",
+    "ru-8d7a2c62576c70a4945de41d",
+    "ru-b6133f22820676222a477a95",
+    "ru-d21ef72ba5ae7eb5b54809aa",
+    "ru-f2740c438ffdf254304d8598"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-54a414ad22c727f6c6a80268": 0.9697,
+     "ru-5dba7f3bcc13c1c700f81dcf": 0.877,
+     "ru-92d66347d06075971fcac4e6": 0.9755,
+     "ru-c63d88df838d317563d18eb6": 0.877,
+     "ru-db8135bd066f1a80d32b3ee8": 0.9711
+    },
+    "language": "de",
+    "seed": "ru-90fa79438260a5ce33e751a6"
+   },
+   "id": "tg-0025",
+   "kind": "topic",
+   "members": [
+    "ru-54a414ad22c727f6c6a80268",
+    "ru-5dba7f3bcc13c1c700f81dcf",
+    "ru-90fa79438260a5ce33e751a6",
+    "ru-92d66347d06075971fcac4e6",
+    "ru-c63d88df838d317563d18eb6",
+    "ru-db8135bd066f1a80d32b3ee8"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-5b90f45967d0a43080d23a3c": 0.3317,
+     "ru-5e33e4f8ee8453e911a086e3": 0.3469,
+     "ru-64e1537bad6d31a6ef471a88": 0.3551,
+     "ru-a75cb5f6cbecad5d8129d4ec": 0.4559,
+     "ru-bd3439d38477d78df4ae86b9": 0.3486
+    },
+    "language": "de",
+    "seed": "ru-cbeb56cda3dbcb69688b912c"
+   },
+   "id": "tg-0026",
+   "kind": "topic",
+   "members": [
+    "ru-5b90f45967d0a43080d23a3c",
+    "ru-5e33e4f8ee8453e911a086e3",
+    "ru-64e1537bad6d31a6ef471a88",
+    "ru-a75cb5f6cbecad5d8129d4ec",
+    "ru-bd3439d38477d78df4ae86b9",
+    "ru-cbeb56cda3dbcb69688b912c"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-94b39c4e92027ba5fdefa8c8": 0.9662,
+     "ru-a8df84dd1fad60ff19d43165": 0.3011
+    },
+    "language": "de",
+    "seed": "ru-c4edff9dff31c8d16b14f9ac"
+   },
+   "id": "tg-0027",
+   "kind": "topic",
+   "members": [
+    "ru-94b39c4e92027ba5fdefa8c8",
+    "ru-a8df84dd1fad60ff19d43165",
+    "ru-c4edff9dff31c8d16b14f9ac"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-ab94c4befae8a83b12abaaa2": 0.8944,
+     "ru-cb0c23d4e8a9df324de33760": 0.6624,
+     "ru-d87e0d4c8ba232f836179b21": 0.6999,
+     "ru-e4a6cdc102f0610fb8a5bb85": 0.6844,
+     "ru-fef337b88e84e568e29a6cbc": 0.9232
+    },
+    "language": "de",
+    "seed": "ru-5ec2382a6a62d1ca506b6787"
+   },
+   "id": "tg-0028",
+   "kind": "topic",
+   "members": [
+    "ru-5ec2382a6a62d1ca506b6787",
+    "ru-ab94c4befae8a83b12abaaa2",
+    "ru-cb0c23d4e8a9df324de33760",
+    "ru-d87e0d4c8ba232f836179b21",
+    "ru-e4a6cdc102f0610fb8a5bb85",
+    "ru-fef337b88e84e568e29a6cbc"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-08c43f5d75b2f0bb106d68ef": 0.9953,
+     "ru-09a8214366e01b55ad1f6607": 0.9945,
+     "ru-8fca7d5a5d0c23bf8b2106d8": 0.9957,
+     "ru-a3ca5e76e82d696b4785fc9b": 0.9947,
+     "ru-edd2e40c5084abf2983012f5": 0.9963
+    },
+    "language": "de",
+    "seed": "ru-07cbc5d1debd925d659cb454"
+   },
+   "id": "tg-0029",
+   "kind": "topic",
+   "members": [
+    "ru-07cbc5d1debd925d659cb454",
+    "ru-08c43f5d75b2f0bb106d68ef",
+    "ru-09a8214366e01b55ad1f6607",
+    "ru-8fca7d5a5d0c23bf8b2106d8",
+    "ru-a3ca5e76e82d696b4785fc9b",
+    "ru-edd2e40c5084abf2983012f5"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-0a7f999e90f24f14adaf08a6": 0.9926,
+     "ru-5795b254087f75f25a41a4c3": 0.9926,
+     "ru-6a51e0c0415001ce6b8e15fd": 0.9921,
+     "ru-82b017d5d05f84b5393a59dd": 0.9948,
+     "ru-ca2cfebcb4c2f4a023068589": 0.9964
+    },
+    "language": "de",
+    "seed": "ru-083c20c631bf5f0bd2ed6cc3"
+   },
+   "id": "tg-0030",
+   "kind": "topic",
+   "members": [
+    "ru-083c20c631bf5f0bd2ed6cc3",
+    "ru-0a7f999e90f24f14adaf08a6",
+    "ru-5795b254087f75f25a41a4c3",
+    "ru-6a51e0c0415001ce6b8e15fd",
+    "ru-82b017d5d05f84b5393a59dd",
+    "ru-ca2cfebcb4c2f4a023068589"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-0779b93dfce5ac2c3b2268a8": 0.9556,
+     "ru-23e5e3d9a4f3ae626a7367a1": 0.9571,
+     "ru-7c2e53b707afffda294427ec": 0.9565,
+     "ru-b43f5fe4044bedc7c2d1ce7d": 0.9557,
+     "ru-e9a73a58ede5f561f914e6b0": 0.9557
+    },
+    "language": "de",
+    "seed": "ru-4e8b9f80dae797267a415745"
+   },
+   "id": "tg-0031",
+   "kind": "topic",
+   "members": [
+    "ru-0779b93dfce5ac2c3b2268a8",
+    "ru-23e5e3d9a4f3ae626a7367a1",
+    "ru-4e8b9f80dae797267a415745",
+    "ru-7c2e53b707afffda294427ec",
+    "ru-b43f5fe4044bedc7c2d1ce7d",
+    "ru-e9a73a58ede5f561f914e6b0"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-060026d851446c3b82b7348e": 0.9065,
+     "ru-1f006b945c77ca8618aad8f0": 0.7131,
+     "ru-35e4c36a988dccc7838620d3": 0.7397,
+     "ru-3c4988f7a17e25d6e04cb38c": 0.8711,
+     "ru-513054cf99ac5adf2060e3b7": 0.8715
+    },
+    "language": "de",
+    "seed": "ru-bd16f1797b5998c3accaf2b2"
+   },
+   "id": "tg-0032",
+   "kind": "topic",
+   "members": [
+    "ru-060026d851446c3b82b7348e",
+    "ru-1f006b945c77ca8618aad8f0",
+    "ru-35e4c36a988dccc7838620d3",
+    "ru-3c4988f7a17e25d6e04cb38c",
+    "ru-513054cf99ac5adf2060e3b7",
+    "ru-bd16f1797b5998c3accaf2b2"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-5ca5a203951e9aaa5a166dbb": 0.3157,
+     "ru-ad6e8cea0be7456d25f6184f": 0.3157
+    },
+    "language": "de",
+    "seed": "ru-a8406865323a0a58cc5b827c"
+   },
+   "id": "tg-0033",
+   "kind": "topic",
+   "members": [
+    "ru-5ca5a203951e9aaa5a166dbb",
+    "ru-a8406865323a0a58cc5b827c",
+    "ru-ad6e8cea0be7456d25f6184f"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-6bf646bdbce527588bb4b585": 0.7231,
+     "ru-aa92f5d674a36e72edea71a4": 0.7341,
+     "ru-bd90b721bbc66a6981908fb3": 0.6707,
+     "ru-da36c533c8393421ac150081": 0.8088,
+     "ru-f8c19c1005a134c1170f6fbb": 0.7412
+    },
+    "language": "de",
+    "seed": "ru-1a43638f2a3edd22fd601463"
+   },
+   "id": "tg-0034",
+   "kind": "topic",
+   "members": [
+    "ru-1a43638f2a3edd22fd601463",
+    "ru-6bf646bdbce527588bb4b585",
+    "ru-aa92f5d674a36e72edea71a4",
+    "ru-bd90b721bbc66a6981908fb3",
+    "ru-da36c533c8393421ac150081",
+    "ru-f8c19c1005a134c1170f6fbb"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-3c18b38d2fcf51da25016751": 0.5586,
+     "ru-79d3e6c5936bc5db0e376ecf": 0.5346,
+     "ru-7ec70d586860157c65bdf06a": 0.5378,
+     "ru-bc5959a37ed038cc99e78a29": 0.5499,
+     "ru-bee39dbe8ddcb9d74f4730ef": 0.5646
+    },
+    "language": "de",
+    "seed": "ru-243f43ad5bc1be4cd2f3aec4"
+   },
+   "id": "tg-0035",
+   "kind": "topic",
+   "members": [
+    "ru-243f43ad5bc1be4cd2f3aec4",
+    "ru-3c18b38d2fcf51da25016751",
+    "ru-79d3e6c5936bc5db0e376ecf",
+    "ru-7ec70d586860157c65bdf06a",
+    "ru-bc5959a37ed038cc99e78a29",
+    "ru-bee39dbe8ddcb9d74f4730ef"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-32833302170827144ea4ce86": 0.3989,
+     "ru-7156968c32bb945c97b5b151": 0.3561,
+     "ru-ab4ec981ffaa6f4632362bbd": 0.3721,
+     "ru-c1c4589e2827d2b63cc43fd9": 0.4564,
+     "ru-e498fc94dee3ce4f7217971f": 0.5536
+    },
+    "language": "de",
+    "seed": "ru-bdd52373524442f1b50076eb"
+   },
+   "id": "tg-0036",
+   "kind": "topic",
+   "members": [
+    "ru-32833302170827144ea4ce86",
+    "ru-7156968c32bb945c97b5b151",
+    "ru-ab4ec981ffaa6f4632362bbd",
+    "ru-bdd52373524442f1b50076eb",
+    "ru-c1c4589e2827d2b63cc43fd9",
+    "ru-e498fc94dee3ce4f7217971f"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-5cb6cfe893f7f802d67a16e4": 0.9785,
+     "ru-f873cdd63aeb88ed5d78c155": 0.9839
+    },
+    "language": "de",
+    "seed": "ru-4359b766478e4b5257108c4c"
+   },
+   "id": "tg-0037",
+   "kind": "topic",
+   "members": [
+    "ru-4359b766478e4b5257108c4c",
+    "ru-5cb6cfe893f7f802d67a16e4",
+    "ru-f873cdd63aeb88ed5d78c155"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-0a4c88a011f0725f6425d2b1": 0.3193,
+     "ru-65b5add3e5d723aa3108ab75": 0.324,
+     "ru-e750d0bde7fd80d526b3e5a0": 0.3184
+    },
+    "language": "de",
+    "seed": "ru-ead24390ffc6ad0fc3b2e7f0"
+   },
+   "id": "tg-0038",
+   "kind": "topic",
+   "members": [
+    "ru-0a4c88a011f0725f6425d2b1",
+    "ru-65b5add3e5d723aa3108ab75",
+    "ru-e750d0bde7fd80d526b3e5a0",
+    "ru-ead24390ffc6ad0fc3b2e7f0"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-46a587763ca3f13c67926656": 0.6447,
+     "ru-97a6982e04cab17592ce337e": 0.7017,
+     "ru-c92514573efc743c694fec6a": 0.737,
+     "ru-d8469348bba5203a88f5c722": 0.8073,
+     "ru-e07c3d7803009eaaf6c4fe33": 0.7234
+    },
+    "language": "de",
+    "seed": "ru-5e08f975aaf902fede8497cd"
+   },
+   "id": "tg-0039",
+   "kind": "topic",
+   "members": [
+    "ru-46a587763ca3f13c67926656",
+    "ru-5e08f975aaf902fede8497cd",
+    "ru-97a6982e04cab17592ce337e",
+    "ru-c92514573efc743c694fec6a",
+    "ru-d8469348bba5203a88f5c722",
+    "ru-e07c3d7803009eaaf6c4fe33"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-2f35a975af29723035a8f532": 0.8661,
+     "ru-5467031f7b305a765cd39c6c": 0.8661,
+     "ru-e3c51e1c75c1068a5c8d2e7e": 0.8541,
+     "ru-eb88137574b49b8d93fa3bfc": 0.8751,
+     "ru-f4a0b7308a111076b787a426": 0.8534
+    },
+    "language": "de",
+    "seed": "ru-827824eb353c47a3cf8bd7da"
+   },
+   "id": "tg-0040",
+   "kind": "topic",
+   "members": [
+    "ru-2f35a975af29723035a8f532",
+    "ru-5467031f7b305a765cd39c6c",
+    "ru-827824eb353c47a3cf8bd7da",
+    "ru-e3c51e1c75c1068a5c8d2e7e",
+    "ru-eb88137574b49b8d93fa3bfc",
+    "ru-f4a0b7308a111076b787a426"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-1fb99cc38206eee6c2730a23": 0.7757,
+     "ru-469f15fde4b4d10dda145afa": 0.7757,
+     "ru-c6901d2940eb83b0a5409723": 0.7815,
+     "ru-d2ca61ace0a4e9df98862616": 0.7757
+    },
+    "language": "de",
+    "seed": "ru-04d17b863566d39ce5e20096"
+   },
+   "id": "tg-0041",
+   "kind": "topic",
+   "members": [
+    "ru-04d17b863566d39ce5e20096",
+    "ru-1fb99cc38206eee6c2730a23",
+    "ru-469f15fde4b4d10dda145afa",
+    "ru-c6901d2940eb83b0a5409723",
+    "ru-d2ca61ace0a4e9df98862616"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-adc276527c869f0e9ccb3aa2": 0.3658,
+     "ru-da50d06ecfece73af7cf406d": 0.4838,
+     "ru-f25615da38f03cb8448ff182": 0.4661
+    },
+    "language": "de",
+    "seed": "ru-5773ee11ca8002550073a0bc"
+   },
+   "id": "tg-0042",
+   "kind": "topic",
+   "members": [
+    "ru-5773ee11ca8002550073a0bc",
+    "ru-adc276527c869f0e9ccb3aa2",
+    "ru-da50d06ecfece73af7cf406d",
+    "ru-f25615da38f03cb8448ff182"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-1a37723c318bb95a113f4487": 0.3098,
+     "ru-2068387693ca66e22c12e2c4": 0.3088,
+     "ru-4df8fbbfc460b31bdf913b9e": 0.3722,
+     "ru-798fc799e41ebf8852f60540": 0.3326,
+     "ru-f14674448a8d4d49f0b7ae42": 0.355
+    },
+    "language": "de",
+    "seed": "ru-0f30536e83f8955aa43083a3"
+   },
+   "id": "tg-0043",
+   "kind": "topic",
+   "members": [
+    "ru-0f30536e83f8955aa43083a3",
+    "ru-1a37723c318bb95a113f4487",
+    "ru-2068387693ca66e22c12e2c4",
+    "ru-4df8fbbfc460b31bdf913b9e",
+    "ru-798fc799e41ebf8852f60540",
+    "ru-f14674448a8d4d49f0b7ae42"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-1353c367a521d871ba77bca7": 0.4891,
+     "ru-172515c6e25897b69e246144": 0.4783,
+     "ru-39793f0d94b024eb5869d2de": 0.9029,
+     "ru-ba54334538e82d8881b8d96f": 0.9033,
+     "ru-f60007326b72b397076c30c7": 0.4608
+    },
+    "language": "de",
+    "seed": "ru-0ff10c34c172415dec77c07a"
+   },
+   "id": "tg-0044",
+   "kind": "topic",
+   "members": [
+    "ru-0ff10c34c172415dec77c07a",
+    "ru-1353c367a521d871ba77bca7",
+    "ru-172515c6e25897b69e246144",
+    "ru-39793f0d94b024eb5869d2de",
+    "ru-ba54334538e82d8881b8d96f",
+    "ru-f60007326b72b397076c30c7"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-1fb14241f017ccbfdb024b01": 0.8427,
+     "ru-8923444ba0a3b7da9a5701f3": 1.0,
+     "ru-e3b0fa5bc9198d0db3a1cd61": 1.0
+    },
+    "language": "de",
+    "seed": "ru-17b55f6c91cf4567a9c04972"
+   },
+   "id": "tg-0045",
+   "kind": "topic",
+   "members": [
+    "ru-17b55f6c91cf4567a9c04972",
+    "ru-1fb14241f017ccbfdb024b01",
+    "ru-8923444ba0a3b7da9a5701f3",
+    "ru-e3b0fa5bc9198d0db3a1cd61"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-02a9aa98d13c7784a326ce74": 0.993,
+     "ru-086dabc88ce29c0954407ba4": 0.9948,
+     "ru-365573e56c80cc48f74b52eb": 0.9913
+    },
+    "language": "de",
+    "seed": "ru-31643471071a2efd399339fc"
+   },
+   "id": "tg-0046",
+   "kind": "topic",
+   "members": [
+    "ru-02a9aa98d13c7784a326ce74",
+    "ru-086dabc88ce29c0954407ba4",
+    "ru-31643471071a2efd399339fc",
+    "ru-365573e56c80cc48f74b52eb"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-d9513fef5bdd7996255a246b": 0.5411,
+     "ru-f8ab11e66bca8f4f933fb92a": 0.7476
+    },
+    "language": "de",
+    "seed": "ru-c0e80d408f7438393b985205"
+   },
+   "id": "tg-0047",
+   "kind": "topic",
+   "members": [
+    "ru-c0e80d408f7438393b985205",
+    "ru-d9513fef5bdd7996255a246b",
+    "ru-f8ab11e66bca8f4f933fb92a"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-12b0e56339b246268b3f42a9": 0.3515,
+     "ru-4abc916065b354f295e30489": 0.3304,
+     "ru-52cd4df75dc7707fea62415f": 0.3835
+    },
+    "language": "de",
+    "seed": "ru-273fffc352fa878c999ba6d3"
+   },
+   "id": "tg-0048",
+   "kind": "topic",
+   "members": [
+    "ru-12b0e56339b246268b3f42a9",
+    "ru-273fffc352fa878c999ba6d3",
+    "ru-4abc916065b354f295e30489",
+    "ru-52cd4df75dc7707fea62415f"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-735141d946233bf2206d3d5b": 0.4963,
+     "ru-a4ffe9c1bda21256ccdfcafd": 0.7032,
+     "ru-c69846cdc0437dc48946852f": 0.8516,
+     "ru-d0aca3a8cc830dbc6060dfa1": 0.6821,
+     "ru-ea587a8866f66089aa1f82ca": 0.6889
+    },
+    "language": "de",
+    "seed": "ru-668ec8659bec07d857c0dc29"
+   },
+   "id": "tg-0049",
+   "kind": "topic",
+   "members": [
+    "ru-668ec8659bec07d857c0dc29",
+    "ru-735141d946233bf2206d3d5b",
+    "ru-a4ffe9c1bda21256ccdfcafd",
+    "ru-c69846cdc0437dc48946852f",
+    "ru-d0aca3a8cc830dbc6060dfa1",
+    "ru-ea587a8866f66089aa1f82ca"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-280eaab5eba4e56c25772f5e": 0.4168,
+     "ru-663954d2af4d34e847398d2e": 0.4355,
+     "ru-7760d89a5b5e053021e98d69": 0.4121,
+     "ru-ade90c33e32a8082da5f7f3e": 0.3641,
+     "ru-d1fa73158ad376ce75ec9ce5": 0.4132
+    },
+    "language": "de",
+    "seed": "ru-8d028e14b6855ce8cb5ad357"
+   },
+   "id": "tg-0050",
+   "kind": "topic",
+   "members": [
+    "ru-280eaab5eba4e56c25772f5e",
+    "ru-663954d2af4d34e847398d2e",
+    "ru-7760d89a5b5e053021e98d69",
+    "ru-8d028e14b6855ce8cb5ad357",
+    "ru-ade90c33e32a8082da5f7f3e",
+    "ru-d1fa73158ad376ce75ec9ce5"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-4ddf6dfebcac23b317bbb1fc": 0.7267,
+     "ru-677d7da974a87c0a4e79310c": 0.8458,
+     "ru-70695167485cf4f0e16d8287": 0.8015,
+     "ru-85461ec0e1928e35f5edb325": 0.8223,
+     "ru-8561032e2f93a2d577f798b9": 0.7271
+    },
+    "language": "de",
+    "seed": "ru-8f85fe260a557cb36e534e33"
+   },
+   "id": "tg-0051",
+   "kind": "topic",
+   "members": [
+    "ru-4ddf6dfebcac23b317bbb1fc",
+    "ru-677d7da974a87c0a4e79310c",
+    "ru-70695167485cf4f0e16d8287",
+    "ru-85461ec0e1928e35f5edb325",
+    "ru-8561032e2f93a2d577f798b9",
+    "ru-8f85fe260a557cb36e534e33"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-854356c5e0b5168ee60709c3": 0.3387,
+     "ru-89dc77c8000f1402ec144942": 0.3785,
+     "ru-cea51b3a8a5cc00eb89dfbb9": 0.3875
+    },
+    "language": "de",
+    "seed": "ru-07b90afd74ea43394344f6d2"
+   },
+   "id": "tg-0052",
+   "kind": "topic",
+   "members": [
+    "ru-07b90afd74ea43394344f6d2",
+    "ru-854356c5e0b5168ee60709c3",
+    "ru-89dc77c8000f1402ec144942",
+    "ru-cea51b3a8a5cc00eb89dfbb9"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-3ec1bc0587cdcca729dc8a38": 0.5853,
+     "ru-5683103a138c03b5aa7f8c9f": 0.5,
+     "ru-7e8a3c3d9b664810d7c0c63c": 0.6255,
+     "ru-82e634729ab0cee454d646f0": 0.4934,
+     "ru-87a9438ea13ae6ce7f740074": 0.5789
+    },
+    "language": "de",
+    "seed": "ru-237de08a89d1bde446723b6a"
+   },
+   "id": "tg-0053",
+   "kind": "topic",
+   "members": [
+    "ru-237de08a89d1bde446723b6a",
+    "ru-3ec1bc0587cdcca729dc8a38",
+    "ru-5683103a138c03b5aa7f8c9f",
+    "ru-7e8a3c3d9b664810d7c0c63c",
+    "ru-82e634729ab0cee454d646f0",
+    "ru-87a9438ea13ae6ce7f740074"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-094174a424357122760ab1ff": 0.3487,
+     "ru-d1c55970bd7d5565360186b7": 0.3013,
+     "ru-fe464acecae0a62269623a69": 0.3061
+    },
+    "language": "de",
+    "seed": "ru-fd3ff9c9e6cc5a66672f58d6"
+   },
+   "id": "tg-0054",
+   "kind": "topic",
+   "members": [
+    "ru-094174a424357122760ab1ff",
+    "ru-d1c55970bd7d5565360186b7",
+    "ru-fd3ff9c9e6cc5a66672f58d6",
+    "ru-fe464acecae0a62269623a69"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-32587661329bf9ac3d4754a2": 0.6282,
+     "ru-3b6b2a7644c2d10d16fdc8e7": 0.3745,
+     "ru-3d0baddbba93169c2c50b012": 0.3909,
+     "ru-6b84f33c3ffaaf77bc06bd94": 0.6259
+    },
+    "language": "de",
+    "seed": "ru-11e230b2793b03760b3c12c6"
+   },
+   "id": "tg-0055",
+   "kind": "topic",
+   "members": [
+    "ru-11e230b2793b03760b3c12c6",
+    "ru-32587661329bf9ac3d4754a2",
+    "ru-3b6b2a7644c2d10d16fdc8e7",
+    "ru-3d0baddbba93169c2c50b012",
+    "ru-6b84f33c3ffaaf77bc06bd94"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-29bb3b7ffb241fc127b00bc1": 0.4059,
+     "ru-b1cf4653551514469a8bc1e4": 0.597,
+     "ru-e968181dec7a51ad80bf91ee": 0.5789,
+     "ru-f33c2cf6cf4bb59105122169": 0.5558
+    },
+    "language": "de",
+    "seed": "ru-1744a04ae17c0caa6d07e265"
+   },
+   "id": "tg-0056",
+   "kind": "topic",
+   "members": [
+    "ru-1744a04ae17c0caa6d07e265",
+    "ru-29bb3b7ffb241fc127b00bc1",
+    "ru-b1cf4653551514469a8bc1e4",
+    "ru-e968181dec7a51ad80bf91ee",
+    "ru-f33c2cf6cf4bb59105122169"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-668fd034de0eb9b19f1d545c": 0.7447,
+     "ru-a0e31daafc9f9c44d29ba3e3": 0.7661,
+     "ru-d14c0ae1c8220f2623722abf": 0.726,
+     "ru-ddf7be145d8348eebc6c02fb": 0.8342
+    },
+    "language": "de",
+    "seed": "ru-3eecd25cad35b679857b3927"
+   },
+   "id": "tg-0057",
+   "kind": "topic",
+   "members": [
+    "ru-3eecd25cad35b679857b3927",
+    "ru-668fd034de0eb9b19f1d545c",
+    "ru-a0e31daafc9f9c44d29ba3e3",
+    "ru-d14c0ae1c8220f2623722abf",
+    "ru-ddf7be145d8348eebc6c02fb"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-5d9d8fba275bb5e8e51e0812": 0.9139,
+     "ru-5ed934a0eaf74c8a2684e6ab": 0.9139,
+     "ru-d21d5f152c7d4d40445d0e8f": 0.9182,
+     "ru-e2cb6e5848be63271d9d57fc": 0.9076
+    },
+    "language": "de",
+    "seed": "ru-53879c6ba30711bd7b5213c2"
+   },
+   "id": "tg-0058",
+   "kind": "topic",
+   "members": [
+    "ru-53879c6ba30711bd7b5213c2",
+    "ru-5d9d8fba275bb5e8e51e0812",
+    "ru-5ed934a0eaf74c8a2684e6ab",
+    "ru-d21d5f152c7d4d40445d0e8f",
+    "ru-e2cb6e5848be63271d9d57fc"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-5d703fde5abb84edde0918e6": 0.3352,
+     "ru-7ca143c91e35e2d4dee9c8f7": 0.3082,
+     "ru-ab919638e8955b0024f8f12f": 0.3645,
+     "ru-f77bc75295d15277bc992a3a": 0.5049
+    },
+    "language": "de",
+    "seed": "ru-d02fb721a57ec6aec9726712"
+   },
+   "id": "tg-0059",
+   "kind": "topic",
+   "members": [
+    "ru-5d703fde5abb84edde0918e6",
+    "ru-7ca143c91e35e2d4dee9c8f7",
+    "ru-ab919638e8955b0024f8f12f",
+    "ru-d02fb721a57ec6aec9726712",
+    "ru-f77bc75295d15277bc992a3a"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-295d6834068f759cb586e2ff": 1.0,
+     "ru-296312b433c16e2ebf7c8ba3": 1.0,
+     "ru-a1248c05c0b45b23d1e8a616": 1.0
+    },
+    "language": "de",
+    "seed": "ru-0120ede492c5211cb409a162"
+   },
+   "id": "tg-0060",
+   "kind": "topic",
+   "members": [
+    "ru-0120ede492c5211cb409a162",
+    "ru-295d6834068f759cb586e2ff",
+    "ru-296312b433c16e2ebf7c8ba3",
+    "ru-a1248c05c0b45b23d1e8a616"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-1addc2a8ba44561040961be1": 0.9968,
+     "ru-303aa4f28eea44c92641a9a6": 0.9951,
+     "ru-5873e279d66cd05a413ac185": 0.8691
+    },
+    "language": "de",
+    "seed": "ru-0333f1f3e3660ea13b339b8c"
+   },
+   "id": "tg-0061",
+   "kind": "topic",
+   "members": [
+    "ru-0333f1f3e3660ea13b339b8c",
+    "ru-1addc2a8ba44561040961be1",
+    "ru-303aa4f28eea44c92641a9a6",
+    "ru-5873e279d66cd05a413ac185"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-40a74f3d96b5901a0da61367": 0.8901,
+     "ru-678cd3b61f29732ce8652f50": 0.9341,
+     "ru-e905e338c38c7434d5d18549": 0.8248
+    },
+    "language": "de",
+    "seed": "ru-0602b124ec1be325406e411a"
+   },
+   "id": "tg-0062",
+   "kind": "topic",
+   "members": [
+    "ru-0602b124ec1be325406e411a",
+    "ru-40a74f3d96b5901a0da61367",
+    "ru-678cd3b61f29732ce8652f50",
+    "ru-e905e338c38c7434d5d18549"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-7b5e5022ef2a33139d1b4342": 0.9661,
+     "ru-a10023f20904d04da3646f8e": 0.9745,
+     "ru-ef4abd2d6351a4a861e8fb52": 0.9909
+    },
+    "language": "de",
+    "seed": "ru-31a8b87494c6e1358ed4b2b5"
+   },
+   "id": "tg-0063",
+   "kind": "topic",
+   "members": [
+    "ru-31a8b87494c6e1358ed4b2b5",
+    "ru-7b5e5022ef2a33139d1b4342",
+    "ru-a10023f20904d04da3646f8e",
+    "ru-ef4abd2d6351a4a861e8fb52"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-70f74fff820b54191df4f51a": 0.9131,
+     "ru-a50dcb329dac2ea36a764061": 0.7817,
+     "ru-c0c3dc9af6225ccff92c01ff": 0.7247
+    },
+    "language": "de",
+    "seed": "ru-4a321f857bbec3d559bbf04f"
+   },
+   "id": "tg-0064",
+   "kind": "topic",
+   "members": [
+    "ru-4a321f857bbec3d559bbf04f",
+    "ru-70f74fff820b54191df4f51a",
+    "ru-a50dcb329dac2ea36a764061",
+    "ru-c0c3dc9af6225ccff92c01ff"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-5e4d3bfdc9da7204afb88f52": 0.4742,
+     "ru-61cd3cd4d91d74e7205b0425": 0.413,
+     "ru-da63006e10d9646db93bc823": 0.419
+    },
+    "language": "de",
+    "seed": "ru-4c2cae5ed1291a482cc13b38"
+   },
+   "id": "tg-0065",
+   "kind": "topic",
+   "members": [
+    "ru-4c2cae5ed1291a482cc13b38",
+    "ru-5e4d3bfdc9da7204afb88f52",
+    "ru-61cd3cd4d91d74e7205b0425",
+    "ru-da63006e10d9646db93bc823"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-9e607a99e1461c26efa92c07": 0.9999,
+     "ru-a708c87bed9d2fc25b5bbf19": 0.7421,
+     "ru-f1a5919285b7dd5b2aeb5697": 0.3015
+    },
+    "language": "de",
+    "seed": "ru-9172c6e8c50fd2a677cea6c9"
+   },
+   "id": "tg-0066",
+   "kind": "topic",
+   "members": [
+    "ru-9172c6e8c50fd2a677cea6c9",
+    "ru-9e607a99e1461c26efa92c07",
+    "ru-a708c87bed9d2fc25b5bbf19",
+    "ru-f1a5919285b7dd5b2aeb5697"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-09a5e06cfdb8f06ec12e3750": 0.5112,
+     "ru-7a55f2b77f92f3f0452b82a3": 0.3282,
+     "ru-f070f870433e410f3d157d69": 0.3383
+    },
+    "language": "de",
+    "seed": "ru-b91512eb317a163a2780c911"
+   },
+   "id": "tg-0067",
+   "kind": "topic",
+   "members": [
+    "ru-09a5e06cfdb8f06ec12e3750",
+    "ru-7a55f2b77f92f3f0452b82a3",
+    "ru-b91512eb317a163a2780c911",
+    "ru-f070f870433e410f3d157d69"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-245b4365070bff7d81e9b75d": 0.7282,
+     "ru-8b9e97815410c7cf40f3c154": 0.7146
+    },
+    "language": "de",
+    "seed": "ru-0329c4deaa82ced4e6cb74e3"
+   },
+   "id": "tg-0068",
+   "kind": "topic",
+   "members": [
+    "ru-0329c4deaa82ced4e6cb74e3",
+    "ru-245b4365070bff7d81e9b75d",
+    "ru-8b9e97815410c7cf40f3c154"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-6fcb426d03756292c555c03e": 0.305,
+     "ru-ba23272ef8f4a4fa7efa45d3": 0.4658
+    },
+    "language": "de",
+    "seed": "ru-065737f359249f5e3e6bf511"
+   },
+   "id": "tg-0069",
+   "kind": "topic",
+   "members": [
+    "ru-065737f359249f5e3e6bf511",
+    "ru-6fcb426d03756292c555c03e",
+    "ru-ba23272ef8f4a4fa7efa45d3"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-8486f936ba26b8aa9404473f": 0.4949,
+     "ru-9758c53949233952cf88b166": 0.6013
+    },
+    "language": "de",
+    "seed": "ru-2515b54fb8f155852e4d3d39"
+   },
+   "id": "tg-0070",
+   "kind": "topic",
+   "members": [
+    "ru-2515b54fb8f155852e4d3d39",
+    "ru-8486f936ba26b8aa9404473f",
+    "ru-9758c53949233952cf88b166"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-3cf8f1ee3ca9480c6f6dd88d": 0.3161,
+     "ru-cad62cea4b234ca0d3648253": 0.934
+    },
+    "language": "de",
+    "seed": "ru-26f9f9d050dc8ed0f4b3d405"
+   },
+   "id": "tg-0071",
+   "kind": "topic",
+   "members": [
+    "ru-26f9f9d050dc8ed0f4b3d405",
+    "ru-3cf8f1ee3ca9480c6f6dd88d",
+    "ru-cad62cea4b234ca0d3648253"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-53bd78d7935149d7469215b4": 0.3226,
+     "ru-6a93e658ee588d58d0a958cc": 0.9404
+    },
+    "language": "de",
+    "seed": "ru-2b7f643e62b95d6df7094112"
+   },
+   "id": "tg-0072",
+   "kind": "topic",
+   "members": [
+    "ru-2b7f643e62b95d6df7094112",
+    "ru-53bd78d7935149d7469215b4",
+    "ru-6a93e658ee588d58d0a958cc"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-4a999640583b45afaad72779": 0.397,
+     "ru-747ebf160441315529181476": 0.327
+    },
+    "language": "de",
+    "seed": "ru-2de2c0b93f6062edf9803809"
+   },
+   "id": "tg-0073",
+   "kind": "topic",
+   "members": [
+    "ru-2de2c0b93f6062edf9803809",
+    "ru-4a999640583b45afaad72779",
+    "ru-747ebf160441315529181476"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-7a54f7538a8a6a7819b226f1": 0.9945,
+     "ru-e9bdf06a8cc629a88b80c50e": 0.9977
+    },
+    "language": "de",
+    "seed": "ru-32305362845536f81533f473"
+   },
+   "id": "tg-0074",
+   "kind": "topic",
+   "members": [
+    "ru-32305362845536f81533f473",
+    "ru-7a54f7538a8a6a7819b226f1",
+    "ru-e9bdf06a8cc629a88b80c50e"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-53822da586ffc0a84706ccd3": 0.9575,
+     "ru-5f85e0775a55684dd52302b5": 0.468
+    },
+    "language": "de",
+    "seed": "ru-416da22e800b17f020cb9567"
+   },
+   "id": "tg-0075",
+   "kind": "topic",
+   "members": [
+    "ru-416da22e800b17f020cb9567",
+    "ru-53822da586ffc0a84706ccd3",
+    "ru-5f85e0775a55684dd52302b5"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-3511b9d1d764366da2f49150": 0.3074,
+     "ru-b75a5dff58e16b54e188abde": 0.3718
+    },
+    "language": "de",
+    "seed": "ru-55832eb3ec5ea05c9dee3d6d"
+   },
+   "id": "tg-0076",
+   "kind": "topic",
+   "members": [
+    "ru-3511b9d1d764366da2f49150",
+    "ru-55832eb3ec5ea05c9dee3d6d",
+    "ru-b75a5dff58e16b54e188abde"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-10d860193cb35bfc9aaa019f": 0.9822,
+     "ru-21477163a67cb9b7908ad7b2": 0.983,
+     "ru-270562db2ef313ee88906329": 0.9822,
+     "ru-a79f5713370daf246a358a02": 0.9777,
+     "ru-fcbadc92323a31f4032ede93": 0.984
+    },
+    "language": "en",
+    "seed": "ru-9dda09565e9c93b06c4d8e49"
+   },
+   "id": "tg-0077",
+   "kind": "topic",
+   "members": [
+    "ru-10d860193cb35bfc9aaa019f",
+    "ru-21477163a67cb9b7908ad7b2",
+    "ru-270562db2ef313ee88906329",
+    "ru-9dda09565e9c93b06c4d8e49",
+    "ru-a79f5713370daf246a358a02",
+    "ru-fcbadc92323a31f4032ede93"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-363b42b1d9e20e6998be4b27": 0.9818,
+     "ru-38723f8839b9ab866ee62bd3": 0.9812,
+     "ru-4f37b344b15ff3910930dd2f": 0.9821,
+     "ru-8cec63e3b684093bf01581f9": 0.9816,
+     "ru-8fe2dd7c19870dcdb8581a49": 0.9811
+    },
+    "language": "en",
+    "seed": "ru-a187db40e8c4e89201fec91c"
+   },
+   "id": "tg-0078",
+   "kind": "topic",
+   "members": [
+    "ru-363b42b1d9e20e6998be4b27",
+    "ru-38723f8839b9ab866ee62bd3",
+    "ru-4f37b344b15ff3910930dd2f",
+    "ru-8cec63e3b684093bf01581f9",
+    "ru-8fe2dd7c19870dcdb8581a49",
+    "ru-a187db40e8c4e89201fec91c"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-47758d9bbb229812ec412034": 0.9817,
+     "ru-4a16ecd45f370e823a79beb4": 0.9823,
+     "ru-573fe8cf72735bebf6e38e1e": 0.9814,
+     "ru-ba5b0c9e05173a48d1f21cb3": 0.9821,
+     "ru-cf402475dedcfb00d0ab96a8": 0.9823
+    },
+    "language": "en",
+    "seed": "ru-254a6558c20b35e7fef04596"
+   },
+   "id": "tg-0079",
+   "kind": "topic",
+   "members": [
+    "ru-254a6558c20b35e7fef04596",
+    "ru-47758d9bbb229812ec412034",
+    "ru-4a16ecd45f370e823a79beb4",
+    "ru-573fe8cf72735bebf6e38e1e",
+    "ru-ba5b0c9e05173a48d1f21cb3",
+    "ru-cf402475dedcfb00d0ab96a8"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-3bfdf962f7eabdd3fcde2795": 0.9814,
+     "ru-670d6b9483e3504c7eb15034": 0.9815,
+     "ru-89a06bcce080a6cc32f2a117": 0.9815,
+     "ru-939b2ce6ed7f9e14c5fc4686": 0.9815,
+     "ru-9c6e1b135f9eac907ec65cb4": 0.981
+    },
+    "language": "en",
+    "seed": "ru-2fb3feeafe44f6fafa793689"
+   },
+   "id": "tg-0080",
+   "kind": "topic",
+   "members": [
+    "ru-2fb3feeafe44f6fafa793689",
+    "ru-3bfdf962f7eabdd3fcde2795",
+    "ru-670d6b9483e3504c7eb15034",
+    "ru-89a06bcce080a6cc32f2a117",
+    "ru-939b2ce6ed7f9e14c5fc4686",
+    "ru-9c6e1b135f9eac907ec65cb4"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-028dd8f933b3d932402dd651": 0.9812,
+     "ru-3eae5992da0a36b42005362e": 0.9804,
+     "ru-b5c55f350c79037e103c49d8": 0.9804,
+     "ru-d16807375bc548049ef51fbc": 0.9803,
+     "ru-e60f69d76e9cc1c6628bb127": 0.9804
+    },
+    "language": "en",
+    "seed": "ru-340386bef23387186b7a0fec"
+   },
+   "id": "tg-0081",
+   "kind": "topic",
+   "members": [
+    "ru-028dd8f933b3d932402dd651",
+    "ru-340386bef23387186b7a0fec",
+    "ru-3eae5992da0a36b42005362e",
+    "ru-b5c55f350c79037e103c49d8",
+    "ru-d16807375bc548049ef51fbc",
+    "ru-e60f69d76e9cc1c6628bb127"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-65d0d3a33ca28ec1a5bb67fe": 0.9871,
+     "ru-829f724cf21bf886722998d2": 0.9851,
+     "ru-979c6764eddb5cc095c1e99d": 0.9844,
+     "ru-a7f793bd44a3d7e4c273bb36": 0.9178,
+     "ru-efdead9015d8acdecf466f6c": 0.5912
+    },
+    "language": "en",
+    "seed": "ru-ac0ca3eed68e466aca4f0313"
+   },
+   "id": "tg-0082",
+   "kind": "topic",
+   "members": [
+    "ru-65d0d3a33ca28ec1a5bb67fe",
+    "ru-829f724cf21bf886722998d2",
+    "ru-979c6764eddb5cc095c1e99d",
+    "ru-a7f793bd44a3d7e4c273bb36",
+    "ru-ac0ca3eed68e466aca4f0313",
+    "ru-efdead9015d8acdecf466f6c"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-2839966daa3b0f6b0e3c951a": 0.9733,
+     "ru-33570c0824522f636f3284fa": 0.9785,
+     "ru-34766b71cf9af2169a6ade62": 0.9732,
+     "ru-4304de73327e1823e8e676c9": 0.9727,
+     "ru-aa3bfa0ac6d3eff7fc1f8ff0": 0.9731
+    },
+    "language": "en",
+    "seed": "ru-dbdbc2e4064b820f0135bcea"
+   },
+   "id": "tg-0083",
+   "kind": "topic",
+   "members": [
+    "ru-2839966daa3b0f6b0e3c951a",
+    "ru-33570c0824522f636f3284fa",
+    "ru-34766b71cf9af2169a6ade62",
+    "ru-4304de73327e1823e8e676c9",
+    "ru-aa3bfa0ac6d3eff7fc1f8ff0",
+    "ru-dbdbc2e4064b820f0135bcea"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-5c91fa9426c435ec881e9975": 0.9791,
+     "ru-6a9c857e7c33fede3c5e1285": 0.9791,
+     "ru-a11963c6115e9485bbf31aa6": 0.9789,
+     "ru-a2779edb07f7282ae17af782": 0.9783,
+     "ru-e9f629d17bd6b3d2e562ee9d": 0.979
+    },
+    "language": "en",
+    "seed": "ru-051a3f1192b152a32b1c4146"
+   },
+   "id": "tg-0084",
+   "kind": "topic",
+   "members": [
+    "ru-051a3f1192b152a32b1c4146",
+    "ru-5c91fa9426c435ec881e9975",
+    "ru-6a9c857e7c33fede3c5e1285",
+    "ru-a11963c6115e9485bbf31aa6",
+    "ru-a2779edb07f7282ae17af782",
+    "ru-e9f629d17bd6b3d2e562ee9d"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-57539db98758aaf42f3461ab": 0.9782,
+     "ru-8286ab73b4bf7a0cc1c29a07": 0.8706,
+     "ru-93ca892cf00ef236324a6d99": 0.977,
+     "ru-99db38713c33bef49cd79786": 0.9782,
+     "ru-e87ea068edb4d61d571743a1": 0.8706
+    },
+    "language": "en",
+    "seed": "ru-4988ec388316587ce8858c6b"
+   },
+   "id": "tg-0085",
+   "kind": "topic",
+   "members": [
+    "ru-4988ec388316587ce8858c6b",
+    "ru-57539db98758aaf42f3461ab",
+    "ru-8286ab73b4bf7a0cc1c29a07",
+    "ru-93ca892cf00ef236324a6d99",
+    "ru-99db38713c33bef49cd79786",
+    "ru-e87ea068edb4d61d571743a1"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-5b1f95c4bd18cbc7ee6530fc": 0.3609,
+     "ru-96506ddd76337c9ef54982f5": 0.3715,
+     "ru-b71759c95212242b75e5bc02": 0.3781,
+     "ru-c76d3c4b0793312bec2ebaa0": 0.351,
+     "ru-dc373f44d5f4caebae62fc65": 0.3566
+    },
+    "language": "en",
+    "seed": "ru-356a3697684b6a28b167ae9b"
+   },
+   "id": "tg-0086",
+   "kind": "topic",
+   "members": [
+    "ru-356a3697684b6a28b167ae9b",
+    "ru-5b1f95c4bd18cbc7ee6530fc",
+    "ru-96506ddd76337c9ef54982f5",
+    "ru-b71759c95212242b75e5bc02",
+    "ru-c76d3c4b0793312bec2ebaa0",
+    "ru-dc373f44d5f4caebae62fc65"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-a9a5b7c845e34dbe84a6b729": 0.3776,
+     "ru-bf4b22370c5d41c699ee8e93": 0.3789,
+     "ru-caa3c95fd50014b1eb7771fe": 0.3761,
+     "ru-cca9a72bc6c676ead0b2b474": 0.3735,
+     "ru-df31a6fa91b74a467c9677b2": 0.3739
+    },
+    "language": "en",
+    "seed": "ru-dffec99943cbb0311853fb40"
+   },
+   "id": "tg-0087",
+   "kind": "topic",
+   "members": [
+    "ru-a9a5b7c845e34dbe84a6b729",
+    "ru-bf4b22370c5d41c699ee8e93",
+    "ru-caa3c95fd50014b1eb7771fe",
+    "ru-cca9a72bc6c676ead0b2b474",
+    "ru-df31a6fa91b74a467c9677b2",
+    "ru-dffec99943cbb0311853fb40"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-05f6856e87522f45163bed8b": 0.4139,
+     "ru-687ca44fcc508d8a6dadee07": 0.7492,
+     "ru-c0449cbe01e357ab633e9f80": 0.402,
+     "ru-e0a964f11daebf90c9f00739": 0.4124,
+     "ru-f2eecb1d183b661a7c2306a0": 0.3862
+    },
+    "language": "en",
+    "seed": "ru-14913361fb0eb1bf85008769"
+   },
+   "id": "tg-0088",
+   "kind": "topic",
+   "members": [
+    "ru-05f6856e87522f45163bed8b",
+    "ru-14913361fb0eb1bf85008769",
+    "ru-687ca44fcc508d8a6dadee07",
+    "ru-c0449cbe01e357ab633e9f80",
+    "ru-e0a964f11daebf90c9f00739",
+    "ru-f2eecb1d183b661a7c2306a0"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-9010ed69e6b28edede358526": 0.3186,
+     "ru-b2daf5df7c841a5cfb9691fc": 0.313,
+     "ru-cedf179b1275e3c0f8d79cb1": 0.3119,
+     "ru-ed0f55d1bad52efa7c2fe64b": 0.3622,
+     "ru-f8ecd7f504c17b9f382fdccb": 0.9739
+    },
+    "language": "en",
+    "seed": "ru-934c63ea37ed99f1de80649c"
+   },
+   "id": "tg-0089",
+   "kind": "topic",
+   "members": [
+    "ru-9010ed69e6b28edede358526",
+    "ru-934c63ea37ed99f1de80649c",
+    "ru-b2daf5df7c841a5cfb9691fc",
+    "ru-cedf179b1275e3c0f8d79cb1",
+    "ru-ed0f55d1bad52efa7c2fe64b",
+    "ru-f8ecd7f504c17b9f382fdccb"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-096a1fd2f71acc350a9c4972": 0.4327,
+     "ru-7702d627699d3aa0aa72eabc": 0.6391
+    },
+    "language": "en",
+    "seed": "ru-7e7e874c38b106bdd3fc3068"
+   },
+   "id": "tg-0090",
+   "kind": "topic",
+   "members": [
+    "ru-096a1fd2f71acc350a9c4972",
+    "ru-7702d627699d3aa0aa72eabc",
+    "ru-7e7e874c38b106bdd3fc3068"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-602d34cf45aac3b0a5d75a2f": 0.3244,
+     "ru-d22237b3b8fe93bb6a4fb263": 0.5897
+    },
+    "language": "en",
+    "seed": "ru-bf94ed131fc00174bad4c7f0"
+   },
+   "id": "tg-0091",
+   "kind": "topic",
+   "members": [
+    "ru-602d34cf45aac3b0a5d75a2f",
+    "ru-bf94ed131fc00174bad4c7f0",
+    "ru-d22237b3b8fe93bb6a4fb263"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-97ecd257404e6910eaf59101": 0.3073,
+     "ru-a8a25b125c90956025920e51": 0.3503
+    },
+    "language": "en",
+    "seed": "ru-44b342dedc2baf886a3e7309"
+   },
+   "id": "tg-0092",
+   "kind": "topic",
+   "members": [
+    "ru-44b342dedc2baf886a3e7309",
+    "ru-97ecd257404e6910eaf59101",
+    "ru-a8a25b125c90956025920e51"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-3752ea9c5efa25a4c4723296": 0.4341,
+     "ru-4098bfc5b78159808a233d0e": 0.5948,
+     "ru-63fc55a6958e1774de829c7e": 0.385,
+     "ru-a0614284b0a7334e53a38dac": 0.4171
+    },
+    "language": "en",
+    "seed": "ru-7c2beb067c74f4e66fd2d431"
+   },
+   "id": "tg-0093",
+   "kind": "topic",
+   "members": [
+    "ru-3752ea9c5efa25a4c4723296",
+    "ru-4098bfc5b78159808a233d0e",
+    "ru-63fc55a6958e1774de829c7e",
+    "ru-7c2beb067c74f4e66fd2d431",
+    "ru-a0614284b0a7334e53a38dac"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-229f53928e9d3ea6da7849ab": 0.4236,
+     "ru-8baccb4d28490d3f28e9f8d3": 0.4359,
+     "ru-95eafd2a4885c1d59692508f": 0.4045,
+     "ru-ec2fdc91707f95c33222aa3a": 0.4345,
+     "ru-f4f37e34ef54d14f4fdc1c09": 0.4382
+    },
+    "language": "en",
+    "seed": "ru-0b2be76d4f499f86f35b41a0"
+   },
+   "id": "tg-0094",
+   "kind": "topic",
+   "members": [
+    "ru-0b2be76d4f499f86f35b41a0",
+    "ru-229f53928e9d3ea6da7849ab",
+    "ru-8baccb4d28490d3f28e9f8d3",
+    "ru-95eafd2a4885c1d59692508f",
+    "ru-ec2fdc91707f95c33222aa3a",
+    "ru-f4f37e34ef54d14f4fdc1c09"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-43bb96cc5f3163593a271592": 0.7599,
+     "ru-8731169720df10d03e2a2133": 0.7744,
+     "ru-89b66afe930ed4189090d1c9": 0.7768,
+     "ru-ad101fd289ea0c3e835bd2e0": 0.7584,
+     "ru-ee8f4577c0563e52d04ec05e": 0.8727
+    },
+    "language": "en",
+    "seed": "ru-2674c8c38719127be0e8cb3d"
+   },
+   "id": "tg-0095",
+   "kind": "topic",
+   "members": [
+    "ru-2674c8c38719127be0e8cb3d",
+    "ru-43bb96cc5f3163593a271592",
+    "ru-8731169720df10d03e2a2133",
+    "ru-89b66afe930ed4189090d1c9",
+    "ru-ad101fd289ea0c3e835bd2e0",
+    "ru-ee8f4577c0563e52d04ec05e"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-025e32cf7947fc703e11c396": 0.4191,
+     "ru-1217905616e80a45d2582e6d": 0.3451,
+     "ru-1ae8cc75503230dc7e2ee8cf": 0.3408,
+     "ru-2a87cc3b01f1fc42a167f763": 0.3341,
+     "ru-d7fbd0f1b906567225d67536": 0.3395
+    },
+    "language": "en",
+    "seed": "ru-e9d01f392c9dbbf0cf53e3ab"
+   },
+   "id": "tg-0096",
+   "kind": "topic",
+   "members": [
+    "ru-025e32cf7947fc703e11c396",
+    "ru-1217905616e80a45d2582e6d",
+    "ru-1ae8cc75503230dc7e2ee8cf",
+    "ru-2a87cc3b01f1fc42a167f763",
+    "ru-d7fbd0f1b906567225d67536",
+    "ru-e9d01f392c9dbbf0cf53e3ab"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-1de52180a7b802ac35553766": 0.3397,
+     "ru-3163e5ee4b8d28adc9e51de2": 0.7248
+    },
+    "language": "en",
+    "seed": "ru-a69e9a44904cb70173c734fc"
+   },
+   "id": "tg-0097",
+   "kind": "topic",
+   "members": [
+    "ru-1de52180a7b802ac35553766",
+    "ru-3163e5ee4b8d28adc9e51de2",
+    "ru-a69e9a44904cb70173c734fc"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-0ea53a18746717fff719e6bb": 0.3273,
+     "ru-311175e16ca1c70ac5a23ab1": 0.3171,
+     "ru-6639d596f0bb2459e17d412d": 0.3246,
+     "ru-9b082bd8ff65fc9b911377c4": 0.3332,
+     "ru-ec5c613fcc4dcf9174f6ee10": 0.3311
+    },
+    "language": "en",
+    "seed": "ru-93469b4e452353780af3f8f7"
+   },
+   "id": "tg-0098",
+   "kind": "topic",
+   "members": [
+    "ru-0ea53a18746717fff719e6bb",
+    "ru-311175e16ca1c70ac5a23ab1",
+    "ru-6639d596f0bb2459e17d412d",
+    "ru-93469b4e452353780af3f8f7",
+    "ru-9b082bd8ff65fc9b911377c4",
+    "ru-ec5c613fcc4dcf9174f6ee10"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-3ed33b32ecd1dadf02b474fc": 0.5609,
+     "ru-867bf7bc9150c9e2a6f59100": 0.7575,
+     "ru-afc652b303d4e61a25a01e05": 0.5522,
+     "ru-c13745bf757fb539ab90781b": 0.5582,
+     "ru-ebd1851d4800a1edc6caa3a9": 0.5532
+    },
+    "language": "en",
+    "seed": "ru-a949c6900bc601a69a757241"
+   },
+   "id": "tg-0099",
+   "kind": "topic",
+   "members": [
+    "ru-3ed33b32ecd1dadf02b474fc",
+    "ru-867bf7bc9150c9e2a6f59100",
+    "ru-a949c6900bc601a69a757241",
+    "ru-afc652b303d4e61a25a01e05",
+    "ru-c13745bf757fb539ab90781b",
+    "ru-ebd1851d4800a1edc6caa3a9"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-19dce6fa4355c0f9c7bc9da5": 0.4107,
+     "ru-2efa68e5e1a0dfc8277a1b47": 0.4218,
+     "ru-7aa3a0717ba058def9a439bb": 0.3881,
+     "ru-a13c231b2a5e75bb836300ee": 0.4081,
+     "ru-e2919aa3fc1ce574f3ae5f61": 0.3991
+    },
+    "language": "en",
+    "seed": "ru-4c8131f556dddda4d9e0b842"
+   },
+   "id": "tg-0100",
+   "kind": "topic",
+   "members": [
+    "ru-19dce6fa4355c0f9c7bc9da5",
+    "ru-2efa68e5e1a0dfc8277a1b47",
+    "ru-4c8131f556dddda4d9e0b842",
+    "ru-7aa3a0717ba058def9a439bb",
+    "ru-a13c231b2a5e75bb836300ee",
+    "ru-e2919aa3fc1ce574f3ae5f61"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-19116c5a0eb9722db1922f76": 0.3618,
+     "ru-c022df7bf3688efb18bb1254": 0.4137,
+     "ru-c9e2b50887b63cbd76159fe6": 0.3741,
+     "ru-dc4e0398ec1f0d17156d9adb": 0.564,
+     "ru-e5bc2db667251a02fd96b2d7": 0.6743
+    },
+    "language": "en",
+    "seed": "ru-e1fb7e9ab595a2751fc20ed0"
+   },
+   "id": "tg-0101",
+   "kind": "topic",
+   "members": [
+    "ru-19116c5a0eb9722db1922f76",
+    "ru-c022df7bf3688efb18bb1254",
+    "ru-c9e2b50887b63cbd76159fe6",
+    "ru-dc4e0398ec1f0d17156d9adb",
+    "ru-e1fb7e9ab595a2751fc20ed0",
+    "ru-e5bc2db667251a02fd96b2d7"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-52fdffadc79117885f98c8ba": 0.3014,
+     "ru-ac4209a547bc1a5409b71bae": 0.5812
+    },
+    "language": "en",
+    "seed": "ru-61bb2d7693abb05225a504eb"
+   },
+   "id": "tg-0102",
+   "kind": "topic",
+   "members": [
+    "ru-52fdffadc79117885f98c8ba",
+    "ru-61bb2d7693abb05225a504eb",
+    "ru-ac4209a547bc1a5409b71bae"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-67bdf7d3ba91ac1a0b30a3c9": 0.351,
+     "ru-7838f394cedeb4f3a62e9e9c": 0.3565,
+     "ru-c580d0a1d537d0c4ed5ff01d": 0.3322,
+     "ru-ccaf20d52eadd8071376a46e": 0.3683,
+     "ru-d65ed0f047bd94f1b32e46ca": 0.3915
+    },
+    "language": "en",
+    "seed": "ru-159f015ce9111597e3acba69"
+   },
+   "id": "tg-0103",
+   "kind": "topic",
+   "members": [
+    "ru-159f015ce9111597e3acba69",
+    "ru-67bdf7d3ba91ac1a0b30a3c9",
+    "ru-7838f394cedeb4f3a62e9e9c",
+    "ru-c580d0a1d537d0c4ed5ff01d",
+    "ru-ccaf20d52eadd8071376a46e",
+    "ru-d65ed0f047bd94f1b32e46ca"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-6b915f10e74292fbb89401e3": 0.5496,
+     "ru-9293eb91ba19778896e00de7": 0.3183,
+     "ru-9cf5ebabaaa64f10eba05023": 0.3264,
+     "ru-a7271aa48c98ce196a7cb9df": 0.3614,
+     "ru-cd5d2ef3400d2acedb4e6b0d": 0.331
+    },
+    "language": "en",
+    "seed": "ru-144b55b6d071d7527d822b34"
+   },
+   "id": "tg-0104",
+   "kind": "topic",
+   "members": [
+    "ru-144b55b6d071d7527d822b34",
+    "ru-6b915f10e74292fbb89401e3",
+    "ru-9293eb91ba19778896e00de7",
+    "ru-9cf5ebabaaa64f10eba05023",
+    "ru-a7271aa48c98ce196a7cb9df",
+    "ru-cd5d2ef3400d2acedb4e6b0d"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-5e5cd703719edcf9692d7fd9": 0.425,
+     "ru-7b76e716b2911c4b1d56dcb2": 0.4918,
+     "ru-89ceae15c98382ac494b54a7": 0.999,
+     "ru-922238e6b0f9daff7ecd105a": 0.4994,
+     "ru-be9981bfad32e1537f96bbe7": 0.5401
+    },
+    "language": "en",
+    "seed": "ru-04f62eee57037f99c255cee7"
+   },
+   "id": "tg-0105",
+   "kind": "topic",
+   "members": [
+    "ru-04f62eee57037f99c255cee7",
+    "ru-5e5cd703719edcf9692d7fd9",
+    "ru-7b76e716b2911c4b1d56dcb2",
+    "ru-89ceae15c98382ac494b54a7",
+    "ru-922238e6b0f9daff7ecd105a",
+    "ru-be9981bfad32e1537f96bbe7"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-1c6de7dd1977c5ca5100ba3a": 0.4903,
+     "ru-3c8e9b15490054093ae06899": 0.5722,
+     "ru-7478ec570dd6866527144f7f": 0.463,
+     "ru-7ab00f13037eba1fa61cdd0f": 0.5507,
+     "ru-970738ba0f4788ec41c17c6c": 0.5716
+    },
+    "language": "en",
+    "seed": "ru-3cd0e56a937b0f59b6b463ab"
+   },
+   "id": "tg-0106",
+   "kind": "topic",
+   "members": [
+    "ru-1c6de7dd1977c5ca5100ba3a",
+    "ru-3c8e9b15490054093ae06899",
+    "ru-3cd0e56a937b0f59b6b463ab",
+    "ru-7478ec570dd6866527144f7f",
+    "ru-7ab00f13037eba1fa61cdd0f",
+    "ru-970738ba0f4788ec41c17c6c"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-51b707db03a80731b5a9becc": 0.7981,
+     "ru-affb3ab55d5404b184e5d4d4": 0.7581
+    },
+    "language": "en",
+    "seed": "ru-1ce6993c464b443d268187bf"
+   },
+   "id": "tg-0107",
+   "kind": "topic",
+   "members": [
+    "ru-1ce6993c464b443d268187bf",
+    "ru-51b707db03a80731b5a9becc",
+    "ru-affb3ab55d5404b184e5d4d4"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-0384b160b5597235ea4702ac": 0.3239,
+     "ru-b9b0e3df682ed5efcf78073b": 0.487,
+     "ru-d854565fd647be5d1dbe5bd8": 0.3026,
+     "ru-fa7c45d46de985ba3f960c85": 0.3579
+    },
+    "language": "en",
+    "seed": "ru-40fd2e74a8c142c3fd50e2cc"
+   },
+   "id": "tg-0108",
+   "kind": "topic",
+   "members": [
+    "ru-0384b160b5597235ea4702ac",
+    "ru-40fd2e74a8c142c3fd50e2cc",
+    "ru-b9b0e3df682ed5efcf78073b",
+    "ru-d854565fd647be5d1dbe5bd8",
+    "ru-fa7c45d46de985ba3f960c85"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-31c5b63a5be7148d993545f2": 0.4086,
+     "ru-3e55af25e4957cb00fe4a4e6": 0.7405,
+     "ru-a3fb8a9514556f66691cc6f8": 0.3133,
+     "ru-eee05e3404337a9be4d5479e": 0.37,
+     "ru-f231c6c0b965d80d9070950e": 0.3988
+    },
+    "language": "en",
+    "seed": "ru-41570a08cb342ef3a6eb11f3"
+   },
+   "id": "tg-0109",
+   "kind": "topic",
+   "members": [
+    "ru-31c5b63a5be7148d993545f2",
+    "ru-3e55af25e4957cb00fe4a4e6",
+    "ru-41570a08cb342ef3a6eb11f3",
+    "ru-a3fb8a9514556f66691cc6f8",
+    "ru-eee05e3404337a9be4d5479e",
+    "ru-f231c6c0b965d80d9070950e"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-2945a10a062eaf2c695e4d25": 0.4749,
+     "ru-346e06c626179f7cb76c57d0": 0.4469,
+     "ru-656d91d210c0893f37a2e60d": 0.3009,
+     "ru-def62bfed0db54df980f315c": 0.3134,
+     "ru-ff8acaa61035c80c699af125": 0.3742
+    },
+    "language": "en",
+    "seed": "ru-484c8961fc91f0768e107886"
+   },
+   "id": "tg-0110",
+   "kind": "topic",
+   "members": [
+    "ru-2945a10a062eaf2c695e4d25",
+    "ru-346e06c626179f7cb76c57d0",
+    "ru-484c8961fc91f0768e107886",
+    "ru-656d91d210c0893f37a2e60d",
+    "ru-def62bfed0db54df980f315c",
+    "ru-ff8acaa61035c80c699af125"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-3e76dc32976654bb55109de4": 0.4429,
+     "ru-685219a30e23ff0338889939": 0.4516,
+     "ru-ec42e68b38c4f5e8e4e941dc": 0.353,
+     "ru-f068493be749da6397c6067b": 0.3594,
+     "ru-f078381a762c310df799f970": 0.3093
+    },
+    "language": "en",
+    "seed": "ru-63417cb4e90dedc113a591a4"
+   },
+   "id": "tg-0111",
+   "kind": "topic",
+   "members": [
+    "ru-3e76dc32976654bb55109de4",
+    "ru-63417cb4e90dedc113a591a4",
+    "ru-685219a30e23ff0338889939",
+    "ru-ec42e68b38c4f5e8e4e941dc",
+    "ru-f068493be749da6397c6067b",
+    "ru-f078381a762c310df799f970"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-36a8f90cff3b35436c88c78f": 0.5675,
+     "ru-37f384eb73e0148f041652a3": 0.5451,
+     "ru-6634f55c994fbf6649065aba": 0.4874,
+     "ru-9a052f6c164e2719ac210a47": 0.5462
+    },
+    "language": "en",
+    "seed": "ru-d7034eb58c17e476e4566025"
+   },
+   "id": "tg-0112",
+   "kind": "topic",
+   "members": [
+    "ru-36a8f90cff3b35436c88c78f",
+    "ru-37f384eb73e0148f041652a3",
+    "ru-6634f55c994fbf6649065aba",
+    "ru-9a052f6c164e2719ac210a47",
+    "ru-d7034eb58c17e476e4566025"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-378752e720e84cfdb9f8eebc": 0.338,
+     "ru-847bde9969e285a6e70bac95": 0.3179,
+     "ru-92f646236b5e4af49d13254b": 0.3441,
+     "ru-d86dfc559dc6b77130ffcb8c": 0.3629,
+     "ru-fcbd93a92cb20fef05e9dbdd": 0.3527
+    },
+    "language": "en",
+    "seed": "ru-f6019897765ae6724e68fb72"
+   },
+   "id": "tg-0113",
+   "kind": "topic",
+   "members": [
+    "ru-378752e720e84cfdb9f8eebc",
+    "ru-847bde9969e285a6e70bac95",
+    "ru-92f646236b5e4af49d13254b",
+    "ru-d86dfc559dc6b77130ffcb8c",
+    "ru-f6019897765ae6724e68fb72",
+    "ru-fcbd93a92cb20fef05e9dbdd"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-497bf4ca3092736832440b94": 0.3339,
+     "ru-6bda37578d3cb7809dbb662a": 0.4541,
+     "ru-ab726cccae877b8b551d6ba3": 0.4668,
+     "ru-db9765d2af0497208bfed949": 0.4647
+    },
+    "language": "en",
+    "seed": "ru-0abf15de533a61010233e096"
+   },
+   "id": "tg-0114",
+   "kind": "topic",
+   "members": [
+    "ru-0abf15de533a61010233e096",
+    "ru-497bf4ca3092736832440b94",
+    "ru-6bda37578d3cb7809dbb662a",
+    "ru-ab726cccae877b8b551d6ba3",
+    "ru-db9765d2af0497208bfed949"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-1911eda51bef534c6af2fa02": 0.6473,
+     "ru-3cb179303f827bef13c8dcd0": 0.5286,
+     "ru-749f14031b00fff6219e849c": 0.6658,
+     "ru-9e48061da34457f4e01071d3": 0.4
+    },
+    "language": "en",
+    "seed": "ru-183885a6f5e716ca257b188d"
+   },
+   "id": "tg-0115",
+   "kind": "topic",
+   "members": [
+    "ru-183885a6f5e716ca257b188d",
+    "ru-1911eda51bef534c6af2fa02",
+    "ru-3cb179303f827bef13c8dcd0",
+    "ru-749f14031b00fff6219e849c",
+    "ru-9e48061da34457f4e01071d3"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-1375f7a98350f89fc042f5ab": 0.3007,
+     "ru-1e457f4e390a831bb74f8d89": 0.8473,
+     "ru-5ef563083f6fac3769ee2add": 0.7436,
+     "ru-96aedf4521dc4097f6de57e4": 0.5738
+    },
+    "language": "en",
+    "seed": "ru-339065d469db0defa15af578"
+   },
+   "id": "tg-0116",
+   "kind": "topic",
+   "members": [
+    "ru-1375f7a98350f89fc042f5ab",
+    "ru-1e457f4e390a831bb74f8d89",
+    "ru-339065d469db0defa15af578",
+    "ru-5ef563083f6fac3769ee2add",
+    "ru-96aedf4521dc4097f6de57e4"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-3bf5d89d96ae4aa02079b928": 0.4091,
+     "ru-64da07dd6f9f91e4f867a56c": 0.5202,
+     "ru-7d4ced7b9aeb27ded778719d": 0.3244,
+     "ru-da814b81f425c0ba07374051": 0.4206
+    },
+    "language": "en",
+    "seed": "ru-442bcac309f659c55213a0fc"
+   },
+   "id": "tg-0117",
+   "kind": "topic",
+   "members": [
+    "ru-3bf5d89d96ae4aa02079b928",
+    "ru-442bcac309f659c55213a0fc",
+    "ru-64da07dd6f9f91e4f867a56c",
+    "ru-7d4ced7b9aeb27ded778719d",
+    "ru-da814b81f425c0ba07374051"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-5d2b6fcfacc9df047f3ebe0c": 0.3125,
+     "ru-81bd2007d24682c6a5d4094c": 0.3323,
+     "ru-b978b171c6d550b9871e3c16": 0.3094,
+     "ru-e6ed62ce0a9bb9fadc6bd095": 0.3092
+    },
+    "language": "en",
+    "seed": "ru-5915166680e6c55a7682ba6a"
+   },
+   "id": "tg-0118",
+   "kind": "topic",
+   "members": [
+    "ru-5915166680e6c55a7682ba6a",
+    "ru-5d2b6fcfacc9df047f3ebe0c",
+    "ru-81bd2007d24682c6a5d4094c",
+    "ru-b978b171c6d550b9871e3c16",
+    "ru-e6ed62ce0a9bb9fadc6bd095"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-4543fcbca82f57e1b97549bf": 0.3971,
+     "ru-948c7e4e402db2e9a9547014": 0.4591,
+     "ru-eacef617c5ad45072d54e56e": 0.4562
+    },
+    "language": "en",
+    "seed": "ru-18e0a2a9df64ff123103fb4d"
+   },
+   "id": "tg-0119",
+   "kind": "topic",
+   "members": [
+    "ru-18e0a2a9df64ff123103fb4d",
+    "ru-4543fcbca82f57e1b97549bf",
+    "ru-948c7e4e402db2e9a9547014",
+    "ru-eacef617c5ad45072d54e56e"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-7e7299e937721ba30a8c55cd": 0.4141,
+     "ru-90ae17778336f4cc9bd624c5": 0.3822,
+     "ru-af1c3fad03d3fd153b0cbeeb": 0.3647
+    },
+    "language": "en",
+    "seed": "ru-19fcc60eae07f8b2f5cd34d0"
+   },
+   "id": "tg-0120",
+   "kind": "topic",
+   "members": [
+    "ru-19fcc60eae07f8b2f5cd34d0",
+    "ru-7e7299e937721ba30a8c55cd",
+    "ru-90ae17778336f4cc9bd624c5",
+    "ru-af1c3fad03d3fd153b0cbeeb"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-52cee303b20c2d6e69e2f79f": 0.8966,
+     "ru-afa8a56f66de68a42b60d44c": 0.9949,
+     "ru-c8904fc94639f99bd296ce7b": 0.9965
+    },
+    "language": "en",
+    "seed": "ru-3ec8fca5f456943d0ad550e6"
+   },
+   "id": "tg-0121",
+   "kind": "topic",
+   "members": [
+    "ru-3ec8fca5f456943d0ad550e6",
+    "ru-52cee303b20c2d6e69e2f79f",
+    "ru-afa8a56f66de68a42b60d44c",
+    "ru-c8904fc94639f99bd296ce7b"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-89d0f9979e41adede6074100": 0.3385,
+     "ru-e573d16ddce014c777838458": 0.3407,
+     "ru-f74703e6331658d3da254b8c": 0.7729
+    },
+    "language": "en",
+    "seed": "ru-42fc77ae6e7bb14c3e5f6cf3"
+   },
+   "id": "tg-0122",
+   "kind": "topic",
+   "members": [
+    "ru-42fc77ae6e7bb14c3e5f6cf3",
+    "ru-89d0f9979e41adede6074100",
+    "ru-e573d16ddce014c777838458",
+    "ru-f74703e6331658d3da254b8c"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-af228054e2e6a0261d5b99fd": 0.7761,
+     "ru-ec24973274736d03754a87fc": 0.7775,
+     "ru-ff2d5b3542c9fa3a40dd1583": 0.7761
+    },
+    "language": "en",
+    "seed": "ru-6d5f6b4ae8fc26783f249917"
+   },
+   "id": "tg-0123",
+   "kind": "topic",
+   "members": [
+    "ru-6d5f6b4ae8fc26783f249917",
+    "ru-af228054e2e6a0261d5b99fd",
+    "ru-ec24973274736d03754a87fc",
+    "ru-ff2d5b3542c9fa3a40dd1583"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-8ea88d2a087677416d4d03e7": 0.7367,
+     "ru-d14e3d1afee1c8987f384a6a": 0.7439
+    },
+    "language": "en",
+    "seed": "ru-81d91a90ab7f9c4b341643c8"
+   },
+   "id": "tg-0124",
+   "kind": "topic",
+   "members": [
+    "ru-81d91a90ab7f9c4b341643c8",
+    "ru-8ea88d2a087677416d4d03e7",
+    "ru-d14e3d1afee1c8987f384a6a"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-1bc99e76126fde0f3cc2c214": 0.5072,
+     "ru-f234a72a567d46af6ded0ded": 0.3804,
+     "ru-f92d8093ce673c3429d78a91": 0.305
+    },
+    "language": "en",
+    "seed": "ru-993c6d8a3bf528f34002188a"
+   },
+   "id": "tg-0125",
+   "kind": "topic",
+   "members": [
+    "ru-1bc99e76126fde0f3cc2c214",
+    "ru-993c6d8a3bf528f34002188a",
+    "ru-f234a72a567d46af6ded0ded",
+    "ru-f92d8093ce673c3429d78a91"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-931b6640d296570b93b0f475": 0.7282,
+     "ru-e03f451a2de9bb5265041b56": 0.329
+    },
+    "language": "en",
+    "seed": "ru-02ff37f1a0409f83891a6d93"
+   },
+   "id": "tg-0126",
+   "kind": "topic",
+   "members": [
+    "ru-02ff37f1a0409f83891a6d93",
+    "ru-931b6640d296570b93b0f475",
+    "ru-e03f451a2de9bb5265041b56"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-5600a52e60572f71187b6c0d": 0.8099,
+     "ru-85d17f7f65da806046093a70": 0.6246
+    },
+    "language": "en",
+    "seed": "ru-03048d9a6a309d805d34086b"
+   },
+   "id": "tg-0127",
+   "kind": "topic",
+   "members": [
+    "ru-03048d9a6a309d805d34086b",
+    "ru-5600a52e60572f71187b6c0d",
+    "ru-85d17f7f65da806046093a70"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-a9642284b396c377ca6dd012": 0.3061,
+     "ru-e74245b4c5e2b9f6eb3b7ebc": 1.0
+    },
+    "language": "en",
+    "seed": "ru-0713cd3fdf42db6a84d0e792"
+   },
+   "id": "tg-0128",
+   "kind": "topic",
+   "members": [
+    "ru-0713cd3fdf42db6a84d0e792",
+    "ru-a9642284b396c377ca6dd012",
+    "ru-e74245b4c5e2b9f6eb3b7ebc"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-455f85df34df7fe0c3623a5c": 0.966,
+     "ru-b46414879d067eb7635ff580": 0.3312
+    },
+    "language": "en",
+    "seed": "ru-0772c764acae9550bfa02e51"
+   },
+   "id": "tg-0129",
+   "kind": "topic",
+   "members": [
+    "ru-0772c764acae9550bfa02e51",
+    "ru-455f85df34df7fe0c3623a5c",
+    "ru-b46414879d067eb7635ff580"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-4c5a9a335794c24c48c3a27e": 0.4197,
+     "ru-f5dcf9382c274401fd567535": 0.7272
+    },
+    "language": "en",
+    "seed": "ru-11d789e8461c7aef4b819398"
+   },
+   "id": "tg-0130",
+   "kind": "topic",
+   "members": [
+    "ru-11d789e8461c7aef4b819398",
+    "ru-4c5a9a335794c24c48c3a27e",
+    "ru-f5dcf9382c274401fd567535"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-5438451665b2e882b8208d30": 0.7616,
+     "ru-b3b4a9ce8cbfaa8a0359b98d": 0.8478
+    },
+    "language": "en",
+    "seed": "ru-1343edd0474891f5f667c43d"
+   },
+   "id": "tg-0131",
+   "kind": "topic",
+   "members": [
+    "ru-1343edd0474891f5f667c43d",
+    "ru-5438451665b2e882b8208d30",
+    "ru-b3b4a9ce8cbfaa8a0359b98d"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-1fd51fb2220d3f8587be2a8c": 0.8571,
+     "ru-e9eac3e3e2dbbdb84c48d273": 0.5112
+    },
+    "language": "en",
+    "seed": "ru-17164a3d74e1db088e563aae"
+   },
+   "id": "tg-0132",
+   "kind": "topic",
+   "members": [
+    "ru-17164a3d74e1db088e563aae",
+    "ru-1fd51fb2220d3f8587be2a8c",
+    "ru-e9eac3e3e2dbbdb84c48d273"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-987d7aa42e6d1258f7235e1e": 0.4654,
+     "ru-b532e55122dc69e80bc390ef": 0.5007
+    },
+    "language": "en",
+    "seed": "ru-1b2546b4ba0705c837107c80"
+   },
+   "id": "tg-0133",
+   "kind": "topic",
+   "members": [
+    "ru-1b2546b4ba0705c837107c80",
+    "ru-987d7aa42e6d1258f7235e1e",
+    "ru-b532e55122dc69e80bc390ef"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-33772f41a643283552721ec7": 0.5353,
+     "ru-67ea4051029ce5f0ee973b8a": 0.5586
+    },
+    "language": "en",
+    "seed": "ru-2296fdb29bb715af09621f35"
+   },
+   "id": "tg-0134",
+   "kind": "topic",
+   "members": [
+    "ru-2296fdb29bb715af09621f35",
+    "ru-33772f41a643283552721ec7",
+    "ru-67ea4051029ce5f0ee973b8a"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-3f1b104197a54a595970bb56": 0.4267,
+     "ru-5a2a1d3a02d6e012876b7079": 0.377
+    },
+    "language": "en",
+    "seed": "ru-2f15c447fe95ac0f28251715"
+   },
+   "id": "tg-0135",
+   "kind": "topic",
+   "members": [
+    "ru-2f15c447fe95ac0f28251715",
+    "ru-3f1b104197a54a595970bb56",
+    "ru-5a2a1d3a02d6e012876b7079"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-8f11750e8fccebe3db43301a": 0.8427,
+     "ru-de809b30705dba00368f8264": 0.8411
+    },
+    "language": "en",
+    "seed": "ru-318569c853a6129c0fe5e875"
+   },
+   "id": "tg-0136",
+   "kind": "topic",
+   "members": [
+    "ru-318569c853a6129c0fe5e875",
+    "ru-8f11750e8fccebe3db43301a",
+    "ru-de809b30705dba00368f8264"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-a124c9d35a0180d779ef8fec": 0.4898,
+     "ru-c115bb57e9aab6aacbdf7ec3": 0.5484
+    },
+    "language": "en",
+    "seed": "ru-3842b338600c476bb4d051d7"
+   },
+   "id": "tg-0137",
+   "kind": "topic",
+   "members": [
+    "ru-3842b338600c476bb4d051d7",
+    "ru-a124c9d35a0180d779ef8fec",
+    "ru-c115bb57e9aab6aacbdf7ec3"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-47959fcb9cf3d1904696c355": 0.426,
+     "ru-e8f4c8d1db994c2df7f0e946": 0.5464
+    },
+    "language": "en",
+    "seed": "ru-3bcccdfa3aa222bf50e0c2f2"
+   },
+   "id": "tg-0138",
+   "kind": "topic",
+   "members": [
+    "ru-3bcccdfa3aa222bf50e0c2f2",
+    "ru-47959fcb9cf3d1904696c355",
+    "ru-e8f4c8d1db994c2df7f0e946"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-9a0daf3a7446d7da71964a50": 0.5262,
+     "ru-d2a666d2f7f88f08d0ff51b9": 0.4621
+    },
+    "language": "en",
+    "seed": "ru-472fffa515719eea20e40b82"
+   },
+   "id": "tg-0139",
+   "kind": "topic",
+   "members": [
+    "ru-472fffa515719eea20e40b82",
+    "ru-9a0daf3a7446d7da71964a50",
+    "ru-d2a666d2f7f88f08d0ff51b9"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-cc95924ed4a06ea64c008c10": 0.4016,
+     "ru-f7ca752570d4503f317269b4": 0.3004
+    },
+    "language": "en",
+    "seed": "ru-57862fda5f6bbed9233d6288"
+   },
+   "id": "tg-0140",
+   "kind": "topic",
+   "members": [
+    "ru-57862fda5f6bbed9233d6288",
+    "ru-cc95924ed4a06ea64c008c10",
+    "ru-f7ca752570d4503f317269b4"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-6ba15b5becb47536cbfc73fa": 0.317,
+     "ru-7971be62e12066c151cc636a": 0.3233
+    },
+    "language": "en",
+    "seed": "ru-5b324d17c1352de106b9102e"
+   },
+   "id": "tg-0141",
+   "kind": "topic",
+   "members": [
+    "ru-5b324d17c1352de106b9102e",
+    "ru-6ba15b5becb47536cbfc73fa",
+    "ru-7971be62e12066c151cc636a"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-6c3b25b5b440a96e786d8a30": 0.327,
+     "ru-9efe2721a1b861edf47387a3": 0.301
+    },
+    "language": "en",
+    "seed": "ru-5c5fd8fde68f61c2ed6a422e"
+   },
+   "id": "tg-0142",
+   "kind": "topic",
+   "members": [
+    "ru-5c5fd8fde68f61c2ed6a422e",
+    "ru-6c3b25b5b440a96e786d8a30",
+    "ru-9efe2721a1b861edf47387a3"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-e20c78382c705a692cbb6c05": 0.4161,
+     "ru-ee4083680934f352fef50848": 0.47
+    },
+    "language": "en",
+    "seed": "ru-8c3f34166f15c5801f4523d1"
+   },
+   "id": "tg-0143",
+   "kind": "topic",
+   "members": [
+    "ru-8c3f34166f15c5801f4523d1",
+    "ru-e20c78382c705a692cbb6c05",
+    "ru-ee4083680934f352fef50848"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-13f2b687136f778a7e5e332e": 0.4115,
+     "ru-8810b8db9231f36bd52ac40a": 0.3083
+    },
+    "language": "en",
+    "seed": "ru-9e81cc7866e5bcdafd815c6e"
+   },
+   "id": "tg-0144",
+   "kind": "topic",
+   "members": [
+    "ru-13f2b687136f778a7e5e332e",
+    "ru-8810b8db9231f36bd52ac40a",
+    "ru-9e81cc7866e5bcdafd815c6e"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-9c1b5c7a67e7a1988b7a65cb": 0.3303,
+     "ru-c75605ada925195ca6fd2de8": 0.4422
+    },
+    "language": "en",
+    "seed": "ru-c497f6cf3b48dd0767db6c4b"
+   },
+   "id": "tg-0145",
+   "kind": "topic",
+   "members": [
+    "ru-9c1b5c7a67e7a1988b7a65cb",
+    "ru-c497f6cf3b48dd0767db6c4b",
+    "ru-c75605ada925195ca6fd2de8"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-5c59bb95483f25545206ebca": 0.3329,
+     "ru-a7763e6bf6ebc68d56ef08af": 0.3633
+    },
+    "language": "en",
+    "seed": "ru-f4538b1adcfa4a1f5a5e1077"
+   },
+   "id": "tg-0146",
+   "kind": "topic",
+   "members": [
+    "ru-5c59bb95483f25545206ebca",
+    "ru-a7763e6bf6ebc68d56ef08af",
+    "ru-f4538b1adcfa4a1f5a5e1077"
+   ]
+  },
+  {
+   "evidence": {
+    "cosine_to_seed": {
+     "ru-396d3cdef35ef17dd6732b2c": 0.73,
+     "ru-a471915f57033a3cb49a1da8": 0.3301
+    },
+    "language": "en",
+    "seed": "ru-fc0c446a60108cc715f63f21"
+   },
+   "id": "tg-0147",
+   "kind": "topic",
+   "members": [
+    "ru-396d3cdef35ef17dd6732b2c",
+    "ru-a471915f57033a3cb49a1da8",
+    "ru-fc0c446a60108cc715f63f21"
+   ]
+  }
+ ]
+}

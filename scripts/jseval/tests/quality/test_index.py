@@ -95,6 +95,24 @@ def test_model_bytes_runtime_collection_and_content_invalidate(collection, confi
     assert ix.compute_index_key(replace(c, content={d: sha256_text("edited") for d in c.documents}, version=""), config, env)[0] != key
 
 
+@pytest.mark.parametrize("name", ["corpus.py", "real_use_queries.py", "index.py", "collections.py"])
+def test_harness_edits_keep_key_but_index_inputs_change_it(collection, config, name):
+    c, source = collection
+    path = config.repo_root / "scripts/jseval/jseval/quality" / name
+    path.parent.mkdir(parents=True)
+    path.write_text("original")
+    key = ix.compute_index_key(c, config, env_for(config))[0]
+    path.write_text("edited")
+    changed = ix.compute_index_key(c, config, env_for(config))[0]
+    assert (changed == key) == (name in ("corpus.py", "real_use_queries.py"))
+    # Document bytes remain pinned independently of the harness source exclusions (K1).
+    doc = next(iter(c.documents))
+    document = source / c.documents[doc]
+    document.write_bytes(document.read_bytes() + b"edited")
+    updated = replace(c, content={**c.content, doc: sha256_text(document.read_text())}, version="")
+    assert ix.compute_index_key(updated, config, env_for(config))[0] != changed
+
+
 def test_tracked_deletion_changes_key(collection, config):
     subprocess.run(["git", "add", "."], cwd=config.repo_root, check=True)
     before = ix.tree_hash(config.repo_root)

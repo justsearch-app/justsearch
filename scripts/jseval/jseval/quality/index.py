@@ -40,7 +40,7 @@ from .collections import load_collection, write_collection, write_documents
 from .types import (Collection, atomic_write_text, canonical_json,
                     canonical_manifest_text, sha256_text)
 
-# Individual files only. These assemble/run requests, never extraction or writes.
+# Individual files only. Reviewed request-time and harness-only code, never engine inputs.
 # New files (including new reranker classes) are index-shaping until reviewed here.
 QUERY_TIME_ONLY = frozenset({
     "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeSearchEngine.java",
@@ -64,7 +64,18 @@ QUERY_TIME_ONLY = frozenset({
     # Dispatches actions; all materialization/ingestion remains in index.py and
     # collections.py, which (along with types.py) deliberately stay in the key.
     "scripts/jseval/jseval/commands/quality.py",
+    # Corpus acquisition does not shape what the engine indexes: document bytes are pinned
+    # independently by the collection's content digests in the key (K1).
+    "scripts/jseval/jseval/quality/corpus.py",
+    # Query planning/writing does not shape what the engine indexes either; document bytes
+    # remain pinned by those same collection content digests (K1).
+    "scripts/jseval/jseval/quality/real_use_queries.py",
+    "scripts/jseval/tests/quality/test_real_use_queries.py",
 })
+# Stored collection data (queries, judgments, configs, recipes), not code. Its index-shaping
+# part enters the key as the collection's document identity (K1): a queries or judgments edit
+# keeps the key; a changed document, layout or witness format list changes it.
+COLLECTION_DATA = ("scripts/jseval/jseval/quality/config/", "scripts/jseval/jseval/quality/recipes/")
 SCHEMA = "jseval.quality.index.v1"
 CACHE_ROOT = Path.home() / ".cache/justsearch-quality/indexes"
 # jseval/dev-tool bookkeeping, never read by extraction/encoding/index writers.
@@ -144,7 +155,7 @@ def tree_hash(root: Path) -> str:
                                    "--exclude-standard"], cwd=root)
     rows = []
     for name in sorted(set(os.fsdecode(n) for n in raw.split(b"\0") if n)):
-        if name in QUERY_TIME_ONLY:
+        if name in QUERY_TIME_ONLY or name.startswith(COLLECTION_DATA):
             continue
         path = root / name
         if path.is_symlink():
@@ -181,7 +192,7 @@ def compute_index_key(collection: Collection, config: IndexConfig,
     components = {"schema": SCHEMA, "tree": tree_hash(config.repo_root),
                   "models": model_hashes(Path(env["JUSTSEARCH_MODELS_DIR"])),
                   "runtime": {k: v for k, v in env.items() if k not in OPERATIONAL_ENV},
-                  "collection": collection.name, "collection_version": collection.compute_version()}
+                  "collection": collection.name, "documents": collection.document_identity()}
     # Checkout location is not a code input; materialized paths are stable under cache root.
     components["runtime"].pop("JUSTSEARCH_REPO_ROOT", None)
     # A mutable external model/config must not hide behind a stable pathname.
@@ -227,7 +238,7 @@ def _under_cache(path: Path) -> Path:
 
 
 def _population_owner(c: Collection, key: str) -> dict:
-    return {"schema": SCHEMA, "collection": c.name, "collection_version": c.version, "index_key": key,
+    return {"schema": SCHEMA, "collection": c.name, "documents": c.document_identity(), "index_key": key,
             "index_population": c.index_population()}
 
 

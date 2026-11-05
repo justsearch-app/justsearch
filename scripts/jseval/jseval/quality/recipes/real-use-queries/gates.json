@@ -1,0 +1,2837 @@
+{
+ "distinguishability": {
+  "bundestag": {
+   "length_separability": 0.0625,
+   "max_target_5gram_coverage": 0.4375,
+   "native_base_rate": 0.5625,
+   "other_median_words": 1871,
+   "others": 153,
+   "passed": true,
+   "target_median_words": 2209.5,
+   "targets": 32,
+   "token_cap": 2000
+  },
+  "enron": {
+   "length_separability": 0.21875,
+   "max_target_5gram_coverage": 0.0625,
+   "native_base_rate": 0.21875,
+   "other_median_words": 230,
+   "others": 81,
+   "passed": true,
+   "target_median_words": 214.0,
+   "targets": 32,
+   "token_cap": 2000
+  },
+  "eurlex": {
+   "length_separability": 0.10714285714285714,
+   "max_target_5gram_coverage": 0.17857142857142858,
+   "native_base_rate": 0.5357142857142857,
+   "other_median_words": 640.5,
+   "others": 228,
+   "passed": true,
+   "target_median_words": 802.5,
+   "targets": 28,
+   "token_cap": 2000
+  },
+  "govdata": {
+   "length_separability": 0.0,
+   "max_target_5gram_coverage": 0.6875,
+   "native_base_rate": 0.8125,
+   "other_median_words": 2967.0,
+   "others": 126,
+   "passed": true,
+   "target_median_words": 2436.5,
+   "targets": 16,
+   "token_cap": 2000
+  },
+  "govdocs1": {
+   "length_separability": 0.3,
+   "max_target_5gram_coverage": 0.06666666666666667,
+   "native_base_rate": 0.16666666666666666,
+   "other_median_words": 2282.5,
+   "others": 152,
+   "passed": true,
+   "target_median_words": 2689.5,
+   "targets": 30,
+   "token_cap": 2000
+  },
+  "safedocs": {
+   "length_separability": 0.045454545454545456,
+   "max_target_5gram_coverage": 0.09090909090909091,
+   "native_base_rate": 0.09090909090909091,
+   "other_median_words": 311,
+   "others": 23,
+   "passed": true,
+   "target_median_words": 480.0,
+   "targets": 22,
+   "token_cap": 2000
+  },
+  "wikipedia": {
+   "length_separability": 0.07407407407407407,
+   "max_target_5gram_coverage": 0.1111111111111111,
+   "native_base_rate": 0.18518518518518517,
+   "other_median_words": 1494.0,
+   "others": 50,
+   "passed": true,
+   "target_median_words": 905,
+   "targets": 27,
+   "token_cap": 2000
+  }
+ },
+ "dropped": {
+  "ki-011": {
+   "attempts": 13,
+   "last_rejection": "verbatim leak",
+   "reason": "gates"
+  },
+  "ki-071": {
+   "attempts": 14,
+   "last_rejection": "6 words",
+   "reason": "gates"
+  },
+  "tp-016": {
+   "duplicate_of": "tp-015",
+   "kind": "topical",
+   "query": "Hamburger Großhandel Umsatzstatistik monatlich",
+   "reason": "duplicate"
+  },
+  "tp-017": {
+   "duplicate_of": "tp-015",
+   "kind": "topical",
+   "query": "Hamburger Großhandel Umsatzstatistik monatlich",
+   "reason": "duplicate"
+  },
+  "tp-033": {
+   "duplicate_of": "tp-032",
+   "kind": "topical",
+   "query": "Industrieproduktion Hamburg Monatsberichte Statistikamt",
+   "reason": "duplicate"
+  },
+  "tp-045": {
+   "duplicate_of": "tp-004",
+   "kind": "topical",
+   "query": "Bundestag Drucksachen 18. Wahlperiode",
+   "reason": "duplicate"
+  },
+  "tp-047": {
+   "duplicate_of": "tp-044",
+   "kind": "topical",
+   "query": "Lobbyeinfluss auf Regierungsentwürfe Anfragen Linke",
+   "reason": "duplicate"
+  },
+  "tp-096": {
+   "attempts": 16,
+   "last_rejection": "8 words",
+   "reason": "gates"
+  },
+  "tp-100": {
+   "attempts": 16,
+   "last_rejection": "verbatim leak",
+   "reason": "gates"
+  }
+ },
+ "generation": "g-20261104-173716",
+ "queries": {
+  "ki-001": {
+   "absent_word_share": 0.25,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "Drohnen-Schwärme Waffensystemen Bundeswher",
+   "verbatim_leak": [],
+   "words": 3
+  },
+  "ki-002": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "Eurofighter Diehl Boeing Bundesregierung",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-003": {
+   "absent_word_share": 0.5,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": null,
+   "query": "Bundestag Satzbetrieb Vertrieb Bundesanzeiger",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-004": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "Armut durch Eingliederungshilfe Drucksache 18/834",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "ki-005": {
+   "absent_word_share": 0.2,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "Göring-Eckardt Asylpaket Bundestagssitzung 2016",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-006": {
+   "absent_word_share": 0.5,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 40,
+   "query": "Agrarpreise Juni 2023 market",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-007": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "Sammelübersicht 408 Petitionen Drucksache 20/8248",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "ki-008": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 2,
+   "query": "Hunko Libyen border Migrationskontrolle",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-009": {
+   "absent_word_share": 0.6,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 3,
+   "query": "Grüne Anfrage Biomasse-Verein Staatsgelder",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-010": {
+   "absent_word_share": 0.5,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 3,
+   "query": "Alterspräsident Antrag Geschäftsordnung Lebensjahre",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-012": {
+   "absent_word_share": 0.75,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 6,
+   "query": "A6 Ausbau Privatfinanzierung Grüne",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-013": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "Drucksache 20/1797 Sahelzone Frankreich",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-014": {
+   "absent_word_share": 0.75,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 24,
+   "query": "Korte Lobbyeinfluss Personenverkehr Reform",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-015": {
+   "absent_word_share": 0.6,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 12,
+   "query": "AfD Sicherheitsdebatte Bundestag Kanzler-Regierungserklärung",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-016": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "Drucksache 19/7421 Drogenanbau Entwicklungszusammenarbeit",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-017": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "Kipping Corona Sanktionen Aussetzung",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-018": {
+   "absent_word_share": 0.25,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 1,
+   "query": "Machmur Kurden Lager Bundestagsanfrage",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-019": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "Corona-Hilfen Agribusiness 19/25981",
+   "verbatim_leak": [],
+   "words": 3
+  },
+  "ki-020": {
+   "absent_word_share": 0.5,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "Kleinwächter Frankreich nuclear Schutzgarantie",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-021": {
+   "absent_word_share": 0.25,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 11,
+   "query": "Petitionen Sammelübersicht Bundestag Eingaben",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-022": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "Drucksache 19/22317 Gold-Plating",
+   "verbatim_leak": [],
+   "words": 3
+  },
+  "ki-023": {
+   "absent_word_share": 0.25,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "Lebensmittelspezialitätengesetz Änderung Einspruchsfrist Begründung",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-024": {
+   "absent_word_share": 0.75,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 11,
+   "query": "Lobbyismus Verbrauchervertragsgesetz Linke Regierungsantwort",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-025": {
+   "absent_word_share": 0.167,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "Drucksache 19/26063 Sicherheit Kinder Strassenverkher",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "ki-026": {
+   "absent_word_share": 0.4,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "Fracking commission Budget 250.000",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-027": {
+   "absent_word_share": 1.0,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": null,
+   "query": "Bundesanwalt Drohnentod Terrorverdächtiger Verfharen",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-028": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "Drucksache 18/9807 Einzelplan 07",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-029": {
+   "absent_word_share": 0.5,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "Hemmelgarn construction Holzpreise Lieferengpässe",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-030": {
+   "absent_word_share": 1.0,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": null,
+   "query": "Unionsfraktion Wirtschaftsabschwung Abwanderung Kapitl",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-031": {
+   "absent_word_share": 0.333,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "Drucksache 19/20929 Anhänger Gespanne Haftung",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "ki-032": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "Jelpke Anfrage Inlandsgeheimdienst Minderjährige",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-033": {
+   "absent_word_share": 0.25,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 1,
+   "query": "Nastić Sabotage Gasleitungen Ostsee",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-034": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "Bonneville Responses to Customer Comments",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "ki-035": {
+   "absent_word_share": 0.25,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "CBS email game peanuts",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-036": {
+   "absent_word_share": 0.5,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 2,
+   "query": "Kean Californa legislature update",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-037": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 2,
+   "query": "Demand Ken Lay Donate Proceeds",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "ki-038": {
+   "absent_word_share": 0.25,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "GISB voting form fax",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-039": {
+   "absent_word_share": 0.5,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 1,
+   "query": "Deborah fiancée congratulations reply",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-040": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "it is going to zero",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "ki-041": {
+   "absent_word_share": 0.5,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "Cera teleconference dial-in",
+   "verbatim_leak": [],
+   "words": 3
+  },
+  "ki-042": {
+   "absent_word_share": 0.5,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 21,
+   "query": "Tana fuel supplier amendment",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-043": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "Still Interested in the Heights",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "ki-044": {
+   "absent_word_share": 0.75,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 2,
+   "query": "Russell Pfandrecht Kreditvertrag collatral",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-045": {
+   "absent_word_share": 0.25,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 1,
+   "query": "Juan Kansas City trip",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-046": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "Bandwidth Products On EnronOnline Revised",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "ki-047": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "Julie Lacima Enron approval",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-048": {
+   "absent_word_share": 0.25,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 1,
+   "query": "Lindy California big shippers",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-049": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "Company Sleuth Daily Report ALEWIS34",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "ki-050": {
+   "absent_word_share": 0.25,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "Mintz lawer bills banks",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-051": {
+   "absent_word_share": 0.5,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 1,
+   "query": "Eyeforenergy newsletter auditor scandal",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-052": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "RE TDC Corporation",
+   "verbatim_leak": [],
+   "words": 3
+  },
+  "ki-054": {
+   "absent_word_share": 0.5,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 1,
+   "query": "Skilling Outlook switchover questionnaire",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-055": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "FW Hola mi primo",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-056": {
+   "absent_word_share": 0.25,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "Sternberg Allegheny netting affiliates",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-057": {
+   "absent_word_share": 0.5,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 1,
+   "query": "Kaminski attending Pilar videoconference",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-058": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "Demo w/ Louise",
+   "verbatim_leak": [],
+   "words": 3
+  },
+  "ki-059": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "Duke New Albany Zisman",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-060": {
+   "absent_word_share": 0.25,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 1,
+   "query": "Ken Powers imbalance automation",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-061": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "FBI file Alan White",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-062": {
+   "absent_word_share": 0.75,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "Lengkeek Kalender 2004 Tausch",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-063": {
+   "absent_word_share": 0.25,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 1,
+   "query": "Hunter inflated Transco prices",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-064": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "Counterparty Approval Lists 1/24/00 1/25/00",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "ki-065": {
+   "absent_word_share": 0.5,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "Texaco takeover oil giants",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-066": {
+   "absent_word_share": 0.5,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 1,
+   "query": "Erdöl weekly Venezuela Rundbrief",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-067": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "Durchführungsverordnung Nr. 121/2013 pauschale Einfuhrwerte",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "ki-068": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "Einfuhrwerte Kommission Januar 2013",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-069": {
+   "absent_word_share": 0.75,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 10,
+   "query": "Rübenzucker Zollaufschläge Aussetzung Wirtschaftsjahr",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-070": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "Durchführungsverordnung Nr. 4/2013 Olivenöl Tunesien",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "ki-072": {
+   "absent_word_share": 0.5,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 11,
+   "query": "Pauschalwerte Zitrusfrüchte Januar 2013",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-073": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 3,
+   "query": "Verordnung 68/2013 Katalog der Einzelfuttermittel",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "ki-074": {
+   "absent_word_share": 0.4,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "Zucker Importzölle Preise 2012/13",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-076": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "Durchführungsverordnung Nr. 5/2013 pauschale Einfuhrwerte",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "ki-077": {
+   "absent_word_share": 0.25,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "IFRS 1 Staatsdarlehen Ausnahme",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-078": {
+   "absent_word_share": 0.25,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 2,
+   "query": "Eigenmittel Clearingstellen Delegierte Verordnung",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-079": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "Durchführungsverordnung Nr. 9/2013 Liberia",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-080": {
+   "absent_word_share": 0.2,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "Durchführungsverordnung 129/2013 Agrarbetriebe Anpassung",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-081": {
+   "absent_word_share": 0.5,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 1,
+   "query": "EMIR Clearinghaus Liquiditätsrisiko Verordnung",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-082": {
+   "absent_word_share": 0.167,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "Durchführungsverordnung Nr. 41/2013 Einreihung Kommision",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "ki-083": {
+   "absent_word_share": 0.5,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": null,
+   "query": "Silva Rodríguez Obst Einfuhrwerte",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-084": {
+   "absent_word_share": 0.25,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 1,
+   "query": "lactic acid beef decontamnation",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-085": {
+   "absent_word_share": 0.167,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "Delegated Regulation 149/2013 indirect clearning",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "ki-086": {
+   "absent_word_share": 0.5,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "Zimbabwe Durchführungsverordnung Feburary sanctions",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-088": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "black scabbardfish prohibition Portugal 29/2013",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "ki-089": {
+   "absent_word_share": 0.25,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 2,
+   "query": "Šemeta toy candy customs",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-090": {
+   "absent_word_share": 0.25,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 2,
+   "query": "2013 pesticide residue limits",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-091": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "Implementing Regulation 50/2013 Libya",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-092": {
+   "absent_word_share": 0.5,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 25,
+   "query": "Silva Rodriguez Febuary fruit",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-093": {
+   "absent_word_share": 0.5,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": null,
+   "query": "produce import prices 2013",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-094": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "Regulation 167/2013 agricultural forestry vehicles",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "ki-096": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 1,
+   "query": "solar panel import registration",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-097": {
+   "absent_word_share": 0.143,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "Implementing Regulation 52/2013 semi-sparkilng wine",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "ki-098": {
+   "absent_word_share": 0.5,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 4,
+   "query": "2013 motorbike approval regulaton",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-099": {
+   "absent_word_share": 0.5,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 14,
+   "query": "Einwohnerzahlen Hamburg Q1 2020",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-100": {
+   "absent_word_share": 0.2,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 2,
+   "query": "Verarbeitendes Gewerbe Hamburg Febuar 2015",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "ki-101": {
+   "absent_word_share": 0.75,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": null,
+   "query": "Statistikamt Nord Handelsumsatz Hansestadt",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-102": {
+   "absent_word_share": 0.75,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": null,
+   "query": "Hamburg Großhandle Jobs Statistikbericht",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-103": {
+   "absent_word_share": 0.2,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "Einzelhandel Hamburg Juni 2019 Umstaz",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "ki-104": {
+   "absent_word_share": 0.75,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 31,
+   "query": "Hansestadt Handelsumsatz April Statistikbericht",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-105": {
+   "absent_word_share": 0.5,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 24,
+   "query": "Hamburg Industrieproduktion 2022 Güterarten",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-106": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "Ausfuhr Hamburg 2. Quartal 2025",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "ki-107": {
+   "absent_word_share": 0.25,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 7,
+   "query": "Hamburg Großhandel Mitarbeiter 2024",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-108": {
+   "absent_word_share": 0.5,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 3,
+   "query": "Hamburg Handelsumsatz Januar Mitarbeitr",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-109": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "Einzelhandel Hamburg März 2020",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-110": {
+   "absent_word_share": 0.25,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 5,
+   "query": "Hamburg Einzelhandle Statistik 2019",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-111": {
+   "absent_word_share": 0.25,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 3,
+   "query": "Hamburg wholesale Umsatz 2019",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-112": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "Großhandel Hamburg Februar 2022",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-113": {
+   "absent_word_share": 0.25,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 6,
+   "query": "Hamburg Einzelhandl Umsatz 2016",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-114": {
+   "absent_word_share": 0.5,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 1,
+   "query": "Norderstedt Bevölkerung Altersverteilung 2013",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-115": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "Natural Disturbances to Estuaries",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-116": {
+   "absent_word_share": 0.5,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 5,
+   "query": "Karousos radio channel rulemaking",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-117": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 2,
+   "query": "HUD grants training slides",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-118": {
+   "absent_word_share": 0.667,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 2,
+   "query": "Data table (3)",
+   "verbatim_leak": [],
+   "words": 3
+  },
+  "ki-119": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "NLM DailyMed drug standards",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-120": {
+   "absent_word_share": 0.5,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 1,
+   "query": "Tenino bussiness stats 1997",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-121": {
+   "absent_word_share": 0.25,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "Commercial Storage Asain Pear",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-122": {
+   "absent_word_share": 0.75,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "smal emitters monitoring shortcut",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-123": {
+   "absent_word_share": 0.5,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 1,
+   "query": "Pinez offshore frozen funds",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-124": {
+   "absent_word_share": 0.4,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "SGEP FTEs Working spreadsheet (12)",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "ki-125": {
+   "absent_word_share": 1.0,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": null,
+   "query": "commuter Verdienst census tabel",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-126": {
+   "absent_word_share": 0.25,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 1,
+   "query": "FIPSE Russian grant guidlines",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-127": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "ARS Felix Franca",
+   "verbatim_leak": [],
+   "words": 3
+  },
+  "ki-128": {
+   "absent_word_share": 0.75,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "Howell Empfehlungsschreiben limb waiver",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-129": {
+   "absent_word_share": 0.75,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 16,
+   "query": "archaeology relics training slides",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-130": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "2000 Brown Marsh Habitat Data",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "ki-131": {
+   "absent_word_share": 0.75,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "Labor Meldung ORU spreadsheet",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-132": {
+   "absent_word_share": 1.0,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": null,
+   "query": "neighborhood dwellings demographics profile",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-133": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "§61.13 capital grant rating criteria",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "ki-135": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 1,
+   "query": "Texas storm damage mapping",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-136": {
+   "absent_word_share": 0.25,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "Importance of Aviation Internsips",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-137": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "Lodi licensee Difuntorum reinstatement",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-138": {
+   "absent_word_share": 0.75,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": null,
+   "query": "veterans pharmacy revenue 2008",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-139": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "Selected Social Characteristics 2007 DP02",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "ki-140": {
+   "absent_word_share": 0.25,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "NCI Congress amendments timeline",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-141": {
+   "absent_word_share": 0.5,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 5,
+   "query": "wetland windflower Pacific Northwest",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-143": {
+   "absent_word_share": 0.25,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "EPICS powr supply record",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-144": {
+   "absent_word_share": 0.5,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 1,
+   "query": "federal fatality statistics manual",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-145": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "OMHAR Lite Review Model",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-146": {
+   "absent_word_share": 0.25,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "Hispanic population estimates multiracial",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-148": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "Busplan Oberbergkirchen-Zangberg 2020-2021 Stand 2021-07-22",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "ki-149": {
+   "absent_word_share": 0.5,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "Münchenstein Wegbeschreibung Tram Haltestelle",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-150": {
+   "absent_word_share": 1.0,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": null,
+   "query": "Tiefgarage Bauplan Bergheim Wohnquartier",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-151": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "Menüplan Feldheim Woche 29",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-152": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "Ganztagsschule Aschaffenburg Hausaufgabenbetreuung Mittagessen",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-153": {
+   "absent_word_share": 0.667,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": null,
+   "query": "Sitzungsniederschrift Ein-Euro-Jobs Haushlat Jobcenter",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-154": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "Pressemitteilung Wandsbeker Winterzauber 2009",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-155": {
+   "absent_word_share": 0.5,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "Grote Bauland Eichendorffstraße Immobilienmakler",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-156": {
+   "absent_word_share": 1.0,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": null,
+   "query": "Mädelstrip Spa Kurztrip Bayern",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-157": {
+   "absent_word_share": 0.2,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "Schlosspark Schwanberg Veranstaltungen 2011 program",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "ki-158": {
+   "absent_word_share": 1.0,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": null,
+   "query": "Realschule Dachau Anmeldeformular Schüler",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-159": {
+   "absent_word_share": 0.75,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 1,
+   "query": "Steuertipps Mandanteninformation Sofortabschreibung Ferienimmobilie",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-160": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "Lebenslauf Foodwatch Jan 2021",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-161": {
+   "absent_word_share": 0.5,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "Vereinssatzung Sebald Literaturpreis Erinnerung",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-162": {
+   "absent_word_share": 0.75,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 1,
+   "query": "Backofen Produktblatt Küchengerät Limatec",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-163": {
+   "absent_word_share": 0.25,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "Fachtagung Qualitätsentwiklung Suchtprävention Pandemie",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-164": {
+   "absent_word_share": 0.5,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "TNG Handy Einrichtung Kurzanleitung",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-165": {
+   "absent_word_share": 0.75,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": null,
+   "query": "libanesisches Weinmenü 2019 Weinfreunde",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-166": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "DWS Emerging Markets Dividend",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-167": {
+   "absent_word_share": 0.5,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "Niehaves Arbeitsblatt Teilbarkeitsregeln worksheet",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-168": {
+   "absent_word_share": 0.6,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 1,
+   "query": "Bits manipulieren Hardware-Port Spickzettel",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-169": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "Termine und Infos Rottal-Inn 2021",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "ki-170": {
+   "absent_word_share": 0.25,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 2,
+   "query": "Energietechnik Kerntechnik Atomausstieg Photovoltaik",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-171": {
+   "absent_word_share": 0.25,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 1,
+   "query": "LOHC hydrogen Carbazol Speicher",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-172": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "Betriebssicherheit",
+   "verbatim_leak": [],
+   "words": 1
+  },
+  "ki-173": {
+   "absent_word_share": 0.5,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "Napoleon Feldzug Energieflüsse Visualisierung",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-174": {
+   "absent_word_share": 0.6,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 2,
+   "query": "Pure-Lead Batterie lange Lagerfähigkeit",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-175": {
+   "absent_word_share": 0.5,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "Ovale Kragensteckvorichtung",
+   "verbatim_leak": [],
+   "words": 2
+  },
+  "ki-176": {
+   "absent_word_share": 0.5,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "Stadtwerke Deregulierung Netzauslastung Industrie",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-177": {
+   "absent_word_share": 0.75,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 1,
+   "query": "CUTEC Harz Forschungsinstitut Defizit",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-178": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "Leistungsbilanz (Energietechnik)",
+   "verbatim_leak": [],
+   "words": 2
+  },
+  "ki-179": {
+   "absent_word_share": 0.5,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "energy Stromnetze Kraftwerke Aktuatoren",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-180": {
+   "absent_word_share": 0.4,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 1,
+   "query": "Messstelle Identifikation 33-stellig Netzbetreiber",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-181": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "Seaweed fuel",
+   "verbatim_leak": [],
+   "words": 2
+  },
+  "ki-182": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "ESDA static shock body",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-183": {
+   "absent_word_share": 0.667,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 24,
+   "query": "hydropower downsides notes",
+   "verbatim_leak": [],
+   "words": 3
+  },
+  "ki-184": {
+   "absent_word_share": 0.2,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "energy upgrades from publc utilities",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "ki-185": {
+   "absent_word_share": 0.25,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "Fujishima TiO2 sunlight catalyst",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-186": {
+   "absent_word_share": 0.5,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 5,
+   "query": "warmth storage underground seasons",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-187": {
+   "absent_word_share": 0.2,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "China Shipbuilding Industry Corporation Schiffbau",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "ki-188": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "Verra carbon compensation certificates",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-189": {
+   "absent_word_share": 0.25,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 7,
+   "query": "military solar power office",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-190": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "Tidal power",
+   "verbatim_leak": [],
+   "words": 2
+  },
+  "ki-191": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "Audi Dresden synthetic fuel",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-192": {
+   "absent_word_share": 0.25,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 1,
+   "query": "Staudamm tallest India reservoir",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-193": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "100% renewable energy",
+   "verbatim_leak": [],
+   "words": 3
+  },
+  "ki-194": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "partial",
+   "lexical_rank": 1,
+   "query": "Gülzow bioeconomy funding agency",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-195": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "vague",
+   "lexical_rank": 1,
+   "query": "wind turbine public opposition",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "ki-196": {
+   "absent_word_share": 0.0,
+   "kind": "known-item",
+   "level": "exact",
+   "lexical_rank": 1,
+   "query": "Global Solar Atlas",
+   "verbatim_leak": [],
+   "words": 3
+  },
+  "tp-001": {
+   "kind": "topical",
+   "query": "Enron executives profit petition emails",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-002": {
+   "kind": "topical",
+   "query": "Lobbyeinfluss auf Gesetzentwürfe der Bundesregierung",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-003": {
+   "kind": "topical",
+   "query": "natural gas standards board voting",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-004": {
+   "kind": "topical",
+   "query": "Bundestag Drucksachen 18. Wahlperiode",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "tp-005": {
+   "kind": "topical",
+   "query": "Notizen zu Energiegewinnung und Energiesystemen",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-006": {
+   "kind": "topical",
+   "query": "biofuel from marine plants research",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-007": {
+   "kind": "topical",
+   "query": "California energy crisis legislation updates",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-008": {
+   "kind": "topical",
+   "query": "email football game promotion newsletters",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-009": {
+   "kind": "topical",
+   "query": "Enron executive donation petition emails",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-010": {
+   "kind": "topical",
+   "query": "natural gas standards voting emails",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-011": {
+   "kind": "topical",
+   "query": "Enron energy trading office emails",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-012": {
+   "kind": "topical",
+   "query": "Hamburg Einzelhandel Umsatzstatistik Monatsberichte",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "tp-013": {
+   "kind": "topical",
+   "query": "Hamburger Einzelhandel Umsatzentwicklung Statistik",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "tp-014": {
+   "kind": "topical",
+   "query": "Hamburger Großhandel Umsatzstatistik Berichte",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "tp-015": {
+   "kind": "topical",
+   "query": "Hamburger Großhandel Umsatzstatistik monatlich",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "tp-018": {
+   "kind": "topical",
+   "query": "Einfuhrzölle Zucker Preise 2013",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "tp-019": {
+   "kind": "topical",
+   "query": "Einwohnerzahlen Hamburg Quartalsberichte Statistikamt",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "tp-020": {
+   "kind": "topical",
+   "query": "Einwohnerzahlen Hamburg Quartalsberichte",
+   "verbatim_leak": [],
+   "words": 3
+  },
+  "tp-021": {
+   "kind": "topical",
+   "query": "Hamburg Bevölkerungszahlen Statistik Bezirke",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "tp-022": {
+   "kind": "topical",
+   "query": "Zollwerte Obst Gemüse Importpreise EU-Verordnungen",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-023": {
+   "kind": "topical",
+   "query": "Einfuhrpreise Obst Gemüse Verordnungen 2013",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-024": {
+   "kind": "topical",
+   "query": "EU Einfuhrpreise Obst Gemüse Verordnungen",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-025": {
+   "kind": "topical",
+   "query": "Zollwerte Obst Gemüse Einfuhr Kommission",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-026": {
+   "kind": "topical",
+   "query": "Einfuhrpreise Obst Gemüse Pauschalwerte 2013",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-027": {
+   "kind": "topical",
+   "query": "Referenzpreise Obst Gemüse Einfuhr 2013",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-028": {
+   "kind": "topical",
+   "query": "EU-Marktregulierung Zucker und Olivenöl Kontingente",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-029": {
+   "kind": "topical",
+   "query": "Agrarmarkt Verordnungen Zollsätze Einfuhrpreise",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "tp-030": {
+   "kind": "topical",
+   "query": "Bürgereingaben Bundestag Ausschussentscheidungen Übersichten",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "tp-031": {
+   "kind": "topical",
+   "query": "Industrieproduktion Hamburg Monatsberichte Statistikamt Nord",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-032": {
+   "kind": "topical",
+   "query": "Industrieproduktion Hamburg Monatsberichte Statistikamt",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "tp-034": {
+   "kind": "topical",
+   "query": "Hamburg Industrie Investitionsstatistik Umweltschutz",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "tp-035": {
+   "kind": "topical",
+   "query": "Bundestag Petitionen Beschlussempfehlungen Petitionsausschuss",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "tp-036": {
+   "kind": "topical",
+   "query": "Petitionen Beschlüsse des Petitionsausschusses",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "tp-037": {
+   "kind": "topical",
+   "query": "Bundestag Petitionen Beschlussempfehlungen Übersicht",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "tp-038": {
+   "kind": "topical",
+   "query": "Bauwirtschaft Hamburg Monatsstatistik Betriebe Beschäftigte",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-039": {
+   "kind": "topical",
+   "query": "Hamburger Außenhandel Importe Exporte Statistik",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-040": {
+   "kind": "topical",
+   "query": "Kölner Kriminalitätszahlen Jahresauswertung Polizei",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "tp-041": {
+   "kind": "topical",
+   "query": "Kölner Kriminalitätsopfer nach Altersgruppen",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "tp-042": {
+   "kind": "topical",
+   "query": "Kölner Kriminalitätszahlen Jahresvergleich Deliktarten",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "tp-043": {
+   "kind": "topical",
+   "query": "Bundestag Plenarsitzungen Stenografische Berichte",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "tp-044": {
+   "kind": "topical",
+   "query": "Lobbyeinfluss auf Regierungsentwürfe Anfragen Linke",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-046": {
+   "kind": "topical",
+   "query": "Zölle auf Getreideeinfuhr 2013",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "tp-048": {
+   "kind": "topical",
+   "query": "Bundestag Sitzungsprotokolle 18. Wahlperiode",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "tp-049": {
+   "kind": "topical",
+   "query": "Zulassung von Pflanzenschutz-Wirkstoffen EU-Verordnungen",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "tp-050": {
+   "kind": "topical",
+   "query": "Haushaltsberatungen Ministerien Einzelpläne Bundestag",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "tp-051": {
+   "kind": "topical",
+   "query": "Fangverbote Fischerei Kommission 2013",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "tp-052": {
+   "kind": "topical",
+   "query": "EU-Einfuhrlizenzen Zollkontingente Agrarprodukte 2013",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "tp-053": {
+   "kind": "topical",
+   "query": "EU Durchführungsverordnungen Kommission 2013",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "tp-054": {
+   "kind": "topical",
+   "query": "EU Sanktionen gegen Drittstaaten 2013",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-055": {
+   "kind": "topical",
+   "query": "EU Sanktionslisten Terrorismus Einfrieren Vermögenswerte",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-056": {
+   "kind": "topical",
+   "query": "Zustand Autobahnbrücken Bundesregierung Anfragen",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "tp-057": {
+   "kind": "topical",
+   "query": "Geburtenbilanz Gemeinden Kreis Steinburg Zeitreihen",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-058": {
+   "kind": "topical",
+   "query": "Zolltarifliche Einstufung von Waren 2013",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-059": {
+   "kind": "topical",
+   "query": "Bevölkerungsstatistik Norderstedt nach Stadtteilen",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "tp-060": {
+   "kind": "topical",
+   "query": "EU-Recht Futtermittel Einzelfuttermittel Katalog",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "tp-061": {
+   "kind": "topical",
+   "query": "AfD Anfragen Korrekturbitten Behörden Medien",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-062": {
+   "kind": "topical",
+   "query": "Industrieproduktion Hamburg Jahreszahlen Betriebe",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "tp-063": {
+   "kind": "topical",
+   "query": "Bananen Handelsabkommen Schutzklausel EU",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "tp-064": {
+   "kind": "topical",
+   "query": "Notizen zu Energiegewinnung und Energieumwandlung",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-065": {
+   "kind": "topical",
+   "query": "Veterinärbescheinigungen Drittländer Listen Tierhandel EU",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-066": {
+   "kind": "topical",
+   "query": "Tierarzneimittel Rückstandshöchstmengen Lebensmittel tierischen Ursprungs",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-067": {
+   "kind": "topical",
+   "query": "Bundestag Menschenrechtsausschuss Anträge Beschlussempfehlungen",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "tp-068": {
+   "kind": "topical",
+   "query": "Futtermittelzusatzstoffe Zulassungsinhaber Namensänderung",
+   "verbatim_leak": [],
+   "words": 3
+  },
+  "tp-069": {
+   "kind": "topical",
+   "query": "Fahrzeug Typgenehmigung CO2-Emissionen Vorschriften",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "tp-070": {
+   "kind": "topical",
+   "query": "Müllentsorgung Statistik Hamburg",
+   "verbatim_leak": [],
+   "words": 3
+  },
+  "tp-071": {
+   "kind": "topical",
+   "query": "Bundestag Anträge Außenpolitik Afrika Osteuropa",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-072": {
+   "kind": "topical",
+   "query": "Hamburger Stadtteilentwicklung Sozialindex Statistik",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "tp-073": {
+   "kind": "topical",
+   "query": "Statistiken zu politisch motivierter Kriminalität",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-074": {
+   "kind": "topical",
+   "query": "Bundesregierung Antworten zu Libyen Einsatz",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-075": {
+   "kind": "topical",
+   "query": "EU fruit vegetable import prices",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-078": {
+   "kind": "topical",
+   "query": "sugar import duties price regulations",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-079": {
+   "kind": "topical",
+   "query": "fruit vegetable import price regulations",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-080": {
+   "kind": "topical",
+   "query": "daily fruit vegetable import prices",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-081": {
+   "kind": "topical",
+   "query": "EU farm market implementing regulations",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-082": {
+   "kind": "topical",
+   "query": "EU sugar market regulations 2013",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-083": {
+   "kind": "topical",
+   "query": "EU agricultural import tariffs 2013",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-084": {
+   "kind": "topical",
+   "query": "EU agricultural import licences quotas",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-085": {
+   "kind": "topical",
+   "query": "EU agricultural support regulations 2013",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-086": {
+   "kind": "topical",
+   "query": "veterinary import conditions animal products",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-087": {
+   "kind": "topical",
+   "query": "Enron employee emails 2001-2002 correspondence",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-088": {
+   "kind": "topical",
+   "query": "fishing bans quota exhausted vessels",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-089": {
+   "kind": "topical",
+   "query": "2013 EU fishing quotas legislation",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-090": {
+   "kind": "topical",
+   "query": "EU fishing quotas 2013",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "tp-091": {
+   "kind": "topical",
+   "query": "Enron emails October November 2001",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-092": {
+   "kind": "topical",
+   "query": "pesticide active substance approvals EU",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-093": {
+   "kind": "topical",
+   "query": "renewable electricity sources overview",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "tp-094": {
+   "kind": "topical",
+   "query": "personal emails about social plans",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-095": {
+   "kind": "topical",
+   "query": "solar heat collection and storage",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-097": {
+   "kind": "topical",
+   "query": "Tenino FM radio channel allotment",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-098": {
+   "kind": "topical",
+   "query": "Washington local government data tables",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-099": {
+   "kind": "topical",
+   "query": "cogeneration and heat recovery notes",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-101": {
+   "kind": "topical",
+   "query": "EMIR derivatives clearing technical standards",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-102": {
+   "kind": "topical",
+   "query": "EU terrorist sanctions list amendments",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-103": {
+   "kind": "topical",
+   "query": "generic drug policy testimony",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "tp-104": {
+   "kind": "topical",
+   "query": "EU sanctions regulation amendments 2013",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-105": {
+   "kind": "topical",
+   "query": "mad cow disease 2004 USDA",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-106": {
+   "kind": "topical",
+   "query": "native plant guides ethnobotanical uses",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-107": {
+   "kind": "topical",
+   "query": "product tariff classification customs decisions",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-108": {
+   "kind": "topical",
+   "query": "renewable fuels from organic matter",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-109": {
+   "kind": "topical",
+   "query": "PHENIX identified hadron production RHIC",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-110": {
+   "kind": "topical",
+   "query": "federal employee performance appraisal policies",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-111": {
+   "kind": "topical",
+   "query": "animal feed ingredient rules EU",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-112": {
+   "kind": "topical",
+   "query": "US-Russia higher education grant program",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-113": {
+   "kind": "topical",
+   "query": "census household demographic statistics tables",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-114": {
+   "kind": "topical",
+   "query": "saving money with generic medications",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-115": {
+   "kind": "topical",
+   "query": "renewable energy and emissions statistics",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-116": {
+   "kind": "topical",
+   "query": "HUD community development grant programs",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-117": {
+   "kind": "topical",
+   "query": "plant taxonomy database species records",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-118": {
+   "kind": "topical",
+   "query": "H5N1 Congress response report",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "tp-119": {
+   "kind": "topical",
+   "query": "petroleum refining product classification codes",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-120": {
+   "kind": "topical",
+   "query": "federal program performance assessment worksheets",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-121": {
+   "kind": "topical",
+   "query": "energy futures market commentary emails",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-122": {
+   "kind": "topical",
+   "query": "FDA manufacturing quality regulations compliance",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-123": {
+   "kind": "topical",
+   "query": "Ken Lay Enron petition emails",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-124": {
+   "kind": "topical",
+   "query": "federal EMS reporting metrics",
+   "verbatim_leak": [],
+   "words": 4
+  },
+  "tp-126": {
+   "kind": "topical",
+   "query": "NYISO reserved hourly prices announcements",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-127": {
+   "kind": "topical",
+   "query": "MedlinePlus plant extract health effects",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-128": {
+   "kind": "topical",
+   "query": "Enron internal staff announcements 2001",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-129": {
+   "kind": "topical",
+   "query": "drug safety error reporting healthcare",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-130": {
+   "kind": "topical",
+   "query": "NRC regulatory communications reactor safety",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-131": {
+   "kind": "topical",
+   "query": "Transwestern pipeline Enron internal correspondence",
+   "verbatim_leak": [],
+   "words": 5
+  },
+  "tp-132": {
+   "kind": "topical",
+   "query": "Medicare Federal Register notices",
+   "verbatim_leak": [],
+   "words": 4
+  }
+ },
+ "ranking": {
+  "pipeline": {
+   "crossEncoderEnabled": false,
+   "crossEncoderWindow": 0,
+   "denseEnabled": false,
+   "expansionEnabled": false,
+   "freshnessEnabled": false,
+   "fusionAlgorithm": "none",
+   "lambdamartEnabled": false,
+   "sparseEnabled": true,
+   "spladeEnabled": false
+  },
+  "trace_stages": {
+   "branch-fusion:executed": 186,
+   "branch-fusion:skipped": 1,
+   "chunk-merge:executed": 187,
+   "correction:skipped": 187,
+   "cross-encoder:skipped": 187,
+   "dense-retrieval:skipped": 187,
+   "expansion:skipped": 187,
+   "freshness:disabled": 187,
+   "fusion:skipped": 187,
+   "lambdamart:skipped": 187,
+   "query-understanding:executed": 187,
+   "sparse-retrieval:executed": 187,
+   "splade-retrieval:skipped": 187
+  }
+ },
+ "strata": {
+  "focus": {
+   "deep": {
+    "median_rank": 1.5,
+    "not_in_top50": 4,
+    "queries": 34,
+    "rank1": 17,
+    "rank1_share": 0.5,
+    "verbatim_leaks": 0
+   },
+   "start": {
+    "median_rank": 1,
+    "not_in_top50": 11,
+    "queries": 153,
+    "rank1": 115,
+    "rank1_share": 0.752,
+    "verbatim_leaks": 0
+   }
+  },
+  "format": {
+   "csv": {
+    "median_rank": 2,
+    "not_in_top50": 2,
+    "queries": 5,
+    "rank1": 2,
+    "rank1_share": 0.4,
+    "verbatim_leaks": 0
+   },
+   "doc": {
+    "median_rank": 1.0,
+    "not_in_top50": 0,
+    "queries": 4,
+    "rank1": 4,
+    "rank1_share": 1.0,
+    "verbatim_leaks": 0
+   },
+   "eml": {
+    "median_rank": 1.0,
+    "not_in_top50": 0,
+    "queries": 32,
+    "rank1": 28,
+    "rank1_share": 0.875,
+    "verbatim_leaks": 0
+   },
+   "html": {
+    "median_rank": 1.0,
+    "not_in_top50": 2,
+    "queries": 42,
+    "rank1": 30,
+    "rank1_share": 0.714,
+    "verbatim_leaks": 0
+   },
+   "md": {
+    "median_rank": 1.0,
+    "not_in_top50": 0,
+    "queries": 12,
+    "rank1": 9,
+    "rank1_share": 0.75,
+    "verbatim_leaks": 0
+   },
+   "pdf": {
+    "median_rank": 1,
+    "not_in_top50": 8,
+    "queries": 63,
+    "rank1": 44,
+    "rank1_share": 0.698,
+    "verbatim_leaks": 0
+   },
+   "ppt": {
+    "median_rank": 1,
+    "not_in_top50": 0,
+    "queries": 5,
+    "rank1": 3,
+    "rank1_share": 0.6,
+    "verbatim_leaks": 0
+   },
+   "txt": {
+    "median_rank": 1.0,
+    "not_in_top50": 0,
+    "queries": 4,
+    "rank1": 4,
+    "rank1_share": 1.0,
+    "verbatim_leaks": 0
+   },
+   "xls": {
+    "median_rank": 1.0,
+    "not_in_top50": 1,
+    "queries": 4,
+    "rank1": 3,
+    "rank1_share": 0.75,
+    "verbatim_leaks": 0
+   },
+   "xlsx": {
+    "median_rank": 4.0,
+    "not_in_top50": 2,
+    "queries": 16,
+    "rank1": 5,
+    "rank1_share": 0.312,
+    "verbatim_leaks": 0
+   }
+  },
+  "in_cluster": {
+   "in-cluster": {
+    "median_rank": 1.0,
+    "not_in_top50": 7,
+    "queries": 86,
+    "rank1": 48,
+    "rank1_share": 0.558,
+    "verbatim_leaks": 0
+   },
+   "singleton": {
+    "median_rank": 1,
+    "not_in_top50": 8,
+    "queries": 101,
+    "rank1": 84,
+    "rank1_share": 0.832,
+    "verbatim_leaks": 0
+   }
+  },
+  "language": {
+   "de": {
+    "median_rank": 1,
+    "not_in_top50": 10,
+    "queries": 95,
+    "rank1": 61,
+    "rank1_share": 0.642,
+    "verbatim_leaks": 0
+   },
+   "en": {
+    "median_rank": 1.0,
+    "not_in_top50": 5,
+    "queries": 92,
+    "rank1": 71,
+    "rank1_share": 0.772,
+    "verbatim_leaks": 0
+   }
+  },
+  "level": {
+   "exact": {
+    "median_rank": 1,
+    "not_in_top50": 0,
+    "queries": 65,
+    "rank1": 60,
+    "rank1_share": 0.923,
+    "verbatim_leaks": 0
+   },
+   "partial": {
+    "median_rank": 1.0,
+    "not_in_top50": 4,
+    "queries": 60,
+    "rank1": 44,
+    "rank1_share": 0.733,
+    "verbatim_leaks": 0
+   },
+   "vague": {
+    "median_rank": 2.0,
+    "not_in_top50": 11,
+    "queries": 62,
+    "rank1": 28,
+    "rank1_share": 0.452,
+    "verbatim_leaks": 0
+   }
+  },
+  "source": {
+   "bundestag": {
+    "median_rank": 1.0,
+    "not_in_top50": 3,
+    "queries": 32,
+    "rank1": 20,
+    "rank1_share": 0.625,
+    "verbatim_leaks": 0
+   },
+   "enron": {
+    "median_rank": 1.0,
+    "not_in_top50": 0,
+    "queries": 32,
+    "rank1": 28,
+    "rank1_share": 0.875,
+    "verbatim_leaks": 0
+   },
+   "eurlex": {
+    "median_rank": 1.0,
+    "not_in_top50": 2,
+    "queries": 28,
+    "rank1": 18,
+    "rank1_share": 0.643,
+    "verbatim_leaks": 0
+   },
+   "govdata": {
+    "median_rank": 4.0,
+    "not_in_top50": 2,
+    "queries": 16,
+    "rank1": 5,
+    "rank1_share": 0.312,
+    "verbatim_leaks": 0
+   },
+   "govdocs1": {
+    "median_rank": 1.0,
+    "not_in_top50": 3,
+    "queries": 30,
+    "rank1": 22,
+    "rank1_share": 0.733,
+    "verbatim_leaks": 0
+   },
+   "safedocs": {
+    "median_rank": 1.0,
+    "not_in_top50": 5,
+    "queries": 22,
+    "rank1": 17,
+    "rank1_share": 0.773,
+    "verbatim_leaks": 0
+   },
+   "wikipedia": {
+    "median_rank": 1,
+    "not_in_top50": 0,
+    "queries": 27,
+    "rank1": 22,
+    "rank1_share": 0.815,
+    "verbatim_leaks": 0
+   }
+  }
+ },
+ "summary": {
+  "accepted": 309,
+  "distinguishability_passed": {
+   "bundestag": true,
+   "enron": true,
+   "eurlex": true,
+   "govdata": true,
+   "govdocs1": true,
+   "safedocs": true,
+   "wikipedia": true
+  },
+  "dropped": {
+   "duplicate": 5,
+   "gates": 4
+  },
+  "known_item": 187,
+  "topical": 122,
+  "triviality": {
+   "exact": {
+    "queries": 65,
+    "rank1": 60,
+    "rank1_share": 0.923
+   },
+   "partial": {
+    "queries": 60,
+    "rank1": 44,
+    "rank1_share": 0.733
+   },
+   "vague": {
+    "queries": 62,
+    "rank1": 28,
+    "rank1_share": 0.452
+   }
+  },
+  "verbatim_leak_failures": 0
+ }
+}

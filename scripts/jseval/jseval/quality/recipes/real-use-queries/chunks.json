@@ -1,0 +1,679 @@
+{
+ "by_format": {
+  "csv": {
+   "chars": {
+    "documents": 30,
+    "max": 292058,
+    "mean": 26329.67,
+    "median": 729.5,
+    "p95": 127678,
+    "sum": 789890
+   },
+   "debug_chunks_found_capped_50": {
+    "documents": 30,
+    "max": 90,
+    "mean": 13.33,
+    "median": 1.0,
+    "p95": 75,
+    "sum": 400
+   },
+   "documents": 30,
+   "engine_chunks_estimated": 461
+  },
+  "doc": {
+   "chars": {
+    "documents": 28,
+    "max": 180861,
+    "mean": 39831.96,
+    "median": 20498.0,
+    "p95": 174913,
+    "sum": 1115295
+   },
+   "debug_chunks_found_capped_50": {
+    "documents": 28,
+    "max": 91,
+    "mean": 22.54,
+    "median": 12.0,
+    "p95": 90,
+    "sum": 631
+   },
+   "documents": 28,
+   "engine_chunks_estimated": 651
+  },
+  "eml": {
+   "chars": {
+    "documents": 113,
+    "max": 41794,
+    "mean": 2485.73,
+    "median": 1495,
+    "p95": 6374,
+    "sum": 280888
+   },
+   "debug_chunks_found_capped_50": {
+    "documents": 113,
+    "max": 25,
+    "mean": 1.84,
+    "median": 1,
+    "p95": 4,
+    "sum": 208
+   },
+   "documents": 113,
+   "engine_chunks_estimated": 164
+  },
+  "html": {
+   "chars": {
+    "documents": 304,
+    "max": 1432974,
+    "mean": 47158.93,
+    "median": 6239.0,
+    "p95": 234851,
+    "sum": 14336316
+   },
+   "debug_chunks_found_capped_50": {
+    "documents": 304,
+    "max": 112,
+    "mean": 15.28,
+    "median": 4.0,
+    "p95": 90,
+    "sum": 4646
+   },
+   "documents": 304,
+   "engine_chunks_estimated": 8363
+  },
+  "md": {
+   "chars": {
+    "documents": 36,
+    "max": 48094,
+    "mean": 15313.86,
+    "median": 7231.0,
+    "p95": 43886,
+    "sum": 551299
+   },
+   "debug_chunks_found_capped_50": {
+    "documents": 36,
+    "max": 28,
+    "mean": 9.28,
+    "median": 4.5,
+    "p95": 26,
+    "sum": 334
+   },
+   "documents": 36,
+   "engine_chunks_estimated": 322
+  },
+  "pdf": {
+   "chars": {
+    "documents": 319,
+    "max": 1201283,
+    "mean": 72906.24,
+    "median": 13203,
+    "p95": 543611,
+    "sum": 23257092
+   },
+   "debug_chunks_found_capped_50": {
+    "documents": 319,
+    "max": 97,
+    "mean": 18.56,
+    "median": 8,
+    "p95": 91,
+    "sum": 5920
+   },
+   "documents": 319,
+   "engine_chunks_estimated": 13567
+  },
+  "ppt": {
+   "chars": {
+    "documents": 19,
+    "max": 69156,
+    "mean": 17562.42,
+    "median": 11047,
+    "p95": 69156,
+    "sum": 333686
+   },
+   "debug_chunks_found_capped_50": {
+    "documents": 19,
+    "max": 40,
+    "mean": 10.47,
+    "median": 7,
+    "p95": 40,
+    "sum": 199
+   },
+   "documents": 19,
+   "engine_chunks_estimated": 195
+  },
+  "txt": {
+   "chars": {
+    "documents": 12,
+    "max": 106075,
+    "mean": 28561.5,
+    "median": 19869.5,
+    "p95": 106075,
+    "sum": 342738
+   },
+   "debug_chunks_found_capped_50": {
+    "documents": 12,
+    "max": 62,
+    "mean": 16.92,
+    "median": 12.0,
+    "p95": 62,
+    "sum": 203
+   },
+   "documents": 12,
+   "engine_chunks_estimated": 200
+  },
+  "xls": {
+   "chars": {
+    "documents": 17,
+    "max": 1338562,
+    "mean": 118795.59,
+    "median": 30913,
+    "p95": 1338562,
+    "sum": 2019525
+   },
+   "debug_chunks_found_capped_50": {
+    "documents": 17,
+    "max": 100,
+    "mean": 27.12,
+    "median": 18,
+    "p95": 100,
+    "sum": 461
+   },
+   "documents": 17,
+   "engine_chunks_estimated": 1178
+  },
+  "xlsx": {
+   "chars": {
+    "documents": 122,
+    "max": 1093000,
+    "mean": 58133.78,
+    "median": 20624.5,
+    "p95": 115531,
+    "sum": 7092321
+   },
+   "debug_chunks_found_capped_50": {
+    "documents": 122,
+    "max": 90,
+    "mean": 21.13,
+    "median": 12.0,
+    "p95": 67,
+    "sum": 2578
+   },
+   "documents": 122,
+   "engine_chunks_estimated": 4137
+  }
+ },
+ "by_source": {
+  "bundestag": {
+   "chars": {
+    "documents": 185,
+    "max": 1201283,
+    "mean": 103717.71,
+    "median": 15410,
+    "p95": 894522,
+    "sum": 19187776
+   },
+   "debug_chunks_found_capped_50": {
+    "documents": 185,
+    "max": 94,
+    "mean": 21.64,
+    "median": 9,
+    "p95": 92,
+    "sum": 4004
+   },
+   "documents": 185,
+   "engine_chunks_estimated": 11193
+  },
+  "enron": {
+   "chars": {
+    "documents": 113,
+    "max": 41794,
+    "mean": 2485.73,
+    "median": 1495,
+    "p95": 6374,
+    "sum": 280888
+   },
+   "debug_chunks_found_capped_50": {
+    "documents": 113,
+    "max": 25,
+    "mean": 1.84,
+    "median": 1,
+    "p95": 4,
+    "sum": 208
+   },
+   "documents": 113,
+   "engine_chunks_estimated": 164
+  },
+  "eurlex": {
+   "chars": {
+    "documents": 256,
+    "max": 1432974,
+    "mean": 51562.79,
+    "median": 4792.5,
+    "p95": 249384,
+    "sum": 13200075
+   },
+   "debug_chunks_found_capped_50": {
+    "documents": 256,
+    "max": 112,
+    "mean": 15.52,
+    "median": 3.0,
+    "p95": 90,
+    "sum": 3973
+   },
+   "documents": 256,
+   "engine_chunks_estimated": 7700
+  },
+  "govdata": {
+   "chars": {
+    "documents": 142,
+    "max": 1093000,
+    "mean": 50004.78,
+    "median": 19480.5,
+    "p95": 115117,
+    "sum": 7100679
+   },
+   "debug_chunks_found_capped_50": {
+    "documents": 142,
+    "max": 90,
+    "mean": 18.3,
+    "median": 12.0,
+    "p95": 67,
+    "sum": 2598
+   },
+   "documents": 142,
+   "engine_chunks_estimated": 4142
+  },
+  "govdocs1": {
+   "chars": {
+    "documents": 182,
+    "max": 1338562,
+    "mean": 45816.12,
+    "median": 15606.5,
+    "p95": 136789,
+    "sum": 8338533
+   },
+   "debug_chunks_found_capped_50": {
+    "documents": 182,
+    "max": 100,
+    "mean": 19.72,
+    "median": 9.5,
+    "p95": 80,
+    "sum": 3589
+   },
+   "documents": 182,
+   "engine_chunks_estimated": 4864
+  },
+  "safedocs": {
+   "chars": {
+    "documents": 45,
+    "max": 143790,
+    "mean": 9700.04,
+    "median": 3349,
+    "p95": 29790,
+    "sum": 436502
+   },
+   "debug_chunks_found_capped_50": {
+    "documents": 45,
+    "max": 84,
+    "mean": 6.02,
+    "median": 2,
+    "p95": 18,
+    "sum": 271
+   },
+   "documents": 45,
+   "engine_chunks_estimated": 255
+  },
+  "wikipedia": {
+   "chars": {
+    "documents": 77,
+    "max": 136091,
+    "mean": 20449.31,
+    "median": 9478,
+    "p95": 79915,
+    "sum": 1574597
+   },
+   "debug_chunks_found_capped_50": {
+    "documents": 77,
+    "max": 79,
+    "mean": 12.17,
+    "median": 6,
+    "p95": 46,
+    "sum": 937
+   },
+   "documents": 77,
+   "engine_chunks_estimated": 919
+  }
+ },
+ "by_source_format": {
+  "bundestag/pdf": {
+   "chars": {
+    "documents": 185,
+    "max": 1201283,
+    "mean": 103717.71,
+    "median": 15410,
+    "p95": 894522,
+    "sum": 19187776
+   },
+   "debug_chunks_found_capped_50": {
+    "documents": 185,
+    "max": 94,
+    "mean": 21.64,
+    "median": 9,
+    "p95": 92,
+    "sum": 4004
+   },
+   "documents": 185,
+   "engine_chunks_estimated": 11193
+  },
+  "enron/eml": {
+   "chars": {
+    "documents": 113,
+    "max": 41794,
+    "mean": 2485.73,
+    "median": 1495,
+    "p95": 6374,
+    "sum": 280888
+   },
+   "debug_chunks_found_capped_50": {
+    "documents": 113,
+    "max": 25,
+    "mean": 1.84,
+    "median": 1,
+    "p95": 4,
+    "sum": 208
+   },
+   "documents": 113,
+   "engine_chunks_estimated": 164
+  },
+  "eurlex/html": {
+   "chars": {
+    "documents": 246,
+    "max": 1432974,
+    "mean": 53510.61,
+    "median": 5402.0,
+    "p95": 249384,
+    "sum": 13163610
+   },
+   "debug_chunks_found_capped_50": {
+    "documents": 246,
+    "max": 112,
+    "mean": 16.05,
+    "median": 3.5,
+    "p95": 90,
+    "sum": 3949
+   },
+   "documents": 246,
+   "engine_chunks_estimated": 7679
+  },
+  "eurlex/pdf": {
+   "chars": {
+    "documents": 10,
+    "max": 4129,
+    "mean": 3646.5,
+    "median": 3528.5,
+    "p95": 4129,
+    "sum": 36465
+   },
+   "debug_chunks_found_capped_50": {
+    "documents": 10,
+    "max": 3,
+    "mean": 2.4,
+    "median": 2.0,
+    "p95": 3,
+    "sum": 24
+   },
+   "documents": 10,
+   "engine_chunks_estimated": 21
+  },
+  "govdata/csv": {
+   "chars": {
+    "documents": 20,
+    "max": 1306,
+    "mean": 417.9,
+    "median": 121.0,
+    "p95": 1304,
+    "sum": 8358
+   },
+   "debug_chunks_found_capped_50": {
+    "documents": 20,
+    "max": 1,
+    "mean": 1.0,
+    "median": 1.0,
+    "p95": 1,
+    "sum": 20
+   },
+   "documents": 20,
+   "engine_chunks_estimated": 5
+  },
+  "govdata/xlsx": {
+   "chars": {
+    "documents": 122,
+    "max": 1093000,
+    "mean": 58133.78,
+    "median": 20624.5,
+    "p95": 115531,
+    "sum": 7092321
+   },
+   "debug_chunks_found_capped_50": {
+    "documents": 122,
+    "max": 90,
+    "mean": 21.13,
+    "median": 12.0,
+    "p95": 67,
+    "sum": 2578
+   },
+   "documents": 122,
+   "engine_chunks_estimated": 4137
+  },
+  "govdocs1/csv": {
+   "chars": {
+    "documents": 10,
+    "max": 292058,
+    "mean": 78153.2,
+    "median": 76979.0,
+    "p95": 292058,
+    "sum": 781532
+   },
+   "debug_chunks_found_capped_50": {
+    "documents": 10,
+    "max": 90,
+    "mean": 38.0,
+    "median": 45.0,
+    "p95": 90,
+    "sum": 380
+   },
+   "documents": 10,
+   "engine_chunks_estimated": 456
+  },
+  "govdocs1/doc": {
+   "chars": {
+    "documents": 28,
+    "max": 180861,
+    "mean": 39831.96,
+    "median": 20498.0,
+    "p95": 174913,
+    "sum": 1115295
+   },
+   "debug_chunks_found_capped_50": {
+    "documents": 28,
+    "max": 91,
+    "mean": 22.54,
+    "median": 12.0,
+    "p95": 90,
+    "sum": 631
+   },
+   "documents": 28,
+   "engine_chunks_estimated": 651
+  },
+  "govdocs1/html": {
+   "chars": {
+    "documents": 17,
+    "max": 27486,
+    "mean": 8788.71,
+    "median": 7257,
+    "p95": 27486,
+    "sum": 149408
+   },
+   "debug_chunks_found_capped_50": {
+    "documents": 17,
+    "max": 17,
+    "mean": 5.53,
+    "median": 5,
+    "p95": 17,
+    "sum": 94
+   },
+   "documents": 17,
+   "engine_chunks_estimated": 87
+  },
+  "govdocs1/pdf": {
+   "chars": {
+    "documents": 79,
+    "max": 1025583,
+    "mean": 45523.41,
+    "median": 17694,
+    "p95": 145972,
+    "sum": 3596349
+   },
+   "debug_chunks_found_capped_50": {
+    "documents": 79,
+    "max": 97,
+    "mean": 20.52,
+    "median": 11,
+    "p95": 85,
+    "sum": 1621
+   },
+   "documents": 79,
+   "engine_chunks_estimated": 2098
+  },
+  "govdocs1/ppt": {
+   "chars": {
+    "documents": 19,
+    "max": 69156,
+    "mean": 17562.42,
+    "median": 11047,
+    "p95": 69156,
+    "sum": 333686
+   },
+   "debug_chunks_found_capped_50": {
+    "documents": 19,
+    "max": 40,
+    "mean": 10.47,
+    "median": 7,
+    "p95": 40,
+    "sum": 199
+   },
+   "documents": 19,
+   "engine_chunks_estimated": 195
+  },
+  "govdocs1/txt": {
+   "chars": {
+    "documents": 12,
+    "max": 106075,
+    "mean": 28561.5,
+    "median": 19869.5,
+    "p95": 106075,
+    "sum": 342738
+   },
+   "debug_chunks_found_capped_50": {
+    "documents": 12,
+    "max": 62,
+    "mean": 16.92,
+    "median": 12.0,
+    "p95": 62,
+    "sum": 203
+   },
+   "documents": 12,
+   "engine_chunks_estimated": 200
+  },
+  "govdocs1/xls": {
+   "chars": {
+    "documents": 17,
+    "max": 1338562,
+    "mean": 118795.59,
+    "median": 30913,
+    "p95": 1338562,
+    "sum": 2019525
+   },
+   "debug_chunks_found_capped_50": {
+    "documents": 17,
+    "max": 100,
+    "mean": 27.12,
+    "median": 18,
+    "p95": 100,
+    "sum": 461
+   },
+   "documents": 17,
+   "engine_chunks_estimated": 1178
+  },
+  "safedocs/pdf": {
+   "chars": {
+    "documents": 45,
+    "max": 143790,
+    "mean": 9700.04,
+    "median": 3349,
+    "p95": 29790,
+    "sum": 436502
+   },
+   "debug_chunks_found_capped_50": {
+    "documents": 45,
+    "max": 84,
+    "mean": 6.02,
+    "median": 2,
+    "p95": 18,
+    "sum": 271
+   },
+   "documents": 45,
+   "engine_chunks_estimated": 255
+  },
+  "wikipedia/html": {
+   "chars": {
+    "documents": 41,
+    "max": 136091,
+    "mean": 24958.49,
+    "median": 10043,
+    "p95": 79919,
+    "sum": 1023298
+   },
+   "debug_chunks_found_capped_50": {
+    "documents": 41,
+    "max": 79,
+    "mean": 14.71,
+    "median": 6,
+    "p95": 46,
+    "sum": 603
+   },
+   "documents": 41,
+   "engine_chunks_estimated": 597
+  },
+  "wikipedia/md": {
+   "chars": {
+    "documents": 36,
+    "max": 48094,
+    "mean": 15313.86,
+    "median": 7231.0,
+    "p95": 43886,
+    "sum": 551299
+   },
+   "debug_chunks_found_capped_50": {
+    "documents": 36,
+    "max": 28,
+    "mean": 9.28,
+    "median": 4.5,
+    "p95": 26,
+    "sum": 334
+   },
+   "documents": 36,
+   "engine_chunks_estimated": 322
+  }
+ },
+ "changed_since_previous_dump": [],
+ "debug_chunks_found_capped_50": 15580,
+ "documents": 1000,
+ "empty_extractions": [],
+ "engine_chunks_total": 29236,
+ "extracted_chars": 50119050,
+ "generation": "g-20261104-120953",
+ "not_ok": {},
+ "status": {
+  "ok": 1000
+ }
+}
