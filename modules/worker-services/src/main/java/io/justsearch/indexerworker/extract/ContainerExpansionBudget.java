@@ -15,6 +15,7 @@ import java.util.zip.ZipInputStream;
 
 /** Bounds every ZIP member, including XML consumed directly by Office/ODF/EPUB parsers. */
 final class ContainerExpansionBudget {
+  private static final int MAX_PACKAGE_PARTS = 1_000;
   private final TikaExtractionPolicy policy;
   private final long documentLimit;
   private final ZipOpener zipOpener;
@@ -80,9 +81,9 @@ final class ContainerExpansionBudget {
         var entry = entries.nextElement();
         // Reserve count and metadata before retaining a name or opening any member stream.
         // Package parsers consume parts without embedded callbacks: bound those separately
-        // using the policy's metadata-entry budget, including when embedded parsing is disabled.
+        // including when embedded parsing is disabled. Output metadata keeps its own budget.
         if (packageDocument) {
-          if (packageParts >= policy.maxMetadataEntries()) {
+          if (packageParts >= MAX_PACKAGE_PARTS) {
             throw new ContentExtractor.BudgetExceededException(
                 "Package member count exceeds policy", "ARCHIVE_MEMBER_LIMIT");
           }
@@ -95,7 +96,10 @@ final class ContainerExpansionBudget {
           archiveMembers++;
         }
         metadataBytes = checkMetadata(entry, metadataBytes);
-        long entryLimit = limit(entry.getCompressedSize());
+        long entryLimit = packageDocument
+            ? (long) Math.min(policy.maxInputBytes(),
+                Math.max(1, entry.getCompressedSize()) * (2 * policy.maxCompressionRatio()))
+            : limit(entry.getCompressedSize());
         entryLimits.merge(entry.getName(), new MemberLimit(entryLimit, 1),
             (first, second) -> new MemberLimit(Math.min(first.bytes(), second.bytes()),
                 first.occurrences() + second.occurrences()));
