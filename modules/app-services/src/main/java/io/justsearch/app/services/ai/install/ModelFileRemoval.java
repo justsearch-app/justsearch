@@ -216,14 +216,6 @@ final class ModelFileRemoval {
   private final Object journalLock = new Object();
   private volatile boolean recovered;
 
-  /** How the removal record is replaced: only atomically (test seam for unsupported disks). */
-  @FunctionalInterface
-  interface RecordReplace {
-    void replace(Path target, byte[] content) throws IOException;
-  }
-
-  private volatile RecordReplace recordReplace = AtomicFileWrites::replaceStrict;
-
   ModelFileRemoval(Path homeDir, Path modelsRoot, Supplier<ModelRegistry> registry,
       Supplier<InstallContract> contract, ModelFileRemovalFence fence) {
     this(homeDir, modelsRoot, registry, contract, fence, OperationLeaseService::noOp);
@@ -242,10 +234,6 @@ final class ModelFileRemoval {
 
   void setCheckpointHookForTest(Consumer<String> hook) {
     this.checkpointHook = hook == null ? name -> {} : hook;
-  }
-
-  void setRecordReplaceForTest(RecordReplace replace) {
-    this.recordReplace = replace == null ? AtomicFileWrites::replaceStrict : replace;
   }
 
   // ---------------------------------------------------------------------------
@@ -1348,7 +1336,7 @@ final class ModelFileRemoval {
       try {
         Files.createDirectories(homeDir);
         // Only an atomic replacement: a torn record could misreport what is left (repair round 2).
-        recordReplace.replace(journalPath(), JSON.writeValueAsBytes(journal));
+        AtomicFileWrites.replaceStrict(journalPath(), JSON.writeValueAsBytes(journal));
         unsaved = null;
       } catch (IOException failure) {
         throw new java.io.UncheckedIOException("Removal record could not be saved", failure);

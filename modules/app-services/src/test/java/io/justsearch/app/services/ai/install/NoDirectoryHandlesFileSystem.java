@@ -33,13 +33,22 @@ import java.util.function.Consumer;
  * the real file system, but a directory stream is a plain {@link DirectoryStream}, never a {@code
  * SecureDirectoryStream} (as on Windows). {@link #onOpenDirectory} runs when a directory is opened,
  * before the stream is returned: what happens there happens after the caller's last check by name.
- * Test-only; it touches only the temporary folders the test gives it.
+ * {@link #onMove} runs before each move and may throw what the file system would. Test-only; it
+ * touches only the temporary folders the test gives it.
  */
 final class NoDirectoryHandlesFileSystem extends FileSystem {
   private final FileSystem real;
   private final Provider provider = new Provider();
   /** Runs with the real path of each directory opened. */
   volatile Consumer<Path> onOpenDirectory = dir -> {};
+  /** Runs before each move, with its real paths and its options. */
+  volatile MoveHook onMove = (source, target, options) -> {};
+
+  /** What happens to a move before it reaches the real file system. */
+  @FunctionalInterface
+  interface MoveHook {
+    void beforeMove(Path source, Path target, CopyOption... options) throws IOException;
+  }
 
   NoDirectoryHandlesFileSystem(FileSystem real) {
     this.real = real;
@@ -196,6 +205,7 @@ final class NoDirectoryHandlesFileSystem extends FileSystem {
 
     @Override
     public void move(Path source, Path target, CopyOption... options) throws IOException {
+      onMove.beforeMove(unwrap(source), unwrap(target), options);
       real().move(unwrap(source), unwrap(target), options);
     }
 

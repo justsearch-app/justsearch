@@ -54,7 +54,7 @@ diff --git a/modules/app-services/src/main/java/io/justsearch/app/services/ai/in
 index cd8aca9ec5..50b97c3fa1 100644
 --- a/modules/app-services/src/main/java/io/justsearch/app/services/ai/install/ModelFileRemoval.java
 +++ b/modules/app-services/src/main/java/io/justsearch/app/services/ai/install/ModelFileRemoval.java
-@@ -162,6 +162,28 @@ final class ModelFileRemoval {
+@@ -162,6 +162,16 @@ final class ModelFileRemoval {
      this.fence = Objects.requireNonNull(fence, "fence");
    }
  
@@ -67,18 +67,6 @@ index cd8aca9ec5..50b97c3fa1 100644
 +      Supplier<io.justsearch.app.api.OperationLeaseService> leases) {
 +    this(homeDir, modelsRoot, registry, contract, fence);
 +  }
-+
-+  /** Compatibility shape: how this revision would replace its record (it never asks). */
-+  @FunctionalInterface
-+  interface RecordReplace {
-+    void replace(Path target, byte[] content) throws IOException;
-+  }
-+
-+  /**
-+   * Compatibility shape: this revision always saves its record through the non-strict
-+   * replacement, which falls back to a plain move where atomic replacement is unavailable.
-+   */
-+  void setRecordReplaceForTest(RecordReplace replace) {}
 +
    void setCheckpointHookForTest(Consumer<String> hook) {
      this.checkpointHook = hook == null ? name -> {} : hook;

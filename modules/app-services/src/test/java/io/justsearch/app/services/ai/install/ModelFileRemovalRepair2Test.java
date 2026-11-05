@@ -15,13 +15,16 @@ import io.justsearch.app.api.OperationLease;
 import io.justsearch.app.api.OperationLeaseSnapshot;
 import io.justsearch.app.services.lease.OperationLeaseServiceImpl;
 import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -213,16 +216,29 @@ final class ModelFileRemovalRepair2Test {
 
   @Test
   void aDiskWithoutAtomicReplacementRefusesBeforeAnythingIsMoved() throws Exception {
-    ModelFileRemoval engine = engine();
+    fixture = new RemovalModelsFixture(tmp.resolve("home"));
     fixture.writeChat();
+    // The engine keeps its own record writer; only the file system below it lacks atomic rename.
+    var disk = new NoDirectoryHandlesFileSystem(FileSystems.getDefault());
+    ModelFileRemoval engine = new ModelFileRemoval(disk.wrap(fixture.home), fixture.models,
+        () -> fixture.registry, () -> null, new ModelFileRemovalFence());
     String digest = part(engine, "chat").previewDigest;
-    engine.setRecordReplaceForTest((target, content) -> {
-      throw new AtomicMoveNotSupportedException(target.toString(), target.toString(), "no atomic rename");
-    });
+    AtomicInteger atomicRenamesRefused = new AtomicInteger();
+    AtomicInteger plainReplacements = new AtomicInteger();
+    disk.onMove = (source, target, options) -> {
+      if (List.of(options).contains(StandardCopyOption.ATOMIC_MOVE)) {
+        atomicRenamesRefused.incrementAndGet();
+        throw new AtomicMoveNotSupportedException(source.toString(), target.toString(), "no atomic rename");
+      }
+      plainReplacements.incrementAndGet();
+    };
 
     var refused = assertThrows(ModelFileRemoval.Refusal.class,
-        () -> engine.prepare("chat", digest, settings, ELIGIBLE, IDLE).finish());
+        () -> engine.prepare("chat", digest, settings, ELIGIBLE, IDLE).finish(),
+        "a removal record saved without an atomic replacement was accepted");
 
+    assertTrue(atomicRenamesRefused.get() > 0, "the record writer asked the disk for an atomic rename");
+    assertEquals(0, plainReplacements.get(), "the record was never replaced by a plain move");
     assertEquals(RECORD_NOT_ATOMIC, refused.getMessage());
     assertArrayEquals(RemovalModelsFixture.CHAT, Files.readAllBytes(fixture.models.resolve("answer.gguf")));
     assertTrue(Files.exists(fixture.models.resolve("mmproj-F16.gguf")));

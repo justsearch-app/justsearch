@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-05T09:31:39.034Z",
-  "revision": "8a7ad0a3c84011dddc461aacbf0e5a25c7933673",
-  "tree": "9e2963ff35ec6e298da267d02db73290254a5801",
+  "createdAt": "2026-11-05T22:14:20.887Z",
+  "revision": "f0edb526518516d2852478b2324b18e8aa7c495d",
+  "tree": "48325b1b4a115b15d0acec91ed8825235d307781",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,34 +18,34 @@
   },
   "runs": [
     {
-      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalTest.removesEveryRetainedRerankerVariantAndItsPartialAndRecordsTheDecline\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalTest.answersRemovesTheModelAndItsPictureReadingFileTogether\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalTest.aCustomFileAtTheCanonicalNameWithADifferentHashIsPutBackUnchanged\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalTest.aDifferentSizedFileIsKeptWithoutBeingTouched\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalTest.aLinkedParentFolderKeepsEverythingBehindIt\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalTest.aFileReplacedByALinkBeforeCaptureIsKeptAndTheTargetIsUntouched\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalTest.aHardLinkedFileIsKept\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalTest.aFileAnotherWantedPartListsIsKeptAndGoesOnlyWhenThatPartIsDeclined\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalTest.aFileOutsideTheModelsFolderIsKept\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalTest.aReplacementBetweenResolveAndCaptureIsKeptAndPutBack\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalTest.aFailedVerificationNeverOverwritesAFileThatTookTheCanonicalPlace\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalTest.aCrashAfterCaptureIsReportedAndTheFileIsPutBackOnRestartWithoutAnyDeletion\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalTest.aFutureOrUnreadableRemovalRecordIsReportedAndNothingIsRestoredOrDeleted\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalTest.filesInTheRemovalFolderWithoutAnyRecordAreReported\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalTest.aRenameFailureKeepsTheFileAndReportsNotRemoved\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalTest.refusalsDeleteNothingAndRecordNothing\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalTest.aDeclineTheSettingsOwnerRefusesDeletesNothing\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalTest.eligibilityIsReadAgainUnderTheLock\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalTest.partsThisStepCannotRemoveAreShownWithTheirReasonAndMeasuredSize\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalFenceTest.aUserCannotEnterWhileARemovalHoldsTheLock\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalFenceTest.aRemovalCannotBeginWhileAUserIsRegisteredAndNamesIt\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalFenceTest.aSecondRemovalCannotStartWhileOneRuns\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalFenceTest.bestMatchFirstIsInUseUntilTheWorkerReportsNoSession\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalFenceTest.theAnswerModelIsInUseWhileAProcessMayHoldItOrAHoldIsOpen\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalFenceTest.anUnboundProbeFailsClosed\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalRoutesTest.aPackImportIsRefusedWhileRemovingAndARunningImportRefusesTheRemoval\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalRoutesTest.aRuntimeActivationOrDeactivationIsRefusedWhileRemovingAndARunningOneRefusesTheRemoval\" --tests \"io.justsearch.app.services.ai.install.AiInstallServiceFileRemovalTest.theDeclineIsRecordedThroughTheSettingsOwnerAndRepairDoesNotBringThePartBack\" --tests \"io.justsearch.app.services.ai.install.AiInstallServiceFileRemovalTest.aSwitchedOnPartIsRefusedWithAPlainReasonAndNothingChanges\" --tests \"io.justsearch.app.services.ai.install.AiInstallServiceFileRemovalTest.answersRequirePictureReadingOffToo\" --tests \"io.justsearch.app.services.ai.install.AiInstallServiceFileRemovalTest.switchingOnUndecliningOrInstallingWhileRemovingIsRefused\" --tests \"io.justsearch.app.services.ai.install.AiInstallServiceFileRemovalTest.aSwitchOnThatLandedFirstRefusesTheRemoval\" --tests \"io.justsearch.app.services.ai.install.AiInstallServiceFileRemovalTest.aRunningDownloadRefusesTheRemovalAndARemovalRefusesTheDownload\" --tests \"io.justsearch.app.services.ai.install.AiInstallServiceFileRemovalTest.downloadAgainPreviewsWithoutChangingTheChoiceAndCancelLeavesRepairUnchanged\" --tests \"io.justsearch.app.services.ai.install.AiInstallServiceFileRemovalTest.anAcceptedDownloadAgainWithdrawsTheDeclineAtStart\" --tests \"io.justsearch.app.services.registry.operations.handlers.RemoveAiFilesHandlerTest.aPartIdAndItsPreviewReachTheOwnerAndAFullRemovalSucceeds\" --tests \"io.justsearch.app.services.registry.operations.handlers.RemoveAiFilesHandlerTest.filesLeftBehindNeverReportSuccess\" --tests \"io.justsearch.app.services.registry.operations.handlers.RemoveAiFilesHandlerTest.aRefusalIsReturnedWithItsPlainReason\" --tests \"io.justsearch.app.services.registry.operations.handlers.RemoveAiFilesHandlerTest.pathsAndUnknownPartsAreRefusedBeforeTheOwnerIsAsked\" --tests \"io.justsearch.app.services.registry.operations.handlers.RemoveAiFilesHandlerTest.theApprovalNamesWhatIsRemovedAndWhatIsNotTouched\" --tests \"io.justsearch.app.services.registry.operations.handlers.RemoveAiFilesHandlerTest.downloadAgainCarriesItsPartsAndThePreviewedPlanToTheAcceptedStart\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalFenceTest.anAnswerServerLaunchInProgressRefusesTheAnswerModelRemovalOnly\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalFenceTest.aRemovalOfTheAnswerModelRefusesALaunchAndOtherRemovalsDoNot\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalFenceTest.aLaunchAndARemovalRacingNeverBothProceed\" --tests \"io.justsearch.app.services.ai.install.AiInstallServiceFileRemovalTest.anOpenInstalledModelActivationRefusesTheRemovalAndDeletesNothing\" --tests \"io.justsearch.app.services.registry.emitter.UIOperationViewConformanceTest\" --tests \"io.justsearch.app.services.registry.operations.CoreOperationCatalogTest.definitionsContainTheExpectedSeedEntries\" --tests \"io.justsearch.app.services.registry.operations.CoreOperationCatalogTest.removeAiFilesIsHighRiskInlineConfirmTakingOnlyAPartIdAndItsPreview\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalTest.removesEveryRetainedRerankerVariantAndItsPartialAndRecordsTheDecline\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalTest.answersRemovesTheModelAndItsPictureReadingFileTogether\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalTest.aCustomFileAtTheCanonicalNameWithADifferentHashIsPutBackUnchanged\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalTest.aDifferentSizedFileIsKeptWithoutBeingTouched\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalTest.aLinkedParentFolderKeepsEverythingBehindIt\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalTest.aFileReplacedByALinkBeforeCaptureIsKeptAndTheTargetIsUntouched\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalTest.aHardLinkedFileIsKept\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalTest.aFileAnotherWantedPartListsIsKeptAndGoesOnlyWhenThatPartIsDeclined\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalTest.aFileOutsideTheModelsFolderIsKept\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalTest.aReplacementBetweenResolveAndCaptureIsKeptAndPutBack\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalTest.aFailedVerificationNeverOverwritesAFileThatTookTheCanonicalPlace\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalTest.aCrashAfterCaptureIsReportedAndTheFileIsPutBackOnRestartWithoutAnyDeletion\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalTest.aFutureOrUnreadableRemovalRecordIsReportedAndNothingIsRestoredOrDeleted\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalTest.filesInTheRemovalFolderWithoutAnyRecordAreReported\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalTest.aRenameFailureKeepsTheFileAndReportsNotRemoved\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalTest.refusalsDeleteNothingAndRecordNothing\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalTest.aDeclineTheSettingsOwnerRefusesDeletesNothing\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalTest.eligibilityIsReadAgainUnderTheLock\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalTest.partsThisStepCannotRemoveAreShownWithTheirReasonAndMeasuredSize\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalFenceTest.aUserCannotEnterWhileARemovalHoldsTheLock\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalFenceTest.aRemovalCannotBeginWhileAUserIsRegisteredAndNamesIt\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalFenceTest.aSecondRemovalCannotStartWhileOneRuns\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalFenceTest.theAnswerModelIsInUseWhileAProcessMayHoldItOrAHoldIsOpen\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalFenceTest.anUnboundProbeFailsClosed\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalRoutesTest.aPackImportIsRefusedWhileRemovingAndARunningImportRefusesTheRemoval\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalRoutesTest.aRuntimeActivationOrDeactivationIsRefusedWhileRemovingAndARunningOneRefusesTheRemoval\" --tests \"io.justsearch.app.services.ai.install.AiInstallServiceFileRemovalTest.theDeclineIsRecordedThroughTheSettingsOwnerAndRepairDoesNotBringThePartBack\" --tests \"io.justsearch.app.services.ai.install.AiInstallServiceFileRemovalTest.aSwitchedOnPartIsRefusedWithAPlainReasonAndNothingChanges\" --tests \"io.justsearch.app.services.ai.install.AiInstallServiceFileRemovalTest.answersRequirePictureReadingOffToo\" --tests \"io.justsearch.app.services.ai.install.AiInstallServiceFileRemovalTest.switchingOnUndecliningOrInstallingWhileRemovingIsRefused\" --tests \"io.justsearch.app.services.ai.install.AiInstallServiceFileRemovalTest.aSwitchOnThatLandedFirstRefusesTheRemoval\" --tests \"io.justsearch.app.services.ai.install.AiInstallServiceFileRemovalTest.aRunningDownloadRefusesTheRemovalAndARemovalRefusesTheDownload\" --tests \"io.justsearch.app.services.ai.install.AiInstallServiceFileRemovalTest.downloadAgainPreviewsWithoutChangingTheChoiceAndCancelLeavesRepairUnchanged\" --tests \"io.justsearch.app.services.ai.install.AiInstallServiceFileRemovalTest.anAcceptedDownloadAgainWithdrawsTheDeclineAtStart\" --tests \"io.justsearch.app.services.registry.operations.handlers.RemoveAiFilesHandlerTest.aPartIdAndItsPreviewReachTheOwnerAndAFullRemovalSucceeds\" --tests \"io.justsearch.app.services.registry.operations.handlers.RemoveAiFilesHandlerTest.filesLeftBehindNeverReportSuccess\" --tests \"io.justsearch.app.services.registry.operations.handlers.RemoveAiFilesHandlerTest.aRefusalIsReturnedWithItsPlainReason\" --tests \"io.justsearch.app.services.registry.operations.handlers.RemoveAiFilesHandlerTest.pathsAndUnknownPartsAreRefusedBeforeTheOwnerIsAsked\" --tests \"io.justsearch.app.services.registry.operations.handlers.RemoveAiFilesHandlerTest.theApprovalNamesWhatIsRemovedAndWhatIsNotTouched\" --tests \"io.justsearch.app.services.registry.operations.handlers.RemoveAiFilesHandlerTest.downloadAgainCarriesItsPartsAndThePreviewedPlanToTheAcceptedStart\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalFenceTest.anAnswerServerLaunchInProgressRefusesTheAnswerModelRemovalOnly\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalFenceTest.aRemovalOfTheAnswerModelRefusesALaunchAndOtherRemovalsDoNot\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalFenceTest.aLaunchAndARemovalRacingNeverBothProceed\" --tests \"io.justsearch.app.services.ai.install.AiInstallServiceFileRemovalTest.anOpenInstalledModelActivationRefusesTheRemovalAndDeletesNothing\" --tests \"io.justsearch.app.services.registry.emitter.UIOperationViewConformanceTest\" --tests \"io.justsearch.app.services.registry.operations.CoreOperationCatalogTest.definitionsContainTheExpectedSeedEntries\" --tests \"io.justsearch.app.services.registry.operations.CoreOperationCatalogTest.removeAiFilesIsHighRiskInlineConfirmTakingOnlyAPartIdAndItsPreview\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalRoutesTest.installedModelActivationIsRefusedWhileRemoving\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 5883
+      "durationMs": 8496
     },
     {
       "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.DownloadedFilesHttpTest.theDownloadedFilesRowsAreServedFromTheInstallOwner\" --tests \"io.justsearch.ui.api.DownloadedFilesHttpTest.downloadAgainPreviewsTheIncludedPartWithoutSavingAnyChoice\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 5100
+      "durationMs": 5641
     },
     {
       "command": "./gradlew :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaServerLaunchFenceTest.aFencedStartLaunchesNothingAndIsARefusal\" --tests \"io.justsearch.app.inference.LlamaServerLaunchFenceTest.anAdmittedLaunchIsRegisteredUntilItsProcessHasStarted\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3587
+      "durationMs": 3955
     },
     {
       "command": "./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.RecordedInstallerGenerationBootProjectionTest.anOpenInstallerActivationIsReportedSoRemoveFilesRefuses\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 5136
+      "durationMs": 3745
     },
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.remove-files.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/qknxm850/tmp/test-intent-vitest-267911-1793871096712.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.remove-files.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/k3a9w7zu/tmp/test-intent-vitest-4605-1793916858576.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 2319
+      "durationMs": 2306
     }
   ],
   "checks": [
@@ -338,7 +338,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java#aUserCannotEnterWhileARemovalHoldsTheLock",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:e957391a90a077f3fb26c2679b6245262aa6bd64aa2daf3e59183935fe975015",
+      "contentDigest": "sha256:71d4e510522ef9cc45c1fa9ab2dd3994e9c1ca7d8ecd04120d8ef2aa8aba3b29",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -353,7 +353,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java#aRemovalCannotBeginWhileAUserIsRegisteredAndNamesIt",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:e957391a90a077f3fb26c2679b6245262aa6bd64aa2daf3e59183935fe975015",
+      "contentDigest": "sha256:71d4e510522ef9cc45c1fa9ab2dd3994e9c1ca7d8ecd04120d8ef2aa8aba3b29",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -368,7 +368,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java#aSecondRemovalCannotStartWhileOneRuns",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:e957391a90a077f3fb26c2679b6245262aa6bd64aa2daf3e59183935fe975015",
+      "contentDigest": "sha256:71d4e510522ef9cc45c1fa9ab2dd3994e9c1ca7d8ecd04120d8ef2aa8aba3b29",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -380,25 +380,10 @@
       ]
     },
     {
-      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java#bestMatchFirstIsInUseUntilTheWorkerReportsNoSession",
-      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java",
-      "runner": "gradle",
-      "contentDigest": "sha256:e957391a90a077f3fb26c2679b6245262aa6bd64aa2daf3e59183935fe975015",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "bestMatchFirstIsInUseUntilTheWorkerReportsNoSession()",
-          "status": "passed"
-        }
-      ]
-    },
-    {
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java#theAnswerModelIsInUseWhileAProcessMayHoldItOrAHoldIsOpen",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:e957391a90a077f3fb26c2679b6245262aa6bd64aa2daf3e59183935fe975015",
+      "contentDigest": "sha256:71d4e510522ef9cc45c1fa9ab2dd3994e9c1ca7d8ecd04120d8ef2aa8aba3b29",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -413,7 +398,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java#anUnboundProbeFailsClosed",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:e957391a90a077f3fb26c2679b6245262aa6bd64aa2daf3e59183935fe975015",
+      "contentDigest": "sha256:71d4e510522ef9cc45c1fa9ab2dd3994e9c1ca7d8ecd04120d8ef2aa8aba3b29",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -818,7 +803,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java#anAnswerServerLaunchInProgressRefusesTheAnswerModelRemovalOnly",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:e957391a90a077f3fb26c2679b6245262aa6bd64aa2daf3e59183935fe975015",
+      "contentDigest": "sha256:71d4e510522ef9cc45c1fa9ab2dd3994e9c1ca7d8ecd04120d8ef2aa8aba3b29",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -833,7 +818,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java#aRemovalOfTheAnswerModelRefusesALaunchAndOtherRemovalsDoNot",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:e957391a90a077f3fb26c2679b6245262aa6bd64aa2daf3e59183935fe975015",
+      "contentDigest": "sha256:71d4e510522ef9cc45c1fa9ab2dd3994e9c1ca7d8ecd04120d8ef2aa8aba3b29",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -848,7 +833,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java#aLaunchAndARemovalRacingNeverBothProceed",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:e957391a90a077f3fb26c2679b6245262aa6bd64aa2daf3e59183935fe975015",
+      "contentDigest": "sha256:71d4e510522ef9cc45c1fa9ab2dd3994e9c1ca7d8ecd04120d8ef2aa8aba3b29",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -933,8 +918,23 @@
           "status": "passed"
         }
       ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalRoutesTest.java#installedModelActivationIsRefusedWhileRemoving",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalRoutesTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:17dc21d695a6f98831eb63a7525b635b205ba26482cf022d7f9b30f1a753bdda",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "installedModelActivationIsRefusedWhileRemoving()",
+          "status": "passed"
+        }
+      ]
     }
   ],
   "failBefore": null,
-  "digest": "sha256:7e5a6222d95566a87c9fc983cf6c842c29623faa5d53a56fdf4a6b53caf6badf"
+  "digest": "sha256:abd5a605915b40e832e9ab2c1910d0a931706f92b396193f8a0a05ab6cb0ef3c"
 }
