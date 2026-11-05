@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-04T22:39:45.737Z",
-  "revision": "7273c984c2cd5fe95feff612b31c03af73c06bd9",
-  "tree": "99730193ecccafa30ff2bc65e3ee681973fc3b3e",
+  "createdAt": "2026-11-05T01:39:40.576Z",
+  "revision": "9018a17e2c831cce9eb2dbac26df530882d81e39",
+  "tree": "70a6d8115fba4753e0fc1133669cfb12db35e0c6",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.picture-switch.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/m66xbzpj/tmp/test-intent-vitest-65-1793831969447.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.picture-switch.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/bvca0hfh/tmp/test-intent-vitest-8-1793842772361.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 4870
+      "durationMs": 1844
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts#reconciles an interrupted delivery with an unchanged witness using the original attempt",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:628e7a23b0386863ba4628bdcdd7597ebad0285bdf60f6502606871cc26279d0",
+      "contentDigest": "sha256:798c5f5069fea6db4ea67503d55549903101b3fffb465ab6e28e5dc34a79b6af",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts#reconciles an interrupted receipt with a changed witness by replaying the original attempt",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:628e7a23b0386863ba4628bdcdd7597ebad0285bdf60f6502606871cc26279d0",
+      "contentDigest": "sha256:798c5f5069fea6db4ea67503d55549903101b3fffb465ab6e28e5dc34a79b6af",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -59,7 +59,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts#clears interrupted uncertainty when the original attempt is refused with an unchanged witness",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:628e7a23b0386863ba4628bdcdd7597ebad0285bdf60f6502606871cc26279d0",
+      "contentDigest": "sha256:798c5f5069fea6db4ea67503d55549903101b3fffb465ab6e28e5dc34a79b6af",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -72,36 +72,36 @@
     }
   ],
   "failBefore": {
-    "ref": "7273c984c2",
-    "revision": "7273c984c2cd5fe95feff612b31c03af73c06bd9",
+    "ref": "0466d6521e",
+    "revision": "0466d6521ebca6692c9e107cc1a8a32f89e58cfb",
     "overlays": [],
     "patches": [],
     "runs": [
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.picture-switch.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/m66xbzpj/tmp/test-intent-vitest-65-1793831980415.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.picture-switch.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/bvca0hfh/tmp/test-intent-vitest-8-1793842778153.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 4371,
-        "output": "JSON report written to /home/elias/.cache/am/m66xbzpj/tmp/test-intent-vitest-65-1793831980415.json\n\n"
+        "durationMs": 1940,
+        "output": "JSON report written to /home/elias/.cache/am/bvca0hfh/tmp/test-intent-vitest-8-1793842778153.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts#reconciles an interrupted delivery with an unchanged witness using the original attempt",
         "classification": "assertion",
-        "detail": "picture reading live switch reconciles an interrupted delivery with an unchanged witness using the original attempt:  AssertionError: expected [ { …(4) } ] to have a length of 2 but got 1\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/m66xbzpj/tmp/test-intent-before-YUIchJ/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/m66xbzpj/tmp/te"
+        "detail": "picture reading live switch reconciles an interrupted delivery with an unchanged witness using the original attempt:  AssertionError: expected [ { …(4) } ] to have a length of 2 but got 1\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/bvca0hfh/tmp/test-intent-before-CuhjZJ/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/bvca0hfh/tmp/te"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts#reconciles an interrupted receipt with a changed witness by replaying the original attempt",
         "classification": "assertion",
-        "detail": "picture reading live switch reconciles an interrupted receipt with a changed witness by replaying the original attempt:  AssertionError: expected [ { …(4) } ] to have a length of 2 but got 1\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/m66xbzpj/tmp/test-intent-before-YUIchJ/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/m66xbzpj/tmp/te"
+        "detail": "picture reading live switch reconciles an interrupted receipt with a changed witness by replaying the original attempt:  AssertionError: expected [ { …(4) } ] to have a length of 2 but got 1\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/bvca0hfh/tmp/test-intent-before-CuhjZJ/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/bvca0hfh/tmp/te"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts#clears interrupted uncertainty when the original attempt is refused with an unchanged witness",
         "classification": "assertion",
-        "detail": "picture reading live switch clears interrupted uncertainty when the original attempt is refused with an unchanged witness:  AssertionError: expected [ { …(4) } ] to have a length of 2 but got 1\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/m66xbzpj/tmp/test-intent-before-YUIchJ/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/m66xbzpj/tmp/te"
+        "detail": "picture reading live switch clears interrupted uncertainty when the original attempt is refused with an unchanged witness:  AssertionError: expected [ { …(4) } ] to have a length of 2 but got 1\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/bvca0hfh/tmp/test-intent-before-CuhjZJ/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/bvca0hfh/tmp/te"
       }
     ]
   },
-  "digest": "sha256:d21388512050abd31bbd3b4856143d85fe803db11b6f8f518dec7be89cabca64"
+  "digest": "sha256:d49f88baa2ebc85899422a68ae8dcbc9a6ab5ad2d86a614e086688e2f765b286"
 }

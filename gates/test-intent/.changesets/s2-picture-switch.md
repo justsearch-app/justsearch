@@ -382,6 +382,44 @@ The brief's adopted scenarios are quoted below. Evidence is emitted only by run-
     },
     {
       "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Repair round 1 UI coverage: after an interrupted delivery or receipt, focus replays the identical original settings attempt, including its operation key and witness. A committed receipt is not applied twice; a refused replay keeps the prior choice, shows the refusal and clears interrupted uncertainty. All three final checks pass on the candidate and fail by assertion on the rebased build commit 0466d6521e: the old page sends only one request instead of replaying the attempt.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "V1",
+          "quote": "After install, Text in scans and images has a live switch. Off: no new picture work starts (automatic or manual), unfinished pictures return to waiting without using up retries, the managed answer server runs without the picture file; files and already read text are kept; the page says \"Off - files and read text kept\". On: picture reading resumes waiting work only (no rereading of already processed files). Works whether answers are on or off.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "V2",
+          "quote": "Switching picture reading at every stage (Engine starting, between documents, during reading, while saving a result) ends consistent: no late result after Off is lost or half-written; completed text stays searchable. The choice survives restart, upgrade, a profile or model change, Repair and runtime activation; a second window converges; failures (server restart fails, file missing or mismatched, settings write fails, process dies midway) leave a truthful prior or recovered state. A user-run (external) answer server: the switch refuses with a reason and never stops that server.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "Keep interrupted picture switches truthful through the existing settings owner, witness and operation registry.",
+          "choice": "Reuse the original operation key, witness and settings payload when focus reconciles an interrupted attempt; let the existing owner receipt distinguish an applied request from one not yet delivered. Clear uncertainty after an explicit refusal while preserving the prior choice.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s2-picture-switch-ui-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts#reconciles an interrupted delivery with an unchanged witness using the original attempt",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts#reconciles an interrupted receipt with a changed witness by replaying the original attempt",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts#clears interrupted uncertainty when the original attempt is refused with an unchanged witness"
+      ]
+    },
+    {
+      "items": [
         "modules/app-api/src/test/java/io/justsearch/app/api/operations/BulkRefusalExplanationTest.java",
         "modules/app-services/src/test/java/io/justsearch/app/services/vdu/PictureReadingCoordinatorTest.java",
         "modules/ui/src/test/java/io/justsearch/ui/api/OfflineProcessingOperationLifecycleIntegrationTest.java",
@@ -390,7 +428,7 @@ The brief's adopted scenarios are quoted below. Evidence is emitted only by run-
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Repair round 2: picture-Off refuses before dispatch with Picture reading is off, stable PICTURE_READING_OFF and retryable false; a fence arriving during indexing-hold acquisition completes with the same refusal. Exercise real coordinator and handler, loopback HTTP controller, durable runner/store and read-time outcome. Library renders the refusal from its real operation button; both AI Brain picture presentations state the unknown saved choice after settings quarantine. Only these changed checks are evidence targets; each fails by assertion at cd1ab03860. Historical whole-file evidence for the coordinator and page is superseded here for the changed checks; the full required suites cover preservation.",
+      "behaviour": "Repair round 2: picture-Off refuses before dispatch with Picture reading is off, stable PICTURE_READING_OFF and retryable false; a fence arriving during indexing-hold acquisition completes with the same refusal. Exercise real coordinator and handler, loopback HTTP controller, durable runner/store and read-time outcome. Library renders the refusal from its real operation button; both AI Brain picture presentations state the unknown saved choice after settings quarantine. The seven final checks pass on the candidate and fail by assertion on the rebased round-1 head c1918ffb47. This evidence covers these changed checks only; it does not establish full-suite or real-GPU preservation.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -438,8 +476,15 @@ The brief's adopted scenarios are quoted below. Evidence is emitted only by run-
         "modules/ui-web/src/shell-v0/views/BrainSurface.redesign.test.ts"
       ],
       "class": "New",
-      "behaviour": "Preservation adaptation in round 2: the runtime-evidence scenario now supplies the valid settings witness required to know the saved choice. Preserve every assertion: picture On when known, runtime sentence changes when its projector is inactive, and unavailable live observations disable both feature controls. Quarantined settings are covered separately and deliberately omit the witness. This check passes before cd1ab03860 and after; this fixture correction does not manufacture a fail-before.",
+      "behaviour": "New picture-switch oracle with a known-choice fixture adaptation: main expected zero Text in scans and images switches when live observations became unknown; the candidate expects one visible, disabled switch in the path step, as required by V1. The scenario also supplies a valid settings witness to know the saved choice. Existing observations remain: picture On initially, the sentence reflects an inactive runtime projector, unknown live observations show Unknown, and Best match first remains disabled. This is not an unchanged preservation oracle or a fail-before claim; the final candidate check passed.",
       "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "V1",
+          "quote": "After install, Text in scans and images has a live switch. Off: no new picture work starts (automatic or manual), unfinished pictures return to waiting without using up retries, the managed answer server runs without the picture file; files and already read text are kept; the page says \"Off - files and read text kept\". On: picture reading resumes waiting work only (no rereading of already processed files). Works whether answers are on or off.",
+          "label": "agent-drafted, owner-adopted"
+        },
         {
           "kind": "owner-adopted-scenario",
           "task": "t-20261101-uiimpl",
@@ -448,7 +493,7 @@ The brief's adopted scenarios are quoted below. Evidence is emitted only by run-
           "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/s2-picture-switch-truthfulness-preservation.json",
+      "evidence": "gates/test-intent/evidence/s2-picture-switch-runtime-observation.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/BrainSurface.redesign.test.ts#keeps runtime evidence in the sentence and disables feature switches when observations become unknown"
       ]
@@ -601,7 +646,7 @@ The earlier route inventories above still cover admission, publication and every
 
 Unknown-choice wording is shared between the disabled reason, path state and sentence phrase. The new page regression supplies the quarantined-settings HTTP refusal, then asserts both actual rendered states and disabled reasons. The Library regression invokes the actual nested operation button through its HTTP client against a session-owned loopback refusal server; asserting the returned fixture alone would not exercise the missing page error binding.
 
-Evidence uses the unmodified run-evidence.mjs and the same temporary shared-clone Git adapter described above. Final candidate evidence uses the assigned worktree under its build slot; before checkouts are private shared clones. This round's evidence targets only its seven changed truthfulness checks and the one preserved runtime-observation check. No acceptance record is authored. Shared resources touched: Gradle cache and build slot/admission queue, npm dependencies/cache, and private loopback ports for test-owned servers. No owner application, dev stack or GPU is used. The frontend fixture's omitted witness was corrected only for its known-choice scenario, preserving all its assertions.
+Evidence uses the unmodified run-evidence.mjs and the same temporary shared-clone Git adapter described above. Final candidate evidence uses the assigned worktree under its build slot; before checkouts are private shared clones. This round's evidence targets only its seven changed truthfulness checks and the runtime-observation check whose picture-switch presence oracle is new behavior under V1. No acceptance record is authored. Shared resources touched: Gradle cache and build slot/admission queue, npm dependencies/cache, and private loopback ports for test-owned servers. No owner application, dev stack or GPU is used. The frontend fixture's omitted witness was corrected for its known-choice scenario. Its picture-switch presence oracle changes from zero controls on main to one disabled path-step control; V1 warrants that new expectation.
 
 ### Repair round 2 check results and handback
 
@@ -614,9 +659,9 @@ No preflight executable exists under `.agents`. All Gradle commands unset DISPLA
 | UI failure, `NvidiaSmiAvailabilityHttpTest.anInstalledNvidiaSmiIsAvailableWhenNvmlSuppliesTheMemory` | Assertion failure at line 83, the environment failure anticipated by the brief. No test or runtime workaround was made. The other environment failures mentioned in the brief were not reported by this bounded three-module run. |
 | `env -u DISPLAY js-gradle-slot ./gradlew :modules:app-api:pmdMain :modules:app-api:pmdTest :modules:app-services:pmdMain :modules:app-services:pmdTest :modules:ui:pmdMain :modules:ui:pmdTest -PskipWebBuild=true --console=plain --continue` | Final refresh exited 1: Gradle build daemon disappeared unexpectedly during app-services pmdTest. This refresh is incomplete, not a pass. Returned under the builder's non-implementation-check-failure rule; no speculative daemon or resource change was made. |
 | `run-evidence.mjs --before cd1ab03860 --copy-node-modules` for the seven named repair checks | Exit 0: all seven executed and passed after; all seven failed before with assertions. The final HTTP failure is on the real successful/started response returned before the repair, not on a missing helper or fixture-side server assertion. |
-| `run-evidence.mjs` for the preserved runtime-observation page check | Exit 0 on the candidate; the same check with the valid witness fixture also passes on cd1ab03860 in the private before clone. |
+| `run-evidence.mjs` for the runtime-observation page check with the new V1 switch-presence oracle | Exit 0 on the candidate; the same check with the valid witness fixture also passes on cd1ab03860 in the private before clone. |
 | `npm --prefix modules/ui-web run lint`; `npm --prefix modules/ui-web run typecheck` | Passed on the final files. |
-| `npm --prefix modules/ui-web run test:unit:run -- --maxWorkers=4` | Final full run: 697 files and 8,873 tests passed. The initial run found the existing known-choice fixture's omitted witness; supplying the witness preserved every assertion. Subsequent fixture parity/real-button improvements were checked again: picture switch file 10/10 and operation refusal file 21/21 passed; the final evidence re-executed both files. |
+| `npm --prefix modules/ui-web run test:unit:run -- --maxWorkers=4` | Final full run: 697 files and 8,873 tests passed. The initial run found the existing known-choice fixture's omitted witness; supplying the witness supports its known-choice fixture; the picture-switch presence expectation is new V1 behavior. Subsequent fixture parity/real-button improvements were checked again: picture switch file 10/10 and operation refusal file 21/21 passed; the final evidence re-executed both files. |
 | `node scripts/ci/run-ui-web-gates.mjs` | 31/31 passed. |
 | `npm --prefix modules/ui-web run knip:report`; `node scripts/governance/run.mjs --mode gate --gate dead-code` | Producer emitted its report (underlying knip exit 1 is expected by the wrapper); dead-code passed, six findings and zero failed gates. |
 | `node scripts/governance/gates/test-intent/cli.mjs` | Only test-intent/acceptance-missing. No acceptance record authored. |
@@ -666,3 +711,15 @@ The final complete invocation used `env -u DISPLAY js-gradle-slot ./gradlew -Psk
 | `:modules:ui:test` | 2443 | 2441 | 2 | 0 |
 
 The unchanged GenerativeSettingsComponentOwnerTest ran all seven cases with zero skips/failures. PictureReadingProfileRepairTest ran all eleven cases with zero skips/failures. `git diff --check` passed. Independent verification and the test-intent acceptance record remain outside this builder assignment.
+
+### Record-only evidence repair (2026-11-05)
+
+Product code and test files are unchanged from 9018a17e2c. The interrupted-delivery, interrupted-receipt and refused-replay checks are now explicitly referenced with final-file evidence. The runtime-observation entry names the changed switch-presence oracle as new V1 behavior instead of claiming unchanged preservation. Five unreferenced evidence files were removed. The relevant UI assertions observe rendered state, dispatched requests or receipt replay; their negative literals exist in production code.
+
+| Targeted evidence command | Observed result |
+| --- | --- |
+| `run-evidence.mjs --before 0466d6521e --copy-node-modules`, three interrupted-change checks | Exit 0: all three passed on the candidate, no skips; all three assertion-failed before because the original attempt was not replayed. |
+| `env -u DISPLAY js-gradle-slot` running `run-evidence.mjs --before c1918ffb47 --copy-node-modules`, seven round-2 checks | Exit 0: all seven passed on the candidate, no skips; all seven assertion-failed before on the missing explanation, admission/refusal outcome or rendered wording under test. |
+| `run-evidence.mjs`, runtime-observation check | Exit 0: the final check executed and passed without skips. No fail-before or unchanged-oracle claim. |
+
+Evidence was generated by the unmodified runner. A temporary Git adapter allocated its before states as shared clones inside the session temporary folder and removed them after the runs; each checkout used its own build folder and copied frontend dependencies. Shared resources touched: Gradle cache and build slot/admission queue, the assigned worktree's frontend dependencies, and private loopback ports for test-owned servers. No owner application, dev stack or GPU was used. No `.agents/preflight` exists. No full suite, fetch, rebase, commit, push or acceptance-record write was performed for this record-only repair.

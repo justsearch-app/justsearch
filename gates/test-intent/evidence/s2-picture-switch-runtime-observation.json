@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-05T00:29:32.626Z",
-  "revision": "cd1ab03860e113a2b3f7e445523b5f41dca7b69a",
-  "tree": "040d17d1656db836ece9b236cab679862c1b9557",
+  "createdAt": "2026-11-05T01:40:06.746Z",
+  "revision": "9018a17e2c831cce9eb2dbac26df530882d81e39",
+  "tree": "7bc466d08170e65b2daa0706b34c7d3f67bdfc40",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.redesign.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/fmk773yu/tmp/test-intent-vitest-2049-1793838567655.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.redesign.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/bvca0hfh/tmp/test-intent-vitest-2-1793842800140.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 4969
+      "durationMs": 6605
     }
   ],
   "checks": [
@@ -42,5 +42,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:216320351491f9cf6334eeba052ef34de3c292ef2570ad1ec58e9190a1b47c84"
+  "digest": "sha256:3e3ddace9b404bbb2f42b67d212aac3568b5881415fb9f0c855c8ac037ca52ec"
 }
