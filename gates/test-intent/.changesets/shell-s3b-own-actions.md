@@ -1245,3 +1245,14 @@ Band focus repair: `shell-s3b-band-focus-repaired.json` compares the themed Libr
   "note": "After the band-focus repair on 0cfda84fe3: the periodic-update, Escape and Keep it checks fail before by assertion and pass after; frozen customization unchanged (226 existing tests on both versions, declaration updates, editing, presentation validation, the bundled plugin window). Transcribed by the orchestrator from the verifier's answer (Codex sandbox)."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1abc1-e83e-7922-9325-d46f0c91b52b",
+  "verdict": "accept",
+  "digest": "sha256:82869a276c4a90414ebc435e3f845a509ee522bce335aa8ca3bc288cc6a8d5ce",
+  "note": "After CI on 978c06a6aa: only the band-focus lockdown test's navigation timeout changed (3 s default -> 45 s for page.goto; focus checks keep 3 s); no assertion changed; both regenerated evidence files keep their checks and the repaired one its assertion fail-before against 0cfda84fe3. Transcribed by the orchestrator from the verifier's answer (Codex sandbox)."
+}
+```
