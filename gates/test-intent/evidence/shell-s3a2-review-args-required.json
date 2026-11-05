@@ -1,0 +1,200 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-05T07:00:54.948Z",
+  "revision": "ae182f7c4c98b4ff183716cabd2cd7bd8517c5be",
+  "tree": "97c58e1b6e5582841adceab9214b8c67437bdee6",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/StatusPanel.review.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/1ohsl9z5/tmp/test-intent-vitest-8553-1793861895727.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1586
+    },
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/1ohsl9z5/tmp/test-intent-vitest-8553-1793861897314.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 70983
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#initial and fresh pending details with no arguments refuse Allow, send no approval, and stay answerable",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f7a684dc6760bfaa1372995bd68a551d89fc8d6a0519f84a8433fe8f04cc060c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE3 only present, well-formed details that match what was shown allow it initial and fresh pending details with no arguments refuse Allow, send no approval, and stay answerable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#initial and fresh pending details with null arguments refuse Allow, send no approval, and stay answerable",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f7a684dc6760bfaa1372995bd68a551d89fc8d6a0519f84a8433fe8f04cc060c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE3 only present, well-formed details that match what was shown allow it initial and fresh pending details with null arguments refuse Allow, send no approval, and stay answerable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#initial and fresh pending details with non-text arguments refuse Allow, send no approval, and stay answerable",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f7a684dc6760bfaa1372995bd68a551d89fc8d6a0519f84a8433fe8f04cc060c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE3 only present, well-formed details that match what was shown allow it initial and fresh pending details with non-text arguments refuse Allow, send no approval, and stay answerable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#DE3 initial and fresh pending details with no arguments refuse Allow, send no approval, and stay answerable",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:16edcc8d98f58358e98fcf466d4790077c018b4cb6a46b1c8586ac1621b60d08",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE3 initial and fresh pending details with no arguments refuse Allow, send no approval, and stay answerable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#DE3 initial and fresh pending details with null arguments refuse Allow, send no approval, and stay answerable",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:16edcc8d98f58358e98fcf466d4790077c018b4cb6a46b1c8586ac1621b60d08",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE3 initial and fresh pending details with null arguments refuse Allow, send no approval, and stay answerable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#DE3 initial and fresh pending details with non-text arguments refuse Allow, send no approval, and stay answerable",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:16edcc8d98f58358e98fcf466d4790077c018b4cb6a46b1c8586ac1621b60d08",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE3 initial and fresh pending details with non-text arguments refuse Allow, send no approval, and stay answerable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#matching empty argument summaries allow, while changing nonempty arguments to empty refuses as changed",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f7a684dc6760bfaa1372995bd68a551d89fc8d6a0519f84a8433fe8f04cc060c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE3 only present, well-formed details that match what was shown allow it matching empty argument summaries allow, while changing nonempty arguments to empty refuses as changed",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "fcccb2528c21238d4b6383c70ec178be67f05d05",
+    "revision": "fcccb2528c21238d4b6383c70ec178be67f05d05",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/StatusPanel.review.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/1ohsl9z5/tmp/test-intent-vitest-8553-1793861971396.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1823,
+        "output": "JSON report written to /home/elias/.cache/am/1ohsl9z5/tmp/test-intent-vitest-8553-1793861971396.json\n\n"
+      },
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/1ohsl9z5/tmp/test-intent-vitest-8553-1793861973219.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 80857,
+        "output": "JSON report written to /home/elias/.cache/am/1ohsl9z5/tmp/test-intent-vitest-8553-1793861973219.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#initial and fresh pending details with no arguments refuse Allow, send no approval, and stay answerable",
+        "classification": "assertion",
+        "detail": "DE3 only present, well-formed details that match what was shown allow it initial and fresh pending details with no arguments refuse Allow, send no approval, and stay answerable:  AssertionError: the identical incomplete responses cannot authorize a POST: expected [ { pendingId: 'incomplete', …(1) } ] to deeply equal []\n    at /home/elias/.cache/am/1ohsl9z5/tmp/test-intent-before-9Hqjor/modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts:358:80\n    at file:///ho"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#initial and fresh pending details with null arguments refuse Allow, send no approval, and stay answerable",
+        "classification": "assertion",
+        "detail": "DE3 only present, well-formed details that match what was shown allow it initial and fresh pending details with null arguments refuse Allow, send no approval, and stay answerable:  AssertionError: the identical incomplete responses cannot authorize a POST: expected [ { pendingId: 'incomplete', …(1) } ] to deeply equal []\n    at /home/elias/.cache/am/1ohsl9z5/tmp/test-intent-before-9Hqjor/modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts:358:80\n    at file:///ho"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#initial and fresh pending details with non-text arguments refuse Allow, send no approval, and stay answerable",
+        "classification": "assertion",
+        "detail": "DE3 only present, well-formed details that match what was shown allow it initial and fresh pending details with non-text arguments refuse Allow, send no approval, and stay answerable:  AssertionError: expected 'Its details changed, so it was not al…' to be 'Its current details are unavailable, …' // Object.is equality\n    at /home/elias/.cache/am/1ohsl9z5/tmp/test-intent-before-9Hqjor/modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts:366:33\n    at file:///home/elia"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#DE3 initial and fresh pending details with no arguments refuse Allow, send no approval, and stay answerable",
+        "classification": "assertion",
+        "detail": "DE3 initial and fresh pending details with no arguments refuse Allow, send no approval, and stay answerable:  AssertionError: identical incomplete initial and fresh details cannot authorize a POST: expected [ { pendingId: 'incomplete', …(1) } ] to deeply equal []\n    at /home/elias/.cache/am/1ohsl9z5/tmp/test-intent-before-9Hqjor/modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.t"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#DE3 initial and fresh pending details with null arguments refuse Allow, send no approval, and stay answerable",
+        "classification": "assertion",
+        "detail": "DE3 initial and fresh pending details with null arguments refuse Allow, send no approval, and stay answerable:  AssertionError: identical incomplete initial and fresh details cannot authorize a POST: expected [ { pendingId: 'incomplete', …(1) } ] to deeply equal []\n    at /home/elias/.cache/am/1ohsl9z5/tmp/test-intent-before-9Hqjor/modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.t"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#DE3 initial and fresh pending details with non-text arguments refuse Allow, send no approval, and stay answerable",
+        "classification": "assertion",
+        "detail": "DE3 initial and fresh pending details with non-text arguments refuse Allow, send no approval, and stay answerable:  AssertionError: expected 'Its details changed, so it was not al…' to contain 'details are unavailable'\n    at /home/elias/.cache/am/1ohsl9z5/tmp/test-intent-before-9Hqjor/modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts:624:94\n    at runNextTicks (node:internal/pr"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#matching empty argument summaries allow, while changing nonempty arguments to empty refuses as changed",
+        "classification": "assertion",
+        "detail": "DE3 only present, well-formed details that match what was shown allow it matching empty argument summaries allow, while changing nonempty arguments to empty refuses as changed:  AssertionError: expected 'Its current details are unavailable, …' to be 'Its details changed, so it was not al…' // Object.is equality\n    at /home/elias/.cache/am/1ohsl9z5/tmp/test-intent-before-9Hqjor/modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts:380:30\n    at file:///home/elia"
+      }
+    ]
+  },
+  "digest": "sha256:716f8b359adc69eb001c00518e2700cdb14e17ddb7a72d190c4d823c0fa70e02"
+}

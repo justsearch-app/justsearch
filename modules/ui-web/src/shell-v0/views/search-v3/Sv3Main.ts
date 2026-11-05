@@ -164,6 +164,7 @@ import {
 import { sv3RunReceiptLabel } from './sv3-run.js';
 import { retrievalFallbackPhrase } from '../../aggregate-substrate/strategies/searchTraceExplain.js';
 import type { Sv3RunFeedItem, Sv3RunPrompt, Sv3RunView } from './sv3-run.js';
+import { STATUS_REVIEW_EVENT } from '../../state/frameStatus.js';
 
 /**
  * Raised when the reader resolves a typed prompt with its OWN dedicated control (tempdoc 822 Phase
@@ -3180,6 +3181,14 @@ export class Sv3Main extends JfElement {
         <p class="run-prompt-text">
           ${prompt.toolName} is waiting for your approval (${prompt.risk.toLowerCase()} risk).
         </p>
+        <!-- DE3 — the request is answered in What's going on; this opens its review there. -->
+        <jf-control
+          data-testid="sv3-run-approval-review"
+          label="Review the request"
+          .onActivate=${() => this.dispatchEvent(new CustomEvent<string>(STATUS_REVIEW_EVENT,
+            { detail: `authorization:${prompt.id}`, bubbles: true, composed: true }))}
+          >Review</jf-control
+        >
       </div>
     `;
   }

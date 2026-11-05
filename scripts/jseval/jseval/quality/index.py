@@ -1,7 +1,9 @@
 """Collection-exclusive, fail-closed index lifecycle.
 
-``prepare_index`` returns immediately. ``handle.wait()`` joins a low-priority,
-pausable preparation and reuses its live engine through confirmation and teardown.
+``prepare_index`` returns once the checkout's distribution snapshot is selected
+(one incremental installDist through the Gradle slot when its sources have none;
+scoring never installs). ``handle.wait()`` joins a low-priority, pausable
+preparation and reuses its live engine through confirmation and teardown.
 ``confirm`` reads the live index; a cache marker is never proof of validity.
 Use ``with prepare_index(...) as handle: handle.wait()`` to own and stop the backend.
 
@@ -33,6 +35,7 @@ from typing import Any, Mapping
 import httpx
 
 from .. import backend, index_identity
+from . import distribution, inputs
 from jsharness import readiness
 from .._paths import REPO_ROOT, shared_models_dir
 from ..ingest import add_watched_root
@@ -40,49 +43,25 @@ from .collections import load_collection, write_collection, write_documents
 from .types import (Collection, atomic_write_text, canonical_json,
                     canonical_manifest_text, sha256_text)
 
-# Individual files only. Reviewed request-time and harness-only code, never engine inputs.
-# New files (including new reranker classes) are index-shaping until reviewed here.
-QUERY_TIME_ONLY = frozenset({
-    "modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeSearchEngine.java",
-    "modules/app-services/src/main/java/io/justsearch/app/services/worker/SearchPipelinePresets.java",
-    "modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/HybridSearchOps.java",
-    # Reranker owns scores/tokenization of request candidates, not stored encodings.
-    *[f"modules/reranker/src/main/java/io/justsearch/reranker/{name}.java" for name in (
-        "RerankerTokenizer", "AssemblyBuildFailure", "RerankerAssembly", "CitationScorer",
-        "RerankSkipCause", "OnnxModelDiscovery", "WorkerModelDiscovery", "CitationScorerConfig",
-        "CrossEncoderReranker", "NumericConsistency", "RerankerShape", "RerankerConfig")],
-    # Scoring orchestration and request collection; never materializes/ingests documents.
-    "scripts/jseval/jseval/quality/run.py",
-    # Compares stored rankings/metrics; never starts an index writer.
-    "scripts/jseval/jseval/quality/compare.py",
-    # Renders stored evidence; no engine or document writes.
-    "scripts/jseval/jseval/quality/report.py",
-    # Pure ranking metric/statistics calculations.
-    "scripts/jseval/jseval/quality/scoring.py",
-    # Validates collection counts and constructed rankings, without ingesting.
-    "scripts/jseval/jseval/quality/known_answers.py",
-    # Dispatches actions; all materialization/ingestion remains in index.py and
-    # collections.py, which (along with types.py) deliberately stay in the key.
-    "scripts/jseval/jseval/commands/quality.py",
-    # Corpus acquisition does not shape what the engine indexes: document bytes are pinned
-    # independently by the collection's content digests in the key (K1).
-    "scripts/jseval/jseval/quality/corpus.py",
-    # Query planning/writing does not shape what the engine indexes either; document bytes
-    # remain pinned by those same collection content digests (K1).
-    "scripts/jseval/jseval/quality/real_use_queries.py",
-    "scripts/jseval/tests/quality/test_real_use_queries.py",
-})
-# Stored collection data (queries, judgments, configs, recipes), not code. Its index-shaping
-# part enters the key as the collection's document identity (K1): a queries or judgments edit
-# keeps the key; a changed document, layout or witness format list changes it.
-COLLECTION_DATA = ("scripts/jseval/jseval/quality/config/", "scripts/jseval/jseval/quality/recipes/")
-SCHEMA = "jseval.quality.index.v1"
+SCHEMA = "jseval.quality.index.v2"
 CACHE_ROOT = Path.home() / ".cache/justsearch-quality/indexes"
 # jseval/dev-tool bookkeeping, never read by extraction/encoding/index writers.
 # In particular, registration is mutable on every boot and must not key its own index.
 OPERATIONAL_ENV = frozenset({"JSEVAL_GRADLE_SLOT", "JUSTSEARCH_DEV_RUNNER_STATE_ROOT",
                              "JUSTSEARCH_JOB_RECORD_DIR", "JUSTSEARCH_DATASET_CACHE",
                              "JUSTSEARCH_INDEX_CACHE", "JUSTSEARCH_GH_BIN"})
+# The ORT optimized-graph store is off for quality runs. Its cache hit loads a stored graph
+# whose bytes it never verifies (OrtOptimizedModelStore.loadOrCreate/committed), so a shared
+# graph would bypass the models component. With a 0 MiB cap loadOrCreate never reads or
+# writes an entry: it loads the source graph and ORT optimizes it in memory, and initialize()
+# returns before pruning anything. Its folder is the entry's own data folder regardless.
+ORT_CACHE_CAP, ORT_CACHE_DIR = "JUSTSEARCH_ORT_OPTIMIZED_CACHE_MAX_MB", "JUSTSEARCH_ORT_OPTIMIZED_CACHE_DIR"
+# The selected snapshot digest; the launch derives every code and resource path from it.
+DISTRIBUTION_ENV = "JSEVAL_DISTRIBUTION"
+# Pinned paths whose content is a key component of its own (never their location).
+SEPARATELY_HASHED = frozenset({"JUSTSEARCH_REPO_ROOT", "JUSTSEARCH_MODELS_DIR", "JUSTSEARCH_TESSERACT_PATH",
+                               "JUSTSEARCH_TESSDATA_PATH", "JUSTSEARCH_DEV_JDK_HOME", "JAVA_HOME",
+                               "LD_LIBRARY_PATH", DISTRIBUTION_ENV, *inputs.JVM_OPTION_VARIABLES})
 
 
 class IndexRefused(RuntimeError):
@@ -91,6 +70,14 @@ class IndexRefused(RuntimeError):
 
 class TransientIndexRefused(IndexRefused):
     """Serving is unavailable; stored index content has not been shown corrupt."""
+
+
+class InputUnavailable(TransientIndexRefused):
+    """An effective input could not be resolved, hashed or validated, or changed.
+
+    Refuses reuse and serving; it is never evidence against a stored index, so a
+    previously valid cached entry is never quarantined for it.
+    """
 
 
 @dataclasses.dataclass(frozen=True)
@@ -108,23 +95,28 @@ class IndexConfig:
     sample_size: int = 3
 
     def environment(self) -> dict[str, str]:
+        """The pinned launch environment: every input explicit, nothing left to discovery."""
         # Fail-safe: hash all inherited JustSearch runtime inputs too. Never inherit
         # another run's paths, port, or eval launcher settings.
         excluded = {"JUSTSEARCH_DATA_DIR", "JUSTSEARCH_HOME", "JUSTSEARCH_INDEX_BASE_PATH",
                     "JUSTSEARCH_API_PORT", "JUSTSEARCH_REPO_ROOT", "JUSTSEARCH_CONFIG",
-                    "JUSTSEARCH_SSOT_PATH", "JUSTSEARCH_STAGE_PLUGIN_MANIFEST"}
+                    "JUSTSEARCH_SSOT_PATH", "JUSTSEARCH_STAGE_PLUGIN_MANIFEST", ORT_CACHE_CAP, ORT_CACHE_DIR}
         env = {k: v for k, v in os.environ.items()
                if k.startswith("JUSTSEARCH_") and k not in excluded}
         env.update(self.env)
-        forbidden = excluded & self.env.keys()
+        forbidden = (excluded | {DISTRIBUTION_ENV}) & self.env.keys()
         if forbidden:
             raise ValueError(f"lifecycle-owned environment overrides: {sorted(forbidden)}")
-        # GPU selection is the caller's (inherited above) and part of the index key.
+        # GPU selection is the caller's (inherited above), explicit, and part of the index key.
+        # ResolvedConfigBuilder:1345,1375 gives reranker/chunk reranker independent GPU
+        # defaults; make them follow the master unless the caller explicitly chose otherwise.
+        # A blank value counts as unset: ResolvedConfigBuilder:728 ignores blank values.
+        for name in ("JUSTSEARCH_RERANK_GPU_ENABLED", "JUSTSEARCH_RERANK_CHUNKS_GPU_ENABLED"):
+            if not env.get(name, "").strip():
+                env[name] = env.get("JUSTSEARCH_GPU_ENABLED", "")
+        env[ORT_CACHE_CAP] = "0"
         env.update({"JUSTSEARCH_SPLADE_ENABLED": "false",
                     "JUSTSEARCH_RAG_CHUNK_SPLADE_ENABLED": "false", "JUSTSEARCH_LLM_ENABLED": "false"})
-        for name in ("JAVA_OPTS", "UI_OPTS", "JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS"):
-            if name in os.environ:
-                env[name] = os.environ[name]
         # An explicit sparse ablation alone opts in to these stages.
         if self.request.get("mode") == "splade":
             env["JUSTSEARCH_SPLADE_ENABLED"] = "true"
@@ -132,6 +124,19 @@ class IndexConfig:
         if models is None or not Path(models).is_dir():
             raise IndexRefused("models directory unavailable; pass --models-dir /path/to/shared/models")
         env["JUSTSEARCH_MODELS_DIR"] = str(Path(models).resolve())
+        process = {**os.environ, **env}
+        try:
+            # Every JVM option variable is set, to its validated value or empty.
+            env.update(inputs.jvm_options(process))
+            env["LD_LIBRARY_PATH"] = process.get("LD_LIBRARY_PATH", "")
+            inputs.native_selection(env)
+            inputs.model_selection(env)
+            env["JAVA_HOME"] = str(inputs.resolve_jdk(self.repo_root, process))
+            # The engine's cwd is the snapshot; its bundle-root search starts there.
+            exe, data = inputs.resolve_ocr(process, distribution.ROOT / "snapshots")
+        except inputs.InputRefused as e:
+            raise InputUnavailable(str(e)) from None
+        env["JUSTSEARCH_TESSERACT_PATH"], env["JUSTSEARCH_TESSDATA_PATH"] = str(exe), str(data)
         env["JUSTSEARCH_REPO_ROOT"] = str(self.repo_root.resolve())
         slot = shutil.which("js-gradle-slot")
         if not slot:
@@ -145,80 +150,153 @@ def _file_hash(path: Path) -> str:
         return hashlib.file_digest(f, "sha256").hexdigest()
 
 
-def tree_hash(root: Path) -> str:
-    """Hash current bytes/modes, including nonignored untracked files and deletions.
-
-    Git object ids/HEAD are intentionally absent: identical index inputs across
-    commits must reuse. Ignored build products are not source inputs.
-    """
-    raw = subprocess.check_output(["git", "ls-files", "-z", "--cached", "--others",
-                                   "--exclude-standard"], cwd=root)
-    rows = []
-    for name in sorted(set(os.fsdecode(n) for n in raw.split(b"\0") if n)):
-        if name in QUERY_TIME_ONLY or name.startswith(COLLECTION_DATA):
-            continue
-        path = root / name
-        if path.is_symlink():
-            # Include target contents as well: external config links cannot escape identity.
-            rows.append((name, "link", os.readlink(path), _file_hash(path)))
-        elif path.is_file():
-            rows.append((name, path.stat().st_mode & 0o777, _file_hash(path)))
-        elif path.exists():
-            raise IndexRefused(f"unhashable source input: {name}")
-        else:
-            rows.append((name, "deleted"))
-    return sha256_text(canonical_json(rows))
-
-
-def model_hashes(models: Path) -> dict[str, str]:
-    # Actual model/tokenizer/config bytes, not unchecked sha sidecars or mtimes.
-    # The engine fingerprints SPLADE model assets even when that stage is disabled.
-    # Hashing assets does not enable/build the unused stage.
-    roots = [models / "onnx", models / "splade"]
-    files = sorted({p for root in roots for p in root.rglob("*") if p.is_file()})
-    if not files:
-        raise IndexRefused(f"no model inputs under {models}; pass --models-dir /path/to/shared/models")
-    for path in files:
-        with path.open("rb") as stream:
-            if stream.read(128).startswith(b"version https://git-lfs.github.com/spec/v1\n"):
-                raise IndexRefused(f"model is an LFS pointer: {path}; pass --models-dir /path/to/shared/models")
-    return {p.relative_to(models).as_posix(): _file_hash(p) for p in files}
+def model_hashes(models: Path, *, llm_off: bool) -> dict[str, str]:
+    try:
+        return inputs.model_hashes(models, llm_off=llm_off)
+    except inputs.InputRefused as e:
+        raise InputUnavailable(str(e)) from None
 
 
 def compute_index_key(collection: Collection, config: IndexConfig,
                       env: Mapping[str, str] | None = None) -> tuple[str, dict]:
+    """Key over everything that can change index contents, each by content, never location.
+
+    Unrelated source edits (docs, web UI, CI, scoring code) leave the snapshot digest and
+    so the key unchanged. Any input that cannot be resolved, hashed or validated refuses.
+    """
     env = dict(env) if env is not None else config.environment()
-    # Ports/data folders are lifecycle-owned; everything else is conservatively shaping.
-    components = {"schema": SCHEMA, "tree": tree_hash(config.repo_root),
-                  "models": model_hashes(Path(env["JUSTSEARCH_MODELS_DIR"])),
-                  "runtime": {k: v for k, v in env.items() if k not in OPERATIONAL_ENV},
-                  "collection": collection.name, "documents": collection.document_identity()}
-    # Checkout location is not a code input; materialized paths are stable under cache root.
-    components["runtime"].pop("JUSTSEARCH_REPO_ROOT", None)
-    # A mutable external model/config must not hide behind a stable pathname.
-    references = {}
-    for name, value in env.items():
-        if (name.startswith("JUSTSEARCH_") and name not in OPERATIONAL_ENV
-                and name not in ("JUSTSEARCH_REPO_ROOT", "JUSTSEARCH_MODELS_DIR")
-                and Path(value).is_absolute()):
-            p = Path(value)
-            if p.is_file():
-                references[name] = _file_hash(p)
-            elif p.is_dir():
-                references[name] = {f.relative_to(p).as_posix(): _file_hash(f)
-                                    for f in sorted(p.rglob("*")) if f.is_file()}
-    components["runtime_files"] = references
+    try:
+        inputs.jvm_options(env)
+        inputs.native_selection(env)
+        inputs.model_selection(env)
+        if env.get(ORT_CACHE_CAP) != "0":
+            raise inputs.InputRefused(f"the ORT optimized-graph cache is not disabled ({ORT_CACHE_CAP}=0)")
+        for name in (DISTRIBUTION_ENV, "JAVA_HOME", "JUSTSEARCH_MODELS_DIR",
+                     "JUSTSEARCH_TESSERACT_PATH", "JUSTSEARCH_TESSDATA_PATH"):
+            if not env.get(name):
+                raise inputs.InputRefused(f"input not pinned: {name}")
+        snapshot = distribution.verify(env[DISTRIBUTION_ENV])
+        # The snapshot is hashed and immutable; what its engine configuration names must lie inside it.
+        inputs.config_references(distribution.path(snapshot))
+        components = {
+            "schema": SCHEMA,
+            "distribution": snapshot,
+            "harness": inputs.harness_digest(),
+            "jdk": inputs.jdk_digest(Path(env["JAVA_HOME"])),
+            "jvm_options": {name: env.get(name, "") for name in inputs.JVM_OPTION_VARIABLES},
+            "library_path": inputs.library_path(env.get("LD_LIBRARY_PATH", "")),
+            # GPU mode only: the driver version and the libcuda.so.1 the system loader resolves.
+            "gpu": inputs.gpu_driver(env),
+            "ocr": inputs.ocr_digest(Path(env["JUSTSEARCH_TESSERACT_PATH"]), Path(env["JUSTSEARCH_TESSDATA_PATH"])),
+            "models": inputs.model_hashes(Path(env["JUSTSEARCH_MODELS_DIR"]), llm_off=inputs.llm_off(env)),
+            # Ports/data folders are lifecycle-owned; everything else is conservatively shaping.
+            "runtime": inputs.runtime(env, OPERATIONAL_ENV | SEPARATELY_HASHED),
+            "collection": collection.name, "documents": collection.document_identity()}
+    except (inputs.InputRefused, distribution.DistributionRefused) as e:
+        raise InputUnavailable(f"not ready: {e}") from None
+    finally:
+        distribution.flush_digests()
     return sha256_text(canonical_json(components)), components
 
 
+def identity_digests(components: Mapping[str, Any]) -> dict[str, str]:
+    """One digest per key component: what a run header records instead of paths."""
+    return {name: (value if name == "distribution" else sha256_text(canonical_json(value)))
+            for name, value in components.items() if name not in ("schema", "collection")}
+
+
+def pin_locations(env: dict) -> None:
+    """Resolve every remaining location once against the selected snapshot, the engine's
+    working directory; the key hashes and the launch receives these absolute paths."""
+    try:
+        env.update(inputs.pin_locations(env, distribution.path(env[DISTRIBUTION_ENV])))
+    except inputs.InputRefused as e:
+        raise InputUnavailable(f"not ready: {e}") from None
+
+
+def _select_distribution(config: IndexConfig, env: Mapping[str, str], prepared_only: bool) -> str:
+    """The snapshot built from the checkout's current sources; preparation installs one if needed.
+
+    Scoring never installs: a checkout without its own snapshot is refused before any
+    engine starts. An equal checkout elsewhere (same HEAD and working tree) shares one.
+    """
+    root = config.repo_root
+    try:
+        source = list(backend.source_identity(root))
+    except (OSError, subprocess.CalledProcessError) as e:
+        raise InputUnavailable(f"not ready: checkout source identity unavailable ({e})") from None
+    try:
+        if prepared_only:
+            return distribution.current(root, source)
+        digest = distribution.lookup(source)
+        if digest is None:
+            # The Gradle invoker queues in its slot and takes machine admission of its own; the
+            # snapshot is taken and published inside that same hold (_snapshot_install).
+            install_env = {k: v for k, v in {**os.environ, **env}.items() if k != DISTRIBUTION_ENV}
+            try:
+                backend._install_distribution(root, install_env, then=f"{__name__}:_snapshot_install")
+            except distribution.DistributionRefused:
+                raise
+            except Exception as e:
+                raise TransientIndexRefused(f"not ready, transient: distribution preparation failed: {e}") from e
+            digest = distribution.lookup(source)
+            if digest is None:
+                raise TransientIndexRefused("not ready, transient: checkout changed during installDist or "
+                                            "snapshot; no snapshot of its current sources was published")
+        distribution.publish(root, source, digest)
+        distribution.prune()
+        return digest
+    except distribution.DistributionRefused as e:
+        raise InputUnavailable(str(e)) from None
+
+
+def _snapshot_install(root: Path) -> None:
+    """Snapshot and publish the install just made, still inside the installation's hold.
+
+    Publishes nothing when the checkout changed: the caller then finds no snapshot for its
+    sources. An incomplete install raises and is never published.
+    """
+    source = list(backend.source_identity(root))
+    try:
+        receipt = _json(root / distribution.INSTALL / distribution.RECEIPT)
+    except (OSError, ValueError):
+        receipt = None
+    if receipt != source:
+        return
+    digest = distribution.create(root, source)
+    if list(backend.source_identity(root)) == source:
+        distribution.publish(root, source, digest)
+
+
+def _native_fallbacks(data: Path) -> None:
+    try:
+        inputs.data_native_fallbacks(data)
+    except inputs.InputRefused as e:
+        raise InputUnavailable(f"not ready: {e}") from None
+
+
 def _launch_env(config: IndexConfig, data: Path, env: Mapping[str, str]) -> dict[str, str]:
-    """Override lifecycle paths that start_backend otherwise inherits from the caller."""
-    root = config.repo_root.resolve()
-    return {**env, "JUSTSEARCH_HOME": str(data), "JUSTSEARCH_DATA_DIR": str(data),
+    """Override lifecycle paths; code and repo resources come from the immutable snapshot.
+
+    Runs before every launch: refuses native code the engine would discover in the data
+    folder and empties the launch's DJL engine cache (inputs.DATA_NATIVE_FOLDER and
+    inputs.ENGINE_CACHE_ENV say why).
+    """
+    snapshot = distribution.path(env[DISTRIBUTION_ENV])
+    # Model discovery also tries <data>/models (data and home folder) and <snapshot>/models
+    # (repo root; a snapshot never holds one): all must stay absent so only the hashed root serves.
+    if (data / "models").exists() or (snapshot / "models").exists():
+        raise InputUnavailable("not ready: a models folder outside the hashed models root would serve "
+                               "model discovery (data or snapshot folder)")
+    _native_fallbacks(data)
+    return {**env, ORT_CACHE_DIR: str(data / "ort-optimized"),
+            inputs.ENGINE_CACHE_ENV: str(inputs.fresh_engine_cache(data)),
+            "JUSTSEARCH_HOME": str(data), "JUSTSEARCH_DATA_DIR": str(data),
             "JUSTSEARCH_INDEX_BASE_PATH": str(data / "index/default"),
-            "JUSTSEARCH_CONFIG": str(root / "modules/ui/src/main/resources/headless-config/application.yaml"),
-            "JUSTSEARCH_SSOT_PATH": str(root / "SSOT"),
-            "JUSTSEARCH_STAGE_PLUGIN_MANIFEST": str(root / "SSOT/manifests/plugins/pipeline-stage-plugins.v1.json")}
+            "JUSTSEARCH_REPO_ROOT": str(snapshot),
+            "JUSTSEARCH_CONFIG": str(snapshot / inputs.ENGINE_CONFIG),
+            "JUSTSEARCH_SSOT_PATH": str(snapshot / "SSOT"),
+            "JUSTSEARCH_STAGE_PLUGIN_MANIFEST": str(snapshot / "SSOT/manifests/plugins/pipeline-stage-plugins.v1.json")}
 
 
 def _json(path: Path) -> dict:
@@ -243,6 +321,10 @@ def _population_owner(c: Collection, key: str) -> dict:
 
 
 def _check_owner(owner: dict, c: Collection, key: str) -> None:
+    if isinstance(owner, dict) and owner.get("schema") != SCHEMA:
+        raise IndexRefused(f"data folder was prepared under an older index identity "
+                           f"({owner.get('schema')}); it is never adopted: prepare a new index "
+                           f"without an explicit data folder (IndexConfig.data_dir) or choose an empty one")
     if owner != _population_owner(c, key):
         raise IndexRefused("data folder belongs to another collection, key or population")
 
@@ -605,6 +687,12 @@ class IndexHandle:
     _backend: Any = dataclasses.field(default=None, repr=False)
     base_url: str | None = None
     index_state: dict = dataclasses.field(default_factory=dict)
+    # Shared hold on the snapshot the engine runs from; retention never removes it meanwhile.
+    _lease: Any = dataclasses.field(default=None, repr=False)
+
+    @property
+    def identity(self) -> dict[str, str]:
+        return identity_digests(self.components)
 
     @property
     def index_population(self) -> dict:
@@ -661,9 +749,10 @@ class IndexHandle:
         deadline = deadline if deadline is not None else time.monotonic() + self.config.timeout_sec
         port = _free_port()
         try:
-            # Distribution absence is not evidence against an owned cached index.
-            if prepared_only:
-                backend.require_prepared(self.config.repo_root)
+            # The checkout must still be the one this snapshot was installed from.
+            # A stale distribution is not evidence against an owned cached index.
+            if prepared_only and _select_distribution(self.config, self.env, True) != self.env[DISTRIBUTION_ENV]:
+                raise InputUnavailable("not ready: stale distribution: the checkout's snapshot changed since preparation")
         except BaseException:
             self.close()
             raise
@@ -716,12 +805,15 @@ class IndexHandle:
                     completed = _json(self.root / "completed.json")
                     _check_owner(completed["owner"], self.collection, self.index_key)
                     _write(self.root / "entry.json", completed)
+                    distribution.reference(self.env[DISTRIBUTION_ENV], self.root)
             if self._backend:
                 backend.stop_backend(self._backend.proc, data_dir=self.data_dir)
                 self._backend = None
         finally:
             if not self._lock.closed:
                 self._lock.close()
+            if self._lease is not None and not self._lease.closed:
+                self._lease.close()
 
     def _preparation_failure(self, fallback: str) -> IndexRefused:
         try:
@@ -746,17 +838,26 @@ def prepare_index(collection: Collection, config: IndexConfig, *, prepared_only:
             or len(collection.documents) > 50000):
         raise IndexRefused("empty or modified collection")
     env = config.environment()
-    key, components = compute_index_key(collection, config, env)
-    root = _under_cache(config.cache_root) / sha256_text(collection.name) / key
-    data = _under_cache(config.data_dir) if config.data_dir else root / "data"
-    if prepared_only:
-        backend.require_prepared(config.repo_root)
-        if not (root / "entry.json").is_file():
+    # Before any lock or engine: resolution/hashing failures never touch a cached entry.
+    env[DISTRIBUTION_ENV] = _select_distribution(config, env, prepared_only)
+    pin_locations(env)
+    try:
+        lease = distribution.lease(env[DISTRIBUTION_ENV])
+    except distribution.DistributionRefused as e:
+        raise InputUnavailable(f"not ready: {e}") from None
+    try:
+        key, components = compute_index_key(collection, config, env)
+        root = _under_cache(config.cache_root) / sha256_text(collection.name) / key
+        data = _under_cache(config.data_dir) if config.data_dir else root / "data"
+        if prepared_only and not (root / "entry.json").is_file():
             raise IndexRefused("not ready: no complete prepared index; run quality prepare outside the scoring window")
-    root.mkdir(parents=True, exist_ok=True)
-    # Lock the actual data path, including explicit paths shared by different keys.
-    data.parent.mkdir(parents=True, exist_ok=True)
-    lock = (data.parent / (data.name + ".quality.lock")).open("a+")
+        root.mkdir(parents=True, exist_ok=True)
+        # Lock the actual data path, including explicit paths shared by different keys.
+        data.parent.mkdir(parents=True, exist_ok=True)
+        lock = (data.parent / (data.name + ".quality.lock")).open("a+")
+    except BaseException:
+        lease.close()
+        raise
     try:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         owner_path = data / "quality-owner.json"
@@ -770,8 +871,11 @@ def prepare_index(collection: Collection, config: IndexConfig, *, prepared_only:
             _check_owner(_json(entry_path)["owner"], collection, key)
             if not owner_path.exists():
                 raise IndexRefused("cache entry has no owned index")
+            _native_fallbacks(data)
             if prepared_only:
-                backend.require_prepared(config.repo_root, data)
+                backend.require_prepared_data(data)
+            # Retention keeps the snapshot of every adopted entry.
+            distribution.reference(env[DISTRIBUTION_ENV], root)
         else:
             # Only our exact owner's interrupted data may be replaced.
             if data.exists():
@@ -779,7 +883,7 @@ def prepare_index(collection: Collection, config: IndexConfig, *, prepared_only:
             data.mkdir()
             _write(owner_path, _population_owner(collection, key))
         handle = IndexHandle(collection, config, key, root, data,
-                             "cached" if adopted else "fresh", components, env, lock)
+                             "cached" if adopted else "fresh", components, env, lock, _lease=lease)
         if adopted:
             _materialize(collection, config, root)  # rehash the source files before boot
             if prepared_only:
@@ -823,6 +927,7 @@ def prepare_index(collection: Collection, config: IndexConfig, *, prepared_only:
                 _quarantine(root, data, collection, key, f"{type(e).__name__}: {e}")
         finally:
             lock.close()
+            lease.close()
         if prepared_only and isinstance(e, Exception):
             raise IndexRefused(f"not ready: prepared index refused ({e}); run quality prepare outside the scoring window") from e
         raise
@@ -841,12 +946,14 @@ def _confirm(handle: IndexHandle, entry: dict | None = None) -> index_identity.C
     handle.index_state = {"settled": False}
     failures = []
     checks = {}
+    # An unresolvable or changed input refuses at once and is not evidence against the
+    # entry: InputUnavailable propagates instead of becoming a (retried) failure.
+    key, _ = compute_index_key(handle.collection, handle.config, handle.env)
+    if key != handle.index_key:
+        raise InputUnavailable("not ready: index-shaping inputs changed since preparation")
     try:
         if not handle.base_url or not handle._backend or handle._backend.proc.poll() is not None:
             raise TransientIndexRefused("no live serving backend")
-        key, _ = compute_index_key(handle.collection, handle.config, handle.env)
-        if key != handle.index_key:
-            raise IndexRefused("index-shaping inputs changed since preparation")
         _check_owner(_json(handle.data_dir / "quality-owner.json"), handle.collection, handle.index_key)
         if entry is None:
             entry = (_json(handle.root / "prepared.json")["entry"] if handle._worker
@@ -895,9 +1002,12 @@ def _start_serving(config: IndexConfig, data: Path, env: dict, port: int,
     for attempt in range(3):
         if time.monotonic() >= deadline:
             break
+        # Refused inputs propagate as they are; they are no startup failure to retry.
+        overrides = _launch_env(config, data, env)
         try:
             return backend.start_backend(repo_root=config.repo_root, data_dir=data, port=port,
-                env_overrides=_launch_env(config, data, env),
+                env_overrides=overrides,
+                distribution=distribution.path(env[DISTRIBUTION_ENV]),
                 health_timeout_sec=max(.001, min(180, deadline-time.monotonic())),
                 startup_admission=startup_admission, prepared_only=prepared_only)
         except Exception as e:
@@ -958,20 +1068,13 @@ def _build(root: Path) -> None:
     info = None
     adopted = spec.get("adopted", False)
     invalid_content = False
+    lease = None
     try:
-        if adopted:
-            try:
-                backend.require_prepared(cfg.repo_root)
-            except RuntimeError:
-                # Preparation may refresh query-only code without reindexing.
-                # The Gradle invoker takes heavy admission of its own; this
-                # pausable worker never holds an exclusive scoring window.
-                try:
-                    backend._install_distribution(cfg.repo_root, {
-                        **os.environ, **_launch_env(cfg, data, spec["env"])})
-                except Exception as e:
-                    raise TransientIndexRefused(f"not ready, transient: distribution preparation failed: {e}") from e
-                backend.require_prepared(cfg.repo_root)
+        # The engine runs from the snapshot the key was computed over, never the build folder.
+        try:
+            lease = distribution.lease(spec["env"][DISTRIBUTION_ENV])
+        except distribution.DistributionRefused as e:
+            raise InputUnavailable(f"not ready: {e}") from None
         deadline = time.monotonic() + cfg.timeout_sec
         info = _start_serving(cfg, data, spec["env"], port, deadline,
                               startup_admission=False, prepared_only=adopted)
@@ -997,8 +1100,8 @@ def _build(root: Path) -> None:
                 raise TransientIndexRefused(f"not ready, transient: build readiness deadline: {last}")
         key, components = compute_index_key(c, cfg, spec["env"])
         if key != spec["key"]:
-            invalid_content = True
-            raise IndexRefused("index-shaping inputs changed during build")
+            # Not evidence against an adopted entry; a fresh build is never published.
+            raise InputUnavailable("not ready: index-shaping inputs changed during build")
         if adopted:
             entry = _json(root / "entry.json")
         else:

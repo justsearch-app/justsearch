@@ -170,7 +170,8 @@ empty sections:
 - **Running:** indexing and enrichment, rebuilds, AI downloads, operations and background
   tasks, with progress and controls where available.
 - **Earlier:** action feedback, advisories and completed work, with details, read/unread
-  state and Mark all read. Reversal actions appear only where supported.
+  state and Mark all read. Reversal actions appear only where a real reversal exists and
+  only while it can still run (see [Confirming and undoing](#confirming-and-undoing)).
 
 Plugin status items render in a separate plugin row. The first item always shows,
 wrapping inside the row; further items that do not fit collect under “… N more”. The footer links to Activity (“All activity”) and Health. An empty panel says
@@ -186,6 +187,95 @@ Needs you; it joins Earlier once answered, expired or withdrawn. Status
 transitions and action feedback are announced to screen readers. The panel updates
 while open, preserving expanded details; switching windows closes it. The Help surface
 supplies keyboard guidance.
+
+#### Confirming and undoing
+
+Reversible beats confirmed. The person's own risky actions follow three tiers:
+
+- **Undo, where a real reversal exists.** A saved skip-rule change can be saved back as it
+  was, and a removed folder can be added again (its files are read again). The pill shows
+  the notice with its action (“Skip rule added · Undo”, “Removed Notes from your library ·
+  Add Notes again”) for a few seconds, held while the pill or the action is hovered or
+  focused; the notice stays in Earlier, and in System › Activity, with its action while the
+  reversal can still run. Ctrl+Z runs the notice's reversal while it shows and afterwards
+  runs the latest reversal still possible, unless the Effect Journal holds a newer
+  reversible effect (`state/ownReversals.ts`). A reversal runs at most once at a time and
+  never after it succeeded. If the world changed since (the settings were saved again
+  elsewhere, the folder is already back), the reversal closes and says why instead of
+  overwriting that change. Undo is never offered where nothing would be reversed. Ctrl+Z
+  keeps its text-editing meaning inside text fields and does nothing during input-method
+  composition, on key repeat or while a dialog owns the keyboard.
+- **In-place confirmation, where there is no reversal.** Removing a folder, removing
+  documents added by other apps, cancelling a rebuild, deleting a custom theme, revoking a
+  plugin, clearing failed jobs, rebuilding and resetting settings ask in a band under the
+  item (`components/ConfirmBand.ts`): one consequence sentence (what changes, what stays,
+  undo or not), a danger button named with the verb and object (“Remove Notes”) and
+  “Keep it”. Focus moves to “Keep it”; Escape or “Keep it” cancels and returns focus to the
+  control that asked. The verb answers once: a double-click or an auto-repeating key cannot
+  run the action twice. Catalog operations with an inline confirmation use the same band,
+  with a consequence sentence per operation.
+- **Typed confirmation in a dialog, for wide, irreversible acts.** Delete all local data,
+  applying exclusions to the index, forgetting an exact item and typed operation approvals
+  show the exact phrase to type. Delete all local data is a centred dialog that says who
+  asked, what is deleted, what stays and that it cannot be undone, with Cancel on the left
+  and the verb on the right; its statechart (`CONFIRM_CEREMONY`) remains the presentation
+  seam.
+
+Pausing an AI download no longer asks: everything downloaded is kept and installing again
+resumes, and a notice says so. Repairing an AI installation keeps its dialog because it
+discloses download size and licences, but it is not drawn as a danger dialog. An undo
+preview (Undo all AI actions, Restore to here, Undo this turn) executes exactly the
+previewed entries, not ones recorded after the preview was drawn, and says how many actions
+in its scope cannot be undone.
+
+After a folder is removed, every window offers “Add <folder> again” in Earlier, including
+after a reload: the engine's removal record keeps the removed folder's path (and its
+collection), and the action ledger carries it. Removal records written before this field
+existed still read, without the offer. The offer is not shown while the folder is watched
+again, and the window that removed the folder shows its own notice instead of a second row.
+
+#### Requests from agents and other apps
+
+A request from an agent — an outside app over MCP (named by the name it gives, such as
+Claude Desktop), the agent in Search, or an agent's suggestion — opens no dialog when it
+arrives. It appears under Needs you, the pill shows the count, and screen readers hear it
+once, assertively; a request found again after a reload or reconnect is listed without an
+announcement. When the window is in the background the arrival also raises a desktop
+notification.
+
+A row offers Allow, Deny and Review. Review opens the request inside the panel (back link
+“What's going on”): who asked and when, the question, its consequence lines (the exact
+target the engine will act on, the risk, whether it can be undone), the requester's own
+words marked “Written by …, not checked by JustSearch” where it gave any, the deadline and
+what happens then (“Denied automatically in 4 min”, or that it waits), and Allow this time
+and Deny. Keys 1 and 2 answer from inside the review; they never act in a text field,
+during IME composition, on key repeat, with a modifier or while another modal is open.
+Escape goes back to the list and the request keeps waiting. Opening a review reads the
+request's live details again: a request that no longer waits leaves the review, and one
+whose details cannot be read is denied. “Always allow” is offered only where the engine
+keeps it — never for high-risk operations and never for the agent in Search. A newly shown
+row or review ignores answers for 400 ms, so the click that showed it cannot also answer it.
+
+Deny cancels the request in the engine; if that fails, the panel says the request could not
+be cancelled and it stays answerable. The panel, the dialog and an MCP announcement all
+answer the same request through one decision: it executes at most once, and an expired,
+withdrawn or already answered request cannot execute.
+
+Requests that need typing (high-risk operations, and agent suggestions that need typed
+confirmation) are listed the same way, but answering them opens the protected security
+dialog (Review, or Allow suggestion for a suggestion). Plugin permission requests that the
+reader's own action started (installing or enabling a plugin) open it at once. That dialog is a native modal `<dialog>` in the
+browser's top layer, headed “JustSearch security check”, with a teal border; skins and
+plugins cannot restyle or cover it. For plugin permissions, “Allow once” is the primary
+answer. A confirmation the reader's own command needs opens at once too: the security
+dialog when it must be typed, otherwise a small dialog that leaves the page usable.
+
+When copies of one agent request share an operation key, answering one answers all of
+them: the answered request is recorded with its decision and the others as withdrawn, so
+Earlier shows one row per decision. An agent reading the outcome of that key
+(`justsearch_operation_outcome`) and `GET /api/operation-history/{operationKey}` give the
+same answer: waiting, denied by the user, or denied automatically once the deadline passed
+unanswered.
 
 ### Progress vocabulary (status panel, Health, folder rows)
 
@@ -301,6 +391,7 @@ another theme.
   `Highlight` that the other tabs do not have.
 - **Semantics:** use the roles the actual controls implement. Current result containers
   use `list` / `listitem`, and shared menus use `menu` / `menuitem`.
-- **Destructive actions:** require a confirmation before destructive work. Settings'
-  Delete all data flow includes a typed DELETE confirmation; operation controls follow
-  their declared confirmation policy.
+- **Destructive actions:** offer Undo where a real reversal exists, confirm in place where
+  it does not, and type a phrase only for wide, irreversible acts (see
+  [Confirming and undoing](#confirming-and-undoing)). Confirmations say the consequence and
+  name the verb on the button; they never ask “Are you sure?” or answer “OK” or “Confirm”.

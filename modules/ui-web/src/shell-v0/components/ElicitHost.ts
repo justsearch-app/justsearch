@@ -12,6 +12,7 @@
  */
 
 import { html, css, nothing, type TemplateResult } from 'lit';
+import { keyed } from 'lit/directives/keyed.js';
 import { JfElement } from '../primitives/JfElement.js';
 import './Button.js';
 import { ModalController } from '../primitives/modalController.js';
@@ -81,6 +82,9 @@ export class ElicitHost extends JfElement {
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
+    // A dialog taken out of the page leaves the top layer but stays open: end its presentation so a
+    // remount (navigating back) opens the still-queued prompt modally again. Nothing is answered.
+    this.modal.close();
     if (this.requestListener) {
       document.removeEventListener('jf-elicit-request', this.requestListener);
       this.requestListener = null;
@@ -200,7 +204,9 @@ export class ElicitHost extends JfElement {
         }}
       >
         ${req
-          ? html`<div data-elicit-id=${req.id}>
+          // Each request gets its own controls: jf-button forwards onActivate only when it renders, so a
+          // reused Submit would keep answering the previous (already answered) request.
+          ? keyed(req.id, html`<div data-elicit-id=${req.id}>
               <h2>${req.title}</h2>
               ${req.description
                 ? html`<div class="description">${req.description}</div>`
@@ -232,7 +238,7 @@ export class ElicitHost extends JfElement {
                   ${req.submitLabel ?? 'Submit'}
                 </jf-button>
               </div>
-            </div>`
+            </div>`)
           : nothing}
       </dialog>
     `;

@@ -16,7 +16,8 @@ import { registerStatusBarItem, __resetForTest as resetRegistry } from '../comma
 import { CORE_PROVENANCE } from '../primitives/provenance.js';
 import { sendDesktopNotification } from '../../utils/notify.js';
 import { isWindowFocused } from '../../utils/windowFocus.js';
-import type { AdvisoryRecord, AdvisorySnapshot } from './advisory/AdvisoryStore.js';
+import { AuthorizationHost } from './AuthorizationHost.js';
+import { requestAuthorization } from '../operations/authorizationBroker.js';
 vi.mock('../../utils/windowFocus.js', () => ({ isWindowFocused: vi.fn(async () => false) }));
 vi.mock('../../utils/notify.js', () => ({ sendDesktopNotification: vi.fn(async () => {}) }));
 
@@ -110,21 +111,22 @@ describe('own-action receipts and desktop escalation (C1, ST14)', () => {
     emitEphemeralToast({ message: `Receipt ${severity}`, severity }); await flush();
     expect(region === 'assertive' ? pill.status.assertive : pill.status.polite).toBe(`Receipt ${severity}`);
   });
-  it('only a live REQUIRES_ACK arrival while unfocused reaches the desktop', async () => {
-    const listeners = new Set<(s: AdvisorySnapshot) => void>();
-    let snapshot: AdvisorySnapshot = { advisories: [], unreadCount: 0, isConnected: true, lastFrameKind: 'snapshot' };
-    pill.store = { subscribe: (cb: (s: AdvisorySnapshot) => void) => { listeners.add(cb); cb(snapshot); return () => listeners.delete(cb); } } as unknown as AdvisoryStore;
-    await flush();
-    const record = (key: string, hint: 'REQUIRES_ACK' | 'PERSISTED'): AdvisoryRecord => ({ key, liveArrival: true, origin: 'stream', acknowledged: false, sourceRenderHint: hint, event: {
-      id: key, classId: 'authorization.pending', occurredAt: new Date().toISOString(), renderHint: hint, classExtras: {}, primaryAction: null, bodyI18nKey: null, diagnosticsLink: null, provenance: null,
-    } });
-    const push = async (r: AdvisoryRecord) => { snapshot = { ...snapshot, lastFrameKind: 'update', advisories: [...snapshot.advisories, r] }; listeners.forEach(cb => cb(snapshot)); await flush(); };
-    await push(record('persisted', 'PERSISTED'));
-    vi.mocked(isWindowFocused).mockResolvedValueOnce(true);
-    await push(record('focused', 'REQUIRES_ACK'));
-    expect(sendDesktopNotification).not.toHaveBeenCalled();
-    await push(record('background', 'REQUIRES_ACK'));
-    expect(sendDesktopNotification).toHaveBeenCalledTimes(1);
+  it('only a live agent arrival while unfocused reaches the desktop', async () => {
+    // DE3 — the host's live arrival decides escalation; a rediscovered request (reload, reconnect) never does.
+    const host = new AuthorizationHost(); document.body.append(host);
+    pill.authorizationHost = () => host; await flush();
+    const ask = async (pendingId: string, live: boolean) => {
+      void requestAuthorization({ pendingId, operationId: 'core.test', gateBehavior: 'INLINE_CONFIRM', arrival: 'needs-you', live });
+      await host.updateComplete; pill.status.refresh(); await flush();
+    };
+    try {
+      await ask('rediscovered', false);
+      vi.mocked(isWindowFocused).mockResolvedValueOnce(true);
+      await ask('focused', true);
+      expect(sendDesktopNotification).not.toHaveBeenCalled();
+      await ask('background', true);
+      expect(sendDesktopNotification).toHaveBeenCalledTimes(1);
+    } finally { host.remove(); }
   });
 });
 

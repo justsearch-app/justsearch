@@ -63,6 +63,7 @@ import './TopBar.js';
 import type { TopBar, TopBarDestination, TopBarSelection } from './TopBar.js';
 import { FRAME_AREAS, FRAME_FIXED_WINDOWS } from '../layout/frameAreas.js';
 import { undoStatusNotice, type StatusPill } from '../components/StatusPill.js';
+import { latestReversalAt, undoLatestReversal } from '../state/ownReversals.js';
 // §21.E — register the PendingEffect chrome surface. Renders nothing
 // when the queue is empty; floats in lower-right when a proposal lands.
 import '../components/RetrospectivePanel.js';
@@ -145,7 +146,9 @@ import { bumpScopeVersion } from '../substrates/evaluationContext/index.js';
 import {
   restoreJournalFromStorage,
   markUndoableOperation,
+  markRemovedFolderOperation,
   undoLastEffect,
+  peekLastEffectUndo,
   redoLastEffect,
 } from '../substrates/effects/index.js';
 // 543-fwd #1 — journal-suppressed dispatcher for the cursor-based undo/redo.
@@ -838,6 +841,15 @@ export class Shell extends JfElement {
         handler: () => {
           // The undo notice in the status pill names what Ctrl+Z reverses while it is showing.
           if (undoStatusNotice()) return { kind: 'noop' as const };
+          // DE6 — afterwards, the last reversible action: the person's own (ownReversals) unless the
+          // Effect Journal holds a newer reversible effect.
+          // C8: never while typing or under a modal (the key itself already yields there).
+          const journal = peekLastEffectUndo();
+          const own = latestReversalAt();
+          if (own !== null && (!journal || own >= Date.parse(journal.invokedAt))
+              && !isTypingTarget(deepActiveElement()) && !modalOwnsFocus() && undoLatestReversal()) {
+            return { kind: 'noop' as const };
+          }
           const undone = undoLastEffect((e) => dispatchEffectToChrome(e));
           dispatchEffectToChrome({
             kind: 'toast',
@@ -871,6 +883,7 @@ export class Shell extends JfElement {
     }
     // commandId uses the legacy 'shell.*' alias; resolveActionIdFromCommandId
     // maps it to 'core.action.shell.*' (same pattern as shell.toggle-palette).
+    // C8 — inside a text field or under a modal, Ctrl+Z keeps its native meaning (KeybindingRegistry).
     registerKeybindingEntry({
       key: 'mod+z',
       commandId: 'shell.undo',
@@ -1097,7 +1110,9 @@ export class Shell extends JfElement {
           // §32 U2 — undoSupported ops return an executionId; associate it
           // with the journal entry so the audit log can offer "Undo"
           // (→ POST /api/undo/{operationId}).
-          if (result.executionId && detail.journalEntryId !== undefined) {
+          if (operationId === 'core.remove-watched-root' && detail.journalEntryId !== undefined) {
+            markRemovedFolderOperation(detail.journalEntryId, result.structuredData?.removedFolder);
+          } else if (result.executionId && detail.journalEntryId !== undefined) {
             markUndoableOperation(
               detail.journalEntryId,
               operationId,

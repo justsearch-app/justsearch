@@ -1037,6 +1037,23 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
         return ExcludeMatcher.fromRawJsonStrict(store.get().ui().excludePatterns(), PlatformPaths.isWindows()).patterns();
     }
 
+    protected record CoveragePolicy(List<String> globs, String digest) {}
+
+    /** No persisted identity: a completion without its enumeration-time policy cannot certify coverage. */
+    protected static CoveragePolicy captureCoveragePolicy(List<String> frozenGlobs) {
+        try {
+            var policy = io.justsearch.configuration.excludes.ExclusionPatterns.fromRawJsonStrict(
+                    resolvedExcludePatterns(), PlatformPaths.isWindows());
+            var globs = frozenGlobs == null ? policy.legacyGlobPatterns() : frozenGlobs;
+            var values = Map.of("globs", globs, "literals", policy.savedPatterns().stream()
+                    .filter(io.justsearch.configuration.excludes.LiteralExclusion.class::isInstance).toList());
+            return new CoveragePolicy(globs,
+                    io.justsearch.configuration.AppliedConfigurationVersion.digest(values.keySet(), values));
+        } catch (IllegalArgumentException invalidPolicy) {
+            return null;
+        }
+    }
+
     private ExcludeMatcher getExcludeMatcher() {
         boolean windows = PlatformPaths.isWindows();
         // String-equality cache on the raw JSON, unchanged: a resolved value is the same kind of

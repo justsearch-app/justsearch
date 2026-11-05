@@ -40,6 +40,14 @@ vi.mock('../components/advisory/ephemeralToast.js', () => ({
 vi.mock('../utils/statusPoll.js', () => ({ subscribeStatus: () => () => {} }));
 
 import { startPendingAuthorizationBridge } from './pendingAuthorizationBridge.js';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+/** DE3 — the person's own gestures in an app window; the Engine grants them only with window authority. */
+const OWN_TRANSPORTS = ['BUTTON', 'PALETTE', 'RAIL'];
+/** Every other source the Engine names (TransportTag), and one it may add later. */
+const OUTSIDE_TRANSPORTS = ['MCP', 'AGENT_LOOP', 'WORKFLOW', 'LLM_EMISSION', 'HTTP_API', 'URL_BAR', 'URL_DEEPLINK',
+  'PLUGIN_EMITTED', 'SCHEDULED', 'RULE_ENGINE', 'SYSTEM_INTERNAL', 'NOT_YET_KNOWN'];
 import type { SseEnvelope } from '../streaming/envelope-types.js';
 import { MultiplexedStream } from '../streaming/MultiplexedStream.js';
 import { SHELL_EVENT_STREAM_IDS } from '../streaming/shellEventStreamIds.js';
@@ -449,6 +457,72 @@ describe('pendingAuthorizationBridge (tempdoc 655)', () => {
     expect(approveAndExecutePendingMock).toHaveBeenCalledWith('pa-flaky-repeek', false);
     expect(emitEphemeralToastMock).not.toHaveBeenCalled();
 
+    stop();
+  });
+
+  it.each(OUTSIDE_TRANSPORTS)('DE3 a %s request waits in Needs you, announced as a live arrival', async (transport) => {
+    peekPendingMock.mockResolvedValue(detailFor('agent', { requestedBy: 'Claude Desktop' }));
+    requestAuthorizationMock.mockReturnValue(new Promise(() => {}));
+    const stop = startPendingAuthorizationBridge('http://test', { multiplex: multiplexOn(fakeEs) });
+    fakeEs.emitFrame(pendingFrame(1, 'agent', { transport, createdAt: '2026-07-02T09:59:00Z' }));
+    await flush();
+    expect(requestAuthorizationMock.mock.calls[0]?.[0]).toMatchObject({ pendingId: 'agent', arrival: 'needs-you', live: true,
+      askedAt: '2026-07-02T09:59:00Z', requestedBy: 'Claude Desktop' });
+    stop();
+  });
+
+  it.each([...OWN_TRANSPORTS, undefined])('DE3 the person\'s own %s request keeps its dialog on arrival', async (transport) => {
+    peekPendingMock.mockResolvedValue(detailFor('own'));
+    requestAuthorizationMock.mockReturnValue(new Promise(() => {}));
+    const stop = startPendingAuthorizationBridge('http://test', { multiplex: multiplexOn(fakeEs) });
+    fakeEs.emitFrame(pendingFrame(1, 'own', transport ? { transport } : {}));
+    await flush();
+    const prompt = requestAuthorizationMock.mock.calls[0]?.[0];
+    expect(prompt).toMatchObject({ pendingId: 'own' });
+    expect(prompt.arrival).toBeUndefined();
+    stop();
+  });
+
+  it('DE3 every source the Engine can name is pinned: only window gestures keep a dialog', () => {
+    // The Engine's own list of sources; a value added there must be placed here deliberately.
+    const java = readFileSync(resolve(import.meta.dirname,
+      '../../../../app-agent-api/src/main/java/io/justsearch/agent/api/registry/TransportTag.java'), 'utf8');
+    const code = java.replace(/\/\*[\s\S]*?\*\//g, '');
+    const body = code.slice(code.indexOf('public enum TransportTag {') + 'public enum TransportTag {'.length);
+    const named = [...body.slice(0, body.indexOf('}')).matchAll(/\b([A-Z][A-Z_]+)\b/g)].map(m => m[1]);
+    expect(named.length).toBeGreaterThan(10);
+    expect([...named].sort()).toEqual([...OWN_TRANSPORTS, ...OUTSIDE_TRANSPORTS.filter(t => t !== 'NOT_YET_KNOWN')].sort());
+  });
+
+  it('DE3 a request rediscovered after a reload waits in Needs you without counting as a live arrival', async () => {
+    const future = new Date(Date.now() + 240_000).toISOString();
+    const snapshot = { advisories: [{ event: { classId: 'authorization.pending', occurredAt: '2026-07-02T09:58:00Z',
+      classExtras: { pendingId: 'kept', operationId: 'core.ingest-files', riskTier: 'MEDIUM', gateBehavior: 'INLINE_CONFIRM', expiresAt: future } } }] };
+    const retained = { subscribe: (cb: (s: typeof snapshot) => void) => { cb(snapshot); return () => {}; } };
+    peekPendingMock.mockResolvedValue(detailFor('kept', { expiresAt: future, gateBehavior: 'INLINE_CONFIRM' }));
+    requestAuthorizationMock.mockReturnValue(new Promise(() => {}));
+    const stop = startPendingAuthorizationBridge('http://test', { multiplex: multiplexOn(fakeEs), retained });
+    await flush();
+    expect(requestAuthorizationMock.mock.calls[0]?.[0]).toMatchObject({ pendingId: 'kept', arrival: 'needs-you', live: false,
+      askedAt: '2026-07-02T09:58:00Z' });
+    stop();
+  });
+
+  it('DE3 reviewing reads the live details again: fresh fields, null when gone, a failure when unreadable', async () => {
+    peekPendingMock.mockResolvedValueOnce(detailFor('fresh'));
+    requestAuthorizationMock.mockReturnValue(new Promise(() => {}));
+    const stop = startPendingAuthorizationBridge('http://test', { multiplex: multiplexOn(fakeEs) });
+    fakeEs.emitFrame(pendingFrame(1, 'fresh', { transport: 'MCP' }));
+    await flush();
+    const refresh = requestAuthorizationMock.mock.calls[0]?.[0].refresh as () => Promise<unknown>;
+    expect(refresh, 'the review can read the live details').toBeTypeOf('function');
+    peekPendingMock.mockResolvedValueOnce(detailFor('fresh', { argsSummary: '/frozen/target', expiresAt: '2026-07-02T10:05:00Z' }));
+    await expect(refresh()).resolves.toMatchObject({ argsSummary: '/frozen/target', expiresAt: '2026-07-02T10:05:00Z',
+      operationId: 'core.ingest-files', gateBehavior: 'TYPED_CONFIRM', riskTier: 'MEDIUM' });
+    peekPendingMock.mockResolvedValueOnce(null);
+    await expect(refresh()).resolves.toBeNull();
+    peekPendingMock.mockRejectedValueOnce(new TypeError('offline'));
+    await expect(refresh()).rejects.toThrow('offline');
     stop();
   });
 });

@@ -115,6 +115,13 @@ async function clickButton(button: JfButton) {
   await control.updateComplete;
   control.shadowRoot!.querySelector<HTMLButtonElement>('button')!.click();
 }
+/** DE1 — answer the in-place confirmation band under the control with its verb. */
+async function confirmBand(root: ShadowRoot) {
+  const band = root.querySelector('jf-confirm-band') as (HTMLElement & { updateComplete: Promise<unknown> }) | null;
+  expect(band, 'in-place confirmation').not.toBeNull();
+  await band!.updateComplete;
+  band!.shadowRoot!.querySelector<HTMLElement & { onActivate(): void }>('jf-button.confirm')!.onActivate();
+}
 async function clickRebuild(el: HealthSurface | BrainSurface, recommended: boolean) {
   const aggregate = el.shadowRoot!.querySelector(`${recommended ? '.recommended ' : ''}jf-operation[operation-id="core.rebuild-index"]`) as JfOperation;
   expect(aggregate).not.toBeNull(); await aggregate.updateComplete;
@@ -124,7 +131,7 @@ async function clickRebuild(el: HealthSurface | BrainSurface, recommended: boole
   await action.updateComplete;
   action.shadowRoot!.querySelector<HTMLButtonElement>('button.invoke')!.click();
   await action.updateComplete;
-  action.shadowRoot!.querySelector<HTMLButtonElement>('.confirm-row button')!.click();
+  await confirmBand(action.shadowRoot!);
 }
 
 const bulkControls = ['health', 'brain', 'health-recommended', 'activation'] as const;
@@ -271,6 +278,7 @@ it.each(['cancel', 'accept-gaps'] as const)('Library %s keeps an immediate decis
   await vi.waitFor(() => expect(el.shadowRoot!.querySelector(`jf-button[label="${gapDecision ? 'Use the new index without them' : 'Cancel rebuild'}"]`)).not.toBeNull());
   const button = el.shadowRoot!.querySelector(`jf-button[label="${gapDecision ? 'Use the new index without them' : 'Cancel rebuild'}"]`) as JfButton;
   await clickButton(button);
+  if (!gapDecision) { await pump(el); await confirmBand(el.shadowRoot!); }
   await vi.waitFor(() => expect(invocations).toBe(1));
   await vi.waitFor(() => expect(gapDecision ? el.gapDecisionBusy : el.reindexCancelBusy).toBe(false));
   await pump(el);

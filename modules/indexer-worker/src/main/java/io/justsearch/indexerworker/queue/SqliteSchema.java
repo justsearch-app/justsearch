@@ -36,6 +36,7 @@ package io.justsearch.indexerworker.queue;
  *   <li>V25: Versioned delete intents and durable watcher reload reconciliation receipts</li>
  *   <li>V26: Durable force intent and rediscovery source identity</li>
  *   <li>V27: Durable source declaration and approval evidence</li>
+ *   <li>V28: Versioned import approval bindings and predecessor origins</li>
  * </ul>
  */
 public final class SqliteSchema {
@@ -48,7 +49,7 @@ public final class SqliteSchema {
    * Target schema version. The migrate() method will upgrade the database
    * to this version using the migration ladder.
    */
-  public static final int TARGET_VERSION = 27;
+  public static final int TARGET_VERSION = 28;
 
   static final String CREATE_SOURCE_ORIGIN = """
       CREATE TABLE IF NOT EXISTS source_origin (

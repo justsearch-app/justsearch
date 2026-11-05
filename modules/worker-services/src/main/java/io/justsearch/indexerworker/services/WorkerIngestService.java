@@ -645,12 +645,14 @@ public final class WorkerIngestService {
     }
   }
 
-  /** {@link #confirmedAbsent} under the root that holds the path; an invalid path is not. */
-  private boolean confirmedGone(String normalizedPath) {
+  /** Reuse the presence check's resolved parent for destination storage, without another stat. */
+  private io.justsearch.indexerworker.loop.SourcePresence.Observation observeDestination(String normalizedPath) {
     try {
-      return confirmedAbsent(normalizedPath, pruneRootFor(normalizedPath));
+      return io.justsearch.indexerworker.loop.SourcePresence.observe(
+          Path.of(normalizedPath), pruneRootFor(normalizedPath), rootWitness);
     } catch (InvalidPathException invalid) {
-      return false;
+      return new io.justsearch.indexerworker.loop.SourcePresence.Observation(
+          io.justsearch.indexerworker.loop.SourcePresence.Verdict.SOURCE_UNREADABLE, null);
     }
   }
 
@@ -665,8 +667,9 @@ public final class WorkerIngestService {
    * @return whether the rename is settled in Lucene: rows moved, or the file is gone from both
    *     paths and rows of it were removed
    */
-  private boolean moveRowsUnderFence(String oldPath, String newPath) {
-    if (confirmedGone(newPath)) {
+  private boolean moveRowsUnderFence(String oldPath, String newPath, StorageObservationSnapshot storage) {
+    var destinationObservation = observeDestination(newPath);
+    if (destinationObservation.verdict() == io.justsearch.indexerworker.loop.SourcePresence.Verdict.ABSENT) {
       // Renames are refused during a candidate build, so there is no serving copy to project to.
       // Each row of the old path is judged as a prune judges it, by its own backing path: a
       // chunk whose explicit path names a live file keeps its row.
@@ -684,7 +687,15 @@ public final class WorkerIngestService {
       return removed > 0;
     }
     try {
-      return ingestLifecycle.indexingCoordinator().updateDocumentPaths(oldPath, newPath) > 0;
+      var fields = ingestLifecycle.documentFieldOps();
+      String former = fields.getDocumentFieldOrThrow(oldPath, SchemaFields.ORIGIN_ID);
+      if (former == null) former = fields.getDocumentFieldOrThrow(newPath, SchemaFields.ORIGIN_ID);
+      Path destination = Path.of(newPath);
+      var envelope = storage.envelope(destinationObservation.realPath(),
+          jobQueue.movedSourceOriginId(destination, former).orElse(null));
+      return ingestLifecycle.indexingCoordinator().updateDocumentPaths(oldPath, newPath, envelope.patch()) > 0;
+    } catch (IOException unavailable) {
+      throw new java.io.UncheckedIOException("Destination provenance is unavailable", unavailable);
     } finally {
       publishedUnderFence(newPath);
     }
@@ -3999,6 +4010,7 @@ public final class WorkerIngestService {
       int updatedCount = 0;
       List<String> failedPaths = new ArrayList<>();
 
+      var storage = StorageObservationSnapshot.capture();
       for (PathMapping mapping : request.getMappingsList()) {
         String rawOldPath = mapping.getOldPath();
         String rawNewPath = mapping.getNewPath();
@@ -4029,7 +4041,7 @@ public final class WorkerIngestService {
           if (isUserExcluded(destination, destination)) return false;
           var identityRekey = documentIdentityStore.rekey(
               oldPathHash, newPathHash, System.currentTimeMillis());
-          boolean rowsSettled = moveRowsUnderFence(oldPath, newPath);
+          boolean rowsSettled = moveRowsUnderFence(oldPath, newPath, storage);
           return identityRekey
               != io.justsearch.indexerworker.identity.DocumentIdentityStore.RekeyResult.NOT_FOUND
               || rowsSettled;
@@ -4403,6 +4415,7 @@ public final class WorkerIngestService {
       throw new WorkerServiceException(WorkerServiceException.Status.CANCELLED, "Generation capture cancelled");
     }
     if (!awaitRecordedGenerationBeforeTraversal(recorded, ctx)) return;
+    jobQueue.allowsIngestionBoundary(JobQueue.IngestionBoundary.TRAVERSAL, recorded.operationKey(), null);
     scanRoot(recorded.request(), sink, ctx, recorded);
   }
 

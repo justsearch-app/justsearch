@@ -66,10 +66,9 @@ final class LegacyChunkBackfillTest extends LuceneExecutorTestBase {
       when(extraction.extractionPolicy()).thenReturn(TikaExtractionPolicy.defaults());
       var journal = mock(IngestionOutcomeJournal.class);
       var batch = extractor(runtime, extraction, journal);
-      assertEquals(List.of(), batch.extractAll(List.of(job(file))));
-      var outcome = org.mockito.ArgumentCaptor.forClass(String.class);
-      verify(journal).recordOutcomeSafely(eq(file), outcome.capture(), any());
-      assertEquals("UNCHANGED", outcome.getValue(), "complete legacy scan retains unchanged admission");
+      var unchanged = batch.extractAll(List.of(job(file)));
+      assertEquals(1, unchanged.size()); assertNull(unchanged.getFirst().artifact());
+      verify(journal, never()).recordOutcomeSafely(any(), eq("UNCHANGED"), any());
       verify(extraction).extractionPolicy();
       verifyNoMoreInteractions(extraction);
       assertEquals(Integer.toString(total), runtime.documentFieldOps().getDocumentField(id, SchemaFields.CHUNK_TOTAL));

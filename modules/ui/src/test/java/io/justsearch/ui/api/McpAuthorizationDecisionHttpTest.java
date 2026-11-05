@@ -167,7 +167,8 @@ class McpAuthorizationDecisionHttpTest {
     assertEquals(0, executions.get());
   }
 
-  @ParameterizedTest @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  @ParameterizedTest(name = "oneAnswerWithdrawsEveryPendingOfTheSameKey(deny={0})")
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
   void oneAnswerWithdrawsEveryPendingOfTheSameKey(boolean deny) throws Exception {
     String key = OperationKeys.generate(clock);
     var ids = new ArrayList<String>();
@@ -185,9 +186,15 @@ class McpAuthorizationDecisionHttpTest {
       var terminal = events.stream().filter(e -> e.pendingId().equals(id)
           && !e.disposition().equals("GATED")).toList();
       assertEquals(1, terminal.size(), "every window receives one withdrawal for " + id);
-      assertEquals(deny ? "DENIED" : "APPROVED", terminal.getFirst().disposition());
+      // L9: the answered request carries the decision; its same-key copy is withdrawn by it.
+      assertEquals(id.equals(ids.get(0)) ? deny ? "DENIED" : "APPROVED" : "WITHDRAWN", terminal.getFirst().disposition());
       assertEquals(410, post("/api/authorizations/approve", Map.of("pendingId", id, "execute", true), true).statusCode());
     }
+    var decisions = outcomes.recent().stream().filter(row -> ids.contains(row.pendingId())
+        && row.disposition() != AuthorizationDisposition.GATED).toList();
+    assertEquals(List.of(deny ? "DENIED" : "APPROVED", "WITHDRAWN"),
+        decisions.stream().map(row -> row.disposition().name()).toList(),
+        "one recorded decision; the copy is recorded as withdrawn: " + decisions);
     assertEquals(deny ? 0 : 1, executions.get());
     var facts = tool("justsearch_operation_outcome", Map.of("operationKey", key)).path("structuredContent");
     assertEquals(deny ? "failed" : "complete", facts.path("state").asText(), facts.toString());
@@ -282,5 +289,94 @@ class McpAuthorizationDecisionHttpTest {
     assertEquals(ids.get(1), decisions.getFirst().pendingId());
     assertEquals(410, post("/api/authorizations/approve", Map.of("pendingId", ids.get(1), "execute", true), true).statusCode());
     assertEquals(1, executions.get());
+  }
+
+  /** GET /api/operation-history/{operationKey} as ResourceApiModule wires it (looked up so the baseline compiles). */
+  @SuppressWarnings("unchecked")
+  private JsonNode history(String key) throws Exception {
+    var facade = mock(HeadAssembly.class);
+    when(facade.operationOutcome(anyString())).thenAnswer(call -> operations.outcome(call.getArgument(0)));
+    java.util.function.Function<String, Object> route;
+    try {
+      var wiring = ResourceApiModule.class.getDeclaredMethod("historyOutcome", HeadAssembly.class, PendingAuthorizationStore.class);
+      wiring.setAccessible(true);
+      route = (java.util.function.Function<String, Object>) wiring.invoke(null, facade, pending);
+    } catch (NoSuchMethodException baseline) {
+      route = facade::operationOutcome; // Before L10 the route read the recorded outcome only.
+    }
+    return JSON.readTree(JSON.writeValueAsString(route.apply(key)));
+  }
+
+  private JsonNode outcomeTool(String key) throws Exception {
+    return tool("justsearch_operation_outcome", Map.of("operationKey", key)).path("structuredContent");
+  }
+
+  @Test void operationHistoryAgreesWithTheOutcomeToolWhileWaitingAndAfterDenial() throws Exception {
+    String key = OperationKeys.generate(clock);
+    tool("justsearch_ingest", Map.of("paths", List.of("/test/exact-target"), "operationKey", key));
+    var waiting = outcomeTool(key);
+    assertEquals("awaiting-approval", waiting.path("phase").asText(), waiting.toString());
+    assertEquals(waiting, history(key), "L10: the history route says what the tool says while a request waits");
+    denyIngest(key);
+    var denied = outcomeTool(key);
+    assertEquals("USER_DENIED", denied.path("reason").asText(), denied.toString());
+    assertEquals(denied, history(key), "L10: the history route says what the tool says after a denial");
+    assertEquals(0, executions.get());
+  }
+
+  @Test void anExpiredRequestIsDeniedAutomaticallyForTheToolTheHistoryAndARepeat() throws Exception {
+    stop();
+    pending = new PendingAuthorizationStore(clock, java.time.Duration.ofMillis(200));
+    outcomes = new AuthorizationOutcomeStore();
+    changes = new PendingAuthorizationChangeRegistry();
+    events.clear();
+    start();
+    String key = OperationKeys.generate(clock);
+    tool("justsearch_ingest", Map.of("paths", List.of("/test/exact-target"), "operationKey", key));
+    String id = events.getLast().pendingId();
+    Thread.sleep(400);
+    var expired = outcomeTool(key);
+    assertEquals("failed", expired.path("state").asText(), "L11: an unanswered request is a terminal denial: " + expired);
+    assertEquals("APPROVAL_EXPIRED", expired.path("reason").asText());
+    assertEquals("Denied automatically: nobody answered before the deadline", expired.path("message").asText());
+    assertTrue(expired.path("completedAt").asLong() > 0);
+    assertEquals(expired, history(key), "L10: both reads agree after expiry");
+    assertEquals(1, events.stream().filter(e -> e.pendingId().equals(id) && e.disposition().equals("EXPIRED")).count());
+    int eventCount = events.size();
+    var repeat = tool("justsearch_ingest", Map.of("paths", List.of("/test/exact-target"), "operationKey", key));
+    assertTrue(repeat.path("isError").asBoolean(), repeat.toString());
+    assertEquals("APPROVAL_EXPIRED", repeat.path("structuredContent").path("errorCode").asText(), repeat.toString());
+    assertFalse(repeat.path("structuredContent").path("retryable").asBoolean(true));
+    assertEquals(eventCount, events.size(), "a repeat with the expired key does not ask again");
+    assertEquals(410, post("/api/authorizations/approve", Map.of("pendingId", id, "execute", true), true).statusCode());
+    assertEquals(0, executions.get());
+  }
+
+  @Test void anExpiredCopyLeavesTheKeyOpenWhileAnotherCopyStillWaits() throws Exception {
+    stop();
+    var now = new java.util.concurrent.atomic.AtomicReference<>(java.time.Instant.now());
+    var manual = new Clock() {
+      @Override public java.time.ZoneId getZone() { return java.time.ZoneOffset.UTC; }
+      @Override public Clock withZone(java.time.ZoneId zone) { return this; }
+      @Override public java.time.Instant instant() { return now.get(); }
+    };
+    pending = new PendingAuthorizationStore(manual, java.time.Duration.ofMinutes(5));
+    outcomes = new AuthorizationOutcomeStore();
+    changes = new PendingAuthorizationChangeRegistry();
+    events.clear();
+    start();
+    String key = OperationKeys.generate(clock);
+    tool("justsearch_ingest", Map.of("paths", List.of("/test/exact-target"), "operationKey", key));
+    String older = events.getLast().pendingId();
+    now.set(now.get().plus(java.time.Duration.ofMinutes(3)));
+    tool("justsearch_ingest", Map.of("paths", List.of("/test/exact-target"), "operationKey", key));
+    String newer = events.getLast().pendingId();
+    now.set(now.get().plus(java.time.Duration.ofMinutes(3)));
+    assertTrue(pending.peek(older).isEmpty());
+    var waiting = outcomeTool(key);
+    assertEquals("awaiting-approval", waiting.path("phase").asText(), waiting.toString());
+    assertEquals(200, post("/api/authorizations/approve", Map.of("pendingId", newer, "execute", true), true).statusCode());
+    assertEquals(1, executions.get());
+    assertEquals("complete", outcomeTool(key).path("state").asText());
   }
 }

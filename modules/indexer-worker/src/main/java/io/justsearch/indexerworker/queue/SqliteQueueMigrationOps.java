@@ -420,6 +420,22 @@ final class SqliteQueueMigrationOps {
           statement.execute(SqliteSchema.CREATE_SOURCE_ORIGIN);
         }
       }
+      case 28 -> {
+        try (Statement statement = conn.createStatement()) {
+          if (!columnExists(conn, "source_origin", "restart_binding_version")) {
+            statement.execute("ALTER TABLE source_origin ADD COLUMN restart_binding_version INTEGER");
+          }
+          if (!columnExists(conn, "source_origin", "approval_binding_id")) {
+            statement.execute("ALTER TABLE source_origin ADD COLUMN approval_binding_id TEXT");
+          }
+          if (!columnExists(conn, "source_origin", "approval_plan_hash")) {
+            statement.execute("ALTER TABLE source_origin ADD COLUMN approval_plan_hash TEXT");
+          }
+          if (!columnExists(conn, "source_origin", "predecessor_origin_id")) {
+            statement.execute("ALTER TABLE source_origin ADD COLUMN predecessor_origin_id TEXT");
+          }
+        }
+      }
       default -> throw new SQLException("Unknown migration version: " + version);
     }
   }

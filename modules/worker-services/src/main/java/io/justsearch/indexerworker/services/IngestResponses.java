@@ -150,8 +150,12 @@ final class IngestResponses {
     return PruneResponse.newBuilder().setPrunedCount(prunedCount).setAborted(aborted).build();
   }
 
+  private static String syncError(String error) {
+    return error == null || error.isEmpty() ? "Sync failed" : error;
+  }
+
   static SyncDirectoryResponse syncDirectoryErrorResponse(String error) {
-    return SyncDirectoryResponse.newBuilder().setError(error == null ? "" : error).build();
+    return SyncDirectoryResponse.newBuilder().setError(syncError(error)).build();
   }
 
   static SyncDirectoryResponse syncDirectoryResultResponse(int filesDeleted, int filesAdded) {
@@ -182,7 +186,7 @@ final class IngestResponses {
     return SyncDirectoryResponse.newBuilder()
         .setFilesDeleted(filesDeleted)
         .setFilesAdded(filesAdded)
-        .setError(error == null ? "" : error)
+        .setError(syncError(error))
         .build();
   }
 

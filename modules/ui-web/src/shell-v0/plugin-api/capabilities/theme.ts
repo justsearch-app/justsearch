@@ -175,13 +175,15 @@ export function createThemeApi(tier: PluginTrustTier, pluginId: string): PluginT
       persistTree({ ...tree, displayName: label }, 'renameTheme');
     },
     deleteTheme: (id: string): void => {
+      const wasActive = getActiveThemeId() === id;
       mutateDocument((doc) => ({
         ...doc,
         customThemes: (doc.customThemes ?? []).filter((t) => t.id !== id),
-      }));
+        activeThemeId: doc.activeThemeId === id ? null : doc.activeThemeId,
+      }), true);
       syncCustomThemesToCatalog();
       // If the deleted theme was the applied one, revert to default (no dangling activeThemeId).
-      if (getActiveThemeId() === id) {
+      if (wasActive) {
         clearActiveTheme();
       }
     },

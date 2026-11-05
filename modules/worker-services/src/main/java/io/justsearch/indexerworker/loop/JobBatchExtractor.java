@@ -46,10 +46,10 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Tempdoc 516 Slice 4a.3 — extracted from {@link IndexingLoop}. Owns the
  * per-job admission / unmodified-check / Tika extraction / validation path
- * and the per-batch {@code indexEmptyForBatch} cache. Returns the surviving
- * {@link ExtractedJob} list; failed / skipped / deleted / stale jobs are
- * recorded into the ledger + {@link BatchStats} internally and don't appear
- * in the return value.
+ * and the per-batch {@code indexEmptyForBatch} cache. Returns admitted publications;
+ * an unchanged source has no extraction artifact and still needs its envelope written.
+ * Failed / policy-skipped / deleted / stale jobs are recorded into the ledger +
+ * {@link BatchStats} internally and don't appear in the return value.
  *
  * <p>Cross-seam state — {@code indexedSinceCommit} — is reported back via
  * the {@link LongConsumer} {@code indexedDelta} callback when the
@@ -271,7 +271,7 @@ public final class JobBatchExtractor {
         batchStats.recordSkipped();
         return null;
       }
-      envelope = admission.envelope().withOrigin(jobQueue.sourceOriginId(claim).orElse(null));
+      envelope = admission.envelope();
       sourceRealPath = filePath.toRealPath();
       String docUid;
       DocumentIdentityStore identityStore = null;
@@ -307,6 +307,7 @@ public final class JobBatchExtractor {
         batchStats.recordFailed();
         return null;
       }
+      jobQueue.allowsIngestionBoundary(JobQueue.IngestionBoundary.HASHING, claim.scanId(), claim);
       requireReadableSource(claim);
       String sourceSha256 = SourceContentHash.sha256WithinRoot(filePath, claim.ingestionRoot());
       if (staleResolver.tryHandleStale(filePath, envelope, collection, null, "after hashing", provenance, claim)) {
@@ -332,18 +333,9 @@ public final class JobBatchExtractor {
         log.debug("Could not check modification state, proceeding with extraction: {}", filePath);
       }
       if (unchanged) {
-        if (staleResolver.tryHandleStale(filePath, envelope, collection, null,
-            "before unchanged acknowledgment", provenance, claim)) {
-          batchStats.recordSkipped();
-          return null;
-        }
-        log.debug("File unchanged, skipping: {}", filePath);
-        FileEnvelope envelopeForLedger = envelope;
-        journal.recordOutcomeSafely(filePath, "UNCHANGED", () -> jobQueue.markClaimDone(claim,
-            journal.skipped(IngestionReasonCodes.UNCHANGED),
-            ledgerEntry(filePath, envelopeForLedger, collection, null, provenance)));
-        batchStats.recordSkipped();
-        return null;
+        // No extraction, but ownership/storage still publish through the fenced writer and
+        // commit journal. A partial envelope write must never be acknowledged as UNCHANGED.
+        return new ExtractedJob(claim, null, startTime, envelope, sourceSha256, docUid, sourceRealPath);
       }
 
       Span extractSpan = maybeSpan("indexing.extract");
@@ -352,6 +344,7 @@ public final class JobBatchExtractor {
       ValidatedExtractionArtifact artifact;
       try {
         // W1.5 — inlined what used to be extractContent + validateArtifact wrappers.
+        jobQueue.allowsIngestionBoundary(JobQueue.IngestionBoundary.EXTRACTION, claim.scanId(), claim);
         requireReadableSource(claim);
         ExtractionArtifact rawArtifact = contentExtractor.extractArtifact(filePath);
         String sourcePathHash = envelope != null ? envelope.pathHash() : null;
@@ -363,6 +356,7 @@ public final class JobBatchExtractor {
 
       String sourceSha256AfterExtraction;
       try {
+        jobQueue.allowsIngestionBoundary(JobQueue.IngestionBoundary.HASHING, claim.scanId(), claim);
         requireReadableSource(claim);
         sourceSha256AfterExtraction = SourceContentHash.sha256WithinRoot(filePath, claim.ingestionRoot());
       } catch (IOException changedDuringExtraction) {

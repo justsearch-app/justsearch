@@ -1086,6 +1086,8 @@ class IndexingLoopTest {
           io.justsearch.indexing.chunking.ChunkParentRevision.sha256Hex("body"),
           SchemaFields.SIZE_BYTES, Long.toString(claim.envelope().sizeBytes()),
           SchemaFields.MODIFIED_AT, Long.toString(claim.envelope().modifiedAtMs()));
+      var activeCoordinator = mock(IndexingCoordinator.class);
+      when(active.indexingCoordinator()).thenReturn(activeCoordinator);
       when(active.documentFieldOps()).thenReturn(activeFields);
       when(active.commitOps()).thenReturn(mock(CommitOps.class));
       when(activeFields.getDocumentFieldOrThrow(
@@ -1095,7 +1097,9 @@ class IndexingLoopTest {
 
       invokeWriteExtractedJob(loop, claim);
 
-      verify(active, never()).indexingCoordinator();
+      verify(activeCoordinator, never()).indexSingle(any());
+      verify(activeCoordinator).updateDocument(eq(io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(file)),
+          argThat(patch -> java.util.Set.of("origin_id", "storage_status", "storage_mount", "storage_key", "envelope_version").containsAll(patch.keySet())));
       verify(queue.indexingCoordinator).indexSingle(any());
       assertNull(queue.lastOutcome, "Green still waits for its commit");
       invokeFinishIdleCommit(loop);

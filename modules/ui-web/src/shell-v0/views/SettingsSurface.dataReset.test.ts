@@ -63,7 +63,8 @@ describe('WP5.1 Settings reset', () => {
   it('RS2 Cancel and an incomplete typed confirmation never invoke deletion', async () => {
     const element = await mount();
     await request(element);
-    const confirm = element.shadowRoot!.querySelector<Button>('jf-button[variant="danger"]')!;
+    // DE2 — the typed confirmation is a dialog; its verb is the dialog's danger button.
+    const confirm = element.shadowRoot!.querySelector<Button>('dialog.delete-dialog jf-button[variant="danger"]')!;
     expect(confirm.disabled).toBe(true);
     confirm.onActivate();
     await settle();
@@ -102,7 +103,7 @@ describe('WP5.1 Settings reset', () => {
     input.value = 'DELETE';
     input.dispatchEvent(new Event('input', { bubbles: true }));
     await element.updateComplete;
-    const confirm = element.shadowRoot!.querySelector<Button>('jf-button[variant="danger"]')!;
+    const confirm = element.shadowRoot!.querySelector<Button>('dialog.delete-dialog jf-button[variant="danger"]')!;
     expect(confirm.disabled).toBe(false);
     confirm.onActivate();
     confirm.onActivate();

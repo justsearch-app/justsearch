@@ -47,6 +47,22 @@ async function settle(surface: SettingsSurface): Promise<void> {
   if (opButton) await opButton.updateComplete;
   const action = opButton?.shadowRoot?.querySelector<Rendered>('jf-action-button');
   if (action) await action.updateComplete;
+  // DE1 — the reset's in-place band and its answers render below the action button.
+  const band = action?.shadowRoot?.querySelector<Rendered>('jf-confirm-band');
+  if (band) {
+    await band.updateComplete;
+    for (const answer of band.shadowRoot!.querySelectorAll<Rendered>('jf-button')) {
+      await answer.updateComplete;
+      await answer.shadowRoot?.querySelector<Rendered>('jf-control')?.updateComplete;
+    }
+    await tick();
+  }
+}
+/** DE1 — the native button of one answer in the reset's in-place band (the verb is 'confirm'). */
+function bandAnswer(surface: SettingsSurface, which: 'confirm' | 'keep'): HTMLButtonElement {
+  const band = action(surface)!.shadowRoot!.querySelector('jf-confirm-band')!;
+  return band.shadowRoot!.querySelector(`jf-button.${which}`)!.shadowRoot!.querySelector('jf-control')!
+    .shadowRoot!.querySelector('button')!;
 }
 async function mount(): Promise<SettingsSurface> {
   const surface = document.createElement('jf-settings-surface') as SettingsSurface;
@@ -239,7 +255,10 @@ describe('CR37c settings recovery', () => {
       const status = observe('settings_recovery');
       const surface = await mount();
       invokeButton(surface)!.click(); await settle(surface);
-      const yes = [...action(surface)!.shadowRoot!.querySelectorAll('button')].find(b => b.textContent!.trim() === 'Yes')!;
+      // DE1 — "Yes" is now the band's verb, named by the operation ("Reset Settings").
+      const yes = bandAnswer(surface, 'confirm');
+      expect(action(surface)!.shadowRoot!.querySelector('jf-confirm-band')!.shadowRoot!.querySelector('jf-button.confirm')!.textContent)
+        .toContain('Reset Settings');
       yes.focus();
       const now = Date.now();
       const clock = vi.spyOn(Date, 'now').mockReturnValue(now + 41_000);
@@ -256,7 +275,8 @@ describe('CR37c settings recovery', () => {
         await settle(surface);
         expect(yes.isConnected).toBe(true);
         expect(deepActiveElement()).toBe(yes);
-        expect(action(surface)!.shadowRoot!.textContent).toContain('Cancel');
+        expect(action(surface)!.shadowRoot!.querySelector('jf-confirm-band')!.shadowRoot!.querySelector('jf-button.keep')!.textContent!.trim())
+          .toBe('Keep it');
         observe(null); await settle(surface);
         if (tier === 'USER') {
           expect(invokeButton(surface)).toBeNull();
@@ -289,9 +309,12 @@ describe('CR37c settings recovery', () => {
     expect(invokeButton(surface)).not.toBeNull();
     invokeButton(surface)!.click();
     await settle(surface);
-    expect(action(surface)!.shadowRoot!.textContent).toContain('Are you sure?');
+    // DE1 — the reset asks in place and says what changes and what stays, never "Are you sure?".
+    const band = action(surface)!.shadowRoot!.querySelector('jf-confirm-band') as (Rendered & { consequence: string }) | null;
+    expect(band!.consequence).toContain('Your settings return to their defaults');
+    expect(band!.consequence).toContain("can't be undone");
     expect(fetchMock.mock.calls.filter(c => String(c[0]).endsWith('/core.reset-settings/invoke'))).toHaveLength(0);
-    const named = (label: string) => [...action(surface)!.shadowRoot!.querySelectorAll('button')].find(b => b.textContent!.trim() === label)!;
+    const named = (label: 'Yes' | 'Cancel') => bandAnswer(surface, label === 'Yes' ? 'confirm' : 'keep');
     named('Cancel').click();
     await settle(surface);
     expect(fetchMock.mock.calls.filter(c => String(c[0]).endsWith('/core.reset-settings/invoke'))).toHaveLength(0);
@@ -358,7 +381,7 @@ describe('CR37c settings recovery', () => {
     const surface = await mount();
     expect(invokeButton(surface)).not.toBeNull();
     invokeButton(surface)!.click(); await settle(surface);
-    const yes = [...action(surface)!.shadowRoot!.querySelectorAll('button')].find(b => b.textContent!.trim() === 'Yes')!;
+    const yes = bandAnswer(surface, 'confirm');
     yes.focus();
     let finish!: (response: Response) => void;
     fetchMock.mockImplementation(() => new Promise<Response>(resolve => { finish = resolve; }));

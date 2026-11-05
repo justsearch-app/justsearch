@@ -19,5 +19,10 @@ public enum AuthorizationDisposition {
   /** A non-AUTO gate fired and was satisfied by a valid consent capsule — dispatch proceeded. */
   APPROVED,
   /** An unanswered authorization reached its deadline. */
-  EXPIRED
+  EXPIRED,
+  /**
+   * A waiting copy of a request that another request for the same operation key answered. It is
+   * not a decision of its own: the answered request carries the decision (L9).
+   */
+  WITHDRAWN
 }

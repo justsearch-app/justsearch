@@ -1,0 +1,527 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-05T06:06:45.267Z",
+  "revision": "fcccb2528c21238d4b6383c70ec178be67f05d05",
+  "tree": "a803915e95bdcd5b541dea747bd39f2270e5e743",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/StatusPanel.review.test.ts\" \"src/shell-v0/operations/pendingAuthorizationBridge.test.ts\" \"src/shell-v0/components/ElicitHost.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-vitest-2947-1793858800019.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1390
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#a live read with an empty answer refuses the Allow as unavailable, sends nothing, and the request stays answerable",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f7a684dc6760bfaa1372995bd68a551d89fc8d6a0519f84a8433fe8f04cc060c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE3 only present, well-formed details that match what was shown allow it a live read with an empty answer refuses the Allow as unavailable, sends nothing, and the request stays answerable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#a live read with no operation refuses the Allow as unavailable, sends nothing, and the request stays answerable",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f7a684dc6760bfaa1372995bd68a551d89fc8d6a0519f84a8433fe8f04cc060c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE3 only present, well-formed details that match what was shown allow it a live read with no operation refuses the Allow as unavailable, sends nothing, and the request stays answerable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#a live read with an empty operation refuses the Allow as unavailable, sends nothing, and the request stays answerable",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f7a684dc6760bfaa1372995bd68a551d89fc8d6a0519f84a8433fe8f04cc060c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE3 only present, well-formed details that match what was shown allow it a live read with an empty operation refuses the Allow as unavailable, sends nothing, and the request stays answerable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#a live read with no arguments refuses the Allow as unavailable, sends nothing, and the request stays answerable",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f7a684dc6760bfaa1372995bd68a551d89fc8d6a0519f84a8433fe8f04cc060c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE3 only present, well-formed details that match what was shown allow it a live read with no arguments refuses the Allow as unavailable, sends nothing, and the request stays answerable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#a live read with no requester refuses the Allow as unavailable, sends nothing, and the request stays answerable",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f7a684dc6760bfaa1372995bd68a551d89fc8d6a0519f84a8433fe8f04cc060c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE3 only present, well-formed details that match what was shown allow it a live read with no requester refuses the Allow as unavailable, sends nothing, and the request stays answerable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#a live read with an operation that is not text refuses the Allow as unavailable, sends nothing, and the request stays answerable",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f7a684dc6760bfaa1372995bd68a551d89fc8d6a0519f84a8433fe8f04cc060c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE3 only present, well-formed details that match what was shown allow it a live read with an operation that is not text refuses the Allow as unavailable, sends nothing, and the request stays answerable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#a live read with arguments that are not text refuses the Allow as unavailable, sends nothing, and the request stays answerable",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f7a684dc6760bfaa1372995bd68a551d89fc8d6a0519f84a8433fe8f04cc060c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE3 only present, well-formed details that match what was shown allow it a live read with arguments that are not text refuses the Allow as unavailable, sends nothing, and the request stays answerable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#a live read with a requester that is not text refuses the Allow as unavailable, sends nothing, and the request stays answerable",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f7a684dc6760bfaa1372995bd68a551d89fc8d6a0519f84a8433fe8f04cc060c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE3 only present, well-formed details that match what was shown allow it a live read with a requester that is not text refuses the Allow as unavailable, sends nothing, and the request stays answerable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#a live read with a list refuses the Allow as unavailable, sends nothing, and the request stays answerable",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f7a684dc6760bfaa1372995bd68a551d89fc8d6a0519f84a8433fe8f04cc060c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE3 only present, well-formed details that match what was shown allow it a live read with a list refuses the Allow as unavailable, sends nothing, and the request stays answerable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#a live read with plain text refuses the Allow as unavailable, sends nothing, and the request stays answerable",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f7a684dc6760bfaa1372995bd68a551d89fc8d6a0519f84a8433fe8f04cc060c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE3 only present, well-formed details that match what was shown allow it a live read with plain text refuses the Allow as unavailable, sends nothing, and the request stays answerable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#in the list, a Deny pressed while an Allow still reads the live details abandons it: when the Deny fails, the late read allows nothing",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f7a684dc6760bfaa1372995bd68a551d89fc8d6a0519f84a8433fe8f04cc060c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C12 one decision in flight per request in the list, a Deny pressed while an Allow still reads the live details abandons it: when the Deny fails, the late read allows nothing",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#in the review, a Deny pressed while an Allow still reads the live details abandons it: when the Deny fails, the late read allows nothing",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f7a684dc6760bfaa1372995bd68a551d89fc8d6a0519f84a8433fe8f04cc060c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C12 one decision in flight per request in the review, a Deny pressed while an Allow still reads the live details abandons it: when the Deny fails, the late read allows nothing",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#in the security dialog, a Deny pressed while an Allow still reads the live details abandons it: when the Deny fails, the late read allows nothing",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f7a684dc6760bfaa1372995bd68a551d89fc8d6a0519f84a8433fe8f04cc060c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C12 one decision in flight per request in the security dialog, a Deny pressed while an Allow still reads the live details abandons it: when the Deny fails, the late read allows nothing",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts#DE3 a HTTP_API request waits in Needs you, announced as a live arrival",
+      "file": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ee4894947aca0afd3839ebadd10239acdfee11a1c9ffe455f939a4c98ac0f13c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pendingAuthorizationBridge (tempdoc 655) DE3 a HTTP_API request waits in Needs you, announced as a live arrival",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts#DE3 a URL_BAR request waits in Needs you, announced as a live arrival",
+      "file": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ee4894947aca0afd3839ebadd10239acdfee11a1c9ffe455f939a4c98ac0f13c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pendingAuthorizationBridge (tempdoc 655) DE3 a URL_BAR request waits in Needs you, announced as a live arrival",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts#DE3 a URL_DEEPLINK request waits in Needs you, announced as a live arrival",
+      "file": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ee4894947aca0afd3839ebadd10239acdfee11a1c9ffe455f939a4c98ac0f13c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pendingAuthorizationBridge (tempdoc 655) DE3 a URL_DEEPLINK request waits in Needs you, announced as a live arrival",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts#DE3 a PLUGIN_EMITTED request waits in Needs you, announced as a live arrival",
+      "file": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ee4894947aca0afd3839ebadd10239acdfee11a1c9ffe455f939a4c98ac0f13c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pendingAuthorizationBridge (tempdoc 655) DE3 a PLUGIN_EMITTED request waits in Needs you, announced as a live arrival",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts#DE3 a SCHEDULED request waits in Needs you, announced as a live arrival",
+      "file": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ee4894947aca0afd3839ebadd10239acdfee11a1c9ffe455f939a4c98ac0f13c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pendingAuthorizationBridge (tempdoc 655) DE3 a SCHEDULED request waits in Needs you, announced as a live arrival",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts#DE3 a RULE_ENGINE request waits in Needs you, announced as a live arrival",
+      "file": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ee4894947aca0afd3839ebadd10239acdfee11a1c9ffe455f939a4c98ac0f13c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pendingAuthorizationBridge (tempdoc 655) DE3 a RULE_ENGINE request waits in Needs you, announced as a live arrival",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts#DE3 a SYSTEM_INTERNAL request waits in Needs you, announced as a live arrival",
+      "file": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ee4894947aca0afd3839ebadd10239acdfee11a1c9ffe455f939a4c98ac0f13c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pendingAuthorizationBridge (tempdoc 655) DE3 a SYSTEM_INTERNAL request waits in Needs you, announced as a live arrival",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts#DE3 a NOT_YET_KNOWN request waits in Needs you, announced as a live arrival",
+      "file": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ee4894947aca0afd3839ebadd10239acdfee11a1c9ffe455f939a4c98ac0f13c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pendingAuthorizationBridge (tempdoc 655) DE3 a NOT_YET_KNOWN request waits in Needs you, announced as a live arrival",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ElicitHost.test.ts#C2 two queued required prompts each answer on a deliberate Submit when the host stays mounted; neither caller hangs",
+      "file": "modules/ui-web/src/shell-v0/components/ElicitHost.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1ad5870c1bb68e92fd6d26c541577e7feb5e05e22add6e3cecd5fb21e4c2e893",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "<jf-elicit-host> — schema-only request renders inputs (543-fwd) C2 two queued required prompts each answer on a deliberate Submit when the host stays mounted; neither caller hangs",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ElicitHost.test.ts#C2 two queued required prompts each answer on a deliberate Submit when the host is re-attached after navigating away; neither caller hangs",
+      "file": "modules/ui-web/src/shell-v0/components/ElicitHost.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1ad5870c1bb68e92fd6d26c541577e7feb5e05e22add6e3cecd5fb21e4c2e893",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "<jf-elicit-host> — schema-only request renders inputs (543-fwd) C2 two queued required prompts each answer on a deliberate Submit when the host is re-attached after navigating away; neither caller hangs",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ElicitHost.test.ts#C2 two queued required prompts each answer on a deliberate Submit when the host is replaced by a new host after navigating away; neither caller hangs",
+      "file": "modules/ui-web/src/shell-v0/components/ElicitHost.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1ad5870c1bb68e92fd6d26c541577e7feb5e05e22add6e3cecd5fb21e4c2e893",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "<jf-elicit-host> — schema-only request renders inputs (543-fwd) C2 two queued required prompts each answer on a deliberate Submit when the host is replaced by a new host after navigating away; neither caller hangs",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "38d5e1e8123d7f71ce1b22e172b267eb806389fb",
+    "revision": "38d5e1e8123d7f71ce1b22e172b267eb806389fb",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/StatusPanel.review.test.ts\" \"src/shell-v0/operations/pendingAuthorizationBridge.test.ts\" \"src/shell-v0/components/ElicitHost.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-vitest-2947-1793858803357.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1426,
+        "output": "JSON report written to /home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-vitest-2947-1793858803357.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#a live read with an empty answer refuses the Allow as unavailable, sends nothing, and the request stays answerable",
+        "classification": "assertion",
+        "detail": "DE3 only present, well-formed details that match what was shown allow it a live read with an empty answer refuses the Allow as unavailable, sends nothing, and the request stays answerable:  AssertionError: nothing is allowed on details that are not all there: expected 'answered' to be 'waiting' // Object.is equality\n    at /home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-before-QRpTAP/modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts:328:93\n    at file:"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#a live read with no operation refuses the Allow as unavailable, sends nothing, and the request stays answerable",
+        "classification": "assertion",
+        "detail": "DE3 only present, well-formed details that match what was shown allow it a live read with no operation refuses the Allow as unavailable, sends nothing, and the request stays answerable:  AssertionError: nothing is allowed on details that are not all there: expected 'answered' to be 'waiting' // Object.is equality\n    at /home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-before-QRpTAP/modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts:328:93\n    at file:"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#a live read with an empty operation refuses the Allow as unavailable, sends nothing, and the request stays answerable",
+        "classification": "assertion",
+        "detail": "DE3 only present, well-formed details that match what was shown allow it a live read with an empty operation refuses the Allow as unavailable, sends nothing, and the request stays answerable:  AssertionError: expected 'Its details changed, so it was not al…' to be 'Its current details are unavailable, …' // Object.is equality\n    at /home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-before-QRpTAP/modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts:329:26\n    a"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#a live read with no arguments refuses the Allow as unavailable, sends nothing, and the request stays answerable",
+        "classification": "assertion",
+        "detail": "DE3 only present, well-formed details that match what was shown allow it a live read with no arguments refuses the Allow as unavailable, sends nothing, and the request stays answerable:  AssertionError: nothing is allowed on details that are not all there: expected 'answered' to be 'waiting' // Object.is equality\n    at /home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-before-QRpTAP/modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts:328:93\n    at file:"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#a live read with no requester refuses the Allow as unavailable, sends nothing, and the request stays answerable",
+        "classification": "assertion",
+        "detail": "DE3 only present, well-formed details that match what was shown allow it a live read with no requester refuses the Allow as unavailable, sends nothing, and the request stays answerable:  AssertionError: nothing is allowed on details that are not all there: expected 'answered' to be 'waiting' // Object.is equality\n    at /home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-before-QRpTAP/modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts:328:93\n    at file:"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#a live read with an operation that is not text refuses the Allow as unavailable, sends nothing, and the request stays answerable",
+        "classification": "assertion",
+        "detail": "DE3 only present, well-formed details that match what was shown allow it a live read with an operation that is not text refuses the Allow as unavailable, sends nothing, and the request stays answerable:  AssertionError: deriving the status model must not throw on malformed live details: expected { …(1) } to be true // Object.is equality\n    at /home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-before-QRpTAP/modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts:326:91\n "
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#a live read with arguments that are not text refuses the Allow as unavailable, sends nothing, and the request stays answerable",
+        "classification": "assertion",
+        "detail": "DE3 only present, well-formed details that match what was shown allow it a live read with arguments that are not text refuses the Allow as unavailable, sends nothing, and the request stays answerable:  AssertionError: expected 'Its details changed, so it was not al…' to be 'Its current details are unavailable, …' // Object.is equality\n    at /home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-before-QRpTAP/modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts:329:26\n   "
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#a live read with a requester that is not text refuses the Allow as unavailable, sends nothing, and the request stays answerable",
+        "classification": "assertion",
+        "detail": "DE3 only present, well-formed details that match what was shown allow it a live read with a requester that is not text refuses the Allow as unavailable, sends nothing, and the request stays answerable:  AssertionError: deriving the status model must not throw on malformed live details: expected { …(1) } to be true // Object.is equality\n    at /home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-before-QRpTAP/modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts:326:91\n  "
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#a live read with a list refuses the Allow as unavailable, sends nothing, and the request stays answerable",
+        "classification": "assertion",
+        "detail": "DE3 only present, well-formed details that match what was shown allow it a live read with a list refuses the Allow as unavailable, sends nothing, and the request stays answerable:  AssertionError: expected 'Its details changed, so it was not al…' to be 'Its current details are unavailable, …' // Object.is equality\n    at /home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-before-QRpTAP/modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts:329:26\n    a"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#a live read with plain text refuses the Allow as unavailable, sends nothing, and the request stays answerable",
+        "classification": "assertion",
+        "detail": "DE3 only present, well-formed details that match what was shown allow it a live read with plain text refuses the Allow as unavailable, sends nothing, and the request stays answerable:  AssertionError: expected 'Its details changed, so it was not al…' to be 'Its current details are unavailable, …' // Object.is equality\n    at /home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-before-QRpTAP/modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts:329:26\n    a"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#in the list, a Deny pressed while an Allow still reads the live details abandons it: when the Deny fails, the late read allows nothing",
+        "classification": "assertion",
+        "detail": "C12 one decision in flight per request in the list, a Deny pressed while an Allow still reads the live details abandons it: when the Deny fails, the late read allows nothing:  AssertionError: the abandoned Allow sends nothing after the person pressed Deny: expected 'answered' to be 'waiting' // Object.is equality\n    at /home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-before-QRpTAP/modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts:456:106"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#in the review, a Deny pressed while an Allow still reads the live details abandons it: when the Deny fails, the late read allows nothing",
+        "classification": "assertion",
+        "detail": "C12 one decision in flight per request in the review, a Deny pressed while an Allow still reads the live details abandons it: when the Deny fails, the late read allows nothing:  AssertionError: the abandoned Allow sends nothing after the person pressed Deny: expected 'answered' to be 'waiting' // Object.is equality\n    at /home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-before-QRpTAP/modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts:456:106"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#in the security dialog, a Deny pressed while an Allow still reads the live details abandons it: when the Deny fails, the late read allows nothing",
+        "classification": "assertion",
+        "detail": "C12 one decision in flight per request in the security dialog, a Deny pressed while an Allow still reads the live details abandons it: when the Deny fails, the late read allows nothing:  AssertionError: the abandoned Allow sends nothing after the person pressed Deny: expected 'answered' to be 'waiting' // Object.is equality\n    at /home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-before-QRpTAP/modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts:456:106"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts#DE3 a HTTP_API request waits in Needs you, announced as a live arrival",
+        "classification": "assertion",
+        "detail": "pendingAuthorizationBridge (tempdoc 655) DE3 a HTTP_API request waits in Needs you, announced as a live arrival:  AssertionError: expected { pendingId: 'agent', …(7) } to match object { pendingId: 'agent', …(4) }\n(6 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-before-QRpTAP/modules/ui-web/node_modules/@vitest/expect/d"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts#DE3 a URL_BAR request waits in Needs you, announced as a live arrival",
+        "classification": "assertion",
+        "detail": "pendingAuthorizationBridge (tempdoc 655) DE3 a URL_BAR request waits in Needs you, announced as a live arrival:  AssertionError: expected { pendingId: 'agent', …(7) } to match object { pendingId: 'agent', …(4) }\n(6 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-before-QRpTAP/modules/ui-web/node_modules/@vitest/expect/d"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts#DE3 a URL_DEEPLINK request waits in Needs you, announced as a live arrival",
+        "classification": "assertion",
+        "detail": "pendingAuthorizationBridge (tempdoc 655) DE3 a URL_DEEPLINK request waits in Needs you, announced as a live arrival:  AssertionError: expected { pendingId: 'agent', …(7) } to match object { pendingId: 'agent', …(4) }\n(6 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-before-QRpTAP/modules/ui-web/node_modules/@vitest/expect/d"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts#DE3 a PLUGIN_EMITTED request waits in Needs you, announced as a live arrival",
+        "classification": "assertion",
+        "detail": "pendingAuthorizationBridge (tempdoc 655) DE3 a PLUGIN_EMITTED request waits in Needs you, announced as a live arrival:  AssertionError: expected { pendingId: 'agent', …(7) } to match object { pendingId: 'agent', …(4) }\n(6 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-before-QRpTAP/modules/ui-web/node_modules/@vitest/expect/d"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts#DE3 a SCHEDULED request waits in Needs you, announced as a live arrival",
+        "classification": "assertion",
+        "detail": "pendingAuthorizationBridge (tempdoc 655) DE3 a SCHEDULED request waits in Needs you, announced as a live arrival:  AssertionError: expected { pendingId: 'agent', …(7) } to match object { pendingId: 'agent', …(4) }\n(6 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-before-QRpTAP/modules/ui-web/node_modules/@vitest/expect/d"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts#DE3 a RULE_ENGINE request waits in Needs you, announced as a live arrival",
+        "classification": "assertion",
+        "detail": "pendingAuthorizationBridge (tempdoc 655) DE3 a RULE_ENGINE request waits in Needs you, announced as a live arrival:  AssertionError: expected { pendingId: 'agent', …(7) } to match object { pendingId: 'agent', …(4) }\n(6 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-before-QRpTAP/modules/ui-web/node_modules/@vitest/expect/d"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts#DE3 a SYSTEM_INTERNAL request waits in Needs you, announced as a live arrival",
+        "classification": "assertion",
+        "detail": "pendingAuthorizationBridge (tempdoc 655) DE3 a SYSTEM_INTERNAL request waits in Needs you, announced as a live arrival:  AssertionError: expected { pendingId: 'agent', …(7) } to match object { pendingId: 'agent', …(4) }\n(6 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-before-QRpTAP/modules/ui-web/node_modules/@vitest/expect/d"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts#DE3 a NOT_YET_KNOWN request waits in Needs you, announced as a live arrival",
+        "classification": "assertion",
+        "detail": "pendingAuthorizationBridge (tempdoc 655) DE3 a NOT_YET_KNOWN request waits in Needs you, announced as a live arrival:  AssertionError: expected { pendingId: 'agent', …(7) } to match object { pendingId: 'agent', …(4) }\n(6 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-before-QRpTAP/modules/ui-web/node_modules/@vitest/expect/d"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/ElicitHost.test.ts#C2 two queued required prompts each answer on a deliberate Submit when the host stays mounted; neither caller hangs",
+        "classification": "assertion",
+        "detail": "<jf-elicit-host> — schema-only request renders inputs (543-fwd) C2 two queued required prompts each answer on a deliberate Submit when the host stays mounted; neither caller hangs:  AssertionError: its Submit answers the second prompt: expected 'still waiting' to deeply equal { a: 'two' }\n    at /home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-before-QRpTAP/modules/ui-web/src/shell-v0/components/ElicitHost.test.ts:189:64\n    at file:///home/elias/.cache/am/8exe"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/ElicitHost.test.ts#C2 two queued required prompts each answer on a deliberate Submit when the host is re-attached after navigating away; neither caller hangs",
+        "classification": "assertion",
+        "detail": "<jf-elicit-host> — schema-only request renders inputs (543-fwd) C2 two queued required prompts each answer on a deliberate Submit when the host is re-attached after navigating away; neither caller hangs:  AssertionError: its Submit answers the second prompt: expected 'still waiting' to deeply equal { a: 'two' }\n    at /home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-before-QRpTAP/modules/ui-web/src/shell-v0/components/ElicitHost.test.ts:189:64\n    at file:///home/elias/.cache/am"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/ElicitHost.test.ts#C2 two queued required prompts each answer on a deliberate Submit when the host is replaced by a new host after navigating away; neither caller hangs",
+        "classification": "assertion",
+        "detail": "<jf-elicit-host> — schema-only request renders inputs (543-fwd) C2 two queued required prompts each answer on a deliberate Submit when the host is replaced by a new host after navigating away; neither caller hangs:  AssertionError: its Submit answers the second prompt: expected 'still waiting' to deeply equal { a: 'two' }\n    at /home/elias/.cache/am/8exetk_q/tmp/s3a2-repair-checks/test-intent-before-QRpTAP/modules/ui-web/src/shell-v0/components/ElicitHost.test.ts:189:64\n    at file:///home/elia"
+      }
+    ]
+  },
+  "digest": "sha256:dcb36233b01d0982fc13baff9b2a6d0f84504ecbfee4b9dfc629b184210792da"
+}

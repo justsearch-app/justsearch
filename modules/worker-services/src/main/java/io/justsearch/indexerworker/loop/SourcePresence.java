@@ -75,32 +75,41 @@ public final class SourcePresence {
    *     the source itself (an explicitly ingested file), the source's parent folder vouches instead
    */
   public static Verdict classify(Path source, Path root, RootCheck rootCheck) {
+    return observe(source, root, rootCheck).verdict();
+  }
+
+  /** The same presence proof, retaining the real parent already resolved by its ancestor check. */
+  public record Observation(Verdict verdict, Path realPath) {}
+
+  public static Observation observe(Path source, Path root, RootCheck rootCheck) {
     if (source == null || rootCheck == null) {
-      return Verdict.SOURCE_UNREADABLE;
+      return new Observation(Verdict.SOURCE_UNREADABLE, null);
     }
     Path file = source.toAbsolutePath().normalize();
+    Path realPath = null;
     if (root != null) {
       try {
-        SourceAccess.requireSafeAncestors(file, root);
+        Path parent = SourceAccess.requireSafeAncestors(file, root);
+        if (parent != null && file.getFileName() != null) realPath = parent.resolve(file.getFileName());
       } catch (java.io.IOException | SecurityException unsafeAncestor) {
-        return Verdict.SOURCE_UNREADABLE;
+        return new Observation(Verdict.SOURCE_UNREADABLE, realPath);
       }
     }
     PathPresence first = PathPresence.probe(file);
     if (first == PathPresence.PRESENT) {
-      return Verdict.PRESENT;
+      return new Observation(Verdict.PRESENT, realPath);
     }
     boolean rooted = answersAsRoot(file, root);
-    if (!rooted && rootCheck.isRelease030ExactFile(file)) return Verdict.SOURCE_UNREADABLE;
+    if (!rooted && rootCheck.isRelease030ExactFile(file)) return new Observation(Verdict.SOURCE_UNREADABLE, realPath);
     Path folder = vouchingFolder(file, root);
     boolean vouches = rooted ? rootCheck.vouches(folder) : rootCheck.vouchesForFile(folder);
     if (!vouches) {
-      return Verdict.ROOT_UNAVAILABLE;
+      return new Observation(Verdict.ROOT_UNAVAILABLE, realPath);
     }
     if (first == PathPresence.UNKNOWN) {
-      return Verdict.SOURCE_UNREADABLE;
+      return new Observation(Verdict.SOURCE_UNREADABLE, realPath);
     }
-    return switch (PathPresence.probe(file)) {
+    Verdict verdict = switch (PathPresence.probe(file)) {
       // "Not found" beneath a folder that cannot be listed proves nothing.
       case ABSENT ->
           PathPresence.absentBeneathListableFolder(file, folder, null) == PathPresence.ABSENT
@@ -109,6 +118,7 @@ public final class SourcePresence {
       case PRESENT -> Verdict.PRESENT;
       case UNKNOWN -> Verdict.SOURCE_UNREADABLE;
     };
+    return new Observation(verdict, realPath);
   }
 
   /**

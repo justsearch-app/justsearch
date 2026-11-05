@@ -6,6 +6,8 @@ from unittest.mock import Mock
 from click.testing import CliRunner
 import pytest
 
+from .conftest import ready_distribution
+
 from jseval import backend
 from jseval.cli import main
 from jseval.quality import collections as qcoll
@@ -53,7 +55,7 @@ def test_document_layout_or_witness_change_alters_key_and_owner(collection, conf
         assert ix._population_owner(d, key) != ix._population_owner(c, key)
 
 
-def test_stored_collection_data_is_outside_the_tree_key(collection, config):
+def test_stored_collection_data_is_outside_the_tree_key(collection, config, monkeypatch):
     c, _ = collection
     env = env_for(config)
     key = lambda: ix.compute_index_key(c, config, env)[0]
@@ -65,14 +67,20 @@ def test_stored_collection_data_is_outside_the_tree_key(collection, config):
     cfg.parent.mkdir(parents=True)
     cfg.write_text("{}")
     assert key() == first
-    code = config.repo_root / "scripts/jseval/jseval/quality/collections.py"
+    # Materialization code stays keyed: the running module's own file, not the checkout's.
+    import sys
+    from jseval.quality import inputs
+    code = config.repo_root / "collections.py"
     code.write_text("# document materialization code stays keyed")
+    monkeypatch.setattr(sys.modules["jseval.quality.collections"], "__file__", str(code))
+    monkeypatch.setattr(inputs, "_harness", None)
     assert key() != first
 
 
 def test_prepared_index_is_adopted_after_a_queries_only_edit(collection, config, tmp_path, monkeypatch):
     c, source = collection
-    monkeypatch.setattr(ix.IndexConfig, "environment", lambda _: env_for(config))
+    env = env_for(config)
+    monkeypatch.setattr(ix.IndexConfig, "environment", lambda _: dict(env))
     monkeypatch.setattr(ix, "_under_cache", lambda p: p)
     real_popen = subprocess.Popen
     launched = []
@@ -84,7 +92,7 @@ def test_prepared_index_is_adopted_after_a_queries_only_edit(collection, config,
         def poll(self):
             return 0
     monkeypatch.setattr(ix.subprocess, "Popen", lambda command, **kw:
-                        real_popen(command, **kw) if command[0] == "git" else FakeWorker(command, **kw))
+                        FakeWorker(command, **kw) if "pausable" in command else real_popen(command, **kw))
     cfg = replace(config, cache_root=tmp_path / "cache", documents_dir=source)
     with ix.prepare_index(c, cfg) as handle:
         assert handle.index_build == "fresh"
@@ -181,6 +189,7 @@ def test_baseline_and_check_refuse_without_scored_queries(tmp_path, monkeypatch,
         cfg = replace(cfg, expected={})
     monkeypatch.setattr(backend, "source_identity", lambda _: ("a" * 40, None))
     monkeypatch.setattr(backend, "require_prepared", lambda *_: None)
+    ready_distribution(monkeypatch)
     monkeypatch.setattr(run.collections, "resolve_collection", lambda _: (c, cfg))
     prepare = Mock(side_effect=AssertionError("refused before any index work"))
     monkeypatch.setattr(run.index, "prepare_index", prepare)
@@ -196,6 +205,7 @@ def test_execute_scores_only_labelled_queries_and_reports_pending(tmp_path, monk
     c, cfg = _with_pending()
     monkeypatch.setattr(backend, "source_identity", lambda _: ("a" * 40, None))
     monkeypatch.setattr(backend, "require_prepared", lambda *_: None)
+    ready_distribution(monkeypatch)
     monkeypatch.setattr(run.collections, "resolve_collection", lambda _: (c, cfg))
     seen = []
     handle = Mock()

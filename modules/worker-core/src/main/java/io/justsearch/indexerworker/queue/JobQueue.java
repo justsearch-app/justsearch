@@ -28,8 +28,33 @@ public interface JobQueue extends Closeable {
     throw new UnsupportedOperationException("Source origin persistence is unavailable");
   }
 
+  enum IngestionBoundary { TRAVERSAL, HASHING, EXTRACTION, PUBLICATION }
+
+  /** P2a approval seam: today's approval verdict is allow. Consumption activates with Resume. */
+  default boolean allowsIngestionBoundary(IngestionBoundary boundary, String operationKey, IndexJob claim) {
+    return true;
+  }
+
+  /** Parent owner supplies completed child keys whose receipts still settle an open import. */
+  default void useRecordedWalkRetention(java.util.function.Supplier<java.util.Set<String>> retained) {}
+
+  /** Strict saved-origin read. Invalid records fail closed rather than becoming caller declarations. */
+  default Optional<io.justsearch.app.api.indexing.SourceOrigin> sourceOrigin(String id) {
+    return Optional.empty();
+  }
+
   /** Existing durable declaration for this admission; absence never creates approval evidence. */
   default Optional<String> sourceOriginId(IndexJob claim) { return Optional.empty(); }
+
+  /** Current in-memory declarations and operation identity, supplied by their existing owners. */
+  default void useSourceOriginAuthority(java.util.function.UnaryOperator<String> operationOwner,
+      java.util.function.Supplier<List<io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding>> roots) {}
+
+  /** Destination owner: a containing watched declaration, the former import if still inside it,
+   * otherwise the exact destination file (no origin record). */
+  default Optional<String> movedSourceOriginId(Path destination, String formerOriginId) {
+    return Optional.empty();
+  }
 
   /** Declared ownership for hintless maintenance admissions; recorded plans remain authoritative. */
   default void useDeclaredCollectionRoots(

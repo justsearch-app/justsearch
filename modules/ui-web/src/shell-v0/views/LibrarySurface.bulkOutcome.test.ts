@@ -47,6 +47,13 @@ it.each(['rebuild', 'cancel', 'accept-gaps'] as const)('Library shows the termin
     const button = [...el.shadowRoot!.querySelectorAll('jf-button')].find(b => b.getAttribute('label') === label);
     expect(button).toBeDefined();
     (button as HTMLElement & { onActivate(): void }).onActivate();
+    if (action === 'cancel') {
+      // DE1 — Cancel rebuild asks in place; its verb runs the cancellation.
+      await pump(el);
+      const band = el.shadowRoot!.querySelector('jf-confirm-band') as (HTMLElement & { updateComplete: Promise<unknown> }) | null;
+      expect(band).not.toBeNull(); await band!.updateComplete;
+      band!.shadowRoot!.querySelector<HTMLElement & { onActivate(): void }>('jf-button.confirm')!.onActivate();
+    }
   }
   await pump(el);
   expect([...el.shadowRoot!.querySelectorAll('[role="alert"]')].map(el => el.textContent).join(' ')).toContain(sentence);

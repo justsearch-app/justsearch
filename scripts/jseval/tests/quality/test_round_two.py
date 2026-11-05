@@ -7,7 +7,9 @@ from unittest.mock import Mock
 import httpx
 import pytest
 
-from jseval.quality import compare, index, report, run
+from .conftest import ready_distribution
+
+from jseval.quality import compare, index, inputs, report, run
 from jseval.quality.types import Outcome, Served
 from .helpers import make_collection, make_run, config_for
 
@@ -155,6 +157,7 @@ def test_french_collection_is_refused_by_quick_check_before_reserving(tmp_path, 
     c = make_collection(name='miracl-fr')
     monkeypatch.setattr(run.backend, 'source_identity', lambda _: ('commit', None))
     monkeypatch.setattr(run.backend, 'require_prepared', lambda _: None)
+    ready_distribution(monkeypatch)
     monkeypatch.setattr(run.collections, 'resolve_collection', lambda _: (c, config_for(c)))
     spawn = Mock(side_effect=AssertionError('not a quick-check collection'))
     monkeypatch.setattr(run.subprocess, 'Popen', spawn)
@@ -163,26 +166,26 @@ def test_french_collection_is_refused_by_quick_check_before_reserving(tmp_path, 
     spawn.assert_not_called()
 
 
-@pytest.mark.parametrize('name', ['run.py', 'compare.py', 'report.py', 'scoring.py', 'known_answers.py', '../commands/quality.py'])
-def test_harness_only_changes_reuse_index(tmp_path, name):
-    import subprocess
-    subprocess.run(['git', 'init', '-q', str(tmp_path)], check=True)
-    before = index.tree_hash(tmp_path)
-    path = tmp_path/'scripts/jseval/jseval/quality'/name
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text('harness-only change')
-    assert index.tree_hash(tmp_path) == before
+@pytest.mark.parametrize('name', ['quality.run', 'quality.compare', 'quality.report', 'quality.scoring',
+                                  'quality.known_answers', 'quality.real_use_queries', 'quality.corpus',
+                                  'commands.quality'])
+def test_harness_only_changes_reuse_index(name):
+    # Scoring, reporting, query and label code never enters the key; nor does any checkout file.
+    assert f'jseval.{name}' not in inputs.HARNESS_MODULES
 
 
-@pytest.mark.parametrize('name', ['index.py', 'collections.py', 'types.py'])
-def test_materialization_sources_still_key_index(tmp_path, name):
-    import subprocess
-    subprocess.run(['git', 'init', '-q', str(tmp_path)], check=True)
-    before = index.tree_hash(tmp_path)
-    path = tmp_path/'scripts/jseval/jseval/quality'/name
-    path.parent.mkdir(parents=True)
-    path.write_text('index-shaping change')
-    assert index.tree_hash(tmp_path) != before
+@pytest.mark.parametrize('name', ['index', 'collections', 'types', 'distribution', 'inputs'])
+def test_materialization_sources_still_key_index(tmp_path, monkeypatch, name):
+    import sys
+    module = f'jseval.quality.{name}'
+    assert module in inputs.HARNESS_MODULES
+    before = inputs.harness_digest()
+    # The running module's own source is hashed, wherever it was loaded from.
+    changed = tmp_path / f'{name}.py'
+    changed.write_text('index-shaping change')
+    monkeypatch.setattr(sys.modules[module], '__file__', str(changed))
+    monkeypatch.setattr(inputs, '_harness', None)
+    assert inputs.harness_digest()[module] != before[module]
 
 
 def test_refused_adoption_is_quarantined_then_next_prepare_builds(tmp_path, monkeypatch):
@@ -192,6 +195,7 @@ def test_refused_adoption_is_quarantined_then_next_prepare_builds(tmp_path, monk
     monkeypatch.setattr(index, 'compute_index_key', lambda *a: ('key', {}))
     monkeypatch.setattr(index, '_under_cache', lambda p: p)
     monkeypatch.setattr(index.backend, 'require_prepared', lambda *a: None)
+    ready_distribution(monkeypatch)
     root = tmp_path/index.sha256_text(c.name)/'key'
     data = root/'data'
     data.mkdir(parents=True)
@@ -225,11 +229,12 @@ def test_failed_live_adoption_is_quarantined_after_engine_stops(tmp_path, monkey
     index._write(root/'entry.json', {'owner': index._population_owner(c, 'key')})
     lock = (root/'data.quality.lock').open('a+')
     cfg = index.IndexConfig(timeout_sec=.01)
-    handle = index.IndexHandle(c, cfg, 'key', root, data, 'cached', {}, {}, lock)
+    handle = index.IndexHandle(c, cfg, 'key', root, data, 'cached', {}, {index.DISTRIBUTION_ENV: index._select_distribution()}, lock)
     engine = Mock()
     engine.proc.poll.return_value = None
     monkeypatch.setattr(index.backend, 'start_backend', lambda **kw: engine)
     monkeypatch.setattr(index.backend, 'require_prepared', lambda *a: None)
+    ready_distribution(monkeypatch)
     stopped = []
     def stop(*a, **kw):
         assert data.exists() and (root/'entry.json').exists()

@@ -6,7 +6,7 @@ import java.sql.Statement;
 
 /** The operations database's independent version ladder; jobs.db keeps its own identity. */
 public final class OperationSchema {
-  public static final int VERSION = 6;
+  public static final int VERSION = 7;
 
   static final String CREATE_OPERATIONS = """
       CREATE TABLE operations (
@@ -63,6 +63,7 @@ public final class OperationSchema {
     migrateV2(statement);
     migrateV3(statement);
     migrateV4(statement);
+    migrateV6(statement);
   }
 
   /** Same columns, stricter payload bounds; copy and version update share the caller's transaction. */
@@ -116,6 +117,15 @@ public final class OperationSchema {
     statement.execute("ALTER TABLE operations ADD COLUMN history_pending INTEGER NOT NULL DEFAULT 0 "
         + "CHECK(history_pending IN (0,1))");
     statement.execute("CREATE INDEX operations_history_pending ON operations(completed_at, id) WHERE history_pending = 1");
+  }
+
+  /** Unversioned approvals remain absent; migration never upgrades old attribution into authority. */
+  static void migrateV6(Statement statement) throws SQLException {
+    statement.execute("ALTER TABLE operations ADD COLUMN active_approval_binding TEXT "
+        + "CHECK(length(CAST(active_approval_binding AS BLOB)) <= 4096)");
+    statement.execute("ALTER TABLE operations ADD COLUMN interruption_revision INTEGER NOT NULL DEFAULT 0 "
+        + "CHECK(interruption_revision >= 0)");
+    statement.execute("ALTER TABLE operations ADD COLUMN interruption_reason TEXT");
   }
 
   private static void createIndexes(Statement statement) throws SQLException {

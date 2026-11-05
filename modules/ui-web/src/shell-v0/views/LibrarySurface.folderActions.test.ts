@@ -49,6 +49,25 @@ async function mount(options: { invoke?: ReturnType<typeof vi.fn>; picks?: (stri
   return { el, invoke, confirm, fetch, setRows: (value: IndexedRootView[]) => { rows = value; },
     setOutcome: (value: typeof outcome) => { outcome = value; } };
 }
+type BandAnswer = HTMLElement & { onActivate: () => unknown };
+type Band = HTMLElement & { heading: string; consequence: string; actionLabel: string; updateComplete: Promise<unknown> };
+/** DE1 — the in-place band Remove opens (null when none is open). */
+function band(el: LibrarySurface): Band | null {
+  return el.shadowRoot!.querySelector<Band>('jf-confirm-band');
+}
+/** Answer the open band with its verb ('confirm') or "Keep it" ('keep'). */
+async function answer(el: LibrarySurface, which: 'confirm' | 'keep') {
+  const open = band(el);
+  expect(open, 'removal band').not.toBeNull();
+  await open!.updateComplete;
+  open!.shadowRoot!.querySelector<BandAnswer>(`jf-button.${which}`)!.onActivate();
+  await pump(el);
+}
+/** Remove the first listed folder: Remove opens the band under it; its verb removes. */
+async function removeFolder(el: LibrarySurface) {
+  button(el, 'Remove from library').onActivate(); await pump(el);
+  await answer(el, 'confirm');
+}
 function button(el: LibrarySurface, label: string) {
   const found = [...el.shadowRoot!.querySelectorAll<HTMLElement & { onActivate: () => unknown; disabled: boolean }>('jf-button')]
     .find(b => b.getAttribute('label') === label);
@@ -161,7 +180,7 @@ it('a cancelled native picker leaves a closed form and an existing draft unchang
 it('exposes row removal progress, suppresses repeats and keeps the other row usable', async () => {
   const request = deferred<{ success: boolean }>(); const invoke = vi.fn(() => request.promise);
   const { el, setRows } = await mount({ invoke });
-  button(el, 'Remove from library').onActivate(); await pump(el);
+  await removeFolder(el);
   expect(el.shadowRoot!.querySelector('.card[aria-busy="true"]')?.textContent).toContain('Removing');
   expect(button(el, 'Removing…').disabled).toBe(true);
   button(el, 'Removing…').onActivate(); await pump(el); expect(invoke).toHaveBeenCalledTimes(1);
@@ -179,10 +198,13 @@ it('R3 a completed removal offers to add the same folder again, once, with its p
   try {
     const { el, invoke, setRows } = await mount();
     setRows([root('b')]);
-    button(el, 'Remove from library').onActivate(); await pump(el);
+    await removeFolder(el);
     expect(notices.map(n => n.actionLabel)).toContain('Add docs again');
     const offer = notices.find(n => n.actionLabel === 'Add docs again')!;
     expect(offer.message).toBe('Removed docs from your library');
+    // DE6 — the real reversal of the removal: Ctrl+Z and the pill's hint apply to it.
+    expect(offer.reversal).toBe(true);
+    expect(offer.restoresFolder).toBe('/docs');
     expect(offer.detail).toContain('/docs');
     expect(offer.detail).toContain('Adding it again reads its files again');
     // Works after leaving the Library; a repeated click adds once.
@@ -201,7 +223,7 @@ it('R3 a failed add-again says so and can be tried again', async () => {
     const invoke = vi.fn().mockResolvedValueOnce({ success: true }).mockRejectedValueOnce(new Error('Engine busy')).mockResolvedValue({ success: true });
     const { el, setRows } = await mount({ invoke });
     setRows([root('b')]);
-    button(el, 'Remove from library').onActivate(); await pump(el);
+    await removeFolder(el);
     expect(notices.map(n => n.actionLabel)).toContain('Add docs again');
     const offer = notices.find(n => n.actionLabel === 'Add docs again')!;
     offer.onAction!(); await pump(el);
@@ -214,18 +236,18 @@ it('R3 a failed add-again says so and can be tried again', async () => {
 it('a refused removal retains the row, explains retry without a live-watch claim, and retries', async () => {
   const invoke = vi.fn().mockRejectedValueOnce(new Error('Engine refusal')).mockResolvedValue({ success: true });
   const { el, setRows } = await mount({ invoke });
-  button(el, 'Remove from library').onActivate(); await pump(el);
+  await removeFolder(el);
   expect(el.roots).toHaveLength(2);
   expect(el.shadowRoot!.querySelector('[role="alert"]')?.textContent).toContain('Removal did not complete');
   expect(el.shadowRoot!.querySelector('[role="alert"]')?.textContent).toContain('retry');
   expect(el.shadowRoot!.querySelector('[role="alert"]')?.textContent).not.toContain('still being watched');
-  setRows([root('b')]); button(el, 'Remove from library').onActivate(); await pump(el);
+  setRows([root('b')]); await removeFolder(el);
   expect(invoke).toHaveBeenCalledTimes(2); expect(el.roots).toHaveLength(1);
 });
 
 it.each(['NETWORK_ERROR', 'SERIALIZATION_ERROR', 'HANDLER_FAILURE'])('reconciles an uncertain removal response with current roots (%s)', async (errorClass) => {
   const request = deferred<{ success: boolean }>(); const { el, setRows } = await mount({ invoke: vi.fn(() => request.promise) });
-  button(el, 'Remove from library').onActivate(); await pump(el);
+  await removeFolder(el);
   setRows([root('b')]); request.reject(Object.assign(new Error('Response lost'), { errorClass }));
   await pump(el);
   expect(el.shadowRoot!.textContent).toContain('Folder removed'); expect(el.error).toBeNull();
@@ -234,7 +256,7 @@ it.each(['NETWORK_ERROR', 'SERIALIZATION_ERROR', 'HANDLER_FAILURE'])('reconciles
 
 it('ignores an old removal response after returning and reads the current roots', async () => {
   const request = deferred<{ success: boolean }>(); const { el, setRows } = await mount({ invoke: vi.fn(() => request.promise) });
-  button(el, 'Remove from library').onActivate(); await pump(el); el.remove(); setRows([root('b')]);
+  await removeFolder(el); el.remove(); setRows([root('b')]);
   document.body.append(el); await pump(el);
   request.reject(new Error('obsolete refusal')); await pump(el);
   expect(el.error).toBeNull(); expect(el.roots.map(r => r.pathHash)).toEqual(['b']);
@@ -242,14 +264,20 @@ it('ignores an old removal response after returning and reads the current roots'
 });
 
 it('names legacy inner folders and ancestor coverage in Remove confirmations', async () => {
-  const { el, confirm } = await mount();
-  el.resolvedPaths = { a: '/docs', b: '/docs/inner' }; confirm.mockResolvedValue(false);
+  const { el, confirm, invoke } = await mount();
+  el.resolvedPaths = { a: '/docs', b: '/docs/inner' };
   button(el, 'Remove from library').onActivate(); await pump(el);
-  expect(confirm.mock.calls[0]?.[0]).toContain('/docs/inner');
+  expect(band(el)!.consequence).toContain('/docs/inner');
+  await answer(el, 'keep');
+  expect(band(el)).toBeNull();
   const removes = [...el.shadowRoot!.querySelectorAll<HTMLElement & { onActivate: () => unknown }>('jf-button[label="Remove from library"]')];
   removes[1]!.onActivate(); await pump(el);
-  expect(confirm.mock.calls[1]?.[0]).toContain('stay searchable');
-  expect(confirm.mock.calls[1]?.[0]).toContain('/docs');
+  expect(band(el)!.consequence).toContain('stay searchable');
+  expect(band(el)!.consequence).toContain('/docs');
+  await answer(el, 'keep');
+  // DE1 — the band replaced the window-blocking dialog; keeping removes nothing.
+  expect(confirm).not.toHaveBeenCalled();
+  expect(invoke).not.toHaveBeenCalled();
 });
 
 it('distinguishes accepted reindex from the recorded completion and failure', async () => {

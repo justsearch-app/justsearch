@@ -6,7 +6,7 @@ import java.nio.file.Path;
 import io.justsearch.indexerworker.queue.JobQueue;
 
 /**
- * Intermediate state for a job that passed pre-checks and was extracted.
+ * Admitted publication. A null artifact means unchanged content: publish only its envelope.
  *
  * <p>Tempdoc 516 Slice 3: lifted from {@code IndexingLoop}'s private nested record
  * so the upcoming Slice 4a {@code JobBatchExtractor} can return it without a circular

@@ -1151,7 +1151,16 @@ public class IndexingLoop implements Closeable {
       batchSpan.setAttribute("batch.extracted", 0L);
       return;
     }
+    // Unchanged sources need no embedding or extraction; retain their claim until metadata commits.
+    var unchanged = extracted.stream().filter(ex -> ex.artifact() == null).toList();
+    for (var ex : unchanged) {
+      if (!running.get()) break;
+      writer.write(ex, null);
+      heartbeatIfDue();
+    }
+    extracted = extracted.stream().filter(ex -> ex.artifact() != null).toList();
     batchSpan.setAttribute("batch.extracted", (long) extracted.size());
+    if (extracted.isEmpty()) return;
     // Liveness beat: extraction (Phase 1) can be long for large/many files — signal we still own these.
     heartbeat();
 

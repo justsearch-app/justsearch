@@ -76,7 +76,7 @@ public final class OperationHistoryProjector implements AutoCloseable {
       history.append(entry);
       if (stopping) return;
       changes.broadcast(entry);
-      if (!stopping && ownsLedger(row)) ledger.publishLiveOperation(entry);
+      if (!stopping && ownsLedger(row)) ledger.publishLiveOperation(entry, OperationHistoryProjection.removedFolder(row));
     } finally { deliveryGate.unlock(); }
   }
 
@@ -89,7 +89,7 @@ public final class OperationHistoryProjector implements AutoCloseable {
     deliveryGate.lock();
     try {
       if (stopping) return false;
-      if (ownsLedger(row)) ledger.publishLiveOperation(entry);
+      if (ownsLedger(row)) ledger.publishLiveOperation(entry, OperationHistoryProjection.removedFolder(row));
       return true;
     } finally { deliveryGate.unlock(); }
   }
@@ -110,7 +110,7 @@ public final class OperationHistoryProjector implements AutoCloseable {
     for (var row : operations.pendingHistoryProjection(OperationStore.HISTORY_PROJECTION_BATCH_LIMIT)) {
       if (stopping) return;
       var entry = OperationHistoryProjection.entry(row);
-      boolean accepted = !ownsLedger(row) || ledger.persistOperation(entry);
+      boolean accepted = !ownsLedger(row) || ledger.persistOperation(entry, OperationHistoryProjection.removedFolder(row));
       // A successful ack may make this row disappear before startup enumeration reaches it.
       if (!publishLive(row, entry) || !accepted) return;
       if (!operations.acknowledgeHistoryProjection(row.key())) return;

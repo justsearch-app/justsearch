@@ -190,11 +190,6 @@ final class ResourceApiModule implements ApiModule {
             headAssembly.substrate().context().holder(),
             headAssembly.substrate().context().changes());
     // Slice 444b: REST + SSE endpoints for the operation-history HISTORY Resource.
-    this.operationHistoryController =
-        new OperationHistoryController(headAssembly.executors(),
-            headAssembly.substrate().conversation().operationHistoryStore(),
-            headAssembly.substrate().conversation().operationHistoryChanges(),
-            headAssembly::operationOutcome);
     // Tempdoc 550 C3 / 655: shared pending-authorization registry — the backend records a
     // gated dispatch here and the FE approves by its id, so a capsule can only be minted
     // against an op the backend actually gated (WA-5). Shared between the invoke
@@ -203,6 +198,12 @@ final class ResourceApiModule implements ApiModule {
     // locally, so the MCP path reaches the exact same store rather than one it can't see.
     io.justsearch.app.services.intent.PendingAuthorizationStore pendingAuthorizationStore =
         headAssembly.substrate().conversation().pendingAuthorizationStore();
+    // The MCP outcome tool answers through the same store, so the two reads agree (L10).
+    this.operationHistoryController =
+        new OperationHistoryController(headAssembly.executors(),
+            headAssembly.substrate().conversation().operationHistoryStore(),
+            headAssembly.substrate().conversation().operationHistoryChanges(),
+            historyOutcome(headAssembly, pendingAuthorizationStore));
     // Tempdoc 550 Slice A1 (Authorize face) + C3: consent-capsule mint / approve endpoint.
     this.authorizationController =
         new AuthorizationController(
@@ -574,5 +575,12 @@ final class ResourceApiModule implements ApiModule {
     } catch (RuntimeException e) {
       log.warn("{}.shutdown failed: {}", name, e.getMessage());
     }
+  }
+
+  /** GET /api/operation-history/{operationKey}: the recorded outcome as the MCP outcome tool reads it. */
+  static java.util.function.Function<String, io.justsearch.app.api.operations.OperationOutcomeView> historyOutcome(
+      HeadAssembly headAssembly, io.justsearch.app.services.intent.PendingAuthorizationStore pending) {
+    return key -> pending == null ? headAssembly.operationOutcome(key)
+        : pending.outcome(key, headAssembly.operationOutcome(key));
   }
 }

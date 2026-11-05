@@ -14,7 +14,7 @@ From an installed `scripts/jseval` environment:
 ```sh
 export JUSTSEARCH_DATASET_CACHE="$HOME/.cache/justsearch-quality/dataset-cache"
 export JUSTSEARCH_GPU_ENABLED=false
-export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-} -Djava.awt.headless=true"
+export JAVA_TOOL_OPTIONS=-Djava.awt.headless=true
 python -m jseval quality corpus fetch real-use
 python -m jseval quality corpus materialize real-use
 python -m jseval quality known-answers real-use-slice
@@ -151,9 +151,12 @@ to run while `subset.json` exists: the selection depends on the stored queries,
 so selecting again after a query drop would silently change the corpus and its
 index. Removing `subset.json` deliberately is the only way to reselect.
 
-Its index is keyed by document identity. Editing queries or judgments reuses
-the prepared index. Prepare it once in the background, GPU allowed, with the
-runtime environment it is keyed with:
+Its index is owned by document identity. Editing queries or judgments reuses
+the prepared index, and so do docs, web-UI, CI and jseval scoring edits: the
+index is keyed by the distribution snapshot, preparation harness, JDK, OCR
+runtime, native folders, models and runtime settings by content (see
+`scripts/jseval/README.md`), not by the source tree. Prepare it once in the
+background, GPU allowed, with the runtime environment it is keyed with:
 
 ```sh
 source ~/.cache/justsearch-quality/real-use-queries/gpu.env   # recorded with the index
@@ -170,9 +173,11 @@ an index-key input, so no collection's key changes with it.
 
 `gpu.env` sets the ONNX Runtime CUDA path (also prefixed to
 `LD_LIBRARY_PATH`), `JUSTSEARCH_GPU_ENABLED=true`,
-`JUSTSEARCH_LLM_ENABLED=false` and `JAVA_TOOL_OPTIONS=-Djava.awt.headless=true`.
-The index key covers the JUSTSEARCH_* variables and JAVA_TOOL_OPTIONS, so a
-different value builds a different index.
+`JUSTSEARCH_LLM_ENABLED=false` and `JAVA_TOOL_OPTIONS=-Djava.awt.headless=true`
+(an allow-listed value). The key covers the JUSTSEARCH_* values, the JVM
+options and the content of the CUDA and `LD_LIBRARY_PATH` folders, so a
+different value or native file builds a different index; the same files at
+another path do not.
 
 Queries come from `jseval.quality.real_use_queries` and cover S30. Its steps
 are `extract`, `clusters`, `plan`, `generate`, `gate` and `write`; each is

@@ -12,7 +12,28 @@ import java.util.UUID;
 
 /** Durable declaration evidence, independent of expiring operation and queue history. */
 public record SourceOrigin(String id, Kind kind, RecordedRootPlan.Root root, Approval approval,
-    long acceptedAt) {
+    long acceptedAt, RestartBinding restartBinding) {
+  /** A successor links immutable provenance; authority still selects the active parent binding. */
+  public record RestartBinding(int version, String bindingId, String planHash, String predecessorOriginId) {
+    public RestartBinding {
+      if (version != io.justsearch.app.api.operations.ImportApprovalBinding.VERSION) {
+        throw new IllegalArgumentException("Unknown origin restart binding version");
+      }
+      io.justsearch.app.api.operations.ImportApprovalBinding.requireId(bindingId);
+      if (planHash == null || !planHash.matches("[a-f0-9]{64}")) {
+        throw new IllegalArgumentException("Invalid origin plan hash");
+      }
+      if (predecessorOriginId != null) {
+        io.justsearch.app.api.operations.ImportApprovalBinding.requireId(predecessorOriginId);
+      }
+    }
+  }
+
+  /** Existing acceptance paths remain unversioned until import-resume activation. */
+  public SourceOrigin(String id, Kind kind, RecordedRootPlan.Root root, Approval approval, long acceptedAt) {
+    this(id, kind, root, approval, acceptedAt, null);
+  }
+
   public enum Kind { IMPORT, WATCHED }
   public enum ApprovalClass { DURABLE, SESSION }
   public enum EvidenceSource { GATE, CALLER_DECLARED }
@@ -62,6 +83,10 @@ public record SourceOrigin(String id, Kind kind, RecordedRootPlan.Root root, App
     Objects.requireNonNull(kind, "kind");
     Objects.requireNonNull(root, "root");
     Objects.requireNonNull(approval, "approval");
+    if (restartBinding != null && (kind != Kind.IMPORT || approval.evidenceSource() != EvidenceSource.GATE
+        || id.equals(restartBinding.predecessorOriginId()))) {
+      throw new IllegalArgumentException("Invalid versioned import origin");
+    }
     if (acceptedAt < 0) throw new IllegalArgumentException("Invalid acceptance time");
   }
 

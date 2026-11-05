@@ -51,7 +51,24 @@ interface PendingAuthorizationPayload {
   readonly sourceTier?: string;
   readonly riskTier?: string;
   readonly gateBehavior?: string;
+  /** Which transport's gate produced it; all but the person's own window gestures wait in Needs you (DE3). */
+  readonly transport?: string;
+  /** ISO-8601, or epoch seconds/milliseconds depending on the stream's date encoding. */
+  readonly createdAt?: string | number;
 }
+
+function isoTime(value: string | number | undefined): string | undefined {
+  if (typeof value === 'string') return Number.isFinite(Date.parse(value)) ? value : undefined;
+  if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
+  return new Date(value < 1e11 ? value * 1000 : value).toISOString();
+}
+
+/**
+ * The person's own gesture in an app window (the Engine grants these only with window authority). Every
+ * other named source — agents, outside HTTP callers, other apps, schedules, the backend itself, and any
+ * source added later — is not the person's action here: it waits in Needs you (DE3).
+ */
+const OWN_TRANSPORTS = new Set(['BUTTON', 'PALETTE', 'RAIL']);
 
 /**
  * B2 — the retained side of the same pending store: the advisory stream's snapshot keeps every
@@ -60,7 +77,8 @@ interface PendingAuthorizationPayload {
  */
 interface RetainedPendingSource {
   subscribe(listener: (snapshot: { readonly advisories: readonly {
-    readonly event: { readonly classId: string; readonly classExtras: Readonly<Record<string, unknown>> };
+    readonly liveArrival?: boolean;
+    readonly event: { readonly classId: string; readonly occurredAt?: string; readonly classExtras: Readonly<Record<string, unknown>> };
   }[] }) => void): () => void;
 }
 
@@ -124,9 +142,10 @@ export function startPendingAuthorizationBridge(
         return { lastPayload: env.payload as PendingAuthorizationPayload | null };
       },
     }),
-    (snapshot) => admit(snapshot.payload.lastPayload, false),
+    (snapshot) => admit(snapshot.payload.lastPayload, false, true),
   );
   const str = (value: unknown): string | undefined => typeof value === 'string' && value ? value : undefined;
+  let initialRetained = true;
   const stopRetained = opts.retained?.subscribe(retained => {
     for (const record of retained.advisories) {
       if (record.event.classId !== 'authorization.pending') continue;
@@ -134,12 +153,15 @@ export function startPendingAuthorizationBridge(
       const expiresAt = str(extras.expiresAt);
       // An expired request cannot be approved; read state never decides validity (peek does).
       if (expiresAt && Date.parse(expiresAt) <= Date.now()) continue;
+      // The retained record is the MCP projection (PendingAuthorizationAdvisoryProjector): an agent's.
       admit({ pendingId: str(extras.pendingId), operationId: str(extras.operationId),
-        gateBehavior: str(extras.gateBehavior), riskTier: str(extras.riskTier) }, true);
+        gateBehavior: str(extras.gateBehavior), riskTier: str(extras.riskTier), transport: 'MCP',
+        createdAt: record.event.occurredAt }, true, !initialRetained && record.liveArrival === true);
     }
+    initialRetained = false;
   });
 
-  function admit(payload: PendingAuthorizationPayload | null, retained: boolean): void {
+  function admit(payload: PendingAuthorizationPayload | null, retained: boolean, live = false): void {
     if (!payload?.pendingId || !payload.operationId) {
       return;
     }
@@ -169,7 +191,9 @@ export function startPendingAuthorizationBridge(
     // A retained request whose state could not be read (or whose host was not mounted yet) is
     // tried again on the next snapshot: a transport failure is neither expiry nor an answer.
     const retry = retained ? () => { if (!stopped) handledIds.delete(pendingId); } : undefined;
-    void presentAndExecute(apiBase, payload, () => !stopped && waiting.get(pendingId) === entry, retry)
+    // MCP's advisory can beat its event here. Preserve the store's per-record live marker;
+    // the initial subscription and replay snapshots remain silent restorations.
+    void presentAndExecute(apiBase, payload, () => !stopped && waiting.get(pendingId) === entry, retry, live)
       .finally(() => { if (waiting.get(pendingId) === entry) waiting.delete(pendingId); });
   }
 
@@ -190,6 +214,8 @@ async function presentAndExecute(
   isCurrent: () => boolean,
   /** Retained discoveries only: the request could not be presented now and may be tried again. */
   retry?: () => void,
+  /** This window saw the announcement live (not a reload or reconnect rediscovery). */
+  live = false,
 ): Promise<void> {
   const pendingId = payload.pendingId as string;
   const client = getOperationClient(apiBase);
@@ -221,6 +247,16 @@ async function presentAndExecute(
     ...(detail.argsSummary ? { argsSummary: detail.argsSummary } : {}),
     ...(detail.rationale ? { purpose: detail.rationale } : {}),
     ...(detail.requestedBy ? { requestedBy: detail.requestedBy } : {}),
+    ...(payload.transport && !OWN_TRANSPORTS.has(payload.transport) ? {
+      // DE3 — an agent's request waits in Needs you; its review reads the live details again.
+      arrival: 'needs-you' as const, live,
+      ...(isoTime(payload.createdAt) ? { askedAt: isoTime(payload.createdAt)! } : {}),
+      refresh: async () => {
+        const fresh = await client.peekPending(pendingId);
+        return fresh && { operationId: fresh.operationId, gateBehavior: fresh.gateBehavior, riskTier: fresh.riskTier,
+          argsSummary: fresh.argsSummary, expiresAt: fresh.expiresAt, requestedBy: fresh.requestedBy };
+      },
+    } : {}),
   };
   const decision = await requestAuthorization(prompt);
   if (!isCurrent() || decision.superseded) return;
