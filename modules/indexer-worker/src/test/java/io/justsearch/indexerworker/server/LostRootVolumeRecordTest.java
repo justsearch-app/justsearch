@@ -35,6 +35,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Properties;
+import java.util.Set;
+import java.util.HashSet;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
@@ -271,17 +273,26 @@ final class LostRootVolumeRecordTest {
   }
 
   private List<Path> recordFiles(String name) throws IOException {
-    var visitor = new RecordFiles(name);
+    var visitor = new RecordFiles(layout.dataDir(), name);
     Files.walkFileTree(layout.dataDir(), visitor);
     return visitor.found;
   }
 
   /** A live data tree can lose unrelated temporary files between enumeration and stat. */
   private static final class RecordFiles extends SimpleFileVisitor<Path> {
+    private final Path dataRoot;
     private final String name;
     private final List<Path> found = new ArrayList<>();
 
-    private RecordFiles(String name) { this.name = name; }
+    private RecordFiles(Path dataRoot, String name) {
+      this.dataRoot = dataRoot;
+      this.name = name;
+    }
+
+    @Override
+    public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
+      return visitFile(dir, attrs);
+    }
 
     @Override
     public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
@@ -291,7 +302,7 @@ final class LostRootVolumeRecordTest {
 
     @Override
     public FileVisitResult visitFileFailed(Path file, IOException failure) throws IOException {
-      if (failure instanceof NoSuchFileException) return FileVisitResult.CONTINUE;
+      if (!file.equals(dataRoot) && failure instanceof NoSuchFileException) return FileVisitResult.CONTINUE;
       throw failure;
     }
   }
@@ -301,7 +312,7 @@ final class LostRootVolumeRecordTest {
     Path data = Files.createDirectory(tempDir.resolve("walk-data"));
     Path vanished = Files.writeString(data.resolve("temporary"), "transient");
     Path record = Files.writeString(data.resolve(RECORD), "root=linux-volume-v1:fixture");
-    var visitor = new RecordFiles(RECORD);
+    var visitor = new RecordFiles(data, RECORD);
     Files.delete(vanished);
     // Inject the exact visitor callback produced when enumeration wins the race with stat.
     assertEquals(FileVisitResult.CONTINUE, assertDoesNotThrow(() ->
@@ -312,6 +323,65 @@ final class LostRootVolumeRecordTest {
     var denied = new AccessDeniedException(record.toString());
     assertEquals(denied, assertThrows(AccessDeniedException.class, () ->
         visitor.visitFileFailed(record, denied)), "non-disappearance failures still propagate");
+  }
+
+  @Test
+  void duplicateExistingRecordFilesStillFail() throws Exception {
+    Path data = recordData();
+    Files.writeString(data.resolve(RECORD), "one");
+    Files.writeString(Files.createDirectory(data.resolve("nested")).resolve(RECORD), "two");
+    assertThrows(AssertionError.class, () -> recordFile(RECORD));
+  }
+
+  @Test
+  void absentRequiredRecordStillFails() throws Exception {
+    recordData();
+    assertThrows(AssertionError.class, () -> recordFile(RECORD));
+  }
+
+  @Test
+  void malformedExistingPropertiesStillFail() throws Exception {
+    Path data = recordData();
+    Files.writeString(data.resolve(RECORD), "key=" + "\\" + "uZZZZ");
+    assertThrows(IllegalArgumentException.class, () -> recordedVolumesUnder(tempDir));
+  }
+
+  @Test
+  void deletedEntireDataRootMustNotMasqueradeAsEmptyRecord() throws Exception {
+    Path data = recordData();
+    Files.delete(data);
+    assertThrows(IOException.class, () -> recordedVolumesUnder(tempDir));
+  }
+
+  @Test
+  void existingDirectoryWithRecordNameMustNotDisappearFromOracle() throws Exception {
+    Path data = recordData();
+    Files.writeString(data.resolve(RECORD), "one");
+    Files.createDirectory(Files.createDirectory(data.resolve("nested")).resolve(RECORD));
+    assertThrows(AssertionError.class, () -> recordFile(RECORD));
+  }
+
+  @Test
+  void validPropertiesRemainFilteredByRootAndVolumePrefix() throws Exception {
+    Path data = recordData();
+    Path watched = tempDir.resolve("watched").toAbsolutePath().normalize();
+    String prefix = WINDOWS ? "windows-volume:" : "linux-volume-v1:";
+    Properties values = new Properties();
+    values.setProperty(watched.toString(), prefix + "expected");
+    values.setProperty(watched.resolve("child").toString(), prefix + "child");
+    values.setProperty(watched + "-other", prefix + "wrong-root");
+    values.setProperty(watched.resolve("invalid-volume").toString(), "invalid:volume");
+    try (var out = Files.newOutputStream(data.resolve(RECORD))) {
+      values.store(out, "fixture");
+    }
+    assertEquals(Set.of(watched.toString(), watched.resolve("child").toString()),
+        new HashSet<>(recordedVolumesUnder(watched)));
+  }
+
+  private Path recordData() throws IOException {
+    Path data = Files.createDirectory(tempDir.resolve("walk-data"));
+    layout = new WorkerBootFixture.Layout(data, data.resolve("index"), null, null);
+    return data;
   }
 
   private List<String> searchHits(String word) {

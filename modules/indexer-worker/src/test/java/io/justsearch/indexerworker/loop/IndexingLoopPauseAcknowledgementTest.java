@@ -26,7 +26,9 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
@@ -60,12 +62,15 @@ final class IndexingLoopPauseAcknowledgementTest extends LuceneExecutorTestBase 
     var releasePublication = new CountDownLatch(1);
     var published = new CountDownLatch(1);
     var heldCycles = new CountDownLatch(3);
+    var pausedCycles = new AtomicReference<>(heldCycles);
+    var resumed = new AtomicBoolean();
+    var resumeDrained = new CountDownLatch(1);
     var polls = new AtomicInteger();
     var signals = mock(WorkerSignalBus.class, call -> switch (call.getMethod().getName()) {
       case "indexingHold" -> hold;
       case "isIndexingHeld" -> hold.held();
       case "isMainGpuActive" -> {
-        if (hold.snapshot().state() == IndexingHold.State.PAUSED) heldCycles.countDown();
+        if (hold.snapshot().state() == IndexingHold.State.PAUSED) pausedCycles.get().countDown();
         yield false;
       }
       default -> RETURNS_DEFAULTS.answer(call);
@@ -86,6 +91,12 @@ final class IndexingLoopPauseAcknowledgementTest extends LuceneExecutorTestBase 
         }
         return call.callRealMethod();
       }).when(queue).pollPending(anyInt());
+      doAnswer(call -> {
+        Object result = call.callRealMethod();
+        if (resumed.get() && "DONE".equals(state(queue, first))
+            && "DONE".equals(state(queue, retry))) resumeDrained.countDown();
+        return result;
+      }).when(queue).markDoneTransitions(anyCollection(), any());
       var extraction = mock(TimeboxedContentExtractor.class);
       when(extraction.extractionPolicy()).thenReturn(TikaExtractionPolicy.defaults());
       when(extraction.extractArtifact(any())).thenAnswer(call -> {
@@ -125,8 +136,14 @@ final class IndexingLoopPauseAcknowledgementTest extends LuceneExecutorTestBase 
           assertEquals("PENDING", state(queue, first));
           assertEquals(1, queue.reenqueue(JobQueue.EnqueueEntry.stat(retry).withinRoot(root)).accepted());
           assertEquals("PENDING", state(queue, retry));
+          var postRequeueCycles = new CountDownLatch(3);
+          pausedCycles.set(postRequeueCycles);
+          assertTrue(postRequeueCycles.await(10, TimeUnit.SECONDS), "held cycles after retry requeue");
+          assertEquals(0, polls.get(), "requeued work stays unclaimed until Resume");
+          assertEquals("PENDING", state(queue, retry));
           releaseExtraction.countDown();
           releasePublication.countDown();
+          resumed.set(true);
           hold.resume();
         } else {
           loop.start();
@@ -150,17 +167,20 @@ final class IndexingLoopPauseAcknowledgementTest extends LuceneExecutorTestBase 
           assertEquals(IndexingHold.State.PAUSED, hold.snapshot().state());
           assertEquals("retry letter", runtime.documentFieldOps().getDocumentField(
               PathNormalizer.normalizeKey(retry), SchemaFields.CONTENT));
-          assertEquals(1, queue.reenqueue(JobQueue.EnqueueEntry.stat(retry).withinRoot(root)).accepted());
           int acknowledgedPolls = polls.get();
+          assertEquals(1, queue.reenqueue(JobQueue.EnqueueEntry.stat(retry).withinRoot(root)).accepted());
           assertTrue(loop.pauseForCutover(5_000), "coordination remains live while user-paused");
           loop.resumeAfterCutover();
+          var postRequeueCycles = new CountDownLatch(3);
+          pausedCycles.set(postRequeueCycles);
+          assertTrue(postRequeueCycles.await(10, TimeUnit.SECONDS),
+              "fresh held cycles after retry requeue and cutover resume");
           assertEquals(acknowledgedPolls, polls.get(), "no further queue claim until Resume");
           assertEquals("PENDING", state(queue, retry));
+          resumed.set(true);
           hold.resume();
         }
-        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
-        while ((!"DONE".equals(state(queue, first)) || !"DONE".equals(state(queue, retry)))
-            && System.nanoTime() < deadline) Thread.sleep(10);
+        assertTrue(resumeDrained.await(10, TimeUnit.SECONDS), "Resume commits both queue outcomes");
         assertEquals("DONE", state(queue, first));
         assertEquals("DONE", state(queue, retry), "Resume drains deliberately retried work");
         assertTrue(polls.get() > (beforeLease ? 0 : 1));
