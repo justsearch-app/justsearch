@@ -57,6 +57,15 @@
         }
       }
     },
+    "pictureReadingSwitchIntent" : {
+      "type" : "boolean"
+    },
+    "pictureReadingEnabled" : {
+      "type" : [ "boolean", "null" ]
+    },
+    "pictureReadingOverrideEnabled" : {
+      "type" : [ "boolean", "null" ]
+    },
     "pauseAnswersWhileIndexing" : {
       "type" : [ "boolean", "null" ]
     },

@@ -1,0 +1,69 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-04T21:49:48.697Z",
+  "revision": "bcc5ece3c64961dbd224dffbae599675e265ac85",
+  "tree": "33d31fe3524c27969882b162b5a3aa366256bfa8",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.settings.PictureReadingCandidateCompatibilityTest\" --tests \"io.justsearch.app.services.settings.PictureReadingPreferenceTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 26391
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/settings/PictureReadingCandidateCompatibilityTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/settings/PictureReadingCandidateCompatibilityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c5d5093b48313a554662fb752e0d6811ab5bf425f4ef2de374d0b35d5c52863c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "absentDefaultsKeepAcceptedCandidateShape()",
+          "status": "passed"
+        },
+        {
+          "name": "explicitChoiceAndItsRevisionAreNeverOmitted()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/settings/PictureReadingPreferenceTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/settings/PictureReadingPreferenceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f9256c0a08f99de3b83e2e91482fc0abc499e8840ac77acfa11656bd1ca89fea",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "offPatchSurvivesReopenAndDoesNotChangeAnswersOrAcquisition(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "everyLegacyVersionKeepsAutomaticPictureReadingAndItsOtherChoices(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:cdc32130f784dbe55337f834ed69df82db44cee6bf34c65f54a0b607d78615e7"
+}

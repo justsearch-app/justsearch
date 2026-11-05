@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-04T21:18:18.111Z",
+  "revision": "bcc5ece3c64961dbd224dffbae599675e265ac85",
+  "tree": "9dfe3437392e98429c4441ceaf7881e8f8ebc14d",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::tests::ui_settings_v9_successor_reads_legacy_v1_without_changing_strategy_identity\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 90677
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/updater.rs#updater::tests::ui_settings_v9_successor_reads_legacy_v1_without_changing_strategy_identity",
+      "file": "modules/shell/src-tauri/src/updater.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:82574bc8f04385bd96b34a8af9a5a2036c329d40d4d81118b61334de82541b0d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "updater::tests::ui_settings_v9_successor_reads_legacy_v1_without_changing_strategy_identity",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:43744081a1bf37747846efcd24751d7b64dc77aaae175907a9548ff68b9407f9"
+}

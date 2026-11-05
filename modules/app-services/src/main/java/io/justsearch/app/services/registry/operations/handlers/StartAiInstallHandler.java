@@ -62,8 +62,11 @@ public final class StartAiInstallHandler implements OperationHandler {
     try {
       boolean enableReranker = BrainInstallHandlerSupport.parseBoolean(
           argumentsJson, "enableRerankerOnCompletion");
-      return BrainInstallHandlerSupport.execution("AI install started", enableReranker
-          ? svc.startInstall(acceptTerms, true) : svc.startInstall(acceptTerms));
+      boolean enablePictures = BrainInstallHandlerSupport.parseBoolean(
+          argumentsJson, "enablePictureReadingOnCompletion");
+      return BrainInstallHandlerSupport.execution("AI install started", enablePictures
+          ? svc.startInstall(acceptTerms, enableReranker, true) : enableReranker
+              ? svc.startInstall(acceptTerms, true) : svc.startInstall(acceptTerms));
     } catch (Exception e) {
       log.error("StartAiInstallHandler: startInstall threw", e);
       return finished(OperationResult.failure(

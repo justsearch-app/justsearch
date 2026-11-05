@@ -1,0 +1,107 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-05T02:12:53.414Z",
+  "revision": "7732f5cd3ec70e94de2557eda090d53c8526a5c7",
+  "tree": "5605155234d5a4d55ae51197b9654727f6aae629",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.picture-switch.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/x7wgfo7d/tmp/test-intent-vitest-96-1793844763144.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 3270
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts#reconciles an interrupted delivery with an unchanged witness using the original attempt",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:266b1c57bae7a9fb99b03c0590fa54de48f76bbb585b4643aef0e04756c0d6f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "picture reading live switch reconciles an interrupted delivery with an unchanged witness using the original attempt",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts#reconciles an interrupted receipt with a changed witness by replaying the original attempt",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:266b1c57bae7a9fb99b03c0590fa54de48f76bbb585b4643aef0e04756c0d6f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "picture reading live switch reconciles an interrupted receipt with a changed witness by replaying the original attempt",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts#clears interrupted uncertainty when the original attempt is refused with an unchanged witness",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:266b1c57bae7a9fb99b03c0590fa54de48f76bbb585b4643aef0e04756c0d6f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "picture reading live switch clears interrupted uncertainty when the original attempt is refused with an unchanged witness",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "0466d6521e",
+    "revision": "0466d6521ebca6692c9e107cc1a8a32f89e58cfb",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.picture-switch.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/x7wgfo7d/tmp/test-intent-vitest-96-1793844768888.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 3660,
+        "output": "JSON report written to /home/elias/.cache/am/x7wgfo7d/tmp/test-intent-vitest-96-1793844768888.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts#reconciles an interrupted delivery with an unchanged witness using the original attempt",
+        "classification": "assertion",
+        "detail": "picture reading live switch reconciles an interrupted delivery with an unchanged witness using the original attempt:  AssertionError: expected [ { …(4) } ] to have a length of 2 but got 1\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/x7wgfo7d/tmp/test-intent-before-oLqeAE/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/x7wgfo7d/tmp/te"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts#reconciles an interrupted receipt with a changed witness by replaying the original attempt",
+        "classification": "assertion",
+        "detail": "picture reading live switch reconciles an interrupted receipt with a changed witness by replaying the original attempt:  AssertionError: expected [ { …(4) } ] to have a length of 2 but got 1\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/x7wgfo7d/tmp/test-intent-before-oLqeAE/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/x7wgfo7d/tmp/te"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts#clears interrupted uncertainty when the original attempt is refused with an unchanged witness",
+        "classification": "assertion",
+        "detail": "picture reading live switch clears interrupted uncertainty when the original attempt is refused with an unchanged witness:  AssertionError: expected [ { …(4) } ] to have a length of 2 but got 1\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/x7wgfo7d/tmp/test-intent-before-oLqeAE/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/x7wgfo7d/tmp/te"
+      }
+    ]
+  },
+  "digest": "sha256:9c3b5caecde3b5c44becc6f0e246b252b9f4764d5833d3e7353fd7b9c53f879c"
+}

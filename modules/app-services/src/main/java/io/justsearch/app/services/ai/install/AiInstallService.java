@@ -187,6 +187,8 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
 
   /** Owned by the running install guard, never persisted before successful completion. */
   private boolean enableRerankerOnCompletion;
+  private boolean enablePictureReadingOnCompletion;
+  private UiSettingsStore.Snapshot picturePreferenceAtInstallStart;
   private UiSettingsStore.Snapshot rerankerPreferenceAtInstallStart;
 
   /**
@@ -1060,12 +1062,18 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
 
   @Override
   public Attempt startInstall(boolean acceptTerms, boolean enableRerankerOnCompletion) {
+    return startInstall(acceptTerms, enableRerankerOnCompletion, false);
+  }
+
+  @Override
+  public Attempt startInstall(boolean acceptTerms, boolean enableRerankerOnCompletion,
+      boolean enablePictureReadingOnCompletion) {
     if (!acceptTerms) {
       throw new AiInstallException(
           400, ApiErrorCode.TERMS_REQUIRED, "You must accept the model terms before downloading.");
     }
     checkPolicy();
-    var preferenceAtStart = enableRerankerOnCompletion && settingsStore != null
+    var preferenceAtStart = (enableRerankerOnCompletion || enablePictureReadingOnCompletion) && settingsStore != null
         ? settingsStore.inspect() : null;
     AiInstallStatus started;
     synchronized (lock) {
@@ -1074,7 +1082,9 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
             409, ApiErrorCode.INSTALL_ALREADY_RUNNING, "AI install is already running.");
       }
       this.enableRerankerOnCompletion = enableRerankerOnCompletion;
-      this.rerankerPreferenceAtInstallStart = preferenceAtStart;
+      this.rerankerPreferenceAtInstallStart = enableRerankerOnCompletion ? preferenceAtStart : null;
+      this.enablePictureReadingOnCompletion = enablePictureReadingOnCompletion;
+      this.picturePreferenceAtInstallStart = enablePictureReadingOnCompletion ? preferenceAtStart : null;
       cancelFlag.set(false);
       pause.resume();
       status.cancelRequested = false;
@@ -1463,6 +1473,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
         return;
       }
 
+      if (enablePictureReadingOnCompletion) completePictureReadingInstall();
       if (enableRerankerOnCompletion) completeRerankerInstall(registry);
       else applyCompletionState();
     } finally {
@@ -2311,6 +2322,28 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     var prepared = candidate.orElseThrow();
     if (!prepared.generationBoundKeys().isEmpty()) return;
     commitSettings(prepared.candidateSettings(), prepared.settingsWitness(), "ai-install-onnx-models");
+  }
+
+  /** A newer picture-reader choice wins over the enable consented before this download. */
+  private void completePictureReadingInstall() {
+    if (settingsStore == null || picturePreferenceAtInstallStart == null) {
+      throw new IllegalStateException("Settings authority unavailable");
+    }
+    var truth = recomputeCompletenessFromDiskBestEffort();
+    if (truth == null || truth.packagesWithMissingRequiredFiles().contains("chat")) {
+      throw new IllegalStateException("Picture reading files are not ready");
+    }
+    var latest = settingsStore.inspect();
+    if (!Objects.equals(latest.settings().getPictureReadingEnabled(),
+        picturePreferenceAtInstallStart.settings().getPictureReadingEnabled())
+        || latest.settings().getPictureReadingPreferenceRevision()
+            > picturePreferenceAtInstallStart.witness().acceptedRevision()) return;
+    UiSettings candidate = latest.settings();
+    candidate.setPictureReadingEnabled(true);
+    candidate.setPictureReadingPreferenceRevision(
+        Math.addExact(latest.witness().acceptedRevision(), 1));
+    if (cancelFlag.get()) return;
+    commitSettings(candidate, latest.witness(), "ai-install-picture-reading");
   }
 
   /** The enable intent and installed query path are committed by one completion batch. */

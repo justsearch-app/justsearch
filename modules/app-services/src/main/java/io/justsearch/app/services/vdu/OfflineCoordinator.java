@@ -42,11 +42,15 @@ public final class OfflineCoordinator implements AutoCloseable {
   private final EngineExecutorRegistry.Registration procedureOwner;
   private final ExecutorService procedureExecutor;
   private final Object procedureGate = new Object();
+  private volatile boolean pictureReadingFenced;
+  private java.util.function.BooleanSupplier pictureReadingEnabled = () -> true;
   private final AtomicBoolean processing = new AtomicBoolean();
   private final AtomicBoolean closing = new AtomicBoolean();
   private final java.util.concurrent.atomic.AtomicReference<CompletableFuture<CompletableFuture<Void>>>
       activeProcedure = new java.util.concurrent.atomic.AtomicReference<>();
   private final java.util.concurrent.atomic.AtomicReference<CompletableFuture<String>> activeExit =
+      new java.util.concurrent.atomic.AtomicReference<>();
+  private final java.util.concurrent.atomic.AtomicReference<CompletableFuture<OfflineProcessingOutcome>> activeBody =
       new java.util.concurrent.atomic.AtomicReference<>();
 
   private final AutomaticVduBreaker automaticBreaker;
@@ -67,6 +71,7 @@ public final class OfflineCoordinator implements AutoCloseable {
       VduCapabilityState vduCapabilityState, java.util.function.LongSupplier breakerClock) {
     this.admission = Objects.requireNonNull(admission, "admission");
     this.vduBatchProcessor = Objects.requireNonNull(vduBatchProcessor, "vduBatchProcessor");
+    vduBatchProcessor.pictureReadingEnabled(this::pictureReadingMayStart);
     this.knowledgeClientSupplier = Objects.requireNonNull(knowledgeClientSupplier, "knowledgeClientSupplier");
     this.vduCapabilityState = Objects.requireNonNull(vduCapabilityState, "vduCapabilityState");
     this.automaticBreaker = new AutomaticVduBreaker(vduCapabilityState,
@@ -132,12 +137,17 @@ public final class OfflineCoordinator implements AutoCloseable {
     var submitted = new CompletableFuture<CompletableFuture<Void>>();
     synchronized (procedureGate) {
       if (closing.get()) throw new CancellationException("Enrichment is stopping");
+      if (!pictureReadingMayStart()) {
+        return CompletableFuture.completedFuture(report(progress, new OfflineProcessingOutcome(
+            0, 0, 0, BlockReason.PICTURE_READING_OFF, EmbeddingHandoff.NOT_EVALUATED)));
+      }
       if (!processing.compareAndSet(false, true)) {
         throw new IllegalStateException("Enrichment is already running");
       }
       // Publish ownership at the same boundary as the claim, before admission can block.
       // Terminal shutdown either fences this owner or excludes its start entirely.
       activeExit.set(exited);
+      activeBody.set(body);
       activeProcedure.set(submitted);
     }
     if (explicit) automaticBreaker.close("an explicit pass");
@@ -145,6 +155,7 @@ public final class OfflineCoordinator implements AutoCloseable {
     try { work = admission.attach(context); }
     catch (RuntimeException | Error failure) {
       submitted.completeExceptionally(failure);
+      body.completeExceptionally(failure);
       releaseProcedure(submitted, exited);
       exited.complete(null);
       throw failure;
@@ -158,6 +169,7 @@ public final class OfflineCoordinator implements AutoCloseable {
       catch (RuntimeException | Error cleanup) { if (failure != cleanup) failure.addSuppressed(cleanup); }
       finally {
         submitted.completeExceptionally(failure);
+        body.completeExceptionally(failure);
         releaseProcedure(submitted, exited);
         exited.complete(null);
       }
@@ -254,6 +266,7 @@ public final class OfflineCoordinator implements AutoCloseable {
     synchronized (procedureGate) {
       activeProcedure.compareAndSet(submitted, null);
       activeExit.compareAndSet(exited, null);
+      activeBody.set(null);
       processing.set(false);
     }
   }
@@ -289,14 +302,23 @@ public final class OfflineCoordinator implements AutoCloseable {
       return report(progress, new OfflineProcessingOutcome(
           0, 0, 0, BlockReason.WORKER_UNAVAILABLE, EmbeddingHandoff.NOT_EVALUATED));
     }
+    if (!pictureReadingMayStart()) {
+      return report(progress, new OfflineProcessingOutcome(
+          0, 0, 0, BlockReason.PICTURE_READING_OFF, EmbeddingHandoff.NOT_EVALUATED));
+    }
     var hold = client.indexingHold();
     try {
-    var lease = hold == null ? null : (explicit ? hold.acquire() : hold.tryAcquire());
+    var lease = hold == null ? null : (explicit ? hold.acquire(this::pictureReadingMayStart) : hold.tryAcquire());
     if (hold != null && lease == null) {
       return report(progress, new OfflineProcessingOutcome(
-          0, 0, 0, BlockReason.NONE, EmbeddingHandoff.NOT_NEEDED));
+          0, 0, 0, pictureReadingMayStart() ? BlockReason.NONE : BlockReason.PICTURE_READING_OFF,
+          EmbeddingHandoff.NOT_NEEDED));
     }
     try (lease) {
+    if (!pictureReadingMayStart()) {
+      return report(progress, new OfflineProcessingOutcome(
+          0, 0, 0, BlockReason.PICTURE_READING_OFF, EmbeddingHandoff.NOT_EVALUATED));
+    }
     client.recoverVduProcessing(context);
     OfflineProcessingOutcome outcome;
     // The batch holds the chat server in VDU mode for itself; a refused hold blocks it AI_OFFLINE.
@@ -336,6 +358,55 @@ public final class OfflineCoordinator implements AutoCloseable {
   public int getPendingEmbeddingCount() {
     KnowledgeClient client = knowledgeClientSupplier.get();
     return client == null ? 0 : client.countPendingEmbeddings(BACKLOG_CONTEXT);
+  }
+
+  /** Bound once at composition; admission and every page use this same owner decision. */
+  public void pictureReadingEnabled(java.util.function.BooleanSupplier enabled) {
+    synchronized (procedureGate) {
+      if (processing.get()) throw new IllegalStateException("Enrichment is already running");
+      pictureReadingEnabled = Objects.requireNonNull(enabled, "enabled");
+    }
+  }
+
+  public boolean pictureReadingMayStart() {
+    return !pictureReadingFenced && pictureReadingEnabled.getAsBoolean();
+  }
+
+  /**
+   * Closes admission without interrupting a result write or revoking its index authority. Reading
+   * defers at the processor's page checkpoint and returns its claim using the existing refund.
+   * A completed result may finish saving before the fence is returned to the settings owner.
+   */
+  public io.justsearch.app.api.chat.Hold fencePictureReading() {
+    CompletableFuture<String> exited;
+    CompletableFuture<OfflineProcessingOutcome> body;
+    synchronized (procedureGate) {
+      if (pictureReadingFenced) throw new IllegalStateException("Picture reading is already changing");
+      pictureReadingFenced = true;
+      exited = activeExit.get();
+      body = activeBody.get();
+    }
+    try {
+      if (exited != null) exited.get(180, java.util.concurrent.TimeUnit.SECONDS);
+      // Cleanup alone is not an acknowledged result. Refuse the settings change if the pass
+      // failed (notably an unacknowledged index write), keeping the prior choice truthful.
+      if (body != null) body.get(0, java.util.concurrent.TimeUnit.SECONDS);
+    } catch (InterruptedException interrupted) {
+      pictureReadingFenced = false;
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException("Interrupted while stopping picture reading", interrupted);
+    } catch (java.util.concurrent.ExecutionException | java.util.concurrent.TimeoutException
+        | CancellationException failure) {
+      pictureReadingFenced = false;
+      throw new IllegalStateException("Picture reading did not finish safely; the saved choice was kept. Try again.", failure);
+    }
+    return new io.justsearch.app.api.chat.Hold() {
+      private final AtomicBoolean released = new AtomicBoolean();
+      @Override public String owner() { return "picture-reading-settings"; }
+      @Override public void close() {
+        if (released.compareAndSet(false, true)) pictureReadingFenced = false;
+      }
+    };
   }
 
   public boolean isProcessing() { return processing.get(); }

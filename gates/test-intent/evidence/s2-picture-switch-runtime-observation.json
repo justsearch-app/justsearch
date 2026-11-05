@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-05T01:40:06.746Z",
+  "revision": "9018a17e2c831cce9eb2dbac26df530882d81e39",
+  "tree": "7bc466d08170e65b2daa0706b34c7d3f67bdfc40",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.redesign.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/bvca0hfh/tmp/test-intent-vitest-2-1793842800140.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 6605
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.redesign.test.ts#keeps runtime evidence in the sentence and disables feature switches when observations become unknown",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.redesign.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:acb1f594e0f5205a33eac847019da03bef89880027e3daea0d038595a215974f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "AI Brain redesign behaviour keeps runtime evidence in the sentence and disables feature switches when observations become unknown",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:3e3ddace9b404bbb2f42b67d212aac3568b5881415fb9f0c855c8ac037ca52ec"
+}

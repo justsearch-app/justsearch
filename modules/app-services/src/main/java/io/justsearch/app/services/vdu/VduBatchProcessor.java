@@ -150,6 +150,13 @@ public class VduBatchProcessor {
         recordFailed();
     }
 
+    private java.util.function.BooleanSupplier pictureReadingEnabled = () -> true;
+
+    /** Bound by the procedure owner before any pass can be admitted. */
+    void pictureReadingEnabled(java.util.function.BooleanSupplier enabled) {
+        pictureReadingEnabled = Objects.requireNonNull(enabled, "enabled");
+    }
+
     public OfflineProcessingOutcome processPendingFiles(
             EngineContext engineContext, Consumer<OfflineProcessingOutcome> progress) {
         return processPendingFiles(engineContext, progress, null);
@@ -162,6 +169,9 @@ public class VduBatchProcessor {
         Objects.requireNonNull(engineContext, "engineContext");
         Objects.requireNonNull(progress, "progress");
         checkInterrupted();
+        if (!pictureReadingEnabled.getAsBoolean()) {
+            return report(progress, 0, 0, 0, BlockReason.PICTURE_READING_OFF);
+        }
         var shouldInterruptBatch = Objects.requireNonNull(interruptBatchFactory.get(), "batch interrupt");
         KnowledgeClient knowledgeClient = knowledgeClientSupplier.get();
         if (knowledgeClient == null) {
@@ -220,9 +230,10 @@ public class VduBatchProcessor {
         try {
             for (String docId : pendingDocIds) {
                 checkInterrupted();
-                if (shouldInterruptBatch.getAsBoolean()
+                if (!pictureReadingEnabled.getAsBoolean() || shouldInterruptBatch.getAsBoolean()
                         || automaticEligibility != null && !automaticEligibility.getAsBoolean()) {
-                    blocked = BlockReason.ACTIVITY_OR_ENERGY;
+                    blocked = pictureReadingEnabled.getAsBoolean()
+                        ? BlockReason.ACTIVITY_OR_ENERGY : BlockReason.PICTURE_READING_OFF;
                     LOG.info("VDU pass interrupted before {}: activity during this pass, energy or bulk hold", docId);
                     break;
                 }
@@ -257,7 +268,7 @@ public class VduBatchProcessor {
                         throw new VduProcessor.VduException("File no longer exists", null);
                     }
                     result = vduProcessor.process(filePath, engineContext,
-                        () -> !shouldInterruptBatch.getAsBoolean()
+                        () -> pictureReadingEnabled.getAsBoolean() && !shouldInterruptBatch.getAsBoolean()
                             && (automaticEligibility == null || automaticEligibility.getAsBoolean())
                             && !vduProcessor.vduInterruptRequested());
                 } catch (VduProcessor.VduException | RuntimeException failure) {
@@ -267,7 +278,8 @@ public class VduBatchProcessor {
                         if (!knowledgeClient.releaseVduProcessing(docId, attemptId, engineContext)) {
                             throw new IllegalStateException("VDU deferral was not acknowledged by the index", failure);
                         }
-                        blocked = BlockReason.ACTIVITY_OR_ENERGY;
+                        blocked = pictureReadingEnabled.getAsBoolean()
+                        ? BlockReason.ACTIVITY_OR_ENERGY : BlockReason.PICTURE_READING_OFF;
                         break;
                     }
                     if (io.justsearch.app.api.chat.GenerationUnavailableException.causedBy(failure)) {

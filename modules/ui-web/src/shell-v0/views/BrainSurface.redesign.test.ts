@@ -96,7 +96,8 @@ describe('AI Brain redesign behaviour', () => {
     switches(el, 'Answer questions')[1]!.click(); await settle(el);
     expect(calls.at(-1)).toEqual({ id: 'core.set-chat-enabled', args: { enabled: true } });
   });
-  it('shows the runtime projector observation, not downloaded files, including model change and offline unknown', async () => {
+  it('keeps runtime evidence in the sentence and disables feature switches when observations become unknown', async () => {
+    settingsGet = async () => json({ ui: { chatEnabled }, llm: {}, witness: { acceptedRevision: 0, lastCommittedOperationKey: null } });
     const el = await mount();
     expect(el.shadowRoot!.querySelector('[data-feature="pictures"]')!.textContent).toContain('On');
     emit({ runtimeStatus: { active: { mmprojActive: false } } }); await el.updateComplete;
@@ -105,7 +106,8 @@ describe('AI Brain redesign behaviour', () => {
     expect(el.shadowRoot!.querySelector('[data-feature="pictures"]')!.textContent).toContain('Unknown');
     expect(switches(el, 'Best match first')).toHaveLength(1);
     expect(switches(el, 'Best match first')[0]!.getAttribute('aria-disabled')).toBe('true');
-    expect(switches(el, 'Text in scans and images')).toHaveLength(0);
+    expect(switches(el, 'Text in scans and images')).toHaveLength(1);
+    expect(switches(el, 'Text in scans and images')[0]!.getAttribute('aria-disabled')).toBe('true');
   });
   it('preserves null answer intent as automatic rather than saving false', async () => {
     chatEnabled = null; const el = await mount();

@@ -37,6 +37,11 @@ public final class TriggerOfflineProcessingHandler implements OperationHandler {
         if (record != null) record.checkpoint(HandlerJson.MAPPER.writeValueAsString(fields(outcome)),
             outcome.processed(), outcome.failed());
       });
+      var future = completion.toCompletableFuture();
+      var immediate = future.isDone() && !future.isCompletedExceptionally() ? future.getNow(null) : null;
+      if (immediate != null && immediate.blockedReason() == OfflineProcessingOutcome.BlockReason.PICTURE_READING_OFF) {
+        return OperationExecution.finished(result(immediate));
+      }
       return new OperationExecution(OperationResult.success("Enrichment pass started", Map.of()),
           completion.thenApply(TriggerOfflineProcessingHandler::result));
     } catch (RuntimeException failure) {
@@ -50,6 +55,12 @@ public final class TriggerOfflineProcessingHandler implements OperationHandler {
   }
 
   private static OperationResult result(OfflineProcessingOutcome outcome) {
+    if (outcome.blockedReason() == OfflineProcessingOutcome.BlockReason.PICTURE_READING_OFF) {
+      return OperationResult.failure(
+          io.justsearch.app.api.operations.BulkReindexFailureMessage.forOperation(
+              "core.trigger-offline-processing", "PICTURE_READING_OFF"),
+          "PICTURE_READING_OFF", fields(outcome), false);
+    }
     return outcome.complete()
         ? OperationResult.success("Enrichment pass completed", fields(outcome))
         : OperationResult.failure("Enrichment pass incomplete", "ENRICHMENT_INCOMPLETE", fields(outcome), true);

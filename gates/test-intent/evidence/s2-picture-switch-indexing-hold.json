@@ -1,0 +1,73 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-04T22:11:00.277Z",
+  "revision": "bcc5ece3c64961dbd224dffbae599675e265ac85",
+  "tree": "bce6be4f70c68bfad981512c5198649032836872",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:core:test --tests \"io.justsearch.core.scheduling.IndexingHoldWithdrawnAdmissionTest\" --tests \"io.justsearch.core.scheduling.IndexingRulesHoldTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 12300
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/core/src/test/java/io/justsearch/core/scheduling/IndexingHoldWithdrawnAdmissionTest.java",
+      "file": "modules/core/src/test/java/io/justsearch/core/scheduling/IndexingHoldWithdrawnAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9cdab2406ad5a338465f68da1371113a611128f12eeb865e66369ac78e7a61aa",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "withdrawnAdmissionCannotGrantALeaseWhileIndexingIsPaused()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/core/src/test/java/io/justsearch/core/scheduling/IndexingRulesHoldTest.java",
+      "file": "modules/core/src/test/java/io/justsearch/core/scheduling/IndexingRulesHoldTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3c9ab5982d3398149ca63dc6c22adb87d53f24eb7620574c5ce29c97eb664d45",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "queuedWorkAutomaticallyContinuesAndDisabledSchedulesNeverReadLocalTime()",
+          "status": "passed"
+        },
+        {
+          "name": "dstRepeatedSkippedHoursClockAndZoneChangesAreReevaluatedInTheRealHold()",
+          "status": "passed"
+        },
+        {
+          "name": "localMinuteTableIncludesEndpointsOvernightSundayAndDisabledHours()",
+          "status": "passed"
+        },
+        {
+          "name": "combinedReasonsKeepAdmissionClosedThroughResumeExpiryAndLeasePublication()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:0061e06be673cc6c6fa4da935c82fb4306ef7c3c444b1d434a15e36e41b5b7fb"
+}

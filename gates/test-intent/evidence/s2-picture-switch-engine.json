@@ -1,0 +1,264 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-04T22:09:29.321Z",
+  "revision": "bcc5ece3c64961dbd224dffbae599675e265ac85",
+  "tree": "68bf9e7c407ce204e4f61c1fc65bc27c37c0a159",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.PictureReadingOwnerRefusalTest\" --tests \"io.justsearch.app.services.chat.PictureReadingConfigurationTest\" --tests \"io.justsearch.app.services.settings.PictureReadingPreferenceTest\" --tests \"io.justsearch.app.services.vdu.PictureReadingCoordinatorTest\" --tests \"io.justsearch.app.services.vdu.OfflineCoordinatorTest\" --tests \"io.justsearch.app.services.vdu.OfflineCoordinatorOwnershipTest\" --tests \"io.justsearch.app.services.vdu.OfflineCoordinatorFailureCleanupTest\" --tests \"io.justsearch.app.services.vdu.IndexingRulesVduTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 45204
+    },
+    {
+      "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.PictureReadingSettingsHttpTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 10619
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/PictureReadingOwnerRefusalTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/PictureReadingOwnerRefusalTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b64e8bbb383f9fcab2cea8e3b1c8524966f9b35d37951ea14b9c08d3dd4c050f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "missingProjectorRefusesEnableBeforeSettingsPublication()",
+          "status": "passed"
+        },
+        {
+          "name": "externalServerRefusesBeforeAnyStopOrPreparation()",
+          "status": "passed"
+        },
+        {
+          "name": "offlinePictureSwitchConfiguresTheNextStartWithoutRequestingALoad()",
+          "status": "passed"
+        },
+        {
+          "name": "operatorProjectorOverrideRefusesWithoutTouchingTheManagerOrCustomPath()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/PictureReadingConfigurationTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/PictureReadingConfigurationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d5cb06277fa752f38d4423c7b3f584ee090c15ce4153cf976cca4421da2674f7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "preparedPictureChangeWaitsForRepliesAndAbortRestoresTheProjector()",
+          "status": "passed"
+        },
+        {
+          "name": "runtimeAndProfileAppliesCannotReattachAProjectorWhileOff()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/settings/PictureReadingPreferenceTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/settings/PictureReadingPreferenceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f9256c0a08f99de3b83e2e91482fc0abc499e8840ac77acfa11656bd1ca89fea",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "offPatchSurvivesReopenAndDoesNotChangeAnswersOrAcquisition(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "everyLegacyVersionKeepsAutomaticPictureReadingAndItsOtherChoices(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/PictureReadingCoordinatorTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/PictureReadingCoordinatorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:88173cf26d5c84cd72bd2c95db1a47ff3149dd8821a16884eeed292c3a47b493",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "offDuringReadingReturnsTheClaimAndOnUsesANewAttempt()",
+          "status": "passed"
+        },
+        {
+          "name": "onResumesPendingOnlyWithoutRereadingCompletedPictures()",
+          "status": "passed"
+        },
+        {
+          "name": "offBlocksAllProcedureEntriesBeforeRecoveryOrClaims()",
+          "status": "passed"
+        },
+        {
+          "name": "failedPublicationDuringOffRefusesTheFenceAndKeepsThePriorChoice()",
+          "status": "passed"
+        },
+        {
+          "name": "offDuringServerEntryDoesNotClaimAnyPicture()",
+          "status": "passed"
+        },
+        {
+          "name": "offWithdrawsAnExplicitWaitWithoutResumingTheIndexingPolicy()",
+          "status": "passed"
+        },
+        {
+          "name": "offWaitsForAResultAlreadyBeingSavedAndKeepsIt()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/PictureReadingSettingsHttpTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/PictureReadingSettingsHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8a90c6cb09dedc1d8b45abe15fa546de8ff6c4f87bb523a017a7467d7b5eac2e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "witnessedHttpSwitchCommitsLiveAndAStaleWindowCannotReplaceIt(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/OfflineCoordinatorTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/OfflineCoordinatorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c23a45c9cf9a9aa0f7e751dae663c68df9fa188dbce4bbafd32cf578c9e76220",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pendingEmbeddingsNeverStopChatAndThePassCompletes()",
+          "status": "passed"
+        },
+        {
+          "name": "zeroRecoveredStillAllowsVdu()",
+          "status": "passed"
+        },
+        {
+          "name": "helperMethodsReportEmbeddingBacklogAndEmptyBacklog()",
+          "status": "passed"
+        },
+        {
+          "name": "noVduClearsCapabilityAndSkipsBatch()",
+          "status": "passed"
+        },
+        {
+          "name": "sharedGuardRejectsASecondStartUntilActualExit()",
+          "status": "passed"
+        },
+        {
+          "name": "helperMethodsReportVduBacklog()",
+          "status": "passed"
+        },
+        {
+          "name": "recoveryRunsOnceBeforeSelection()",
+          "status": "passed"
+        },
+        {
+          "name": "unavailableWorkerReturnsExplicitBlockedOutcome()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/OfflineCoordinatorOwnershipTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/OfflineCoordinatorOwnershipTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:68275093d6430ec3dbeb236a3eea8fcc3893a792727ccfb567c50b972d4e8699",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "executorRefusalRetainsCleanupFailureAndReleasesOnce()",
+          "status": "passed"
+        },
+        {
+          "name": "vduModeFailureIsVisibleAfterOwnershipRelease()",
+          "status": "passed"
+        },
+        {
+          "name": "queuedCancellationRunsNoBodyAndReleasesOwnershipExactlyOnce()",
+          "status": "passed"
+        },
+        {
+          "name": "runningCancellationRetainsStageGuardAndAdmissionThroughBlockedCleanup()",
+          "status": "passed"
+        },
+        {
+          "name": "admittedContextWithWorkIdFlowsToEveryProcedurePort()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/OfflineCoordinatorFailureCleanupTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/OfflineCoordinatorFailureCleanupTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:685cd7316e5b0f94687682232a6dcdb52ec609ec26a594d6a89494710f23933e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "fatalBodyFailureIsPreservedAndReleasesTheGuard()",
+          "status": "passed"
+        },
+        {
+          "name": "bodyFailureIsPrimaryAndReleasesTheGuardForTheNextPass()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/IndexingRulesVduTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/IndexingRulesVduTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3fc82c9f2a229ebc7400b36de0affcb5e24d382c014f4520df03a55d3a4d9914",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "explicitPassWaitsAndAnActivePassMustFinishBeforeQuiet()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:da34cf245787102863341a444633d044be69f62ae18a0541c16e47f66ef07ca1"
+}

@@ -87,6 +87,7 @@ public final class OfflineCoordinatorBuilder {
               interruptBatchFactory);
       OfflineCoordinator coordinator =
           new OfflineCoordinator(executors, admission, batchProcessor, clientSupplier, vduCapabilityState);
+      coordinator.pictureReadingEnabled(manager::pictureReadingEnabled);
       log.info("OfflineCoordinator created for VDU batch processing");
       return coordinator;
     } catch (Exception e) {

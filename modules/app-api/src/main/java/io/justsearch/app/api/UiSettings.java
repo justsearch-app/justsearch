@@ -300,6 +300,20 @@ public final class UiSettings {
   private Boolean rerankerEnabled;
   // Absent preserves existing installs: answers are never automatically paused.
   private Boolean pauseAnswersWhileIndexing;
+  // Null preserves the installed projector's historical behaviour.
+  private Boolean pictureReadingEnabled;
+  private long pictureReadingPreferenceRevision;
+
+  @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_DEFAULT)
+  public long getPictureReadingPreferenceRevision() { return pictureReadingPreferenceRevision; }
+  public void setPictureReadingPreferenceRevision(long revision) {
+    if (revision < 0) throw new IllegalArgumentException("Invalid picture reading preference revision");
+    pictureReadingPreferenceRevision = revision;
+  }
+
+  @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+  public Boolean getPictureReadingEnabled() { return pictureReadingEnabled; }
+  public void setPictureReadingEnabled(Boolean enabled) { pictureReadingEnabled = enabled; }
 
   public Boolean getPauseAnswersWhileIndexing() { return pauseAnswersWhileIndexing; }
   public void setPauseAnswersWhileIndexing(Boolean enabled) { pauseAnswersWhileIndexing = enabled; }
