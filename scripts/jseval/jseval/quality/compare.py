@@ -15,7 +15,8 @@ decisions is fixed:
    or merge state, the legs or reranker status that served each query — the affected queries are
    named; identical by-design skips remain comparable), or — for a collection with
    pooled judgments only — the labels are too incomplete for this pair of rankings (the unjudged
-   pairs to judge are listed). With official, fixed judgments an unjudged document counts as
+   pairs to judge are listed), or — in a group of topical queries — either arm's own top-10
+   unjudged share exceeds the pooled tolerance (shared unknowns count; never zero-filled). With official, fixed judgments an unjudged document counts as
    non-relevant and the unjudged share is reported, never changing the verdict.
 3. Per group (fixed by query labels, never by input order): paired sign-flip randomization test
    on the per-query delta of the primary metric, Holm-adjusted over the collection's groups, a
@@ -63,6 +64,9 @@ from .types import (
 )
 
 ALL_GROUP = "all"
+# Topical queries ask for every file about a topic: their pooled labels are complete only near
+# the pooled depth, so each arm's own unjudged share is bounded per topical group (design 8).
+TOPICAL_KIND = "topical"
 
 
 class BaselineError(ValueError):
@@ -467,6 +471,21 @@ def compare(c: Collection, cfg: QualityConfig, baseline: RunRecord | None,
         reasons.append(f"labels incomplete: {differing_share:.1%} of top-10 pairs are unjudged in "
                        f"only one arm (threshold {cfg.max_differing_unjudged_share:.0%}); "
                        f"{len(requests)} unjudged pairs need judgment, then rescore both arms")
+    topical = topical_unjudged(c, cfg, baseline.results, candidate.results)
+    if topical:
+        unjudged["topical_groups"] = {g: {k: v for k, v in s.items() if k != "pairs"}
+                                      for g, s in topical.items()}
+    over = {g: s for g, s in topical.items()
+            if max(s["baseline_share"], s["candidate_share"]) > cfg.max_differing_unjudged_share}
+    if over:
+        outcome = Outcome.INCONCLUSIVE
+        pairs = {p for s in over.values() for p in s["pairs"]}
+        requests = sorted(set(requests) | pairs)
+        reasons += [f"labels incomplete in topical group {g}: top-10 unjudged share baseline "
+                    f"{s['baseline_share']:.1%}, candidate {s['candidate_share']:.1%} (threshold "
+                    f"{cfg.max_differing_unjudged_share:.0%} per arm, shared unknowns included)"
+                    for g, s in sorted(over.items())]
+        reasons.append(f"{len(pairs)} unjudged topical pairs need judgment, then rescore both arms")
     if not reasons:
         regressed = [g for g in groups if g.outcome == GROUP_REGRESSED]
         undecided = [g for g in groups if g.outcome == GROUP_INCONCLUSIVE]
@@ -485,6 +504,24 @@ def compare(c: Collection, cfg: QualityConfig, baseline: RunRecord | None,
     return Comparison(Verdict(outcome, tuple(reasons), tuple(groups)), c, cfg, baseline,
                       candidate, per_query, differences, confounds, affected, notes, unjudged,
                       requests)
+
+
+def topical_unjudged(c: Collection, cfg: QualityConfig, baseline: Iterable[QueryResult],
+                     candidate: Iterable[QueryResult]) -> dict[str, dict]:
+    """Per topical group, each arm's own top-10 unjudged share (unknowns both arms share count)."""
+    topical = {q for q, t in c.queries.items() if t.groups.get("kind") == TOPICAL_KIND}
+    out: dict[str, dict] = {}
+    for arm, results in (("baseline", baseline), ("candidate", candidate)):
+        by_group: dict[str, list[QueryResult]] = {}
+        for r in results:
+            if r.qid in topical:
+                by_group.setdefault(qcoll.query_group(c, r.qid, cfg.groups), []).append(r)
+        for g, rs in by_group.items():
+            unj, slots, pairs = scoring.unjudged_top(c.judgments, rs)
+            entry = out.setdefault(g, {"baseline_share": 0.0, "candidate_share": 0.0, "pairs": []})
+            entry[f"{arm}_share"] = unj / max(1, slots)
+            entry["pairs"] = sorted(set(entry["pairs"]) | pairs)
+    return out
 
 
 def _check_stored_metrics(stored: Mapping, rescored: Mapping, c: Collection) -> list[str]:

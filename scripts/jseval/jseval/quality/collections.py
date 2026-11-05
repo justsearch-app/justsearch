@@ -89,8 +89,13 @@ class QualityConfig:
     # Query kinds stored without judgments until a later labelling pass (``groups.kind``).
     # They are excluded from scoring and counted as pending; a labelled kind leaves this list.
     pending_kinds: tuple[str, ...] = ()
+    # Query ids kept with their judgments but excluded from scoring, each with its recorded
+    # reason (a topical query whose pool holds no relevant document: never an invented positive).
+    excluded: Mapping[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
+        if any(not isinstance(r, str) or not r.strip() for r in self.excluded.values()):
+            raise CollectionError("every excluded query needs a recorded reason")
         if self.layout not in ("opaque", "as-is"):
             raise CollectionError(f"unknown collection layout: {self.layout!r}")
         if self.witness_formats is not None and (not self.witness_formats or
@@ -131,7 +136,8 @@ class QualityConfig:
                    most_changed=int(rep.get("most_changed", 10)), top=int(rep.get("top", 5)),
                    layout=d.get("layout", "opaque"),
                    witness_formats=tuple(d["witness_formats"]) if "witness_formats" in d else None,
-                   pending_kinds=tuple(d.get("pending_kinds") or ()))
+                   pending_kinds=tuple(d.get("pending_kinds") or ()),
+                   excluded=dict(d.get("excluded") or {}))
 
 
 def known_aliases() -> list[str]:
@@ -552,12 +558,13 @@ def pending_queries(c: Collection, cfg: QualityConfig) -> list[str]:
 
 
 def scored_collection(c: Collection, cfg: QualityConfig) -> Collection:
-    """``c`` without its pending queries: the queries baseline, check and score measure.
+    """``c`` without its pending and excluded queries: the queries baseline, check and score
+    measure.
 
     Documents, content and metadata are unchanged, so the index key and data-folder owner
     (document identity, K1) are the same as for the stored collection.
     """
-    pending = set(pending_queries(c, cfg))
+    pending = set(pending_queries(c, cfg)) | set(cfg.excluded)
     if not pending:
         return c
     return Collection(c.name, c.language, {q: t for q, t in c.queries.items() if q not in pending},

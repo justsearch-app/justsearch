@@ -127,7 +127,7 @@ with evidence in `real-use-queries/excluded.json`:
 The core witness refuses parser failures and truncated extractions. OCR
 truncation depends on load, because the PDF OCR has a 30-second per-document
 budget. The second build truncated two more large PDFs (109 and 64 pages,
-recorded under `second_build`) and was not adopted. Both are under the page cap.
+recorded under `second_build`) and was not adopted. Both have 40 or more pages, so the page cap excludes them.
 The decision also excludes any OCR'd PDF whose OCR took 15 s or more. Neither
 build's engine log records per-document OCR time, so that rule excluded
 nothing. Clusters (`clusters.json`) were computed on the 2,916-file population.
@@ -264,3 +264,87 @@ partial and vague queries (rounds `triviality-1` to `triviality-6` in
 `generation.jsonl`) and then dropped 4 rank-1 partial queries by a seed. The
 drops are undone. The regenerations stay: 55 of the 187 known-item queries are
 the accepted output of such a round, and the record shows which ones.
+
+### Topical labels
+
+Topical queries ask for all files about a topic. `jseval.quality.topical_labels`
+labels them; its steps are `extract`, `pool`, `excerpts`, `judge`, `project`,
+`sample`, `accept` and `freeze`, each resumable. Document text, excerpts,
+prompts, replies, model grades before the freeze and the user's sheets stay in
+`~/.cache/justsearch-quality/real-use-labels/`, never in Git.
+
+```sh
+source ~/.cache/justsearch-quality/real-use-queries/gpu.env
+python -m jseval quality prepare real-use                      # background, pausable
+python -m jseval.quality.topical_labels extract                # text of the prepared index
+python scripts/dev/admission.py exclusive --purpose "real-use pools" --timeout 600 -- \
+  python -m jseval.quality.topical_labels pool                 # scoring window, like gate
+python -m jseval.quality.topical_labels excerpts
+python -m jseval.quality.topical_labels judge --max-calls 10 --phase calibration
+python -m jseval.quality.topical_labels project
+```
+
+- **Pools.** Per topical query: the union of the top 10 of three pipelines on
+  one prepared index, each response verified by its trace. Keyword search
+  alone is exactly the gate's request. Dense retrieval alone has every other
+  stage off. The Search window's refined request is the hybrid default, valid
+  as `quality check` accepts it (by-design leg and reranker skips only). The
+  pool adds the members of the topic group the query was written from (at
+  most 10). Each pair records which pipeline retrieved it at which rank, and
+  whether it is a group member. A pipeline that delivered fewer than 10 files
+  is recorded `short`; one without a verified ranking after three attempts is
+  recorded `failed` with its reason, never as an empty result. The pool's
+  generation is the digest of its content.
+- **Excerpts.** One per pair, from the pooled index's extracted text: the
+  file name, the first ~600 characters and the two non-overlapping
+  ~600-character windows sharing the most query terms (whole tokens of the
+  existing tokenizer; this codebase has no German compound-splitting rule), at
+  most ~1,800 characters of text. Judge and user see exactly this text, marked
+  as data. Limit: labels are agreement on the excerpt; relevance outside it
+  can be missed.
+- **Judge.** `claude-opus-5-5` through `claude -p` on the subscription only,
+  with the generator's refusal of API keys and provider overrides. Up to five
+  files per call in seeded random order, each graded independently 0-3
+  (`prompts/topical-judge.txt`). Each judgment is checkpointed per pair and
+  bound to the query text, document content, extracted text, excerpt, pool
+  generation, model and prompt template; a resumed run reuses it only when all
+  of these are equal. A kill during a write loses only the torn last pair.
+  `judge` stops with its reason: `paused` (create `PAUSE` in the work folder,
+  or send SIGTERM), `call limit reached`, `time budget reached`, `quota`,
+  `timeout` or `stalled` (three consecutive failed calls). Judging the whole
+  pool starts only after its projected calls and wall time (`project`) are
+  confirmed.
+- **Labels.** Binary at the fixed cutoff grade >= 2 (relevant 1, else 0),
+  judged zeros kept; raw grades and pool provenance go to
+  `real-use-queries/topical-labels.json` at the freeze.
+- **Agreement sample**, fixed before any user grade: 150 pairs from the
+  complete graded pool (seed 20261105), at most 2 per query, 75 the model
+  calls relevant and 75 not, each half split by query language in proportion,
+  at least 30 graded 1 or 2. Pair ids and order carry no stratum. The sheet is
+  plain text: one block per pair with the question "Would you want this file
+  among the results for this search?" and `Answer:` yes, no or unsure. The
+  parser refuses missing, duplicate or altered blocks and reports unanswered
+  ones.
+- **Acceptance**, fixed: agreement is the unrounded share of answered yes/no
+  pairs where the user's answer equals the model's label. PASS at >= 0.80.
+  Fewer than 120 yes/no answers, or a 95% Wilson interval that contains 0.80,
+  draws a second batch of 150 new pairs with the same quotas; the decision is
+  then made on all yes/no answers by the same rule, never with a third batch.
+  A FAIL allows one rubric or prompt revision, a full re-label and a new
+  sample of new pairs; a second FAIL stops. The report adds the confusion
+  matrix, false positives and negatives by language and grade, unsure answers
+  and a weighted population estimate (information only).
+- **Freeze**, only after a PASS on exactly the current model labels: binary
+  qrels for every topical pair through the collection writer, counts and grade
+  histogram in the config, `topical` removed from `pending_kinds`. Known-item
+  labels and document identity are unchanged, so the prepared index is
+  reused. A query whose pool holds no relevant file is excluded from scoring
+  with the recorded reason `no relevant document in pool` (config `excluded`),
+  never given an invented positive. Rerunning the query writer keeps the
+  topical labels of every query whose text is unchanged.
+
+Once no query kind awaits labels, real-use joins the default `quality check`
+and `full-suite` collections. Later comparisons keep the labels frozen: in a
+topical group a comparison is INCONCLUSIVE when either arm's top-10 unjudged
+share exceeds the pooled tolerance (`unjudged.max_differing_share`, counted
+per arm with shared unknowns), and the unjudged pairs are listed for judgment.
