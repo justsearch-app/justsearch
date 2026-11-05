@@ -246,3 +246,14 @@ env -u DISPLAY -u WAYLAND_DISPLAY node scripts/dev/java-prepush.mjs --unreferenc
   All edits remain uncommitted; the shared dev stack and acceptance records are untouched.
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1aacc-6e3d-7eb2-9ad1-e9bef6b57e35",
+  "verdict": "accept",
+  "digest": "sha256:edf6491b881fc205a96944f0d839e13f0d979fea9ba9807ac96d67a5fb324995",
+  "note": "Codex acceptor on 242d9d2d14: entries 1 (13 repair selectors fail before by assertion, 27 cases pass) and 2 (15 preservation cases pass before and after) accept; evidence produced by run-evidence.mjs, digests validated. Behaviour: Codex verifier-2 01a1aa97 on a8d8a97405 (D1-D5, R2/policy, R3, R6 fail before, pass after; 49 focused cases)."
+}
+```
