@@ -1181,6 +1181,8 @@ metadata, shared dev stack or another session's service is used. No existing ass
 }
 ```
 
+## Acceptance records
+
 ```json
 {
   "kind": "acceptance",
