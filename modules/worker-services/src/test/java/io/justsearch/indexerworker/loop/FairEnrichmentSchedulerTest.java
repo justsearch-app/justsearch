@@ -680,6 +680,67 @@ class FairEnrichmentSchedulerTest extends LuceneExecutorTestBase {
         "no probe-specific five-writing-batch publication commit");
   }
 
+  @Test
+  void D5b_denseChunkAcquisitionHoldUnderBge() throws Exception {
+    try (var h = new Harness()) {
+      h.enable("dense"); h.bgeEnabled = true;
+      h.seed("parent", "body", Map.of(SchemaFields.SPLADE_STATUS, "COMPLETED_EMPTY"));
+      h.chunk("chunk", "parent", "body", Map.of(SchemaFields.SPLADE_STATUS, "COMPLETED_EMPTY",
+          SchemaFields.CHUNK_EMBEDDING_STATUS, "PENDING", SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT, "2"));
+      h.refresh(); h.unavailable.set(true);
+      h.scheduler.runIdleCycle();
+      assertEquals(1, h.failedCalls.get(), "one acquisition was attempted");
+      busy(h, 1); h.scheduler.runIdleCycle();
+      assertEquals(1, h.failedCalls.get(), "the independent dense provider's acquisition hold covers dense chunks with BGE configured");
+      assertEquals("2", h.value("chunk", SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT));
+    }
+  }
+
+  @Test
+  void D5b_bgeHoldDoesNotBlockIndependentDenseChunk() throws Exception {
+    try (var h = new Harness()) {
+      h.enable("bge"); h.denseEnabled = true;
+      h.seed("parent", "body", Map.of(SchemaFields.SPLADE_STATUS, "PENDING"));
+      h.chunk("chunk", "parent", "body", Map.of(SchemaFields.SPLADE_STATUS, "COMPLETED_EMPTY",
+          SchemaFields.CHUNK_EMBEDDING_STATUS, "PENDING"));
+      h.refresh(); h.unavailable.set(true);
+      h.scheduler.runIdleCycle(); h.refresh();
+      assertEquals(1, h.failedCalls.get(), "BGE acquisition failed once");
+      busy(h, 2); h.scheduler.runIdleCycle(); h.refresh();
+      assertEquals("COMPLETED", h.value("chunk", SchemaFields.CHUNK_EMBEDDING_STATUS),
+          "BGE provider hold must not hold the separate healthy dense provider");
+    }
+  }
+
+  @Test
+  void D11_notDueBusyCallReportsIdle() throws Exception {
+    try (var h = new Harness()) {
+      h.denseEnabled = true;
+      h.seed("parent", "body", Map.of(SchemaFields.EMBEDDING_STATUS, "PENDING")); h.refresh();
+      busy(h, 1);
+      assertEquals("active", OperationalMetrics.getInstance().getBackfillMode());
+      busy(h, 1);
+      assertEquals("idle", OperationalMetrics.getInstance().getBackfillMode(), "the last call admitted no lane turn");
+    }
+  }
+
+  @Test
+  void D3_globalEligibilityGapDoesNotReintroduceCatchupBurst() throws Exception {
+    try(var h=new Harness()) {
+      h.sparseEnabled=true; h.nerEnabled=true;
+      when(h.config.rag().chunkSpladeEnabled()).thenReturn(false);
+      seedSparseAndNer(h,240); var turns=h.observe(); busy(h,1); busy(h,2);
+      h.sparseEnabled=false;
+      for(int i=3;i<=8;i++)busy(h,i);
+      h.nerEnabled=false; h.scheduler.runIdleCycle();
+      h.sparseEnabled=true; h.nerEnabled=true; turns.clear();
+      for(int i=9;i<=14;i++)busy(h,i);
+      assertEquals(List.of("SPARSE_PARENT","NER","SPARSE_PARENT","NER","SPARSE_PARENT","NER"),
+        turns.stream().map(FairEnrichmentSchedulerTest::lane).toList(),
+        "an all-ineligible observation cannot resurrect catch-up credit for a lane absent while its peer worked");
+    }
+  }
+
   // ==================== Helpers ====================
 
   private static void busy(Harness h, long call) {

@@ -164,7 +164,7 @@ Scope:
 | **Backfill Pacing (tempdoc 710 Wave-1.5 Move 4)** | | | |
 | `JUSTSEARCH_BACKFILL_POLL_BATCH_SIZE` | `justsearch.backfill.poll_batch_size` | Int | Advanced/tuning knob. Primary-indexing job-queue poll batch size (default 16 — tempdoc 278 Phase 1 item 1b: raised from 1 to amortize per-batch queue overhead). |
 | `JUSTSEARCH_BACKFILL_EMBEDDING_BATCH_SIZE` | `justsearch.backfill.embedding_batch_size` | Int | Advanced/tuning knob. Doc-count per embedding backfill batch, parent and chunk (default 100). |
-| `JUSTSEARCH_BACKFILL_NER_BATCH_SIZE` | `justsearch.backfill.ner_batch_size` | Int | Advanced/tuning knob. Doc-count per NER backfill batch (default 100). |
+| `JUSTSEARCH_BACKFILL_NER_BATCH_SIZE` | `justsearch.backfill.ner_batch_size` | Int | Retained batch setting (default 100). The scheduler runs NER one document per turn; this setting no longer applies to scheduled NER. |
 | `JUSTSEARCH_BACKFILL_DISAMBIGUATION_BATCH_SIZE` | `justsearch.backfill.disambiguation_batch_size` | Int | Advanced/tuning knob. Doc-count per disambiguation backfill batch (default 500). |
 | `JUSTSEARCH_BACKFILL_SPLADE_BATCH_SIZE` | `justsearch.backfill.splade_batch_size` | Int | Advanced/tuning knob. Doc-count per idle-branch SPLADE backfill batch (default 200). |
 | `JUSTSEARCH_BACKFILL_ENRICHMENT_INTERLEAVE_BATCH_SIZE` | `justsearch.backfill.enrichment_interleave_batch_size` | Int | Advanced/tuning knob. Document count cap of one busy enrichment lane turn (dense parent, dense chunk, sparse parent, sparse chunk or NER) during primary indexing (default 10). A count cap, not a time quantum. BGE-M3 keeps its own `bge_m3_interleave_batch_size` cap. |

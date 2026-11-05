@@ -13,6 +13,7 @@ dense-parent position, replacing dense parent and both sparse lanes), dense chun
 sparse chunk and NER. A turn runs one E4a lane unit, charged `max(measured, 10 ms)` with
 foreground pacing waits excluded. Ties go to the first tied lane after a round-robin pointer.
 A lane that (re)enters eligibility gets `max(S_i, min S_j)` over the lanes that stayed eligible.
+When none stayed eligible, the last eligible minimum survives the gap.
 Busy calls admit one turn at the canonical interleave interval; pending ingestion no longer
 hard-stops them. An idle cycle repeats turns until its deadline, a 500-turn bound (its budget at
 the charge floor), a hard stop, pending ingestion after the admitted unit, or no lane that can
@@ -74,7 +75,9 @@ orchestrator's on a committed candidate.
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BackfillResourceAdmissionTest.java"
       ],
       "class": "Adaptation",
-      "moved": ["rename"],
+      "moved": [
+        "rename"
+      ],
       "whatMoved": "The busy entry point runInterleavedSplade is renamed runInterleavedEnrichment and the resolved accessors spladeInterleave* are renamed enrichmentInterleave*. Inputs, preconditions, observations and expected values are unchanged.",
       "sources": [
         {
@@ -91,7 +94,9 @@ orchestrator's on a committed candidate.
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/BackfillSchedulerTightLoopTest.java"
       ],
       "class": "Adaptation",
-      "moved": ["input re-encoding"],
+      "moved": [
+        "input re-encoding"
+      ],
       "whatMoved": "The never-draining population is also returned through the parent-only (non-chunk) query, the population the separate sparse-parent lane selects. The three containments, their bounds and expected outcomes are unchanged; the class comment records that they now bind the idle cycle of lane turns.",
       "sources": [
         {
@@ -176,7 +181,7 @@ orchestrator's on a committed candidate.
         {
           "kind": "owner-words",
           "location": "task redesign-e4b request",
-          "quote": "Absolute dense-share reservation | `BackfillSchedulerSlowBatchTest:663`; `CombinedEnrichmentLongDocumentTest:509–573`. Replace reservation-specific assertions with opportunity/service-time assertions."
+          "quote": "Absolute dense-share reservation | `BackfillSchedulerSlowBatchTest:663`; `CombinedEnrichmentLongDocumentTest:509\u2013573`. Replace reservation-specific assertions with opportunity/service-time assertions."
         },
         {
           "kind": "owner-words",
@@ -202,7 +207,12 @@ orchestrator's on a committed candidate.
         {
           "kind": "owner-words",
           "location": "task redesign-e4b request",
-          "quote": "**Do not substitute the individual dense parent handler for combined processing.** Individual processing performs ordinary batch embedding (EmbeddingBackfillOps.java:153). Combined owns late-chunking single-pass classification, retained fallback routes, resumable windows and pooling (`Combined:767–1055`). Move that behavior into the common dense unit implementation."
+          "quote": "extract the dense kernel (single-pass classification, retained routes, resumable windows, pooling) from the combined op into a common dense unit; expose bounded lane operations"
+        },
+        {
+          "kind": "owner-words",
+          "location": "task redesign-e4b request",
+          "quote": "both existing dense paths (combined and individual) run the common kernel before E4a merges."
         }
       ],
       "conflictSearch": "decision records searched for a conflict: none. There is one dense lane now, so the dense-only configuration also classifies once under late chunking and resumes the same windows. The individual case expects one classification and the combined case's turn sequence. The pooling case never expects single-pass when late chunking is off. Reference pooling, sparse preservation, offsets and stored vectors are unchanged."
@@ -224,7 +234,7 @@ orchestrator's on a committed candidate.
         {
           "kind": "owner-words",
           "location": "task redesign-e4b request",
-          "quote": "Work-set-signature stall detector | `BackfillSchedulerStallDetectionTest:262–334`; replace selection identity with eligible-service/advancement evidence."
+          "quote": "Work-set-signature stall detector | `BackfillSchedulerStallDetectionTest:262\u2013334`; replace selection identity with eligible-service/advancement evidence."
         }
       ],
       "evidence": "gates/test-intent/evidence/redesign-e4b.json",
@@ -275,6 +285,38 @@ orchestrator's on a committed candidate.
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/IndexConfigurationProjectionTest.java#canonicalAndLegacyEnrichmentInterleaveNamesProjectOneEffectiveValue"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/FairEnrichmentSchedulerTest.java"
+      ],
+      "class": "New",
+      "behaviour": "The re-entry service floor survives a call with no eligible lanes. A BGE-M3 acquisition hold never blocks the separate dense-chunk provider; a dense-chunk acquisition failure under BGE-M3 stays held through busy and idle calls without row retry charge. A not-due busy call reports idle after an active call.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "location": "task redesign-e4b request",
+          "quote": "the re-entry floor is the minimum charged service over all lanes at the last call where any lane was eligible (kept when no lane is eligible), so a global gap cannot create a burst"
+        },
+        {
+          "kind": "owner-words",
+          "location": "task redesign-e4b request",
+          "quote": "holds are keyed by the provider that lane's operation actually calls (dense chunk -> dense provider even when BGE-M3 is configured; BGE-M3 lane -> BGE-M3 provider), and a hold is recorded against that provider so it is not re-acquired until expiry or replacement"
+        },
+        {
+          "kind": "owner-words",
+          "location": "task redesign-e4b request",
+          "quote": "every scheduler call, due or not, sets the gauge from that call (a call that admits no turn reports idle)"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/redesign-e4b-verifier-repair.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/FairEnrichmentSchedulerTest.java#D3_globalEligibilityGapDoesNotReintroduceCatchupBurst",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/FairEnrichmentSchedulerTest.java#D5b_bgeHoldDoesNotBlockIndependentDenseChunk",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/FairEnrichmentSchedulerTest.java#D5b_denseChunkAcquisitionHoldUnderBge",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/FairEnrichmentSchedulerTest.java#D11_notDueBusyCallReportsIdle"
+      ],
+      "repaired": true
     }
   ]
 }
@@ -283,10 +325,10 @@ orchestrator's on a committed candidate.
 ## Evidence commands
 
 Run sequentially in the background under `js-gradle-slot`. The evidence runner writes these
-files; the builder is authorized to regenerate them for this selector repair. The two isolated new files,
-`FairEnrichmentSchedulerTest` and `EnrichmentInterleaveAliasTest`, are exempt from entries; their
-fail-before is listed here for the verifier. Run in a disposable shared clone inside `$TMPDIR`
-with the current test and changeset edits copied in; copy the two generated evidence files back
+files; the orchestrator runs these commands after the builder hands back. The two original isolated new files,
+`FairEnrichmentSchedulerTest` and `EnrichmentInterleaveAliasTest`, have their original fail-before listed here for the verifier. The four verifier-repair checks
+in `FairEnrichmentSchedulerTest` have their own entry and pre-repair evidence command below. Run in a disposable shared clone of the final candidate commit inside `$TMPDIR`
+with any current test and changeset edits copied in; copy the generated evidence files back
 to the source worktree. The runner creates its before checkout in `$TMPDIR` against that
 clone, so Git metadata and build folders stay isolated from the source repository.
 
@@ -352,6 +394,26 @@ env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot node scripts/governance/gates/t
   --check modules/configuration/src/test/java/io/justsearch/configuration/resolved/ResolvedConfigBuilderTest.java \
   --check modules/configuration/src/test/java/io/justsearch/configuration/resolved/ConfigApplyScopesTest.java#packagedRegisterIsTheRepositoryRegister \
   --check modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/EnrichmentPublicationReceiptTest.java
+```
+
+The four verifier-repair checks were transplanted into shared clones with separate build folders.
+All four fail by assertion on pre-repair HEAD `481b18c047f30168229559b3e4bf0bbe142dedc3`:
+the global gap gives sparse six consecutive turns, the BGE hold leaves the dense chunk pending,
+the dense provider is acquired three times, and the not-due busy call leaves the gauge active.
+On base `7a5ee0004c1dd2b3e7ed7cd71e3fc61eb02f7329`, the BGE-hold independence check passes;
+the dense acquisition hold, global-gap and not-due telemetry checks fail by assertion. The last
+two base failures reflect the absence of turn observation and the former gauge semantics,
+respectively. No evidence JSON is written by the builder.
+
+```bash
+env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot node scripts/governance/gates/test-intent/run-evidence.mjs \
+  --out gates/test-intent/evidence/redesign-e4b-verifier-repair.json \
+  --before 481b18c047f30168229559b3e4bf0bbe142dedc3 \
+  --before-root "$TMPDIR" \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/FairEnrichmentSchedulerTest.java#D3_globalEligibilityGapDoesNotReintroduceCatchupBurst \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/FairEnrichmentSchedulerTest.java#D5b_bgeHoldDoesNotBlockIndependentDenseChunk \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/FairEnrichmentSchedulerTest.java#D5b_denseChunkAcquisitionHoldUnderBge \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/FairEnrichmentSchedulerTest.java#D11_notDueBusyCallReportsIdle
 ```
 
 Parameterized checks include their method signature in each invocation name, and the stall

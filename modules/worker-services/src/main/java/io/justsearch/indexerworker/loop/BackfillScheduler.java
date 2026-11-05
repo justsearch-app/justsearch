@@ -54,8 +54,9 @@ import org.slf4j.LoggerFactory;
  * pointer that advances past each chosen lane. Every admitted turn is charged {@code max(measured
  * time, 10 ms)}: wall time from the unit's selection to its publication receipt, failed and
  * zero-completion attempts included, foreground pacing waits excluded. A lane that (re)becomes
- * eligible gets {@code S_i = max(S_i, min S_j)} over the lanes that stayed eligible, so debt is
- * kept and catch-up bursts are impossible. The ledger, cursors, retained routes and holds are in
+ * eligible gets {@code S_i = max(S_i, min S_j)} over the lanes that stayed eligible, retaining
+ * the last eligible minimum across a global eligibility gap. Debt is kept and catch-up bursts
+ * are impossible. The ledger, cursors, retained routes and holds are in
  * memory; a restart starts a fresh ledger.
  *
  * <p><b>Bound.</b> While lane {@code i} stays continuously eligible, every other lane receives
@@ -104,6 +105,7 @@ public final class BackfillScheduler {
   private static final List<Lane> ROTATION = List.of(Lane.values());
   private final Map<Lane, Long> service = new EnumMap<>(Lane.class);
   private final Set<Lane> eligible = EnumSet.noneOf(Lane.class);
+  private long reentryFloor;
   private final Map<Lane, Integer> unsuccessful = new EnumMap<>(Lane.class);
   /** Round-robin tie pointer: index into {@link #ROTATION}. */
   private int nextLane;
@@ -305,9 +307,9 @@ public final class BackfillScheduler {
    * while ingestion remains pending (a soft yield, not a veto).
    */
   public void runInterleavedEnrichment(long now) {
+    OperationalMetrics.getInstance().recordBackfillMode("idle");
     if (now - lastEnrichmentInterleaveTime < pacing().enrichmentInterleaveIntervalMs()) return;
     if (hardStopBackfillWork()) {
-      OperationalMetrics.getInstance().recordBackfillMode("idle");
       return;
     }
     lastEnrichmentInterleaveTime = now;
@@ -340,6 +342,7 @@ public final class BackfillScheduler {
     long charge = Math.max(MIN_CHARGE_NANOS, monotonicNanos.getAsLong() - start
         - (indexingPacing.yieldedNanosOnCurrentThread() - yielded));
     service.merge(chosen, charge, Long::sum);
+    reentryFloor = eligible.stream().mapToLong(this::charged).min().orElse(reentryFloor);
     enrichmentSelection.served(outcome.accounting());
     recordStageOutcome(switch (chosen) {
       case DENSE_PARENT, DENSE_CHUNK -> BatchTimingKeys.EMBED;
@@ -380,17 +383,16 @@ public final class BackfillScheduler {
   private Lane chooseLane(Set<Lane> finished) {
     Set<Lane> current = EnumSet.noneOf(Lane.class);
     for (Lane lane : ROTATION) if (laneEligible(lane)) current.add(lane);
-    // The minimum over lanes that stayed eligible; when every lane enters together, over all of
-    // them, so their existing debt relative to each other is kept.
+    // Retain the last eligible minimum when no lane stayed eligible, including across empty calls.
     Set<Lane> stayed = EnumSet.copyOf(current);
     stayed.retainAll(eligible);
-    long minimum = (stayed.isEmpty() ? current : stayed).stream()
-        .mapToLong(this::charged).min().orElse(0L);
+    long minimum = stayed.stream().mapToLong(this::charged).min().orElse(reentryFloor);
     for (Lane lane : current) {
       if (!eligible.contains(lane)) service.put(lane, Math.max(charged(lane), minimum));
     }
     eligible.clear();
     eligible.addAll(current);
+    reentryFloor = current.stream().mapToLong(this::charged).min().orElse(reentryFloor);
     Lane chosen = null;
     for (int offset = 0; offset < ROTATION.size(); offset++) {
       Lane lane = ROTATION.get((nextLane + offset) % ROTATION.size());
@@ -447,8 +449,9 @@ public final class BackfillScheduler {
       case NER -> ner != null && ner.isAvailable() && stageAllowed(Stage.NER)
           && unitAllowed(LoopPacingPolicy.requiresGpu(ner.isGpuAvailable(), ner.getOrtCudaStatus()));
       // Held if its provider is held or any stage it represents has a storage hold.
-      case BGE_M3 -> bge && sparseUnitAllowed() && stageAllowed(Stage.SPLADE)
-          && stageAllowed(Stage.EMBED) && stageAllowed(Stage.CHUNK_EMBED);
+      case BGE_M3 -> bge && sparseUnitAllowed() && acquisitionAllowed(bgeM3EncoderSupplier.get())
+          && storageAllowed(Stage.SPLADE) && storageAllowed(Stage.EMBED)
+          && storageAllowed(Stage.CHUNK_EMBED);
     };
     if (!allowed) return false;
     String field = switch (lane) {
@@ -530,6 +533,7 @@ public final class BackfillScheduler {
     densePublished.clear();
     service.clear();
     eligible.clear();
+    reentryFloor = 0;
     unsuccessful.clear();
     nextLane = 0;
     // Dirty publication state survives a profiling reset until a successful commit.
@@ -556,7 +560,8 @@ public final class BackfillScheduler {
   private Object provider(Stage stage) {
     BgeM3Encoder bge = bgeM3EncoderSupplier.get();
     return switch (stage) {
-      case EMBED, CHUNK_EMBED -> bge != null ? bge : embeddingLifecycle.embeddingProvider();
+      case EMBED -> bge != null ? bge : embeddingLifecycle.embeddingProvider();
+      case CHUNK_EMBED -> embeddingLifecycle.embeddingProvider();
       case SPLADE -> bge != null ? bge : spladeEncoderSupplier.get();
       case NER -> nerServiceSupplier.get();
     };
@@ -574,13 +579,19 @@ public final class BackfillScheduler {
   }
 
   private boolean stageAllowed(Stage stage) {
+    return storageAllowed(stage) && acquisitionAllowed(provider(stage));
+  }
+
+  private boolean storageAllowed(Stage stage) {
     var state = backoff(stage);
+    return state.failures == 0 || monotonicNanos.getAsLong() >= state.retryNanos;
+  }
+
+  private boolean acquisitionAllowed(Object provider) {
     acquisitionBackoffs.keySet().removeIf(held -> java.util.Arrays.stream(Stage.values())
         .noneMatch(candidate -> provider(candidate) == held));
-    var acquisition = acquisitionBackoffs.get(provider(stage));
-    long now = monotonicNanos.getAsLong();
-    return (state.failures == 0 || now >= state.retryNanos)
-        && (acquisition == null || now >= acquisition.retryNanos);
+    var acquisition = acquisitionBackoffs.get(provider);
+    return acquisition == null || monotonicNanos.getAsLong() >= acquisition.retryNanos;
   }
 
   private void recordBackfillResult(Stage stage, boolean success) {
