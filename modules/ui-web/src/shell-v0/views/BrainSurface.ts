@@ -1465,10 +1465,15 @@ export class BrainSurface extends JfElement {
   }
 
   private packagePresent(id: string): boolean {
+    const files = this.modelPresence?.packages?.find(p => p.id === id);
+    const onDisk = files ? files.complete || (id === 'chat' && (files.presentVariantFiles?.length ?? 0) > 0) : undefined;
+    // Once no download runs, what is on disk now decides: a finished run's package rows can still
+    // say "installed" for files removed since, and trusting them would switch a removed part on
+    // without asking first (design D4).
+    if (onDisk !== undefined && this.installStatus?.state !== 'running') return onDisk;
     const progress = this.installPlanPending() ? undefined : this.installStatus?.packages?.find(p => p.packageId === id);
     if (progress?.state === 'installed') return true;
-    const files = this.modelPresence?.packages?.find(p => p.id === id);
-    if (files) return files.complete || (id === 'chat' && (files.presentVariantFiles?.length ?? 0) > 0);
+    if (onDisk !== undefined) return onDisk;
     return this.planPreview?.components?.some(c => c.id === id && c.state === 'installed') === true;
   }
 
@@ -1882,7 +1887,7 @@ export class BrainSurface extends JfElement {
     const view = this.downloadedFiles;
     if (!view) return html`<p class="advanced-note">Checking the files on this computer…</p>`;
     const running = this.removalRunning();
-    const rows = (view.parts ?? []).filter(p => p.state === 'downloaded'
+    const rows = (view.parts ?? []).filter(p => p.state === 'downloaded' || p.state === 'incomplete'
       || (REMOVABLE_PARTS.has(p.id ?? '') && p.declined === true));
     const removal = view.removal;
     return html`<div class="downloaded-files" data-testid="downloaded-files">
@@ -1896,14 +1901,18 @@ export class BrainSurface extends JfElement {
   private renderDownloadedPart(part: DownloadedPart, running: boolean): TemplateResult {
     const id = part.id ?? '';
     const downloaded = part.state === 'downloaded';
+    // Some files are left, but not every file the part needs: it is not usable (design D4).
+    const incomplete = part.state === 'incomplete';
+    const onDisk = downloaded || incomplete;
     const error = this.removalError?.id === id ? this.removalError.message : null;
     return html`<div class="advanced-row" data-part=${id}>
-        <div>${part.label ?? id}<p>${downloaded ? `${measuredSize(part.sizeOnDiskBytes)} on disk` : 'Not downloaded'}</p></div>
+        <div>${part.label ?? id}<p>${downloaded ? `${measuredSize(part.sizeOnDiskBytes)} on disk`
+          : incomplete ? `Incomplete, not usable · ${measuredSize(part.sizeOnDiskBytes)} on disk` : 'Not downloaded'}</p></div>
         <div>
-          ${downloaded && part.removable ? html`<button type="button" data-remove=${id}
+          ${onDisk && part.removable ? html`<button type="button" data-remove=${id}
             aria-expanded=${this.removalConfirm === id ? 'true' : 'false'} ?disabled=${running}
             @click=${() => this.openRemoval(id)}>${icon({ name: 'trash-2', size: 14 })} Remove files</button>` : nothing}
-          ${downloaded && !part.removable && part.reason ? html`<span class="removal-reason">${part.reason}</span>` : nothing}
+          ${onDisk && !part.removable && part.reason ? html`<span class="removal-reason">${part.reason}</span>` : nothing}
           ${!downloaded && REMOVABLE_PARTS.has(id) && part.declined === true ? html`<button type="button"
             data-download-again=${id} ?disabled=${running} @click=${() => void this.downloadAgain(id)}>
             ${icon({ name: 'download', size: 14 })} Download again</button>` : nothing}
@@ -1942,11 +1951,15 @@ export class BrainSurface extends JfElement {
       : removal.state === 'interrupted' ? 'The removal was interrupted'
         : removal.state === 'refused' || removal.state === 'not-removed' ? 'Nothing was removed'
           : 'Some files were not removed';
+    const deleted = removal.deleted ?? [];
     const kept = removal.kept ?? [];
     return html`<div role=${removal.state === 'removed' ? 'status' : 'alert'} tabindex="-1"
         data-testid="removal-outcome">
       <p>${removal.label ?? removal.packageId}: ${headline}. ${removal.message ?? ''}</p>
-      ${kept.length > 0 ? html`<ul class="removal-files">${kept.map(f => html`<li><code>${f.path}</code> · ${f.reason ?? ''}</li>`)}</ul>` : nothing}
+      ${deleted.length > 0 ? html`<p>Deleted:</p>
+        <ul class="removal-files" data-testid="removal-deleted">${deleted.map(f => html`<li><code>${f.path}</code> · ${measuredSize(f.sizeBytes)}</li>`)}</ul>` : nothing}
+      ${kept.length > 0 ? html`<p>Kept:</p>
+        <ul class="removal-files" data-testid="removal-kept">${kept.map(f => html`<li><code>${f.path}</code> · ${f.reason ?? ''}</li>`)}</ul>` : nothing}
     </div>`;
   }
 

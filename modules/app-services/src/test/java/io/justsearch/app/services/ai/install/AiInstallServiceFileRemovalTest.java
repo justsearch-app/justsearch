@@ -208,6 +208,26 @@ final class AiInstallServiceFileRemovalTest {
   }
 
   @Test
+  void anOpenInstalledModelActivationRefusesTheRemovalAndDeletesNothing() throws Exception {
+    compose(s -> {});
+    files.writeChat();
+    String digest = part("chat").previewDigest;
+    // Accepted, running, or continuing after a restart: the recorded-ingestion owner says so.
+    owner.setInstallerActivationOpen(() -> true);
+
+    assertEquals("Downloaded models are being activated - try again when it finishes", part("chat").reason);
+    var refused = assertThrows(AiInstallException.class, () -> owner.removeFiles("chat", digest));
+
+    assertEquals("Downloaded models are being activated - try again when it finishes", refused.getMessage());
+    assertTrue(Files.exists(files.models.resolve("answer.gguf")));
+    assertTrue(Files.exists(files.models.resolve("mmproj-F16.gguf")));
+    assertTrue(savedDeclines().isEmpty());
+
+    owner.setInstallerActivationOpen(() -> false);
+    assertEquals("removed", remove("chat").state, "once the activation has finished the removal runs");
+  }
+
+  @Test
   void aRunningDownloadRefusesTheRemovalAndARemovalRefusesTheDownload() throws Exception {
     compose(s -> {});
     files.writeChat();

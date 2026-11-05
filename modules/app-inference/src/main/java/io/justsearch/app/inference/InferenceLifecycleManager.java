@@ -144,10 +144,10 @@ public class InferenceLifecycleManager
   }
 
   /**
-   * Binds the managed answer server launch fence: a plain reason refuses every managed launch while
-   * the answer model's files are being removed (design D4).
+   * Binds the managed answer server launch fence: every managed launch registers with it while its
+   * process starts, and is refused while the answer model's files are being removed (design D4).
    */
-  public void setManagedLaunchFence(java.util.function.Supplier<Optional<String>> fence) {
+  public void setManagedLaunchFence(ManagedLaunchFence fence) {
     serverOps.setLaunchFence(fence);
   }
 
@@ -1267,12 +1267,16 @@ public class InferenceLifecycleManager
 
   /** Latches a failed start's code; an exit naming a lost device is reported as well. */
   private void latchStartFailure(ModeTransitionException failure) {
+    // A launch refused before any process started (design D4) is not a failed start.
+    if (failure instanceof ManagedLaunchRefusedException) return;
     latchChatFailure(LlamaServerExitException.failedCodeOf(failure));
     if (failure instanceof LlamaServerExitException exit) reportLlamaDeviceLoss(exit.classification());
   }
 
   /** The code a failed start reports, whatever failed: an exit, a health wait or a check. */
   private static FailedCode startFailureCode(Exception failure) {
+    // A refused launch started nothing: there is no start failure to report.
+    if (failure instanceof ManagedLaunchRefusedException) return null;
     return LlamaServerExitException.failedCodeOf(failure);
   }
 

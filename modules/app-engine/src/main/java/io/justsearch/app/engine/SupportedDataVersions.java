@@ -26,6 +26,8 @@ public final class SupportedDataVersions {
         Map.entry("index-generations", io.justsearch.indexerworker.index.IndexGenerationManager.STATE_FORMAT_VERSION),
         Map.entry("entity-clusters", io.justsearch.indexerworker.disambiguation.EntityClusterStore.CURRENT_SCHEMA_VERSION),
         Map.entry("ai-install-attempt-memory", io.justsearch.app.services.ai.install.InstallAttemptMemory.VERSION),
+        Map.entry("ai-model-file-removal-journal",
+            io.justsearch.app.services.ai.install.AiInstallService.MODEL_FILE_REMOVAL_RECORD_VERSION),
         Map.entry("operations-db", io.justsearch.app.observability.operations.OperationSchema.VERSION));
   }
 }

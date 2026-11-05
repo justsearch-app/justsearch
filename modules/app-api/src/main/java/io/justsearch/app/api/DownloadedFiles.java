@@ -27,8 +27,10 @@ public final class DownloadedFiles {
     /** Plain name. */
     public String label = "";
     /**
-     * {@code downloaded} when any of its files is on disk, else {@code not-downloaded};
-     * {@code not-measured} for runtime libraries, which live outside the models folder.
+     * {@code downloaded} when a usable copy is on disk (one variant's model file and every
+     * required file beside it); {@code incomplete} when files are left but not that whole set (not
+     * usable; it can be downloaded again); otherwise {@code not-downloaded}; {@code not-measured}
+     * for runtime libraries, which live outside the models folder.
      */
     public String state = "not-downloaded";
     /** Measured bytes on disk of the files found for this part; {@code null} when unreadable. */

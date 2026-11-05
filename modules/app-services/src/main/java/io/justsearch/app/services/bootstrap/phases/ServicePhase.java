@@ -371,9 +371,11 @@ public final class ServicePhase {
     var removalFence = aiInstallHelper.removalFence();
     var answerRuntime = in.inferenceManager();
     if (answerRuntime != null) {
-      answerRuntime.setManagedLaunchFence(() -> removalFence.removingPart()
-          .filter("chat"::equals)
-          .map(part -> io.justsearch.app.services.ai.install.ModelFileRemovalFence.REMOVING));
+      answerRuntime.setManagedLaunchFence(removalFence.answerServerLaunches());
+    }
+    var recordedIngestion = in.recordedIngestion();
+    if (recordedIngestion != null) {
+      aiInstallHelper.setInstallerActivationOpen(recordedIngestion::installerActivationOpen);
     }
     aiInstallHelper.setRemovalUsageProbe(io.justsearch.app.services.ai.install.ModelFileUsage.probe(
         workerFeatureCache,

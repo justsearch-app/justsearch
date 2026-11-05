@@ -21,10 +21,14 @@ The brief's adopted scenarios are quoted below; choices the scenarios leave open
         "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalTest.java",
         "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/handlers/RemoveAiFilesHandlerTest.java",
         "modules/ui/src/test/java/io/justsearch/ui/api/DownloadedFilesHttpTest.java",
-        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/RemovalModelsFixture.java"
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/RemovalModelsFixture.java",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLaunchRefusalTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalSafetyTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AiInstallServiceRemovalPresenceTest.java",
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedInstallerGenerationBootProjectionTest.java"
       ],
       "class": "New",
-      "behaviour": "Remove files and Download again end to end below the real system: the engine against a temporary models folder only (each ownership rule's refusal, every retained Best match first variant and partial, the answer model with its picture-reading file, capture-before-verify cases, crash recovery, unreadable or future records, rename failure, refusals deleting nothing); the lock in both orders for install, Repair, Download again, pack import, runtime activation and deactivation, settings switch-on and undecline, and the managed answer-server launch; the runtime owners' in-use answers; the install owner with the real settings owner (decline recorded, Repair skips the part, Download again preview and accepted start); the HIGH operation's arguments, refusals and outcomes; the HTTP routes over the production route table; and the page section with its inline confirmation and focus. Native sessions on Windows, real model files and a running Engine are not exercised here.",
+      "behaviour": "Remove files and Download again end to end below the real system: the engine against a temporary models folder only (each ownership rule's refusal, every retained Best match first variant and partial, the answer model with its picture-reading file, capture-before-verify cases, crash recovery, unreadable or future records, rename failure, refusals deleting nothing); the lock in both orders for install, Repair, Download again, pack import, runtime activation and deactivation, settings switch-on and undecline, and the managed answer-server launch (registered while its process starts, scoped to the answer model, raced against a removal); the runtime owners' in-use answers; the install owner with the real settings owner (decline recorded, Repair skips the part, Download again preview and accepted start); the HIGH operation's arguments, refusals and outcomes; the HTTP routes over the production route table; and the page section with its inline confirmation and focus. An open installed-model activation (also one continuing after a restart) refuses the removal. Native sessions on Windows, real model files and a running Engine are not exercised here.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -141,6 +145,78 @@ The brief's adopted scenarios are quoted below; choices the scenarios leave open
           "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
           "choice": "Page: Advanced settings > Downloaded files lists downloaded parts (and declined removable parts) with measured size, Remove files or the reason; the inline confirmation is a labelled group listing each deleted and kept file with size and reason; focus moves to its title and returns to the row's action; a running removal (any window) disables Remove files and every page route that adds files, and the page follows it until it reports what is left.",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
+          "choice": "Repair round 1, ownership boundary: rule 2 also covers the models folder and every folder above it, read without following links (on Windows also without reparse points). If the models folder or any ancestor is a link or junction the whole removal refuses with 'The models folder is a link or inside a linked folder, so nothing can be removed here' and nothing is deleted.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
+          "choice": "Repair round 1, recovery: a removal record is acted on only when it is complete and well formed (version 1, a removable part, known states, a non-null file list with non-null entries, each a relative canonical path inside the models folder outside the removal folder, each captured name of the form .removing/<uuid>.removing). Anything else is the existing unreadable-record report ('The removal record could not be read; files in the removal folder were kept'), never an error response. A recorded file is put back only when every folder on its captured and canonical paths (and above the models folder) is a plain folder and the captured entry is a regular file with one link; otherwise it is kept untouched and reported as 'kept - not touched: its place could not be checked'.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
+          "choice": "Repair round 1, restoring: a captured file goes back only by the atomic no-replace link-then-unlink publication. When that is unavailable nothing else is tried (the existence check plus move fallback is removed), the file stays in the removal folder and is reported. If the captured name cannot be dropped after linking, the file is at its place and its captured name is still reported; nothing at the canonical place is deleted to undo it.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
+          "choice": "Repair round 1, failure handling: when a removal stops (for example a checkpoint that cannot be saved), every unfinished file is settled in memory before the lock is released: captured files are put back where their place is free, otherwise kept in the removal folder, and files never reached are 'kept - the removal stopped before this file'. If the settled record cannot be saved it is held in memory for reports and saved by the next recovery; a record that may still say running is reconciled by the next read, never left running without an owner.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
+          "choice": "Repair round 1, presence: a part is 'downloaded' only when one variant's model file and every required supporting file beside it are on disk (in a candidate folder or the historical folder); files left without that whole set make it 'incomplete' (shown as 'Incomplete, not usable' with its measured size, still offering Remove files where removable and Download again when declined). After a removal the install owner turns the part's retained 'installed' row into a skipped-by-choice row when it is no longer usable, and the page takes current disk presence (models/status) over the run's package rows whenever no download is running.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
+          "choice": "Repair round 1, answer server: each managed launch registers with the removal lock as a user of the answer model's files from just before its process starts until it has started (after that the runtime reports the server running, which keeps refusing the removal). Registrations are per part: a launch neither blocks nor is blocked by a Best match first removal. A launch refused by a removal throws ManagedLaunchRefusedException (reason ALREADY_TRANSITIONING, message 'Removing files - try again when it finishes'), which is never latched as a chat start failure, so the next start after the removal launches normally.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
+          "choice": "Repair round 1, installed-model activation: removal also refuses with 'Downloaded models are being activated - try again when it finishes' while the recorded-ingestion owner has an open installer activation row (accepted, running, or continuing after a restart). Before that row exists the activation's own entry checks the lock, and its accepted execution re-prepares and refuses or goes stale if the files changed.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
+          "choice": "Repair round 1, page: the finished removal outcome lists the deleted files with their sizes as returned, then the kept files with their reasons.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
+          "choice": "Repair round 1, data versions: the removal record's format version (AiInstallService.MODEL_FILE_REMOVAL_RECORD_VERSION, from ModelFileRemoval.JOURNAL_VERSION) is listed in the boot data-version marker (SupportedDataVersions as ai-model-file-removal-journal), as its store-register row's versionSource requires; the register row itself is unchanged.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/s2-remove-files-checks.json",
@@ -186,8 +262,6 @@ The brief's adopted scenarios are quoted below; choices the scenarios leave open
         "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/handlers/RemoveAiFilesHandlerTest.java#pathsAndUnknownPartsAreRefusedBeforeTheOwnerIsAsked",
         "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/handlers/RemoveAiFilesHandlerTest.java#theApprovalNamesWhatIsRemovedAndWhatIsNotTouched",
         "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/handlers/RemoveAiFilesHandlerTest.java#downloadAgainCarriesItsPartsToTheAcceptedStart",
-        "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerLaunchFenceTest.java#aFencedStartLaunchesNothingAndSaysWhy",
-        "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerLaunchFenceTest.java#anOpenFenceLaunchesAsBefore",
         "modules/ui/src/test/java/io/justsearch/ui/api/DownloadedFilesHttpTest.java#theDownloadedFilesRowsAreServedFromTheInstallOwner",
         "modules/ui/src/test/java/io/justsearch/ui/api/DownloadedFilesHttpTest.java#downloadAgainPreviewsTheIncludedPartWithoutSavingAnyChoice",
         "modules/ui-web/src/shell-v0/views/BrainSurface.remove-files.test.ts#lists each part with its measured size, Remove files where allowed and the reason elsewhere",
@@ -195,7 +269,14 @@ The brief's adopted scenarios are quoted below; choices the scenarios leave open
         "modules/ui-web/src/shell-v0/views/BrainSurface.remove-files.test.ts#removes through the HIGH-risk operation with the part id and preview, then offers Download again",
         "modules/ui-web/src/shell-v0/views/BrainSurface.remove-files.test.ts#shows a refusal with its plain reason and keeps the row",
         "modules/ui-web/src/shell-v0/views/BrainSurface.remove-files.test.ts#while a removal runs elsewhere, Remove files is disabled and the page says so",
-        "modules/ui-web/src/shell-v0/views/BrainSurface.remove-files.test.ts#Download again asks first; closing the consent saves nothing and accepting starts the included download"
+        "modules/ui-web/src/shell-v0/views/BrainSurface.remove-files.test.ts#Download again asks first; closing the consent saves nothing and accepting starts the included download",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerLaunchFenceTest.java#aFencedStartLaunchesNothingAndIsARefusal",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerLaunchFenceTest.java#anAdmittedLaunchIsRegisteredUntilItsProcessHasStarted",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java#anAnswerServerLaunchInProgressRefusesTheAnswerModelRemovalOnly",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java#aRemovalOfTheAnswerModelRefusesALaunchAndOtherRemovalsDoNot",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java#aLaunchAndARemovalRacingNeverBothProceed",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AiInstallServiceFileRemovalTest.java#anOpenInstalledModelActivationRefusesTheRemovalAndDeletesNothing",
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedInstallerGenerationBootProjectionTest.java#anOpenInstallerActivationIsReportedSoRemoveFilesRefuses"
       ]
     },
     {
@@ -233,6 +314,131 @@ The brief's adopted scenarios are quoted below; choices the scenarios leave open
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/BrainSurface.remove-files.test.ts#Best match first: Cancel leaves the decline, Accept carries it to the install start",
         "modules/ui-web/src/shell-v0/views/BrainSurface.remove-files.test.ts#Answers and picture reading: a declined answer model is undeclined only by the accepted start"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalSafetyTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AiInstallServiceRemovalPresenceTest.java",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLaunchRefusalTest.java",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.remove-files.test.ts"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Repair round 1 of the reviewed candidate (3b99787c01): a models folder that is a link, or sits below a linked folder, refuses the whole removal and deletes nothing; recovery never puts a file back through a removal folder replaced by a link, never restores to a recorded place outside the models folder, and reports a malformed record (files null, a null entry, an invalid or missing path) as unreadable instead of failing; restoring never falls back to an existence check plus move; a checkpoint that cannot be saved after a capture puts the file back, releases the lock and leaves no running record; a part missing a required file is incomplete, not downloaded; after a removal the install owner's retained installed row no longer says installed, and on the page both switch-on routes (the feature switch and including the part in Downloaded files) ask first instead of switching on or withdrawing the decline; a managed answer-server start refused by a removal is a refusal that latches no failure, and the next start launches; the finished outcome lists deleted files with sizes. Each check failed by assertion on 3b99787c01; the answer-server check needed only the compatibility patch gates/test-intent/s2-remove-launch-refusal-before.patch (the new ManagedLaunchFence interface and an adapter onto the old reason fence, keeping the old refusal behaviour).",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "X1",
+          "quote": "Advanced settings > Downloaded files offers Remove files for best match first, for answers (its model and picture-reading file together, only when answers and picture reading are both off), and for other optional parts (SPLADE, entity recognition, citation scoring) when nothing uses them; the confirmation lists exactly what is deleted, its measured size, and what is kept because another part needs it. Not offered for picture reading alone (its file belongs to the answer model download), Understand meaning, runtime libraries, or imported, discovered or custom files. (challenger-4 #1, #10)",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "X2",
+          "quote": "Removal refuses with a plain reason (switch it off first; a download, repair, import or activation is running; an index generation or recovery still needs it; a file is shared with a wanted part) and deletes nothing in that case. After removal: the part shows Not downloaded, Repair does not bring it back, the install total counts it again, \"Download again\" asks for consent and downloads only what is missing.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "X3",
+          "quote": "Removal is safe under failure: permission or sharing errors, a path replaced by a link, process death between steps, restart midway: the page reports the files actually left, never \"removed\" while files remain, and never re-enables the part; a second window or a repeated click cannot start a second removal. Source documents, the index and conversations are untouched.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "X4",
+          "quote": "Removal cannot race new users: Remove versus switching the part on, Repair, import, activation or index generation preparation, in both orders and through the page, agents and HTTP; once removal starts, no new user takes the files until it ends. On Windows removal waits for or refuses until native sessions and child processes have released the files. After partial deletion or a crash, removal intent and the files left are reported; recovery does not turn it into a deferred deletion. Linked or junctioned parent folders are refused. (challenger-4 #9, #10)",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
+          "choice": "Repair round 1, ownership boundary: rule 2 also covers the models folder and every folder above it, read without following links (on Windows also without reparse points). If the models folder or any ancestor is a link or junction the whole removal refuses with 'The models folder is a link or inside a linked folder, so nothing can be removed here' and nothing is deleted.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
+          "choice": "Repair round 1, recovery: a removal record is acted on only when it is complete and well formed (version 1, a removable part, known states, a non-null file list with non-null entries, each a relative canonical path inside the models folder outside the removal folder, each captured name of the form .removing/<uuid>.removing). Anything else is the existing unreadable-record report ('The removal record could not be read; files in the removal folder were kept'), never an error response. A recorded file is put back only when every folder on its captured and canonical paths (and above the models folder) is a plain folder and the captured entry is a regular file with one link; otherwise it is kept untouched and reported as 'kept - not touched: its place could not be checked'.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
+          "choice": "Repair round 1, restoring: a captured file goes back only by the atomic no-replace link-then-unlink publication. When that is unavailable nothing else is tried (the existence check plus move fallback is removed), the file stays in the removal folder and is reported. If the captured name cannot be dropped after linking, the file is at its place and its captured name is still reported; nothing at the canonical place is deleted to undo it.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
+          "choice": "Repair round 1, failure handling: when a removal stops (for example a checkpoint that cannot be saved), every unfinished file is settled in memory before the lock is released: captured files are put back where their place is free, otherwise kept in the removal folder, and files never reached are 'kept - the removal stopped before this file'. If the settled record cannot be saved it is held in memory for reports and saved by the next recovery; a record that may still say running is reconciled by the next read, never left running without an owner.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
+          "choice": "Repair round 1, presence: a part is 'downloaded' only when one variant's model file and every required supporting file beside it are on disk (in a candidate folder or the historical folder); files left without that whole set make it 'incomplete' (shown as 'Incomplete, not usable' with its measured size, still offering Remove files where removable and Download again when declined). After a removal the install owner turns the part's retained 'installed' row into a skipped-by-choice row when it is no longer usable, and the page takes current disk presence (models/status) over the run's package rows whenever no download is running.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
+          "choice": "Repair round 1, answer server: each managed launch registers with the removal lock as a user of the answer model's files from just before its process starts until it has started (after that the runtime reports the server running, which keeps refusing the removal). Registrations are per part: a launch neither blocks nor is blocked by a Best match first removal. A launch refused by a removal throws ManagedLaunchRefusedException (reason ALREADY_TRANSITIONING, message 'Removing files - try again when it finishes'), which is never latched as a chat start failure, so the next start after the removal launches normally.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
+          "choice": "Repair round 1, installed-model activation: removal also refuses with 'Downloaded models are being activated - try again when it finishes' while the recorded-ingestion owner has an open installer activation row (accepted, running, or continuing after a restart). Before that row exists the activation's own entry checks the lock, and its accepted execution re-prepares and refuses or goes stale if the files changed.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
+          "choice": "Repair round 1, page: the finished removal outcome lists the deleted files with their sizes as returned, then the kept files with their reasons.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s2-remove-files-repair1.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalSafetyTest.java#aModelsFolderThatIsALinkRefusesTheWholeRemovalAndDeletesNothing",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalSafetyTest.java#aLinkedFolderAboveTheModelsFolderRefusesTheWholeRemovalAndDeletesNothing",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalSafetyTest.java#recoveryNeverPutsBackThroughARemovalFolderReplacedByALink",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalSafetyTest.java#recoveryNeverRestoresToARecordedPlaceOutsideTheModelsFolder",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalSafetyTest.java#restoringNeverFallsBackToAMoveWhenAnAtomicNoReplacePublicationIsUnavailable",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalSafetyTest.java#aCheckpointThatCannotBeSavedAfterCapturePutsTheFileBackAndLeavesNoRunningRecord",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalSafetyTest.java#aPartMissingARequiredFileIsIncompleteNotDownloaded",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalSafetyTest.java#aRecordWithoutAFileListIsReportedAsUnreadableAndTouchesNothing",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalSafetyTest.java#aRecordWithANullFileEntryIsReportedAsUnreadableAndTouchesNothing",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalSafetyTest.java#aRecordWithAnInvalidPathIsReportedAsUnreadableAndTouchesNothing",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalSafetyTest.java#aRecordWithAMissingPathIsReportedAsUnreadableAndTouchesNothing",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AiInstallServiceRemovalPresenceTest.java#aRemovedPartsRetainedInstalledRowNoLongerSaysInstalled",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLaunchRefusalTest.java#aStartRefusedWhileRemovingIsNotAStartFailureAndTheNextStartLaunches",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.remove-files.test.ts#lists the deleted files with their sizes in the finished outcome",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.remove-files.test.ts#a part left incomplete says it is not usable and keeps Remove files and Download again",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.remove-files.test.ts#stale installed rows: the Best match first switch asks first instead of switching on",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.remove-files.test.ts#stale installed rows: including the part in Downloaded files asks first instead of withdrawing the decline"
       ]
     },
     {

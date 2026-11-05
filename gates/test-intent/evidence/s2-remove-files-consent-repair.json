@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-05T06:21:25.571Z",
-  "revision": "b21749f0e07917daceb0df14e57bd2e9163cb91b",
-  "tree": "05dcb9b8aad4c3b49246865afba13f83b567d8c3",
+  "createdAt": "2026-11-05T08:00:03.327Z",
+  "revision": "3b99787c0106eb9f374535ccb5c5b8ed401df1af",
+  "tree": "a15b82cec9d6f3745fbb62a99bb4f417e640e15d",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.remove-files.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/7u_pptlp/tmp/test-intent-vitest-23497-1793859677732.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.remove-files.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/4eb4gr2c/tmp/test-intent-vitest-299718-1793865598792.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 2490
+      "durationMs": 1663
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.remove-files.test.ts#Best match first: Cancel leaves the decline, Accept carries it to the install start",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.remove-files.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:ab6825975eb9380fe54391f6e17a3a04fb7294e2c110680edee01b0b681edbff",
+      "contentDigest": "sha256:2623403848bab5f2713b27242e849f996360ae4bbd2e082096e704d3d8551efa",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.remove-files.test.ts#Answers and picture reading: a declined answer model is undeclined only by the accepted start",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.remove-files.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:ab6825975eb9380fe54391f6e17a3a04fb7294e2c110680edee01b0b681edbff",
+      "contentDigest": "sha256:2623403848bab5f2713b27242e849f996360ae4bbd2e082096e704d3d8551efa",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -63,25 +63,25 @@
     "patches": [],
     "runs": [
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.remove-files.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/7u_pptlp/tmp/test-intent-vitest-23497-1793859683312.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.remove-files.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/4eb4gr2c/tmp/test-intent-vitest-299718-1793865601691.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 1769,
-        "output": "JSON report written to /home/elias/.cache/am/7u_pptlp/tmp/test-intent-vitest-23497-1793859683312.json\n\n"
+        "durationMs": 1409,
+        "output": "JSON report written to /home/elias/.cache/am/4eb4gr2c/tmp/test-intent-vitest-299718-1793865601691.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.remove-files.test.ts#Best match first: Cancel leaves the decline, Accept carries it to the install start",
         "classification": "assertion",
-        "detail": "switching on a removed part saves nothing until the consented install starts Best match first: Cancel leaves the decline, Accept carries it to the install start:  AssertionError: expected [ Array(1) ] to deeply equal []\n    at /home/elias/.cache/am/7u_pptlp/tmp/test-intent-before-ncNb0b/modules/ui-web/src/shell-v0/views/BrainSurface.remove-files.test.ts:212:22\n    at file:///home/elias/.cache/am/7u_pptlp/tmp/test-intent-before-ncNb0b/modules/ui-web/node_modul"
+        "detail": "switching on a removed part saves nothing until the consented install starts Best match first: Cancel leaves the decline, Accept carries it to the install start:  AssertionError: expected [ Array(1) ] to deeply equal []\n    at /home/elias/.cache/am/4eb4gr2c/tmp/test-intent-before-gzCsS6/modules/ui-web/src/shell-v0/views/BrainSurface.remove-files.test.ts:213:22\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s2-remove/modules/ui-web/node_modules/@vi"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.remove-files.test.ts#Answers and picture reading: a declined answer model is undeclined only by the accepted start",
         "classification": "assertion",
-        "detail": "switching on a removed part saves nothing until the consented install starts Answers and picture reading: a declined answer model is undeclined only by the accepted start:  AssertionError: Answer questions: expected [ Array(1) ] to deeply equal []\n    at /home/elias/.cache/am/7u_pptlp/tmp/test-intent-before-ncNb0b/modules/ui-web/src/shell-v0/views/BrainSurface.remove-files.test.ts:236:31\n    at file:///home/elias/.cache/am/7u_pptlp/tmp/test-intent-before-ncNb0b/modules"
+        "detail": "switching on a removed part saves nothing until the consented install starts Answers and picture reading: a declined answer model is undeclined only by the accepted start:  AssertionError: Answer questions: expected [ Array(1) ] to deeply equal []\n    at /home/elias/.cache/am/4eb4gr2c/tmp/test-intent-before-gzCsS6/modules/ui-web/src/shell-v0/views/BrainSurface.remove-files.test.ts:237:31\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s2-remove/modules/ui-we"
       }
     ]
   },
-  "digest": "sha256:9dc7a0f3e6333dcb0863fef22c7eec64df8fd1b658b2688dd3ac5c2c8e833b10"
+  "digest": "sha256:b0a835a23ef1b6b936ebc2d405f6d77385323c2c37c8221b3cf3d36177fe21f8"
 }

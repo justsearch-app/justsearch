@@ -207,14 +207,14 @@ final class LlamaServerOps {
   private final AtomicLong launchAttempts = new AtomicLong();
 
   /**
-   * Refuses a managed launch with a plain reason while the answer model's files are being removed
-   * (design D4). Empty means launch; bound by composition, empty by default.
+   * Admits each managed launch against the answer model's file-removal lock (design D4); open
+   * until composition binds it.
    */
-  private volatile Supplier<Optional<String>> launchFence = Optional::empty;
+  private volatile ManagedLaunchFence launchFence = ManagedLaunchFence.OPEN;
 
   /** Binds the managed-launch fence (design D4). */
-  void setLaunchFence(Supplier<Optional<String>> fence) {
-    this.launchFence = fence == null ? Optional::empty : fence;
+  void setLaunchFence(ManagedLaunchFence fence) {
+    this.launchFence = fence == null ? ManagedLaunchFence.OPEN : fence;
   }
 
   /**
@@ -1784,7 +1784,24 @@ final class LlamaServerOps {
     launchManagedLlamaServer(argv, result, port);
   }
 
+  /**
+   * Admits the launch against the file-removal lock for as long as it takes to start the process
+   * (design D4); a refused launch starts nothing and is a {@link ManagedLaunchRefusedException}.
+   */
   private void launchManagedLlamaServer(List<String> command, StartResult result, int port)
+      throws IOException, ModeTransitionException {
+    final ManagedLaunchFence.Admission admitted;
+    try {
+      admitted = launchFence.admit();
+    } catch (IllegalStateException refused) {
+      throw new ManagedLaunchRefusedException(refused.getMessage());
+    }
+    try (admitted) {
+      launchAdmittedLlamaServer(command, result, port);
+    }
+  }
+
+  private void launchAdmittedLlamaServer(List<String> command, StartResult result, int port)
       throws IOException, ModeTransitionException {
     // Tempdoc 656 Task 3: a missing llama-server.exe previously failed inside ProcessBuilder.start()
     // below with a raw IOException (Windows error 2), which propagates past every typed handler and
@@ -1793,11 +1810,6 @@ final class LlamaServerOps {
     // pre-launch check mirrors the existing MISSING_DLL pattern (detect a specific missing-artifact
     // condition, throw a typed reason) but at an earlier failure point — before a process exists,
     // rather than by inspecting an already-launched process's exit code.
-    Optional<String> fenced = launchFence.get();
-    if (fenced.isPresent()) {
-      throw new ModeTransitionException(ModeTransitionException.Reason.ONLINE_START_FAILED,
-          fenced.get());
-    }
     LlamaServerConfigContext context = result.context();
     Path exe = context.inference().serverExecutable();
     if (exe == null || !Files.isRegularFile(exe)) {

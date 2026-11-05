@@ -47,6 +47,78 @@ final class ModelFileRemovalFenceTest {
   }
 
   @Test
+  void anAnswerServerLaunchInProgressRefusesTheAnswerModelRemovalOnly() {
+    var fence = new ModelFileRemovalFence();
+    var launches = fence.answerServerLaunches();
+
+    try (var _ = launches.admit()) {
+      var refused = assertThrows(ModelFileRemovalFence.Refused.class, () -> fence.begin("chat"));
+      assertEquals("An answer server start is running - try again when it finishes", refused.getMessage());
+      fence.begin("reranker").close(); // Best match first's files are not the answer server's
+    }
+    fence.begin("chat").close();
+  }
+
+  @Test
+  void aRemovalOfTheAnswerModelRefusesALaunchAndOtherRemovalsDoNot() {
+    var fence = new ModelFileRemovalFence();
+    var launches = fence.answerServerLaunches();
+
+    try (var _ = fence.begin("chat")) {
+      var refused = assertThrows(IllegalStateException.class, launches::admit);
+      assertEquals(ModelFileRemovalFence.REMOVING, refused.getMessage());
+    }
+    try (var _ = fence.begin("reranker")) {
+      launches.admit().close(); // answers keep starting while Best match first's files go
+    }
+    launches.admit().close();
+  }
+
+  @Test
+  void aLaunchAndARemovalRacingNeverBothProceed() throws Exception {
+    var fence = new ModelFileRemovalFence();
+    var launches = fence.answerServerLaunches();
+    var start = new java.util.concurrent.CyclicBarrier(2);
+    var held = new java.util.concurrent.CyclicBarrier(2);
+    int both = 0;
+    int neither = 0;
+    try (var pool = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+      for (int round = 0; round < 300; round++) {
+        var launch = pool.submit(() -> {
+          start.await();
+          io.justsearch.app.inference.ManagedLaunchFence.Admission admitted = null;
+          try {
+            admitted = launches.admit();
+          } catch (IllegalStateException refused) {
+            // removal won
+          }
+          held.await(); // both sides hold what they won until both have tried
+          if (admitted != null) admitted.close();
+          return admitted != null;
+        });
+        var removal = pool.submit(() -> {
+          start.await();
+          ModelFileRemovalFence.Removal begun = null;
+          try {
+            begun = fence.begin("chat");
+          } catch (ModelFileRemovalFence.Refused refused) {
+            // launch won
+          }
+          held.await();
+          if (begun != null) begun.close();
+          return begun != null;
+        });
+        boolean launched = launch.get();
+        boolean removed = removal.get();
+        if (launched && removed) both++;
+        if (!launched && !removed) neither++;
+      }
+    }
+    assertEquals(0, both, "a launch and a removal of the answer model never hold together");
+    assertEquals(0, neither, "neither waits for the other: one of them always proceeds");
+  }
+
+  @Test
   void aSecondRemovalCannotStartWhileOneRuns() {
     var fence = new ModelFileRemovalFence();
     var first = fence.begin("reranker");

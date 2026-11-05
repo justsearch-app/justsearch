@@ -191,6 +191,15 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
   }
 
   @Override
+  public boolean installerActivationOpen() {
+    synchronized (lock) {
+      return operations.openRecords().stream().anyMatch(row ->
+          row.descriptor().kind() == OperationKind.REINDEX
+              && RecordedInstallerGenerationPlan.OPERATION_ID.equals(row.descriptor().operationRef()));
+    }
+  }
+
+  @Override
   public boolean generationPendingAtBoot() {
     synchronized (lock) {
       return operations.openRecords().stream().anyMatch(RecordedIngestionCoordinator::isBulk);

@@ -22,7 +22,13 @@ public final class ModelFileRemovalFence {
   /** The refusal every fenced route gives while files are being removed. */
   public static final String REMOVING = "Removing files - try again when it finishes";
 
-  private final Map<Long, String> users = new LinkedHashMap<>();
+  /** A registered user: its plain route name and the one part it uses ({@code null}: every part). */
+  private record Use(String route, String packageId) {}
+
+  /** Route name of a managed answer-server launch while it registers (design D4). */
+  public static final String ANSWER_SERVER_STARTING = "An answer server start";
+
+  private final Map<Long, Use> users = new LinkedHashMap<>();
   private long nextUser;
   private String removing;
 
@@ -88,10 +94,34 @@ public final class ModelFileRemovalFence {
    * @throws Refused while a removal holds the lock
    */
   public synchronized User enter(String route) {
-    if (removing != null) throw new Refused(REMOVING);
+    return enter(route, null);
+  }
+
+  /**
+   * Registers {@code route} as a user of {@code packageId}'s files only ({@code null}: every part)
+   * until the result closes; only a removal of that part refuses it, and only it refuses that part's
+   * removal.
+   *
+   * @throws Refused while a removal of that part (or, for every part, any removal) holds the lock
+   */
+  public synchronized User enter(String route, String packageId) {
+    if (removing != null && (packageId == null || packageId.equals(removing))) {
+      throw new Refused(REMOVING);
+    }
     long id = ++nextUser;
-    users.put(id, route);
+    users.put(id, new Use(route, packageId));
     return new User(id);
+  }
+
+  /**
+   * The managed answer-server launch fence over this lock: each launch registers as a user of the
+   * answer model's files while its process starts, and is refused while they are being removed.
+   */
+  public io.justsearch.app.inference.ManagedLaunchFence answerServerLaunches() {
+    return () -> {
+      User launch = enter(ANSWER_SERVER_STARTING, "chat");
+      return launch::close;
+    };
   }
 
   /** Point check for an entry that does not hold its work open here. */
@@ -111,8 +141,10 @@ public final class ModelFileRemovalFence {
    */
   synchronized Removal begin(String packageId) {
     if (removing != null) throw new Refused(REMOVING);
-    if (!users.isEmpty()) {
-      throw new Refused(users.values().iterator().next() + " is running - try again when it finishes");
+    for (Use use : users.values()) {
+      if (use.packageId() == null || use.packageId().equals(packageId)) {
+        throw new Refused(use.route() + " is running - try again when it finishes");
+      }
     }
     removing = packageId;
     return new Removal();

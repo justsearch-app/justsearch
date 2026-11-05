@@ -107,12 +107,17 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
   private final Path homeDir;
   private final Path modelsDir;
 
+  /** Format version of the "Remove files" record, for the boot data-version marker (design D4). */
+  public static final int MODEL_FILE_REMOVAL_RECORD_VERSION = ModelFileRemoval.JOURNAL_VERSION;
+
   /** The one removal lock (design D4); this owner holds it for a whole "Remove files" run. */
   private final ModelFileRemovalFence removalFence = new ModelFileRemovalFence();
   private final ModelFileRemoval removal;
   /** What the runtime owners say about a part's files; fail closed until composition binds it. */
   private volatile java.util.function.Function<String, Optional<String>> removalUsage =
       ModelFileRemoval.UsageProbe.UNBOUND::inUse;
+  /** Whether an accepted installed-model activation is open; none until composition binds it. */
+  private volatile BooleanSupplier installerActivationOpen = () -> false;
 
   // Liveness backstop window (575 §17 Face C, polled-state model): a "running" install with no
   // progress for longer than this is treated as a dead owner and reclaimed to terminal on read.
@@ -1422,6 +1427,11 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     this.removalUsage = probe == null ? ModelFileRemoval.UsageProbe.UNBOUND::inUse : probe;
   }
 
+  /** Binds the recorded-ingestion owner's open installed-model activation (design D4). */
+  public void setInstallerActivationOpen(BooleanSupplier open) {
+    this.installerActivationOpen = open == null ? () -> false : open;
+  }
+
   @Override
   public void refuseWhileRemovingFiles() {
     removalFence.refuseWhileRemoving();
@@ -1464,6 +1474,14 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
       if ("activation_required".equals(status.phase)) {
         return Optional.of("Downloaded files are waiting to be activated - try again after that");
       }
+    }
+    try {
+      // An accepted activation, also one continuing after a restart, was prepared from these files.
+      if (installerActivationOpen.getAsBoolean()) {
+        return Optional.of("Downloaded models are being activated - try again when it finishes");
+      }
+    } catch (RuntimeException unknown) {
+      return Optional.of("JustSearch can't confirm nothing uses these files yet - try again in a moment");
     }
     switch (packageId) {
       case "reranker" -> {
@@ -1525,7 +1543,9 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     io.justsearch.app.api.DownloadedFiles.Removal started = run.started();
     Runnable finish = () -> {
       try {
-        completion.complete(run.finish());
+        var outcome = run.finish();
+        reconcileRemovedPresence(id);
+        completion.complete(outcome);
       } catch (RuntimeException | Error failure) {
         completion.completeExceptionally(failure);
         throw failure;
@@ -1539,6 +1559,25 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
       finish.run();
     }
     return new RemovalAttempt(started, completion.minimalCompletionStage());
+  }
+
+  /**
+   * After a removal the run bookkeeping must not keep saying "installed": the page trusts that row,
+   * and a stale one would let a switch-on withdraw the decline without consent. When the part's
+   * required files are no longer all on disk, its row becomes what a fresh plan reports for a
+   * declined part (skipped by the user's choice).
+   */
+  private void reconcileRemovedPresence(String packageId) {
+    boolean usable = removal.usable(packageId);
+    synchronized (lock) {
+      if (usable || running.get()) return;
+      var ps = findPackageStatus(packageId);
+      if (ps == null || !"installed".equals(ps.state)) return;
+      ps.state = "skipped";
+      ps.skipCause = SkipCause.USER_DECLINED.id();
+      ps.skipReason = "Its files were removed";
+      touch();
+    }
   }
 
   /** The settings owner as the removal sees it: one read, and the decline against its witness. */

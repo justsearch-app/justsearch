@@ -57,7 +57,8 @@ async function mount(openAdvanced = true) {
       view = { parts: [{ ...chatRow(), state: 'not-downloaded', sizeOnDiskBytes: 0, declined: true, removable: false,
         reason: 'No downloaded files to remove', delete: [], kept: [] }, rerankerRow(), spladeRow()],
       removal: { packageId: 'chat', label: 'Chat model', state: 'removed', message: '2 files removed',
-        deleted: [{ path: 'answer.gguf' }, { path: 'mmproj-F16.gguf' }], kept: [] } };
+        deleted: [{ path: 'answer.gguf', sizeBytes: 2 * 1024 * 1024 }, { path: 'mmproj-F16.gguf', sizeBytes: 1024 * 1024 }],
+        kept: [] } };
     }
     return { success: true, structuredData: { state: 'running' } };
   } } });
@@ -152,7 +153,7 @@ describe('Advanced settings - Downloaded files', () => {
     section(el).querySelector<HTMLButtonElement>('.confirm-remove')!.click(); await settle(el);
 
     expect(operations).toEqual([{ id: 'core.remove-ai-files', args: { packageId: 'chat', previewDigest: DIGEST } }]);
-    expect(text(section(el).querySelector('[data-testid="removal-outcome"]'))).toBe('Chat model: Files removed. 2 files removed');
+    expect(text(section(el).querySelector('[data-testid="removal-outcome"] p'))).toBe('Chat model: Files removed. 2 files removed');
     expect(text(row(el, 'chat'))).toContain('Not downloaded');
     expect(el.shadowRoot!.activeElement).toBe(row(el, 'chat').querySelector('[data-download-again="chat"]'));
     expect(declines).toEqual([]);
@@ -246,5 +247,66 @@ describe('switching on a removed part saves nothing until the consented install 
     expect(operations).toEqual([{ id: 'core.start-ai-install',
       args: { acceptTerms: true, enablePictureReadingOnCompletion: true, includePackages: ['chat'] } }]);
     expect(declines).toEqual([]);
+  });
+});
+
+describe('after Remove files (repair round 1)', () => {
+  it('lists the deleted files with their sizes in the finished outcome', async () => {
+    const el = await mount();
+    row(el, 'chat').querySelector<HTMLButtonElement>('[data-remove="chat"]')!.click(); await settle(el);
+    section(el).querySelector<HTMLButtonElement>('.confirm-remove')!.click(); await settle(el);
+
+    const outcome = section(el).querySelector('[data-testid="removal-outcome"]');
+    expect([...(outcome?.querySelectorAll('[data-testid="removal-deleted"] li') ?? [])].map(text))
+      .toEqual(['answer.gguf · 2.0 MB', 'mmproj-F16.gguf · 1.0 MB']);
+  });
+
+  it('a part left incomplete says it is not usable and keeps Remove files and Download again', async () => {
+    view = { parts: [{ ...rerankerRow(), state: 'incomplete', sizeOnDiskBytes: 18, declined: true, removable: true,
+      reason: null, delete: [{ path: 'onnx/reranker/config.json', sizeBytes: 18 }],
+      kept: [{ path: 'onnx/reranker/tokenizer.json', sizeBytes: 30, reason: "kept - not verified as JustSearch's download" }] }],
+    removal: null };
+    const el = await mount();
+
+    expect(text(row(el, 'reranker'))).toContain('Incomplete, not usable · 18 B on disk');
+    expect(row(el, 'reranker').querySelector('[data-remove="reranker"]')).not.toBeNull();
+    expect(row(el, 'reranker').querySelector('[data-download-again="reranker"]')).not.toBeNull();
+  });
+
+  // The finished install's package rows still say "installed" for the removed part; what is on disk
+  // now (models/status) says it is missing. Both switch-on routes must ask first and save nothing.
+  const removedReranker = () => {
+    rerankerEnabled = false;
+    preview.components = preview.components!.map(c => c.id === 'reranker'
+      ? { ...c, state: 'declined', declined: true, downloadBytes: 0 } : c);
+    store.current = { ...store.current,
+      installStatus: { state: 'completed', installedFully: true, packages: ['embedding', 'reranker', 'chat']
+        .map(packageId => ({ packageId, state: 'installed' })) },
+      runtimeStatus: { onnxFeatures: [{ id: 'reranker', status: 'inactive', reason: 'disabled', modelActive: false }] },
+    } as unknown as AiState;
+  };
+
+  it('stale installed rows: the Best match first switch asks first instead of switching on', async () => {
+    removedReranker();
+    const el = await mount(false);
+
+    switches(el, 'Best match first')[0]!.click(); await settle(el);
+
+    expect(el.installConsentOpen).toBe(true);
+    expect(paths.some(p => p.endsWith('/api/ai/install/plan-preview?include=reranker'))).toBe(true);
+    expect(declines).toEqual([]);
+    expect(operations).toEqual([]);
+  });
+
+  it('stale installed rows: including the part in Downloaded files asks first instead of withdrawing the decline', async () => {
+    removedReranker();
+    const el = await mount();
+
+    el.shadowRoot!.querySelector<HTMLButtonElement>('[data-testid="component-toggle-reranker"]')!.click();
+    await settle(el);
+
+    expect(el.installConsentOpen).toBe(true);
+    expect(declines).toEqual([]);
+    expect(operations).toEqual([]);
   });
 });

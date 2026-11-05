@@ -17,6 +17,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -49,17 +50,21 @@ import tools.jackson.databind.json.JsonMapper;
  * <p>Ownership evidence (decided): a file is removable only when (1) the registry lists it for
  * that part (any of its variants, or the historical folder the install contract records), (2) it
  * sits at that canonical path inside the managed models folder with no link or junction in the
- * path or any parent folder, (3) it is a regular file with one link, (4) its content hash equals the
- * registry's (checked in full immediately before deletion), and (5) no other wanted part lists the
- * same file. A file failing any rule is kept and listed with its reason. Partial downloads are the
- * installer's own {@code .partial} staging files beside those canonical paths.
+ * path, any folder between it and the models folder, the models folder itself or any folder above
+ * it (a linked models folder refuses the whole removal), (3) it is a regular file with one link,
+ * (4) its content hash equals the registry's (checked in full immediately before deletion), and
+ * (5) no other wanted part lists the same file. A file failing any rule is kept and listed with
+ * its reason. Partial downloads are the installer's own {@code .partial} staging files beside
+ * those canonical paths.
  *
  * <p>Capture before verify (decided): each file is first recorded in the journal, then atomically
  * renamed to a private name in a removal folder inside the models folder, then verified (same file
  * identity as resolved before the fence, regular, one link, registry hash) and only then deleted. A
  * failed rename keeps the file (a Windows sharing violation refuses that file); a failed check puts
- * the file back only if its place is free. Recovery after a crash reports the interrupted removal
- * and puts captured files back; it never deletes.
+ * the file back only if its place is free, by an atomic no-replace link (never an overwriting
+ * move). Recovery after a crash acts only on a well-formed record whose paths lie inside the models
+ * folder and whose folders are all plain; it reports the interrupted removal, puts captured files
+ * back where it can, keeps everything else untouched and reported, and never deletes.
  */
 final class ModelFileRemoval {
   private static final Logger log = LoggerFactory.getLogger(ModelFileRemoval.class);
@@ -87,6 +92,20 @@ final class ModelFileRemoval {
   static final String KEPT_IN_REMOVAL_FOLDER = "kept in the removal folder - its original place is taken";
   static final String KEPT_INTERRUPTED = "kept - the removal was interrupted";
   static final String KEPT_PUT_BACK = "kept - the removal was interrupted; the file was put back";
+  static final String KEPT_UNCERTAIN = "kept - not touched: its place could not be checked";
+  static final String KEPT_STOPPED = "kept - the removal stopped before this file";
+
+  /** The whole removal refuses when the models folder itself is a link or sits in a linked folder. */
+  static final String ROOT_LINKED =
+      "The models folder is a link or inside a linked folder, so nothing can be removed here";
+
+  private static final Set<String> JOURNAL_STATES =
+      Set.of("running", "removed", "partly-removed", "not-removed", "refused", "interrupted");
+  private static final Set<String> FILE_STATES =
+      Set.of("planned", "capturing", "captured", "deleted", "kept", "missing");
+  private static final java.util.regex.Pattern STAGED_NAME = java.util.regex.Pattern.compile(
+      java.util.regex.Pattern.quote(REMOVAL_FOLDER + "/") + "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-"
+          + "[0-9a-f]{4}-[0-9a-f]{12}" + java.util.regex.Pattern.quote(STAGED_SUFFIX));
 
   private static final JsonMapper JSON = JsonMapper.builder()
       .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
@@ -182,8 +201,9 @@ final class ModelFileRemoval {
         measureOnly(part, pkg, recorded);
       } else {
         List<Found> found = classify(reg, pkg, recorded, declined);
-        fill(part, found);
-        String why = part.delete.isEmpty() ? "No downloaded files to remove"
+        fill(part, found, usable(pkg, recorded));
+        String why = !found.isEmpty() && rootLinked() ? ROOT_LINKED
+            : part.delete.isEmpty() ? "No downloaded files to remove"
             : refusal.reason(pkg.id(), settings).orElse(null);
         part.removable = why == null;
         part.reason = why;
@@ -215,8 +235,54 @@ final class ModelFileRemoval {
         unknown = true;
       }
     }
-    part.state = any ? "downloaded" : "not-downloaded";
+    part.state = presence(usable(pkg, recorded), any);
     part.sizeOnDiskBytes = measured(any, unknown, total);
+  }
+
+  /**
+   * Usable presence comes from the part's required file set, not from any file being left: a part
+   * missing a required file is {@code incomplete} (not usable) and can be downloaded again.
+   */
+  private static String presence(boolean usable, boolean anyFileLeft) {
+    return usable ? "downloaded" : anyFileLeft ? "incomplete" : "not-downloaded";
+  }
+
+  /**
+   * Whether a usable copy of {@code pkg} is on disk: one variant's model file and every required
+   * supporting file beside it, in a candidate folder or the historical folder, as regular files.
+   */
+  boolean usable(ModelPackage pkg, InstallContract recorded) {
+    List<String> dirs = new ArrayList<>();
+    for (ModelVariant v : pkg.variants()) dirs.add(InstallPlanner.effectiveTargetDir(pkg, v));
+    dirs.add(pkg.targetDir() == null ? "" : pkg.targetDir());
+    for (String dir : dirs) {
+      if (!requiredSupportingPresent(pkg, dir)) continue;
+      if (pkg.variants().isEmpty()) return true;
+      for (ModelVariant v : pkg.variants()) {
+        if (Files.isRegularFile(root.resolve(join(dir, v.filename())).normalize(),
+            LinkOption.NOFOLLOW_LINKS)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /** {@link #usable(ModelPackage, InstallContract)} for a part id, with the current registry. */
+  boolean usable(String packageId) {
+    ModelPackage pkg = registry.get().findPackage(packageId);
+    return pkg != null && usable(pkg, contractOrNull());
+  }
+
+  private boolean requiredSupportingPresent(ModelPackage pkg, String dir) {
+    for (SupportingFile sf : pkg.supportingFiles()) {
+      if (sf.filename() == null || sf.extract() || !sf.required()) continue;
+      if (!Files.isRegularFile(root.resolve(join(dir, sf.filename())).normalize(),
+          LinkOption.NOFOLLOW_LINKS)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /** Zero when nothing is on disk; unknown ({@code null}) when any present file was unreadable. */
@@ -226,7 +292,7 @@ final class ModelFileRemoval {
     return total;
   }
 
-  private static void fill(DownloadedFiles.Part part, List<Found> found) {
+  private static void fill(DownloadedFiles.Part part, List<Found> found, boolean usable) {
     long total = 0;
     boolean unknown = false;
     for (Found f : found) {
@@ -236,7 +302,7 @@ final class ModelFileRemoval {
       if (f.reason() == null) part.delete.add(entry);
       else part.kept.add(entry);
     }
-    part.state = found.stream().anyMatch(f -> !f.expected().partial()) ? "downloaded" : "not-downloaded";
+    part.state = presence(usable, found.stream().anyMatch(f -> !f.expected().partial()));
     part.sizeOnDiskBytes = measured(!found.isEmpty(), unknown, total);
   }
 
@@ -342,29 +408,58 @@ final class ModelFileRemoval {
     return new Found(e, p, size, null);
   }
 
-  /** Rule 2: a link or junction anywhere below the models folder down to {@code p}. */
-  private boolean linkedOnTheWay(Path p) {
-    Path real;
+  /**
+   * Rule 2 for the models folder itself: it and every folder above it must be plain folders, read
+   * without following links. A link or junction at the models folder or any ancestor refuses the
+   * whole removal; otherwise registry-matching files behind it could be deleted.
+   */
+  boolean rootLinked() {
+    Path current = root.getRoot();
+    if (current == null) return true;
+    for (Path name : root) {
+      current = current.resolve(name);
+      if (!plainFolder(current)) return true;
+    }
+    return false;
+  }
+
+  private static boolean plainFolder(Path dir) {
     try {
-      real = root.toRealPath();
-    } catch (IOException missing) {
+      BasicFileAttributes attrs =
+          Files.readAttributes(dir, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+      if (!attrs.isDirectory() || attrs.isSymbolicLink() || attrs.isOther()) return false;
+      if (isWindows()) WindowsOwnerOnlyDirectory.requireNonReparsePoint(dir);
       return true;
+    } catch (IOException | RuntimeException unreadable) {
+      return false;
     }
+  }
+
+  /**
+   * Rule 2 for the folders holding {@code p}: the models folder and its ancestors, and every folder
+   * between it and {@code p}, are plain folders; {@code p} itself is not checked (it may be absent).
+   */
+  private boolean linkedParents(Path p) {
+    if (!p.startsWith(root) || p.equals(root) || rootLinked()) return true;
     Path current = root;
-    for (Path part : root.relativize(p)) {
-      current = current.resolve(part);
-      try {
-        BasicFileAttributes attrs =
-            Files.readAttributes(current, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
-        if (attrs.isSymbolicLink() || attrs.isOther()) return true;
-        if (isWindows()) WindowsOwnerOnlyDirectory.requireNonReparsePoint(current);
-      } catch (IOException unreadable) {
-        return true;
-      }
+    Path rel = root.relativize(p);
+    for (int i = 0; i < rel.getNameCount() - 1; i++) {
+      current = current.resolve(rel.getName(i));
+      if (!plainFolder(current)) return true;
     }
+    return false;
+  }
+
+  /** Rule 2: a link or junction at {@code p}, on the way to it, at the models folder or above it. */
+  private boolean linkedOnTheWay(Path p) {
+    if (linkedParents(p)) return true;
     try {
-      return !p.toRealPath().startsWith(real);
-    } catch (IOException unreadable) {
+      BasicFileAttributes attrs =
+          Files.readAttributes(p, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+      if (attrs.isSymbolicLink() || attrs.isOther()) return true;
+      if (isWindows()) WindowsOwnerOnlyDirectory.requireNonReparsePoint(p);
+      return !p.toRealPath().startsWith(root.toRealPath());
+    } catch (IOException | RuntimeException unreadable) {
       return true;
     }
   }
@@ -430,27 +525,38 @@ final class ModelFileRemoval {
       return journal.report();
     }
 
-    /** Capture, verify, delete each file; the report says what is actually left. */
+    /**
+     * Capture, verify, delete each file; the report says what is actually left. A failure (a
+     * checkpoint that could not be saved, say) puts captured files back or keeps them in the
+     * removal folder before the lock is released; a record that could not be finished is
+     * reconciled by the next read rather than left "running" without an owner.
+     */
     DownloadedFiles.Removal finish() {
+      boolean settled = false;
       try {
         for (Target t : targets) removeOne(journal, t);
         journal.state = outcome(journal, targets);
         journal.finishedAtEpochMs = System.currentTimeMillis();
         journal.message = summary(journal);
         write(journal);
+        settled = true;
         return journal.report();
       } catch (RuntimeException failure) {
+        // Settle every unfinished file in memory first: no checkpoint write may stop this.
+        for (JournalFile f : journal.files) {
+          if (!"deleted".equals(f.state) && !"kept".equals(f.state) && !"missing".equals(f.state)) {
+            settleOne(f);
+            if ("kept".equals(f.state) && KEPT_INTERRUPTED.equals(f.reason)) f.reason = KEPT_STOPPED;
+          }
+        }
         journal.state = outcome(journal, targets);
         journal.finishedAtEpochMs = System.currentTimeMillis();
         journal.message = "Removal stopped: " + failure.getMessage() + ". " + summary(journal);
-        try {
-          write(journal);
-        } catch (RuntimeException unwritten) {
-          failure.addSuppressed(unwritten);
-        }
+        settled = saveOrHold(journal, failure);
         log.warn("Model file removal stopped", failure);
         return journal.report();
       } finally {
+        if (!settled) recovered = false; // the saved record may still say running
         held.close();
       }
     }
@@ -467,9 +573,9 @@ final class ModelFileRemoval {
     long deleted = 0;
     boolean passingLeft = false;
     for (JournalFile f : journal.files) {
-      if (!rels.contains(f.path)) continue;
+      if (!rels.contains(f.path) || "missing".equals(f.state)) continue;
       if ("deleted".equals(f.state)) deleted++;
-      else if (!OWNERSHIP_FAILURES.contains(f.reason)) passingLeft = true;
+      else if (f.reason == null || !OWNERSHIP_FAILURES.contains(f.reason)) passingLeft = true;
     }
     return deleted == 0 ? "not-removed" : passingLeft ? "partly-removed" : "removed";
   }
@@ -497,6 +603,7 @@ final class ModelFileRemoval {
     ModelRegistry reg = registry.get();
     ModelPackage pkg = reg.findPackage(packageId);
     if (pkg == null) throw new Refusal("No such part");
+    if (rootLinked()) throw new Refusal(ROOT_LINKED);
     InstallContract recorded = contractOrNull();
     UiSettingsStoreView before = settings.inspect();
     Set<String> declined = Set.copyOf(before.settings().getDeclinedAiPackages());
@@ -555,6 +662,8 @@ final class ModelFileRemoval {
       checkpointHook.accept("declined");
       return new Run(held, journal, targets);
     } catch (RuntimeException | Error failure) {
+      // A record may have been saved as running: the next read reconciles it, never this lock.
+      recovered = false;
       held.close();
       throw failure;
     }
@@ -629,7 +738,9 @@ final class ModelFileRemoval {
 
   /** Puts a captured file back only if its place is free; never overwrites. */
   private void putBack(Journal journal, JournalFile entry, Path staged, Path canonical, String why) {
-    if (restoreWithoutOverwrite(staged, canonical)) {
+    if (linkedParents(staged) || linkedParents(canonical)) {
+      keep(journal, entry, KEPT_UNCERTAIN);
+    } else if (restoreWithoutOverwrite(staged, canonical)) {
       entry.staged = null;
       keep(journal, entry, why);
     } else {
@@ -637,22 +748,26 @@ final class ModelFileRemoval {
     }
   }
 
-  /** Link-then-unlink is an atomic no-replace; a plain move without REPLACE_EXISTING is the fallback. */
+  /**
+   * Link-then-unlink is an atomic no-replace publication. When it is unavailable (no hard links on
+   * this file system, say) nothing else is tried: an existence check followed by a move could
+   * overwrite a file that took the place meanwhile, so the captured file stays in the removal
+   * folder and is reported. If the captured name cannot be dropped after linking, the file is at
+   * its place and its captured name is still reported in the removal folder (nothing at the
+   * canonical place is ever deleted to undo it).
+   */
   static boolean restoreWithoutOverwrite(Path staged, Path canonical) {
     try {
       Files.createLink(canonical, staged);
+    } catch (IOException | UnsupportedOperationException | SecurityException notLinked) {
+      return false;
+    }
+    try {
       Files.delete(staged);
       return true;
-    } catch (FileAlreadyExistsException taken) {
+    } catch (IOException | SecurityException notDropped) {
+      log.warn("A captured file was put back at {} but its captured name {} remains", canonical, staged);
       return false;
-    } catch (IOException | UnsupportedOperationException noLinks) {
-      try {
-        if (Files.exists(canonical, LinkOption.NOFOLLOW_LINKS)) return false;
-        Files.move(staged, canonical);
-        return true;
-      } catch (IOException notMoved) {
-        return false;
-      }
     }
   }
 
@@ -766,14 +881,34 @@ final class ModelFileRemoval {
     return homeDir.resolve(JOURNAL_FILENAME);
   }
 
+  /**
+   * A finished or reconciled record whose save failed. It is what the files actually look like, so
+   * reports show it, and the next recovery saves it instead of re-reading the stale record.
+   */
+  private volatile Journal unsaved;
+
   private void write(Journal journal) {
     synchronized (journalLock) {
       try {
         Files.createDirectories(homeDir);
         AtomicFileWrites.replace(journalPath(), JSON.writeValueAsBytes(journal));
+        unsaved = null;
       } catch (IOException failure) {
         throw new java.io.UncheckedIOException("Removal record could not be saved", failure);
       }
+    }
+  }
+
+  /** Saves a settled record; when that fails it is held for reports and the next recovery. */
+  private boolean saveOrHold(Journal journal, RuntimeException failure) {
+    try {
+      write(journal);
+      return true;
+    } catch (RuntimeException unwritten) {
+      if (failure != null) failure.addSuppressed(unwritten);
+      else log.warn("Settled removal record could not be saved", unwritten);
+      unsaved = journal;
+      return false;
     }
   }
 
@@ -782,10 +917,55 @@ final class ModelFileRemoval {
     if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) return null;
     try {
       Journal journal = JSON.readValue(path.toFile(), Journal.class);
-      return journal != null && journal.version == JOURNAL_VERSION ? journal : unreadable();
+      return wellFormed(journal) ? journal : unreadable();
     } catch (RuntimeException corrupt) {
       return unreadable();
     }
+  }
+
+  /**
+   * The complete record is checked before anything acts on it: its version, part, states and every
+   * file entry (present, a canonical path relative to and inside the models folder, a known state,
+   * a captured name of this removal folder's own form). Anything else is an unreadable record:
+   * reported, and its files in the removal folder kept untouched.
+   */
+  private boolean wellFormed(Journal journal) {
+    if (journal == null || journal.version != JOURNAL_VERSION || journal.packageId == null
+        || !REMOVABLE.contains(journal.packageId) || journal.state == null
+        || !JOURNAL_STATES.contains(journal.state) || journal.files == null) {
+      return false;
+    }
+    for (JournalFile f : journal.files) {
+      if (f == null || f.state == null || !FILE_STATES.contains(f.state)
+          || canonicalOf(f.path) == null
+          || (f.staged != null && !STAGED_NAME.matcher(f.staged).matches())) {
+        return false;
+      }
+    }
+    if (journal.label == null) journal.label = journal.packageId;
+    if (journal.message == null) journal.message = "";
+    return true;
+  }
+
+  /** The canonical place a recorded relative path names, or {@code null} unless it is one. */
+  private Path canonicalOf(String rel) {
+    if (rel == null || rel.isBlank() || rel.indexOf('\\') >= 0) return null;
+    final Path relative;
+    try {
+      relative = Path.of(rel);
+    } catch (InvalidPathException invalid) {
+      return null;
+    }
+    if (relative.isAbsolute() || relative.getRoot() != null
+        || !relative.normalize().equals(relative)) {
+      return null;
+    }
+    for (Path name : relative) {
+      if (name.toString().equals("..") || name.toString().equals(".")) return null;
+    }
+    if (relative.getName(0).toString().equals(REMOVAL_FOLDER)) return null;
+    Path canonical = root.resolve(relative).normalize();
+    return canonical.startsWith(root) && !canonical.equals(root) ? canonical : null;
   }
 
   private static Journal unreadable() {
@@ -798,7 +978,7 @@ final class ModelFileRemoval {
 
   private DownloadedFiles.Removal readReport() {
     synchronized (journalLock) {
-      Journal journal = readJournal();
+      Journal journal = unsaved != null ? unsaved : readJournal();
       if (journal == null) {
         // No record, yet files sit in the removal folder: say so rather than hide them.
         Journal none = unreadable();
@@ -838,56 +1018,86 @@ final class ModelFileRemoval {
     synchronized (journalLock) {
       if (recovered) return;
       if (fence.removingPart().isPresent()) return; // a live removal in this process owns the journal
+      Journal held = unsaved;
+      if (held != null) {
+        // Already settled in memory: only its save is outstanding.
+        if (saveOrHold(held, null)) recovered = true;
+        return;
+      }
       Journal journal = readJournal();
       if (journal != null && "running".equals(journal.state)) {
-        for (JournalFile f : journal.files) recoverOne(f);
+        for (JournalFile f : journal.files) settleOne(f);
         journal.state = "interrupted";
         journal.finishedAtEpochMs = System.currentTimeMillis();
         journal.message = "The removal was interrupted: " + summary(journal)
             + ". Nothing more will be deleted.";
-        try {
-          write(journal);
-        } catch (RuntimeException unwritten) {
-          log.warn("Interrupted removal could not be recorded", unwritten);
-          return;
-        }
+        if (!saveOrHold(journal, null)) return;
         log.warn("Reported an interrupted model file removal of '{}'", journal.packageId);
       }
       recovered = true;
     }
   }
 
-  private void recoverOne(JournalFile f) {
-    Path canonical = root.resolve(f.path).normalize();
-    switch (f.state) {
-      case "deleted", "kept" -> { /* final */ }
-      case "planned" -> {
-        // Never captured: the file is left where it was (or something else moved it).
-        f.state = Files.exists(canonical, LinkOption.NOFOLLOW_LINKS) ? "kept" : "missing";
-        f.reason = "kept".equals(f.state) ? KEPT_INTERRUPTED : null;
+  /**
+   * Settles one unfinished entry without deleting anything: a captured file goes back to its
+   * canonical place when that place is free and every folder on both paths is a plain folder;
+   * otherwise it stays where it is and is reported. An entry whose paths cannot be checked is
+   * reported as kept and not touched.
+   */
+  private void settleOne(JournalFile f) {
+    if ("deleted".equals(f.state) || "kept".equals(f.state) || "missing".equals(f.state)) return;
+    Path canonical = canonicalOf(f.path);
+    if (canonical == null || linkedParents(canonical)) {
+      uncertain(f);
+      return;
+    }
+    if ("planned".equals(f.state)) {
+      // Never captured: the file is left where it was (or something else moved it).
+      boolean there = Files.exists(canonical, LinkOption.NOFOLLOW_LINKS);
+      f.state = there ? "kept" : "missing";
+      f.reason = there ? KEPT_INTERRUPTED : null;
+      return;
+    }
+    Path staged = f.staged == null ? null : root.resolve(f.staged).normalize();
+    if (staged != null && (!STAGED_NAME.matcher(f.staged).matches() || linkedParents(staged))) {
+      uncertain(f);
+      return;
+    }
+    if (staged != null && Files.exists(staged, LinkOption.NOFOLLOW_LINKS)) {
+      if (!plainSingleFile(staged)) {
+        uncertain(f);
+      } else if (restoreWithoutOverwrite(staged, canonical)) {
+        f.staged = null;
+        f.state = "kept";
+        f.reason = KEPT_PUT_BACK;
+      } else {
+        f.state = "kept";
+        f.reason = KEPT_IN_REMOVAL_FOLDER;
       }
-      default -> {
-        Path staged = f.staged == null ? null : root.resolve(f.staged).normalize();
-        if (staged != null && staged.startsWith(root.resolve(REMOVAL_FOLDER))
-            && Files.exists(staged, LinkOption.NOFOLLOW_LINKS)) {
-          if (restoreWithoutOverwrite(staged, canonical)) {
-            f.staged = null;
-            f.state = "kept";
-            f.reason = KEPT_PUT_BACK;
-          } else {
-            f.state = "kept";
-            f.reason = KEPT_IN_REMOVAL_FOLDER;
-          }
-        } else if (Files.exists(canonical, LinkOption.NOFOLLOW_LINKS)) {
-          f.staged = null;
-          f.state = "kept";
-          f.reason = KEPT_INTERRUPTED;
-        } else {
-          f.staged = null;
-          f.state = "deleted";
-          f.reason = null;
-        }
-      }
+    } else if (Files.exists(canonical, LinkOption.NOFOLLOW_LINKS)) {
+      f.staged = null;
+      f.state = "kept";
+      f.reason = KEPT_INTERRUPTED;
+    } else {
+      f.staged = null;
+      f.state = "deleted";
+      f.reason = null;
+    }
+  }
+
+  private static void uncertain(JournalFile f) {
+    f.state = "kept";
+    f.reason = KEPT_UNCERTAIN;
+  }
+
+  /** A regular file (not a link) with one link: the only thing recovery puts back. */
+  private static boolean plainSingleFile(Path p) {
+    try {
+      BasicFileAttributes attrs =
+          Files.readAttributes(p, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+      return attrs.isRegularFile() && !attrs.isSymbolicLink() && singleLink(p);
+    } catch (IOException unreadable) {
+      return false;
     }
   }
 

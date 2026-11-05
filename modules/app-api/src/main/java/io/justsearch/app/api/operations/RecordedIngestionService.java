@@ -25,6 +25,13 @@ public interface RecordedIngestionService {
     throw new UnsupportedOperationException("Recorded rebuild cancellation is unavailable");
   }
 
+  /**
+   * Whether an accepted installed-model activation is still open (accepted, running, or waiting to
+   * continue after a restart). "Remove files" refuses while one is (design D4): the activation was
+   * prepared from the files that are on disk now.
+   */
+  default boolean installerActivationOpen() { return false; }
+
   /** Existing operations maintenance cadence retries deferred admission and flushes committed progress. */
   void maintain();
 

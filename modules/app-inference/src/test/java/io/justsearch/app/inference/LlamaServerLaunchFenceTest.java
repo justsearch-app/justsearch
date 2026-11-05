@@ -2,6 +2,7 @@
 package io.justsearch.app.inference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -18,7 +19,7 @@ import java.net.http.HttpClient;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Optional;
+import java.util.concurrent.CopyOnWriteArrayList;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -27,7 +28,8 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * Design D4: while the answer model's files are being removed, starting the managed answer server
- * is refused before any process is launched; with the fence open the same start launches.
+ * is refused before any process is launched, as a refusal rather than a failed start; an admitted
+ * launch stays registered with the removal lock until its process exists.
  */
 final class LlamaServerLaunchFenceTest {
   private static final String REMOVING = "Removing files - try again when it finishes";
@@ -48,30 +50,41 @@ final class LlamaServerLaunchFenceTest {
   }
 
   @Test
-  void aFencedStartLaunchesNothingAndSaysWhy() throws Exception {
+  void aFencedStartLaunchesNothingAndIsARefusal() throws Exception {
     Path executable = HealthyFakeLlamaServer.install(tmp.resolve("fake-llama"));
     ops = ops();
-    ops.setLaunchFence(() -> Optional.of(REMOVING));
+    ops.setLaunchFence(() -> {
+      throw new IllegalStateException(REMOVING);
+    });
 
     ModeTransitionException refused = assertThrows(ModeTransitionException.class,
         () -> ops.startLlamaServer(request(executable)));
 
-    assertEquals(ModeTransitionException.Reason.ONLINE_START_FAILED, refused.reason());
+    assertInstanceOf(ManagedLaunchRefusedException.class, refused, "a refusal, not a failed start");
+    assertEquals(ModeTransitionException.Reason.ALREADY_TRANSITIONING, refused.reason());
     assertTrue(refused.getMessage().endsWith(REMOVING), refused.getMessage());
     assertEquals(List.of(), HealthyFakeLlamaServer.launches(tmp.resolve("fake-llama")),
         "no llama-server process was started");
   }
 
   @Test
-  void anOpenFenceLaunchesAsBefore() throws Exception {
-    Path executable = HealthyFakeLlamaServer.install(tmp.resolve("fake-llama"));
+  void anAdmittedLaunchIsRegisteredUntilItsProcessHasStarted() throws Exception {
+    Path fake = tmp.resolve("fake-llama");
+    Path executable = HealthyFakeLlamaServer.install(fake);
     ops = ops();
-    ops.setLaunchFence(Optional::empty);
+    List<String> seen = new CopyOnWriteArrayList<>();
+    ops.setLaunchFence(() -> {
+      seen.add("admitted; a managed process is live: " + ops.hasLiveManagedProcess());
+      return () -> seen.add("released; a managed process is live: " + ops.hasLiveManagedProcess());
+    });
 
     LlamaServerOps.StartResult start = ops.startLlamaServer(request(executable));
     ops.waitForServerHealth(start);
 
-    assertEquals(1, HealthyFakeLlamaServer.launches(tmp.resolve("fake-llama")).size());
+    assertEquals(List.of("admitted; a managed process is live: false",
+            "released; a managed process is live: true"), seen,
+        "the registration covers the process start and ends once the process exists");
+    assertEquals(1, HealthyFakeLlamaServer.launches(fake).size());
   }
 
   private LlamaServerOps ops() {
