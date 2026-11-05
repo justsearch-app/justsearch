@@ -2,6 +2,7 @@
 package io.justsearch.indexerworker.extract;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -163,6 +164,97 @@ class ArchiveExtractionLimitsTest {
     assertEquals("EMBEDDED_RESOURCE_LIMIT", failure.reasonCode());
   }
 
+  @Test
+  void parserConsumedPackageMemberBetweenOneAndTwoHundredRatioExtractsText() throws Exception {
+    Path file = commentedDocument(FormatId.XLSX, "xl/worksheets/sheet1.xml", 48_000);
+    try (var zip = new java.util.zip.ZipFile(file.toFile())) {
+      var member = zip.getEntry("xl/worksheets/sheet1.xml");
+      double ratio = (double) member.getSize() / member.getCompressedSize();
+      assertTrue(ratio > 100 && ratio < 200, "Fixture ratio: " + ratio);
+      assertTrue(zip.size() <= 128);
+      long expanded = zip.stream().mapToLong(ZipEntry::getSize).sum();
+      assertTrue(expanded < 100 * Files.size(file));
+    }
+    try (var parser = extractor(TikaExtractionPolicy.defaults())) {
+      var artifact = assertDoesNotThrow(() -> parser.extractArtifact(file),
+          "A parser-consumed part below 200x must not be refused at 100x");
+      assertTrue(artifact.result().content().contains("JUSTSEARCH_XLSX_SMOKE_MARKER"), artifact.result().content());
+    }
+  }
+
+  @Test
+  void realChildKeepsDepthAndExpansionReasonsAndAcceptsNormalFileAfterwards() throws Exception {
+    var policy = TikaExtractionPolicy.defaults();
+    try (var child = new PersistentExtractionSandbox(
+        io.justsearch.indexerworker.TestWorkerExecutorRegistrations.readers(),
+        ExtractionSandboxCommand.defaultCommand(policy, "256m"), policy,
+        OcrRoutingConfig.disabled(), java.time.Duration.ofSeconds(30), 1, 500, null)) {
+      Path normal = Files.writeString(tempDir.resolve("normal.txt"), "normalcapybara");
+      for (int depth : new int[] {8, 9}) {
+        byte[] content = bytes("nestedcapybara");
+        String name = "leaf.txt";
+        for (int i = 0; i < depth; i++) {
+          content = zip(Map.of(name, content));
+          name = "nested.zip";
+        }
+        Path file = Files.write(tempDir.resolve("depth-" + depth + ".zip"), content);
+        if (depth == 8) {
+          assertTrue(child.extract(file).result().content().contains("nestedcapybara"));
+        } else {
+          var failure = assertThrows(ContentExtractor.BudgetExceededException.class,
+              () -> child.extract(file));
+          assertEquals("EMBEDDED_DEPTH_LIMIT", failure.reasonCode());
+          assertTrue(child.extract(normal).result().content().contains("normalcapybara"));
+        }
+      }
+      Path bomb = archive("child-bomb.zip", Map.of("payload", bytes("A".repeat(128 * 1024))));
+      var failure = assertThrows(ContentExtractor.BudgetExceededException.class,
+          () -> child.extract(bomb));
+      assertEquals("ARCHIVE_EXPANSION_LIMIT", failure.reasonCode());
+      assertTrue(child.extract(normal).result().content().contains("normalcapybara"));
+    }
+  }
+
+  @Test
+  void nestedSiblingOfficePackagesShareThePartAllowanceThroughParserCallbacks() throws Exception {
+    byte[] first = spreadsheetWithParts(300);
+    byte[] second = spreadsheetWithParts(300);
+    byte[] third = spreadsheetWithParts(300);
+    byte[] last = spreadsheetWithParts(100);
+    var children = new LinkedHashMap<String, byte[]>();
+    children.put("second.xlsx", second);
+    children.put("third.xlsx", third);
+    children.put("last.xlsx", last);
+    var outer = new LinkedHashMap<String, byte[]>();
+    outer.put("first.xlsx", first);
+    outer.put("nested.zip", zip(children));
+    Path accepted = archive("nested-packages.zip", outer);
+    try (var parser = extractor(TikaExtractionPolicy.defaults())) {
+      var artifact = assertDoesNotThrow(() -> parser.extractArtifact(accepted));
+      assertTrue(artifact.result().content().contains("JUSTSEARCH_XLSX_SMOKE_MARKER"));
+    }
+    children.put("last.xlsx", spreadsheetWithParts(101));
+    outer.put("nested.zip", zip(children));
+    Path refused = archive("nested-packages-excess.zip", outer);
+    try (var parser = extractor(TikaExtractionPolicy.defaults())) {
+      var failure = assertThrows(ContentExtractor.BudgetExceededException.class,
+          () -> parser.extractArtifact(refused));
+      assertEquals("ARCHIVE_MEMBER_LIMIT", failure.reasonCode());
+    }
+  }
+
+  private static byte[] spreadsheetWithParts(int count) throws Exception {
+    var members = new LinkedHashMap<String, byte[]>();
+    try (var input = new ZipInputStream(new ByteArrayInputStream(
+        FormatCapabilityFixtureFactory.generate(FormatId.XLSX).bytes()))) {
+      ZipEntry entry;
+      while ((entry = input.getNextEntry()) != null) members.put(entry.getName(), input.readAllBytes());
+    }
+    for (int i = members.size(); i < count; i++) members.put("p" + i + ".xml", bytes("<part/>"));
+    assertEquals(count, members.size());
+    return zip(members);
+  }
+
   private PolicyDrivenTikaExtractor extractor(TikaExtractionPolicy policy) {
     return new PolicyDrivenTikaExtractor(workers -> {
       throw new AssertionError("OCR is disabled");
@@ -210,7 +302,9 @@ class ArchiveExtractionLimitsTest {
     var bytes = new ByteArrayOutputStream();
     try (var zip = new ZipOutputStream(bytes)) {
       for (var member : members.entrySet()) {
-        zip.putNextEntry(new ZipEntry(member.getKey()));
+        var entry = new ZipEntry(member.getKey());
+        entry.setTimeLocal(java.time.LocalDateTime.of(1980, 1, 1, 0, 0));
+        zip.putNextEntry(entry);
         zip.write(member.getValue());
         zip.closeEntry();
       }

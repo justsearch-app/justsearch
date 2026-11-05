@@ -2,6 +2,7 @@
 package io.justsearch.indexerworker.extract;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -130,14 +131,14 @@ class ContainerExpansionBudgetTest {
 
   @Test
   void packagePartsHaveABoundEvenWhenEmbeddedResourcesAreDisabled() throws Exception {
-    var policy = policy(0, 2, 32);
+    var policy = policy(0, 128, 4096);
     var members = new LinkedHashMap<String, byte[]>();
     members.put("[Content_Types].xml", new byte[] {1});
-    members.put("part.xml", new byte[] {2});
+    for (int i = 1; i < 1000; i++) members.put("p" + i + "/", new byte[0]);
     Path accepted = archive("package.zip", members);
     var acceptedWork = new ObservedWork();
-    budget(policy, accepted, acceptedWork).inspect(accepted);
-    assertEquals(2, acceptedWork.openedMembers);
+    assertDoesNotThrow(() -> budget(policy, accepted, acceptedWork).inspect(accepted));
+    assertEquals(1000, acceptedWork.openedMembers);
 
     members.put("excess.xml", new byte[] {3});
     Path rejected = archive("package-excess.zip", members);
@@ -145,8 +146,80 @@ class ContainerExpansionBudgetTest {
     var failure = assertThrows(ContentExtractor.BudgetExceededException.class,
         () -> budget(policy, rejected, rejectedWork).inspect(rejected));
     assertEquals("ARCHIVE_MEMBER_LIMIT", failure.reasonCode());
-    assertEquals(3, rejectedWork.visitedMembers);
+    assertEquals(1001, rejectedWork.visitedMembers);
     assertEquals(0, rejectedWork.openedMembers);
+  }
+
+  @Test
+  void packageExcessRefusesBeforeAnyMemberStreamOpens() throws Exception {
+    var members = packageMembers(1001);
+    Path file = archive("excess-package.zip", members);
+    var work = new ObservedWork();
+    var failure = assertThrows(ContentExtractor.BudgetExceededException.class,
+        () -> budget(TikaExtractionPolicy.defaults(), file, work).inspect(file));
+    assertEquals("ARCHIVE_MEMBER_LIMIT", failure.reasonCode());
+    assertEquals(0, work.openedMembers);
+  }
+
+  @Test
+  void nestedAndSiblingPackagesShareOneThousandParts() throws Exception {
+    // inspect is the same cumulative budget used by embedded callbacks. The outer package
+    // and two children each admit 300 entries; a final sibling consumes the remainder.
+    var budget = new ContainerExpansionBudget(TikaExtractionPolicy.defaults(), 1_000_000);
+    for (int i = 0; i < 3; i++) {
+      Path file = archive("nested-" + i + ".zip", packageMembers(300));
+      assertDoesNotThrow(() -> budget.inspect(file));
+    }
+    Path last = archive("last.zip", packageMembers(100));
+    assertDoesNotThrow(() -> budget.inspect(last));
+    Path excess = archive("sibling.zip", packageMembers(1));
+    var failure = assertThrows(ContentExtractor.BudgetExceededException.class,
+        () -> budget.inspect(excess));
+    assertEquals("ARCHIVE_MEMBER_LIMIT", failure.reasonCode());
+  }
+
+  @Test
+  void explicitRatioScalesOnlyPackageMembers() throws Exception {
+    byte[] content = "a".repeat(2400).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    Path file = archive("scaled.zip", Map.of("[Content_Types].xml", new byte[0],
+        "part", content, "padding", randomBytes(4096)));
+    var base = TikaExtractionPolicy.defaults();
+    var scaled = new TikaExtractionPolicy("scaled", base.maxExtractedChars(), base.maxInputBytes(),
+        base.maxOfficeInputBytes(), base.maxMetadataEntries(), base.maxMetadataKeyChars(),
+        base.maxMetadataValueChars(), base.maxEmbeddedResources(), base.maxEmbeddedDepth(), 80,
+        true, base.allowedMimeTypes(), base.excludedMimeTypes());
+    try (var zip = new ZipFile(file.toFile())) {
+      double ratio = (double) content.length / zip.getEntry("part").getCompressedSize();
+      assertTrue(ratio > 80 && ratio < 160, "Fixture ratio: " + ratio);
+    }
+    assertDoesNotThrow(() -> new ContainerExpansionBudget(scaled, Files.size(file)).inspect(file));
+  }
+
+  @Test
+  void spoofedPackagesAndGenericMembersKeepExpansionAndByteCeilings() throws Exception {
+    for (boolean spoof : new boolean[] {false, true}) {
+      var members = new LinkedHashMap<String, byte[]>();
+      if (spoof) members.put("[Content_Types].xml", new byte[0]);
+      members.put("payload", "a".repeat(128 * 1024).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+      members.put("padding", randomBytes(8192));
+      Path file = archive("bomb-" + spoof + ".zip", members);
+      var failure = assertThrows(ContentExtractor.BudgetExceededException.class,
+          () -> new ContainerExpansionBudget(TikaExtractionPolicy.defaults(), Files.size(file)).inspect(file));
+      assertEquals("ARCHIVE_EXPANSION_LIMIT", failure.reasonCode());
+    }
+  }
+
+  private static Map<String, byte[]> packageMembers(int count) {
+    var members = new LinkedHashMap<String, byte[]>();
+    members.put("[Content_Types].xml", new byte[0]);
+    for (int i = 1; i < count; i++) members.put("p" + i, new byte[] {1});
+    return members;
+  }
+
+  private static byte[] randomBytes(int length) {
+    byte[] bytes = new byte[length];
+    new java.util.Random(5).nextBytes(bytes);
+    return bytes;
   }
 
   private ContainerExpansionBudget budget(TikaExtractionPolicy policy, Path file, ObservedWork work)
@@ -177,7 +250,9 @@ class ContainerExpansionBudgetTest {
     Path file = tempDir.resolve(name);
     try (var output = new ZipOutputStream(Files.newOutputStream(file))) {
       for (var member : members.entrySet()) {
-        output.putNextEntry(new ZipEntry(member.getKey()));
+        var entry = new ZipEntry(member.getKey());
+        entry.setTimeLocal(java.time.LocalDateTime.of(1980, 1, 1, 0, 0));
+        output.putNextEntry(entry);
         output.write(member.getValue());
         output.closeEntry();
       }
