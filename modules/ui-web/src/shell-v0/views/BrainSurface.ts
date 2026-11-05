@@ -129,6 +129,7 @@ interface ModelPresence {
 
 const NUM = new Intl.NumberFormat();
 const PICTURE_CHOICE_UNKNOWN = 'Saved picture reading choice is not known. Refresh settings before changing it.';
+const PICTURE_MODEL_UNAVAILABLE = 'Not available with this answer model';
 
 /**
  * Round-15 scope-mismatch fix — the enrichment card's SCOPE, stated on the card itself.
@@ -1502,6 +1503,7 @@ export class BrainSurface extends JfElement {
         : pictureMismatch ? 'On — the saved Off choice is not applied'
         : !pictureChoice ? 'Off - files and read text kept'
         : !pictureFiles ? 'Unavailable — picture reading files are missing'
+        : mmproj === false ? PICTURE_MODEL_UNAVAILABLE
         : 'On',
       size: null, switchable: installed,
       blockedReason: !live ? 'Checking AI status before changing features.'
@@ -1516,9 +1518,9 @@ export class BrainSurface extends JfElement {
 
   private renderBrainSentence(verdict: AiEngineVerdict, installed: boolean, features: Record<BrainFeatureId, BrainFeature>, readingPictures: boolean | null): TemplateResult {
     const parts = composeBrainSentence(verdict, installed, features, readingPictures, this.aiKnown());
-    if (features.pictures.state === PICTURE_CHOICE_UNKNOWN) {
+    if (features.pictures.state === PICTURE_CHOICE_UNKNOWN || features.pictures.state === PICTURE_MODEL_UNAVAILABLE) {
       const picturePart = parts.find(part => part.feature === 'pictures');
-      if (picturePart) picturePart.text = `. ${PICTURE_CHOICE_UNKNOWN}`;
+      if (picturePart) picturePart.text = `. ${features.pictures.state}`;
     }
     for (let i = 1; i < parts.length; ++i) {
       const punctuation = parts[i]!.text.match(/^[.,]/)?.[0];

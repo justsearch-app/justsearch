@@ -89,6 +89,40 @@ beforeEach(() => {
 afterEach(() => { document.body.innerHTML = ''; store.listeners.clear(); vi.unstubAllGlobals(); });
 
 describe('picture reading live switch', () => {
+  it('shows model unavailability in both places when saved On has no live projector and remains operable', async () => {
+    enabled = true; emit(false);
+    const el = await mount();
+    const path = el.shadowRoot!.querySelector('[data-feature="pictures"]')!;
+    expect(path.textContent).toContain('Not available with this answer model');
+    expect(path.textContent).not.toMatch(/\bOn\b/);
+    expect(el.shadowRoot!.querySelector('.brain-sentence .feature-phrase[aria-controls="brain-feature-panel-pictures"]')!.textContent)
+      .toContain('Not available with this answer model');
+    expect(switches(el)).toHaveLength(2);
+    expect(switches(el).map(b => b.getAttribute('aria-checked'))).toEqual(['true', 'true']);
+    expect(switches(el).map(b => b.getAttribute('aria-disabled'))).toEqual(['false', 'false']);
+    expect(posts).toEqual([]);
+    switches(el)[1]!.click(); await settle(el);
+    expect(posts.map(p => p.pictureReadingEnabled)).toEqual([false]);
+    expect(path.textContent).toContain('Off - files and read text kept');
+  });
+
+  it.each([
+    { choice: true, projector: true, mode: 'online', state: 'On' },
+    { choice: false, projector: false, mode: 'online', state: 'Off - files and read text kept' },
+    { choice: true, projector: false, mode: 'offline', state: 'On' },
+    { choice: false, projector: false, mode: 'offline', state: 'Off - files and read text kept' },
+    { choice: true, projector: undefined, mode: 'online', state: 'On' },
+    { choice: false, projector: undefined, mode: 'online', state: 'Off - files and read text kept' },
+  ] as const)('preserves picture wording for choice $choice projector $projector mode $mode', async ({ choice, projector, mode, state }) => {
+    enabled = choice;
+    store.current = { ...store.current, aiEngine: { ...store.current.aiEngine, kind: mode },
+      runtime: { mode, installed: { known: true, value: true } }, runtimeStatus: { active: { mmprojActive: projector } } } as AiState;
+    const el = await mount();
+    expect([...el.shadowRoot!.querySelectorAll('[data-feature="pictures"] .step-meta')].at(-1)!.textContent).toBe(state);
+    expect(switches(el).map(b => b.getAttribute('aria-checked'))).toEqual([String(choice), String(choice)]);
+    expect(posts).toEqual([]);
+  });
+
   it('shows the unknown saved choice in both places after settings quarantine', async () => {
     settingsQuarantined = true;
     const el = await mount();
