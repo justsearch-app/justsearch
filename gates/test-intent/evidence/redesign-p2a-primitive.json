@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-05T10:40:10.097Z",
-  "revision": "d2e4ebf12ad9ecf7ff14a75dc27899395228e8e3",
-  "tree": "7d8c8a5860599590a16fe0dc2a2c12af49802f0e",
+  "createdAt": "2026-11-05T12:53:03.450Z",
+  "revision": "010ecb63ea8c401b7441ac464d7d54f1bdccf653",
+  "tree": "c0b562bd3d1e37d11bc3a4695b9f7124606d45fc",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,25 +21,25 @@
       "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.bootstrap.OriginApprovalEvaluatorTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2863
+      "durationMs": 3550
     },
     {
       "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.queue.StrictSourceOriginLoadingTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3128
+      "durationMs": 2687
     },
     {
       "command": "./gradlew :modules:app-observability:test --tests \"io.justsearch.app.observability.operations.ImportApprovalStatePersistenceTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2788
+      "durationMs": 3166
     },
     {
       "command": "./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.OriginApprovalExpiryTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3595
+      "durationMs": 2636
     }
   ],
   "checks": [
@@ -117,5 +117,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:10008af4ef0630ba5699302c33f6b9a3499fee1c5db39be9529559dedee98a83"
+  "digest": "sha256:e302067ca120f28d670a48e2c85dd85686e72ace9e38ee3fa5d20446a4109bfc"
 }

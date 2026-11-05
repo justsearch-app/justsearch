@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-05T10:40:53.875Z",
-  "revision": "d2e4ebf12ad9ecf7ff14a75dc27899395228e8e3",
-  "tree": "ebccb8b55f8671f3d88c1382c591d5341fde704b",
+  "createdAt": "2026-11-05T12:53:48.683Z",
+  "revision": "010ecb63ea8c401b7441ac464d7d54f1bdccf653",
+  "tree": "87a2ca6abd72aa47cb78d8dbe3e21af527cc9c0c",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,37 +21,37 @@
       "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.SourceEnvelopePublicationTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 8769
+      "durationMs": 9877
     },
     {
       "command": "./gradlew :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.SourceEnvelopePreservationTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3903
+      "durationMs": 3626
     },
     {
       "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.queue.AdmissionSourceWitnessTest\" --tests \"io.justsearch.indexerworker.queue.SourceOriginLookupTest\" --tests \"io.justsearch.indexerworker.queue.SourceOriginMigrationTest\" --tests \"io.justsearch.indexerworker.queue.RecordedWalkReceiptValidationTest\" --tests \"io.justsearch.indexerworker.queue.RecordedWalkIssuedClaimsTest\" --tests \"io.justsearch.indexerworker.queue.RecordedWalkSealTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 10200
+      "durationMs": 10486
     },
     {
       "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.registry.executor.RecordedIngestRecoveryDecisionTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3324
+      "durationMs": 2422
     },
     {
       "command": "./gradlew :modules:app-observability:test --tests \"io.justsearch.app.observability.operations.SqliteOperationStoreTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 7660
+      "durationMs": 6963
     },
     {
       "command": "./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.RecordedIngestionCoordinatorTest.dispatchesAcceptedWatchedReindexThroughMembershipFencedProducer\" --tests \"io.justsearch.app.engine.RecordedIngestionCoordinatorTest.gatedImportPublishesItsParentOriginOnAllRowsIncludingReopenedReplay\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 7536
+      "durationMs": 6510
     }
   ],
   "checks": [
@@ -152,7 +152,7 @@
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/SourceOriginLookupTest.java",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/SourceOriginLookupTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:34cf5bba42014091dfa106ac3a3f63908afc80d00228a75e8d714814252bda65",
+      "contentDigest": "sha256:c3693cb42ebb5a483b1c01140542b9ed4b42f8e7881efc4e33bc93bfb679bb95",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -171,7 +171,7 @@
       "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/SourceOriginMigrationTest.java",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/SourceOriginMigrationTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:21431df37f57e48610a2124241ad13372a00014f3a15c760524a3f31ff1879e9",
+      "contentDigest": "sha256:eec35ad21354b158dccde8861af651503c4c71fd5a9bcad5519d2cd0241531ba",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -442,7 +442,7 @@
       "id": "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/SqliteOperationStoreTest.java",
       "file": "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/SqliteOperationStoreTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:a59a89a80d4981c60f91d16484f5798e4b1b5a505dec3c5dcd96f4c944182d13",
+      "contentDigest": "sha256:7a2ed688cf4c29c28a88395041e8bf4382de5f29ccf10b02f796623a905e6a96",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -484,27 +484,27 @@
           "status": "passed"
         },
         {
-          "name": "[1] quarantine-directory",
+          "name": "interruptedQuarantineCannotResetTheHistoryFence(quarantine-directory)",
           "status": "passed"
         },
         {
-          "name": "[2] quarantine-operations.db",
+          "name": "interruptedQuarantineCannotResetTheHistoryFence(quarantine-operations.db)",
           "status": "passed"
         },
         {
-          "name": "[3] quarantine-operations.db-wal",
+          "name": "interruptedQuarantineCannotResetTheHistoryFence(quarantine-operations.db-wal)",
           "status": "passed"
         },
         {
-          "name": "[4] quarantine-operations.db-shm",
+          "name": "interruptedQuarantineCannotResetTheHistoryFence(quarantine-operations.db-shm)",
           "status": "passed"
         },
         {
-          "name": "[5] quarantine-finalized",
+          "name": "interruptedQuarantineCannotResetTheHistoryFence(quarantine-finalized)",
           "status": "passed"
         },
         {
-          "name": "[6] before-schema-commit",
+          "name": "interruptedQuarantineCannotResetTheHistoryFence(before-schema-commit)",
           "status": "passed"
         },
         {
@@ -569,5 +569,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:95c28c3f886d236c2e6f98d18c289d1129971dad3a3bb102382a6d6e5ac037e1"
+  "digest": "sha256:24ce6bbcc34ba25ac71e27a6f5bdef6ccc45e889c1e9823e25ae24cf11f0eed7"
 }
