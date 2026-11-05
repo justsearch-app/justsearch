@@ -41,6 +41,7 @@ existing tokenizer (``duplicate_prevalence.tokenize_near_duplicate``).
 from __future__ import annotations
 
 import argparse
+from bisect import bisect_left
 from collections import Counter, defaultdict
 import concurrent.futures
 import contextlib
@@ -80,6 +81,8 @@ DEPTH = 10
 GROUP_CAP = 10
 BATCH = 5
 PART_CHARS = 600
+REPEATED_WORDS = 6
+REPEATED_MIN = 8
 PASSAGES = 2
 SEED = 20261105
 CUTOFF = 2  # binary label: relevant when grade >= CUTOFF
@@ -348,33 +351,60 @@ def _part(norm: str, start: int) -> str:
     return part.strip()
 
 
-def excerpt(name: str, text: str, query: str) -> str:
-    """Name, beginning and the two best-matching non-overlapping windows, at most ~1,800
-    characters of document text, all whitespace-normalized; deterministic for its inputs."""
+def _excerpt_document(text: str) -> tuple[str, list[tuple[int, Counter[str]]]]:
+    """Query-independent windows, analysed once per document by ``build_excerpts``."""
     norm = _neutral(text)
-    lines = [f"Name: {_neutral(name)}"]
     if len(norm) <= PART_CHARS * (1 + PASSAGES):
-        return "\n".join(lines + [f"Start: {norm}"])
+        return norm, []
+
+    words = norm.split()
+    runs = Counter(tuple(words[i:i + REPEATED_WORDS])
+                   for i in range(len(words) - REPEATED_WORDS + 1))
+    repeated = bytearray(len(words))
+    for i in range(len(words) - REPEATED_WORDS + 1):
+        if runs[tuple(words[i:i + REPEATED_WORDS])] >= REPEATED_MIN:
+            repeated[i:i + REPEATED_WORDS] = b"\1" * REPEATED_WORDS
+    word_starts, repeated_prefix, toks = [], [0], []
+    for m, is_repeated in zip(re.finditer(r"\S+", norm), repeated):
+        word_starts.append(m.start())
+        repeated_prefix.append(repeated_prefix[-1] + is_repeated)
+        if not is_repeated:
+            # Keep the existing tokenizer and its offsets, including punctuation within words.
+            toks.extend((m.start() + t.start(), token)
+                        for t in re.finditer(r"[^\W_]+", m.group()) for token in ruq.tokens(t.group()))
+
     head = _part(norm, 0)
-    lines.append(f"Start: {head}")
-    terms = {t for t in ruq.tokens(query) if len(t) > 1 and t not in ruq._STOP}
-    # Tokens with their offsets, by the existing tokenizer (alphanumeric runs, case-folded).
-    toks = [(m.start(), t) for m in re.finditer(r"[^\W_]+", norm) for t in ruq.tokens(m.group())]
     starts = [m.start() for m in re.finditer(r"(?<= )\S", norm[len(head):])]
-    candidates, last, first, end = [], -PART_CHARS, 0, 0
+    windows, last, first, end = [], -PART_CHARS, 0, 0
     for rel in starts:
         pos = len(head) + rel
         if pos - last < PART_CHARS // 6:
             continue
         last = pos
+        word_first = bisect_left(word_starts, pos)
+        word_end = bisect_left(word_starts, pos + len(_part(norm, pos)))
+        if 2 * (repeated_prefix[word_end] - repeated_prefix[word_first]) > word_end - word_first:
+            continue
         while first < len(toks) and toks[first][0] < pos:
             first += 1
         end = max(end, first)
         while end < len(toks) and toks[end][0] < pos + PART_CHARS:
             end += 1
-        inside = [t for _, t in toks[first:end] if t in terms]
+        windows.append((pos, Counter(t for _, t in toks[first:end])))
+    return norm, windows
+
+
+def _excerpt(name: str, norm: str, windows: list[tuple[int, Counter[str]]], query: str) -> str:
+    lines = [f"Name: {_neutral(name)}"]
+    if len(norm) <= PART_CHARS * (1 + PASSAGES):
+        return "\n".join(lines + [f"Start: {norm}"])
+    lines.append(f"Start: {_part(norm, 0)}")
+    terms = {t for t in ruq.tokens(query) if len(t) > 1 and t not in ruq._STOP}
+    candidates = []
+    for pos, counts in windows:
+        inside = [counts[t] for t in terms if t in counts]
         if inside:
-            candidates.append((-len(set(inside)), -len(inside), pos))
+            candidates.append((-len(inside), -sum(inside), pos))
     chosen: list[int] = []
     for _, _, start in sorted(candidates):
         if all(abs(start - other) >= PART_CHARS for other in chosen):
@@ -385,15 +415,27 @@ def excerpt(name: str, text: str, query: str) -> str:
     return "\n".join(lines)
 
 
+def excerpt(name: str, text: str, query: str) -> str:
+    """Name, beginning and up to two non-overlapping content windows, at most ~1,800
+    characters of document text, all whitespace-normalized; deterministic for its inputs."""
+    norm, windows = _excerpt_document(text)
+    return _excerpt(name, norm, windows, query)
+
+
 def build_excerpts(c: Collection, pools: dict, extracted: dict[str, dict]) -> dict:
     out = {}
     missing = []
+    by_doc = defaultdict(list)
     for qid, q in pools["queries"].items():
         for doc in q["pairs"]:
             if doc not in extracted:
                 missing.append(doc)
                 continue
-            text = excerpt(PurePosixPath(c.documents[doc]).name, extracted[doc]["text"], c.queries[qid].text)
+            by_doc[doc].append(qid)
+    for doc, qids in by_doc.items():
+        norm, windows = _excerpt_document(extracted[doc]["text"])
+        for qid in qids:
+            text = _excerpt(PurePosixPath(c.documents[doc]).name, norm, windows, c.queries[qid].text)
             out.setdefault(qid, {})[doc] = {"excerpt": text, "excerpt_sha256": sha256_text(text),
                                             "extracted_sha256": extracted[doc]["extracted_sha256"]}
     if missing:
