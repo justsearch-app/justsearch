@@ -69,6 +69,18 @@ five checks in the edited Chromium file against their original before-state. At 
 actions now share two rows inside the bar; the full notice stays available when its text is clamped.
 Both evidence runs use temporary shared clones and copied dependencies, with the unchanged producer.
 
+Font-metrics repair: the baseline 1fc4f0bcec passes 24 default-font Chromium checks. DejaVu Sans
+with 3 px notice-only letter spacing reproduces both CI failures by assertion (900×700 unknown
+window; 1280 px notice beside a problem). Line clamping hid overflow. Notices now use measured
+inline geometry and move under the top bar when more than two lines are needed; text is never
+clamped. ResizeObserver rechecks text, font and frame dimensions, including returning beside the
+pill after widening. `shell-s3c-fonts-repaired.json` records the new regressions against
+1fc4f0bcece024cc30624560627ee0e9bd7b7307; `shell-s3c-fonts-preserved.json` refreshes the earlier
+checks against their original baseline 7ed8454d85; `shell-s3c-fonts-repaired.json` also reruns every check in
+both edited Chromium files. The unchanged producer uses a temporary Git adapter for shared clones
+and a Node adapter limiting Vitest to four workers. All checkouts use copied dependencies, private
+Vite ports and owned headless Chromium processes; no shared service is touched.
+
 Recorded reason (L12, orchestrator decision): `pendingAuthorizationBridge.test.ts` pinned that a
 broadcast with no source keeps its dialog on arrival. The brief retires that: such a request is not
 the person's own action, so it waits in Needs you. The own-transport cases of that check stay.
@@ -449,10 +461,10 @@ the person's own action, so it waits in Needs you. The own-transport cases of th
         }
       ],
       "repaired": true,
-      "evidence": "gates/test-intent/evidence/shell-s3c-topbar-preserved.json",
+      "evidence": "gates/test-intent/evidence/shell-s3c-fonts-preserved.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts#11 the narrow area menu closes when the window widens past its button, and focus stays on the switcher",
-        "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts#11 at 1280 px a notice beside a problem leaves the switcher centred; pill and notice stay readable",
+        "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts#11 at 1280 px a notice beside a problem leaves the switcher centred; pill and notice stay readable (default font)",
         "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts#11 at 600 px the pill shows the number of problems, as it does for needs-you",
         "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts#L6 a plugin item whose words are in its own shadow root keeps them as its tooltip; an empty one its declared label",
         "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts#11 a long plugin item's provenance chip keeps whole words; its full text stays available"
@@ -463,7 +475,7 @@ the person's own action, so it waits in Needs you. The own-transport cases of th
         "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts"
       ],
       "class": "New",
-      "behaviour": "Redirect notices stay inside the top bar at 1280×800, 900×800 and 600×400, in at most two lines with full text in a tooltip and accessible name when truncated, while the switcher stays centred within 2 px. Health redirects to System using plain names; a much longer window name is bounded too. A window with no available plain name keeps its id. Existing unknown-address assertions are unchanged.",
+      "behaviour": "Redirect notices name windows plainly (Opened System instead of Health), retaining an id only when no plain name is available. Placement is adapted by the orchestrator decision recorded below.",
       "sources": [
         {
           "kind": "owner-words",
@@ -472,10 +484,123 @@ the person's own action, so it waits in Needs you. The own-transport cases of th
         }
       ],
       "repaired": true,
-      "evidence": "gates/test-intent/evidence/shell-s3c-topbar-repaired.json",
+      "evidence": "gates/test-intent/evidence/shell-s3c-fonts-preserved.json",
       "newChecks": [
-        "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts#redirect notices stay inside the bar in at most two lines with a centred switcher at every size",
         "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts#redirect notices use window names and retain an id only when no name is available"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation",
+        "input re-encoding"
+      ],
+      "whatMoved": "Adaptation of this PR's own new, never-shipped redirect placement check, on the orchestrator's decision after builder-4 (not an owner decision). The obsolete inside-the-bar/two-line/truncation oracle becomes full readability with conditional placement: beside when the words fit within two lines, otherwise under the top bar. The check independently probes the inline slot, checks visible full text and no overlap with pill or switcher, and returns from 600 to 1280 px. Every centring, pill and action assertion stays; default and wide-font variants add 900×700 coverage. Serves X2 and C1.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "Decide what you can judge better than the user, which is most work: scope, scenarios, fixing now or deferring, design options, retries, restarting or resuming work the host stopped.",
+          "delegationLocation": "task t-20261103-shell user turn (working agreement, Deciding)",
+          "delegationScope": "The orchestrator's bounded repair of this PR's own unshipped top-bar notice placement check; preserve all centring, pill and action assertions.",
+          "choice": "Orchestrator decision after builder-4: replace the redirect-notice placement assertions with full readability; beside the pill when at most two lines fit, otherwise under the bar; never cover the pill or switcher; keep centring within 2 px, an uncut pill and every offered action. This is the orchestrator's decision, not the owner's.",
+          "label": "agent choice (orchestrator decision)"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "X2",
+          "quote": "Sizes 1280×800, 900×800, 600×400: nothing overflows sideways",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "C1",
+          "quote": "unknown destinations … show at the place of the action … or in the pill; never silently dropped",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s3c-fonts-repaired.json"
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts",
+        "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "With DejaVu Sans plus 3 px notice-only letter spacing, the unknown-address notice remains readable in full at 900×700 and the 1280 px notice beside a problem remains readable, without cutting the pill or losing Choose destination. Redirect notices stay fully readable under default and wide metrics, beside the pill when they fit in two lines and otherwise below the bar, with no overlap and centred navigation at 1280×800, 900×700/800 and 600×400.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "Decide what you can judge better than the user, which is most work: scope, scenarios, fixing now or deferring, design options, retries, restarting or resuming work the host stopped.",
+          "delegationLocation": "task t-20261103-shell user turn (working agreement, Deciding)",
+          "delegationScope": "The orchestrator's bounded repair of this PR's own unshipped top-bar notice placement check; preserve all centring, pill and action assertions.",
+          "choice": "Orchestrator decision after builder-4: replace the redirect-notice placement assertions with full readability; beside the pill when at most two lines fit, otherwise under the bar; never cover the pill or switcher; keep centring within 2 px, an uncut pill and every offered action. This is the orchestrator's decision, not the owner's.",
+          "label": "agent choice (orchestrator decision)"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "X2",
+          "quote": "Sizes 1280×800, 900×800, 600×400: nothing overflows sideways",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "C1",
+          "quote": "unknown destinations … show at the place of the action … or in the pill; never silently dropped",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s3c-fonts-repaired.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#L3 a notice for a window that does not exist is readable at every size (wide font) 900×700: the notice can be read, the pill is not cut and \"Choose destination\" is offered",
+        "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts#11 at 1280 px a notice beside a problem leaves the switcher centred; pill and notice stay readable (wide font)",
+        "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts#redirect notices stay readable in full beside the pill when they fit, otherwise below the bar; the switcher stays centred (default font)",
+        "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts#redirect notices stay readable in full beside the pill when they fit, otherwise below the bar; the switcher stays centred (wide font)"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts",
+        "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Every check in both edited Chromium files is rerun, including default and wide unknown-address sizes, unknown-id forms and every existing navigation, settings, forced-colour, plugin, name and action assertion. The wide variant forces DejaVu Sans and deterministic 3 px letter spacing on notice text, without widening action labels or changing their assertions. Navigation and readiness both have 45 second timeouts.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "Decide what you can judge better than the user, which is most work: scope, scenarios, fixing now or deferring, design options, retries, restarting or resuming work the host stopped.",
+          "delegationLocation": "task t-20261103-shell user turn (working agreement, Deciding)",
+          "delegationScope": "The orchestrator's bounded repair of this PR's own unshipped top-bar notice placement check; preserve all centring, pill and action assertions.",
+          "choice": "Orchestrator decision after builder-4: replace the redirect-notice placement assertions with full readability; beside the pill when at most two lines fit, otherwise under the bar; never cover the pill or switcher; keep centring within 2 px, an uncut pill and every offered action. This is the orchestrator's decision, not the owner's.",
+          "label": "agent choice (orchestrator decision)"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "X2",
+          "quote": "Sizes 1280×800, 900×800, 600×400: nothing overflows sideways",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "C1",
+          "quote": "unknown destinations … show at the place of the action … or in the pill; never silently dropped",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "repaired": false,
+      "evidence": "gates/test-intent/evidence/shell-s3c-fonts-repaired.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts",
+        "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts"
       ]
     }
   ]

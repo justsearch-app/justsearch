@@ -20,6 +20,10 @@ const SETTINGS = 'core.settings-surface';
 /** The page: catalog, a stubbed backend and the real `<jf-shell>`; everything else is the app's own code. */
 const HARNESS = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <link rel="stylesheet" href="/src/styles/tokens.css"></head><body><script type="module">
+// Exercise font metrics independently of the machine's default installed fonts.
+if (new URLSearchParams(location.search).has('wideFont')) {
+  document.body.style.fontFamily = '"DejaVu Sans", sans-serif';
+}
 const json = (body) => new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
 // ?registryDelay=<ms> holds the boot's window-catalog response, as a busy engine does: the app
 // keeps starting (Settings mounts ahead of its first opening) before the address is applied.
@@ -107,9 +111,16 @@ async function open(width = 1280, height = 800, query = '', hash = ''): Promise<
   context = await browser.newContext({ viewport: { width, height } });
   const page = await context.newPage();
   page.on('pageerror', error => console.info('pageerror', error.message));
-  await page.goto(`${url}${query}${hash}`);
-  await page.locator('body[data-ready="true"]').waitFor();
+  await page.goto(`${url}${query}${hash}`, { timeout: 45_000 });
+  await page.locator('body[data-ready="true"]').waitFor({ timeout: 45_000 });
   await page.locator('jf-top-bar').waitFor();
+  if (query.includes('wideFont')) {
+    await page.locator('jf-status-pill').evaluate(pill => {
+      const style = document.createElement('style');
+      style.textContent = '.beside-notice, .notice-below, .trigger.notice .label { font-family: "DejaVu Sans", sans-serif; letter-spacing: 3px; }';
+      pill.shadowRoot!.append(style);
+    });
+  }
   await settle(page);
   return page;
 }
@@ -203,18 +214,35 @@ async function pillCut(page: Page): Promise<boolean> {
   return page.locator('jf-status-pill button.trigger').evaluate(el => el.scrollWidth > el.clientWidth + 1);
 }
 
-describe('L3 a notice for a window that does not exist is readable at every size', () => {
-  it.each([[1280, 800], [900, 700], [600, 400]])('%i×%i: the notice can be read, the pill is not cut and "Choose destination" is offered', async (width, height) => {
-    const page = await open(width, height);
+describe.each(['default', 'wide'])('L3 a notice for a window that does not exist is readable at every size (%s font)', (font) => {
+  it.each([[1280, 800], [900, 700], [900, 800], [600, 400]])('%i×%i: the notice can be read, the pill is not cut and "Choose destination" is offered', async (width, height) => {
+    const page = await open(width, height, font === 'wide' ? '?wideFont=1' : '');
     await page.evaluate(() => { location.hash = '#justsearch://surface/core.nope-window'; });
     await settle(page);
     expect(await readableNotices(page), `${width}×${height}`).not.toEqual([]);
+    const layout = await page.evaluate(() => {
+      const bar = document.querySelector('jf-shell')!.shadowRoot!.querySelector('jf-top-bar')!;
+      const nav = bar.shadowRoot!.querySelector('nav')!.getBoundingClientRect();
+      const root = bar.querySelector('jf-status-pill')!.shadowRoot!;
+      const trigger = root.querySelector('.trigger')!;
+      const pill = trigger.getBoundingClientRect();
+      const text = [...root.querySelectorAll('.beside-notice, .notice-below, .trigger.notice .label')].find(el => {
+        const rect = el.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      })!;
+      const notice = text.getBoundingClientRect();
+      const overlaps = (r: DOMRect) => notice.left < r.right && notice.right > r.left && notice.top < r.bottom && notice.bottom > r.top;
+      return { centre: (nav.left + nav.right) / 2, half: innerWidth / 2, coversPill: !trigger.contains(text) && overlaps(pill),
+        coversSwitcher: overlaps(nav), sideways: document.documentElement.scrollWidth > innerWidth };
+    });
+    expect(Math.abs(layout.centre - layout.half), JSON.stringify(layout)).toBeLessThanOrEqual(2);
+    expect(layout).toMatchObject({ coversPill: false, coversSwitcher: false, sideways: false });
     expect(await pillCut(page)).toBe(false);
     expect(await page.getByRole('button', { name: 'Choose destination' }).isVisible()).toBe(true);
   }, 120_000);
 
   it.each(['vendor.nope-window', 'nope-window'])('C1 an unknown destination %s shows the same notice', async (id) => {
-    const page = await open();
+    const page = await open(1280, 800, font === 'wide' ? '?wideFont=1' : '');
     await page.evaluate((target) => { location.hash = `#justsearch://surface/${target}`; }, id);
     await settle(page);
     expect(await readableNotices(page), id).not.toEqual([]);
@@ -296,7 +324,7 @@ describe('C9 closing Settings once keeps the area and leaves no Settings entry b
     await area(page, LIBRARY);
     await openSettings(page);
     await page.reload();
-    await page.locator('body[data-ready="true"]').waitFor();
+    await page.locator('body[data-ready="true"]').waitFor({ timeout: 45_000 });
     await settle(page, 800);
     expect(await where(page)).toMatchObject({ settings: true, stage: 'jf-library-surface' });
     await page.keyboard.press('Escape'); await settle(page, 400);
@@ -327,7 +355,7 @@ describe('FR3 the window under Settings shows its addressed tab', () => {
     });
     expect(await tabBehind()).toBe('Browse');
     await page.reload();
-    await page.locator('body[data-ready="true"]').waitFor();
+    await page.locator('body[data-ready="true"]').waitFor({ timeout: 45_000 });
     await settle(page, 800);
     expect(await where(page)).toMatchObject({ settings: true, stage: 'jf-library-surface' });
     expect(await tabBehind()).toBe('Browse');
@@ -343,7 +371,7 @@ describe('FR3 the Settings section in the address wins over the one Settings rem
     expect(await where(page)).toMatchObject({ settings: true, address: `${SETTINGS}?section=developer` });
     expect(await settingsSection(page)).toBe('developer');
     await page.reload();
-    await page.locator('body[data-ready="true"]').waitFor();
+    await page.locator('body[data-ready="true"]').waitFor({ timeout: 45_000 });
     await settle(page, 2500);
     expect(await where(page)).toMatchObject({ settings: true, address: `${SETTINGS}?section=developer` });
     expect(await settingsSection(page)).toBe('developer');

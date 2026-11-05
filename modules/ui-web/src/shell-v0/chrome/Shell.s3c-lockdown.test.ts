@@ -20,6 +20,10 @@ const NOTICE = "Couldn't find that window";
 /** The page: catalog, a stubbed backend and the real `<jf-shell>`; everything else is the app's own code. */
 const HARNESS = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <link rel="stylesheet" href="/src/styles/tokens.css"></head><body><script type="module">
+// Exercise font metrics independently of the machine's default installed fonts.
+if (new URLSearchParams(location.search).has('wideFont')) {
+  document.body.style.fontFamily = '"DejaVu Sans", sans-serif';
+}
 const json = (body) => new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
 // ?registryDelay=<ms> holds the boot's window-catalog response, as a busy engine does: the app
 // keeps starting (Settings mounts ahead of its first opening) before the address is applied.
@@ -112,6 +116,13 @@ async function open(width = 1280, height = 800, query = '', hash = ''): Promise<
   await page.goto(`${url}${query}${hash}`, { timeout: 45_000 });
   await page.locator('body[data-ready="true"]').waitFor({ timeout: 45_000 });
   await page.locator('jf-top-bar').waitFor();
+  if (query.includes('wideFont')) {
+    await page.locator('jf-status-pill').evaluate(pill => {
+      const style = document.createElement('style');
+      style.textContent = '.beside-notice, .notice-below, .trigger.notice .label { font-family: "DejaVu Sans", sans-serif; letter-spacing: 3px; }';
+      pill.shadowRoot!.append(style);
+    });
+  }
   await settle(page);
   return page;
 }
@@ -127,7 +138,7 @@ async function settle(page: Page, ms = 150): Promise<void> {
  * real size, inside the window, not clipped or cut off, not covered, and not hidden from assistive
  * technology. (The pill's live announcer holds the same words in a one-pixel clipped box.)
  */
-async function readableNotices(page: Page): Promise<string[]> {
+async function readableNotices(page: Page, words = NOTICE): Promise<string[]> {
   return page.evaluate((words) => {
     const found: string[] = [];
     const visit = (root: ParentNode): void => {
@@ -154,7 +165,7 @@ async function readableNotices(page: Page): Promise<string[]> {
     };
     visit(document);
     return found;
-  }, NOTICE);
+  }, words);
 }
 
 /** A plugin failed to load: a problem the pill shows until it is dismissed. */
@@ -201,8 +212,8 @@ it('11 the narrow area menu closes when the window widens past its button, and f
   }
 }, 120_000);
 
-it('11 at 1280 px a notice beside a problem leaves the switcher centred; pill and notice stay readable', async () => {
-  const page = await open(1280, 800);
+it.each(['default', 'wide'])('11 at 1280 px a notice beside a problem leaves the switcher centred; pill and notice stay readable (%s font)', async (font) => {
+  const page = await open(1280, 800, font === 'wide' ? '?wideFont=1' : '');
   await problem(page);
   await page.evaluate(() => { location.hash = '#justsearch://surface/core.nope-window'; });
   await settle(page, 400);
@@ -277,13 +288,13 @@ it('11 a long plugin item\'s provenance chip keeps whole words; its full text st
 }, 120_000);
 
 
-it('redirect notices stay inside the bar in at most two lines with a centred switcher at every size', async () => {
-  const page = await open();
+it.each(['default', 'wide'])('redirect notices stay readable in full beside the pill when they fit, otherwise below the bar; the switcher stays centred (%s font)', async (font) => {
+  const page = await open(1280, 800, font === 'wide' ? '?wideFont=1' : '');
   await problem(page);
   for (const target of [HEALTH, LONG_WINDOW]) {
     await page.evaluate(id => { location.hash = `#justsearch://surface/${id}`; }, target);
     await settle(page, 400);
-    for (const [width, height] of [[1280, 800], [900, 800], [600, 400]]) {
+    for (const [width, height] of [[1280, 800], [900, 700], [900, 800], [600, 400], [1280, 800]]) {
       await page.setViewportSize({ width: width!, height: height! });
       await settle(page);
       const layout = await page.evaluate(() => {
@@ -296,26 +307,42 @@ it('redirect notices stay inside the bar in at most two lines with a centred swi
         const style = getComputedStyle(notice);
         const range = document.createRange(); range.selectNodeContents(notice);
         const painted = [...range.getClientRects()];
-        const clips = style.overflow === 'hidden' || style.overflow === 'clip';
+        const trigger = pill.shadowRoot!.querySelector('.trigger')!.getBoundingClientRect();
+        const overlaps = (r: DOMRect) => box.left < r.right && box.right > r.left && box.top < r.bottom && box.bottom > r.top;
+        // Measure the same words in the inline slot without the fallback's positioning. This
+        // checks both directions: fitting text must return beside the pill after a resize.
+        const originalStyle = notice.style.cssText;
+        notice.style.position = 'static';
+        notice.style.width = 'auto';
+        notice.style.maxWidth = 'var(--frame-menu-width)';
+        notice.style.paddingBlock = '0';
+        notice.style.paddingInline = innerWidth < 720 ? 'var(--jf-space-1)' : 'var(--jf-space-2)';
+        const inline = notice.getBoundingClientRect();
+        const fits = inline.width > 0 && inline.height <= parseFloat(style.lineHeight) * 2 + 1
+          && notice.scrollWidth <= notice.clientWidth + 1;
+        notice.style.cssText = originalStyle;
         return { width: innerWidth, target: notice.textContent?.trim(), centre: (nav.left + nav.right) / 2,
           half: innerWidth / 2, top: box.top, bottom: box.bottom, barTop: frame.top, barBottom: frame.bottom,
           height: box.height, lineHeight: parseFloat(style.lineHeight), visible: box.width > 0 && box.height > 0,
-          paintedInside: clips || painted.every(r => r.top >= frame.top && r.bottom <= frame.bottom),
+          paintedInside: painted.every(r => r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight),
           clipped: notice.scrollHeight > notice.clientHeight + 1 || notice.scrollWidth > notice.clientWidth + 1,
-          title: notice.title, name: notice.getAttribute('aria-label') };
+          coversPill: overlaps(trigger), coversSwitcher: overlaps(nav), fits };
       });
       const evidence = JSON.stringify(layout);
       expect(layout.visible, evidence).toBe(true);
-      expect(layout.height, evidence).toBeLessThanOrEqual(layout.lineHeight * 2 + 1);
-      expect(layout.top, evidence).toBeGreaterThanOrEqual(layout.barTop);
-      expect(layout.bottom, evidence).toBeLessThanOrEqual(layout.barBottom);
+      expect(layout.clipped, evidence).toBe(false);
       expect(layout.paintedInside, evidence).toBe(true);
-      expect(Math.abs(layout.centre - layout.half), evidence).toBeLessThanOrEqual(2);
-      if (layout.clipped) {
-        expect(layout.title, evidence).toBe(layout.target);
-        expect(layout.name, evidence).toBe(layout.target);
-        expect(await page.getByRole('note', { name: layout.target!, exact: true }).count()).toBe(1);
+      expect(layout.coversPill, evidence).toBe(false);
+      expect(layout.coversSwitcher, evidence).toBe(false);
+      expect(await readableNotices(page, layout.target!), evidence).toContain('beside-notice');
+      if (layout.fits) {
+        expect(layout.height, evidence).toBeLessThanOrEqual(layout.lineHeight * 2 + 1);
+        expect(layout.top, evidence).toBeGreaterThanOrEqual(layout.barTop);
+        expect(layout.bottom, evidence).toBeLessThanOrEqual(layout.barBottom);
+      } else {
+        expect(layout.top, evidence).toBeGreaterThanOrEqual(layout.barBottom);
       }
+      expect(Math.abs(layout.centre - layout.half), evidence).toBeLessThanOrEqual(2);
       expect(await page.locator('jf-status-pill button.trigger').evaluate(el => el.scrollWidth > el.clientWidth + 1)).toBe(false);
       const action = page.getByRole('button', { name: 'Undo auto-correction', exact: true });
       expect(await action.isVisible()).toBe(true);

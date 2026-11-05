@@ -53,6 +53,7 @@ export class StatusPill extends JfElement {
   /** Window narrower than 1000 px: the state reads from the icon (badge, ring or dot); the name stays on the button. */
   declare narrow: boolean;
   private narrowQuery: MediaQueryList | null = null;
+  private noticeResize: ResizeObserver | null = null;
   private readonly narrowChange = (): void => { this.narrow = this.narrowQuery?.matches ?? false; };
   readonly status = new FrameStatusController(this);
   private readonly transient = new TransientController(this, {
@@ -71,30 +72,35 @@ export class StatusPill extends JfElement {
     jf-status-badge { min-width: 0; max-width: 100%; }
     jf-status-badge::part(badge) { min-width: 0; max-width: 100%; box-sizing: border-box; }
     .transient-action { font: inherit; color: var(--text-tint); background: var(--surface-2); border: 0; border-radius: var(--frame-pill-radius); padding: var(--jf-space-1) var(--jf-space-2); }
-    /* Notices give way within two lines; their full words stay in the tooltip and accessible name. */
+    /* Measure the full words; notices that need more than two lines move below the bar. */
     .beside-notice { align-self: center; flex: 0 1 auto; min-width: 0; max-width: var(--frame-menu-width); padding-inline: var(--jf-space-2);
       color: var(--text-secondary); font-size: var(--font-size-xs); line-height: 1.2; white-space: normal; overflow-wrap: normal;
     }
-    .beside-notice, .notice-below, .trigger.notice .label { display: -webkit-box; -webkit-box-orient: vertical;
-      -webkit-line-clamp: 2; max-block-size: min(2lh, var(--frame-topbar-height)); overflow: hidden;
-      white-space: normal; overflow-wrap: anywhere; }
+    .beside-notice, .notice-below, .trigger.notice .label { white-space: normal; overflow-wrap: anywhere; }
     .trigger.notice { flex: 0 1 auto; }
     .trigger.notice .label { min-width: 0; flex: 0 1 auto; text-align: start; }
     .trigger { flex: none; }
     .transient-action { white-space: nowrap; flex: none; }
     .content { display: inline-flex; align-items: center; gap: var(--jf-space-2); min-width: 0; }
     .trigger.stale { outline: var(--frame-hairline) dashed var(--border-emphasized); }
-    /* The status words stay whole. In the minimal bar the notice and action share two rows beside the icon. */
+    /* The status words stay whole. In the minimal bar the action has its own row. */
     .label { white-space: nowrap; flex: none; }
     .notice-below { display: none; }
     @media (max-width: 719px) {
       :host { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; }
       .label, .trigger.notice .label { display: none; }
       .trigger { grid-column: 1; grid-row: 1; }
-      .beside-notice, .notice-below { grid-column: 2; grid-row: 1; display: -webkit-box;
+      .beside-notice, .notice-below { grid-column: 2; grid-row: 1; display: block;
         min-width: 0; padding-inline: var(--jf-space-1); font-size: var(--font-size-xs); line-height: 1.2;
         color: var(--text-secondary); }
       .transient-action { grid-column: 1 / -1; grid-row: 2; justify-self: end; font-size: var(--font-size-xs); }
+    }
+    :host([notice-under]) .trigger.notice .label { display: none; }
+    :host([notice-under]) .beside-notice, :host([notice-under]) .notice-below {
+      display: block; position: fixed; top: var(--frame-status-notice-top); left: var(--jf-space-2); right: var(--jf-space-2);
+      width: auto; max-width: none; box-sizing: border-box; padding: var(--jf-space-2);
+      background: var(--surface-1); color: var(--text-secondary); font-size: var(--font-size-xs); line-height: 1.2;
+      z-index: var(--z-overlay-top);
     }
     .symbol { color: var(--text-secondary); }
     .calm .symbol { color: var(--text-success); }
@@ -136,6 +142,7 @@ export class StatusPill extends JfElement {
     this.narrowQuery = typeof window.matchMedia === 'function' ? window.matchMedia('(max-width: 999px)') : null;
     this.narrowQuery?.addEventListener('change', this.narrowChange);
     this.narrowChange();
+    if (typeof ResizeObserver !== 'undefined') this.noticeResize = new ResizeObserver(this.placeNotice);
   }
   override disconnectedCallback(): void {
     super.disconnectedCallback();
@@ -146,6 +153,8 @@ export class StatusPill extends JfElement {
     document.removeEventListener('visibilitychange', this.visibility);
     this.narrowQuery?.removeEventListener('change', this.narrowChange);
     this.narrowQuery = null;
+    this.noticeResize?.disconnect();
+    this.noticeResize = null;
     this.open = false;
   }
   protected override willUpdate(changed: PropertyValues): void {
@@ -154,6 +163,13 @@ export class StatusPill extends JfElement {
     if (changed.has('authorizationHost')) this.status.refresh();
   }
   protected override updated(changed: PropertyValues): void {
+    this.noticeResize?.disconnect();
+    this.noticeResize?.observe(this);
+    if (this.parentElement) this.noticeResize?.observe(this.parentElement);
+    for (const element of this.shadowRoot!.querySelectorAll('.beside-notice, .notice-below, .trigger, .label, .transient-action')) {
+      this.noticeResize?.observe(element);
+    }
+    this.placeNotice();
     if (changed.has('open')) {
       if (this.open) {
         this.transient.open();
@@ -181,6 +197,21 @@ export class StatusPill extends JfElement {
       } else this.transient.close();
     }
   }
+  /** Recheck the inline slot on text, font or frame-size changes, including a return from below. */
+  private readonly placeNotice = (): void => {
+    this.removeAttribute('notice-under');
+    const notice = this.shadowRoot?.querySelector<HTMLElement>('.beside-notice')
+      ?? this.shadowRoot?.querySelector<HTMLElement>(window.innerWidth < 720 ? '.notice-below' : '.trigger.notice .label');
+    if (!notice || !this.parentElement) return;
+    const box = notice.getBoundingClientRect();
+    const bar = this.parentElement.getBoundingClientRect();
+    const style = getComputedStyle(notice);
+    const lineHeight = parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.2;
+    if (box.width > 0 && box.height <= lineHeight * 2 + 1
+      && notice.scrollWidth <= notice.clientWidth + 1 && box.top >= bar.top && box.bottom <= bar.bottom) return;
+    this.style.setProperty('--frame-status-notice-top', `${bar.bottom}px`);
+    this.setAttribute('notice-under', '');
+  };
   /** A length token in px (rem resolves against the root font size); 0 when the token is not defined. */
   private cssPx(name: string): number {
     const value = getComputedStyle(this).getPropertyValue(name).trim();
