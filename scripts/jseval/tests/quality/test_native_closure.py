@@ -10,14 +10,16 @@ Names are spelled out so the checks stand on their own.
 from __future__ import annotations
 
 from dataclasses import replace
+import json
 import os
 from pathlib import Path
-import platform
 import subprocess
+import sys
 
 import pytest
 
 from jseval.quality import index as ix
+from jseval.quality.types import sha256_text
 from .conftest import pinned_env
 from .helpers import make_collection
 from .test_index import collection, config  # noqa: F401 (fixtures)
@@ -30,7 +32,6 @@ DATA_FALLBACKS = ("native-bin/llama-server/variants/cuda12/libonnxruntime.so",
 MODEL_GPU_SWITCHES = ("JUSTSEARCH_EMBED_GPU_ENABLED", "JUSTSEARCH_SPLADE_GPU_ENABLED",
                       "JUSTSEARCH_NER_GPU_ENABLED", "JUSTSEARCH_BGE_M3_GPU_ENABLED",
                       "JUSTSEARCH_RERANK_GPU_ENABLED", "JUSTSEARCH_RERANK_CHUNKS_GPU_ENABLED")
-LDCONFIG_ARCH = {"x86_64": "x86-64", "aarch64": "AArch64"}
 
 
 @pytest.fixture(autouse=True)
@@ -135,7 +136,21 @@ def test_per_model_gpu_switches_stay_in_the_key_as_values(models, tmp_path, name
     off = ix.compute_index_key(c, cfg, pinned_env(cfg, **{name: "false"}))
     unset = ix.compute_index_key(c, cfg, pinned_env(cfg))
     assert off[1]["runtime"][name] == "false"
-    assert off[0] != unset[0]
+    if name in ("JUSTSEARCH_RERANK_GPU_ENABLED", "JUSTSEARCH_RERANK_CHUNKS_GPU_ENABLED"):
+        assert off[0] == unset[0]  # the launch pins their independent defaults to the master
+    else:
+        assert off[0] != unset[0]
+
+
+@pytest.mark.parametrize("master", ["false", "true"])
+@pytest.mark.parametrize("name", ["JUSTSEARCH_RERANK_GPU_ENABLED", "JUSTSEARCH_RERANK_CHUNKS_GPU_ENABLED"])
+def test_independent_gpu_defaults_follow_the_master_unless_explicit(models, tmp_path, master, name):
+    natives = tmp_path / "natives"
+    natives.mkdir()
+    env = {"JUSTSEARCH_GPU_ENABLED": master, "JUSTSEARCH_ONNXRUNTIME_NATIVE_PATH": str(natives)}
+    assert ix.IndexConfig(models_dir=models, env=env).environment().get(name) == master
+    opposite = "true" if master == "false" else "false"
+    assert ix.IndexConfig(models_dir=models, env={**env, name: opposite}).environment()[name] == opposite
 
 
 @pytest.mark.parametrize("name", MODEL_GPU_SWITCHES)
@@ -150,7 +165,7 @@ def test_a_per_model_gpu_switch_is_gpu_mode(models, tmp_path, name):
 
 @pytest.fixture
 def driver(tmp_path, monkeypatch):
-    """Stand-in nvidia-smi and ldconfig first on PATH, reporting what the test writes."""
+    """Stand-in nvidia-smi and loader child; no test loads the machine's CUDA library."""
     bin_dir, state = tmp_path / "bin", tmp_path / "driver"
     bin_dir.mkdir()
     state.mkdir()
@@ -158,19 +173,25 @@ def driver(tmp_path, monkeypatch):
     (state / "smi-status").write_text("0")
     lib = state / "libcuda.so.1"
     lib.write_bytes(b"\x7fELF driver one")
-    arch = LDCONFIG_ARCH.get(platform.machine(), "x86-64")
-    (state / "ldconfig").write_text(f"2 libs found in cache\n"
-                                    f"\tlibcuda.so.1 (libc6) => /nonexistent/i386/libcuda.so.1\n"
-                                    f"\tlibcuda.so.1 (libc6,{arch}) => {lib}\n")
+    (state / "loader-status").write_text("0")
+    (state / "mapped").write_text(json.dumps(str(lib)))
     (bin_dir / "nvidia-smi").write_text(f"#!/bin/sh\ncat {state}/version\nexit $(cat {state}/smi-status)\n")
-    (bin_dir / "ldconfig").write_text(f"#!/bin/sh\ncat {state}/ldconfig\n")
-    for tool in ("nvidia-smi", "ldconfig"):
-        (bin_dir / tool).chmod(0o755)
+    (bin_dir / "nvidia-smi").chmod(0o755)
     monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
+    real_run, calls = subprocess.run, []
+
+    def fake_loader(command, **kw):
+        if command[0] == sys.executable and "-c" in command and "ctypes.CDLL" in command[-1]:
+            calls.append((command, kw))
+            return subprocess.CompletedProcess(command, int((state / "loader-status").read_text()),
+                                               (state / "mapped").read_text(), "loader failed")
+        return real_run(command, **kw)
+
+    monkeypatch.setattr(subprocess, "run", fake_loader)
     natives = tmp_path / "ort-natives"
     natives.mkdir()
     (natives / "libonnxruntime_providers_cuda.so").write_bytes(b"provider")
-    return {"state": state, "lib": lib, "natives": natives}
+    return {"state": state, "lib": lib, "natives": natives, "calls": calls}
 
 
 def gpu_key(models, driver, **env):
@@ -200,6 +221,46 @@ def test_a_per_model_switch_keys_the_driver_too(models, driver):
     assert ix.compute_index_key(make_collection(), cfg, pinned_env(cfg, **env))[0] != before
 
 
+def test_explicit_reranker_gpu_with_master_off_keys_the_driver(models, driver):
+    cfg = ix.IndexConfig(models_dir=models, env={
+        "JUSTSEARCH_GPU_ENABLED": "false", "JUSTSEARCH_RERANK_GPU_ENABLED": "true",
+        "JUSTSEARCH_ONNXRUNTIME_NATIVE_PATH": str(driver["natives"])})
+    env = pinned_env(cfg)
+    key, components = ix.compute_index_key(make_collection(), cfg, env)
+    assert components["gpu"]["libcuda"] == sha256_text("\x7fELF driver one")
+    driver["lib"].write_bytes(b"\x7fELF driver two")
+    assert ix.compute_index_key(make_collection(), cfg, env)[0] != key
+
+
+def test_loader_mapping_overrides_the_first_library_path_candidate(models, driver):
+    skipped = driver["natives"] / "libcuda.so.1"
+    skipped.write_bytes(b"\x7fELF incompatible 32-bit driver")
+    key, components = gpu_key(models, driver, LD_LIBRARY_PATH=str(driver["natives"]))
+    assert components["gpu"]["libcuda"] == sha256_text("\x7fELF driver one")
+    _, options = driver["calls"][-1]
+    assert options["env"]["LD_LIBRARY_PATH"] == str(driver["natives"])
+    skipped.write_bytes(b"\x7fELF another incompatible driver")
+    # The library-path component conservatively hashes skipped files too; the GPU component
+    # must still track the file that the loader actually selected.
+    assert gpu_key(models, driver, LD_LIBRARY_PATH=str(driver["natives"]))[1]["gpu"] == components["gpu"]
+    driver["lib"].write_bytes(b"\x7fELF driver two")
+    assert gpu_key(models, driver, LD_LIBRARY_PATH=str(driver["natives"]))[0] != key
+
+
+@pytest.mark.parametrize("result", ["null", '"relative/libcuda.so.1"', '"/nonexistent/libcuda.so.1"', "invalid JSON"])
+def test_missing_or_unreadable_loader_mapping_refuses(models, driver, result):
+    (driver["state"] / "mapped").write_text(result)
+    with pytest.raises(ix.InputUnavailable):
+        gpu_key(models, driver)
+
+
+def test_loader_failure_refuses_even_when_a_library_path_candidate_exists(models, driver):
+    (driver["natives"] / "libcuda.so.1").write_bytes(b"\x7fELF incompatible driver")
+    (driver["state"] / "loader-status").write_text("1")
+    with pytest.raises(ix.InputUnavailable, match="loader"):
+        gpu_key(models, driver, LD_LIBRARY_PATH=str(driver["natives"]))
+
+
 @pytest.mark.parametrize("break_it", ["smi fails", "no version", "no libcuda"])
 def test_unreadable_driver_information_refuses_gpu_mode(models, driver, break_it):
     if break_it == "smi fails":
@@ -207,14 +268,17 @@ def test_unreadable_driver_information_refuses_gpu_mode(models, driver, break_it
     elif break_it == "no version":
         (driver["state"] / "version").write_text("\n")
     else:
-        (driver["state"] / "ldconfig").write_text("0 libs found in cache\n")
+        (driver["state"] / "mapped").write_text("null")
     with pytest.raises(ix.InputUnavailable):
         gpu_key(models, driver)
 
 
 def test_cpu_mode_never_reads_the_driver(models, driver):
     (driver["state"] / "smi-status").write_text("9")
-    (driver["state"] / "ldconfig").write_text("")
+    (driver["state"] / "loader-status").write_text("1")
     cfg = ix.IndexConfig(models_dir=models)
     key, components = ix.compute_index_key(make_collection(), cfg, pinned_env(cfg))
     assert key and components["runtime"]["JUSTSEARCH_GPU_ENABLED"] == "false"
+    assert components["runtime"].get("JUSTSEARCH_RERANK_GPU_ENABLED") == "false"
+    assert components["runtime"].get("JUSTSEARCH_RERANK_CHUNKS_GPU_ENABLED") == "false"
+    assert components["gpu"] is None and not driver["calls"]

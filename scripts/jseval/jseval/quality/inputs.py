@@ -10,10 +10,10 @@ import importlib
 import json
 import os
 from pathlib import Path
-import platform
 import re
 import shutil
 import subprocess
+import sys
 
 import yaml
 
@@ -187,16 +187,36 @@ DATA_NATIVE_FOLDER = "native-bin"
 # Each launch points ENGINE_CACHE_DIR at this data subfolder, emptied first (fresh_engine_cache),
 # so the library is always extracted from the snapshot's tokenizers jar.
 ENGINE_CACHE_ENV, ENGINE_CACHE_FOLDER = "ENGINE_CACHE_DIR", "engine-cache"
-# Per-model GPU switches: each overrides JUSTSEARCH_GPU_ENABLED for its model
-# (ResolvedConfigBuilder.resolveEmbedGpuEnabled/resolveModelGpuEnabled: per-model key, then the
-# master switch). They are ordinary settings, so the key keeps their literal values (runtime);
-# any value that is not plainly false also makes the launch GPU mode.
+# Per-model GPU switches: embed (ResolvedConfigBuilder:1267-1278), SPLADE/NER/BGE-M3
+# (1284-1293, callers at 1217,1313,1329) inherit the master. Reranker and chunk reranker
+# default independently (1345,1375), so IndexConfig.environment pins their unset values to
+# the master. Explicit values stay in the key; any not plainly false makes the launch GPU mode.
 MODEL_GPU_SWITCHES = ("JUSTSEARCH_EMBED_GPU_ENABLED", "JUSTSEARCH_SPLADE_GPU_ENABLED",
                       "JUSTSEARCH_NER_GPU_ENABLED", "JUSTSEARCH_BGE_M3_GPU_ENABLED",
                       "JUSTSEARCH_RERANK_GPU_ENABLED", "JUSTSEARCH_RERANK_CHUNKS_GPU_ENABLED")
 # The CUDA driver library, loaded by name through the system loader (GpuDriverApiProbe.probe).
 CUDA_DRIVER = "libcuda.so.1"
-_LDCONFIG_ARCH = {"x86_64": "x86-64", "aarch64": "AArch64"}
+# A fresh process is essential: LD_LIBRARY_PATH is read when the loader starts, and the
+# evaluator must never load CUDA itself. Refuse missing/ambiguous mappings rather than guess.
+_CUDA_LOADER_PROBE = r'''
+import ctypes
+import json
+from pathlib import Path
+import re
+
+driver = ctypes.CDLL("libcuda.so.1")
+paths = set()
+for line in Path("/proc/self/maps").read_text().splitlines():
+    fields = line.split(None, 5)
+    if len(fields) != 6:
+        continue
+    path = re.sub(r"\\([0-7]{3})", lambda m: chr(int(m[1], 8)), fields[5])
+    if Path(path).name.startswith("libcuda.so"):
+        paths.add(path)
+if len(paths) != 1:
+    raise RuntimeError(f"expected one mapped libcuda, found {sorted(paths)!r}")
+print(json.dumps(paths.pop()))
+'''
 
 
 def gpu_mode(env) -> bool:
@@ -238,9 +258,9 @@ def fresh_engine_cache(data: Path) -> Path:
     return cache
 
 
-def _run_text(command: list[str], what: str) -> str:
+def _run_text(command: list[str], what: str, *, env=None) -> str:
     try:
-        out = subprocess.run(command, capture_output=True, text=True, timeout=30)
+        out = subprocess.run(command, capture_output=True, text=True, timeout=30, env=env)
     except (OSError, subprocess.SubprocessError) as e:
         raise InputRefused(f"GPU mode: {what} unreadable: {e}") from None
     if out.returncode != 0:
@@ -248,22 +268,17 @@ def _run_text(command: list[str], what: str) -> str:
     return out.stdout
 
 
-def cuda_driver_library(library_path: str) -> Path:
-    """The libcuda.so.1 the system loader resolves: LD_LIBRARY_PATH, then the loader cache."""
-    for entry in library_path.split(os.pathsep) if library_path else []:
-        candidate = Path(entry) / CUDA_DRIVER
-        if candidate.is_file():
-            return candidate.resolve()
-    arch = _LDCONFIG_ARCH.get(platform.machine())
-    ldconfig = shutil.which("ldconfig") or next(
-        (p for p in ("/sbin/ldconfig", "/usr/sbin/ldconfig") if os.access(p, os.X_OK)), None)
-    if arch is None or ldconfig is None:
-        raise InputRefused(f"GPU mode: cannot resolve {CUDA_DRIVER} (no ldconfig for {platform.machine()})")
-    for line in _run_text([ldconfig, "-p"], "the loader cache (ldconfig -p)").splitlines():
-        m = re.match(r"\s*(\S+) \(([^)]*)\) => (/.+)$", line)
-        if m and m.group(1) == CUDA_DRIVER and arch in m.group(2).split(",") and Path(m.group(3)).is_file():
-            return Path(m.group(3)).resolve()
-    raise InputRefused(f"GPU mode: the system loader resolves no {CUDA_DRIVER}")
+def cuda_driver_library(env) -> Path:
+    """Ask a child with the launch environment which libcuda.so.1 its loader maps."""
+    text = _run_text([sys.executable, "-c", _CUDA_LOADER_PROBE], f"the {CUDA_DRIVER} loader probe",
+                     env={**os.environ, **env})
+    try:
+        path = json.loads(text)
+        if not isinstance(path, str) or not Path(path).is_absolute() or not Path(path).is_file():
+            raise ValueError("missing, relative or unreadable mapped file")
+        return Path(path).resolve(strict=True)
+    except (OSError, ValueError) as e:
+        raise InputRefused(f"GPU mode: {CUDA_DRIVER} loader mapping unreadable: {e}") from None
 
 
 def gpu_driver(env) -> dict | None:
@@ -278,7 +293,7 @@ def gpu_driver(env) -> dict | None:
     versions = sorted({line.strip() for line in text.splitlines() if line.strip()})
     if not versions or not all(re.fullmatch(r"[0-9][0-9.]*", v) for v in versions):
         raise InputRefused(f"GPU mode: nvidia-smi reported no driver version ({text.strip()[-200:]!r})")
-    library = cuda_driver_library(env.get("LD_LIBRARY_PATH", ""))
+    library = cuda_driver_library(env)
     return {"driver_version": versions, "libcuda": _hashing(distribution.file_sha256, library)}
 
 

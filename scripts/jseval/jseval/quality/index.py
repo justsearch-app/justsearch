@@ -108,6 +108,10 @@ class IndexConfig:
         if forbidden:
             raise ValueError(f"lifecycle-owned environment overrides: {sorted(forbidden)}")
         # GPU selection is the caller's (inherited above), explicit, and part of the index key.
+        # ResolvedConfigBuilder:1345,1375 gives reranker/chunk reranker independent GPU
+        # defaults; make them follow the master unless the caller explicitly chose otherwise.
+        for name in ("JUSTSEARCH_RERANK_GPU_ENABLED", "JUSTSEARCH_RERANK_CHUNKS_GPU_ENABLED"):
+            env.setdefault(name, env.get("JUSTSEARCH_GPU_ENABLED", ""))
         env[ORT_CACHE_CAP] = "0"
         env.update({"JUSTSEARCH_SPLADE_ENABLED": "false",
                     "JUSTSEARCH_RAG_CHUNK_SPLADE_ENABLED": "false", "JUSTSEARCH_LLM_ENABLED": "false"})
@@ -318,7 +322,7 @@ def _check_owner(owner: dict, c: Collection, key: str) -> None:
     if isinstance(owner, dict) and owner.get("schema") != SCHEMA:
         raise IndexRefused(f"data folder was prepared under an older index identity "
                            f"({owner.get('schema')}); it is never adopted: prepare a new index "
-                           f"without --data-dir or choose an empty data folder")
+                           f"without an explicit data folder (IndexConfig.data_dir) or choose an empty one")
     if owner != _population_owner(c, key):
         raise IndexRefused("data folder belongs to another collection, key or population")
 
