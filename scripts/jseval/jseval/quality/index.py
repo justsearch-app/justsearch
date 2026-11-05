@@ -47,11 +47,15 @@ SCHEMA = "jseval.quality.index.v2"
 CACHE_ROOT = Path.home() / ".cache/justsearch-quality/indexes"
 # jseval/dev-tool bookkeeping, never read by extraction/encoding/index writers.
 # In particular, registration is mutable on every boot and must not key its own index.
-# The ORT optimized-graph store is content-addressed by model bytes and ORT version.
 OPERATIONAL_ENV = frozenset({"JSEVAL_GRADLE_SLOT", "JUSTSEARCH_DEV_RUNNER_STATE_ROOT",
                              "JUSTSEARCH_JOB_RECORD_DIR", "JUSTSEARCH_DATASET_CACHE",
-                             "JUSTSEARCH_INDEX_CACHE", "JUSTSEARCH_GH_BIN",
-                             "JUSTSEARCH_ORT_OPTIMIZED_CACHE_DIR"})
+                             "JUSTSEARCH_INDEX_CACHE", "JUSTSEARCH_GH_BIN"})
+# The ORT optimized-graph store is off for quality runs. Its cache hit loads a stored graph
+# whose bytes it never verifies (OrtOptimizedModelStore.loadOrCreate/committed), so a shared
+# graph would bypass the models component. With a 0 MiB cap loadOrCreate never reads or
+# writes an entry: it loads the source graph and ORT optimizes it in memory, and initialize()
+# returns before pruning anything. Its folder is the entry's own data folder regardless.
+ORT_CACHE_CAP, ORT_CACHE_DIR = "JUSTSEARCH_ORT_OPTIMIZED_CACHE_MAX_MB", "JUSTSEARCH_ORT_OPTIMIZED_CACHE_DIR"
 # The selected snapshot digest; the launch derives every code and resource path from it.
 DISTRIBUTION_ENV = "JSEVAL_DISTRIBUTION"
 # Pinned paths whose content is a key component of its own (never their location).
@@ -96,7 +100,7 @@ class IndexConfig:
         # another run's paths, port, or eval launcher settings.
         excluded = {"JUSTSEARCH_DATA_DIR", "JUSTSEARCH_HOME", "JUSTSEARCH_INDEX_BASE_PATH",
                     "JUSTSEARCH_API_PORT", "JUSTSEARCH_REPO_ROOT", "JUSTSEARCH_CONFIG",
-                    "JUSTSEARCH_SSOT_PATH", "JUSTSEARCH_STAGE_PLUGIN_MANIFEST"}
+                    "JUSTSEARCH_SSOT_PATH", "JUSTSEARCH_STAGE_PLUGIN_MANIFEST", ORT_CACHE_CAP, ORT_CACHE_DIR}
         env = {k: v for k, v in os.environ.items()
                if k.startswith("JUSTSEARCH_") and k not in excluded}
         env.update(self.env)
@@ -104,6 +108,7 @@ class IndexConfig:
         if forbidden:
             raise ValueError(f"lifecycle-owned environment overrides: {sorted(forbidden)}")
         # GPU selection is the caller's (inherited above), explicit, and part of the index key.
+        env[ORT_CACHE_CAP] = "0"
         env.update({"JUSTSEARCH_SPLADE_ENABLED": "false",
                     "JUSTSEARCH_RAG_CHUNK_SPLADE_ENABLED": "false", "JUSTSEARCH_LLM_ENABLED": "false"})
         # An explicit sparse ablation alone opts in to these stages.
@@ -119,6 +124,7 @@ class IndexConfig:
             env.update(inputs.jvm_options(process))
             env["LD_LIBRARY_PATH"] = process.get("LD_LIBRARY_PATH", "")
             inputs.native_selection(env)
+            inputs.model_selection(env)
             env["JAVA_HOME"] = str(inputs.resolve_jdk(self.repo_root, process))
             # The engine's cwd is the snapshot; its bundle-root search starts there.
             exe, data = inputs.resolve_ocr(process, distribution.ROOT / "snapshots")
@@ -156,6 +162,9 @@ def compute_index_key(collection: Collection, config: IndexConfig,
     try:
         inputs.jvm_options(env)
         inputs.native_selection(env)
+        inputs.model_selection(env)
+        if env.get(ORT_CACHE_CAP) != "0":
+            raise inputs.InputRefused(f"the ORT optimized-graph cache is not disabled ({ORT_CACHE_CAP}=0)")
         for name in (DISTRIBUTION_ENV, "JAVA_HOME", "JUSTSEARCH_MODELS_DIR",
                      "JUSTSEARCH_TESSERACT_PATH", "JUSTSEARCH_TESSDATA_PATH"):
             if not env.get(name):
@@ -201,21 +210,19 @@ def _select_distribution(config: IndexConfig, env: Mapping[str, str], prepared_o
             return distribution.current(root, source)
         digest = distribution.lookup(source)
         if digest is None:
-            # The Gradle invoker queues in its slot and takes machine admission of its own.
+            # The Gradle invoker queues in its slot and takes machine admission of its own; the
+            # snapshot is taken and published inside that same hold (_snapshot_install).
             install_env = {k: v for k, v in {**os.environ, **env}.items() if k != DISTRIBUTION_ENV}
             try:
-                backend._install_distribution(root, install_env)
+                backend._install_distribution(root, install_env, then=f"{__name__}:_snapshot_install")
+            except distribution.DistributionRefused:
+                raise
             except Exception as e:
                 raise TransientIndexRefused(f"not ready, transient: distribution preparation failed: {e}") from e
-            try:
-                receipt = _json(root / distribution.INSTALL / distribution.RECEIPT)
-            except (OSError, ValueError):
-                receipt = None
-            if receipt != source or list(backend.source_identity(root)) != source:
-                raise TransientIndexRefused("not ready, transient: checkout changed during installDist")
-            digest = distribution.create(root, source)
-            if list(backend.source_identity(root)) != source:
-                raise TransientIndexRefused("not ready, transient: checkout changed during snapshot")
+            digest = distribution.lookup(source)
+            if digest is None:
+                raise TransientIndexRefused("not ready, transient: checkout changed during installDist or "
+                                            "snapshot; no snapshot of its current sources was published")
         distribution.publish(root, source, digest)
         distribution.prune()
         return digest
@@ -223,10 +230,34 @@ def _select_distribution(config: IndexConfig, env: Mapping[str, str], prepared_o
         raise InputUnavailable(str(e)) from None
 
 
+def _snapshot_install(root: Path) -> None:
+    """Snapshot and publish the install just made, still inside the installation's hold.
+
+    Publishes nothing when the checkout changed: the caller then finds no snapshot for its
+    sources. An incomplete install raises and is never published.
+    """
+    source = list(backend.source_identity(root))
+    try:
+        receipt = _json(root / distribution.INSTALL / distribution.RECEIPT)
+    except (OSError, ValueError):
+        receipt = None
+    if receipt != source:
+        return
+    digest = distribution.create(root, source)
+    if list(backend.source_identity(root)) == source:
+        distribution.publish(root, source, digest)
+
+
 def _launch_env(config: IndexConfig, data: Path, env: Mapping[str, str]) -> dict[str, str]:
     """Override lifecycle paths; code and repo resources come from the immutable snapshot."""
     snapshot = distribution.path(env[DISTRIBUTION_ENV])
-    return {**env, "JUSTSEARCH_HOME": str(data), "JUSTSEARCH_DATA_DIR": str(data),
+    # Model discovery also tries <data>/models (data and home folder) and <snapshot>/models
+    # (repo root; a snapshot never holds one): all must stay absent so only the hashed root serves.
+    if (data / "models").exists() or (snapshot / "models").exists():
+        raise InputUnavailable("not ready: a models folder outside the hashed models root would serve "
+                               "model discovery (data or snapshot folder)")
+    return {**env, ORT_CACHE_DIR: str(data / "ort-optimized"),
+            "JUSTSEARCH_HOME": str(data), "JUSTSEARCH_DATA_DIR": str(data),
             "JUSTSEARCH_INDEX_BASE_PATH": str(data / "index/default"),
             "JUSTSEARCH_REPO_ROOT": str(snapshot),
             "JUSTSEARCH_CONFIG": str(snapshot / "modules/ui/src/main/resources/headless-config/application.yaml"),

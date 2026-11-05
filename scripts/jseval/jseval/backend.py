@@ -11,6 +11,7 @@ import sys
 import time
 import threading
 import io
+import importlib
 import importlib.util
 import contextlib
 from pathlib import Path
@@ -26,6 +27,16 @@ _DEFAULT_PORT = 33221
 _HEALTH_POLL_SEC = 2.0
 _HEALTH_TIMEOUT_SEC = 120.0
 _LLM_HEALTH_TIMEOUT_SEC = 240.0  # 369: LLM model loading adds significant time
+# Environment that makes Node load code (or code-shaping data) the launch did not choose:
+# preloads and loaders (NODE_OPTIONS --require/--import/--loader), module search paths,
+# symlink-preserving resolution, a compile cache, a REPL module and ICU data. Never passed to
+# the eval launcher, nor to a Node helper that resolves an index-shaping input.
+NODE_CODE_LOADING = ("NODE_OPTIONS", "NODE_PATH", "NODE_PRESERVE_SYMLINKS", "NODE_PRESERVE_SYMLINKS_MAIN",
+                     "NODE_COMPILE_CACHE", "NODE_REPL_EXTERNAL_MODULE", "NODE_ICU_DATA")
+
+
+def without_node_code_loading(env) -> dict[str, str]:
+    return {k: v for k, v in env.items() if k not in NODE_CODE_LOADING}
 
 # Lane F: dev-runner owns registered-child cleanup. --clean still fails closed.
 
@@ -213,6 +224,7 @@ def start_backend(
     env["JUSTSEARCH_API_PORT"] = str(port)
     if env_overrides:
         env.update(env_overrides)
+    env = without_node_code_loading(env)
 
     # Tempdoc 644 Axis 1: when launched from a git worktree, the worktree's own models/
     # holds only LFS pointer files, so reranker/dense/SPLADE discovery silently fails and
@@ -264,8 +276,13 @@ def start_backend(
     return BackendInfo(proc=proc, data_dir=resolved_data, spawn_env=env)
 
 
-def _install_distribution(resolved_root: Path, env: dict[str, str]) -> None:
-    """Build the distribution before the lifetime helper or runner is needed."""
+def _install_distribution(resolved_root: Path, env: dict[str, str], then: str | None = None) -> None:
+    """Build the distribution before the lifetime helper or runner is needed.
+
+    ``then`` ("module:function") is called with the root right after a successful install and
+    inside the same hold: with a Gradle slot, in the slot's child, so the slot's worktree
+    installation lock stays held until it returns.
+    """
     command = ["node", str(resolved_root / "scripts/lib/tool-invoker.cjs"), "gradle",
                ":modules:ui:installDist", "-PskipWebBuild=true", "--quiet", "--no-daemon"]
     if env.get("JSEVAL_GRADLE_SLOT"):
@@ -273,17 +290,25 @@ def _install_distribution(resolved_root: Path, env: dict[str, str]) -> None:
         # build admission and changes the receipt only after the slot is held.
         script = ("import os,sys; from pathlib import Path; from jseval.backend import "
                   "_install_distribution_admitted; "
-                  "_install_distribution_admitted(Path(sys.argv[1]), dict(os.environ), sys.argv[2:])")
+                  "_install_distribution_admitted(Path(sys.argv[1]), dict(os.environ), sys.argv[3:], "
+                  "then=sys.argv[2] or None)")
         result = subprocess.run([env["JSEVAL_GRADLE_SLOT"], "-w", "3600", sys.executable,
-                                 "-c", script, str(resolved_root), *command],
+                                 "-c", script, str(resolved_root), then or "", *command],
                                 cwd=str(resolved_root), env=env, check=False)
         if result.returncode != 0:
-            raise RuntimeError(f"Backend installDist failed (exit {result.returncode})")
+            step = "installDist or its snapshot" if then else "installDist"
+            raise RuntimeError(f"Backend {step} failed (exit {result.returncode})")
         return
-    _install_distribution_admitted(resolved_root, env, command)
+    _install_distribution_admitted(resolved_root, env, command, then=then)
 
 
-def _install_distribution_admitted(resolved_root: Path, env: dict[str, str], command: list[str]) -> None:
+def after_install(then: str, resolved_root: Path) -> None:
+    module, _, function = then.partition(":")
+    getattr(importlib.import_module(module), function)(resolved_root)
+
+
+def _install_distribution_admitted(resolved_root: Path, env: dict[str, str], command: list[str],
+                                   then: str | None = None) -> None:
     identity = None
     if (resolved_root / ".git").exists():
         try:
@@ -313,6 +338,8 @@ def _install_distribution_admitted(resolved_root: Path, env: dict[str, str], com
                     pending.unlink(missing_ok=True)
         else:
             log.warning("Install distribution source unavailable or changed; prepared-only start will refuse it")
+    if then:
+        after_install(then, resolved_root)
 
 
 def source_identity(root: Path) -> tuple[str, str | None]:

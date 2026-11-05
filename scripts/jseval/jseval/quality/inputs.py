@@ -13,6 +13,7 @@ import re
 import shutil
 import subprocess
 
+from .. import backend
 from . import distribution
 from .types import canonical_json, sha256_text
 
@@ -34,10 +35,27 @@ HARNESS_MODULES = ("jseval.quality.index", "jseval.quality.collections", "jseval
                    "jseval.quality.distribution", "jseval.quality.inputs", "jseval.backend",
                    "jseval.ingest", "jseval.index_identity", "jseval.corpus_identity", "jseval.types",
                    "jsharness.readiness", "jsharness.types")
-# Generated model bookkeeping whose readers cannot change index contents (checked):
-# *.sha256 is Sha256SidecarCache's mtime+size-validated copy of a digest of the hashed bytes;
-# the legacy ORT optimized siblings are only ever deleted (OrtOptimizedModelStore.cleanupLegacy).
-MODEL_SIDECARS = (".sha256", ".optimized", ".opt-meta", ".cuda.optimized", ".cuda.opt-meta")
+# Model-root bookkeeping, checked reader by reader; nothing else under the root is excluded.
+# - ORT legacy optimized siblings: OrtOptimizedModelStore.cleanupLegacy only deletes them.
+# - Chat identity receipts (*.justsearch-identity.v1): read only by InferenceConfig to identify
+#   the chat model, and the chat model is off for quality runs (JUSTSEARCH_LLM_ENABLED=false).
+# - Writer temporaries: Sha256SidecarCache's *.sha256.tmp and ChatArtifactIdentity's
+#   .chat-identity-*.tmp are only ever renamed onto the two sidecar names.
+# *.sha256 sidecars are not excluded blindly: model fingerprints (stored in index commit
+# metadata) come from them, so each is validated as Sha256SidecarCache reads it.
+MODEL_BOOKKEEPING = (".optimized", ".opt-meta", ".cuda.optimized", ".cuda.opt-meta",
+                     ".justsearch-identity.v1", ".sha256.tmp")
+SHA256_SIDECAR = ".sha256"
+# Per-package model locations bypass the hashed models root; JUSTSEARCH_MODELS_DIR selects it.
+MODEL_PATH_OVERRIDES = ("JUSTSEARCH_EMBED_ONNX_MODEL_PATH", "JUSTSEARCH_SPLADE_MODEL_PATH",
+                        "JUSTSEARCH_NER_MODEL_PATH", "JUSTSEARCH_BGE_M3_MODEL_PATH",
+                        "JUSTSEARCH_RERANK_MODEL_PATH", "JUSTSEARCH_RERANK_CHUNKS_MODEL_PATH",
+                        "JUSTSEARCH_CITATION_SCORER_MODEL_PATH")
+# Settings whose value names a resource the engine reads: keyed by that resource's content,
+# never its location. Every other setting enters the key as its literal value.
+RESOURCE_LOCATORS = frozenset({"JUSTSEARCH_FIELD_CATALOG", "JUSTSEARCH_MCP_HOST_CONFIG",
+                               "JUSTSEARCH_ONNXRUNTIME_NATIVE_PATH", "JUSTSEARCH_NATIVE_PATH",
+                               "JUSTSEARCH_SERVER_EXE", "JUSTSEARCH_LLM_MODEL_PATH"})
 LFS_POINTER = b"version https://git-lfs.github.com/spec/v1\n"
 
 
@@ -88,7 +106,8 @@ def resolve_jdk(checkout: Path, environ) -> Path:
         if not node or not resolver.is_file():
             raise InputRefused("JDK resolver unavailable (node or resolve-jdk.cjs missing)")
         result = subprocess.run([node, "-e", "process.stdout.write(require(process.argv[1]).resolveJdkHome())",
-                                 str(resolver)], env=dict(environ), capture_output=True, text=True, timeout=60)
+                                 str(resolver)], env=backend.without_node_code_loading(environ),
+                                capture_output=True, text=True, timeout=60)
         if result.returncode != 0 or not result.stdout.strip():
             raise InputRefused(f"no usable JDK: {result.stderr.strip()[-500:]}")
         _jdk_cache[memo] = Path(result.stdout.strip())
@@ -223,23 +242,67 @@ def ocr_digest(exe: Path, data: Path) -> dict:
 # --------------------------------------------------------------------------- models
 
 
+def _bookkeeping(rel: str) -> bool:
+    name = rel.rsplit("/", 1)[-1]
+    return (name.endswith(MODEL_BOOKKEEPING + (SHA256_SIDECAR,))
+            or (name.startswith(".chat-identity-") and name.endswith(".tmp")))
+
+
+def _effective_sidecar(sidecar: Path) -> str | None:
+    """The digest Sha256SidecarCache.readSidecar would return for its model file, or None."""
+    model = sidecar.with_name(sidecar.name[:-len(SHA256_SIDECAR)])
+    if not model.is_file() or not sidecar.is_file():
+        return None  # getOrCompute never consults it
+    try:
+        parts = sidecar.read_text(encoding="utf-8").split()
+    except UnicodeDecodeError:
+        return None  # Files.readString fails; the reader recomputes
+    digest, mtime, size = None, -1, -1
+    try:
+        for part in parts:
+            if part.startswith("sha256:"):
+                digest = part[len("sha256:"):]
+            elif part.startswith("mtime:"):
+                mtime = int(part[len("mtime:"):])
+            elif part.startswith("size:"):
+                size = int(part[len("size:"):])
+    except ValueError:
+        return None
+    st = model.stat()
+    return digest if digest and len(digest) == 64 and mtime == st.st_mtime_ns // 1_000_000 \
+        and size == st.st_size else None
+
+
 def model_hashes(models: Path) -> dict[str, str]:
-    """Bytes of every model package under onnx/ and splade/: graphs, external tensors,
-    tokenizers, manifests and configuration sidecars. Links are followed; a dangling link,
-    an LFS pointer or an unreadable file is an unresolved dependency and refuses."""
-    out = {}
-    for root in (models / "onnx", models / "splade"):
-        if not root.is_dir():
-            continue
-        digests = _hashing(distribution.tree_digest, root, lambda rel: rel.endswith(MODEL_SIDECARS))
-        for rel in digests:
-            with (root / rel).open("rb") as stream:
-                if stream.read(len(LFS_POINTER)) == LFS_POINTER:
-                    raise InputRefused(f"model is an LFS pointer: {root / rel}; pass --models-dir /path/to/shared/models")
-        out.update({f"{root.name}/{rel}": sha for rel, sha in digests.items()})
-    if not out:
+    """Bytes of the whole models root: every package discovery can select (onnx/, splade/,
+    bge-m3/, chat models, manifests, tokenizers, configuration). Links are followed; a dangling
+    link, an LFS pointer, an unreadable file or folder, or a digest sidecar the engine would
+    trust that disagrees with its model's bytes refuses."""
+    if not models.is_dir():
+        raise InputRefused(f"no models root at {models}; pass --models-dir /path/to/shared/models")
+    out = _hashing(distribution.tree_digest, models, _bookkeeping)
+    for rel in out:
+        with (models / rel).open("rb") as stream:
+            if stream.read(len(LFS_POINTER)) == LFS_POINTER:
+                raise InputRefused(f"model is an LFS pointer: {models / rel}; pass --models-dir /path/to/shared/models")
+    for rel, path in _hashing(lambda: list(distribution._walk(models))):
+        if rel.endswith(SHA256_SIDECAR):
+            claimed = _hashing(_effective_sidecar, path)
+            actual = out.get(rel[:-len(SHA256_SIDECAR)])
+            if claimed is not None and claimed != actual:
+                raise InputRefused(f"model digest sidecar {path} disagrees with its model's bytes; "
+                                   f"delete it so the engine recomputes it")
+    if not any(rel.endswith(".onnx") for rel in out):
         raise InputRefused(f"no model inputs under {models}; pass --models-dir /path/to/shared/models")
     return out
+
+
+def model_selection(env) -> None:
+    """Every model package comes from the hashed models root; per-package locations refuse."""
+    for name in MODEL_PATH_OVERRIDES:
+        if env.get(name, "").strip():
+            raise InputRefused(f"{name} selects a model package outside the hashed models root; "
+                               f"unset it and point JUSTSEARCH_MODELS_DIR at a models root instead")
 
 
 # --------------------------------------------------------------------------- harness
@@ -273,9 +336,6 @@ def located(value: str) -> dict:
 
 
 def runtime(env, skip) -> dict:
-    out = {}
-    for name, value in env.items():
-        if name in skip:
-            continue
-        out[name] = located(value) if name.startswith("JUSTSEARCH_") and os.path.isabs(value) else value
-    return out
+    """Remaining settings: resource locators by content, everything else by literal value."""
+    return {name: located(value) if name in RESOURCE_LOCATORS and value.strip() else value
+            for name, value in env.items() if name not in skip}

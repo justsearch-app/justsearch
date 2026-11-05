@@ -136,8 +136,13 @@ def tree_digest(root: Path, exclude=lambda rel: False) -> dict[str, str]:
     return out
 
 
+def _unreadable(error: OSError):
+    raise DistributionRefused(f"unreadable folder {error.filename}: {error.strerror or error}") from error
+
+
 def _walk(root: Path) -> Iterable[tuple[str, Path]]:
-    for directory, dirs, files in os.walk(root, followlinks=True):
+    """Every file below ``root``; a folder that cannot be listed refuses instead of looking empty."""
+    for directory, dirs, files in os.walk(root, followlinks=True, onerror=_unreadable):
         dirs.sort()
         for name in sorted(files):
             path = Path(directory) / name
@@ -188,6 +193,27 @@ def snapshot_inputs(checkout: Path) -> dict[str, Path]:
         if path.is_symlink() or not path.is_file():
             raise DistributionRefused(f"snapshot input is not a regular file: {rel}")
     return files
+
+
+def _classpath(script: str) -> set[str]:
+    """Install-relative jars the start script's CLASSPATH names (the launcher loads lib/*)."""
+    match = re.search(r"^CLASSPATH=(.*)$", script, re.M)
+    if not match:
+        raise DistributionRefused("installed start script names no CLASSPATH")
+    jars = {entry.removeprefix("$APP_HOME/") for entry in match.group(1).split(":") if entry}
+    if any(not jar.startswith("lib/") or jar.count("/") != 1 or ".." in jar for jar in jars):
+        raise DistributionRefused("installed start script names a classpath entry outside lib/")
+    return jars
+
+
+def _launcher_inventory(tree: Path, rels: Iterable[str]) -> None:
+    """Refuse a snapshot that lacks or adds a jar the launcher would load from lib/*."""
+    prefix = f"{INSTALL}/"
+    lib = {rel[len(prefix):] for rel in rels if rel.startswith(f"{prefix}lib/")}
+    jars = _classpath((tree / INSTALL / "bin/ui").read_text(encoding="utf-8"))
+    if lib != jars:
+        raise DistributionRefused(f"incomplete install: classpath jars missing {sorted(jars - lib)[:5]}, "
+                                  f"unnamed files in lib/ {sorted(lib - jars)[:5]}")
 
 
 def _rows(entries: dict[str, tuple[str, bool]]) -> list:
@@ -259,9 +285,12 @@ def _remove_tree(tree: Path) -> None:
 def create(checkout: Path, source: list) -> str:
     """Copy the checkout's complete install into a snapshot; return its digest.
 
-    Every build-folder file is hashed, stored through a verified copy, and its file identity
-    is rechecked after the snapshot is complete: a concurrent reinstall or a replaced jar
-    refuses this snapshot instead of mis-recording it.
+    Called inside the installation's own hold (the Gradle slot's worktree lock), so no other
+    install runs meanwhile. Every build-folder file is hashed, stored through a verified copy,
+    and its file identity is rechecked after the snapshot is complete; the install folder is
+    walked again and must hold exactly the snapshot's files, and lib/ exactly the jars the start
+    script's CLASSPATH names. Any difference, or a folder that cannot be listed, refuses this
+    snapshot before its record exists.
     """
     files = snapshot_inputs(checkout)
     entries, before = {}, {}
@@ -294,6 +323,10 @@ def create(checkout: Path, source: list) -> str:
         for rel, src in files.items():
             if _identity(src.stat()) != before[rel]:
                 raise DistributionRefused(f"build folder changed during snapshot: {rel}")
+        # Every file the install folder holds now is in the snapshot, and nothing it lost is.
+        now = {f"{INSTALL}/{rel}" for rel, _ in _walk(checkout.resolve() / INSTALL) if rel != RECEIPT}
+        if now != {rel for rel in files if rel.startswith(f"{INSTALL}/")}:
+            raise DistributionRefused("build folder changed during snapshot: install folder inventory differs")
         if verify(digest, record=False) != digest:
             raise DistributionRefused("snapshot differs from its digest")
         atomic_write_text(ROOT / "snapshots" / f"{digest}.json", canonical_json(
@@ -329,6 +362,10 @@ def verify(digest: str, *, record: bool = True) -> str:
     actual = digest_of(entries)
     if actual != digest:
         raise DistributionRefused(f"snapshot {digest[:12]} bytes differ from its digest")
+    try:
+        _launcher_inventory(tree, entries)
+    except OSError as e:
+        raise DistributionRefused(f"snapshot {digest[:12]} start script unreadable: {e}") from e
     flush_digests()
     return actual
 

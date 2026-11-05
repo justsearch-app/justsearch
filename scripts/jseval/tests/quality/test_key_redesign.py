@@ -1,4 +1,4 @@
-"""Index key redesign (KR1-KR9): reuse unless an index-shaping input changed; fail safe otherwise.
+"""Index key redesign (KR1-KR6, KR8, KR9): reuse unless an index-shaping input changed; fail safe otherwise.
 
 Key/preflight tests without ingestion. The real installDist is replaced by a stand-in that
 behaves like an incremental, up-to-date install (it rewrites only the receipt); everything
@@ -60,10 +60,12 @@ def installs(monkeypatch):
     """An up-to-date incremental installDist: the receipt is the only file it rewrites."""
     calls = []
 
-    def install(root, env):
+    def install(root, env, then=None):
         calls.append(Path(root))
         receipt = Path(root) / distribution.INSTALL / distribution.RECEIPT
         receipt.write_text(json.dumps(list(backend.source_identity(Path(root)))))
+        if then:
+            backend.after_install(then, Path(root))
     monkeypatch.setattr(backend, "_install_distribution", install)
     monkeypatch.setattr(ix, "_select_distribution", REAL["select_distribution"])
     return calls
@@ -158,7 +160,10 @@ def test_kr2_each_index_shaping_input_changes_the_key(checkout, models, installs
     # Java code: an indexing module and a query-only class both change jar bytes.
     changed("indexing module", lambda: (install / "lib/app.jar").write_bytes(b"jar bytes: chunker edit"))
     changed("query-only class", lambda: (install / "lib/app.jar").write_bytes(b"jar bytes: fusion edit"))
-    changed("dependency version", lambda: (install / "lib/app.jar").rename(install / "lib/app-2.0.jar"))
+    def bump():  # a dependency bump renames the jar and the start script's classpath with it
+        (install / "lib/app.jar").rename(install / "lib/app-2.0.jar")
+        (install / "bin/ui").write_text("#!/bin/sh\nCLASSPATH=$APP_HOME/lib/app-2.0.jar\n")
+    changed("dependency version", bump)
     changed("SSOT catalog", lambda: (checkout / "SSOT/catalogs/fields.v1.json").write_text('{"x": 1}'))
     changed("application.yaml", lambda: (checkout / "modules/ui/src/main/resources/headless-config/"
                                          "application.yaml").write_text("a: 2\n"))
@@ -534,10 +539,11 @@ def test_kr6_retention_keeps_used_newest_and_referenced_snapshots(checkout, tmp_
     assert distribution.verify(new) == new
 
 
-# --------------------------------------------------------------------------- KR7
+# --------------------------------------------------------------------------- digest cache
+# (KR7, the preflight cost, is measured on the real inputs, not asserted here.)
 
 
-def test_kr7_warm_digests_read_no_file_but_a_racy_change_is_always_rehashed(tmp_path, monkeypatch):
+def test_digest_cache_never_trusts_a_change_younger_than_a_timestamp_tick(tmp_path, monkeypatch):
     f = tmp_path / "model.onnx"
     f.write_bytes(b"one")
     reads = []

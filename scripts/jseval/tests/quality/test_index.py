@@ -600,14 +600,18 @@ def test_gpu_selection_is_inherited_and_keyed_and_lifecycle_paths_override_inher
     assert launch["JUSTSEARCH_CONFIG"].startswith(str(snapshot) + "/")
 
 
-def test_external_runtime_model_bytes_invalidate_key(collection, config, tmp_path):
+def test_resource_locator_bytes_invalidate_key_and_model_locations_refuse(collection, config, tmp_path):
     c, _ = collection
+    catalog = tmp_path / "fields.json"
+    catalog.write_bytes(b"one")
+    env = {**env_for(config), "JUSTSEARCH_FIELD_CATALOG": str(catalog)}
+    key = ix.compute_index_key(c, config, env)[0]
+    catalog.write_bytes(b"two")
+    assert ix.compute_index_key(c, config, env)[0] != key
     model = tmp_path / "external.onnx"
     model.write_bytes(b"one")
-    env = {**env_for(config), "JUSTSEARCH_EMBED_MODEL_PATH": str(model)}
-    key = ix.compute_index_key(c, config, env)[0]
-    model.write_bytes(b"two")
-    assert ix.compute_index_key(c, config, env)[0] != key
+    with pytest.raises(ix.InputUnavailable, match="outside the hashed models root"):
+        ix.compute_index_key(c, config, {**env_for(config), "JUSTSEARCH_EMBED_ONNX_MODEL_PATH": str(model)})
 
 
 def test_runtime_registration_is_not_an_index_shaping_input(collection, config, tmp_path):

@@ -79,20 +79,42 @@ collection without scored queries.
 The index is keyed by what can change its contents, each by content, never by
 where it lives:
 
-- the **distribution snapshot**: after `installDist`, preparation copies the
+- the **distribution snapshot**: inside the same Gradle slot hold as
+  `installDist` (the worktree installation lock), preparation copies the
   install folder, the runtime resources the engine reads through its repo root
   (`SSOT/`, the headless `application.yaml`) and the eval launch scripts into a
   read-only snapshot under `~/.cache/justsearch-quality/dists/`. Unchanged
-  files share one copy. The engine and its extraction children run from the
-  snapshot, never from the build folder. Its digest covers every file;
+  files share one copy. A snapshot is published only when `lib/` holds exactly
+  the jars the installed start script's `CLASSPATH` names and the install
+  folder, walked again, holds exactly the snapshot's files; a folder that
+  cannot be listed refuses. The engine and its extraction children run from
+  the snapshot, never from the build folder. Its digest covers every file;
 - the preparation harness modules as loaded (materialization, ingestion,
   launch, witness and identity code; not scoring, comparison, reporting, query
   or label code);
 - the JDK (resolved once and passed as `JAVA_HOME`), JVM options, the ORT/CUDA
   native folders and `LD_LIBRARY_PATH`, the tesseract executable, its libraries
-  and language data (resolved once and passed explicitly), the model packages,
-  and every other `JUSTSEARCH_*` setting (path settings as the content they
-  point to).
+  and language data (resolved once and passed explicitly);
+- the whole models root (`--models-dir`): every package model discovery can
+  select, BGE-M3 and chat models included. Only bookkeeping whose readers cannot
+  change index contents is left out: ORT's legacy optimized siblings (only ever
+  deleted), chat identity receipts (read only to identify the chat model, which
+  quality runs disable) and writer temporaries. A `*.sha256` digest sidecar the
+  engine would trust (matching modification time and size) must equal its
+  model's digest, because index fingerprints come from it;
+- every other `JUSTSEARCH_*` setting by its literal value, except the listed
+  resource locators (`JUSTSEARCH_FIELD_CATALOG`, `JUSTSEARCH_MCP_HOST_CONFIG`,
+  `JUSTSEARCH_ONNXRUNTIME_NATIVE_PATH`, `JUSTSEARCH_NATIVE_PATH`,
+  `JUSTSEARCH_SERVER_EXE`, `JUSTSEARCH_LLM_MODEL_PATH`), which key by the
+  content they name.
+
+Quality engines never use ORT's optimized-graph cache
+(`JUSTSEARCH_ORT_OPTIMIZED_CACHE_MAX_MB=0`, its folder inside the entry's data
+folder): a cached graph is loaded without verifying its bytes. The engine
+launch and the JDK resolver drop inherited Node variables that load code or
+code-shaping data (`NODE_OPTIONS`, `NODE_PATH`, `NODE_PRESERVE_SYMLINKS`,
+`NODE_PRESERVE_SYMLINKS_MAIN`, `NODE_COMPILE_CACHE`, `NODE_REPL_EXTERNAL_MODULE`,
+`NODE_ICU_DATA`).
 
 So a docs, web-UI, CI or jseval scoring/report/query/label edit, a rebase over
 such changes or a second worktree at the same tree adopts the existing index.
@@ -104,7 +126,9 @@ cannot be resolved, hashed or validated is refused with its reason: automatic
 GPU discovery (set `JUSTSEARCH_GPU_ENABLED=false`, or `true` with
 `JUSTSEARCH_ONNXRUNTIME_NATIVE_PATH`), JVM argument files, VM option files,
 agents, `LD_PRELOAD`, an extraction-command override or any option value not on
-the allow-list, a missing or unreadable model, snapshot or OCR file. Such a
+the allow-list, a per-package model location (`JUSTSEARCH_*_MODEL_PATH`; point
+`--models-dir` at a models root instead), a `models/` folder in the data folder,
+a missing or unreadable model, snapshot or OCR file. Such a
 refusal never quarantines a cached index. Snapshots that are not newest for a
 checkout, not used by a cache entry and not running are pruned. Indexes keyed
 before this identity (`jseval.quality.index.v1`) are never adopted; an

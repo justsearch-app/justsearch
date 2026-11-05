@@ -23,7 +23,7 @@ REAL = {"resolve_jdk": inputs.resolve_jdk, "resolve_ocr": inputs.resolve_ocr,
 def write_checkout(root: Path, *, jar: bytes = b"jar bytes") -> Path:
     """A minimal checkout with a complete install, runtime resources and launch closure."""
     install = root / distribution.INSTALL
-    for rel, text in {"bin/ui": "#!/bin/sh\n", "bin/ui.bat": "@echo off\n",
+    for rel, text in {"bin/ui": "#!/bin/sh\nCLASSPATH=$APP_HOME/lib/app.jar\n", "bin/ui.bat": "@echo off\n",
                       "build-stamp.txt": "stamp\n"}.items():
         (install / rel).parent.mkdir(parents=True, exist_ok=True)
         (install / rel).write_text(text)
