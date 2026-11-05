@@ -319,14 +319,19 @@ const contractEdit = { write: { [P.contract]: '# Calc contract\n\nThe calculator
  * the first `tieBreaks` of them carry an acceptor/auditor disagreement settled by a tie-break, the
  * next `disagreements` a disagreement without one.
  */
+const mergedRecord = (o = {}) => ({ kind: 'acceptance', role: 'verifier', session: 'v', verdict: 'accept', digest: 'sha256:merged', ...o });
+
+function mergedReview(pr, records) {
+  const text = records.reduce((t, r) => appendRecord(t, r), changesetText({ entries: [{ items: [`m${pr}`], class: 'Obsolete' }] }));
+  return { write: { [`gates/test-intent/.changesets/merged-${pr}.md`]: text }, message: `Merged change (#${pr})` };
+}
+
 function mergedHistory({ audited, tieBreaks = 0, disagreements = 0 }) {
-  const rec = (o) => ({ kind: 'acceptance', role: 'verifier', session: 'v', verdict: 'accept', digest: 'sha256:merged', ...o });
   return Array.from({ length: audited }, (_, i) => {
     const pr = (i + 1) * 5;
-    const records = [rec(), rec({ kind: 'audit', session: 'a', verdict: i < tieBreaks + disagreements ? 'reject' : 'accept' })];
-    if (i < tieBreaks) records.push(rec({ kind: 'tie-break', session: 't' }));
-    const text = records.reduce((t, r) => appendRecord(t, r), changesetText({ entries: [{ items: [`m${pr}`], class: 'Obsolete' }] }));
-    return { write: { [`gates/test-intent/.changesets/merged-${pr}.md`]: text }, message: `Merged change (#${pr})` };
+    const records = [mergedRecord(), mergedRecord({ kind: 'audit', session: 'a', verdict: i < tieBreaks + disagreements ? 'reject' : 'accept' })];
+    if (i < tieBreaks) records.push(mergedRecord({ kind: 'tie-break', session: 't' }));
+    return mergedReview(pr, records);
   });
 }
 
@@ -846,22 +851,63 @@ export const CASES = [
     check: (r) => {
       const w = r.findings.find((f) => f.ruleId === 'test-intent/reconsider-rate' && f.level === 'warning');
       assert.ok(w, 'warning finding');
-      assert.match(w.message, /third-reviewer tie-breaks were 2 of 10 audited PRs \(20\.0%\)/);
+      assert.match(w.message, /PRs with a reviewer disagreement or third-reviewer tie-break were 2 of 10 audited PRs \(20\.0%\)/);
       assert.match(w.message, /orchestrator must report this as a finding in its next delivery/);
       assert.match(formatReport(r), /WARNING test-intent\/reconsider-rate \(does not fail the gate\)/);
     },
   },
   {
-    name: 'measurement: before any tie-break, disagreements above one in ten audited PRs warn',
+    name: 'measurement: disagreements above one in ten audited PRs warn',
     scenario: { main: BASE, branch: [changedTest], mainMoves: mergedHistory({ audited: 10, disagreements: 2 }) },
     expect: 'fail', rules: ['uncovered'],
     check: (r) => {
       const w = r.findings.find((f) => f.ruleId === 'test-intent/reconsider-rate' && f.level === 'warning');
       assert.ok(w, 'warning finding');
-      assert.match(w.message, /two-reviewer disagreements \(no tie-break yet\) were 2 of 10 audited PRs/);
+      assert.match(w.message, /PRs with a reviewer disagreement or third-reviewer tie-break were 2 of 10 audited PRs/);
       assert.ok(r.findings.filter((f) => f.level === 'error').every((f) => f.ruleId !== 'test-intent/reconsider-rate'));
     },
   },
+
+  {
+    name: 'measurement: a tie-break and a separate disagreement count together without counting overlap twice',
+    scenario: { main: BASE, branch: [contractEdit], mainMoves: mergedHistory({ audited: 10, tieBreaks: 1, disagreements: 1 }) },
+    expect: 'pass', flagged: [],
+    check: (r) => {
+      assert.equal(r.reconsider.count, 2);
+      assert.equal(r.reconsider.rate, 0.2);
+      assert.equal(r.reconsider.above, true);
+      assert.ok(r.findings.some((f) => f.ruleId === 'test-intent/reconsider-rate' && f.level === 'warning'));
+    },
+  },
+  ...[
+    { name: 'audit rejection before acceptance on the same digest survives a later repair', disagreement: true,
+      records: [mergedRecord({ kind: 'audit', session: 'a', verdict: 'reject' }), mergedRecord(),
+        mergedRecord({ digest: 'repaired' }), mergedRecord({ kind: 'audit', session: 'a', digest: 'repaired' })] },
+    { name: 'acceptance rejection then another acceptance on the same digest', disagreement: true,
+      records: [mergedRecord({ verdict: 'reject' }), mergedRecord({ session: 'u' })] },
+    { name: 'repeated reject repair accept cycles on different digests', disagreement: false,
+      records: [mergedRecord({ verdict: 'reject' }), mergedRecord({ session: 'u', digest: 'repair-1' }),
+        mergedRecord({ verdict: 'reject', digest: 'repair-2' }), mergedRecord({ session: 'u', digest: 'repair-3' })] },
+    { name: 'same session reverses its verdict', disagreement: false,
+      records: [mergedRecord({ verdict: 'reject' }), mergedRecord()] },
+    { name: 'missing digests never match', disagreement: false,
+      records: [mergedRecord({ verdict: 'reject', digest: undefined }), mergedRecord({ session: 'u', digest: undefined })] },
+    { name: 'missing sessions never match', disagreement: false,
+      records: [mergedRecord({ verdict: 'reject', session: undefined }), mergedRecord({ session: 'u' })] },
+    { name: 'non-audited disagreement stays in the table and out of the rate', disagreement: true, pr: 11,
+      records: [mergedRecord({ verdict: 'reject' }), mergedRecord({ session: 'u' })] },
+  ].map(({ name, records, disagreement, pr = 10 }) => ({
+    name: `measurement: ${name}`,
+    scenario: { main: BASE, branch: [contractEdit], mainMoves: [...mergedHistory({ audited: 1 }), mergedReview(pr, records)] },
+    expect: 'pass', flagged: [],
+    check: (r) => {
+      const row = r.rollingReport.report.prs.find((p) => p.pr === pr);
+      assert.equal(row.disagreement, disagreement);
+      assert.equal(r.rollingReport.report.totals.auditDisagreements, disagreement && pr === 10 ? 1 : 0);
+      assert.equal(r.reconsider.count, disagreement && pr === 10 ? 1 : 0);
+      assert.equal(r.reconsider.above, disagreement && pr === 10);
+    },
+  })),
 
   // P5 / P6.
   {
