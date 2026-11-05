@@ -224,11 +224,14 @@ defaults to false (`ResolvedConfigBuilder.java:1442`); UI settings contribute
 no override for this key (`ConfigStoreRebuilder.contributeUiSettings`).
 `KnowledgeSearchEngine.java:896–899` passes that switch to extraction, and
 `QueryUnderstandingService.java:172–173,223–227` returns before inference if
-it is false or the AI service is unavailable. JVM `-Djustsearch.qu.enabled`
-and `-Djustsearch.llm.enabled` overrides must also be absent or false, since
-JVM properties outrank environment variables (`ResolvedConfigBuilder.java:205–206`).
-The gate checks all five Java option variables, including `_JAVA_OPTIONS`,
-and refuses option files that could hide overrides. The search request stays
+it is false or the AI service is unavailable. JVM properties outrank
+environment variables (`ResolvedConfigBuilder.java:205–206`), and launchers and
+the JVM split and unquote option text differently, so the gate does not parse
+it: each of the five Java option variables (`JAVA_OPTS`, `UI_OPTS`,
+`JAVA_TOOL_OPTIONS`, `JDK_JAVA_OPTIONS`, `_JAVA_OPTIONS`) must be empty or
+exactly an allowed value (today only `-Djava.awt.headless=true`). Anything else,
+including an explicit `-Djustsearch.qu.enabled=false`, is refused before the
+engine starts. The search request stays
 unchanged. As a second check it refuses a nonempty
 `queryUnderstanding.appliedBoosts`, the field in the response schema.
 Rule-based answer-type classification is accepted. A date-only model boost
