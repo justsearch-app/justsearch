@@ -773,3 +773,25 @@ the person's own action, so it waits in Needs you. The own-transport cases of th
   "note": "Audit: the enriched-prompt check in entry 24 also pins the repaired risk wording, so it is a repair, not preservation; all other entries and 324 frontend checks held. Repaired since: that check has its own repaired entry with assertion fail-before evidence. The acceptance on this digest (01a1ad4c-f06a-7432-99f2-ef530ef9f03f) accepted the product changes. Transcribed by the orchestrator (Codex sandbox)."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1ad55-ec58-76e0-ab61-45c818ad6a6a",
+  "verdict": "accept",
+  "digest": "sha256:2d14e877c96b4b643ad3a1ea6f2f3db1dcb79d6c2b828e65bd013dc79605e4a0",
+  "note": "Narrow review of the last correction: the risk-wording check has its own repaired entry with assertion fail-before evidence bound to the current test content; the preservation entry holds only the plain-purpose check. Everything else was accepted on the previous digest by 01a1ad4c-f06a-7432-99f2-ef530ef9f03f. Transcribed by the orchestrator from the verifier's answer (Codex sandbox)."
+}
+```
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "01a1ad56-03e3-74a1-8ddc-242d6b2b981f",
+  "verdict": "accept",
+  "digest": "sha256:2d14e877c96b4b643ad3a1ea6f2f3db1dcb79d6c2b828e65bd013dc79605e4a0",
+  "note": "Independent audit (PR audit-selected): the single open finding of the previous audit is corrected; evidence and producer digests match the current files; a stale-content probe is rejected. Transcribed by the orchestrator from the auditor's answer (Codex sandbox)."
+}
+```
