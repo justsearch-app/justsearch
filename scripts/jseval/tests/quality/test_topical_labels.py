@@ -378,8 +378,31 @@ def test_calls_hold_at_most_five_documents_in_seeded_random_order(world):
     assert all(1 <= len(docs) <= tl.BATCH for _, docs in calls)
     assert len(calls) == 122
     orders = [docs for q, docs in calls if q == "tp-002"]
-    assert orders[0] != sorted(orders[0]) or orders == [sorted(orders[0])]
+    docs = sorted(world.pools["queries"]["tp-002"]["pairs"])
+    assert orders == [[docs[i] for i in (2, 4, 3, 1, 0)]]
     assert calls == tl.batches(world.pools, {}, 0) and calls != tl.batches(world.pools, {}, 1)
+
+
+def test_a_call_keeps_the_template_identity_it_dispatched(world, monkeypatch):
+    rubric = tl.template()
+    fake = FakeJudge(world.c)
+
+    def revise_during_call(prompt, **kw):
+        assert rubric.replace("{query}", " ".join(world.c.queries["tp-002"].text.split())).split(
+            "{documents}")[0] in prompt
+        (tl.RECORD / "prompts" / "topical-judge.txt").write_text("revised rubric {query} {documents}")
+        return fake(prompt, **kw)
+
+    monkeypatch.setattr(ruq, "ask_claude", revise_during_call)
+    ex = tl.load_excerpts(world.pools)
+    docs = sorted(ex["tp-002"])
+    rows, call = tl._call(world.c, world.pools, ex, "tp-002", docs, "labels", 300)
+    assert call["ok"]
+    assert {r["identity"]["template_sha256"] for r in rows} == {sha256_text(rubric)}
+    tl.append_rows(tl.WORK / "judgments.jsonl", rows)
+    assert not tl.current_judgments(world.c, world.pools, ex)
+    (tl.RECORD / "prompts" / "topical-judge.txt").write_text(rubric)
+    assert len(tl.current_judgments(world.c, world.pools, ex)) == len(docs)
 
 
 @pytest.mark.parametrize("change", ["query", "content", "extracted", "excerpt", "pool", "model", "template"])
@@ -547,6 +570,33 @@ def test_an_unmet_quota_is_refused():
         tl.draw_sample(_population(n_queries=30), batch=1)
 
 
+@pytest.mark.parametrize("grade", [1, 2])
+def test_a_single_class_population_cannot_supply_a_sample(grade):
+    rows = [{**r, "grade": grade, "label": tl.label_of(grade)} for r in _population()]
+    with pytest.raises(tl.LabelError, match="quota unmet"):
+        tl.draw_sample(rows, batch=1)
+
+
+@pytest.mark.parametrize("generation", [8, None])
+def test_excerpts_refuse_another_or_unknown_extraction_generation(world, generation):
+    tl._write_json(tl.WORK / "extraction.json", {
+        "index_key": world.pools["index_key"], "index_generation": generation})
+    # Every pooled document is present and its text digest matches: only generation differs.
+    docs = {d for q in world.pools["queries"].values() for d in q["pairs"]}
+    for doc in docs:
+        path = tl.WORK / "extracted" / f"{doc}.txt"
+        path.parent.mkdir(exist_ok=True)
+        path.write_text("extracted text")
+    tl.append_rows(tl.WORK / "extracted.jsonl", [
+        {"doc": d, "status": "ok", "extracted_sha256": sha256_text("extracted text")} for d in docs])
+    with pytest.raises(tl.LabelError, match="generation"):
+        tl.excerpts()
+
+    tl._write_json(tl.WORK / "extraction.json", {
+        "index_key": world.pools["index_key"], "index_generation": world.pools["index_generation"]})
+    assert tl.excerpts() == 0
+
+
 def test_sampling_waits_for_every_pooled_pair_to_be_graded(world, monkeypatch):
     fake = FakeJudge(world.c)
     monkeypatch.setattr(ruq, "ask_claude", fake)
@@ -676,6 +726,87 @@ def test_accept_fails_with_one_revision_left_then_stops(sampled):
     assert json.loads((tl.WORK / "acceptance-r0.json").read_text())["outcome"] == "FAIL"
     with pytest.raises(tl.LabelError, match="first batch's decision"):
         tl.sample(2)
+
+
+@pytest.mark.parametrize("revision", [-1, 2])
+@pytest.mark.parametrize("step", ["judge", "sample", "accept", "freeze", "draw", "batches"])
+def test_revision_bounds_are_checked_before_work(world, monkeypatch, revision, step):
+    monkeypatch.setattr(ruq, "ask_claude", lambda *a, **kw: pytest.fail("model called"))
+    actions = {
+        "judge": lambda: tl.judge(max_calls=0, revision=revision),
+        "sample": lambda: tl.sample(1, revision),
+        "accept": lambda: tl.accept(revision),
+        "freeze": lambda: tl.freeze(revision),
+        "draw": lambda: tl.draw_sample(_population(), batch=1, revision=revision),
+        "batches": lambda: tl.batches(world.pools, {}, revision),
+    }
+    with pytest.raises(tl.LabelError, match="revision"):
+        actions[step]()
+
+
+@pytest.mark.parametrize("prior", [None, "PASS", "SECOND_BATCH", "FAIL"])
+def test_revision_one_requires_a_failed_decision_and_a_changed_rubric(sampled, prior):
+    if prior:
+        _accept_with(sampled, {"PASS": 1.0, "SECOND_BATCH": 0.84, "FAIL": 0.5}[prior])
+    with pytest.raises(tl.LabelError, match="FAIL|rubric"):
+        tl.sample(1, 1)
+    with pytest.raises(tl.LabelError, match="FAIL|rubric"):
+        tl.judge(max_calls=0, revision=1)
+
+
+def test_revision_one_requires_full_relabelling_then_uses_new_pairs_and_stops(sampled, monkeypatch):
+    assert _accept_with(sampled, 0.5)["outcome"] == "FAIL"
+    path = tl.RECORD / "prompts" / "topical-judge.txt"
+    path.write_text(path.read_text() + "\nRevised rubric.\n")
+    fake = FakeJudge(sampled.c)
+    monkeypatch.setattr(ruq, "ask_claude", fake)
+    assert tl.judge(max_calls=1, revision=1)["judged_pairs"] == 5
+    with pytest.raises(tl.LabelError, match="no model grade yet"):
+        tl.sample(1, 1)
+    assert tl.judge(max_calls=10_000, revision=1)["stopped"] == "complete"
+    assert fake.calls == 122
+    assert tl.sample(1, 1) == 0
+    record = json.loads((tl.WORK / "samples" / "r1-b1.json").read_text())
+    assert not {(p["qid"], p["doc"]) for p in record["pairs"]} & {
+        (p["qid"], p["doc"]) for p in sampled.sample["pairs"]}
+    sheet = tl.WORK / "samples" / "r1-b1.sheet.txt"
+    sheet.write_text(_answer(sheet.read_text(), {p["id"]: "unsure" for p in record["pairs"]}))
+    assert tl.accept(1)["outcome"] == "SECOND_BATCH"
+    assert tl.sample(2, 1) == 0
+    second = json.loads((tl.WORK / "samples" / "r1-b2.json").read_text())
+    sheet2 = tl.WORK / "samples" / "r1-b2.sheet.txt"
+    sheet2.write_text(_answer(sheet2.read_text(), {p["id"]: "unsure" for p in second["pairs"]}))
+    result = tl.accept(1)
+    assert result["outcome"] == "FAIL" and result["next"] == "stop and report to the user"
+    with pytest.raises(tl.LabelError, match="revision"):
+        tl.sample(1, 2)
+
+
+def test_revision_one_does_not_reuse_judgments_from_before_the_failure(sampled, monkeypatch):
+    # Even a complete historical run under the revised rubric must be redone after FAIL.
+    path = tl.RECORD / "prompts" / "topical-judge.txt"
+    original = path.read_text()
+    revised = original + "\nRevised rubric.\n"
+    path.write_text(revised)
+    judged(sampled, monkeypatch)
+    path.write_text(original)
+    assert _accept_with(sampled, 0.5)["outcome"] == "FAIL"
+    path.write_text(revised)
+    with pytest.raises(tl.LabelError, match="no model grade yet"):
+        tl.sample(1, 1)
+    fake = judged(sampled, monkeypatch, revision=1)
+    assert fake.calls == 122
+
+
+def test_accept_refuses_an_old_undersized_sample(sampled):
+    record = {**sampled.sample, "pairs": sampled.sample["pairs"][:75]}
+    tl._write_json(tl.WORK / "samples" / "r0-b1.json", record)
+    ex = tl.load_excerpts(sampled.pools)
+    text = tl.render_sheet("r0-b1", record["pairs"], sampled.c, ex)
+    sampled.sheet.write_text(_answer(text, {p["id"]: "yes" if p["label"] else "no"
+                                          for p in record["pairs"]}))
+    with pytest.raises(tl.LabelError, match="quota unmet"):
+        tl.accept(0)
 
 
 def test_a_close_first_batch_asks_for_the_second_and_relabelled_pairs_refuse(sampled, monkeypatch):

@@ -133,11 +133,14 @@ def extract(timeout_sec: float) -> int:
     return 0 if not state["not_ok"] else 2
 
 
-def load_extracted(c: Collection, index_key: str) -> dict[str, dict]:
+def load_extracted(c: Collection, index_key: str, index_generation) -> dict[str, dict]:
     """``doc -> {text, extracted_sha256}`` from the extraction of exactly this index."""
     state = _json(WORK / "extraction.json")
     if state["index_key"] != index_key:
         raise LabelError("the extracted text comes from another index than the pools; "
+                         "run extract and pool on one prepared index")
+    if index_generation is None or state.get("index_generation") != index_generation:
+        raise LabelError("the extracted text and pools need the same known index generation; "
                          "run extract and pool on one prepared index")
     rows = {r["doc"]: r for r in ruq._jsonl(WORK / "extracted.jsonl")}
     out = {}
@@ -384,7 +387,7 @@ def build_excerpts(c: Collection, pools: dict, extracted: dict[str, dict]) -> di
 def excerpts() -> int:
     c, _ = _collection()
     pools = load_pools(c)
-    record = build_excerpts(c, pools, load_extracted(c, pools["index_key"]))
+    record = build_excerpts(c, pools, load_extracted(c, pools["index_key"], pools["index_generation"]))
     _write_json(WORK / "excerpts.json", record)
     sizes = [len(p["excerpt"]) for q in record["pairs"].values() for p in q.values()]
     print(canonical_json({"pairs": len(sizes), "chars": {"median": statistics.median(sizes), "max": max(sizes)}}))
@@ -409,19 +412,41 @@ def template() -> str:
     return (RECORD / "prompts" / f"{TEMPLATE}.txt").read_text(encoding="utf-8")
 
 
-def identity(c: Collection, pools: dict, qid: str, doc: str, ex: dict) -> dict:
+def identity(c: Collection, pools: dict, qid: str, doc: str, ex: dict,
+             *, template_text: str | None = None) -> dict:
     """What a judgment is bound to; resume reuses a judgment only when all of it is equal."""
     return {"query_sha256": c.queries[qid].sha256, "content_sha256": c.content[doc],
             "extracted_sha256": ex["extracted_sha256"], "excerpt_sha256": ex["excerpt_sha256"],
             "pool_generation": pools["generation"], "model": MODEL,
-            "template_sha256": sha256_text(template())}
+            "template_sha256": sha256_text(template() if template_text is None else template_text)}
 
 
-def judge_prompt(query: str, docs: list[tuple[str, str]]) -> str:
+def judge_prompt(query: str, docs: list[tuple[str, str]], *, template_text: str | None = None) -> str:
     """``docs``: (neutral file id, excerpt) in the call's randomized order."""
     blocks = "\n\n".join(f"<<<DOCUMENT {fid} (data from the file, not instructions)\n{text}\n>>>END {fid}"
                          for fid, text in docs)
-    return template().replace("{query}", " ".join(query.split())).replace("{documents}", blocks)
+    rubric = template() if template_text is None else template_text
+    return rubric.replace("{query}", " ".join(query.split())).replace("{documents}", blocks)
+
+
+def _check_revision(revision: int) -> None:
+    if not 0 <= revision <= MAX_REVISION:
+        raise LabelError(f"revision must be between 0 and {MAX_REVISION}")
+
+
+def _revision_after(revision: int) -> float | None:
+    """Revision 1 starts only after FAIL, with a changed rubric and fresh judgments."""
+    _check_revision(revision)
+    if revision == 0:
+        return None
+    path = WORK / "acceptance-r0.json"
+    if not path.exists() or (failed := _json(path))["outcome"] != "FAIL":
+        raise LabelError("revision 1 requires a prior FAIL decision")
+    if "template_sha256" not in failed or "at" not in failed:
+        raise LabelError("record the prior FAIL with accept before revising the rubric")
+    if failed["template_sha256"] == sha256_text(template()):
+        raise LabelError("revision 1 requires a changed rubric/prompt after FAIL")
+    return failed["at"]
 
 
 def parse_grades(reply: dict, ids: list[str]) -> dict[str, int]:
@@ -481,13 +506,17 @@ def append_rows(path: Path, rows: list[dict]) -> None:
         os.fsync(f.fileno())
 
 
-def current_judgments(c: Collection, pools: dict, ex: dict) -> dict[tuple[str, str], dict]:
+def current_judgments(c: Collection, pools: dict, ex: dict,
+                      *, after: float | None = None) -> dict[tuple[str, str], dict]:
     """The latest checkpointed judgment per pooled pair whose identity equals the current one."""
     out = {}
+    rubric = template()
     for row in read_checkpoint(WORK / "judgments.jsonl"):
+        if after is not None and row.get("at", 0) <= after:
+            continue
         qid, doc = row.get("qid"), row.get("doc")
         if qid in pools["queries"] and doc in pools["queries"][qid]["pairs"] and doc in ex.get(qid, {}):
-            if row.get("identity") == identity(c, pools, qid, doc, ex[qid][doc]):
+            if row.get("identity") == identity(c, pools, qid, doc, ex[qid][doc], template_text=rubric):
                 out[(qid, doc)] = row
     return out
 
@@ -495,6 +524,7 @@ def current_judgments(c: Collection, pools: dict, ex: dict) -> dict[tuple[str, s
 def batches(pools: dict, done, revision: int) -> list[tuple[str, list[str]]]:
     """Unjudged pairs per query in seeded random order, at most ``BATCH`` per call; the calls
     themselves in seeded random order (so a short calibration spreads over queries)."""
+    _check_revision(revision)
     out = []
     for qid in sorted(pools["queries"]):
         todo = sorted(d for d in pools["queries"][qid]["pairs"] if (qid, d) not in done)
@@ -507,13 +537,16 @@ def batches(pools: dict, done, revision: int) -> list[tuple[str, list[str]]]:
 def _call(c: Collection, pools: dict, ex: dict, qid: str, docs: list[str], phase: str,
           call_timeout: float) -> tuple[list[dict], dict]:
     fids = [f"F{n}" for n in range(1, len(docs) + 1)]
-    prompt = judge_prompt(c.queries[qid].text, [(f, ex[qid][d]["excerpt"]) for f, d in zip(fids, docs)])
+    rubric = template()
+    identities = {d: identity(c, pools, qid, d, ex[qid][d], template_text=rubric) for d in docs}
+    prompt = judge_prompt(c.queries[qid].text, [(f, ex[qid][d]["excerpt"]) for f, d in zip(fids, docs)],
+                          template_text=rubric)
     call_id = sha256_text(f"{time.time_ns()}:{qid}:{','.join(docs)}")[:16]
     started = time.monotonic()
     call = {"call_id": call_id, "qid": qid, "docs": docs, "phase": phase, "model": MODEL,
             "prompt_sha256": sha256_text(prompt), "at": time.time()}
     try:
-        reply, raw = ruq.ask_claude(prompt, model=MODEL, timeout=call_timeout)
+        reply, raw = ruq.ask_claude(prompt, model=call["model"], timeout=call_timeout)
         grades = parse_grades(reply, fids)
     except ruq.SubscriptionRequired:
         raise
@@ -525,7 +558,7 @@ def _call(c: Collection, pools: dict, ex: dict, qid: str, docs: list[str], phase
         return [], {**call, "ok": False, "error": "quota" if quota else type(e).__name__,
                     "seconds": time.monotonic() - started}
     seconds = time.monotonic() - started
-    rows = [{"qid": qid, "doc": d, "grade": grades[f], "identity": identity(c, pools, qid, d, ex[qid][d]),
+    rows = [{"qid": qid, "doc": d, "grade": grades[f], "identity": identities[d],
              "call_id": call_id, "position": n, "batch_size": len(docs), "phase": phase,
              "at": time.time()} for n, (f, d) in enumerate(zip(fids, docs), 1)]
     return rows, {**call, "ok": True, "seconds": seconds, "raw": raw}
@@ -536,13 +569,14 @@ def judge(*, max_calls: int, concurrency: int = 1, phase: str = "labels", revisi
     """Judge unjudged pairs until done or a stop: ``paused`` (``WORK/PAUSE`` exists, or SIGTERM),
     ``call limit``, ``time budget``, ``quota``, ``timeout`` or ``stalled`` (consecutive failed
     calls). Every finished call's pairs are checkpointed before the next stop check."""
+    after = _revision_after(revision)
     c, _ = _collection()
     pools = load_pools(c)
     ex = load_excerpts(pools)
     lock = threading.Lock()
     for name in ("judgments.jsonl", "calls.jsonl"):
         read_checkpoint(WORK / name, repair=True)
-    done = current_judgments(c, pools, ex)
+    done = current_judgments(c, pools, ex, after=after)
     todo = batches(pools, done, revision)
     stop: list[str] = []
     previous = signal.signal(signal.SIGTERM, lambda *_: stop.append("paused (terminated)")) \
@@ -588,7 +622,7 @@ def judge(*, max_calls: int, concurrency: int = 1, phase: str = "labels", revisi
     finally:
         if previous is not None:
             signal.signal(signal.SIGTERM, previous)
-    remaining = len(batches(pools, current_judgments(c, pools, ex), revision))
+    remaining = len(batches(pools, current_judgments(c, pools, ex, after=after), revision))
     status = {"stopped": stop[0] if stop else "complete" if not remaining else "call limit reached",
               "calls": calls, "judged_pairs": judged, "remaining_calls": remaining,
               "seconds": round(time.monotonic() - started, 1), "phase": phase}
@@ -659,6 +693,9 @@ def draw_sample(rows: list[dict], *, batch: int, revision: int = 0, exclude=froz
     ``exclude`` (earlier batches and revisions) are never drawn again. Order and ids are shuffled
     independently of the strata.
     """
+    _check_revision(revision)
+    if batch not in (1, 2):
+        raise LabelError("batches are 1 or 2")
     rng = random.Random(f"{SEED}:{revision}:{batch}:sample")
     pop = sorted((r for r in rows if (r["qid"], r["doc"]) not in exclude), key=lambda r: (r["qid"], r["doc"]))
     rng.shuffle(pop)
@@ -689,11 +726,19 @@ def draw_sample(rows: list[dict], *, batch: int, revision: int = 0, exclude=froz
                 raise LabelError(f"sample quota unmet: {len(picked)} of {quota[lang]} "
                                  f"{'relevant' if label else 'not-relevant'} {lang} pairs")
             chosen += picked
+    _check_sample_halves(chosen)
     if sum(1 for r in chosen if r["grade"] in (1, 2)) < BOUNDARY_MIN:
         raise LabelError(f"sample quota unmet: fewer than {BOUNDARY_MIN} pairs at the 1/2 boundary")
     random.Random(f"{SEED}:{revision}:{batch}:order").shuffle(chosen)
     prefix = "ABCD"[2 * revision + batch - 1]
     return [{**r, "id": f"{prefix}{n:03d}"} for n, r in enumerate(chosen, 1)]
+
+
+def _check_sample_halves(pairs: list[dict]) -> None:
+    if len(pairs) != SAMPLE_SIZE or Counter(p["label"] for p in pairs) != {0: SAMPLE_SIZE // 2,
+                                                                         1: SAMPLE_SIZE // 2}:
+        raise LabelError(f"sample quota unmet: need exactly {SAMPLE_SIZE} pairs, "
+                         f"{SAMPLE_SIZE // 2} relevant and {SAMPLE_SIZE // 2} not-relevant")
 
 
 def sheet_header(name: str, n: int) -> str:
@@ -755,6 +800,7 @@ def parse_sheet(text: str, name: str, pairs: list[dict], c: Collection, ex: dict
 
 
 def _sample_paths(revision: int, batch: int) -> tuple[Path, Path]:
+    _check_revision(revision)
     name = f"r{revision}-b{batch}"
     return WORK / "samples" / f"{name}.json", WORK / "samples" / f"{name}.sheet.txt"
 
@@ -764,8 +810,9 @@ def labels_sha256(done: dict) -> str:
 
 
 def sample(batch: int, revision: int = 0) -> int:
-    if revision > MAX_REVISION or batch not in (1, 2):
-        raise LabelError(f"batches are 1 or 2 and at most {MAX_REVISION} revision is allowed")
+    after = _revision_after(revision)
+    if batch not in (1, 2):
+        raise LabelError("batches are 1 or 2")
     record_path, sheet_path = _sample_paths(revision, batch)
     if record_path.exists():
         raise LabelError(f"{record_path.name} exists: a drawn sample is fixed")
@@ -776,8 +823,10 @@ def sample(batch: int, revision: int = 0) -> int:
     c, _ = _collection()
     pools = load_pools(c)
     ex = load_excerpts(pools)
-    done = current_judgments(c, pools, ex)
+    done = current_judgments(c, pools, ex, after=after)
     rows = population(c, pools, done)
+    if batch == 2 and decision["labels_sha256"] != labels_sha256(done):
+        raise LabelError("the model labels changed since the first batch's decision")
     exclude = set()
     for path in sorted((WORK / "samples").glob("r*-b*.json")):
         exclude |= {(p["qid"], p["doc"]) for p in _json(path)["pairs"]}
@@ -858,16 +907,18 @@ def acceptance_report(pairs: list[dict], strata: dict[str, int]) -> dict:
 
 
 def accept(revision: int = 0, sheets: dict[int, Path] | None = None) -> dict:
+    after = _revision_after(revision)
     c, _ = _collection()
     pools = load_pools(c)
     ex = load_excerpts(pools)
-    done = current_judgments(c, pools, ex)
+    done = current_judgments(c, pools, ex, after=after)
     batches_ = {}
     for batch in (1, 2):
         record_path, sheet_path = _sample_paths(revision, batch)
         if not record_path.exists():
             continue
         record = _json(record_path)
+        _check_sample_halves(record["pairs"])
         if record["labels_sha256"] != labels_sha256(done):
             raise LabelError(f"{record['name']}: the model labels changed since this sample was drawn")
         path = (sheets or {}).get(batch, sheet_path)
@@ -883,6 +934,7 @@ def accept(revision: int = 0, sheets: dict[int, Path] | None = None) -> dict:
     elif result["outcome"] == "SECOND_BATCH":
         result["next"] = "draw the second batch of the same revision"
     result.update(revision=revision, labels_sha256=labels_sha256(done),
+                  template_sha256=sha256_text(template()), at=time.time(),
                   report=acceptance_report([p for b in batches_.values() for p in b], strata))
     _write_json(WORK / f"acceptance-r{revision}.json", result)
     return result
@@ -916,10 +968,11 @@ def frozen_collection(c: Collection, pools: dict, done: dict) -> tuple[Collectio
 
 
 def freeze(revision: int = 0) -> int:
+    after = _revision_after(revision)
     c, _ = _collection()
     pools = load_pools(c)
     ex = load_excerpts(pools)
-    done = current_judgments(c, pools, ex)
+    done = current_judgments(c, pools, ex, after=after)
     decision = _json(WORK / f"acceptance-r{revision}.json")
     if decision["outcome"] != "PASS" or decision["labels_sha256"] != labels_sha256(done):
         raise LabelError("labels freeze only after a PASS decision on exactly the current model labels")
@@ -977,8 +1030,6 @@ def main(argv=None) -> int:
         if args.step == "excerpts":
             return excerpts()
         if args.step == "judge":
-            if args.revision > MAX_REVISION:
-                raise LabelError(f"at most {MAX_REVISION} revision is allowed")
             status = judge(max_calls=args.max_calls, concurrency=args.concurrency, phase=args.phase,
                            revision=args.revision, max_seconds=args.max_seconds)
             print(canonical_json(status))

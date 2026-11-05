@@ -111,7 +111,7 @@ def search_query(client: httpx.Client, handle: index.IndexHandle, qid, query,
 
 
 def require_budget(estimate: float, budget: float, *, full_suite: bool = False) -> None:
-    maximum = 720 if full_suite else 600
+    maximum = 600
     if not math.isfinite(budget) or not CLEANUP_SECONDS < budget <= maximum:
         raise RunRefused(f'window must be greater than {CLEANUP_SECONDS} and at most {maximum} seconds')
     if not math.isfinite(estimate) or estimate > budget:
