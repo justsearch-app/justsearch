@@ -12,6 +12,18 @@ under tested configurations, and the bottleneck structure that explains
 them. For how to run benchmarks see `docs/explanation/20-benchmarking-architecture.md` and `python -m jseval` (the prior `scripts/perf/` harness was removed — tempdoc 638);
 for indexing loop architecture see `docs/explanation/03-knowledge-server.md`.
 
+SPLADE is installed by Install AI but its separate inference lanes are opt-in.
+Default installs skip SPLADE sessions and inference while keeping the tokenizer
+for ordinary ingestion's full parent token counts. Enable with
+`JUSTSEARCH_SPLADE_ENABLED=true` / `justsearch.splade.enabled=true` and restart;
+`rag.chunk_splade.enabled=true` also requests it unless the parent switch is
+explicitly false. System properties override environment variables. Disabling
+retains existing postings, payloads, coverage and retry state; re-enabling runs
+the existing pending-parent backfill. Live chunk changes do not construct an
+omitted encoder or enroll old chunks retroactively. BGE-M3 remains independent.
+Throughput gains depend on the corpus and hardware; compare equivalent fresh
+inputs with SPLADE enabled, rather than promising a fixed speedup.
+
 ## Throughput-Governing Parameters
 
 The loop policies live in `modules/worker-services`; the embedding and SPLADE

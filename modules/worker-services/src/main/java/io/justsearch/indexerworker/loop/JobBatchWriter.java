@@ -57,6 +57,30 @@ public final class JobBatchWriter {
   private final WorkerSignalBus signalBus;
   private final EmbeddingProviderLifecycle embeddingLifecycle;
   private final Supplier<SpladeEncoder> spladeEncoderSupplier;
+  private io.justsearch.indexerworker.splade.SpladeTokenCounter tokenCounter;
+  private java.nio.file.Path tokenCounterDirectory;
+
+  /** Called before this producer starts; repeated wiring of a borrowed loop is harmless. */
+  public synchronized void useSpladeTokenizer(java.nio.file.Path directory) {
+    if (Objects.equals(tokenCounterDirectory, directory)) return;
+    if (tokenCounter != null) tokenCounter.close();
+    tokenCounter = null;
+    tokenCounterDirectory = directory;
+    if (directory != null) {
+      try {
+        tokenCounter = new io.justsearch.indexerworker.splade.SpladeTokenCounter(directory);
+      } catch (IOException | RuntimeException | LinkageError failure) {
+        log.warn("SPLADE token counting unavailable; using character estimate: {}", failure.toString());
+      }
+    }
+  }
+
+  public synchronized void closeTokenCounter() {
+    if (tokenCounter != null) {
+      tokenCounter.close();
+      tokenCounter = null;
+    }
+  }
   private final IngestionOutcomeJournal journal;
   private final JobQueue jobQueue;
   private final TimeboxedContentExtractor contentExtractor;
@@ -199,7 +223,8 @@ public final class JobBatchWriter {
       }
       SpladeEncoder splade = spladeEncoderSupplier.get();
       IndexingDocumentOps.ParentIndexMetadata parentMetadata =
-          IndexingDocumentOps.deriveParentMetadata(ex.filePath(), ex.artifact().result(), splade, log);
+          IndexingDocumentOps.deriveParentMetadataWithTokenCounter(ex.filePath(), ex.artifact().result(),
+              tokenCounter != null ? tokenCounter : splade == null ? null : splade::tokenCount, log);
       // Split once and declare the chunk set on the parent document itself: the parent is then
       // never rewritten per document (no blocking refresh, read-back or superseded version).
       var chunkPlan =

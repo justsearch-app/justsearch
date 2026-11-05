@@ -165,7 +165,7 @@ test('S3: CLI refuses conflicting inherited overrides before admitting a run or 
   assert.equal(fs.existsSync(dataDir), false);
 });
 
-test('P1: ordinary resolution retains shared models and existing SPLADE injection', () => {
+test('P1: ordinary resolution retains shared models without injecting SPLADE demand', () => {
   const saved = { ...process.env };
   try {
     for (const name of ['JUSTSEARCH_MODELS_DIR', 'JUSTSEARCH_SPLADE_MODEL_PATH', 'JUSTSEARCH_SUPERVISOR_HARNESS', 'JUSTSEARCH_SERVER_EXE']) delete process.env[name];
@@ -176,7 +176,7 @@ test('P1: ordinary resolution retains shared models and existing SPLADE injectio
     const splade = path.join(expected, 'splade', 'naver-splade-v3');
     if (['model.onnx', 'tokenizer.json', 'vocab.txt'].every(file => fs.existsSync(path.join(splade, file)))) {
       assert.equal(env.JUSTSEARCH_SPLADE_MODEL_PATH, splade);
-      assert.equal(env.JUSTSEARCH_SPLADE_ENABLED, 'true');
+      assert.equal(env.JUSTSEARCH_SPLADE_ENABLED, undefined);
     } else assert.equal(env.JUSTSEARCH_SPLADE_MODEL_PATH, undefined);
     const isolatedEnv = api.resolveAiDevEnv({ isolatedModels: 'none', dataDir: path.join(root, 'resolved') });
     assert.equal(isolatedEnv.JUSTSEARCH_MODELS_DIR, path.join(root, 'resolved', 'isolated-models'));

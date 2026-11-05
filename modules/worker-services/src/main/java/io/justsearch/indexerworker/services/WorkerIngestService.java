@@ -1810,6 +1810,16 @@ public final class WorkerIngestService {
    * consumers (e.g. jseval readiness polling) can skip coverage checks for
    * disabled stages. See tempdoc 394 / commit {@code c4e677f63}.
    */
+  /** Runtime permission captured by the serving service owner at construction. */
+  public void setChunkSparsePermission(boolean permitted) {
+    statusOps.setChunkSparsePermission(permitted);
+  }
+
+  /** A query-only successor retains the actual serving owner's applicability. */
+  public void copyChunkSparsePermissionFrom(WorkerIngestService source) {
+    statusOps.copyChunkSparsePermissionFrom(source.statusOps);
+  }
+
   public void setStageEnabled(boolean embedding, boolean splade, boolean ner) {
     statusOps.setStageEnabled(embedding, splade, ner);
   }

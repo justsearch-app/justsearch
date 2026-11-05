@@ -3407,20 +3407,20 @@ public final class KnowledgeServer implements Closeable {
     if (runtimeReloadSource != null) {
       var runtime = (RunningRuntime) ingestLifecycle;
       bindTerminalWriterFaultSource(runtime);
-      return DefaultWorkerAppServices.prepareRuntimeReload(workerExecutors,
+      return prepareSparseMetadata(DefaultWorkerAppServices.prepareRuntimeReload(workerExecutors,
           fixedRuntimeContext(runtime, activeIndexPath),
           () -> buildingIndexPath != null && searchLifecycle != ingestLifecycle,
-          embeddingTelemetry, indexingPacing, childControl, serviceConfiguration, runtimeReloadSource);
+          embeddingTelemetry, indexingPacing, childControl, serviceConfiguration, runtimeReloadSource));
     }
     return newAppServices(infraCtx, ingestLifecycle);
   }
 
   private DefaultWorkerAppServices newAppServicesForRuntime(
       RunningRuntime runtime, DefaultWorkerAppServices deferredSource) {
-    return DefaultWorkerAppServices.prepareDeferredWriterUpgrade(
+    return prepareSparseMetadata(DefaultWorkerAppServices.prepareDeferredWriterUpgrade(
         workerExecutors, fixedRuntimeContext(runtime, activeIndexPath),
         () -> buildingIndexPath != null && searchLifecycle != ingestLifecycle,
-        embeddingTelemetry, indexingPacing, childControl, serviceConfiguration, deferredSource);
+        embeddingTelemetry, indexingPacing, childControl, serviceConfiguration, deferredSource));
   }
 
   private InfraContext fixedRuntimeContext(RunningRuntime runtime, Path servingPath) {
@@ -3448,6 +3448,7 @@ public final class KnowledgeServer implements Closeable {
         embeddingTelemetry, indexingPacing, childControl, serviceConfiguration,
         selectedCandidateConfiguration, source);
     try {
+      prepareSparseMetadata(candidate);
       wireAppServicesPostConstruction(candidate);
       return candidate;
     } catch (RuntimeException | Error failure) {
@@ -3513,7 +3514,7 @@ public final class KnowledgeServer implements Closeable {
     if (selectedIngest instanceof RunningRuntime runningRuntime) {
       bindTerminalWriterFaultSource(runningRuntime);
     }
-    return new DefaultWorkerAppServices(
+    return prepareSparseMetadata(new DefaultWorkerAppServices(
         workerExecutors,
         selected,
         () -> buildingIndexPath != null && searchLifecycle != ingestLifecycle,
@@ -3521,7 +3522,36 @@ public final class KnowledgeServer implements Closeable {
         indexingPacing,
         childControl,
         serviceConfiguration,
-        candidateServiceConfiguration);
+        candidateServiceConfiguration));
+  }
+
+  /** Prepare sparse applicability and token counting before ingestion or async inference. */
+  private DefaultWorkerAppServices prepareSparseMetadata(DefaultWorkerAppServices producer) {
+    try {
+      // Load token counting synchronously, before primary ingestion can race async inference.
+      // A generation's selected assets keep authority even when inference is intentionally off.
+      var producerConfig = producer.producerResolvedConfig();
+      var servingConfig = producer.resolvedConfig();
+      String servingMode = initialModelSelection == null ? servingConfig.ai().sparseModel()
+          : initialModelSelection.sparseModel().orElse(servingConfig.ai().sparseModel());
+      producer.ingestService().setChunkSparsePermission(
+          io.justsearch.indexerworker.splade.SpladeConfig.permitted(
+              servingConfig.ai().splade().enabled(), servingConfig.rag().chunkSpladeEnabled())
+              || "bge-m3".equalsIgnoreCase(servingMode));
+      Path tokenizerDirectory = initialModelSelection == null
+          ? io.justsearch.indexerworker.splade.SpladeConfig.from(producerConfig).modelPath()
+          : initialModelSelection.metadataDirectory("splade").orElse(null);
+      if (recordedCandidate != null && producerConfig == recordedCandidate.configuration()) {
+        var selectedSplade = recordedCandidate.models().get("splade");
+        tokenizerDirectory = selectedSplade == null ? null : Path.of(selectedSplade.id()).getParent();
+      }
+      producer.useSpladeTokenizer(tokenizerDirectory);
+      return producer;
+    } catch (RuntimeException | Error failure) {
+      try { producer.close(); }
+      catch (IOException | RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
+      throw failure;
+    }
   }
 
   /** Tempdoc 885 item 3: the process-scoped duty-cycle policy, built from resolved config. */
@@ -4692,7 +4722,8 @@ public final class KnowledgeServer implements Closeable {
               && identity.embeddingModel().state()
                    == IndexFingerprint.ModelState.PRESENT && embedding == null)
           || (identity.spladeModel().state()
-               == IndexFingerprint.ModelState.PRESENT && splade == null)
+               == IndexFingerprint.ModelState.PRESENT && encoderConfiguration.splade().enabled()
+               && splade == null)
           || (identity.nerModel().state()
                == IndexFingerprint.ModelState.PRESENT && ner == null)
           || (identity.bgeM3Selected() && bge == null)) {

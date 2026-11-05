@@ -14,7 +14,7 @@ import org.slf4j.LoggerFactory;
  *
  * <ul>
  *   <li>{@code JUSTSEARCH_SPLADE_ENABLED} / {@code justsearch.splade.enabled} — enable SPLADE
- *       (auto if model found)
+ *       (opt-in; applied at next start)
  *   <li>{@code JUSTSEARCH_SPLADE_MODEL_PATH} / {@code justsearch.splade.model_path} — explicit
  *       model directory
  *   <li>{@code JUSTSEARCH_SPLADE_GPU_ENABLED} / {@code justsearch.splade.gpu_enabled} — enable GPU
@@ -57,35 +57,17 @@ public record SpladeConfig(
     return from(config.ai().splade(), config);
   }
 
-  /** Legacy sub-record factory; discovery retains its historical global-snapshot fallback. */
+  /** Legacy sub-record factory; chunk demand and discovery use the global snapshot. */
   public static SpladeConfig from(ResolvedConfig.Ai.Splade splade) {
-    return from(splade, null);
+    return from(splade, ConfigStore.global().get());
   }
 
   private static SpladeConfig from(ResolvedConfig.Ai.Splade splade, ResolvedConfig snapshot) {
     String modelPathStr = splade.modelPath() != null ? splade.modelPath().toString() : null;
-    SpladeModelDiscovery.Result discovery =
-        snapshot != null
-            ? SpladeModelDiscovery.resolve(snapshot, modelPathStr)
-            : SpladeModelDiscovery.resolve(modelPathStr);
+    SpladeModelDiscovery.Result discovery = SpladeModelDiscovery.resolve(snapshot, modelPathStr);
     Path modelPath = discovery != null ? discovery.modelDir() : null;
 
-    Boolean explicitEnabled = splade.enabled();
-    // Tempdoc 374 alpha.17 R4: align with EmbeddingConfig — explicit path also
-    // enables. Pre-alpha.17 the fallback was `discovery.autoDiscovered()` only,
-    // so {@code AiInstallService.applyOnnxSettings} writing an explicit
-    // {@code justsearch.splade.model_path} sysprop at end of Install AI flipped
-    // SPLADE from auto-on (autoDiscovered=true) to silently disabled
-    // (autoDiscovered=false, explicitEnabled=null → enabled=false). Round-7
-    // sandbox: every install post-Install-AI had {@code spladeEnabled: false}
-    // and {@code splade=...} was missing from {@code Combined backfill} log
-    // lines even though the model was on disk and the runtime worked. Embedding
-    // already had this branch; SPLADE was the asymmetry.
-    boolean enabled =
-        explicitEnabled != null
-            ? explicitEnabled
-            : (discovery != null
-                && (discovery.autoDiscovered() || modelPathStr != null));
+    boolean enabled = permitted(splade.enabled(), snapshot.rag().chunkSpladeEnabled());
 
     int maxSeqLen = splade.maxSeqLen();
     // Policy gate is already applied in ResolvedConfigBuilder.resolveModelGpuEnabled() (D4).
@@ -111,10 +93,15 @@ public record SpladeConfig(
     } else if (enabled) {
       log.warn("SPLADE enabled but model not found -- SPLADE will be unavailable");
     } else {
-      log.debug("SPLADE disabled (no model found or explicitly disabled)");
+      log.debug("SPLADE inference disabled (opt-in)");
     }
 
     return config;
+  }
+
+  /** Persistent demand only. An explicit parent false vetoes chunk demand. */
+  public static boolean permitted(Boolean parent, boolean chunk) {
+    return parent != null ? parent : chunk;
   }
 
   /** Returns true if SPLADE is enabled and model path is configured. */

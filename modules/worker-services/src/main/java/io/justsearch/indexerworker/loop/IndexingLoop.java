@@ -1511,6 +1511,10 @@ public class IndexingLoop implements Closeable {
   // Tempdoc 516 Slice 4c: handleGpuStateTransition, unloadEmbeddingService,
   // notifyEmbeddingProviderChange moved to EmbeddingProviderLifecycle.
 
+  public void useSpladeTokenizer(Path directory) {
+    writer.useSpladeTokenizer(directory);
+  }
+
   @Override
   public void close() throws IOException {
     closeOwnedResources(true);
@@ -1554,6 +1558,8 @@ public class IndexingLoop implements Closeable {
       try { contentExtractor.close(); }
       catch (RuntimeException failure) { throw new IOException("Content extractor still owns resources", failure); }
     }
+
+    writer.closeTokenCounter();
 
     // Ordinary loop close also closes NER. A live native-to-Green handoff retains NER for
     // issued A queries; the generation's EncoderSet retires it after those leases leave.

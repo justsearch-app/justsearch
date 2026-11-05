@@ -717,6 +717,9 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
             servingRuntime,
             ctx.migrationProgressSupplier(),
             ctx.migrationSwitchingMaxDurationMs());
+    this.ingestService.setChunkSparsePermission(io.justsearch.indexerworker.splade.SpladeConfig.permitted(
+        resolvedConfig.ai().splade().enabled(), resolvedConfig.rag().chunkSpladeEnabled())
+        || "bge-m3".equalsIgnoreCase(resolvedConfig.ai().sparseModel()));
 
     // Tempdoc 419 / T5.3 (ADR-0028): wire the scoped reverse-lookup store. KnowledgeServer
     // constructed it; we just inject so the LookupPathByHash service handler returns real data.
@@ -838,6 +841,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
   private void copySourceQueryBindings(DefaultWorkerAppServices source) {
     var bindings = source.encoderBindings.snapshot();
     encoderBindings.publish(bindings);
+    ingestService.copyChunkSparsePermissionFrom(source.ingestService);
     healthService.setBgeM3Encoder(bindings.bgeM3Encoder());
     var disambiguation = bindings.disambiguationService();
     searchService.setClusterSnapshotSupplier(
@@ -972,6 +976,13 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
             greenRuntime,
             greenContext.migrationProgressSupplier(),
             greenContext.migrationSwitchingMaxDurationMs());
+    if (applied == null) {
+      this.ingestService.copyChunkSparsePermissionFrom(incumbent.ingestService);
+    } else {
+      this.ingestService.setChunkSparsePermission(io.justsearch.indexerworker.splade.SpladeConfig.permitted(
+          resolvedConfig.ai().splade().enabled(), resolvedConfig.rag().chunkSpladeEnabled())
+          || "bge-m3".equalsIgnoreCase(resolvedConfig.ai().sparseModel()));
+    }
     this.preparedWatcherTarget = new WatcherCallbacks.Target(
         greenRuntime, this.ingestService, incumbent.preparedWatcherTarget.deletionMarker(),
         mutationAdmission, mutationOwnerToken);
@@ -1326,6 +1337,15 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
   @Override
   public WorkerHealthService healthService() {
     return healthService;
+  }
+
+  /** The producer may target a different generation than the retained serving services. */
+  public ResolvedConfig producerResolvedConfig() {
+    return candidateConfiguration == null ? resolvedConfig : candidateConfiguration.snapshot();
+  }
+
+  public void useSpladeTokenizer(Path directory) {
+    if (indexingLoop != null) indexingLoop.useSpladeTokenizer(directory);
   }
 
   /** Snapshot from which this complete service set was composed. */

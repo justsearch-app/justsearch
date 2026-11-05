@@ -639,7 +639,6 @@ function resolveAiDevEnv({ isolatedModels: state = null, dataDir } = {}) {
     const required = ['model.onnx', 'tokenizer.json', 'vocab.txt'];
     if (required.every(f => fs.existsSync(path.join(spladeDir, f)))) {
       env.JUSTSEARCH_SPLADE_MODEL_PATH = spladeDir;
-      env.JUSTSEARCH_SPLADE_ENABLED = 'true';
     }
   }
   return env;

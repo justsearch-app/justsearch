@@ -1050,7 +1050,7 @@ public final class McpToolSurface {
           ? (statusFacts == null ? -1L : statusFacts.docCount()) : -1L;
       String searchEnrichmentHint = statusFacts != null
           && (statusFacts.embeddingCoveragePercent() < 100
-              || statusFacts.spladeCoveragePercent() < 100)
+              || (statusFacts.spladeEnabled() && statusFacts.spladeCoveragePercent() < 100))
           ? SEARCH_ENRICHMENT_MESSAGE : null;
       // Tempdoc 771 item (b): carriage settings resolved once per call, outside the governor's view
       // lambda for the same reason the framing flags are — every degradation step renders under one
@@ -2036,7 +2036,8 @@ public final class McpToolSurface {
       var status = ctrl.getAdapter().status(engineContext);
       Map<String, Object> extras = status.extras();
       boolean lowEmbedding = extras.get("embeddingCoveragePercent") instanceof Number n && n.doubleValue() < 100;
-      boolean lowSplade = extras.get("spladeCoveragePercent") instanceof Number n && n.doubleValue() < 100;
+      boolean lowSplade = !Boolean.FALSE.equals(extras.get("spladeEnabled"))
+          && extras.get("spladeCoveragePercent") instanceof Number n && n.doubleValue() < 100;
       return (lowEmbedding || lowSplade) ? message : null;
     } catch (Exception e) {
       rethrowRefusal(e);
