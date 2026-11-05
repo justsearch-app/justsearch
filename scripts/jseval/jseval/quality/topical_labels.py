@@ -701,8 +701,9 @@ def _verify_codex_home(home: Path, model: str) -> None:
 @contextlib.contextmanager
 def codex_home(model: str = SECOND_MODEL):
     """A fresh CODEX_HOME for one second-judge run: the tool's own config and a copy of the stored
-    ChatGPT login (never an API key), verified tool-free before any call, deleted afterwards. A
-    token refresh during the run is written back so the stored login stays usable."""
+    ChatGPT login (never an API key) without its refresh token, verified tool-free before any call,
+    deleted afterwards. The copy cannot refresh, so the run can never rotate or overwrite the
+    owner's stored login; a run whose access token expires stops with codex's error."""
     if any(n.startswith(CODEX_OVERRIDE_PREFIXES) or n in CODEX_OVERRIDES for n in os.environ):
         raise ruq.SubscriptionRequired("ChatGPT subscription required; remove API/provider overrides")
     source = _codex_auth_path()
@@ -718,35 +719,20 @@ def codex_home(model: str = SECOND_MODEL):
     try:
         fd = os.open(home / "auth.json", os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(fd, "wb") as f:
-            f.write(copied)
+            f.write(_without_refresh_token(copied))
         (home / "config.toml").write_text(_codex_config(model, None), encoding="utf-8")
         _verify_codex_home(home, model)
         yield home
     finally:
-        try:
-            _write_back_refresh(home / "auth.json", source, copied)
-        finally:
-            shutil.rmtree(home)
+        shutil.rmtree(home)
 
 
-def _write_back_refresh(used: Path, source: Path, copied: bytes) -> None:
-    """A login the run refreshed replaces the stored one, unless that changed meanwhile."""
-    try:
-        now = used.read_bytes()
-        unchanged = source.read_bytes() == copied
-    except OSError:
-        return
-    if now == copied or not unchanged or not _subscription_auth(now):
-        return
-    fd, tmp = tempfile.mkstemp(dir=source.parent, prefix=".auth.json.")  # mode 0600
-    try:
-        with os.fdopen(fd, "wb") as f:
-            f.write(now)
-        os.replace(tmp, source)
-    except BaseException:
-        if os.path.exists(tmp):
-            os.unlink(tmp)
-        raise
+def _without_refresh_token(raw: bytes) -> bytes:
+    """The stored login for the isolated home, minus the refresh token (never written back)."""
+    auth = json.loads(raw)
+    if isinstance(auth, dict) and isinstance(auth.get("tokens"), dict):
+        auth["tokens"] = {k: v for k, v in auth["tokens"].items() if k != "refresh_token"}
+    return json.dumps(auth).encode("utf-8")
 
 
 def codex_command(model: str, cwd: str, schema: str) -> list[str]:
