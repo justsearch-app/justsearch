@@ -63,6 +63,48 @@ python -m jseval quality check scifact
 python -m jseval quality ablate scifact --mode vector
 ```
 
+To measure query-time settings on an already prepared index, keep the preparation
+environment and use explicit scoring overrides. For example, choose four CPUs
+from the process's allowed CPU set:
+
+```sh
+python -m jseval quality sensitivity scifact \
+  --set JUSTSEARCH_RERANK_ENABLED=true \
+  --set JUSTSEARCH_RERANK_GPU_ENABLED=false \
+  --set JUSTSEARCH_EMBED_GPU_ENABLED=false \
+  --set JUSTSEARCH_ORT_INTRA_OP_THREADS=4 \
+  --cpus 0-3 --sample 20 --seed 42
+```
+
+The allowlist is exactly those four names plus `JUSTSEARCH_RERANK_TOP_K`.
+Overrides apply only to the scoring launch; inherited settings still key the
+index, including unknown `JUSTSEARCH_*` variables and ORT threads. Sensitivity
+never builds, repairs or quarantines. It refuses pending ingestion/enrichment
+work and confirms identity without the cross-encoder canary; preparation and
+normal checks keep that canary. GPU overrides still require pinned native
+libraries. CPU affinity is inherited by the backend's children and read back
+from the Engine JVM; a mismatch refuses the run.
+
+Sensitivity exits **3**, labelled **SENSITIVITY**, and cannot be stored as a
+baseline or used by compare/check. Sampling excludes pending labels and is
+deterministic regardless of input order. Without matching sensitivity history,
+the window estimate allows 15 seconds per query plus startup, confirmation and
+cleanup; a run exceeding the 600-second window refuses before admission. Use
+`--sample` to fit a cold run. The report counts executed rerankers and skips by
+reason and fixed query group, including consecutive deadline skips. Disabled
+and deadline skips do not invalidate sensitivity; default skip rules are
+unchanged. Other failures still invalidate it. `SEARCH_DEADLINE_EXCEEDED` may include model loading or saturation
+by earlier native runs; the trace does not distinguish them.
+
+Every scoring report includes per-collection **p50/p95 search time** from
+per-query `elapsed_seconds`, including slow skips and excluding startup,
+confirmation and waiting. Missing timings show `unavailable`. Run JSONL also
+keeps nullable per-hit keyword/meaning/SPLADE ranks, fusion and cross-encoder
+scores, aligned with delivered documents after chunk collapse. These signals
+do not affect scoring or verdicts. Sensitivity headers record settings, requested
+and effective CPUs, sample IDs and text hashes, and the Engine's effective
+settings; paths are digested and unreported fields carry a reason.
+
 Omit the collection arguments to baseline/check to use SciFact, MIRACL de
 and Enron, plus real-use once none of its query kinds awaits labels (once its
 topical labels are frozen). Each needs its prepared index; run

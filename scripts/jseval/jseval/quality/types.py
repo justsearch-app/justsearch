@@ -394,11 +394,13 @@ class QueryResult:
     served: Served = Served()
     error: str | None = None  # S11: a failed query is recorded, never dropped
     timings: Mapping[str, float] = field(default_factory=dict)
+    hit_signals: tuple[Mapping[str, Any], ...] = ()
 
     def to_dict(self) -> dict:
         return {"qid": self.qid, "query_text_sha256": self.query_text_sha256,
                 "ranked": list(self.ranked), "served": self.served.to_dict(),
-                "error": self.error, "timings": dict(self.timings)}
+                "error": self.error, "timings": dict(self.timings),
+                "hit_signals": [dict(h) for h in self.hit_signals]}
 
     @classmethod
     def from_dict(cls, d: Mapping) -> "QueryResult":
@@ -410,9 +412,16 @@ class QueryResult:
         timings = _mapping(d.get("timings") or {}, f"query {qid}: timings")
         _need(all(is_finite_number(v) for v in timings.values()),
               f"query {qid}: timings must be finite numbers")
+        signals = d.get("hit_signals", [])
+        _need(isinstance(signals, list) and all(isinstance(h, Mapping) for h in signals),
+              f"query {qid}: hit_signals must be objects")
+        _need(not signals or len(signals) == len(ranked),
+              f"query {qid}: hit_signals must align with ranked documents")
+        _need(all(v is None or is_finite_number(v) for h in signals for v in h.values()),
+              f"query {qid}: hit_signals must contain finite numbers or null")
         return cls(qid, _text(d.get("query_text_sha256"), f"query {qid}: query_text_sha256"),
                    tuple(ranked), Served.from_dict(d.get("served") or {"reranker": "skipped"}),
-                   _text(d.get("error"), f"query {qid}: error", optional=True), dict(timings))
+                   _text(d.get("error"), f"query {qid}: error", optional=True), dict(timings), tuple(signals))
 
 
 @dataclass(frozen=True)
@@ -449,7 +458,12 @@ class RunHeader:
     # what the index was built from, with no machine paths. Empty for records that predate it.
     identity: Mapping[str, str] = field(default_factory=dict)
 
+    run_kind: str = "standard"
+    sensitivity: Mapping[str, Any] = field(default_factory=dict)
+
     def __post_init__(self) -> None:
+        _need(self.run_kind in ("standard", "sensitivity"), "unknown run_kind")
+        _mapping(self.sensitivity, "sensitivity")
         for name in ("collection", "collection_version", "index_key", "commit", "started"):
             _text(getattr(self, name), name)
         _text(self.dirty_hash, "candidate.dirty_hash", optional=True)
@@ -481,7 +495,8 @@ class RunHeader:
         object.__setattr__(self, "request_config_sha256", computed)
 
     def to_dict(self) -> dict:
-        return {"schema": RUN_SCHEMA,
+        return {"schema": RUN_SCHEMA, "run_kind": self.run_kind,
+                "sensitivity": dict(self.sensitivity),
                 "collection": {"name": self.collection, "version": self.collection_version},
                 "index_key": self.index_key,
                 "index_population": dict(self.index_population),
@@ -508,6 +523,7 @@ class RunHeader:
         cand = _mapping(d["candidate"], "candidate")
         served = _mapping(d["expected_served"], "expected_served")
         return cls(collection=col["name"], collection_version=col["version"],
+                   run_kind=d.get("run_kind", "standard"), sensitivity=d.get("sensitivity", {}),
                    index_key=d["index_key"], index_population=d["index_population"],
                    index_build=d["index_build"], index_cache_key=d["index_cache_key"],
                    index_state=d["index_state"] if "index_state" in d else {},
@@ -586,10 +602,11 @@ class Outcome(str, enum.Enum):
     REGRESSION = "REGRESSION"
     INCONCLUSIVE = "INCONCLUSIVE"
     INVALID = "INVALID"
+    SENSITIVITY = "SENSITIVITY"
 
     @property
     def exit_code(self) -> int:
-        return {"PASS": 0, "REGRESSION": 1, "INCONCLUSIVE": 2, "INVALID": 2}[self.value]
+        return {"PASS": 0, "REGRESSION": 1, "INCONCLUSIVE": 2, "INVALID": 2, "SENSITIVITY": 3}[self.value]
 
 
 # Per-group outcomes (the overall Outcome is derived from these plus the validity checks).

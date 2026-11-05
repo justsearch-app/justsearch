@@ -66,7 +66,7 @@ def test_refined_request_and_delivered_order():
 def test_errors_never_become_empty_success(wire, status, error):
     c = make_collection()
     with httpx.Client(transport=httpx.MockTransport(lambda _: httpx.Response(status, json=wire)), base_url='http://engine') as client:
-        h = Mock(); h.ranked_doc_ids.return_value = []
+        h = Mock(); h.ranked_doc_ids.return_value = ['d000'] if wire.get('results') else []
         r = run.search_query(client, h, 'q000', c.queries['q000'], run.refined_request(), 5)
     assert bool(r.error) == error
     if not error:

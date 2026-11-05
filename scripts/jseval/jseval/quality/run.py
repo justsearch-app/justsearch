@@ -25,7 +25,7 @@ import psutil
 
 from .. import backend
 from .._paths import REPO_ROOT
-from . import collections, compare, distribution, index, inputs, known_answers, report, scoring
+from . import collections, compare, distribution, index, inputs, known_answers, report, scoring, sensitivity
 from .types import (Outcome, QueryResult, RunHeader, RunRecord, Served,
                     atomic_write_text, canonical_json, sha256_text)
 
@@ -75,6 +75,7 @@ def search_query(client: httpx.Client, handle: index.IndexHandle, qid, query,
     served = Served()
     ranked = ()
     error = None
+    signals = ()
     try:
         resp = client.post('/api/knowledge/search', json={**request, 'query': query.text},
                            timeout=max(.001, timeout))
@@ -103,11 +104,36 @@ def search_query(client: httpx.Client, handle: index.IndexHandle, qid, query,
         if any(not isinstance(loc, str) or not loc for loc in locations):
             raise ValueError('delivered hit has no full document identity')
         ranked = tuple(handle.ranked_doc_ids(locations))
+        signals = delivered_signals(handle, hits, locations, ranked)
     except Exception as e:
         # All other HTTP errors, transport failures and malformed traces stay errors.
         error = f'{type(e).__name__}: {e}'
     return QueryResult(qid, query.sha256, ranked, served, error,
-                       {'elapsed_seconds': time.monotonic() - start})
+                       {'elapsed_seconds': time.monotonic() - start}, signals)
+
+
+def delivered_signals(handle, hits, locations, ranked):
+    """Keep the first delivered chunk's trace, exactly like ranked_doc_ids collapse."""
+    empty = dict.fromkeys(('keyword_rank', 'meaning_rank', 'splade_rank', 'fusion_score', 'cross_encoder_score'))
+    if not any(hit.get('trace') for hit in hits):
+        return tuple(dict(empty) for _ in ranked)
+    # Resolve the salted manifest once. Calling ranked_doc_ids per hit would
+    # reconstruct and validate the whole collection up to 50 times per query.
+    materialized = replace(handle.collection, version='',
+        documents=json.loads((handle.root/'materialized.json').read_text()))
+    by_doc = {}
+    for hit, location in zip(hits, locations):
+        doc = materialized.doc_id_for_location(location, handle.documents_dir)
+        if doc in by_doc:
+            continue
+        stages = {stage['id']: stage for stage in hit.get('trace') or []}
+        by_doc[doc] = {name: (stages.get(stage) or {}).get(field) for name, stage, field in (
+            ('keyword_rank', 'sparse-retrieval', 'rank'),
+            ('meaning_rank', 'dense-retrieval', 'rank'),
+            ('splade_rank', 'splade-retrieval', 'rank'),
+            ('fusion_score', 'fusion', 'score'),
+            ('cross_encoder_score', 'cross-encoder', 'score'))}
+    return tuple(by_doc.get(doc, empty) for doc in ranked)
 
 
 def require_budget(estimate: float, budget: float, *, full_suite: bool = False) -> None:
@@ -125,6 +151,7 @@ def _history(c, request: dict, models: dict, runs: Path):
             r = RunRecord.read(path)
             h = r.header
             if (h.collection_version != c.version or h.request_config != request
+                    or h.run_kind == 'sensitivity'
                     or h.model_hashes != models or h.ended is None
                     or compare.validate_run(c, r, {c.version}, 'history')):
                 continue
@@ -254,9 +281,18 @@ def _collection_worker(plan: dict, item: dict, deadline: float) -> None:
     ready = scoring_start = scoring_end = None
     gpu_peak = None
     gpu_enabled = str(plan['hardware'].get('gpu_enabled', '')).lower() == 'true'
+    arm = item.get('sensitivity')
     try:
-        handle = index.prepare_index(c, cfg, prepared_only=True)
+        if arm is not None:
+            sensitivity.pin_cpus(arm['requested_cpus'])
+        handle = index.prepare_index(c, cfg, prepared_only=True,
+            **({'sensitivity': arm['settings']} if arm is not None else {}))
         handle.wait(prepared_only=True, deadline=deadline)
+        if arm is not None:
+            arm = sensitivity.history_key(arm,
+                sensitivity.effective_settings(handle.base_url, arm['settings']),
+                sensitivity.engine_cpus(handle, arm['requested_cpus']))
+            sensitivity.check_profile(arm, item.get('sensitivity_expected'))
         header = RunHeader(
             collection=c.name, collection_version=c.version, index_key=handle.index_key,
             index_population=handle.index_population, request_config=plan['request'],
@@ -268,7 +304,8 @@ def _collection_worker(plan: dict, item: dict, deadline: float) -> None:
             # every other path-like value as its own digest.
             index_state={**handle.index_state, 'runtime': inputs.recorded(handle.components['runtime'])},
             identity=handle.identity, hardware=plan['hardware'],
-            budget={'window_seconds': plan['budget']})
+            budget={'window_seconds': plan['budget']},
+            run_kind='sensitivity' if arm is not None else 'standard', sensitivity=arm or {})
         # started includes this collection's backend start and confirmation for estimation.
         header = replace(header, started=datetime.fromtimestamp(
             time.time() - (time.monotonic()-start), timezone.utc).isoformat())
@@ -281,7 +318,9 @@ def _collection_worker(plan: dict, item: dict, deadline: float) -> None:
             time.sleep(.02)
         scoring_start = time.monotonic()
         with httpx.Client(base_url=handle.base_url) as client:
-            for qid, query in sorted(c.queries.items()):
+            chosen = arm['queries'] if arm is not None else c.queries
+            for qid in sorted(chosen):
+                query = c.queries[qid]
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
                     raise RunRefused(f'window deadline at query {qid}')
@@ -293,6 +332,12 @@ def _collection_worker(plan: dict, item: dict, deadline: float) -> None:
         confirmed = index.confirm(handle)
         if not confirmed.ok:
             raise RunRefused('not ready: index changed during scoring: ' + '; '.join(confirmed.failures))
+        if arm is not None:
+            # Lazy sessions can acquire their execution provider on the first query.
+            header = replace(header, sensitivity=sensitivity.history_key(arm,
+                sensitivity.effective_settings(handle.base_url, arm['settings']),
+                sensitivity.engine_cpus(handle, arm['requested_cpus'])))
+            sensitivity.check_profile(header.sensitivity, item.get('sensitivity_expected'))
         scoring_end = time.monotonic()
     except BaseException as e:
         failure = f'{type(e).__name__}: {e}'
@@ -353,8 +398,11 @@ def execute(action: str, refs: tuple[str, ...], *, baseline_dir: Path,
             runs_dir: Path, window_seconds: float = 600, mode: str | None = None,
             models_dir: Path | None = None, documents_dir: Path | None = None,
             cache_root: Path = index.CACHE_ROOT, repo_root: Path = REPO_ROOT,
-            full_suite: bool = False) -> tuple[Outcome, str]:
+            full_suite: bool = False, sets: tuple[str, ...] = (),
+            cpus: str | None = None, sample: int | None = None, seed: int = 0) -> tuple[Outcome, str]:
     """Plan -> reserve -> run -> reap -> validate -> publish; no successful partial verdict."""
+    overrides = sensitivity.settings(sets) if action == 'sensitivity' else None
+    requested_cpus = sensitivity.cpus(cpus) if action == 'sensitivity' else None
     request = request_for(mode)
     if action == 'ablate' and mode is None:
         raise RunRefused('ablation must name an explicit mode')
@@ -369,6 +417,7 @@ def execute(action: str, refs: tuple[str, ...], *, baseline_dir: Path,
         distribution.current(repo_root, [commit, dirty])
     except distribution.DistributionRefused as e:
         raise RunRefused(str(e)) from None
+    arms, expected_profiles = {}, {}
     loaded = []
     totals, startups, footprints = [], [], []
     pending = {}
@@ -384,13 +433,24 @@ def execute(action: str, refs: tuple[str, ...], *, baseline_dir: Path,
         cfg = index.IndexConfig(repo_root=repo_root, models_dir=models_dir,
                                 documents_dir=documents_dir, cache_root=cache_root)
         # Read-only prepared check happens before taking the gate; no worker/build fallback.
-        with index.prepare_index(c, cfg, prepared_only=True) as handle:
+        if overrides is not None:
+            # Revalidate core pins first, then the explicit scoring-only overlay.
+            sensitivity.launch_environment(cfg.environment(), overrides)
+            arms[c.name] = sensitivity.declaration(c, overrides, requested_cpus, sample, seed)
+        with index.prepare_index(c, cfg, prepared_only=True,
+                **({'sensitivity': overrides} if overrides is not None else {})) as handle:
             models = dict(handle.model_hashes)
         baseline = baseline_dir / (sha256_text(c.name) + '.baseline.json')
         if action == 'check':
             compare.load_baseline(baseline)  # refuse an absent/corrupt baseline before scoring
-        totals.append(estimate_seconds(c, request, models, runs_dir))
-        startups.append(estimate_startup_seconds(c, request, models, runs_dir))
+        if overrides is not None:
+            total, startup, expected_profiles[c.name] = sensitivity.estimate(
+                c, request, models, runs_dir, arms[c.name])
+        else:
+            total, startup = (estimate_seconds(c, request, models, runs_dir),
+                              estimate_startup_seconds(c, request, models, runs_dir))
+        totals.append(total)
+        startups.append(startup)
         for _, _, done in _history(c, request, models, runs_dir):
             footprint = done.get('gpu_engine_mib')
             if isinstance(footprint, (int, float)) and math.isfinite(footprint) and footprint > 0:
@@ -400,7 +460,7 @@ def execute(action: str, refs: tuple[str, ...], *, baseline_dir: Path,
         raise RunRefused('duplicate collection names')
     gpu_enabled = str(loaded[0][2].environment().get('JUSTSEARCH_GPU_ENABLED', '')).lower() == 'true'
     footprint = max(footprints) if footprints else None
-    overlap = bool(footprint and can_overlap(gpu_enabled, None, footprint))
+    overlap = overrides is None and bool(footprint and can_overlap(gpu_enabled, None, footprint))
     estimate = estimate_window(totals, startups, overlap)
     require_budget(estimate, window_seconds, full_suite=full_suite)
     out = runs_dir.resolve() / (datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S') + '-' + uuid.uuid4().hex[:8])
@@ -418,7 +478,10 @@ def execute(action: str, refs: tuple[str, ...], *, baseline_dir: Path,
         collections.write_collection(c, folder/'collection')
         plan['items'].append({'number': n, 'name': c.name, 'collection': str(folder/'collection'),
                               'index_config': _serial_config(cfg), 'run': str(folder/'run.jsonl'),
-                              'ready': str(folder/'ready'), 'go': str(folder/'go'), 'done': str(folder/'done.json')})
+                              'ready': str(folder/'ready'), 'go': str(folder/'go'), 'done': str(folder/'done.json'),
+                              **({'sensitivity': arms[c.name],
+                                  'sensitivity_expected': expected_profiles[c.name]}
+                                 if overrides is not None else {})})
     _write_json(out/'plan.json', plan)
     command = [sys.executable, str(repo_root/'scripts/dev/admission.py'), 'exclusive',
                '--purpose', 'search quality ' + action, '--gate-timeout', '1200',
@@ -438,7 +501,7 @@ def execute(action: str, refs: tuple[str, ...], *, baseline_dir: Path,
         problems.append(f'exclusive window exited {code}: {(out/"window.log").read_text()[-2000:]}')
     if backend.source_identity(repo_root) != (commit, dirty):
         problems.append('candidate changed during scoring')
-    comparisons, times, records, refusals = [], {}, [], {}
+    comparisons, times, records, refusals, measurements = [], {}, [], {}, {}
     for item, (c, qc, cfg, baseline, models) in zip(plan['items'], loaded):
         record, errors = compare.load_run_or_reason(item['run'], c.name)
         # The reservation/startup failure explains missing output. Lead with it
@@ -446,7 +509,13 @@ def execute(action: str, refs: tuple[str, ...], *, baseline_dir: Path,
         errors = problems + errors
         if record:
             refusals[c.name] = [r.qid for r in record.results if compare.syntax_refused(r)]
-            errors += compare.validate_run(c, record, {c.version}, c.name)
+            errors += compare.validate_run(c, record, {c.version}, c.name,
+                                           sensitivity=overrides is not None)
+            if overrides is not None and (record.header.run_kind != 'sensitivity' or any(
+                    record.header.sensitivity.get(k) != v for k, v in arms[c.name].items())):
+                errors.append(f'{c.name}: sensitivity declaration differs from the planned arm')
+            if not errors:
+                measurements[c.name] = report.run_measurements(c, record, qc.groups)
             pinned = cfg.environment()
             if dict(record.header.model_hashes) != models or index.model_hashes(
                     Path(pinned['JUSTSEARCH_MODELS_DIR']), llm_off=inputs.llm_off(pinned)) != models:
@@ -480,8 +549,9 @@ def execute(action: str, refs: tuple[str, ...], *, baseline_dir: Path,
     elif problems:
         outcome, details = Outcome.INVALID, '; '.join(dict.fromkeys(problems))
     else:
-        outcome = Outcome.PASS
-        details = 'baseline stored' if action == 'baseline' else f'explicit-mode ablation {mode} (sensitivity information)'
+        outcome = Outcome.SENSITIVITY if overrides is not None else Outcome.PASS
+        details = ('scoring-only settings on prepared index' if overrides is not None else
+                   'baseline stored' if action == 'baseline' else f'explicit-mode ablation {mode} (sensitivity information)')
         if action == 'baseline':
             for item, c, baseline in records:
                 compare.write_baseline(item['run'], c, baseline)
@@ -489,7 +559,7 @@ def execute(action: str, refs: tuple[str, ...], *, baseline_dir: Path,
     summary = {'outcome': outcome.value, 'surface': surface, 'request': request,
                'estimate_seconds': estimate, 'collection_seconds': times, 'details': details,
                'overlap_planned': overlap, 'syntax_refusals': refusals,
-               'pending_labels': pending}
+               'pending_labels': pending, 'measurements': measurements}
     _write_json(out/'summary.json', summary)
     atomic_write_text(out/'summary.md',
         f"# {outcome.value}: {surface}\n\n{details}\n\n"
@@ -501,9 +571,13 @@ def execute(action: str, refs: tuple[str, ...], *, baseline_dir: Path,
                                   for name, ids in refusals.items())
         + "".join(f"\n\n{name}: {n} queries pending labels, excluded from scoring"
                   for name, n in pending.items() if n)
+        + "\n\n" + "\n\n".join(report.measurement_text(name, row, overrides is not None)
+                                            for name, row in measurements.items())
         + "\n\nPer-query rankings, served legs, reranker status/reason and errors: `*/run.jsonl`.\n"
         + "Comparison reports: `*/run.md`. Effective runtime and model hashes are in each run header.\n")
     waiting = ''.join(f'; {name}: {n} queries pending labels, not scored' for name, n in pending.items() if n)
+    timing_line = '; '.join(f'{name} {report.timing_text(row)}' for name, row in measurements.items())
+    details += ('; ' + timing_line) if timing_line else ''
     line = f'{outcome.value} {surface}: {report.compact(details, 3000)}; ' + ', '.join(f'{c} {s:.1f}s' for c,s in times.items()) + waiting + f'; report {out}'
     return outcome, ' '.join(line.split())
 
