@@ -13,6 +13,8 @@ const LIBRARY = 'core.library-surface';
 const BROWSE = 'core.browse-surface';
 const BRAIN = 'core.brain-surface';
 const SETTINGS = 'core.settings-surface';
+const HEALTH = 'core.health-surface';
+const LONG_WINDOW = 'vendor.example.a-window-with-a-very-long-plain-name-for-the-redirect-notice-surface';
 const NOTICE = "Couldn't find that window";
 
 /** The page: catalog, a stubbed backend and the real `<jf-shell>`; everything else is the app's own code. */
@@ -45,7 +47,9 @@ __seedForTest({ schemaVersion: '1.0.0', catalogVersion: 1, namespace: 'core', pr
   surface('${LIBRARY}', 'jf-library-surface', { members: ['${BROWSE}'] }),
   surface('${BROWSE}', 'jf-browse-surface', { placement: 'DEEPLINK' }),
   surface('${BRAIN}', 'jf-brain-surface'),
-  surface('core.system-surface', 'jf-system-surface'),
+  surface('core.system-surface', 'jf-system-surface', { members: ['${HEALTH}', '${LONG_WINDOW}'] }),
+  surface('${HEALTH}', 'jf-health-surface', { placement: 'DEEPLINK' }),
+  surface('${LONG_WINDOW}', 'jf-health-surface', { placement: 'DEEPLINK' }),
   surface('${SETTINGS}', 'jf-settings-surface', { placement: 'MODAL' }),
 ] });
 document.body.append(document.createElement('jf-shell'));
@@ -270,4 +274,72 @@ it('11 a long plugin item\'s provenance chip keeps whole words; its full text st
   for (const span of chip.lines) expect(span.lines, `${span.text} on one line: ${JSON.stringify(chip)}`).toBe(1);
   expect(chip.height, JSON.stringify(chip)).toBeLessThan(chip.lineHeight * 2);
   expect(chip.title).toContain(contributor);
+}, 120_000);
+
+
+it('redirect notices stay inside the bar in at most two lines with a centred switcher at every size', async () => {
+  const page = await open();
+  await problem(page);
+  for (const target of [HEALTH, LONG_WINDOW]) {
+    await page.evaluate(id => { location.hash = `#justsearch://surface/${id}`; }, target);
+    await settle(page, 400);
+    for (const [width, height] of [[1280, 800], [900, 800], [600, 400]]) {
+      await page.setViewportSize({ width: width!, height: height! });
+      await settle(page);
+      const layout = await page.evaluate(() => {
+        const bar = document.querySelector('jf-shell')!.shadowRoot!.querySelector('jf-top-bar')!;
+        const nav = bar.shadowRoot!.querySelector('nav')!.getBoundingClientRect();
+        const pill = bar.querySelector('jf-status-pill')!;
+        const notice = pill.shadowRoot!.querySelector<HTMLElement>('.beside-notice')!;
+        const box = notice.getBoundingClientRect();
+        const frame = bar.getBoundingClientRect();
+        const style = getComputedStyle(notice);
+        const range = document.createRange(); range.selectNodeContents(notice);
+        const painted = [...range.getClientRects()];
+        const clips = style.overflow === 'hidden' || style.overflow === 'clip';
+        return { width: innerWidth, target: notice.textContent?.trim(), centre: (nav.left + nav.right) / 2,
+          half: innerWidth / 2, top: box.top, bottom: box.bottom, barTop: frame.top, barBottom: frame.bottom,
+          height: box.height, lineHeight: parseFloat(style.lineHeight), visible: box.width > 0 && box.height > 0,
+          paintedInside: clips || painted.every(r => r.top >= frame.top && r.bottom <= frame.bottom),
+          clipped: notice.scrollHeight > notice.clientHeight + 1 || notice.scrollWidth > notice.clientWidth + 1,
+          title: notice.title, name: notice.getAttribute('aria-label') };
+      });
+      const evidence = JSON.stringify(layout);
+      expect(layout.visible, evidence).toBe(true);
+      expect(layout.height, evidence).toBeLessThanOrEqual(layout.lineHeight * 2 + 1);
+      expect(layout.top, evidence).toBeGreaterThanOrEqual(layout.barTop);
+      expect(layout.bottom, evidence).toBeLessThanOrEqual(layout.barBottom);
+      expect(layout.paintedInside, evidence).toBe(true);
+      expect(Math.abs(layout.centre - layout.half), evidence).toBeLessThanOrEqual(2);
+      if (layout.clipped) {
+        expect(layout.title, evidence).toBe(layout.target);
+        expect(layout.name, evidence).toBe(layout.target);
+        expect(await page.getByRole('note', { name: layout.target!, exact: true }).count()).toBe(1);
+      }
+      expect(await page.locator('jf-status-pill button.trigger').evaluate(el => el.scrollWidth > el.clientWidth + 1)).toBe(false);
+      const action = page.getByRole('button', { name: 'Undo auto-correction', exact: true });
+      expect(await action.isVisible()).toBe(true);
+      expect(await action.evaluate(el => {
+        const rect = el.getBoundingClientRect();
+        const bar = document.querySelector('jf-shell')!.shadowRoot!.querySelector('jf-top-bar')!.getBoundingClientRect();
+        return rect.top >= bar.top && rect.bottom <= bar.bottom;
+      })).toBe(true);
+    }
+  }
+}, 120_000);
+
+it('redirect notices use window names and retain an id only when no name is available', async () => {
+  const page = await open();
+  await problem(page);
+  await page.evaluate(() => { location.hash = '#justsearch://surface/core.health-surface'; });
+  await settle(page, 400);
+  expect(await page.locator('jf-status-pill .beside-notice').textContent()).toBe('Opened System instead of Health');
+  // An alias with no last segment has neither a catalog name nor an id-derived title.
+  await page.evaluate(`(async () => {
+    const { setSurfaceAliases } = await import('/src/shell-v0/router/catalogResolver.ts');
+    setSurfaceAliases({ 'legacy.': { target: 'core.system-surface', reason: 'renamed' } });
+    document.querySelector('jf-shell').activateSurface('legacy.', {}, 'URL_BAR');
+  })()`);
+  await settle(page, 400);
+  expect(await page.locator('jf-status-pill .beside-notice').textContent()).toBe('Opened System instead of legacy.');
 }, 120_000);

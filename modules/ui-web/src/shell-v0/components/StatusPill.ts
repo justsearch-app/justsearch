@@ -71,27 +71,30 @@ export class StatusPill extends JfElement {
     jf-status-badge { min-width: 0; max-width: 100%; }
     jf-status-badge::part(badge) { min-width: 0; max-width: 100%; box-sizing: border-box; }
     .transient-action { font: inherit; color: var(--text-tint); background: var(--surface-2); border: 0; border-radius: var(--frame-pill-radius); padding: var(--jf-space-1) var(--jf-space-2); }
-    /* L3/top bar — the notice beside the pill gives way first: it wraps onto lines inside the bar (never
-       cut), so the switcher stays centred while the pill and its action keep their words. */
+    /* Notices give way within two lines; their full words stay in the tooltip and accessible name. */
     .beside-notice { align-self: center; flex: 0 1 auto; min-width: 0; max-width: var(--frame-menu-width); padding-inline: var(--jf-space-2);
       color: var(--text-secondary); font-size: var(--font-size-xs); line-height: 1.2; white-space: normal; overflow-wrap: normal;
-      max-block-size: var(--frame-topbar-height); }
+    }
+    .beside-notice, .notice-below, .trigger.notice .label { display: -webkit-box; -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2; max-block-size: min(2lh, var(--frame-topbar-height)); overflow: hidden;
+      white-space: normal; overflow-wrap: anywhere; }
+    .trigger.notice { flex: 0 1 auto; }
+    .trigger.notice .label { min-width: 0; flex: 0 1 auto; text-align: start; }
     .trigger { flex: none; }
     .transient-action { white-space: nowrap; flex: none; }
     .content { display: inline-flex; align-items: center; gap: var(--jf-space-2); min-width: 0; }
     .trigger.stale { outline: var(--frame-hairline) dashed var(--border-emphasized); }
-    /* L3 — the pill's words never truncate: the top bar makes room for them (it is a grid whose
-       brand side gives way), and below 720 px the pill is its icon alone. A notice cannot fit
-       beside it there, so it moves under the top bar, where it wraps instead of being cut. */
+    /* The status words stay whole. In the minimal bar the notice and action share two rows beside the icon. */
     .label { white-space: nowrap; flex: none; }
     .notice-below { display: none; }
     @media (max-width: 719px) {
-      .label, .beside-notice { display: none; }
-      .notice-below { display: block; position: fixed; top: var(--frame-topbar-height); inset-inline-end: var(--jf-space-2);
-        max-width: calc(100vw - 2 * var(--jf-space-2)); box-sizing: border-box; z-index: var(--z-overlay-top);
-        padding: var(--jf-space-1) var(--jf-space-2); border: var(--frame-hairline) solid var(--border-subtle);
-        border-radius: var(--frame-control-radius); background: var(--surface-1); color: var(--text-primary);
-        white-space: normal; overflow-wrap: anywhere; }
+      :host { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; }
+      .label, .trigger.notice .label { display: none; }
+      .trigger { grid-column: 1; grid-row: 1; }
+      .beside-notice, .notice-below { grid-column: 2; grid-row: 1; display: -webkit-box;
+        min-width: 0; padding-inline: var(--jf-space-1); font-size: var(--font-size-xs); line-height: 1.2;
+        color: var(--text-secondary); }
+      .transient-action { grid-column: 1 / -1; grid-row: 2; justify-self: end; font-size: var(--font-size-xs); }
     }
     .symbol { color: var(--text-secondary); }
     .calm .symbol { color: var(--text-success); }
@@ -343,14 +346,14 @@ export class StatusPill extends JfElement {
     const action = shown && toastActionAvailable(shown) ? shown : undefined;
     const undo = action?.toast?.reversal === true;
     return html`<button type="button" class="trigger ${transient ? 'notice' : pill.kind} ${pill.stale ? 'stale' : ''}"
-      aria-label=${label} aria-expanded=${this.open} aria-haspopup="dialog" title="What's going on · Ctrl+Shift+S"
+      aria-label=${label} aria-expanded=${this.open} aria-haspopup="dialog" title=${transient?.toast?.message ?? "What's going on · Ctrl+Shift+S"}
       @click=${() => this.toggle()} @mouseenter=${() => this.status.pauseTransient(true)} @mouseleave=${() => this.status.pauseTransient(false)}
       @focus=${() => this.status.pauseTransient(true)} @blur=${() => this.status.pauseTransient(false)}>
       <jf-status-badge .tone=${pill.kind === 'needs' || pill.kind === 'limited' ? 'warning' : pill.kind === 'unreachable' || pill.kind === 'problems' ? 'error' : 'neutral'}><span class="content">${icon}${this.narrow && !transient ? nothing : html`<span class="label">${text}</span>`}
       ${pill.kind === 'calm' && plugins.length ? html`<span aria-label="Plugin status items">${plugins.length}</span>` : nothing}</span></jf-status-badge></button>
-      ${beside?.toast ? html`<span class="beside-notice" data-testid="status-notice" title=${beside.toast.message} @mouseenter=${() => this.status.pauseTransient(true)}
+      ${beside?.toast ? html`<span class="beside-notice" role="note" aria-label=${beside.toast.message} data-testid="status-notice" title=${beside.toast.message} @mouseenter=${() => this.status.pauseTransient(true)}
         @mouseleave=${() => this.status.pauseTransient(false)}>${beside.toast.message}</span>` : nothing}
-      ${shown?.toast ? html`<span class="notice-below">${shown.toast.message}</span>` : nothing}
+      ${transient?.toast ? html`<span class="notice-below" role="note" title=${transient.toast.message} aria-label=${transient.toast.message}>${transient.toast.message}</span>` : nothing}
       ${action ? html`<button class="transient-action" type="button" @mouseenter=${() => this.status.pauseTransient(true)} @mouseleave=${() => this.status.pauseTransient(false)} @focus=${() => this.status.pauseTransient(true)} @blur=${() => this.status.pauseTransient(false)} @click=${() => this.act({ kind: 'advisory', target: action.key, label: this.transientActionLabel(action) })}
         aria-keyshortcuts=${undo ? 'Control+Z' : nothing}>${this.transientActionLabel(action)}${undo ? html`<kbd aria-hidden="true">Ctrl+Z</kbd>` : nothing}</button>` : nothing}
       <div class="overlay" ?hidden=${!this.open} @click=${() => this.close()}></div>

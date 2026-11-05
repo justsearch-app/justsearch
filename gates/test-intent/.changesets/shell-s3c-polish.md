@@ -63,6 +63,12 @@ of the L16/L21 repair with their fail-before against 511b14e88d; its before-stat
 `setApprovalLinkSink`) so the Java checks compile there. `shell-s3c-all.json` re-runs every check in
 every edited or added test file on the candidate.
 
+Top-bar follow-up: `shell-s3c-topbar-repaired.json` records the redirect repair against
+`c8b58b5e25cf509dac9313d6085054a70508c46f`; `shell-s3c-topbar-preserved.json` re-runs the other
+five checks in the edited Chromium file against their original before-state. At 600 px notices and
+actions now share two rows inside the bar; the full notice stays available when its text is clamped.
+Both evidence runs use temporary shared clones and copied dependencies, with the unchanged producer.
+
 Recorded reason (L12, orchestrator decision): `pendingAuthorizationBridge.test.ts` pinned that a
 broadcast with no source keeps its dialog on arrival. The brief retires that: such a request is not
 the person's own action, so it waits in Needs you. The own-transport cases of that check stay.
@@ -422,13 +428,33 @@ the person's own action, so it waits in Needs you. The own-transport cases of th
         }
       ],
       "repaired": true,
-      "evidence": "gates/test-intent/evidence/shell-s3c-repaired.json",
+      "evidence": "gates/test-intent/evidence/shell-s3c-topbar-preserved.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts#11 the narrow area menu closes when the window widens past its button, and focus stays on the switcher",
         "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts#11 at 1280 px a notice beside a problem leaves the switcher centred; pill and notice stay readable",
         "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts#11 at 600 px the pill shows the number of problems, as it does for needs-you",
         "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts#L6 a plugin item whose words are in its own shadow root keeps them as its tooltip; an empty one its declared label",
         "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts#11 a long plugin item's provenance chip keeps whole words; its full text stays available"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Redirect notices stay inside the top bar at 1280×800, 900×800 and 600×400, in at most two lines with full text in a tooltip and accessible name when truncated, while the switcher stays centred within 2 px. Health redirects to System using plain names; a much longer window name is bounded too. A window with no available plain name keeps its id. Existing unknown-address assertions are unchanged.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Expected: the notice fits inside the top bar at 1280×800, 900×800 and 600×400 — at most two lines, else truncated with its full text as tooltip and accessible name; never taller than the bar; the switcher stays centred (±2 px) while it shows; the unknown-address notice keeps working as the candidate made it. Also: the notice names windows by their plain names (\"Opened System instead of Health\"), never internal ids; when a window has no plain name, use its id as today.",
+          "location": "task t-20261103-shell request (S3c bounded top-bar notice repair brief, 2026-11-05)"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s3c-topbar-repaired.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts#redirect notices stay inside the bar in at most two lines with a centred switcher at every size",
+        "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts#redirect notices use window names and retain an id only when no name is available"
       ]
     }
   ]

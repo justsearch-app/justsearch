@@ -96,11 +96,10 @@ export class TopBar extends JfElement {
   }
 
   static override styles = css`
-    /* The switcher stays centred while both sides fit; a wider right side (the pill with a notice
-       beside it) takes room from the brand side rather than truncating the pill (L3). */
+    /* Equal side tracks keep the switcher centred; the status notice gives way inside its track. */
     :host {
       display: grid;
-      grid-template-columns: 1fr auto 1fr;
+      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
       align-items: center;
       gap: var(--jf-space-3);
       box-sizing: border-box;
@@ -112,7 +111,7 @@ export class TopBar extends JfElement {
       color: var(--text-secondary);
       font-size: var(--font-size-sm);
     }
-    .start, .end { display: flex; align-items: center; }
+    .start, .end { display: flex; align-items: center; min-width: 0; }
     .start { gap: var(--jf-space-3); }
     .end { justify-content: flex-end; gap: var(--jf-space-2); }
     .brand { display: inline-flex; align-items: center; gap: var(--jf-space-3); flex: none;
