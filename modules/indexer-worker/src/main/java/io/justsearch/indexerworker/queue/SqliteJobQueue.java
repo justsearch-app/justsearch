@@ -2872,13 +2872,17 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     if (!hasSufficientDiskSpace()) throw new IllegalStateException("Insufficient sync disk space");
     var declared = collection == null || collection.isBlank()
         ? declaredCollectionRoots.get() : List.<IngestCollectionPolicy.RootBinding>of();
+    var sources = observeAdmissionSources(entries);
     lockTimed();
     try {
       ensureOpen();
       String generation = release030RetirementGeneration();
       if (generation == null) throw new IllegalStateException("Retirement changed during sync");
+      var journal = retirementReplayOps();
+      var orders = maintenance ? retirementOrders(journal) : null;
+      var deletes = maintenance ? retirementDeletes(journal) : List.<RetirementDelete>of();
       return inTransaction(() -> {
-        var refreshable = refreshableRetirementFiles(retirementReplayOps(), generation, !maintenance);
+        var refreshable = refreshableRetirementFiles(journal, generation, !maintenance);
         int accepted = 0;
         for (var entry : entries) {
           if (cancelled.getAsBoolean() || Thread.currentThread().isInterrupted()) {
@@ -2886,6 +2890,23 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           }
           if (maintenance && preservesMaintenanceRetryWait(entry.path(), System.currentTimeMillis())) {
             accepted++; // Existing policy coverage, not a new admission or source witness.
+            continue;
+          }
+          String effectiveCollection = collection;
+          boolean exactCollection = false;
+          if (collection == null || collection.isBlank()) {
+            var owner = collectionOwner(entry.path(), frozenCollectionRoots.get(), declared);
+            if (owner != null) {
+              effectiveCollection = owner.collection();
+              exactCollection = true;
+              var prior = watcherRowLocked(normalizePath(entry.path()));
+              if (prior != null && IngestCollectionPolicy.isReserved(prior.get("collection")))
+                effectiveCollection = prior.get("collection");
+            }
+          }
+          if (maintenance && preservesRetirementMaintenanceWork(entry, effectiveCollection,
+              exactCollection, sources.get(entry), orders, deletes)) {
+            accepted++;
             continue;
           }
           boolean exact = refreshable.contains(PathNormalizer.normalizeKey(entry.path()));
@@ -2901,7 +2922,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
             }
           }
           if (enqueueEntriesInTransaction(List.of(admitted), collection, null,
-              System.currentTimeMillis(), false, null, false, declared).covered() != 1) {
+              System.currentTimeMillis(), false, null, false, declared, sources).covered() != 1) {
             throw new SQLException("Retirement sync admission incomplete");
           }
           if (exact) bufferAdmittedFile(generation, admitted);
@@ -2909,7 +2930,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         }
         return accepted;
       });
-    } catch (SQLException failure) {
+    } catch (SQLException | IOException failure) {
       throw new IllegalStateException("Retirement sync admissions were not saved", failure);
     } finally {
       unlockAfterChanges();
@@ -2974,6 +2995,15 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
               if (!SwitchBufferSyncRoot.decode(root.payload()).force()
                   && preservedIndexedRootOwner(owner,scope,current,orders,deletes)) {covered++;continue;}
             }
+            var intent = orders.rootIntents().get(root.retirementUuid());
+            boolean withinIntent = intent != null && intent.scope().contains(path)
+                && Objects.equals(PathNormalizer.normalizeKey(Path.of(intent.scope().prefix())),
+                    PathNormalizer.normalizeKey(entry.ingestionRoot()));
+            // Replay already observed its correction witness; never spend a second source read.
+            var observation = !replay && withinIntent ? observeAdmissionSource(entry) : null;
+            var sources = observation == null ? Map.<JobQueue.EnqueueEntry,AdmissionSource>of() : Map.of(entry,observation);
+            if (maintenance && withinIntent && preservesRetirementMaintenanceWork(entry, effective, true,
+                observation, orders, deletes)) {covered++;continue;}
             boolean exact=refreshable.contains(path);
             JobQueue.EnqueueEntry admitted=entry;
             if(exact&&!replay) {
@@ -2984,7 +3014,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
             String admittedUnit = exact && !replay ? null : root.retirementRootUnit();
             // The retained ROOT already resolved its frozen inheritance above, including default.
             if(enqueueEntriesInTransaction(List.of(admitted),effective,null,System.currentTimeMillis(),true,
-                admittedUnit)!=1)throw new SQLException("Short ROOT admission");
+                admittedUnit,false,List.of(),sources).covered()!=1)throw new SQLException("Short ROOT admission");
             if (!(exact && !replay)) {
               // Native enqueue has now resolved null collection/provenance inheritance. Bind
               // the actual row inside this transaction; no root1 intermediate is published.
@@ -3007,6 +3037,29 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       });
     } catch(SQLException|IOException invalid){throw new IllegalStateException("ROOT admission incomplete",invalid);}
     finally{unlockAfterChanges();}
+  }
+
+  /** Keep the original obligation only with both current source proof and validated receipt authority. */
+  private boolean preservesRetirementMaintenanceWork(JobQueue.EnqueueEntry entry, String collection,
+      boolean exactCollection, AdmissionSource source, RetirementOrders orders,
+      List<RetirementDelete> deletes) throws SQLException {
+    if (entry.forceReindex()) return false;
+    String path = normalizePath(entry.path());
+    var row = watcherRowLocked(path);
+    if (row == null || !(STATE_PENDING.equals(row.get("state")) || STATE_PROCESSING.equals(row.get("state")))
+        || correctionHasRecordedOwner(path, row) || source == null) return false;
+    var candidate = correctionCandidate(row);
+    long order;
+    try { order = validatedUnitOrder(candidate, orders); }
+    catch (IOException | RuntimeException unknown) { return false; }
+    if (order <= 0 || !retirementAllowsClaim(candidate, orders, deletes,
+        (ignoredPath, ignoredUnit) -> true, true)) return false;
+    String planned = row.get("planned_source_sha256");
+    if (planned != null && !planned.equals(source.sha256())) return false;
+    // A validated, unplanned ROOT keeps ordinary maintenance's metadata fallback. The real
+    // extractor/publication fences still compare source hashes when bytes change during work.
+    return preservesMaintenanceWork(entry, collection, exactCollection, source.sha256(), source,
+        System.currentTimeMillis(), true);
   }
 
   private Set<String> refreshableRetirementFiles(List<SwitchBufferOp> journal,
@@ -3161,7 +3214,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   }
 
   private boolean preservesMaintenanceWork(JobQueue.EnqueueEntry entry, String collection, boolean exactCollection,
-      String sourceIdentity, AdmissionSource source, long now) throws SQLException {
+      String sourceIdentity, AdmissionSource source, long now, boolean validatedRecoveryOwner) throws SQLException {
     if (source != null && !source.stillCurrent(entry.path())) return false;
     try (var query = connection.prepareStatement(
         "SELECT state,collection,admitted_source_sha256,planned_source_sha256,unit_revision,ingestion_root,"
@@ -3177,7 +3230,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           return STATE_PENDING.equals(row.getString(1)) && preservesMaintenanceRetryWait(entry.path(), now);
         }
         String revision = row.getString(5);
-        boolean legacyRecovery = revision != null && (revision.startsWith("release030")
+        boolean legacyRecovery = !validatedRecoveryOwner && revision != null && (revision.startsWith("release030")
             || revision.startsWith("root1:") || revision.startsWith("root2:"));
         if ((exactCollection || collection != null)
             && !Objects.equals(rootOwner(collection), rootOwner(row.getString(2)))) return false;
@@ -3256,10 +3309,9 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         boolean ordinaryAdmission = unitRevision == null
             && (releaseRecovery == null || !releaseRecovery.retiringBuild());
         var source = sources.get(entry);
-        String sourceIdentity = !ordinaryAdmission ? null
-            : sources.containsKey(entry)
-                ? source != null && source.stillCurrent(entry.path()) ? source.sha256() : null
-                : entry.plannedSourceSha256();
+        String sourceIdentity = sources.containsKey(entry)
+            ? source != null && source.stillCurrent(entry.path()) ? source.sha256() : null
+            : ordinaryAdmission ? entry.plannedSourceSha256() : null;
         sealBeforeMaintenance(normalizedPath);
         var membership =
             SqliteIngestionWalkOps.maintenanceMembership(connection, normalizedPath, scanId);
@@ -3286,7 +3338,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         }
         if (preserveRetryWaits && !entry.forceReindex()
             && (ordinaryAdmission
-                ? preservesMaintenanceWork(entry, effectiveCollection, exact, sourceIdentity, source, now)
+                ? preservesMaintenanceWork(entry, effectiveCollection, exact, sourceIdentity, source, now, false)
                 : preservesMaintenanceRetryWait(entry.path(), now))) {
           accepted++;
           continue;
