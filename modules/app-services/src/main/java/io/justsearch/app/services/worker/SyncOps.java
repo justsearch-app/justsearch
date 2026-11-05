@@ -180,7 +180,7 @@ final class SyncOps {
             EngineContext engineContext, boolean watchedOnly) {
         Path root = Path.of(rootPath).toAbsolutePath().normalize();
         var fence = rootsState == null ? null : rootsState.captureRootProducer(root, watchedOnly);
-        String policy = KnowledgeClient.resolvedExcludePatterns();
+        var policyAtStart = KnowledgeClient.captureCoveragePolicy(null);
         try {
             SyncDirectoryResponse response = executeSyncDirectory(rootPath, force, engineContext, fence);
 
@@ -195,8 +195,10 @@ final class SyncOps {
                 }
             }
 
+            var currentPolicy = KnowledgeClient.captureCoveragePolicy(null);
             recordRootAvailability(rootPath, response, fence,
-                    policy.equals(KnowledgeClient.resolvedExcludePatterns()));
+                    policyAtStart != null && currentPolicy != null
+                            && policyAtStart.digest().equals(currentPolicy.digest()));
 
             if (response.getSkipped()) {
                 log.debug("SyncDirectory skipped for {} (force={})", rootPath, force);
@@ -243,7 +245,8 @@ final class SyncOps {
             } else if (response.getError().isEmpty() && !response.getSkipped()
                     && !response.getDeleteDetectionUnverified() && !response.getDeferredToSwitchBuffer()
                     && samePolicy && fence.currentCoverage()) {
-                changed = rootsState.completeCoverage(root, fence, response.getEligibleFiles());
+                changed = response.hasEligibleFiles()
+                        && rootsState.completeCoverage(root, fence, response.getEligibleFiles());
                 changed |= rootsState.markRootReturned(root);
             } else {
                 changed = false;

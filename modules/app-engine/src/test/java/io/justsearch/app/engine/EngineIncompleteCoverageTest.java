@@ -74,10 +74,92 @@ final class EngineIncompleteCoverageTest {
   @Test void D5LegacyReindexRejectsUnverifiedResponseIndependentlyOfSkipped() throws Exception {
     try (var fixture = new Fixture(directory)) {
       fixture.addIncomplete();
-      doReturn(SyncDirectoryResponse.newBuilder().setDeleteDetectionUnverified(true).build())
+      doReturn(SyncDirectoryResponse.newBuilder().mergeFrom(new byte[] {56, 3})
+              .setDeleteDetectionUnverified(true).build())
           .when(fixture.service).syncDirectory(any(), any());
       fixture.client.reindexWatchedRoots(false, TestEngineContexts.FOREGROUND);
       fixture.assertWarning();
+    }
+  }
+
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @ValueSource(strings = {"periodic", "verify", "legacy"})
+  void R6AbsentCoverageCannotClearOrCompleteNonemptyRootAsEmpty(String route) throws Exception {
+    try (var fixture = new Fixture(directory)) {
+      fixture.addIncomplete(); fixture.assertWarning(); fixture.repair();
+      // Exact old-schema wire response: files_added=3, coverage field absent.
+      var response = SyncDirectoryResponse.parseFrom(new byte[] {8, 3});
+      doReturn(response).when(fixture.service).syncDirectory(any(), any());
+      if (route.equals("legacy")) fixture.client.reindexWatchedRoots(false, TestEngineContexts.FOREGROUND);
+      else fixture.recover(route, false);
+      assertTrue(fixture.status().walkError() != null || fixture.status().lastIndexed() != null,
+          "an old peer must not persist a nonempty root as completed-empty");
+      fixture.assertWarning();
+      assertNull(fixture.status().lastIndexed());
+      assertTrue(fixture.status().walkCompleted());
+    }
+  }
+
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @ValueSource(strings = {"boot", "periodic", "verify"})
+  void R2LiteralPolicyExpansionCannotClearPartialWalk(String route) throws Exception {
+    try (var fixture = new Fixture(directory)) {
+      fixture.addIncomplete(); fixture.assertWarning(); fixture.repair();
+      var literal = io.justsearch.configuration.excludes.LiteralExclusion.create(fixture.root,
+          io.justsearch.configuration.excludes.LiteralExclusion.Scope.FOLDER);
+      fixture.exclusions(tools.jackson.databind.json.JsonMapper.builder().build()
+          .writeValueAsString(List.of(literal)));
+      if (route.equals("boot")) {
+        doAnswer(call -> { call.callRealMethod(); fixture.exclusions("[]"); return null; })
+            .when(fixture.service).scanRoot(any(), any(), any());
+      } else {
+        doAnswer(call -> { var response = call.callRealMethod(); fixture.exclusions("[]"); return response; })
+            .when(fixture.service).syncDirectory(any(), any());
+      }
+      fixture.recover(route, true);
+      assertEquals("INCOMPLETE_COVERAGE", fixture.status().walkError(),
+          "enumeration under a literal exclusion cannot certify the expanded current scope");
+      fixture.assertReload(true);
+    }
+  }
+
+  @Test void R6UnchangedEligibleFilesRemainCoverageEvidenceWithoutAdmission() throws Exception {
+    try (var fixture = new Fixture(directory)) {
+      fixture.addIncomplete(); fixture.repair();
+      Files.delete(fixture.first); Files.delete(fixture.second);
+      Path file = fixture.control;
+      var fields = new java.util.HashMap<String, String>();
+      fields.put(io.justsearch.indexing.SchemaFields.PATH, file.toString());
+      fields.put(io.justsearch.indexing.SchemaFields.COLLECTION, "documents");
+      fields.put(io.justsearch.indexing.SchemaFields.SIZE_BYTES, Long.toString(Files.size(file)));
+      fields.put(io.justsearch.indexing.SchemaFields.MODIFIED_AT,
+          Long.toString(Files.getLastModifiedTime(file).toMillis()));
+      fields.put(io.justsearch.indexing.SchemaFields.SOURCE_SHA256,
+          io.justsearch.indexerworker.loop.SourceContentHash.sha256(file));
+      fields.put(io.justsearch.indexing.SchemaFields.EXTRACTION_POLICY_ID,
+          io.justsearch.indexerworker.extract.TikaExtractionPolicy.defaults().policyId());
+      when(fixture.runtime.readPathOps().search(any(), anyInt(), anySet(), any(), nullable(String.class)))
+          .thenReturn(new LuceneRuntimeTypes.SearchResult(List.of(
+              new LuceneRuntimeTypes.SearchHit(file.toString(), 1f, fields)), 1, 0));
+      var reuse = mock(io.justsearch.adapters.lucene.runtime.DocumentFieldOps.class);
+      when(reuse.isUnmodified(anyList(), any())).thenReturn(Set.of(file.toString()));
+      var syncField = WorkerIngestService.class.getDeclaredField("syncOps"); syncField.setAccessible(true);
+      var ops = syncField.get(fixture.service);
+      var setFields = ops.getClass().getDeclaredMethod("setDocumentFieldOps",
+          io.justsearch.adapters.lucene.runtime.DocumentFieldOps.class);
+      setFields.setAccessible(true); setFields.invoke(ops, reuse);
+      var queue = mock(JobQueue.class, org.mockito.AdditionalAnswers.delegatesTo(fixture.queue));
+      var queueField = ops.getClass().getDeclaredField("jobQueue"); queueField.setAccessible(true);
+      queueField.set(ops, queue);
+      var response = fixture.client.syncDirectory(fixture.root.toString(), false, TestEngineContexts.FOREGROUND);
+      assertEquals("", response.getError()); assertFalse(response.getSkipped());
+      assertFalse(response.getDeleteDetectionUnverified()); assertEquals(0, response.getFilesAdded());
+      verify(queue, never()).enqueueEntries(anyList());
+      verify(queue, never()).enqueueEntries(anyList(), nullable(String.class));
+      assertNull(fixture.status().walkError(), "unchanged eligible content still completes whole-root coverage");
+      assertNotNull(fixture.status().lastIndexed(), "unchanged nonempty content must remain indexed");
+      assertTrue(fixture.status().walkCompleted());
+      fixture.assertReload(false);
     }
   }
 
@@ -85,7 +167,7 @@ final class EngineIncompleteCoverageTest {
   void R1NonqualifyingSyncCannotClear(String result) throws Exception {
     try (var fixture = new Fixture(directory)) {
       fixture.addIncomplete();
-      var response = SyncDirectoryResponse.newBuilder();
+      var response = SyncDirectoryResponse.newBuilder().mergeFrom(new byte[] {56, 3});
       switch (result) {
         case "skipped" -> response.setSkipped(true);
         case "deferred" -> response.setDeferredToSwitchBuffer(true);
@@ -300,6 +382,7 @@ final class EngineIncompleteCoverageTest {
     final Set<PosixFilePermission> permissions;
     final WatchedRootsState roots;
     final SqliteJobQueue queue;
+    final RunningRuntime runtime;
     final WorkerIngestService service;
     final WorkerAppServices services;
     final DefaultEngineExecutorRegistry registry = new DefaultEngineExecutorRegistry();
@@ -320,7 +403,7 @@ final class EngineIncompleteCoverageTest {
       generation = layout.activeGenerationId();
       queue = new SqliteJobQueue(layout.basePath().resolve("jobs.db"), ignored -> JobQueue.RecordedClaimDecision.ALLOW_FORCE);
       queue.open();
-      var runtime = mock(RunningRuntime.class, RETURNS_DEEP_STUBS);
+      runtime = mock(RunningRuntime.class, RETURNS_DEEP_STUBS);
       when(runtime.isAcceptingWrites()).thenReturn(true);
       when(runtime.pruneOps()).thenReturn(null);
       when(runtime.documentFieldOps()).thenReturn(null);

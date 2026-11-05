@@ -338,6 +338,7 @@ final class RootLifecycleOps {
         }
         ExcludeMatcher excludes = excludeMatcherSupplier.get();
         List<String> excludeGlobs = excludes.patterns();
+        var policyAtStart = KnowledgeClient.captureCoveragePolicy(excludeGlobs);
         long[] admittedTotal = new long[] {0L};
         try {
             java.util.function.Consumer<ScanRootProgress> progressConsumer =
@@ -356,8 +357,10 @@ final class RootLifecycleOps {
                 }
                 String reason = terminal == null ? "EMPTY_STREAM" : terminal.getTerminalReasonCode();
                 if (reason == null || reason.isEmpty()) {
+                    var currentPolicy = KnowledgeClient.captureCoveragePolicy(excludeMatcherSupplier.get().patterns());
                     if (terminal == null || !terminal.getComplete() || !fence.currentCoverage()
-                            || !excludeGlobs.equals(excludeMatcherSupplier.get().patterns())) return;
+                            || policyAtStart == null || currentPolicy == null
+                            || !policyAtStart.digest().equals(currentPolicy.digest())) return;
                     if (terminal.getFilesWalked() > terminal.getFilesSkipped() || admittedTotal[0] > 0) {
                         watchedRootsState.markIndexed(normalized);
                     } else {
