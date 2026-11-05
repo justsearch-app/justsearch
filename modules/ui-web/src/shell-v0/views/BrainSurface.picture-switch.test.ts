@@ -16,6 +16,7 @@ import './BrainSurface.js';
 interface Brain extends HTMLElement { apiBase: string; host_: unknown; installConsentOpen: boolean; updateComplete: Promise<boolean> }
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
 let enabled: boolean | null;
+let settingsQuarantined: boolean;
 let witness: { acceptedRevision: number; lastCommittedOperationKey: string | null };
 let preview: InstallPlanPreview;
 let posts: Array<{ pictureReadingEnabled: boolean; pictureReadingSwitchIntent?: boolean; witness: typeof witness }>;
@@ -46,7 +47,7 @@ function switches(el: Brain) {
   return [...el.shadowRoot!.querySelectorAll<HTMLButtonElement>('[role="switch"][aria-label="Use Text in scans and images"]')];
 }
 beforeEach(() => {
-  interrupt = null; receipts.clear();
+  interrupt = null; receipts.clear(); settingsQuarantined = false;
   enabled = null; override = null; witness = { acceptedRevision: 0, lastCommittedOperationKey: null };
   posts = []; operations = []; operationArgs = []; refusal = null; wait = null;
   preview = { totalDownloadBytes: 0, components: ['embedding', 'reranker', 'chat'].map(id => ({
@@ -74,6 +75,7 @@ beforeEach(() => {
       if (interrupt === 'after') { interrupt = null; throw new Error('Receipt interrupted'); }
       return json(receipt);
     }
+    if (path.endsWith('/api/settings/v2') && settingsQuarantined) return json({ error: 'Settings recovery is required before a revision can be read', errorCode: 'SETTINGS_RECOVERY_REQUIRED', retryable: false }, 503);
     if (path.endsWith('/api/settings/v2')) return json({ ui: { chatEnabled: true }, pictureReadingEnabled: enabled, pictureReadingOverrideEnabled: override, witness });
     if (path.endsWith('/plan-preview')) return json(preview);
     if (path.endsWith('/manifest')) return json({ schemaVersion: 2, packages: [
@@ -87,6 +89,25 @@ beforeEach(() => {
 afterEach(() => { document.body.innerHTML = ''; store.listeners.clear(); vi.unstubAllGlobals(); });
 
 describe('picture reading live switch', () => {
+  it('shows the unknown saved choice in both places after settings quarantine', async () => {
+    settingsQuarantined = true;
+    const el = await mount();
+    const reason = 'Saved picture reading choice is not known. Refresh settings before changing it.';
+    expect(switches(el)).toHaveLength(2);
+    expect(switches(el).map(b => b.getAttribute('aria-disabled'))).toEqual(['true', 'true']);
+    for (const selector of ['.brain-sentence', '[data-feature="pictures"]']) {
+      const place = el.shadowRoot!.querySelector(selector)!;
+      expect(place.textContent).toContain(reason);
+      const control = place.querySelector('[role="switch"][aria-label="Use Text in scans and images"]')!;
+      expect(place.querySelector(`#${control.getAttribute('aria-describedby')}`)!.textContent).toBe(reason);
+      const state = selector === '.brain-sentence' ? place.querySelector('.feature-phrase[aria-controls="brain-feature-panel-pictures"]') : [...place.querySelectorAll('.step-meta')].at(-1);
+      expect(state!.textContent).toContain(reason);
+      expect(state!.textContent).not.toMatch(/\bOn\b|\bOff\b/);
+    }
+    switches(el)[0]!.click(); await settle(el);
+    expect(posts).toEqual([]);
+  });
+
   it('reconciles an interrupted delivery with an unchanged witness using the original attempt', async () => {
     const el = await mount();
     interrupt = 'before';

@@ -5,9 +5,11 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+import io.justsearch.app.api.BrainRuntimeService;
 import io.justsearch.app.api.EngineAdmissionService;
 import io.justsearch.app.api.EngineWorkHandle;
 import io.justsearch.app.services.TestEngineContexts;
+import io.justsearch.app.services.registry.operations.handlers.TriggerOfflineProcessingHandler;
 import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.core.context.EngineContext;
 import io.justsearch.core.execution.TestEngineExecutors;
@@ -57,10 +59,22 @@ final class PictureReadingCoordinatorTest {
     return coordinator;
   }
 
+  private TriggerOfflineProcessingHandler handler(OfflineCoordinator coordinator) {
+    var runtime = mock(BrainRuntimeService.class);
+    when(runtime.triggerOfflineProcessing(any(), any())).thenAnswer(call ->
+        coordinator.startExplicitProcessing(call.getArgument(0), call.getArgument(1)));
+    return new TriggerOfflineProcessingHandler(() -> runtime);
+  }
+
   @Test
   void offBlocksAllProcedureEntriesBeforeRecoveryOrClaims() throws Exception {
     try (var executors = TestEngineExecutors.awaitingTermination(); var coordinator = coordinator(executors)) {
       enabled.set(false);
+      var refusal = handler(coordinator).execute("{}", context);
+      assertFalse(refusal.success());
+      assertEquals("PICTURE_READING_OFF", refusal.errorCode().orElseThrow());
+      assertFalse(refusal.retryable().orElseThrow());
+      assertTrue(refusal.message().contains("Picture reading is off"));
       assertEquals(0, coordinator.startExplicitProcessing(context, ignored -> {}).toCompletableFuture().get().selected());
       assertEquals(0, coordinator.startOfflineProcessing(context, ignored -> {}).toCompletableFuture().get().selected());
       assertEquals(0, coordinator.startAutomaticProcessing(context, () -> true).toCompletableFuture().get().selected());
@@ -141,14 +155,19 @@ final class PictureReadingCoordinatorTest {
     when(client.indexingHold()).thenReturn(hold);
     try (var executors = TestEngineExecutors.awaitingTermination(); var coordinator = coordinator(executors)) {
       try {
-        var pass = coordinator.startExplicitProcessing(context, ignored -> {}).toCompletableFuture();
+        var execution = handler(coordinator).executeRecorded("{}", null, context, null);
+        var pass = execution.completion().toCompletableFuture();
+        assertEquals("Enrichment pass started", execution.response().message());
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
         while (hold.snapshot().waiting() == 0 && System.nanoTime() < deadline) Thread.sleep(5);
         assertEquals(1, hold.snapshot().waiting(), "the explicit pass must first observe the real indexing hold");
         var stopping = CompletableFuture.supplyAsync(coordinator::fencePictureReading);
         try (var _ = stopping.get(5, TimeUnit.SECONDS)) {
-          assertEquals(io.justsearch.app.api.OfflineProcessingOutcome.BlockReason.PROCESSING_REFUSED,
-              pass.get(5, TimeUnit.SECONDS).blockedReason());
+          var refusal = pass.get(5, TimeUnit.SECONDS);
+          assertFalse(refusal.success());
+          assertEquals("PICTURE_READING_OFF", refusal.errorCode().orElseThrow());
+          assertFalse(refusal.retryable().orElseThrow());
+          assertTrue(refusal.message().contains("Picture reading is off"));
           assertTrue(hold.held(), "stopping picture work must not resume indexing");
           assertEquals(0, hold.snapshot().waiting());
           verify(client, never()).recoverVduProcessing(any());

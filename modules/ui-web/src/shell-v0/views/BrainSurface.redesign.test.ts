@@ -97,6 +97,7 @@ describe('AI Brain redesign behaviour', () => {
     expect(calls.at(-1)).toEqual({ id: 'core.set-chat-enabled', args: { enabled: true } });
   });
   it('keeps runtime evidence in the sentence and disables feature switches when observations become unknown', async () => {
+    settingsGet = async () => json({ ui: { chatEnabled }, llm: {}, witness: { acceptedRevision: 0, lastCommittedOperationKey: null } });
     const el = await mount();
     expect(el.shadowRoot!.querySelector('[data-feature="pictures"]')!.textContent).toContain('On');
     emit({ runtimeStatus: { active: { mmprojActive: false } } }); await el.updateComplete;

@@ -8,6 +8,12 @@ import org.junit.jupiter.api.Test;
 
 final class BulkRefusalExplanationTest {
   @Test
+  void pictureOffHasAReadTimeExplanationForHistoryAndReplay() {
+    assertEquals("Picture reading is off. Turn it on to process pending work.",
+        BulkReindexFailureMessage.forOperation("core.trigger-offline-processing", "PICTURE_READING_OFF"));
+  }
+
+  @Test
   void everyExplanationCarriesItsOwnSupportCode() {
     for (String operation : List.of("core.bulk-reindex", "core.rebuild-index", "core.activate-installed-models")) {
       for (String code : List.of("cancelled", "RECOVERY_AUTHORIZATION_REFUSED", "RECOVERY_SCOPE_REFUSED",

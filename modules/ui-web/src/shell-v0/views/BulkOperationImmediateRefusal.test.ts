@@ -42,7 +42,7 @@ let invokeRefusal = { message, code };
 function operation(id: string): Operation {
   return { id, presentation: { labelKey: id, descriptionKey: '', iconHint: null, category: null },
     intf: { errors: [], inputs: {}, result: {}, uiHints: {} },
-    policy: { risk: 'HIGH', confirm: { kind: 'INLINE' }, audit: 'NONE', undoSupported: false },
+    policy: { risk: id === 'core.trigger-offline-processing' ? 'LOW' : 'HIGH', confirm: { kind: id === 'core.trigger-offline-processing' ? 'NONE' : 'INLINE' }, audit: 'NONE', undoSupported: false },
     availability: {}, lineage: { affects: [], supersedes: [] },
     provenance: { tier: 'CORE', contributorId: 'core', version: '1.0' },
     executors: ['UI'], audience: 'USER', consumers: [] };
@@ -91,7 +91,7 @@ beforeEach(async () => {
   __resetForTest(); __clearAggregateRegistry(); __resetBootstrap(); bootstrapAggregateSubstrate();
   __resetUiModeForTest(); setUiMode('advanced');
   __seedForTest({ schemaVersion: '1.0', catalogVersion: 1, namespace: 'core', primitive: 'Operation',
-    entries: [operation('core.rebuild-index'), operation('core.activate-installed-models')] });
+    entries: [operation('core.rebuild-index'), operation('core.activate-installed-models'), operation('core.trigger-offline-processing')] });
   feed();
 });
 afterEach(async () => {
@@ -278,4 +278,20 @@ it.each(['cancel', 'accept-gaps'] as const)('Library %s keeps an immediate decis
   const expectedCode = gapDecision ? 'GAP_ACCEPTANCE_UNAVAILABLE' : 'REINDEX_CANCEL_UNAVAILABLE';
   expect(el.shadowRoot!.textContent).toContain(expectedMessage);
   expect([...el.shadowRoot!.querySelectorAll('[role="alert"] small')].map(e => e.textContent).join(' ')).toContain(`Code: ${expectedCode}`);
+});
+
+it('Library shows the picture-off refusal from Process pending work in plain words', async () => {
+  invokeRefusal = { code: 'PICTURE_READING_OFF', message: 'Picture reading is off. Turn it on to process pending work.' };
+  const el = document.createElement('jf-library-surface') as LibrarySurface;
+  el.apiBase = base; el.host_ = host(); document.body.append(el); await pump(el);
+  const aggregate = el.shadowRoot!.querySelector('jf-operation[operation-id="core.trigger-offline-processing"]') as JfOperation;
+  expect(aggregate).not.toBeNull(); await aggregate.updateComplete;
+  const op = aggregate.querySelector('jf-op-button') as OpButton;
+  await op.updateComplete;
+  const action = op.shadowRoot!.querySelector('jf-action-button') as ActionButton;
+  await action.updateComplete;
+  action.shadowRoot!.querySelector<HTMLButtonElement>('button.invoke')!.click();
+  await vi.waitFor(() => expect(el.shadowRoot!.textContent).toContain(invokeRefusal.message));
+  expect(invocations).toBe(1);
+  expect(el.shadowRoot!.textContent).not.toContain('Enrichment pass started');
 });

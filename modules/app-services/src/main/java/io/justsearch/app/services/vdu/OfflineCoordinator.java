@@ -139,7 +139,7 @@ public final class OfflineCoordinator implements AutoCloseable {
       if (closing.get()) throw new CancellationException("Enrichment is stopping");
       if (!pictureReadingMayStart()) {
         return CompletableFuture.completedFuture(report(progress, new OfflineProcessingOutcome(
-            0, 0, 0, BlockReason.PROCESSING_REFUSED, EmbeddingHandoff.NOT_EVALUATED)));
+            0, 0, 0, BlockReason.PICTURE_READING_OFF, EmbeddingHandoff.NOT_EVALUATED)));
       }
       if (!processing.compareAndSet(false, true)) {
         throw new IllegalStateException("Enrichment is already running");
@@ -304,20 +304,20 @@ public final class OfflineCoordinator implements AutoCloseable {
     }
     if (!pictureReadingMayStart()) {
       return report(progress, new OfflineProcessingOutcome(
-          0, 0, 0, BlockReason.PROCESSING_REFUSED, EmbeddingHandoff.NOT_EVALUATED));
+          0, 0, 0, BlockReason.PICTURE_READING_OFF, EmbeddingHandoff.NOT_EVALUATED));
     }
     var hold = client.indexingHold();
     try {
     var lease = hold == null ? null : (explicit ? hold.acquire(this::pictureReadingMayStart) : hold.tryAcquire());
     if (hold != null && lease == null) {
       return report(progress, new OfflineProcessingOutcome(
-          0, 0, 0, pictureReadingMayStart() ? BlockReason.NONE : BlockReason.PROCESSING_REFUSED,
+          0, 0, 0, pictureReadingMayStart() ? BlockReason.NONE : BlockReason.PICTURE_READING_OFF,
           EmbeddingHandoff.NOT_NEEDED));
     }
     try (lease) {
     if (!pictureReadingMayStart()) {
       return report(progress, new OfflineProcessingOutcome(
-          0, 0, 0, BlockReason.PROCESSING_REFUSED, EmbeddingHandoff.NOT_EVALUATED));
+          0, 0, 0, BlockReason.PICTURE_READING_OFF, EmbeddingHandoff.NOT_EVALUATED));
     }
     client.recoverVduProcessing(context);
     OfflineProcessingOutcome outcome;

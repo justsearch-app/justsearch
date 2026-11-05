@@ -7,7 +7,7 @@ author-session: builder-s2-picture-20261104
 
 # Picture reading switch test intent
 
-The brief's adopted scenarios are quoted below. Evidence is emitted only by run-evidence.mjs. The baseline and candidate evidence checkouts are shared clones inside the session temporary directory, with their own build folders and copied frontend dependencies; source-repository worktrees are not created. These are builder checks, not acceptance of the complete application. The independent verifier must cover the real-system scenarios, including actual GPU processing, full installer completion, deletion/exclusion publication races and process-death recovery. No acceptance record is written here.
+The brief's adopted scenarios are quoted below. Evidence is emitted only by run-evidence.mjs. Fail-before evidence uses shared clones inside the session temporary directory, with their own build folders and copied frontend dependencies; no source-repository worktrees are created. Candidate checks use the assigned worktree or an isolated shared clone. These are builder checks, not acceptance of the complete application. The independent verifier must cover the real-system scenarios, including actual GPU processing, full installer completion, deletion/exclusion publication races and process-death recovery. No acceptance record is written here.
 
 ```json
 {
@@ -17,7 +17,6 @@ The brief's adopted scenarios are quoted below. Evidence is emitted only by run-
         "modules/app-services/src/test/java/io/justsearch/app/services/PictureReadingOwnerRefusalTest.java",
         "modules/app-services/src/test/java/io/justsearch/app/services/chat/PictureReadingConfigurationTest.java",
         "modules/app-services/src/test/java/io/justsearch/app/services/settings/PictureReadingPreferenceTest.java",
-        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/PictureReadingCoordinatorTest.java",
         "modules/ui/src/test/java/io/justsearch/ui/api/PictureReadingSettingsHttpTest.java"
       ],
       "class": "New",
@@ -118,98 +117,7 @@ The brief's adopted scenarios are quoted below. Evidence is emitted only by run-
         "modules/app-services/src/test/java/io/justsearch/app/services/PictureReadingOwnerRefusalTest.java",
         "modules/app-services/src/test/java/io/justsearch/app/services/chat/PictureReadingConfigurationTest.java",
         "modules/app-services/src/test/java/io/justsearch/app/services/settings/PictureReadingPreferenceTest.java",
-        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/PictureReadingCoordinatorTest.java",
         "modules/ui/src/test/java/io/justsearch/ui/api/PictureReadingSettingsHttpTest.java"
-      ]
-    },
-    {
-      "items": [
-        "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts"
-      ],
-      "class": "New",
-      "behaviour": "Both installed switches send the same witnessed single-field setting, stay busy until the receipt, preserve the prior state on refusal, show the operator-controlled effective state after restart, and use the whole selected download consent. Cancel does not save the picture setting or start transfer; accepting carries the picture-enable intent to installer completion. These checks fail with assertions on the baseline because no picture switches exist.",
-      "sources": [
-        {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261101-uiimpl",
-          "scenario": "V1",
-          "quote": "After install, Text in scans and images has a live switch. Off: no new picture work starts (automatic or manual), unfinished pictures return to waiting without using up retries, the managed answer server runs without the picture file; files and already read text are kept; the page says \"Off - files and read text kept\". On: picture reading resumes waiting work only (no rereading of already processed files). Works whether answers are on or off.",
-          "label": "agent-drafted, owner-adopted"
-        },
-        {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261101-uiimpl",
-          "scenario": "V2",
-          "quote": "Switching picture reading at every stage (Engine starting, between documents, during reading, while saving a result) ends consistent: no late result after Off is lost or half-written; completed text stays searchable. The choice survives restart, upgrade, a profile or model change, Repair and runtime activation; a second window converges; failures (server restart fails, file missing or mismatched, settings write fails, process dies midway) leave a truthful prior or recovered state. A user-run (external) answer server: the switch refuses with a reason and never stops that server.",
-          "label": "agent-drafted, owner-adopted"
-        },
-        {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261101-uiimpl",
-          "scenario": "V4",
-          "quote": "Switching picture reading on or off while an answer, summary or answer with sources is streaming: the reply is not lost; the switch either waits for the reply and then applies, or says it is busy; it never shows applied before the answer server is reconfigured.",
-          "label": "agent-drafted, owner-adopted"
-        },
-        {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261101-uiimpl",
-          "scenario": "C1",
-          "quote": "Switching on a part whose files are missing opens the existing consent listing everything the download will actually transfer (all missing selected parts, with sizes and licences), not only the switched part; closing or declining starts no transfer and leaves the switch as it was.",
-          "label": "agent-drafted, owner-adopted"
-        },
-        {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261101-uiimpl",
-          "scenario": "R5",
-          "quote": "With an operator override (JUSTSEARCH_MMPROJ_MODEL), the switch refuses with a reason instead of showing Off while the override keeps the feature in use, live and after restart; custom paths are preserved.",
-          "label": "agent-drafted, owner-adopted"
-        },
-        {
-          "kind": "delegated-choice",
-          "delegationQuote": "proceed accordingly",
-          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
-          "delegationScope": "Implement the adopted picture-reading switch design, preserving files, acquisition choices and the existing fixed settings owner.",
-          "choice": "Expose a read-only operator-enabled projection beside the saved nullable preference. A successful witnessed receipt takes precedence over an older runtime poll until a new observation arrives.",
-          "label": "agent choice"
-        },
-        {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261101-uiimpl",
-          "scenario": "N1",
-          "quote": "Answers on/off (core.set-chat-enabled) keeps files and its meaning; search by exact words and by meaning, indexing and its pacing, energy and manual pause rules, GPU-pressure handling and picture-reading back-off work as today; \"Pause answers while indexing\" and \"Best match first\" keep their behaviour; installs, consent, decline and Repair of parts not switched keep today's behaviour.",
-          "label": "agent-drafted, owner-adopted"
-        }
-      ],
-      "evidence": "gates/test-intent/evidence/s2-picture-switch-behaviour.json",
-      "newChecks": [
-        "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts"
-      ]
-    },
-    {
-      "items": [
-        "modules/ui-web/src/shell-v0/views/BrainSurface.redesign.test.ts"
-      ],
-      "class": "New",
-      "behaviour": "Replace only the superseded expectation that installed picture reading has no control. Its path switch now remains visible and disabled while live observations are unknown; the existing runtime-derived sentence and other feature expectations stay in place.",
-      "sources": [
-        {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261101-uiimpl",
-          "scenario": "V1",
-          "quote": "After install, Text in scans and images has a live switch. Off: no new picture work starts (automatic or manual), unfinished pictures return to waiting without using up retries, the managed answer server runs without the picture file; files and already read text are kept; the page says \"Off - files and read text kept\". On: picture reading resumes waiting work only (no rereading of already processed files). Works whether answers are on or off.",
-          "label": "agent-drafted, owner-adopted"
-        },
-        {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261101-uiimpl",
-          "scenario": "V2",
-          "quote": "Switching picture reading at every stage (Engine starting, between documents, during reading, while saving a result) ends consistent: no late result after Off is lost or half-written; completed text stays searchable. The choice survives restart, upgrade, a profile or model change, Repair and runtime activation; a second window converges; failures (server restart fails, file missing or mismatched, settings write fails, process dies midway) leave a truthful prior or recovered state. A user-run (external) answer server: the switch refuses with a reason and never stops that server.",
-          "label": "agent-drafted, owner-adopted"
-        }
-      ],
-      "evidence": "gates/test-intent/evidence/s2-picture-switch-redesign.json",
-      "newChecks": [
-        "modules/ui-web/src/shell-v0/views/BrainSurface.redesign.test.ts"
       ]
     },
     {
@@ -435,29 +343,6 @@ The brief's adopted scenarios are quoted below. Evidence is emitted only by run-
     },
     {
       "items": [
-        "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts"
-      ],
-      "class": "New",
-      "repaired": true,
-      "behaviour": "Repair round 1: retain the original witnessed attempt after uncertain delivery or receipt. Reconnect replays exactly the same body and operation key; a COMPLETE receipt resolves application with either an unchanged or changed GET witness, without spending another revision for a replay. A terminal refusal resolves non-application with an unchanged witness and keeps the prior switch. Uncertainty clears only on a reconciled outcome, not merely a changed GET witness. All three checks fail with assertions against 7273c984c2.",
-      "sources": [
-        {
-          "kind": "owner-adopted-scenario",
-          "task": "t-20261101-uiimpl",
-          "scenario": "V2",
-          "quote": "Switching picture reading at every stage (Engine starting, between documents, during reading, while saving a result) ends consistent: no late result after Off is lost or half-written; completed text stays searchable. The choice survives restart, upgrade, a profile or model change, Repair and runtime activation; a second window converges; failures (server restart fails, file missing or mismatched, settings write fails, process dies midway) leave a truthful prior or recovered state. A user-run (external) answer server: the switch refuses with a reason and never stops that server.",
-          "label": "agent-drafted, owner-adopted"
-        }
-      ],
-      "evidence": "gates/test-intent/evidence/s2-picture-switch-ui-repair.json",
-      "newChecks": [
-        "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts#reconciles an interrupted delivery with an unchanged witness using the original attempt",
-        "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts#reconciles an interrupted receipt with a changed witness by replaying the original attempt",
-        "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts#clears interrupted uncertainty when the original attempt is refused with an unchanged witness"
-      ]
-    },
-    {
-      "items": [
         "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/PictureReadingInstallCompletionTest.java"
       ],
       "class": "New",
@@ -489,6 +374,79 @@ The brief's adopted scenarios are quoted below. Evidence is emitted only by run-
       "evidence": "gates/test-intent/evidence/s2-picture-switch-install-completion.json",
       "newChecks": [
         "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/PictureReadingInstallCompletionTest.java"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/operations/BulkRefusalExplanationTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/PictureReadingCoordinatorTest.java",
+        "modules/ui/src/test/java/io/justsearch/ui/api/OfflineProcessingOperationLifecycleIntegrationTest.java",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts",
+        "modules/ui-web/src/shell-v0/views/BulkOperationImmediateRefusal.test.ts"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Repair round 2: picture-Off refuses before dispatch with Picture reading is off, stable PICTURE_READING_OFF and retryable false; a fence arriving during indexing-hold acquisition completes with the same refusal. Exercise real coordinator and handler, loopback HTTP controller, durable runner/store and read-time outcome. Library renders the refusal from its real operation button; both AI Brain picture presentations state the unknown saved choice after settings quarantine. Only these changed checks are evidence targets; each fails by assertion at cd1ab03860. Historical whole-file evidence for the coordinator and page is superseded here for the changed checks; the full required suites cover preservation.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "V1",
+          "quote": "After install, Text in scans and images has a live switch. Off: no new picture work starts (automatic or manual), unfinished pictures return to waiting without using up retries, the managed answer server runs without the picture file; files and already read text are kept; the page says \"Off - files and read text kept\". On: picture reading resumes waiting work only (no rereading of already processed files). Works whether answers are on or off.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "V3",
+          "quote": "While picture reading is off, new scans are indexed and wait for picture reading; a changed scan gets normal fresh processing later; a deleted or excluded scan never gets a late result; unchanged scans with a final empty or rejected outcome stay as they are; the manual or agent trigger of offline processing cannot bypass Off. Off during a multipage document followed at once by On: no old attempt publishes into the new one; an orderly Off returns retries, a crash keeps today's spent-count recovery.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "N2",
+          "quote": "Saved settings keep their meaning across the stored settings schema change (stored schema 8 today -> 9; public API v2): existing installs load with no explicit choice (today's behaviour: picture reading on when its file is present), older settings versions migrate, corrupt settings are quarantined as today; declinedAiPackages stays acquisition preference only.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "Repair round 2 truthfulness defects in offline trigger refusals and unknown picture choices.",
+          "choice": "Use a distinct PICTURE_READING_OFF blocked outcome from the existing admission owners; return an already refused stage immediately and preserve the same nonretryable reason on late completion. Derive human wording from compact receipts at the existing history/replay explanation seam. Both unknown-choice presentations use the disabled switch reason verbatim.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s2-picture-switch-truthfulness-repair.json",
+      "newChecks": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/operations/BulkRefusalExplanationTest.java#pictureOffHasAReadTimeExplanationForHistoryAndReplay",
+        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/PictureReadingCoordinatorTest.java#offBlocksAllProcedureEntriesBeforeRecoveryOrClaims",
+        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/PictureReadingCoordinatorTest.java#offWithdrawsAnExplicitWaitWithoutResumingTheIndexingPolicy",
+        "modules/ui/src/test/java/io/justsearch/ui/api/OfflineProcessingOperationLifecycleIntegrationTest.java#pictureOffRefusesHttpAndRecordsTheReasonWithoutStartingWork",
+        "modules/ui/src/test/java/io/justsearch/ui/api/OfflineProcessingOperationLifecycleIntegrationTest.java#pictureOffDuringStartCompletesWithTheSameRecordedRefusal",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts#shows the unknown saved choice in both places after settings quarantine",
+        "modules/ui-web/src/shell-v0/views/BulkOperationImmediateRefusal.test.ts#Library shows the picture-off refusal from Process pending work in plain words"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.redesign.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Preservation adaptation in round 2: the runtime-evidence scenario now supplies the valid settings witness required to know the saved choice. Preserve every assertion: picture On when known, runtime sentence changes when its projector is inactive, and unavailable live observations disable both feature controls. Quarantined settings are covered separately and deliberately omit the witness. This check passes before cd1ab03860 and after; this fixture correction does not manufacture a fail-before.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "N2",
+          "quote": "Saved settings keep their meaning across the stored settings schema change (stored schema 8 today -> 9; public API v2): existing installs load with no explicit choice (today's behaviour: picture reading on when its file is present), older settings versions migrate, corrupt settings are quarantined as today; declinedAiPackages stays acquisition preference only.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s2-picture-switch-truthfulness-preservation.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.redesign.test.ts#keeps runtime evidence in the sentence and disables feature switches when observations become unknown"
       ]
     }
   ]
@@ -563,3 +521,45 @@ All three cases pass at the unmodified `222f968617` baseline in the temporary sh
 | `git diff --check`; `git ls-remote origin refs/heads/main` | Passed; main remains `bcc5ece3c64961dbd224dffbae599675e265ac85`, so no rebase required. |
 
 `.agents/preflight` is absent. No unrelated suites were run. Shared resources touched: Gradle cache, CPU/build slot and admission queue; loopback servers and temporary settings/operations databases belonged to these tests. No running owner application, dev stack or GPU was used. Native preparation and actual GPU/model activation remain outside these bounded completion checks. Changes are uncommitted and unpushed.
+
+
+## Repair round 2: truthful refusal and unknown choice
+
+The earlier route inventories above still cover admission, publication and every projector-configuration path. This repair changes the reason carried from those existing gates; it introduces no admission rule, server configuration route or saved setting.
+
+| Picture route | Owner in this repair | Off result | Check |
+| --- | --- | --- | --- |
+| Page button, HTTP operation, agent/MCP operation | modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/TriggerOfflineProcessingHandler.java:30; modules/app-services/src/main/java/io/justsearch/app/services/vdu/OfflineCoordinator.java:127 | The coordinator's pre-dispatch refusal returns immediately as PICTURE_READING_OFF, nonretryable; no started claim | PictureReadingCoordinatorTest.offBlocksAllProcedureEntriesBeforeRecoveryOrClaims; OfflineProcessingOperationLifecycleIntegrationTest.pictureOffRefusesHttpAndRecordsTheReasonWithoutStartingWork; BulkOperationImmediateRefusal Library picture-Off case |
+| Automatic sampler and legacy/direct runtime calls | modules/app-services/src/main/java/io/justsearch/app/services/vdu/OfflineCoordinator.java:127 | Same owner outcome before attaching procedure work | PictureReadingCoordinatorTest.offBlocksAllProcedureEntriesBeforeRecoveryOrClaims |
+| Start in progress, waiting for indexing hold | modules/app-services/src/main/java/io/justsearch/app/services/vdu/OfflineCoordinator.java:297 | Same reason after cleanup; no recovery, claims or publications | PictureReadingCoordinatorTest.offWithdrawsAnExplicitWaitWithoutResumingTheIndexingPolicy; OfflineProcessingOperationLifecycleIntegrationTest.pictureOffDuringStartCompletesWithTheSameRecordedRefusal |
+| Batch entry, between documents, deferred in-flight read | modules/app-services/src/main/java/io/justsearch/app/services/vdu/VduBatchProcessor.java:166 | Distinct picture-Off reason; the existing claim-release and acknowledged result logic are retained | Existing coordinator cancellation/publication checks in the full app-services suite; changed handler and durable-operation checks above |
+| History and replay | modules/app-api/src/main/java/io/justsearch/app/api/operations/BulkReindexFailureMessage.java:12, the existing shared read-time explanation seam | Human explanation derived from compact PICTURE_READING_OFF receipts | BulkRefusalExplanationTest.pictureOffHasAReadTimeExplanationForHistoryAndReplay; real SqliteOperationStore.outcome in the two HTTP/lifecycle checks |
+
+| Projector configuration route | How Off applies | Evidence |
+| --- | --- | --- |
+| Boot, profile/model change, Repair, install completion, runtime activation, recovery and residency reload | Unchanged from the projector inventory above: retained preference is applied at the existing configuration owners; this repair does not reconfigure a server | Prior bounded checks named above; required module suites rerun for this repair |
+
+Unknown-choice wording is shared between the disabled reason, path state and sentence phrase. The new page regression supplies the quarantined-settings HTTP refusal, then asserts both actual rendered states and disabled reasons. The Library regression invokes the actual nested operation button through its HTTP client against a session-owned loopback refusal server; asserting the returned fixture alone would not exercise the missing page error binding.
+
+Evidence uses the unmodified run-evidence.mjs and the same temporary shared-clone Git adapter described above. Final candidate evidence uses the assigned worktree under its build slot; before checkouts are private shared clones. This round's evidence targets only its seven changed truthfulness checks and the one preserved runtime-observation check. No acceptance record is authored. Shared resources touched: Gradle cache and build slot/admission queue, npm dependencies/cache, and private loopback ports for test-owned servers. No owner application, dev stack or GPU is used. The frontend fixture's omitted witness was corrected only for its known-choice scenario, preserving all its assertions.
+
+### Repair round 2 check results and handback
+
+No preflight executable exists under `.agents`. All Gradle commands unset DISPLAY, use `js-gradle-slot` without `-w`, and set `-PskipWebBuild=true`. The first targeted Java run caught a test-harness compile error (Javalin is not AutoCloseable); the harness now stops its own server in finally. The HTTP regression's fail-before asserts the actual response message, with no test assertion inside the dispatcher that could manufacture a server error. Page selector corrections target the picture switch's own reason and state, rather than another feature or the empty footprint row. All assertions inspect production responses, durable rows or rendered output; no fixture-only assertion or missing-helper failure is used as repair evidence.
+
+| Command | Observed result |
+| --- | --- |
+| `env -u DISPLAY js-gradle-slot ./gradlew :modules:app-api:test :modules:app-api:pmdMain :modules:app-api:pmdTest :modules:app-services:test :modules:app-services:pmdMain :modules:app-services:pmdTest :modules:ui:test :modules:ui:pmdMain :modules:ui:pmdTest -PskipWebBuild=true --console=plain --continue` | BUILD FAILED in 12m 4s. App-services: 5,087 passed, one failed, 11 skipped. UI: 2,424 passed, one failed, two skipped. App-api tests completed without a failed task; all six PMD tasks completed. No skip is counted as a pass. |
+| App-services failure, `GenerativeSettingsComponentOwnerTest.transientProfilePreparesTheModelAndProjectorPairWithoutChangingResolvedSettings` | Line 111 expects the compact projector path and receives null. The identical test on unmodified cd1ab03860, in the private `before` shared clone, also fails with that assertion. Its baseline evidence was emitted by run-evidence.mjs to that clone's build folder. No repair of this separate profile/configuration defect was attempted. |
+| UI failure, `NvidiaSmiAvailabilityHttpTest.anInstalledNvidiaSmiIsAvailableWhenNvmlSuppliesTheMemory` | Assertion failure at line 83, the environment failure anticipated by the brief. No test or runtime workaround was made. The other environment failures mentioned in the brief were not reported by this bounded three-module run. |
+| `env -u DISPLAY js-gradle-slot ./gradlew :modules:app-api:pmdMain :modules:app-api:pmdTest :modules:app-services:pmdMain :modules:app-services:pmdTest :modules:ui:pmdMain :modules:ui:pmdTest -PskipWebBuild=true --console=plain --continue` | Final refresh exited 1: Gradle build daemon disappeared unexpectedly during app-services pmdTest. This refresh is incomplete, not a pass. Returned under the builder's non-implementation-check-failure rule; no speculative daemon or resource change was made. |
+| `run-evidence.mjs --before cd1ab03860 --copy-node-modules` for the seven named repair checks | Exit 0: all seven executed and passed after; all seven failed before with assertions. The final HTTP failure is on the real successful/started response returned before the repair, not on a missing helper or fixture-side server assertion. |
+| `run-evidence.mjs` for the preserved runtime-observation page check | Exit 0 on the candidate; the same check with the valid witness fixture also passes on cd1ab03860 in the private before clone. |
+| `npm --prefix modules/ui-web run lint`; `npm --prefix modules/ui-web run typecheck` | Passed on the final files. |
+| `npm --prefix modules/ui-web run test:unit:run -- --maxWorkers=4` | Final full run: 697 files and 8,873 tests passed. The initial run found the existing known-choice fixture's omitted witness; supplying the witness preserved every assertion. Subsequent fixture parity/real-button improvements were checked again: picture switch file 10/10 and operation refusal file 21/21 passed; the final evidence re-executed both files. |
+| `node scripts/ci/run-ui-web-gates.mjs` | 31/31 passed. |
+| `npm --prefix modules/ui-web run knip:report`; `node scripts/governance/run.mjs --mode gate --gate dead-code` | Producer emitted its report (underlying knip exit 1 is expected by the wrapper); dead-code passed, six findings and zero failed gates. |
+| `node scripts/governance/gates/test-intent/cli.mjs` | Only test-intent/acceptance-missing. No acceptance record authored. |
+| `git diff --check` | Passed. |
+
+Open for the orchestrator: independent live verification/acceptance, the separately reproduced baseline projector assertion, and completion of the PMD refresh after its daemon failure. Remote main advanced during checks (latest inspected 51bfa7756ce7f6313350eaaaf70d6a5cec4dc8b5); its incoming changes include jseval tooling and authorization/operation transport code used by these paths. The reported checks ran against cd1ab03860, so rebasing and checking that new transport integration remain open. The assigned branch remains at cd1ab03860 with uncommitted repairs. Rebase is pending because the worktree is dirty and this builder is instructed not to commit; nothing was stashed, reset, committed or pushed.

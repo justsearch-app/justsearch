@@ -170,7 +170,7 @@ public class VduBatchProcessor {
         Objects.requireNonNull(progress, "progress");
         checkInterrupted();
         if (!pictureReadingEnabled.getAsBoolean()) {
-            return report(progress, 0, 0, 0, BlockReason.PROCESSING_REFUSED);
+            return report(progress, 0, 0, 0, BlockReason.PICTURE_READING_OFF);
         }
         var shouldInterruptBatch = Objects.requireNonNull(interruptBatchFactory.get(), "batch interrupt");
         KnowledgeClient knowledgeClient = knowledgeClientSupplier.get();
@@ -232,7 +232,8 @@ public class VduBatchProcessor {
                 checkInterrupted();
                 if (!pictureReadingEnabled.getAsBoolean() || shouldInterruptBatch.getAsBoolean()
                         || automaticEligibility != null && !automaticEligibility.getAsBoolean()) {
-                    blocked = BlockReason.ACTIVITY_OR_ENERGY;
+                    blocked = pictureReadingEnabled.getAsBoolean()
+                        ? BlockReason.ACTIVITY_OR_ENERGY : BlockReason.PICTURE_READING_OFF;
                     LOG.info("VDU pass interrupted before {}: activity during this pass, energy or bulk hold", docId);
                     break;
                 }
@@ -277,7 +278,8 @@ public class VduBatchProcessor {
                         if (!knowledgeClient.releaseVduProcessing(docId, attemptId, engineContext)) {
                             throw new IllegalStateException("VDU deferral was not acknowledged by the index", failure);
                         }
-                        blocked = BlockReason.ACTIVITY_OR_ENERGY;
+                        blocked = pictureReadingEnabled.getAsBoolean()
+                        ? BlockReason.ACTIVITY_OR_ENERGY : BlockReason.PICTURE_READING_OFF;
                         break;
                     }
                     if (io.justsearch.app.api.chat.GenerationUnavailableException.causedBy(failure)) {

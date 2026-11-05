@@ -128,6 +128,7 @@ interface ModelPresence {
 }
 
 const NUM = new Intl.NumberFormat();
+const PICTURE_CHOICE_UNKNOWN = 'Saved picture reading choice is not known. Refresh settings before changing it.';
 
 /**
  * Round-15 scope-mismatch fix — the enrichment card's SCOPE, stated on the card itself.
@@ -1494,6 +1495,7 @@ export class BrainSurface extends JfElement {
         : 'Text in scans and images comes with the answer model’s files; it is not a separate download'
         : this.pendingActions.has('picture-switch') ? this.pictureTargetEnabled ? 'Starting picture reading…' : 'Stopping picture reading…'
         : this.pictureUncertain ? 'Unknown — checking picture reading after an interrupted change'
+        : !this.settingsRead || !this.rerankerSettings?.witness ? PICTURE_CHOICE_UNKNOWN
         : pictureOverride === false ? 'Off — operator controlled'
         : pictureOverride === true ? mmproj === true ? 'On — operator controlled'
           : mmproj === false ? 'Unavailable — operator picture reader is not active' : 'Enabled by an operator override'
@@ -1506,7 +1508,7 @@ export class BrainSurface extends JfElement {
         : this.pictureUncertain ? 'Checking the interrupted picture reading change.'
         : pictureOverride != null ? 'Text in scans and images is controlled by an operator override; change that override first'
         : features.chat.availability === 'unavailable' ? 'Text in scans and images is unavailable on this computer'
-        : !this.settingsRead || !this.rerankerSettings?.witness ? 'Saved picture reading choice is not known. Refresh settings before changing it.'
+        : !this.settingsRead || !this.rerankerSettings?.witness ? PICTURE_CHOICE_UNKNOWN
         : this.planLockReason(),
     };
     return features;
@@ -1514,6 +1516,10 @@ export class BrainSurface extends JfElement {
 
   private renderBrainSentence(verdict: AiEngineVerdict, installed: boolean, features: Record<BrainFeatureId, BrainFeature>, readingPictures: boolean | null): TemplateResult {
     const parts = composeBrainSentence(verdict, installed, features, readingPictures, this.aiKnown());
+    if (features.pictures.state === PICTURE_CHOICE_UNKNOWN) {
+      const picturePart = parts.find(part => part.feature === 'pictures');
+      if (picturePart) picturePart.text = `. ${PICTURE_CHOICE_UNKNOWN}`;
+    }
     for (let i = 1; i < parts.length; ++i) {
       const punctuation = parts[i]!.text.match(/^[.,]/)?.[0];
       if (punctuation) {
