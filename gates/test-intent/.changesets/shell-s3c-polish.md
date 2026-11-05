@@ -473,3 +473,14 @@ the person's own action, so it waits in Needs you. The own-transport cases of th
   "note": "Round 2 on 279a8dea3b: all 11 items pass, every repaired check fails before by assertion; item 4 held across 1440 orderings of two same-operation Allows; item 9 across all 24 orders. Labelling note: entry 14 labels an orchestrator decision as owner-adopted; its never-join-without-an-id expectation passes on the baseline and follows from L16. Round 1 (Claude verifier 531730fa-109e-421d-aecf-e039bd1fd924) accepted an earlier digest with items 4 and 9 failing; the Codex attempt before it stopped at model capacity. Transcribed by the orchestrator from the verifier's answer."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1acb7-7409-79f0-94de-70154dcc3019",
+  "verdict": "accept",
+  "digest": "sha256:aeed90971fed7b2f4923c48fc665145ca96a5eab4875bcc1de9a7d63d0e2e692",
+  "note": "After the top-bar notice repair: redirect notices stay within the bar at three sizes with full tooltip and accessible name, windows named plainly with an id fallback (54 Chromium cases, centre error 0 px); the unknown-address notice unchanged. Transcribed by the orchestrator from the verifier's answer (Codex sandbox)."
+}
+```
