@@ -79,6 +79,13 @@ def test_estimate_refuses_before_admission(tmp_path):
     assert not list(tmp_path.iterdir())
 
 
+def test_full_suite_uses_the_same_ten_minute_limit():
+    run.require_budget(600, 600, full_suite=True)
+    for budget in (600.01, 601, 720):
+        with pytest.raises(run.RunRefused, match='at most 600'):
+            run.require_budget(100, budget, full_suite=True)
+
+
 def test_candidate_identity_covers_untracked_and_deletion(tmp_path):
     subprocess.run(['git','init','-q',str(tmp_path)], check=True)
     subprocess.run(['git','-c','user.name=Test','-c','user.email=test@example.com','commit','--allow-empty','-qm','fixture'], cwd=tmp_path, check=True)

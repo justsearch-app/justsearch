@@ -1205,7 +1205,7 @@
  "second_build": {
   "failed_jobs": 0,
   "indexed_documents": 2916,
-  "note": "Still in the collection (decision pending). Extracted completely in the first build, truncated in the second: the PDF OCR per-document elapsed budget (PdfOcrEngine DEFAULT_BUDGET_MS 30 s) truncates large OCR documents under machine load, so the core witness refused the second build.",
+  "note": "Both excluded from the collection by the OCR page cap (ocr_page_cap: 109 and 64 pages). Extracted completely in the first build, truncated in the second: the PDF OCR per-document elapsed budget (PdfOcrEngine DEFAULT_BUDGET_MS 30 s) truncates large OCR documents under machine load, so the core witness refused the second build.",
   "ocr_route_documents": 433,
   "ocr_route_documents_with_at_least_40_pages": 26,
   "truncated": [

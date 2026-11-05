@@ -31,6 +31,14 @@ from .types import (Outcome, QueryResult, RunHeader, RunRecord, Served,
 
 DEFAULT_COLLECTIONS = ('scifact', 'miracl-de', 'enron-email')
 FULL_COLLECTIONS = ('scifact', 'miracl-de', 'miracl-fr', 'enron-email')
+# Join the default and full checks once no query kind of theirs awaits labels (real-use: when
+# its topical labels are frozen); until then they run only when named.
+LABELLED_DEFAULTS = ('real-use',)
+
+
+def default_collections(full_suite: bool = False) -> tuple[str, ...]:
+    base = FULL_COLLECTIONS if full_suite else DEFAULT_COLLECTIONS
+    return base + tuple(a for a in LABELLED_DEFAULTS if not collections.load_config(a).pending_kinds)
 CLEANUP_SECONDS = 45
 GPU_MARGIN_MIB = 2048
 
@@ -103,7 +111,7 @@ def search_query(client: httpx.Client, handle: index.IndexHandle, qid, query,
 
 
 def require_budget(estimate: float, budget: float, *, full_suite: bool = False) -> None:
-    maximum = 720 if full_suite else 600
+    maximum = 600
     if not math.isfinite(budget) or not CLEANUP_SECONDS < budget <= maximum:
         raise RunRefused(f'window must be greater than {CLEANUP_SECONDS} and at most {maximum} seconds')
     if not math.isfinite(estimate) or estimate > budget:
@@ -364,7 +372,7 @@ def execute(action: str, refs: tuple[str, ...], *, baseline_dir: Path,
     loaded = []
     totals, startups, footprints = [], [], []
     pending = {}
-    for ref in refs or (FULL_COLLECTIONS if full_suite else DEFAULT_COLLECTIONS):
+    for ref in refs or default_collections(full_suite):
         c, qc = collections.resolve_collection(ref)
         if action == 'check' and not full_suite and c.name == 'miracl-fr':
             raise RunRefused('MIRACL fr belongs to quality full-suite with an explicit window')

@@ -259,17 +259,18 @@ PREVIEW_FIELDS = ("extractionStatus", "contentTruncated", "textProvenance", "vdu
                   "extractionParserId", "extractionPolicyId", "totalChars")
 
 
-def dump(base_url: str, root: Path, c: Collection) -> dict:
+def dump(base_url: str, root: Path, c: Collection, *, work: Path | None = None) -> dict:
     """Extracted text, chunk count and extraction status of every document of a live index.
 
     A document the index does not hold is recorded as ``missing``; a truncated extraction as
     ``truncated`` (the core witness refuses both). Text that differs from an earlier dump is
     recorded as a ``changed`` document, so a rebuilt index is checked against the first one.
     """
+    work = work or WORK
     rows = _recipe_rows()
-    out = WORK / "extracted"
+    out = work / "extracted"
     out.mkdir(parents=True, exist_ok=True)
-    records = {r["doc"]: r for r in _jsonl(WORK / "extracted.jsonl")}
+    records = {r["doc"]: r for r in _jsonl(work / "extracted.jsonl")}
     changed = []
     with httpx.Client(base_url=base_url, timeout=600) as client:
         live = _live_ids(base_url, root, c, client)
@@ -297,7 +298,7 @@ def dump(base_url: str, root: Path, c: Collection) -> dict:
                     rec.update(status="ok", chars=len(text), words=len(text.split()), chunks=chunks,
                                extracted_sha256=digest)
             if records.get(doc) != rec:
-                _log(WORK / "extracted.jsonl", rec)
+                _log(work / "extracted.jsonl", rec)
             records[doc] = rec
             if n % 200 == 0:
                 print(f"extracted {n}/{len(c.documents)}", file=sys.stderr, flush=True)
@@ -933,8 +934,8 @@ class SubscriptionRequired(RuntimeError):
     pass
 
 
-def ask_claude(prompt: str, *, timeout: float = 180) -> tuple[dict, str]:
-    """One tool-less, session-less ``claude -p`` call on the subscription model."""
+def ask_claude(prompt: str, *, model: str = MODEL, timeout: float = 180) -> tuple[dict, str]:
+    """One tool-less, session-less ``claude -p`` call on the subscription, with ``model``."""
     env = dict(os.environ)
     forbidden = {name for name in env
                  if name.startswith(AUTH_OVERRIDE_PREFIXES) or name in AUTH_OVERRIDES}
@@ -963,7 +964,7 @@ def ask_claude(prompt: str, *, timeout: float = 180) -> tuple[dict, str]:
             subscribed = False
         if not subscribed:
             raise SubscriptionRequired("Claude subscription authentication could not be verified") from None
-        command = ["claude", "-p", prompt, "--model", MODEL, "--output-format", "json",
+        command = ["claude", "-p", prompt, "--model", model, "--output-format", "json",
                    "--tools", "", "--strict-mcp-config", "--setting-sources", "",
                    "--no-session-persistence"]
         r = subprocess.run(command,
@@ -1111,7 +1112,9 @@ def generate_one(q: dict, rows: dict, texts: dict, *, feedback: str = "", round_
                        "reason": "generation failed"})
             row["error_detail"] = str(e)
             if isinstance(e, SubscriptionRequired):
-                _record_generation(row)
+                # A refused run made no call: it stays out of the committed record.
+                with _GEN_LOCK:
+                    _log(WORK / "generation.jsonl", row)
                 raise
             if isinstance(e, (RuntimeError, ValueError)) and "limit" in str(e).lower():
                 _record_generation(row)
@@ -1388,6 +1391,8 @@ def distinguishability(targets: list[str], records: dict, texts: dict, *, cap_to
 
 
 def write() -> int:
+    """The stored collection from the plan and gates. Topical labels frozen by
+    ``topical_labels freeze`` are kept for every topical query whose text is unchanged."""
     c, cfg = _collection()
     planned = {q["qid"]: q for q in load_plan(c.documents)}
     done = {q: r for q, r in _accepted().items() if q in planned}
@@ -1408,6 +1413,8 @@ def write() -> int:
                                                  if d != q["target"]}}
         else:
             groups = {"lang": q["language"], "kind": "topical", "group": q["group"]}
+            if qid in c.judgments and qid in c.queries and c.queries[qid].text == text:
+                judgments[qid] = dict(c.judgments[qid])
         queries[qid] = QueryText(text, groups)
     new = Collection(c.name, c.language, queries, judgments, dict(c.documents), dict(c.content),
                      dict(c.metadata))
@@ -1417,10 +1424,12 @@ def write() -> int:
         raise ValueError(f"repeated query texts the gate did not drop: {sorted(dup)}")
     qcoll.write_collection(new, Path(__file__).with_name("recipes") / COLLECTION)
     pending = len(qcoll.pending_queries(new, cfg))
-    counts = {**new.counts(), "pending": pending}
+    counts = {**new.counts(), "pending": pending, "excluded": len(cfg.excluded)}
     config_path = qcoll.CONFIG_DIR / f"{COLLECTION}.json"
     raw = json.loads(config_path.read_text(encoding="utf-8"))
-    raw["expected"] = {k: counts[k] for k in ("queries", "pending", "judgments", "positives", "grades", "documents")}
+    raw["expected"] = {k: counts[k] for k in ("queries", "pending", "excluded", "judgments", "positives",
+                                              "grades", "documents")
+                      if k != "excluded" or cfg.excluded or "excluded" in raw["expected"]}
     atomic_write_text(config_path, json.dumps(raw, ensure_ascii=False, indent=2) + "\n")
     print(canonical_json(counts))
     return 0
