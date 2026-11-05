@@ -385,11 +385,12 @@ The brief's adopted scenarios are quoted below. Evidence is emitted only by run-
         "modules/app-api/src/test/java/io/justsearch/app/api/operations/BulkRefusalExplanationTest.java",
         "modules/app-services/src/test/java/io/justsearch/app/services/vdu/PictureReadingCoordinatorTest.java",
         "modules/ui/src/test/java/io/justsearch/ui/api/OfflineProcessingOperationLifecycleIntegrationTest.java",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts",
         "modules/ui-web/src/shell-v0/views/BulkOperationImmediateRefusal.test.ts"
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Repair round 2: picture-Off refuses before dispatch with Picture reading is off, stable PICTURE_READING_OFF and retryable false; a fence arriving during indexing-hold acquisition completes with the same refusal. Exercise real coordinator and handler, loopback HTTP controller, durable runner/store and read-time outcome. Library renders the refusal from its real operation button; both AI Brain picture presentations state the unknown saved choice after settings quarantine. Only these changed checks are evidence targets; each fails by assertion at cd1ab03860. Historical whole-file evidence for the coordinator and page is superseded here for the changed checks; the full required suites cover preservation. The page check is now covered by the bounded display preservation entry below; its former evidence is retained as history.",
+      "behaviour": "Repair round 2: picture-Off refuses before dispatch with Picture reading is off, stable PICTURE_READING_OFF and retryable false; a fence arriving during indexing-hold acquisition completes with the same refusal. Exercise real coordinator and handler, loopback HTTP controller, durable runner/store and read-time outcome. Library renders the refusal from its real operation button; both AI Brain picture presentations state the unknown saved choice after settings quarantine. Only these changed checks are evidence targets; each fails by assertion at cd1ab03860. Historical whole-file evidence for the coordinator and page is superseded here for the changed checks; the full required suites cover preservation.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -428,6 +429,7 @@ The brief's adopted scenarios are quoted below. Evidence is emitted only by run-
         "modules/app-services/src/test/java/io/justsearch/app/services/vdu/PictureReadingCoordinatorTest.java#offWithdrawsAnExplicitWaitWithoutResumingTheIndexingPolicy",
         "modules/ui/src/test/java/io/justsearch/ui/api/OfflineProcessingOperationLifecycleIntegrationTest.java#pictureOffRefusesHttpAndRecordsTheReasonWithoutStartingWork",
         "modules/ui/src/test/java/io/justsearch/ui/api/OfflineProcessingOperationLifecycleIntegrationTest.java#pictureOffDuringStartCompletesWithTheSameRecordedRefusal",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts#shows the unknown saved choice in both places after settings quarantine",
         "modules/ui-web/src/shell-v0/views/BulkOperationImmediateRefusal.test.ts#Library shows the picture-off refusal from Process pending work in plain words"
       ]
     },
@@ -504,49 +506,6 @@ The brief's adopted scenarios are quoted below. Evidence is emitted only by run-
       "evidence": "gates/test-intent/evidence/s2-picture-switch-profile-choice-preservation.json",
       "newChecks": [
         "modules/app-services/src/test/java/io/justsearch/app/services/chat/PictureReadingProfileRepairTest.java#profileAndReconfigureBuildersKeepTheNullablePictureChoice"
-      ]
-    },
-    {
-      "items": [
-        "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts"
-      ],
-      "class": "New",
-      "repaired": true,
-      "behaviour": "Saved On with complete chat files and observed mmprojActive=false renders Not available with this answer model in the sentence and path, never On; both switches retain the saved choice, stay operable and can switch Off. Assertion-fails on 8922a1726a.",
-      "sources": [
-        {
-          "kind": "delegated-choice",
-          "delegationQuote": "proceed accordingly",
-          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
-          "delegationScope": "Bounded page display repair after review of 8922a1726a; no Engine change.",
-          "choice": "While the Engine is online and its live runtime reports no projector, show Not available with this answer model for saved On in both picture presentations, preserving the operable saved choice. Keep current wording for saved Off, unknown, offline and unobserved runtime states. Describing a custom model companion file is out of scope.",
-          "label": "agent choice"
-        }
-      ],
-      "evidence": "gates/test-intent/evidence/s2-picture-switch-model-unavailable-repair.json",
-      "newChecks": [
-        "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts#shows model unavailability in both places when saved On has no live projector and remains operable"
-      ]
-    },
-    {
-      "items": [
-        "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts"
-      ],
-      "class": "New",
-      "behaviour": "Preserve observed On, saved Off, offline saved choices, and not-yet-observed projector wording. Re-execute the complete page switch file, including quarantine, operator control, pending transitions, refusals, witness convergence and download consent. The new six-case wording matrix and all prior checks pass both on 8922a1726a and after; the display regression alone fails before. This evidence supersedes historical page-file evidence whose digest predates the added checks.",
-      "sources": [
-        {
-          "kind": "delegated-choice",
-          "delegationQuote": "proceed accordingly",
-          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
-          "delegationScope": "Bounded page display repair after review of 8922a1726a; no Engine change.",
-          "choice": "While the Engine is online and its live runtime reports no projector, show Not available with this answer model for saved On in both picture presentations, preserving the operable saved choice. Keep current wording for saved Off, unknown, offline and unobserved runtime states. Describing a custom model companion file is out of scope.",
-          "label": "agent choice"
-        }
-      ],
-      "evidence": "gates/test-intent/evidence/s2-picture-switch-model-unavailable-preservation.json",
-      "newChecks": [
-        "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts"
       ]
     }
   ]
@@ -707,30 +666,3 @@ The final complete invocation used `env -u DISPLAY js-gradle-slot ./gradlew -Psk
 | `:modules:ui:test` | 2443 | 2441 | 2 | 0 |
 
 The unchanged GenerativeSettingsComponentOwnerTest ran all seven cases with zero skips/failures. PictureReadingProfileRepairTest ran all eleven cases with zero skips/failures. `git diff --check` passed. Independent verification and the test-intent acceptance record remain outside this builder assignment.
-
-## Bounded page display repair after 8922a1726a
-
-Saved On with complete chat files no longer claims On when the live, online runtime reports no projector. The sentence phrase and path step both say `Not available with this answer model`; both switches retain the saved choice and remain operable. Saved Off, unknown settings, offline Engine and not-yet-observed projector wording retain their existing behavior. Describing a custom model's companion file remains outside this assignment. The picture-entry and projector-configuration route tables above remain the route inventory; this repair changes neither Engine owner nor admission/configuration routes.
-
-| Page observation route | Owner, file:line | How the saved choice applies | Covering check |
-| --- | --- | --- | --- |
-| Live runtime projector observation | modules/ui-web/src/shell-v0/views/BrainSurface.ts:1481 | Existing live/online observation gate supplies mmproj; saved Off keeps Off wording, saved On with observed false gets model-unavailable wording | BrainSurface.picture-switch.test.ts: model-unavailability regression and six-case wording preservation matrix |
-| Sentence phrase / path step | modules/ui-web/src/shell-v0/views/BrainSurface.ts:1520; modules/ui-web/src/shell-v0/views/BrainSurface.ts:1643 | Both consume the same feature state; the switch retains the selected preference and can request Off | BrainSurface.picture-switch.test.ts: model-unavailability regression asserts both renderings, both switch states and the resulting Off request |
-
-No `.agents/preflight` executable exists. Every new assertion observes rendered production output or requests from a real rendered control; fixtures do not predetermine the expected display. The negative On literal exists in product code. Existing assertions were not weakened or deleted. The two evidence files were produced by the unmodified run-evidence.mjs in a private shared candidate clone. Its before-checkout adapter uses private shared clones, copied dependencies and independent build folders without writing source Git metadata. The initial evidence invocation completed checks but could not hash its fresh clone until the local LFS format key was configured in that clone only; the subsequent invocation succeeded.
-
-| Check | Observed result |
-| --- | --- |
-| `run-evidence.mjs --before 8922a1726a --copy-node-modules`, model-unavailability check | Exit 0: passes candidate; assertion-fails before because the page renders On instead of Not available with this answer model. |
-| `run-evidence.mjs`, complete picture-switch page file | Exit 0: 17/17 checks passed; evidence regenerated for the changed file digest. |
-| Private shared baseline clone, picture-switch file with only model-unavailability regression excluded by name | Exit 0: 16 preservation checks passed; the one excluded regression is not counted as a pass. |
-| `npm --prefix modules/ui-web run lint` | Exit 0. |
-| `npm --prefix modules/ui-web run test:unit:run -- --maxWorkers=4` | Exit 0: 699 files, 8,891 tests passed in 137.12s. |
-| `node scripts/ci/run-ui-web-gates.mjs` | Exit 0: 31/31 passed. |
-| `npm --prefix modules/ui-web run knip:report` | Exit 0: report generated; underlying Knip exit 1 for existing findings. |
-| `node scripts/governance/run.mjs --gate dead-code --mode gate` | Exit 0: pass, six findings. |
-| `npm --prefix modules/ui-web run typecheck` | Exit 2: only the four errors anticipated in the brief: TS6133 at authorizationReject.test.ts:6 and TS2352 at frameStatus.authorization.test.ts:30,50,78. No additional errors. |
-| `node scripts/governance/gates/test-intent/cli.mjs` | Exit 1: only test-intent/acceptance-missing. No acceptance record authored. |
-| `git diff --check` | Exit 0. |
-
-Shared resources touched: the assigned UI checkout's npm dependencies and lint/typecheck caches, and loopback ports belonging to the UI suite's test servers. Temporary checkouts have their own copied dependencies. No owner application, dev stack or GPU was used. No Gradle, fetch, rebase, commit or push was run. Independent verification and acceptance remain for the orchestrator.
