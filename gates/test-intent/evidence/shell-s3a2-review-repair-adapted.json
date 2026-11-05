@@ -1,0 +1,106 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-05T02:48:03.254Z",
+  "revision": "c42cb3591ca441526a9f6779c6ff95459d40168e",
+  "tree": "34adf430afc2823e57c66a0586ce77e4af3d66dd",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/StatusPanel.approvals.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/u635vwnv/tmp/test-intent-vitest-13743-1793846882165.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1087
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.approvals.test.ts#accept executes once and records acceptance; reject records rejection without applying",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.approvals.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a0b8526c8f7323387fd783dd9bd0152911503d10d1102f8d01479ce8352d7c91",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Needs you (moved from proposed-effect cards and agent activity) accept executes once and records acceptance; reject records rejection without applying",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.approvals.test.ts#HIGH/agent requires the exact typed operation and preserves consent provenance",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.approvals.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a0b8526c8f7323387fd783dd9bd0152911503d10d1102f8d01479ce8352d7c91",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Needs you (moved from proposed-effect cards and agent activity) HIGH/agent requires the exact typed operation and preserves consent provenance",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.approvals.test.ts#HIGH/user requires the exact typed operation and preserves consent provenance",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.approvals.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a0b8526c8f7323387fd783dd9bd0152911503d10d1102f8d01479ce8352d7c91",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Needs you (moved from proposed-effect cards and agent activity) HIGH/user requires the exact typed operation and preserves consent provenance",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.approvals.test.ts#MEDIUM/agent requires the exact typed operation and preserves consent provenance",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.approvals.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a0b8526c8f7323387fd783dd9bd0152911503d10d1102f8d01479ce8352d7c91",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Needs you (moved from proposed-effect cards and agent activity) MEDIUM/agent requires the exact typed operation and preserves consent provenance",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.approvals.test.ts#user MEDIUM proposal dispatches without a ceremony or client-minted confirmation token",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.approvals.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a0b8526c8f7323387fd783dd9bd0152911503d10d1102f8d01479ce8352d7c91",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Needs you (moved from proposed-effect cards and agent activity) user MEDIUM proposal dispatches without a ceremony or client-minted confirmation token",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:b907415872d5c83d34098cd29846eaed6ce20cfc390fe99fa6e81641b9119844"
+}

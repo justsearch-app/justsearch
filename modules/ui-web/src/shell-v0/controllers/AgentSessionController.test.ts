@@ -1984,6 +1984,24 @@ describe('private live tool approval display', () => {
     await expect(prompt.refresh!()).rejects.toThrow('offline');
   });
 
+  it('C6 a held call restored by the reattach snapshot is listed without an announcement; a live frame announces', async () => {
+    ctrl.sessionId = 'private-run';
+    const { callId: _ignored, ...gate } = detail;
+    globalThis.fetch = mockFetchLiveApprovals(ctrl, gate);
+    const presenter = vi.fn((_prompt: AuthorizationPrompt) => new Promise<{ approved: boolean; allowAlways: boolean }>(() => {}));
+    setAuthorizationPresenter(presenter);
+    // A reload or reconnect: the primer carries the call that was already waiting.
+    ctrl.onStateSnapshot({ iteration: 1, budgetRemaining: 1, toolCallsExecuted: 0, messageCount: 1, activeAgentId: 'primary',
+      pendingApprovals: [{ ...pending, callId: 'restored-call' }] });
+    await vi.waitFor(() => expect(presenter).toHaveBeenCalledTimes(1));
+    const restored = presenter.mock.calls[0]![0];
+    expect(restored).toMatchObject({ pendingId: 'restored-call', arrival: 'needs-you', live: false });
+    expect(restored.askedAt, 'when it was asked is unknown, never "just now"').toBeUndefined();
+    ctrl.onToolCallPending({ ...pending, callId: 'live-call' });
+    await vi.waitFor(() => expect(presenter).toHaveBeenCalledTimes(2));
+    expect(presenter.mock.calls[1]![0]).toMatchObject({ pendingId: 'live-call', arrival: 'needs-you', live: true });
+  });
+
   it.each([404, 500, 200, 0])('refuses unavailable or malformed live details (status %s) without raw fallback', async (status) => {
     ctrl.sessionId = 'private-run';
     const presenter = vi.fn(async () => ({ approved: true, allowAlways: false }));

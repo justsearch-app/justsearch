@@ -1080,7 +1080,8 @@ export class AgentSessionController implements CoreAgentRunHandlers {
     this.notify();
   }
 
-  private handleToolCallEntry(payload: unknown, status: 'proposed' | 'pending'): void {
+  /** `restored`: the call came from a (re)attach primer, not a live frame; it is listed, never announced (C6). */
+  private handleToolCallEntry(payload: unknown, status: 'proposed' | 'pending', restored = false): void {
     if (status === 'pending' && !this.replayMode && !this.isStreaming) return;
     const data = payload as Record<string, unknown>;
     const callId = data.callId as string;
@@ -1131,13 +1132,13 @@ export class AgentSessionController implements CoreAgentRunHandlers {
       }
     } else if (status === 'pending') {
       const owningRunId = (data.sessionId as string | undefined) ?? this.sessionId ?? undefined;
-      void this.requestLiveToolAuthorization(callId, owningRunId);
+      void this.requestLiveToolAuthorization(callId, owningRunId, restored);
     }
     this.notify();
   }
 
   /** Frozen display stays on the live server gate; replay frames only identify the call to read. */
-  private async requestLiveToolAuthorization(callId: string, owningRunId: string | undefined): Promise<void> {
+  private async requestLiveToolAuthorization(callId: string, owningRunId: string | undefined, restored = false): Promise<void> {
     const pendingCall = this.toolCalls[callId];
     const revision = this.approvalLookupRevision;
     const isCurrent = (): boolean => revision === this.approvalLookupRevision
@@ -1178,8 +1179,9 @@ export class AgentSessionController implements CoreAgentRunHandlers {
         ...fields(detail),
         allowAlwaysSupported: false,
         arrival: 'needs-you',
-        live: true,
-        askedAt: new Date().toISOString(),
+        // A held call restored by a reload or reconnect is not news, and its asking time is unknown.
+        live: !restored,
+        ...(restored ? {} : { askedAt: new Date().toISOString() }),
         refresh: async () => {
           const fresh = await readLive();
           return fresh && fields(fresh);
@@ -1656,6 +1658,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
         sessionId: this.sessionId ?? undefined,
       },
       'pending',
+      true,
     );
   }
 

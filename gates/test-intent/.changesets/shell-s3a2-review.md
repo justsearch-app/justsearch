@@ -18,6 +18,11 @@ Saved-state note: L9 adds one value, `WITHDRAWN`, to the existing string `dispos
 action-ledger gate rows. Nothing is migrated or rewritten; older readers show it as an unknown
 disposition. L11 adds no persisted state: the expiry answer is process-local, bounded like denials.
 
+Repair (after the independent check of c42cb3591c): an agent's request is allowed only on live
+details read for that press that still match, and a failed read sends nothing; every listed or
+reviewed Allow/Deny re-arms when the request under it changes; a restored in-app approval is not
+announced. Those checks fail on c42cb3591c and pass now.
+
 All added checks are durable. The reflective lookup of `ResourceApiModule.historyOutcome` in the
 Java check is fail-before compatibility scaffolding: on the baseline it reads the recorded outcome,
 which is what that route returned there. No independent acceptance is claimed by this builder.
@@ -32,7 +37,7 @@ which is what that route returned there. No independent acceptance is claimed by
         "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts"
       ],
       "class": "New",
-      "behaviour": "Agent requests arrive in Needs you without a dialog and are announced once (never on rediscovery); the panel review shows who asked and when, the question, consequence lines, the agent's reason marked as written by it, the deadline and its consequence; durable scope only where the backend keeps it; Allow this time / Deny and keys 1/2 answer once after arming and never in text fields, IME composition, key repeat, with modifiers or under another modal; fresh live details are read on review and unavailable details deny; a failed Deny keeps the request answerable; typed requests open the protected dialog from Review; panel, dialog and announcement execute once; a waiting run opens its request's review; the engine's pending check withdraws a gone outside request but never the agent in Search's run-owned request (its tool-call id is not a pending-store id).",
+      "behaviour": "Agent requests arrive in Needs you without a dialog and are announced once (never on rediscovery); the panel review shows who asked and when, the question, consequence lines, the agent's reason marked as written by it, the deadline and its consequence; durable scope only where the backend keeps it; Allow this time / Deny and keys 1/2 answer once after arming and never in text fields, IME composition, key repeat, with modifiers or under another modal; fresh live details are read on review; details that cannot be read never allow it, send nothing and leave it answerable (only the person's Deny denies it); a failed Deny keeps the request answerable; typed requests open the protected dialog from Review; panel, dialog and announcement execute once; a waiting run opens its request's review; the engine's pending check withdraws a gone outside request but never the agent in Search's run-owned request (its tool-call id is not a pending-store id).",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -71,6 +76,11 @@ which is what that route returned there. No independent acceptance is claimed by
           "kind": "owner-words",
           "quote": "Deny in the panel calls the reject endpoint as the dialog does; a failed Deny says the request could not be cancelled and keeps it answerable (as today).",
           "location": "task t-20261103-shell request (S3a2 builder brief, 2026-11-05)"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "deny here means \"never allow\"; do not send a reject for a fetch failure unless the person pressed Deny",
+          "location": "task t-20261103-shell request (S3a2 repair brief from the independent check of c42cb3591c, 2026-11-05)"
         }
       ],
       "repaired": true,
@@ -265,6 +275,125 @@ which is what that route returned there. No independent acceptance is claimed by
         }
       ],
       "evidence": "gates/test-intent/evidence/shell-s3a2-review-adapted.json"
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts",
+        "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "An agent's request is allowed only on live details read for that press that match what the person saw: an Allow pressed while the review's read is still out answers nothing (Allow shows as waiting); an Allow in the review, in the list or in the typed security dialog reads the details again, and a failed read, one that does not answer within 5 s, or different details refuse it with a plain message (different details are shown and re-arm), send no denial and leave the request answerable; the person's Deny still denies it. A held call of the agent in Search restored by a reload or reconnect (the attach snapshot) is listed but not announced, without an invented asking time; a live frame announces.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "no path executes Allow unless fresh live details for that pending id were fetched successfully after the review opened (or, for an Allow outside the review, as part of that press) and still match; if the fetch fails, times out or returns different details, the answer is refused with a plain \"details unavailable\" message and the request stays answerable",
+          "location": "task t-20261103-shell request (S3a2 repair brief from the independent check of c42cb3591c, 2026-11-05)"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "DE3",
+          "quote": "Agent/MCP requests are reviewed in the status panel: who, consequence lines, the agent's reason marked as written by the agent, deadline and what happens on timeout, Allow this time / Deny (keys 1/2), durable scope offered only where the backend allows it (never HIGH, never live agent approvals). Fresh live details are fetched; unavailable details deny.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "restoration never announces; only a live arrival announces, once.",
+          "location": "task t-20261103-shell request (S3a2 repair brief from the independent check of c42cb3591c, 2026-11-05)"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "They appear in Needs you (pill state needs-you with count, an assertive live announcement once per arrival, never for historical replay)",
+          "location": "task t-20261103-shell request (S3a2 builder brief, orchestrator decision 4 from the approved design, 2026-11-05)"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s3a2-review-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#an Allow pressed while the live details are still being read answers nothing; unavailable details send nothing and the request stays answerable",
+        "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#an Allow in the list reads the live details as part of the press: unavailable or different details are refused, matching ones allow",
+        "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#an Allow whose live details do not come in time is refused as unavailable",
+        "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts#a typed request's Approve in the security dialog reads the live details first",
+        "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#C6 a held call restored by the reattach snapshot is listed without an announcement; a live frame announces"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "In real Chromium, against the engine's pending-store route: an Allow pressed in the review while its live-details read is still out (it then answers 503) sends no approval, says the details are unavailable, and the request is still answered by Deny; the list Allow and the typed security dialog's Approve read the details as part of the press and send nothing when they answer 503 or differ, and one approval when they match. With two waiting requests, a native double-click on the first row's Allow approves only the first; a click where the second row's Allow moved under the pointer 100 ms later answers nothing, and a fresh click after the arming delay answers it once. The page harness gains a live-agent hook (its details read over HTTP, its approval sent over HTTP); the existing cases are unchanged.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "no path executes Allow unless fresh live details for that pending id were fetched successfully after the review opened (or, for an Allow outside the review, as part of that press) and still match; if the fetch fails, times out or returns different details, the answer is refused with a plain \"details unavailable\" message and the request stays answerable",
+          "location": "task t-20261103-shell request (S3a2 repair brief from the independent check of c42cb3591c, 2026-11-05)"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "DE3",
+          "quote": "Agent/MCP requests are reviewed in the status panel: who, consequence lines, the agent's reason marked as written by the agent, deadline and what happens on timeout, Allow this time / Deny (keys 1/2), durable scope offered only where the backend allows it (never HIGH, never live agent approvals). Fresh live details are fetched; unavailable details deny.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "a control whose row identity changed under the pointer (reflow, arrival, removal) ignores input until a fresh press after the arming delay; a native double-click, key auto-repeat or held Enter answers at most one request.",
+          "location": "task t-20261103-shell request (S3a2 repair brief from the independent check of c42cb3591c, 2026-11-05)"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "C12",
+          "quote": "One decision, one execution: the same authorization reached from the panel, a dialog and an MCP announcement executes once; repeated clicks are idempotent; expired, withdrawn or superseded requests cannot execute and leave the panel.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s3a2-review-repair-chromium.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#DE3 an Allow pressed while the review is still reading the live details sends nothing; unavailable details stay answerable",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#DE3 the list Allow reads the live details as part of the press: unavailable or different details allow nothing",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#DE3 a typed request's Approve in the security check reads the live details as part of the press",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#C12 a native double-click on the first row's Allow answers only the first request",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#C12 a click where the next row moved in answers nothing; a fresh click after the delay answers it once"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "In real Chromium, Enter held on the first of two waiting requests' list Allow (the platform's auto-repeat) answers at most one request and the second still waits. Preservation: passes before and after (the list now answers on the release of an unrepeated press).",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "a control whose row identity changed under the pointer (reflow, arrival, removal) ignores input until a fresh press after the arming delay; a native double-click, key auto-repeat or held Enter answers at most one request.",
+          "location": "task t-20261103-shell request (S3a2 repair brief from the independent check of c42cb3591c, 2026-11-05)"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s3a2-review-repair-preservation.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts#C12 Enter held on the first row's Allow answers at most one request"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/StatusPanel.approvals.test.ts"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "Each click on a suggestion's Allow suggestion or Reject now comes after the fake clock advances the 400 ms arming delay (a new arm() helper), because a listed answer ignores input until it has stood still that long. Kept oracle: accept executes once on a repeated click and records acceptance; reject records rejection without applying; HIGH and agent MEDIUM proposals need the exact typed operation and keep consent provenance; a user MEDIUM proposal dispatches without a ceremony or client-minted token.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "a control whose row identity changed under the pointer (reflow, arrival, removal) ignores input until a fresh press after the arming delay; a native double-click, key auto-repeat or held Enter answers at most one request.",
+          "location": "task t-20261103-shell request (S3a2 repair brief from the independent check of c42cb3591c, 2026-11-05)"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s3a2-review-repair-adapted.json"
     }
   ]
 }

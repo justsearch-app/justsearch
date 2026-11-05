@@ -42,6 +42,10 @@ function rowGlyph(row: StatusFact): string {
 
 const LINE_ICONS: Record<StatusReviewLine['icon'], string> = { target: '▸', risk: '⚠', undo: '↺', info: 'ⓘ' };
 
+/** The answers a list row or a review gives in place: each one is a decision control. */
+const DECISIONS: ReadonlySet<StatusAction['kind']> = new Set(['authorization-allow', 'authorization-deny', 'proposal', 'reject-proposal']);
+const decisionId = (action: StatusAction): string => `${action.kind}:${action.target}`;
+
 /** Keyed rows preserve disclosures, focus and scroll through live source updates. */
 export class StatusPanel extends JfElement {
   static override properties = {
@@ -60,6 +64,15 @@ export class StatusPanel extends JfElement {
   private answered: string | null = null;
   /** The pointer press a decision click must complete; it has to start after the review armed. */
   private press: { at: number; button: Element | null } | null = null;
+  /**
+   * C12 — where each decision control stands (which request it answers, and its box) and since when.
+   * A control that appeared, moved (a row above it left or arrived) or now answers another request
+   * re-arms: only a press that starts {@link ARMING_DELAY_MS} after that counts.
+   */
+  private readonly placed = new WeakMap<Element, { where: string; at: number }>();
+  /** The decision control's press: a pointer press or an unrepeated Enter/Space, after it armed. */
+  private controlPress: { at: number; control: Element | null } | null = null;
+  private keyPress: { key: string; control: Element } | null = null;
   declare model: FrameStatus | null;
   declare plugins: readonly StatusBarItem[];
   declare apiBase: string;
@@ -177,11 +190,63 @@ export class StatusPanel extends JfElement {
     this.focusSummary = !row || SECTION_NAMES[row.section] !== this.focusedRow.section;
   }
   protected override updated(): void {
+    this.placeControls();
     if (this.focusSummary) {
       this.focusSummary = false;
       this.shadowRoot?.querySelector<HTMLElement>('[role="dialog"]')?.focus({ preventScroll: true });
     }
   }
+  private static where(control: Element): string {
+    const box = control.getBoundingClientRect();
+    return `${control.getAttribute('data-decision')}@${[box.left, box.top, box.width, box.height].map(Math.round).join(',')}`;
+  }
+  /** Note every decision control that appeared, moved or changed request since it was last seen. */
+  placeControls(): void {
+    const now = performance.now();
+    for (const control of this.renderRoot.querySelectorAll('[data-decision]')) {
+      const where = StatusPanel.where(control);
+      if (this.placed.get(control)?.where !== where) this.placed.set(control, { where, at: now });
+    }
+  }
+  private controlArmed(control: Element, at = performance.now()): boolean {
+    const placed = this.placed.get(control);
+    return !!placed && at - placed.at >= ARMING_DELAY_MS;
+  }
+  private static decision(e: Event): HTMLElement | null {
+    return e.composedPath().find((node): node is HTMLElement => node instanceof HTMLElement && node.matches('[data-decision]')) ?? null;
+  }
+  /**
+   * One deliberate interaction answers one request, as in the security dialog: a pointer click on a
+   * decision control completes a press that started on that same control after it armed; the keyboard
+   * answers on the release of an armed, unrepeated Enter or Space (the native Enter-on-keydown, a held
+   * key's auto-repeat and a release whose press began elsewhere answer nothing). Other activations
+   * (assistive technology's default action) wait for the control to arm.
+   */
+  private readonly onDecisionPointerDown = (e: PointerEvent): void => {
+    this.placeControls();
+    this.controlPress = { at: performance.now(), control: StatusPanel.decision(e) };
+  };
+  private readonly onDecisionClick = (e: MouseEvent): void => {
+    const control = StatusPanel.decision(e);
+    if (!control) return;
+    this.placeControls();
+    const press = this.controlPress;
+    if (e.detail > 0) this.controlPress = null;
+    if (this.controlArmed(control) && (e.detail === 0 || (press?.control === control && this.controlArmed(control, press.at)))) return;
+    e.preventDefault();
+    e.stopPropagation();
+  };
+  private readonly onDecisionKey = (e: KeyboardEvent): void => {
+    const control = StatusPanel.decision(e);
+    if (!control || (e.key !== 'Enter' && e.key !== ' ')) return;
+    e.preventDefault();
+    const pending = this.keyPress;
+    this.keyPress = null;
+    if (e.type === 'keydown') {
+      this.placeControls();
+      if (!e.repeat && this.controlArmed(control)) this.keyPress = { key: e.key, control };
+    } else if (pending?.key === e.key && pending.control === control && this.controlArmed(control)) control.click();
+  };
   private pluginOutput(item: StatusBarItem): HTMLElement | string {
     if (!this.pluginOutputs.has(item)) this.pluginOutputs.set(item, item.render());
     return this.pluginOutputs.get(item)!;
@@ -213,7 +278,7 @@ export class StatusPanel extends JfElement {
   }
   /** Answer the open review once: never before it arms, while busy, or (Allow) when it cannot be allowed. */
   private answer(review: StatusReview, allow: boolean): void {
-    if (!this.armed(review) || review.busy || review.typed || (allow && review.unavailable)) return;
+    if (!this.armed(review) || review.busy || review.typed || (allow && review.checking)) return;
     this.answered = this.reviewing;
     this.action(allow ? this.always && review.allowAlways ? review.allowAlways : review.allow : review.deny);
   }
@@ -262,7 +327,7 @@ export class StatusPanel extends JfElement {
         .allowPause=${row.section === 'running'} api-base=${this.apiBase}></jf-indexing-controls>` : nothing}
       <div class="actions">
         ${(row.actions ?? []).map(action => html`<button type="button" class=${action.kind === 'authorization-allow' ? 'primary' : nothing}
-          @click=${() => this.action(action, row)}>${action.label}</button>`)}
+          data-decision=${DECISIONS.has(action.kind) ? decisionId(action) : nothing} @click=${() => this.action(action, row)}>${action.label}</button>`)}
         ${row.section === 'earlier' || row.details?.length ? html`<button type="button" aria-expanded=${expanded}
           @click=${() => this.toggle(row)}>${expanded ? 'Hide details' : 'Details'}</button>` : nothing}
       </div>
@@ -285,7 +350,7 @@ export class StatusPanel extends JfElement {
   }
   /** ref-10 — who asked, the question, consequences, its own words, the deadline, and the answers. */
   private renderReview(row: StatusFact, review: StatusReview): TemplateResult {
-    const disabled = (allow: boolean) => review.busy || (allow && review.unavailable);
+    const disabled = (allow: boolean) => review.busy || (allow && review.checking);
     const decide = (allow: boolean) => (e: MouseEvent) => { if (this.deliberate(e, review)) this.answer(review, allow); };
     return html`<div class="review" data-testid="status-review" data-fact=${row.id} @keydown=${this.onReviewKey}
       @pointerdown=${{ handleEvent: this.onReviewPointerDown, capture: true }}>
@@ -307,9 +372,9 @@ export class StatusPanel extends JfElement {
       ${review.typed ? html`<div class="actions"><button type="button" class="primary"
           @click=${() => this.action({ kind: 'authorization', target: review.allow.target, label: 'Review' })}>Continue in the security check</button></div>`
         : html`<div class="decide">
-        <button type="button" class="allow" data-answer="allow" aria-keyshortcuts="1" aria-disabled=${disabled(true) ? 'true' : 'false'}
+        <button type="button" class="allow" data-answer="allow" data-decision=${decisionId(review.allow)} aria-keyshortcuts="1" aria-disabled=${disabled(true) ? 'true' : 'false'}
           @click=${decide(true)}>${review.allow.label}<kbd aria-hidden="true">1</kbd></button>
-        <button type="button" class="deny" data-answer="deny" aria-keyshortcuts="2" aria-disabled=${disabled(false) ? 'true' : 'false'}
+        <button type="button" class="deny" data-answer="deny" data-decision=${decisionId(review.deny)} aria-keyshortcuts="2" aria-disabled=${disabled(false) ? 'true' : 'false'}
           @click=${decide(false)}>${review.deny.label}<kbd aria-hidden="true">2</kbd></button></div>
       <p class="keys" aria-hidden="true"><span><kbd>1</kbd> allow</span><span><kbd>2</kbd> deny</span><span><kbd>Esc</kbd> back, still waiting</span></p>`}
     </div>`;
@@ -320,11 +385,16 @@ export class StatusPanel extends JfElement {
     const model = this.model;
     const reviewed = this.reviewed();
     if (reviewed?.review) {
-      return html`<div class="panel" data-testid="status-panel" role="dialog" aria-label="What's going on" tabindex="-1">
+      return html`<div class="panel" data-testid="status-panel" role="dialog" aria-label="What's going on" tabindex="-1"
+        @pointerdown=${{ handleEvent: this.onDecisionPointerDown, capture: true }} @click=${{ handleEvent: this.onDecisionClick, capture: true }}
+        @keydown=${{ handleEvent: this.onDecisionKey, capture: true }} @keyup=${{ handleEvent: this.onDecisionKey, capture: true }}
+        @scroll=${() => this.placeControls()}>
         ${this.renderReview(reviewed, reviewed.review)}</div>`;
     }
     return html`<div class="panel" data-testid="status-panel" role="dialog" aria-label="What's going on" tabindex="-1"
-      @focusin=${(event: FocusEvent) => {
+      @pointerdown=${{ handleEvent: this.onDecisionPointerDown, capture: true }} @click=${{ handleEvent: this.onDecisionClick, capture: true }}
+      @keydown=${{ handleEvent: this.onDecisionKey, capture: true }} @keyup=${{ handleEvent: this.onDecisionKey, capture: true }}
+      @scroll=${() => this.placeControls()} @focusin=${(event: FocusEvent) => {
         const row = event.composedPath().find(node => node instanceof HTMLElement && node.matches('article')) as HTMLElement | undefined;
         this.focusedRow = row ? { id: row.getAttribute('data-fact'), section: row.closest('section')?.getAttribute('aria-label') ?? null } : null;
       }} @focusout=${(event: FocusEvent) => {

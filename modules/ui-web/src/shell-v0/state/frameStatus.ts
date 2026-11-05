@@ -52,7 +52,8 @@ export interface StatusReview {
   /** Why "always allow" is not offered; absent when it is offered (then `allowAlways` is set). */
   readonly askedEveryTime?: string;
   readonly typed: boolean;
-  readonly unavailable: boolean;
+  /** Its live details are being read: Allow waits for them (DE3). */
+  readonly checking: boolean;
   readonly busy: boolean;
   readonly error?: string;
   /** `performance.now()` time after which an answer counts (arming). */
@@ -94,7 +95,7 @@ interface PendingStatusAuthorization {
   readonly gateBehavior?: string; readonly riskTier?: string; readonly undoSupported?: boolean;
   readonly arrival?: 'needs-you'; readonly askedAt?: string; readonly owningRunId?: string;
   /** The waiting request's answer state, owned by the authorization host. */
-  readonly state?: { readonly busy: boolean; readonly error?: string; readonly unavailable: boolean;
+  readonly state?: { readonly busy: boolean; readonly checking: boolean; readonly error?: string;
     readonly readyAt: number; readonly durable: boolean } | null;
 }
 export interface DurableStatusOperation {
@@ -195,7 +196,7 @@ function authorizationReview(request: PendingStatusAuthorization, label: string,
       : { askedEveryTime: request.riskTier === 'HIGH' ? `“${label}” is asked every time; it can't be allowed permanently.`
         : appAgent ? 'The agent in Search asks every time; its requests can\'t be allowed permanently.'
           : 'This request is asked every time.' }),
-    typed, unavailable: state?.unavailable ?? false, busy: state?.busy ?? false,
+    typed, checking: state?.checking ?? false, busy: state?.busy ?? false,
     ...(state?.error ? { error: state.error } : {}), readyAt: state?.readyAt ?? 0,
     allow: { kind: 'authorization-allow', target: request.pendingId, label: 'Allow this time' },
     deny: { kind: 'authorization-deny', target: request.pendingId, label: 'Deny' },
@@ -362,7 +363,7 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
       lines: p.confidence == null ? [] : [{ icon: 'info', text: `${who === 'You' ? 'Confidence' : 'The agent rates its confidence'}: ${Math.round(p.confidence * 100)}%` }],
       ...(p.rationale ? { reason: p.rationale, reasonBy: who === 'The agent' ? 'the agent' : who } : {}),
       timeout: 'No deadline: it waits until you answer', askedEveryTime: 'Suggestions are asked every time.',
-      typed: false, unavailable: false, busy: false, readyAt: 0,
+      typed: false, checking: false, busy: false, readyAt: 0,
       allow: { ...allow, label: 'Allow this time' }, deny: { ...reject, label: 'Deny' },
     };
     add({ id: `proposal:${p.id}`, section: 'needs',

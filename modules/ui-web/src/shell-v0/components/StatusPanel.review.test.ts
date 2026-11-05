@@ -53,11 +53,22 @@ function key(target: EventTarget, init: KeyboardEventInit) {
 }
 function agent(id: string, extra: Partial<AuthorizationPrompt> = {}) {
   const reject = vi.fn(async () => {});
+  // The engine still holds it with the same details unless a case says otherwise.
+  const live = async () => ({ operationId: prompt.operationId, argsSummary: prompt.argsSummary });
   const prompt: AuthorizationPrompt = { pendingId: id, operationId: 'core.ingest-files', gateBehavior: 'INLINE_CONFIRM',
     riskTier: 'MEDIUM', argsSummary: '/home/me/Downloads', requestedBy: 'Claude Desktop', arrival: 'needs-you', live: true,
-    askedAt: new Date(Date.now() - 60_000).toISOString(), expiresAt: new Date(Date.now() + 4 * 60_000).toISOString(), reject, ...extra };
+    askedAt: new Date(Date.now() - 60_000).toISOString(), expiresAt: new Date(Date.now() + 4 * 60_000).toISOString(), reject,
+    refresh: live, ...extra };
   return { decision: requestAuthorization(prompt), reject, prompt };
 }
+/** A live-details read the case resolves or fails itself. */
+function deferred<T>() {
+  let resolve!: (value: T) => void; let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej; });
+  return { promise, resolve, reject };
+}
+const UNAVAILABLE = 'Its current details are unavailable, so it can’t be allowed right now. Try again, or deny it.';
+const settled = async (decision: Promise<unknown>) => Promise.race([decision.then(() => 'answered'), flush().then(() => 'waiting')]);
 async function openPanel() { pill.open = true; await flush(); }
 async function openReview(id: string) {
   await openPanel();
@@ -215,23 +226,77 @@ describe('DE3 fresh live details', () => {
     expect(root().querySelector('[role="status"]')!.textContent).toBe('The request you were reviewing is no longer waiting.');
   });
 
-  it('unavailable live details deny the request', async () => {
-    const { decision, reject } = agent('unavailable', { refresh: async () => { throw new TypeError('offline'); } }); await flush();
-    await openReview('authorization:unavailable');
-    expect(reject).toHaveBeenCalledTimes(1);
+  it('an Allow pressed while the live details are still being read answers nothing; unavailable details send nothing and the request stays answerable', async () => {
+    const read = deferred<null>();
+    const refresh = vi.fn(() => read.promise);
+    const { decision, reject } = agent('unavailable', { refresh }); await flush();
+    await openReview('authorization:unavailable'); await arm();
+    expect(answer('allow').getAttribute('aria-disabled'), 'Allow waits for the details').toBe('true');
+    press(answer('allow')); key(review()!, { key: '1' }); await flush();
+    expect(await settled(decision), 'nothing is allowed on details not read yet').toBe('waiting');
+    expect(refresh).toHaveBeenCalledTimes(1);
+    read.reject(new TypeError('HTTP 503')); await flush();
+    expect(review()!.querySelector('[role="alert"]')!.textContent).toBe(UNAVAILABLE);
+    expect(reject, 'unreadable details are not a denial: nothing is sent').not.toHaveBeenCalled();
+    expect(await settled(decision)).toBe('waiting');
+    expect(answer('allow').getAttribute('aria-disabled'), 'still answerable').toBe('false');
+    refresh.mockRejectedValueOnce(new TypeError('HTTP 503'));
+    press(answer('allow')); await flush();
+    expect(refresh, 'the press reads the details again').toHaveBeenCalledTimes(2);
+    expect(await settled(decision), 'and refuses while they stay unavailable').toBe('waiting');
+    press(answer('deny')); await flush();
+    expect(reject, 'the person denied it').toHaveBeenCalledTimes(1);
     await expect(decision).resolves.toEqual({ approved: false, allowAlways: false });
   });
 
-  it('when the denial of unreadable details cannot be sent, the request stays and can only be denied', async () => {
-    const { decision, reject } = agent('stuck', { refresh: async () => { throw new TypeError('offline'); } });
-    reject.mockRejectedValueOnce(new Error('offline')); await flush();
-    await openReview('authorization:stuck');
-    expect(review()!.querySelector('[role="alert"]')!.textContent).toBe('The request could not be cancelled. Try again.');
-    expect(answer('allow').getAttribute('aria-disabled')).toBe('true');
-    await arm(); press(answer('allow')); await flush();
-    expect(host.statusRequests()).toHaveLength(1);
-    press(answer('deny')); await flush();
-    await expect(decision).resolves.toEqual({ approved: false, allowAlways: false });
+  it('an Allow in the list reads the live details as part of the press: unavailable or different details are refused, matching ones allow', async () => {
+    const refresh = vi.fn(async (): Promise<Partial<AuthorizationPrompt> | null> => ({ argsSummary: '/home/me/Downloads' }));
+    const { decision } = agent('listed', { refresh }); await openPanel(); await arm();
+    refresh.mockRejectedValueOnce(new TypeError('HTTP 503'));
+    rowButton('authorization:listed', 'Allow').click(); await flush();
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(await settled(decision)).toBe('waiting');
+    expect(row('authorization:listed')!.querySelector('[role="alert"]')!.textContent).toBe(UNAVAILABLE);
+    refresh.mockResolvedValueOnce({ argsSummary: '/home/me' });
+    rowButton('authorization:listed', 'Allow').click(); await flush();
+    expect(await settled(decision), 'different details are not what the person allowed').toBe('waiting');
+    expect(row('authorization:listed')!.querySelector('[role="alert"]')!.textContent).toBe('Its details changed, so it was not allowed. Check them and answer again.');
+    expect(row('authorization:listed')!.querySelector('.detail')!.textContent, 'the current details are shown').toBe('/home/me');
+    refresh.mockResolvedValue({ argsSummary: '/home/me' });
+    rowButton('authorization:listed', 'Allow').click(); await flush();
+    expect(await settled(decision), 'the changed request re-arms before it can be allowed').toBe('waiting');
+    await arm(); rowButton('authorization:listed', 'Allow').click(); await flush();
+    await expect(decision).resolves.toEqual({ approved: true, allowAlways: false });
+  });
+
+  it('an Allow whose live details do not come in time is refused as unavailable', async () => {
+    vi.useFakeTimers({ toFake: ['performance', 'setTimeout', 'clearTimeout'] });
+    const { decision, reject } = agent('slow', { refresh: () => new Promise(() => {}) }); await openPanel(); await arm();
+    rowButton('authorization:slow', 'Allow').click(); await flush();
+    vi.advanceTimersByTime(5_000); await flush();
+    expect(await settled(decision)).toBe('waiting');
+    expect(row('authorization:slow')?.querySelector('[role="alert"]')?.textContent).toBe(UNAVAILABLE);
+    expect(reject).not.toHaveBeenCalled();
+  });
+
+  it("a typed request's Approve in the security dialog reads the live details first", async () => {
+    const refresh = vi.fn(async (): Promise<Partial<AuthorizationPrompt> | null> => { throw new TypeError('HTTP 503'); });
+    const { decision } = agent('typed-live', { gateBehavior: 'TYPED_CONFIRM', riskTier: 'HIGH', refresh }); await openPanel();
+    rowButton('authorization:typed-live', 'Review').click(); await flush();
+    const input = host.shadowRoot!.querySelector<HTMLInputElement>('[data-testid="authorization-typed-input"]')!;
+    input.value = 'core.ingest-files'; input.dispatchEvent(new Event('input')); await flush();
+    const approve = async () => {
+      const control = host.shadowRoot!.querySelector('[data-testid="authorization-approve"]')!.shadowRoot!.querySelector('jf-control')!;
+      await (control as HTMLElement & { updateComplete: Promise<unknown> }).updateComplete;
+      vi.advanceTimersByTime(400); control.shadowRoot!.querySelector<HTMLButtonElement>('button')!.click(); await flush();
+    };
+    await approve();
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(await settled(decision)).toBe('waiting');
+    expect(host.shadowRoot!.querySelector('dialog [role="alert"]')!.textContent).toBe(UNAVAILABLE);
+    refresh.mockResolvedValueOnce({ operationId: 'core.ingest-files' });
+    await approve();
+    await expect(decision).resolves.toEqual({ approved: true, allowAlways: false });
   });
 });
 

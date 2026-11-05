@@ -22,6 +22,7 @@ declare global {
     consentState(): ConsentState;
     requestApproval(id: string, typed: boolean): void;
     requestAgent(id: string, typed: boolean): void;
+    requestLiveAgent(id: string, typed: boolean): void;
     answers: Record<string, boolean>;
   }
 }
@@ -65,6 +66,20 @@ beforeAll(async () => {
               void requestAuthorization({ pendingId: id, operationId: 'core.' + id, gateBehavior: typed ? 'TYPED_CONFIRM' : 'INLINE_CONFIRM',
                 riskTier: typed ? 'HIGH' : 'MEDIUM', requestedBy: 'Claude Desktop', arrival: 'needs-you', live: true })
                 .then(decision => { window.answers[id] = decision.approved; });
+            };
+            // An outside agent's request as the pending bridge presents it: its live details are read
+            // from the engine's pending store, and an approval is sent over HTTP.
+            window.requestLiveAgent = (id, typed) => {
+              void requestAuthorization({ pendingId: id, operationId: 'core.' + id, gateBehavior: typed ? 'TYPED_CONFIRM' : 'INLINE_CONFIRM',
+                riskTier: typed ? 'HIGH' : 'MEDIUM', requestedBy: 'Claude Desktop', argsSummary: '/home/me/' + id,
+                arrival: 'needs-you', live: true,
+                refresh: async () => {
+                  const fresh = await client.peekPending(id);
+                  return fresh && { operationId: fresh.operationId, gateBehavior: fresh.gateBehavior, riskTier: fresh.riskTier,
+                    argsSummary: fresh.argsSummary };
+                } })
+                .then(decision => { window.answers[id] = decision.approved;
+                  return decision.approved ? client.approveByPendingId(id, decision.allowAlways) : null; });
             };
             window.consentState = () => ({
               granted: Object.fromEntries(['first', 'second'].map(id => [id, checkCapability('plugin.' + id, 'fs.read') ?? null])),
@@ -408,3 +423,152 @@ it.each(looks)('X1/X2 the panel review in %s at %s×%s fits without sideways ove
   expect(fits).toEqual({ page: true, panel: true, inside: true });
   if (process.env.REVIEW_SHOTS) await page.screenshot({ path: path.join(process.env.REVIEW_SHOTS, `review-${look}-${width}x${height}.png`) });
 }, 30_000);
+
+/** How the engine's pending store answers a live-details read: its details, a failure, or a slow failure. */
+type Pending = 'same' | 'changed' | 503 | 'slow-503';
+async function pendingStore(page: Page, answers: Record<string, Pending>): Promise<string[]> {
+  const reads: string[] = [];
+  await page.route('**/api/authorizations/pending/*', async route => {
+    const id = decodeURIComponent(new URL(route.request().url()).pathname.split('/').pop()!);
+    reads.push(id);
+    const answer = answers[id] ?? 'same';
+    if (answer === 'slow-503') await new Promise(resolve => setTimeout(resolve, 1_500));
+    if (answer === 503 || answer === 'slow-503') return route.fulfill({ status: 503, json: {} });
+    const typed = id.startsWith('typed');
+    return route.fulfill({ json: { pendingId: id, operationId: 'core.' + id, gateBehavior: typed ? 'TYPED_CONFIRM' : 'INLINE_CONFIRM',
+      riskTier: typed ? 'HIGH' : 'MEDIUM', argsSummary: answer === 'changed' ? '/home/me' : '/home/me/' + id } });
+  });
+  return reads;
+}
+const panelRow = (page: Page, id: string) => page.locator(`jf-status-pill jf-status-panel article[data-fact="authorization:${id}"]`);
+async function openList(page: Page): Promise<void> {
+  await page.locator('jf-status-pill .trigger').click();
+  await page.locator('jf-status-pill jf-status-panel article[data-fact^="authorization:"]').first().waitFor();
+}
+
+it('DE3 an Allow pressed while the review is still reading the live details sends nothing; unavailable details stay answerable', async () => {
+  const page = await opened();
+  const sent = await approvals(page);
+  const answers: Record<string, Pending> = { pick: 'slow-503' };
+  const reads = await pendingStore(page, answers);
+  await page.evaluate(() => window.requestLiveAgent('pick', false));
+  await openList(page);
+  await panelRow(page, 'pick').getByRole('button', { name: 'Review' }).click();
+  const review = page.locator('jf-status-pill jf-status-panel [data-testid="status-review"]');
+  await review.waitFor();
+  await page.waitForTimeout(600);
+  // Armed, but the details read on opening have not come back yet.
+  await review.locator('[data-answer="allow"]').click();
+  await expect.poll(() => reads.length).toBeGreaterThanOrEqual(1);
+  await page.waitForTimeout(1_800);
+  expect(sent, 'an Allow before the details came back sends nothing').toEqual([]);
+  expect(await review.getByRole('alert').textContent()).toContain('details are unavailable');
+  answers.pick = 503;
+  const before = reads.length;
+  await review.locator('[data-answer="allow"]').click();
+  await expect.poll(() => reads.length, { message: 'the press reads the details again' }).toBeGreaterThan(before);
+  await page.waitForTimeout(300);
+  expect(sent, 'nothing is allowed on details that were not read').toEqual([]);
+  expect(await page.evaluate(() => window.answers)).toEqual({});
+  await page.waitForTimeout(450);
+  await review.locator('[data-answer="deny"]').click();
+  await expect.poll(() => page.evaluate(() => window.answers)).toEqual({ pick: false });
+  expect(sent).toEqual([]);
+}, 30_000);
+
+it('DE3 the list Allow reads the live details as part of the press: unavailable or different details allow nothing', async () => {
+  const page = await opened();
+  const sent = await approvals(page);
+  const answers: Record<string, Pending> = { listed: 503 };
+  await pendingStore(page, answers);
+  await page.evaluate(() => window.requestLiveAgent('listed', false));
+  await openList(page);
+  await page.waitForTimeout(600);
+  const allow = panelRow(page, 'listed').getByRole('button', { name: 'Allow', exact: true });
+  await allow.click();
+  await page.waitForTimeout(300);
+  expect(sent, 'unavailable details allow nothing').toEqual([]);
+  expect(await panelRow(page, 'listed').getByRole('alert').textContent()).toContain('details are unavailable');
+  answers.listed = 'changed';
+  await page.waitForTimeout(450);
+  await allow.click();
+  await expect.poll(() => panelRow(page, 'listed').getByRole('alert').textContent()).toContain('details changed');
+  expect(await panelRow(page, 'listed').locator('.detail').first().textContent(), 'the current details are shown').toBe('/home/me');
+  expect(sent).toEqual([]);
+  await page.waitForTimeout(450);
+  await allow.click();
+  await expect.poll(() => sent.map(body => body.pendingId)).toEqual(['listed']);
+}, 30_000);
+
+it("DE3 a typed request's Approve in the security check reads the live details as part of the press", async () => {
+  const page = await opened();
+  const sent = await approvals(page);
+  const answers: Record<string, Pending> = { 'typed-check': 503 };
+  await pendingStore(page, answers);
+  await page.evaluate(() => window.requestLiveAgent('typed-check', true));
+  await openList(page);
+  await panelRow(page, 'typed-check').getByRole('button', { name: 'Review' }).click();
+  const dialog = page.locator('jf-authorization-host dialog');
+  await expect.poll(() => dialog.evaluate(d => (d as HTMLDialogElement).open)).toBe(true);
+  await page.waitForTimeout(450);
+  await page.getByTestId('authorization-typed-input').fill('core.typed-check');
+  await page.getByTestId('authorization-approve').click();
+  await page.waitForTimeout(300);
+  expect(sent, 'the security check allows nothing on unavailable details').toEqual([]);
+  expect(await dialog.getByRole('alert').textContent()).toContain('details are unavailable');
+  answers['typed-check'] = 'same';
+  await page.getByTestId('authorization-approve').click();
+  await expect.poll(() => sent.map(body => body.pendingId)).toEqual(['typed-check']);
+}, 30_000);
+
+/** Two waiting agent requests, listed one above the other, armed. */
+async function twoListed(): Promise<{ page: Page; sent: Array<{ pendingId: string; allowAlways: boolean }> }> {
+  const page = await opened();
+  const sent = await approvals(page);
+  await pendingStore(page, {});
+  await page.evaluate(() => { window.requestLiveAgent('first', false); window.requestLiveAgent('second', false); });
+  await openList(page);
+  await panelRow(page, 'second').waitFor();
+  await page.waitForTimeout(600);
+  return { page, sent };
+}
+
+it("C12 a native double-click on the first row's Allow answers only the first request", async () => {
+  const { page, sent } = await twoListed();
+  await panelRow(page, 'first').getByRole('button', { name: 'Allow', exact: true }).dblclick();
+  await page.waitForTimeout(700);
+  expect(sent.map(body => body.pendingId)).toEqual(['first']);
+  expect(await page.evaluate(() => window.answers)).toEqual({ first: true });
+  expect(await panelRow(page, 'second').count(), 'the second request still waits').toBe(1);
+});
+
+it('C12 a click where the next row moved in answers nothing; a fresh click after the delay answers it once', async () => {
+  const { page, sent } = await twoListed();
+  const box = (await panelRow(page, 'first').getByRole('button', { name: 'Allow', exact: true }).boundingBox())!;
+  const at = [box.x + box.width / 2, box.y + box.height / 2] as const;
+  await page.mouse.click(...at);
+  await expect.poll(() => panelRow(page, 'first').count()).toBe(0);
+  const moved = (await panelRow(page, 'second').getByRole('button', { name: 'Allow', exact: true }).boundingBox())!;
+  expect(Math.abs(moved.y - box.y), "the second row's Allow is now under the pointer").toBeLessThan(2);
+  await page.waitForTimeout(100);
+  await page.mouse.click(...at);
+  await page.waitForTimeout(300);
+  expect(sent.map(body => body.pendingId)).toEqual(['first']);
+  await page.waitForTimeout(450);
+  await page.mouse.click(...at);
+  await expect.poll(() => sent.map(body => body.pendingId)).toEqual(['first', 'second']);
+});
+
+it("C12 Enter held on the first row's Allow answers at most one request", async () => {
+  const { page, sent } = await twoListed();
+  await panelRow(page, 'first').getByRole('button', { name: 'Allow', exact: true }).focus();
+  await page.keyboard.down('Enter');
+  for (let i = 0; i < 16; ++i) {
+    await page.waitForTimeout(50);
+    await page.keyboard.down('Enter');
+  }
+  await page.keyboard.up('Enter');
+  await page.waitForTimeout(600);
+  expect(sent.length).toBeLessThanOrEqual(1);
+  expect(await panelRow(page, 'second').count(), 'the second request still waits').toBe(1);
+});

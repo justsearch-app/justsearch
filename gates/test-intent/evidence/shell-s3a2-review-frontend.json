@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-05T01:37:35.408Z",
-  "revision": "5ce766ca8b318df99e67596446a7ea8d51ec467b",
-  "tree": "ac8edaa9ce741b7d563f3945aa69c5e7ca07fa7f",
+  "createdAt": "2026-11-05T02:44:10.792Z",
+  "revision": "c42cb3591ca441526a9f6779c6ff95459d40168e",
+  "tree": "970b798e9622d9f35fa634217ae099cdd61e13b6",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/StatusPanel.review.test.ts\" \"src/shell-v0/state/frameStatus.authorization.test.ts\" \"src/shell-v0/operations/pendingAuthorizationBridge.test.ts\" \"src/shell-v0/controllers/AgentSessionController.test.ts\" \"src/shell-v0/components/StatusPill.feedback.test.ts\" \"src/shell-v0/components/StatusPill.transitions.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-1405331-1793842644346.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/StatusPanel.review.test.ts\" \"src/shell-v0/state/frameStatus.authorization.test.ts\" \"src/shell-v0/operations/pendingAuthorizationBridge.test.ts\" \"src/shell-v0/controllers/AgentSessionController.test.ts\" \"src/shell-v0/components/StatusPill.feedback.test.ts\" \"src/shell-v0/components/StatusPill.transitions.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/u635vwnv/tmp/test-intent-vitest-11700-1793846644430.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 4217
+      "durationMs": 2362
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts",
       "file": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:47c6d4f77c56a6cc6ff2dc5ee4c4593f6e678a2999240e39b8ec5469fb13baf4",
+      "contentDigest": "sha256:92b94540253f15d1874db1d4bf38ecab4d02474314b95a1aac8636eb2034988c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -87,11 +87,19 @@
           "status": "passed"
         },
         {
-          "name": "DE3 fresh live details unavailable live details deny the request",
+          "name": "DE3 fresh live details an Allow pressed while the live details are still being read answers nothing; unavailable details send nothing and the request stays answerable",
           "status": "passed"
         },
         {
-          "name": "DE3 fresh live details when the denial of unreadable details cannot be sent, the request stays and can only be denied",
+          "name": "DE3 fresh live details an Allow in the list reads the live details as part of the press: unavailable or different details are refused, matching ones allow",
+          "status": "passed"
+        },
+        {
+          "name": "DE3 fresh live details an Allow whose live details do not come in time is refused as unavailable",
+          "status": "passed"
+        },
+        {
+          "name": "DE3 fresh live details a typed request's Approve in the security dialog reads the live details first",
           "status": "passed"
         },
         {
@@ -292,7 +300,7 @@
       "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#DE3 the agent request waits in Needs you; its review reads the live gate again",
       "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:91a7c24b1fd063293d711e0ba05321880d0356c63cdb021f1173faf8ffce523c",
+      "contentDigest": "sha256:a40ccd4d499e6f686d8a04b1274170800b4cd9ce3883d0d52d534aab85caab24",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -341,28 +349,28 @@
     "patches": [],
     "runs": [
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/StatusPanel.review.test.ts\" \"src/shell-v0/state/frameStatus.authorization.test.ts\" \"src/shell-v0/operations/pendingAuthorizationBridge.test.ts\" \"src/shell-v0/controllers/AgentSessionController.test.ts\" \"src/shell-v0/components/StatusPill.feedback.test.ts\" \"src/shell-v0/components/StatusPill.transitions.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-1405331-1793842650946.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/StatusPanel.review.test.ts\" \"src/shell-v0/state/frameStatus.authorization.test.ts\" \"src/shell-v0/operations/pendingAuthorizationBridge.test.ts\" \"src/shell-v0/controllers/AgentSessionController.test.ts\" \"src/shell-v0/components/StatusPill.feedback.test.ts\" \"src/shell-v0/components/StatusPill.transitions.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/u635vwnv/tmp/test-intent-vitest-11700-1793846648260.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 4223,
-        "output": "JSON report written to /tmp/test-intent-vitest-1405331-1793842650946.json\n\n"
+        "durationMs": 2265,
+        "output": "JSON report written to /home/elias/.cache/am/u635vwnv/tmp/test-intent-vitest-11700-1793846648260.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts",
         "classification": "assertion",
-        "detail": "DE3 arrival: Needs you, no dialog, one announcement an agent request lists in Needs you with Allow, Deny and Review, opens no dialog and is announced once:  AssertionError: no dialog on arrival: expected true to be false // Object.is equality\n    at /tmp/test-intent-before-5UTG1Z/modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts:85:49\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///home/elias/dev | DE3 arrival: Needs you, no dialog, one a"
+        "detail": "DE3 arrival: Needs you, no dialog, one announcement an agent request lists in Needs you with Allow, Deny and Review, opens no dialog and is announced once:  AssertionError: no dialog on arrival: expected true to be false // Object.is equality\n    at /home/elias/.cache/am/u635vwnv/tmp/test-intent-before-rlewEE/modules/ui-web/src/shell-v0/components/StatusPanel.review.test.ts:96:49\n    at processTicksAndRejections (node:internal/process/task_queues:104:5) | DE3 arrival: Needs you, no dialog, one a"
       },
       {
         "id": "modules/ui-web/src/shell-v0/state/frameStatus.authorization.test.ts#L9 a same-key copy withdrawn by a APPROVED answer adds no Earlier row: one row per decision",
         "classification": "assertion",
-        "detail": "L9 a same-key copy withdrawn by a APPROVED answer adds no Earlier row: one row per decision:  AssertionError: expected [ 'activity:answer', …(1) ] to deeply equal [ 'activity:answer' ]\n    at /tmp/test-intent-before-5UTG1Z/modules/ui-web/src/shell-v0/state/frameStatus.authorization.test.ts:105:55\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s3a2/modules/ui-web/node_module"
+        "detail": "L9 a same-key copy withdrawn by a APPROVED answer adds no Earlier row: one row per decision:  AssertionError: expected [ 'activity:answer', …(1) ] to deeply equal [ 'activity:answer' ]\n    at /home/elias/.cache/am/u635vwnv/tmp/test-intent-before-rlewEE/modules/ui-web/src/shell-v0/state/frameStatus.authorization.test.ts:105:55\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s"
       },
       {
         "id": "modules/ui-web/src/shell-v0/state/frameStatus.authorization.test.ts#L9 a same-key copy withdrawn by a DENIED answer adds no Earlier row: one row per decision",
         "classification": "assertion",
-        "detail": "L9 a same-key copy withdrawn by a DENIED answer adds no Earlier row: one row per decision:  AssertionError: expected [ 'activity:answer', …(1) ] to deeply equal [ 'activity:answer' ]\n    at /tmp/test-intent-before-5UTG1Z/modules/ui-web/src/shell-v0/state/frameStatus.authorization.test.ts:105:55\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s3a2/modules/ui-web/node_module"
+        "detail": "L9 a same-key copy withdrawn by a DENIED answer adds no Earlier row: one row per decision:  AssertionError: expected [ 'activity:answer', …(1) ] to deeply equal [ 'activity:answer' ]\n    at /home/elias/.cache/am/u635vwnv/tmp/test-intent-before-rlewEE/modules/ui-web/src/shell-v0/state/frameStatus.authorization.test.ts:105:55\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s"
       },
       {
         "id": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts#DE3 a MCP request waits in Needs you, announced as a live arrival",
@@ -392,7 +400,7 @@
       {
         "id": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts#DE3 reviewing reads the live details again: fresh fields, null when gone, a failure when unreadable",
         "classification": "assertion",
-        "detail": "pendingAuthorizationBridge (tempdoc 655) DE3 reviewing reads the live details again: fresh fields, null when gone, a failure when unreadable:  AssertionError: the review can read the live details: expected undefined to be type of 'function'\n    at /tmp/test-intent-before-5UTG1Z/modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts:499:61\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s3a2/modules/ui-we"
+        "detail": "pendingAuthorizationBridge (tempdoc 655) DE3 reviewing reads the live details again: fresh fields, null when gone, a failure when unreadable:  AssertionError: the review can read the live details: expected undefined to be type of 'function'\n    at /home/elias/.cache/am/u635vwnv/tmp/test-intent-before-rlewEE/modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts:499:61\n    at file:///home/elias/dev/justsearch/.claude/work"
       },
       {
         "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#DE3 the agent request waits in Needs you; its review reads the live gate again",
@@ -402,14 +410,14 @@
       {
         "id": "modules/ui-web/src/shell-v0/components/StatusPill.feedback.test.ts#C6 rediscovered agent requests stay silent; a live arrival is escalated to the desktop once",
         "classification": "assertion",
-        "detail": "status feedback ownership C6 rediscovered agent requests stay silent; a live arrival is escalated to the desktop once:  AssertionError: expected \"vi.fn()\" to be called 1 times, but got 0 times\n    at /tmp/test-intent-before-5UTG1Z/modules/ui-web/src/shell-v0/components/StatusPill.feedback.test.ts:72:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s3a2/modules/ui-web/node_modules/@vitest/runner/dis"
+        "detail": "status feedback ownership C6 rediscovered agent requests stay silent; a live arrival is escalated to the desktop once:  AssertionError: expected \"vi.fn()\" to be called 1 times, but got 0 times\n    at /home/elias/.cache/am/u635vwnv/tmp/test-intent-before-rlewEE/modules/ui-web/src/shell-v0/components/StatusPill.feedback.test.ts:72:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s3a2/modules/ui-web/n"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts#only a live agent arrival while unfocused reaches the desktop",
         "classification": "assertion",
-        "detail": "own-action receipts and desktop escalation (C1, ST14) only a live agent arrival while unfocused reaches the desktop:  AssertionError: expected \"vi.fn()\" to be called 1 times, but got 0 times\n    at /tmp/test-intent-before-5UTG1Z/modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts:128:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s3a2/modules/ui-web/node_modules/@vitest/runner"
+        "detail": "own-action receipts and desktop escalation (C1, ST14) only a live agent arrival while unfocused reaches the desktop:  AssertionError: expected \"vi.fn()\" to be called 1 times, but got 0 times\n    at /home/elias/.cache/am/u635vwnv/tmp/test-intent-before-rlewEE/modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts:128:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s3a2/modules/ui-w"
       }
     ]
   },
-  "digest": "sha256:2fc180414838e3ae83794237d61cd351fca404e43433744d103874d70579dbe3"
+  "digest": "sha256:a430e098fd91130af00d4497cfc975a66fae12809115fd43841b88c95afef5d1"
 }

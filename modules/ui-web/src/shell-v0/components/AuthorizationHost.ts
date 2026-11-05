@@ -47,7 +47,6 @@ import {
   type AuthorizationPrompt,
   type AuthorizationDecision,
 } from '../operations/authorizationBroker.js';
-import { emitEphemeralToast } from './advisory/ephemeralToast.js';
 import {
   listPendingConsentRequests,
   resolveConsentRequest,
@@ -61,17 +60,16 @@ interface AuthorizeItem {
   /** Replaced by the fresh live details read when the person reviews it. */
   prompt: AuthorizationPrompt;
   readonly resolve: (decision: AuthorizationDecision) => void;
-  /** Needs-you requests: when the panel may accept an answer (arrival, then each review opening). */
+  /** Needs-you requests: when the panel may accept an answer (arrival, each review opening, changed details). */
   readyAt?: number;
-  /** The fresh live details could not be read: the request can only be denied. */
-  unavailable?: boolean;
 }
 
 /** What the status panel shows and may do for one waiting request. */
 export interface StatusRequestState {
   readonly busy: boolean;
+  /** Its live details are being read: it cannot be allowed until they are. */
+  readonly checking: boolean;
   readonly error?: string;
-  readonly unavailable: boolean;
   /** `performance.now()` time after which the panel accepts an answer. */
   readonly readyAt: number;
   /** An "always allow" choice the backend would keep (never HIGH, never the in-app agent's route). */
@@ -85,6 +83,14 @@ interface CapabilityItem {
 }
 
 type CeremonyItem = AuthorizeItem | CapabilityItem;
+
+/** How long an Allow waits for a request's live details before it is refused as unavailable. */
+const FRESH_DETAILS_TIMEOUT_MS = 5_000;
+const DETAILS_UNAVAILABLE = 'Its current details are unavailable, so it can’t be allowed right now. Try again, or deny it.';
+const DETAILS_CHANGED = 'Its details changed, so it was not allowed. Check them and answer again.';
+
+/** The live details read for an agent's request, as `refresh` reports them. */
+type FreshDetails = Awaited<ReturnType<NonNullable<AuthorizationPrompt['refresh']>>>;
 
 export class AuthorizationHost extends JfElement {
   static properties = {
@@ -120,7 +126,10 @@ export class AuthorizationHost extends JfElement {
    */
   private dismissed = false;
   private readonly rejecting = new Set<CeremonyItem>();
-  private readonly rejectionErrors = new WeakMap<CeremonyItem, string>();
+  /** Agent requests whose live details are being read; none of them can be allowed meanwhile. */
+  private readonly checking = new Set<AuthorizeItem>();
+  /** Why the last answer to a request did not go through, shown with it until it is answered. */
+  private readonly answerErrors = new WeakMap<CeremonyItem, string>();
 
   constructor() {
     super();
@@ -308,41 +317,65 @@ export class AuthorizationHost extends JfElement {
   statusRequestState(id: string): StatusRequestState | null {
     const item = this.statusRequests().find((row): row is AuthorizeItem => row.kind === 'authorize' && row.prompt.pendingId === id);
     if (!item) return null;
-    const error = this.rejectionErrors.get(item);
-    return { busy: this.rejecting.has(item), ...(error ? { error } : {}), unavailable: item.unavailable === true,
+    const error = this.answerErrors.get(item);
+    return { busy: this.rejecting.has(item), checking: this.checking.has(item), ...(error ? { error } : {}),
       readyAt: item.readyAt ?? 0, durable: AuthorizationHost.honoursAllowAlways(item.prompt) };
   }
 
   /**
    * The panel opened the review of a waiting request: re-arm it (the activation that opened the review
-   * cannot answer it) and read its live details again. Gone → withdrawn; unreadable → denied.
+   * cannot answer it) and read its live details again. Gone → withdrawn. Unreadable details are said;
+   * nothing is sent for them: the request stays answerable, and only a fresh read lets it be allowed.
    */
   async openStatusReview(id: string): Promise<void> {
     const item = this.waiting.find(row => row.prompt.pendingId === id);
     if (!item) return;
     item.readyAt = performance.now();
     this.requestUpdate();
-    if (!item.prompt.refresh) return;
-    let fresh;
-    try {
-      fresh = await item.prompt.refresh();
-    } catch {
-      if (!this.waiting.includes(item)) return;
-      item.unavailable = true;
+    if (item.prompt.refresh && !this.checking.has(item)) await this.readFresh(item);
+  }
+
+  /**
+   * DE3 — read an agent request's live details again and show them. `fresh`: they match what was
+   * shown; `changed`: they did not (now shown, and the request re-arms); `unavailable`: they could not
+   * be read in time; `gone`: the request no longer waits (withdrawn); `stale`: it was answered meanwhile.
+   */
+  private async readFresh(item: AuthorizeItem): Promise<'fresh' | 'changed' | 'unavailable' | 'gone' | 'stale'> {
+    const refresh = item.prompt.refresh;
+    if (!refresh) {
+      this.answerErrors.set(item, DETAILS_UNAVAILABLE);
       this.requestUpdate();
-      await this.settle(item, false, false);
-      if (this.waiting.includes(item)) {
-        if (!this.rejectionErrors.has(item)) this.rejectionErrors.set(item, 'Its details could not be read, so it can only be denied.');
-        this.requestUpdate();
-      } else emitEphemeralToast({ message: 'A request’s details could not be read, so it was denied.', severity: 'warning' });
-      return;
+      return 'unavailable';
     }
-    if (!this.waiting.includes(item)) return;
-    if (!fresh) { this.cancelMatching(prompt => prompt.pendingId === id); return; }
-    const defined = Object.fromEntries(Object.entries(fresh).filter(([, value]) => value !== undefined));
-    item.prompt = { ...item.prompt, ...defined };
-    item.unavailable = false;
+    this.checking.add(item);
     this.requestUpdate();
+    let fresh: FreshDetails | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      fresh = await Promise.race([refresh(), new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error('Live details timed out')), FRESH_DETAILS_TIMEOUT_MS);
+      })]);
+    } catch {
+      fresh = undefined;
+    } finally {
+      clearTimeout(timer);
+      this.checking.delete(item);
+      this.requestUpdate();
+    }
+    const id = item.prompt.pendingId;
+    if (!this.holds(item) || this.decided.has(id)) return 'stale';
+    if (fresh === null) { this.cancelMatching(prompt => prompt.pendingId === id); return 'gone'; }
+    if (fresh === undefined) { this.answerErrors.set(item, DETAILS_UNAVAILABLE); return 'unavailable'; }
+    const defined = Object.entries(fresh).filter(([, value]) => value !== undefined);
+    const changed = defined.some(([key, value]) => item.prompt[key as keyof AuthorizationPrompt] !== value);
+    item.prompt = { ...item.prompt, ...Object.fromEntries(defined) };
+    this.answerErrors.delete(item);
+    if (changed) {
+      // Different details under the person's pointer: nothing done before they show can answer them.
+      item.readyAt = performance.now();
+      if (this.active === item) this.arm();
+    }
+    return changed ? 'changed' : 'fresh';
   }
 
   /**
@@ -353,7 +386,7 @@ export class AuthorizationHost extends JfElement {
   async answerStatusRequest(id: string, approved: boolean, allowAlways = false): Promise<void> {
     const item = this.waiting.find(row => row.prompt.pendingId === id);
     if (!item || performance.now() - (item.readyAt ?? 0) < ARMING_DELAY_MS) return;
-    if (approved && (item.unavailable || item.prompt.gateBehavior === 'TYPED_CONFIRM')) return;
+    if (approved && item.prompt.gateBehavior === 'TYPED_CONFIRM') return;
     await this.settle(item, approved, approved && allowAlways && AuthorizationHost.honoursAllowAlways(item.prompt));
   }
 
@@ -478,7 +511,7 @@ export class AuthorizationHost extends JfElement {
 
   /** Make `item` the presented prompt (or none) with fresh state; nothing done before it can answer it. */
   private show(item: CeremonyItem | null): void {
-    if (item) this.rejectionErrors.delete(item);
+    if (item) this.answerErrors.delete(item);
     this.active = item;
     this.typed = '';
     this.allowAlways = false;
@@ -609,23 +642,30 @@ export class AuthorizationHost extends JfElement {
 
   /**
    * The one decision path for the dialog and the status panel (C12): an expired request is withdrawn;
-   * a denial cancels the backend request first and stays answerable when that fails (DE8); the id is
-   * then decided exactly once and leaves every list before its caller hears the answer.
+   * an agent's request is allowed only on live details read for this press that match what was shown
+   * (DE3); a denial cancels the backend request first and stays answerable when that fails (DE8); the
+   * id is then decided exactly once and leaves every list before its caller hears the answer.
    */
   private async settle(item: AuthorizeItem, approved: boolean, allowAlways: boolean): Promise<void> {
     const id = item.prompt.pendingId;
-    if (this.decided.has(id) || this.rejecting.has(item) || !this.holds(item)) return;
-    if (item.prompt.expiresAt && Date.parse(item.prompt.expiresAt) <= Date.now()) {
-      this.cancelMatching(prompt => prompt.pendingId === id); return;
+    const expired = (): boolean => !!item.prompt.expiresAt && Date.parse(item.prompt.expiresAt) <= Date.now();
+    if (this.decided.has(id) || this.rejecting.has(item) || !this.holds(item) || (approved && this.checking.has(item))) return;
+    if (expired()) { this.cancelMatching(prompt => prompt.pendingId === id); return; }
+    if (approved && item.prompt.arrival === 'needs-you') {
+      const read = await this.readFresh(item);
+      if (read === 'changed') this.answerErrors.set(item, DETAILS_CHANGED);
+      this.requestUpdate();
+      if (read !== 'fresh' || this.decided.has(id) || this.rejecting.has(item) || !this.holds(item)) return;
+      if (expired()) { this.cancelMatching(prompt => prompt.pendingId === id); return; }
     }
     if (!approved && item.prompt.reject) {
       this.rejecting.add(item);
-      this.rejectionErrors.delete(item);
+      this.answerErrors.delete(item);
       this.requestUpdate();
       try {
         await item.prompt.reject();
       } catch {
-        if (this.holds(item)) this.rejectionErrors.set(item, 'The request could not be cancelled. Try again.');
+        if (this.holds(item)) this.answerErrors.set(item, 'The request could not be cancelled. Try again.');
         return;
       } finally {
         this.rejecting.delete(item);
@@ -760,7 +800,7 @@ export class AuthorizationHost extends JfElement {
             Always allow this action (don't ask again)
           </label>`
         : ''}
-      ${this.active && this.rejectionErrors.get(this.active) ? html`<p role="alert">${this.rejectionErrors.get(this.active)}</p>` : ''}
+      ${this.active && this.answerErrors.get(this.active) ? html`<p role="alert">${this.answerErrors.get(this.active)}</p>` : ''}
       <div class="actions">
         <jf-button ?disabled=${!!this.active && this.rejecting.has(this.active)} class="deny" variant="danger" data-testid="authorization-deny" label="Deny" .onActivate=${() => this.decide(false, prompt.pendingId)}>
           Deny
@@ -770,7 +810,7 @@ export class AuthorizationHost extends JfElement {
           variant="primary"
           data-testid="authorization-approve"
           label="Approve"
-          ?disabled=${!matches || (!!this.active && this.rejecting.has(this.active))}
+          ?disabled=${!matches || (!!this.active && (this.rejecting.has(this.active) || (this.active.kind === 'authorize' && this.checking.has(this.active))))}
           .onActivate=${() => this.decide(true, prompt.pendingId)}
         >
           Approve

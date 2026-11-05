@@ -166,6 +166,8 @@ export class StatusPill extends JfElement {
           const inset = this.cssPx('--frame-panel-radius') + margin / 2;
           const fromRight = Math.min(Math.max(inset, placed.right - (rect.left + rect.width / 2)), Math.max(inset, placed.width - inset));
           this.style.setProperty('--frame-status-arrow-right', `calc(${fromRight}px - var(--jf-space-2) / 2)`);
+          // The panel's answers just appeared where the pointer may already be: they arm from now (C12).
+          panel.placeControls();
           panel.shadowRoot?.querySelector<HTMLElement>('[role="dialog"]')?.focus();
         });
       } else this.transient.close();

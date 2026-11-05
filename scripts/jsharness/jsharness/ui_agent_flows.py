@@ -235,7 +235,8 @@ async def approval(page, *, failure):
         await expect(run(page)).to_have_attribute("data-phase", "running")
     await expect(row).to_have_count(0)
     await expect(page.get_by_test_id("authorization-ceremony")).to_have_count(0)
-    assert len(fixture.matching("GET", "/api/chat/approval")) == 2, fixture.requests  # arrival + review
+    # Arrival, the review's read, and the Allow's own read: it is allowed only on details read for it.
+    assert len(fixture.matching("GET", "/api/chat/approval")) == 3, fixture.requests
     assert len(fixture.matching("POST", APPROVE)) == 1, fixture.requests
     only_run(fixture)
 
