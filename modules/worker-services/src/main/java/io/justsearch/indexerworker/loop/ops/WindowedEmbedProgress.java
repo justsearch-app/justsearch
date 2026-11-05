@@ -40,7 +40,7 @@ import java.util.Map;
  * indexing-loop thread.
  */
 public final class WindowedEmbedProgress {
-  public enum Route { WINDOW, ORDINARY }
+  public enum Route { WINDOW, ORDINARY, FALLBACK }
 
   /** Runtime authority also distinguishes index generations and every provider publication. */
   public record Identity(Object authority, long sourceEpoch, Object provider, int dimension, String uid,

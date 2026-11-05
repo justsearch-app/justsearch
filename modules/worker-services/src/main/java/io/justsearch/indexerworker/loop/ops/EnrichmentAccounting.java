@@ -37,16 +37,20 @@ public final class EnrichmentAccounting {
   public enum Disposition { PUBLISHED, COMPLETED_EMPTY, FAILED_CHARGED, DEFERRED, REJECTED_STALE, REJECTED_OUTPUT, CANCELLED }
   public record Ticket(String documentId, Stage stage) {}
 
+  /** Native acquisition is a provider outcome, independent of row and storage outcomes. */
+  public record Acquisition(Object provider, boolean available) {}
+
   public record Summary(Map<Ticket, Disposition> tickets, Map<String, Long> counters,
-      Set<Stage> storageFailures) {
+      Set<Stage> storageFailures, List<Acquisition> acquisitions) {
     public Summary {
       tickets = Map.copyOf(tickets);
       counters = Map.copyOf(counters);
       storageFailures = Set.copyOf(storageFailures);
+      acquisitions = List.copyOf(acquisitions);
     }
 
     public Summary(Map<Ticket, Disposition> tickets, Map<String, Long> counters) {
-      this(tickets, counters, Set.of());
+      this(tickets, counters, Set.of(), List.of());
     }
 
     public static Summary empty() { return new Summary(Map.of(), Map.of()); }
@@ -56,6 +60,8 @@ public final class EnrichmentAccounting {
           .filter(entry -> entry.getKey().stage() == stage && entry.getValue() == disposition).count();
     }
   }
+
+  private final Map<Object, Boolean> acquisitions = new java.util.IdentityHashMap<>();
 
   private final Map<Ticket, Disposition> tickets = new LinkedHashMap<>();
   private final Set<Ticket> computed = new HashSet<>();
@@ -72,6 +78,20 @@ public final class EnrichmentAccounting {
 
   EnrichmentAccounting(Predicate<Stage> cancellationRequested) {
     this.cancellationRequested = cancellationRequested;
+  }
+
+  boolean acquisitionHeld(Object provider) { return Boolean.FALSE.equals(acquisitions.get(provider)); }
+
+  void acquired(Object provider) { acquisitions.put(provider, true); }
+
+  boolean acquisitionUnavailable(Object provider, Throwable failure) {
+    for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+      if (cause instanceof io.justsearch.ort.SessionTemporarilyUnavailableException) {
+        acquisitions.put(provider, false);
+        return true;
+      }
+    }
+    return false;
   }
 
   boolean storageFailed() { return !storageFailures.isEmpty(); }
@@ -184,7 +204,8 @@ public final class EnrichmentAccounting {
     for (Ticket ticket : terminalFailures) counters.merge(ticket.stage().key + ".failed", 1L, Long::sum);
     for (Ticket ticket : acceptedStages) counters.merge(ticket.stage().key + ".accepted", 1L, Long::sum);
     for (Ticket ticket : computed) counters.merge(ticket.stage().key + ".computed", 1L, Long::sum);
-    return new Summary(tickets, counters, storageFailures);
+    return new Summary(tickets, counters, storageFailures, acquisitions.entrySet().stream()
+        .map(entry -> new Acquisition(entry.getKey(), entry.getValue())).toList());
   }
 
   private boolean isCancellation(Stage stage, Throwable failure) {

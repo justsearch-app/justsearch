@@ -196,6 +196,7 @@ public final class BgeM3BackfillOps {
               ? EnrichmentAccounting.Stage.CHUNK_EMBED : EnrichmentAccounting.Stage.EMBED);
         }
         outputs = batch.inferenceCancellation(() -> !context.runningSupplier().getAsBoolean(), unavailable).call(() -> encoder.encodeBatch(batchContents));
+        accounting.acquired(encoder);
         // A short/empty result is as unusable as null for the index-aligned loop in Phase 3 —
         // trusting its length to match batchDocIds is what crash-loops the embedding-chunk
         // sibling of this method (EmbeddingBackfillOps#processChunkEmbeddingBackfill). Route
@@ -215,6 +216,9 @@ public final class BgeM3BackfillOps {
         boolean cancelled = false;
         for (var stage : EnrichmentAccounting.Stage.values()) cancelled |= accounting.cancelled(stage, e);
         if (cancelled) return StageOutcome.observed(true, processed, t0, accounting);
+        if (accounting.acquisitionUnavailable(encoder, e)) {
+          return StageOutcome.observed(false, processed, t0, accounting);
+        }
         context.log().error("BGE-M3 batch encoding failed: {}", e.getMessage());
         // Fallback to per-doc encoding
         int perDocFailed = 0;
@@ -229,6 +233,7 @@ public final class BgeM3BackfillOps {
             String fallbackText = batchContents.get(i);
             BgeM3Output output = batch.inferenceCancellation(() -> !context.runningSupplier().getAsBoolean(), unavailable).call(() -> encoder.encode(
                 fallbackText, LocalSessionAcquisition.backgroundInference()));
+            accounting.acquired(encoder);
             if (output != null) {
               batch.computed(docId, EnrichmentAccounting.Stage.SPLADE);
               if (output.denseVector() != null && output.denseVector().length > 0) {
@@ -243,6 +248,7 @@ public final class BgeM3BackfillOps {
             boolean cancelledFallback = false;
             for (var stage : EnrichmentAccounting.Stage.values()) cancelledFallback |= accounting.cancelled(stage, e2);
             if (cancelledFallback) break;
+            if (accounting.acquisitionUnavailable(encoder, e2)) break;
             context
                 .log()
                 .warn("BGE-M3 per-doc encoding failed for {}: {}", docId, e2.getMessage());
