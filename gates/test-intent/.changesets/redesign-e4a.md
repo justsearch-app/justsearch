@@ -201,3 +201,14 @@ Run the same preservation selectors manually on the base shared clone in its own
 The repair selectors transplant only the new test source; they need no production overlay.
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1a9d8-bc6b-7300-a3ea-9f7da4da6ec0",
+  "verdict": "accept",
+  "digest": "sha256:5a91056e53fe6ba5b6b4f5313a79cbc7be89e5bb44e18672e59128eaea747fbe",
+  "note": "Codex acceptor on 85b9f98dd4: entries 1 New, 2 Obsolete (NER acquisition-retry oracle superseded by D5a), 3 New accept; NerBackfillOpsTest (not found by the runner) executed directly: 11 nested cases pass on both revisions. Component verification: Codex verifier-1 01a1a9a9 (D4a, D5a, dense retention/bounds pass; #1095 and E1-E3c groups pass)."
+}
+```
