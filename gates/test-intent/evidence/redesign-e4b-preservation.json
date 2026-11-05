@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-05T10:02:55.887Z",
-  "revision": "3a6779a23a1b5aebc47e37d6f3fa938a03032796",
-  "tree": "0f8948bb5abdb50c93366124d871efa7f8d241b8",
+  "createdAt": "2026-11-05T11:54:37.953Z",
+  "revision": "43d570b17b8f4f513c709e1f67bec129058ede1a",
+  "tree": "1ee5a5645e3597351f1a52de7c97390d5830f8ed",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,19 +21,19 @@
       "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.FairEnrichmentSchedulerTest.P1095_chunksAdvanceWithinThreeCyclesUnderTheOriginalLongDocumentCosts\" --tests \"io.justsearch.indexerworker.loop.FairEnrichmentSchedulerTest.D8_holdsAndBackoffAreNotUnsuccessfulService\" --tests \"io.justsearch.indexerworker.loop.BackfillSchedulerStallDetectionTest.publishingWorkSetDoesNotWarn\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentCycleBudgetTest\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentLongDocumentTest\" --tests \"io.justsearch.adapters.lucene.runtime.EnrichmentStorageBackoffTest\" --tests \"io.justsearch.adapters.lucene.runtime.BackfillProbeCommitPersistenceTest\" --tests \"io.justsearch.indexerworker.loop.BackfillSchedulerPersistenceTest\" --tests \"io.justsearch.indexerworker.loop.BackfillSchedulerSlowBatchTest\" --tests \"io.justsearch.indexerworker.loop.BackfillSchedulerTightLoopTest\" --tests \"io.justsearch.indexerworker.loop.BackfillSchedulerModeRecordingTest\" --tests \"io.justsearch.indexerworker.loop.BackfillSchedulerProviderGateTest\" --tests \"io.justsearch.indexerworker.loop.BackfillResourceAdmissionTest\" --tests \"io.justsearch.indexerworker.loop.EnrichmentLaneDecompositionTest\" --tests \"io.justsearch.indexerworker.loop.EnrichmentReceiptPreservationTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentPreservationTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentAttemptAccountingTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentHardStopRepairTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentInternalStopTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentStorageDispositionTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentMapperDispositionTest\" --tests \"io.justsearch.indexerworker.loop.ops.BgeM3BackfillOpsTest\" --tests \"io.justsearch.indexerworker.loop.ops.DisambiguationBackfillOpsTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 67208
+      "durationMs": 80210
     },
     {
       "command": "./gradlew :modules:configuration:test --tests \"io.justsearch.configuration.resolved.EnrichmentInterleaveAliasTest.blankWinnerDefersToTheNextSourceIncludingTheAliasAtEqualPriority\" --tests \"io.justsearch.configuration.resolved.ResolvedConfigBuilderTest\" --tests \"io.justsearch.configuration.resolved.ConfigApplyScopesTest.packagedRegisterIsTheRepositoryRegister\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 1735
+      "durationMs": 2528
     },
     {
       "command": "./gradlew :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.SpladePendingSelectionTest\" --tests \"io.justsearch.adapters.lucene.runtime.EnrichmentPublicationReceiptTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 5882
+      "durationMs": 6590
     }
   ],
   "checks": [
@@ -41,7 +41,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/FairEnrichmentSchedulerTest.java#P1095_chunksAdvanceWithinThreeCyclesUnderTheOriginalLongDocumentCosts",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/FairEnrichmentSchedulerTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:9c49b12484fc13413cd6aec8ac9d9a9d6cfd2b3031d2c19cb10a09091db1b56f",
+      "contentDigest": "sha256:60c903b3dbf111c632a5f3cab74e9530289118b116626dc59c029277163e75ae",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -64,7 +64,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/FairEnrichmentSchedulerTest.java#D8_holdsAndBackoffAreNotUnsuccessfulService",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/FairEnrichmentSchedulerTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:9c49b12484fc13413cd6aec8ac9d9a9d6cfd2b3031d2c19cb10a09091db1b56f",
+      "contentDigest": "sha256:60c903b3dbf111c632a5f3cab74e9530289118b116626dc59c029277163e75ae",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -3790,5 +3790,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:35d8ce56c72d6d0a5afdce16dc3ec15b7e901c40d4f7e5f8f2f1318e3e02fcb8"
+  "digest": "sha256:e83c3ee38d111e1a8a0c8c49b44bc1cbbbb0d777171fb539c624885bc16ef454"
 }
