@@ -8,6 +8,8 @@
 import type { FrameStatus, StatusFact } from './frameStatus.js';
 import type { NotificationsChoice } from './notificationsState.js';
 
+const LONG_WORK_MIN_DURATION_MS = 60_000;
+
 type NoticeKind = 'agent-request' | 'work-finished' | 'work-failed';
 
 /**
@@ -21,6 +23,8 @@ export interface DesktopNotice {
   readonly body?: string;
   /** False for anything rediscovered: startup snapshots, reconnects, late discovery (C6). */
   readonly live: boolean;
+  /** Observed active time for finished work; unknown durations stay inside the app. */
+  readonly activeDurationMs?: number;
 }
 
 export interface NoticeConditions {
@@ -30,8 +34,10 @@ export interface NoticeConditions {
 }
 
 /** How a notice leaves the app, or null when it stays inside. */
-export function routeDesktopNotice(notice: Pick<DesktopNotice, 'live'>, { notifications, focused }: NoticeConditions): { sound: boolean } | null {
+export function routeDesktopNotice(notice: Pick<DesktopNotice, 'live' | 'kind' | 'activeDurationMs'>, { notifications, focused }: NoticeConditions): { sound: boolean } | null {
   if (!notice.live || focused || notifications === 'off') return null;
+  if (notice.kind === 'work-finished' && (notice.activeDurationMs === undefined
+    || !Number.isFinite(notice.activeDurationMs) || notice.activeDurationMs < LONG_WORK_MIN_DURATION_MS)) return null;
   return { sound: notifications === 'sound' };
 }
 
@@ -40,9 +46,9 @@ export function agentRequestNotice(row: Pick<StatusFact, 'id' | 'title' | 'deadl
   return { id: row.id, kind: 'agent-request', title: row.title, ...(row.deadline ? { body: row.deadline } : {}), live };
 }
 
-/** A completion edge the pill just showed as "just finished", which is live by construction. */
-export function workFinishedNotice(title: string, id = title): DesktopNotice {
-  return { id, kind: 'work-finished', title, live: true };
+/** A live completion edge; the pill shows it regardless of its active duration. */
+export function workFinishedNotice(title: string, id = title, activeDurationMs?: number): DesktopNotice {
+  return { id, kind: 'work-finished', title, live: true, activeDurationMs };
 }
 
 /** A failure edge. The failure's own message stays in the panel: it can carry paths. */

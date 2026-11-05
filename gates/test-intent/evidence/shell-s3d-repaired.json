@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-05T21:42:18.220Z",
-  "revision": "6ac7c57e77fae29cbbf3ba0a01212c6eb6f55d13",
-  "tree": "0c209a43cd18a92d640366a44a306cd8839357d9",
+  "createdAt": "2026-11-05T22:26:45.674Z",
+  "revision": "32149108492c1f93c6d9227774ef49a975b44390",
+  "tree": "5b32be61c25caebd015036b3496a74533e5e531b",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/StatusPill.notices.test.ts\" \"src/utils/windowFocus.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/sj500zv7/tmp/test-intent-vitest-59455-1793914929308.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/StatusPill.notices.test.ts\" \"src/utils/windowFocus.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/8x00ak4p/tmp/test-intent-vitest-3-1793917585676.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 1858
+      "durationMs": 2764
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 an agent request in the background notifies once, saying who, what and the deadline, never its arguments",
       "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:0a2a52ba2aa5fb2b9396f5586521267dbffb412d9fcd124a04b73bbd08150393",
+      "contentDigest": "sha256:948729b9baf8ec75e25d4682378f4f951f30e0bd9d1a930569ba797bc0ba5fc2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 an agent request each request arriving together notifies, so each click lands on its own review",
       "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:0a2a52ba2aa5fb2b9396f5586521267dbffb412d9fcd124a04b73bbd08150393",
+      "contentDigest": "sha256:948729b9baf8ec75e25d4682378f4f951f30e0bd9d1a930569ba797bc0ba5fc2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -59,7 +59,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 an agent request Off sends nothing while the pill, the announcement and the badge stay",
       "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:0a2a52ba2aa5fb2b9396f5586521267dbffb412d9fcd124a04b73bbd08150393",
+      "contentDigest": "sha256:948729b9baf8ec75e25d4682378f4f951f30e0bd9d1a930569ba797bc0ba5fc2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -74,7 +74,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 an agent request On with sound asks for the platform sound",
       "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:0a2a52ba2aa5fb2b9396f5586521267dbffb412d9fcd124a04b73bbd08150393",
+      "contentDigest": "sha256:948729b9baf8ec75e25d4682378f4f951f30e0bd9d1a930569ba797bc0ba5fc2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -89,7 +89,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 long work finishing notifies once, by its row",
       "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:0a2a52ba2aa5fb2b9396f5586521267dbffb412d9fcd124a04b73bbd08150393",
+      "contentDigest": "sha256:948729b9baf8ec75e25d4682378f4f951f30e0bd9d1a930569ba797bc0ba5fc2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -104,7 +104,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 long work failing notifies once, leaving the failure message in the panel",
       "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:0a2a52ba2aa5fb2b9396f5586521267dbffb412d9fcd124a04b73bbd08150393",
+      "contentDigest": "sha256:948729b9baf8ec75e25d4682378f4f951f30e0bd9d1a930569ba797bc0ba5fc2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -119,7 +119,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 long work a witnessed transition settling notifies; a first load in the settled state does not",
       "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:0a2a52ba2aa5fb2b9396f5586521267dbffb412d9fcd124a04b73bbd08150393",
+      "contentDigest": "sha256:948729b9baf8ec75e25d4682378f4f951f30e0bd9d1a930569ba797bc0ba5fc2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -134,7 +134,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 long work an AI install completing or failing notifies; finding one already online does not",
       "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:0a2a52ba2aa5fb2b9396f5586521267dbffb412d9fcd124a04b73bbd08150393",
+      "contentDigest": "sha256:948729b9baf8ec75e25d4682378f4f951f30e0bd9d1a930569ba797bc0ba5fc2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -149,7 +149,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 the taskbar badge reports the count it starts with, so a count left before a reload can clear",
       "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:0a2a52ba2aa5fb2b9396f5586521267dbffb412d9fcd124a04b73bbd08150393",
+      "contentDigest": "sha256:948729b9baf8ec75e25d4682378f4f951f30e0bd9d1a930569ba797bc0ba5fc2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -164,7 +164,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 the taskbar badge follows Needs you live, is sent only on a change, and clears at zero",
       "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:0a2a52ba2aa5fb2b9396f5586521267dbffb412d9fcd124a04b73bbd08150393",
+      "contentDigest": "sha256:948729b9baf8ec75e25d4682378f4f951f30e0bd9d1a930569ba797bc0ba5fc2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -218,75 +218,75 @@
     ],
     "runs": [
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/StatusPill.notices.test.ts\" \"src/utils/windowFocus.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/sj500zv7/tmp/test-intent-vitest-59455-1793914935600.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/StatusPill.notices.test.ts\" \"src/utils/windowFocus.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/8x00ak4p/tmp/test-intent-vitest-3-1793917601363.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 2518,
-        "output": "JSON report written to /home/elias/.cache/am/sj500zv7/tmp/test-intent-vitest-59455-1793914935600.json\n\n"
+        "durationMs": 3668,
+        "output": "JSON report written to /home/elias/.cache/am/8x00ak4p/tmp/test-intent-vitest-3-1793917601363.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 an agent request in the background notifies once, saying who, what and the deadline, never its arguments",
         "classification": "assertion",
-        "detail": "DE5 an agent request in the background notifies once, saying who, what and the deadline, never its arguments:  AssertionError: expected [ Array(1) ] to deeply equal [ { id: 'authorization:a1', …(3) } ]\n    at /home/elias/.cache/am/sj500zv7/tmp/test-intent-before-NvsHp5/modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts:93:20\n    at processTicksAndRejections (node:internal/process/task_queues:1"
+        "detail": "DE5 an agent request in the background notifies once, saying who, what and the deadline, never its arguments:  AssertionError: expected [ Array(1) ] to deeply equal [ { id: 'authorization:a1', …(3) } ]\n    at /home/elias/.cache/am/8x00ak4p/tmp/test-intent-before-XX1Ja0/modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts:97:20\n    at processTicksAndRejections (node:internal/process/task_queues:1"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 an agent request each request arriving together notifies, so each click lands on its own review",
         "classification": "assertion",
-        "detail": "DE5 an agent request each request arriving together notifies, so each click lands on its own review:  AssertionError: expected [ undefined ] to deeply equal [ 'authorization:b1', …(1) ]\n    at /home/elias/.cache/am/sj500zv7/tmp/test-intent-before-NvsHp5/modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts:98:52\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s3d/modules"
+        "detail": "DE5 an agent request each request arriving together notifies, so each click lands on its own review:  AssertionError: expected [ undefined ] to deeply equal [ 'authorization:b1', …(1) ]\n    at /home/elias/.cache/am/8x00ak4p/tmp/test-intent-before-XX1Ja0/modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts:102:52\n    at file:///home/elias/.cache/am/8x00ak4p/tmp/test-intent-before-XX1Ja0/"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 an agent request Off sends nothing while the pill, the announcement and the badge stay",
         "classification": "assertion",
-        "detail": "DE5 an agent request Off sends nothing while the pill, the announcement and the badge stay:  AssertionError: expected \"vi.fn()\" to not be called at all, but actually been called 1 times\n\nReceived:\n\n  1st vi.fn() call:\n\n    Array [\n      \"Claude Desktop requests Ingest Files\",\n      \"/home/me/Downloads/secret.txt\",\n    ]\n\n\nNumber of calls: 1\n\n    at Proxy.<anonymous> (file:///home/elias/dev/"
+        "detail": "DE5 an agent request Off sends nothing while the pill, the announcement and the badge stay:  AssertionError: expected \"vi.fn()\" to not be called at all, but actually been called 1 times\n\nReceived:\n\n  1st vi.fn() call:\n\n    Array [\n      \"Claude Desktop requests Ingest Files\",\n      \"/home/me/Downloads/secret.txt\",\n    ]\n\n\nNumber of calls: 1\n\n    at Proxy.<anonymous> (file:///home/elias/.cac"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 an agent request On with sound asks for the platform sound",
         "classification": "assertion",
-        "detail": "DE5 an agent request On with sound asks for the platform sound:  AssertionError: expected [ Array(1) ] to match object [ { id: 'authorization:e1', …(1) } ]\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/shell-s3d/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:10)\n    at Proxy.<anonymous> (file:///home/elias/dev/justse"
+        "detail": "DE5 an agent request On with sound asks for the platform sound:  AssertionError: expected [ Array(1) ] to match object [ { id: 'authorization:e1', …(1) } ]\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/8x00ak4p/tmp/test-intent-before-XX1Ja0/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:10)\n    at Proxy.<anonymous> (file:///home/elias/.cac"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 long work finishing notifies once, by its row",
         "classification": "assertion",
-        "detail": "DE5 long work finishing notifies once, by its row:  AssertionError: expected [] to deeply equal [ { id: 'operation:op1', …(2) } ]\n    at /home/elias/.cache/am/sj500zv7/tmp/test-intent-before-NvsHp5/modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts:144:20\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s3d/modules/ui-w"
+        "detail": "DE5 long work finishing notifies once, by its row:  AssertionError: expected [] to deeply equal [ { id: 'operation:op1', …(2) } ]\n    at /home/elias/.cache/am/8x00ak4p/tmp/test-intent-before-XX1Ja0/modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts:149:20\n    at file:///home/elias/.cache/am/8x00ak4p/tmp/test-intent-before-XX1Ja0/module"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 long work failing notifies once, leaving the failure message in the panel",
         "classification": "assertion",
-        "detail": "DE5 long work failing notifies once, leaving the failure message in the panel:  AssertionError: expected [] to deeply equal [ { id: 'operation:op2', …(3) } ]\n    at /home/elias/.cache/am/sj500zv7/tmp/test-intent-before-NvsHp5/modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts:151:20\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s3d/modules/ui-w"
+        "detail": "DE5 long work failing notifies once, leaving the failure message in the panel:  AssertionError: expected [] to deeply equal [ { id: 'operation:op2', …(3) } ]\n    at /home/elias/.cache/am/8x00ak4p/tmp/test-intent-before-XX1Ja0/modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts:156:20\n    at file:///home/elias/.cache/am/8x00ak4p/tmp/test-intent-before-XX1Ja0/module"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 long work a witnessed transition settling notifies; a first load in the settled state does not",
         "classification": "assertion",
-        "detail": "DE5 long work a witnessed transition settling notifies; a first load in the settled state does not:  AssertionError: expected [] to deeply equal [ Array(1) ]\n    at /home/elias/.cache/am/sj500zv7/tmp/test-intent-before-NvsHp5/modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts:168:20\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s3d/modules/ui-web/node_modules/@vite"
+        "detail": "DE5 long work a witnessed transition settling notifies; a first load in the settled state does not:  AssertionError: expected [] to deeply equal [ Array(1) ]\n    at /home/elias/.cache/am/8x00ak4p/tmp/test-intent-before-XX1Ja0/modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts:174:20\n    at file:///home/elias/.cache/am/8x00ak4p/tmp/test-intent-before-XX1Ja0/modules/ui-web/node_modules"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 long work an AI install completing or failing notifies; finding one already online does not",
         "classification": "assertion",
-        "detail": "DE5 long work an AI install completing or failing notifies; finding one already online does not:  AssertionError: expected [] to deeply equal [ 'AI install complete', …(1) ]\n    at /home/elias/.cache/am/sj500zv7/tmp/test-intent-before-NvsHp5/modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts:175:48\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s3d/modules/ui-web"
+        "detail": "DE5 long work an AI install completing or failing notifies; finding one already online does not:  AssertionError: expected [] to deeply equal [ 'AI install complete', …(1) ]\n    at /home/elias/.cache/am/8x00ak4p/tmp/test-intent-before-XX1Ja0/modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts:181:48\n    at file:///home/elias/.cache/am/8x00ak4p/tmp/test-intent-before-XX1Ja0/modules/"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 the taskbar badge reports the count it starts with, so a count left before a reload can clear",
         "classification": "assertion",
-        "detail": "DE5 the taskbar badge reports the count it starts with, so a count left before a reload can clear:  AssertionError: expected [] to deeply equal [ [ +0 ] ]\n    at /home/elias/.cache/am/sj500zv7/tmp/test-intent-before-NvsHp5/modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts:189:51\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s3d/modules/ui-web/node_modules/@vitest"
+        "detail": "DE5 the taskbar badge reports the count it starts with, so a count left before a reload can clear:  AssertionError: expected [] to deeply equal [ [ +0 ] ]\n    at /home/elias/.cache/am/8x00ak4p/tmp/test-intent-before-XX1Ja0/modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts:239:51\n    at file:///home/elias/.cache/am/8x00ak4p/tmp/test-intent-before-XX1Ja0/modules/ui-web/node_modules/@"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 the taskbar badge follows Needs you live, is sent only on a change, and clears at zero",
         "classification": "assertion",
-        "detail": "DE5 the taskbar badge follows Needs you live, is sent only on a change, and clears at zero:  AssertionError: expected [] to deeply equal [ +0, 1, 2 ]\n    at /home/elias/.cache/am/sj500zv7/tmp/test-intent-before-NvsHp5/modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts:194:72\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s3d/modules/ui-web/node_modules/@vite"
+        "detail": "DE5 the taskbar badge follows Needs you live, is sent only on a change, and clears at zero:  AssertionError: expected [] to deeply equal [ +0, 1, 2 ]\n    at /home/elias/.cache/am/8x00ak4p/tmp/test-intent-before-XX1Ja0/modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts:244:72\n    at file:///home/elias/.cache/am/8x00ak4p/tmp/test-intent-before-XX1Ja0/modules/ui-web/node_modules"
       },
       {
         "id": "modules/ui-web/src/utils/windowFocus.test.ts#isWindowFocused DE5 inside Tauri, a window hidden to the tray is in the background even if it kept its focus flag",
         "classification": "assertion",
-        "detail": "isWindowFocused DE5 inside Tauri, a window hidden to the tray is in the background even if it kept its focus flag:  Error: expected true to be false // Object.is equality\n    at _Assertion.__VITEST_RESOLVES__ (file:///home/elias/dev/justsearch/.claude/worktrees/shell-s3d/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1710:17)\n    at _Assertion.propertyGetter (file:///home/elias/dev/justsearch/.claude/wo"
+        "detail": "isWindowFocused DE5 inside Tauri, a window hidden to the tray is in the background even if it kept its focus flag:  Error: expected true to be false // Object.is equality\n    at _Assertion.__VITEST_RESOLVES__ (file:///home/elias/.cache/am/8x00ak4p/tmp/test-intent-before-XX1Ja0/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1710:17)\n    at _Assertion.propertyGetter (file:///home/elias/.cache/am/8x00ak4p/"
       },
       {
         "id": "modules/ui-web/src/utils/windowFocus.test.ts#isWindowFocused DE5 inside Tauri, a minimised window is in the background even if it kept its focus flag",
         "classification": "assertion",
-        "detail": "isWindowFocused DE5 inside Tauri, a minimised window is in the background even if it kept its focus flag:  Error: expected true to be false // Object.is equality\n    at _Assertion.__VITEST_RESOLVES__ (file:///home/elias/dev/justsearch/.claude/worktrees/shell-s3d/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1710:17)\n    at _Assertion.propertyGetter (file:///home/elias/dev/justsearch/.claude/wo"
+        "detail": "isWindowFocused DE5 inside Tauri, a minimised window is in the background even if it kept its focus flag:  Error: expected true to be false // Object.is equality\n    at _Assertion.__VITEST_RESOLVES__ (file:///home/elias/.cache/am/8x00ak4p/tmp/test-intent-before-XX1Ja0/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1710:17)\n    at _Assertion.propertyGetter (file:///home/elias/.cache/am/8x00ak4p/"
       }
     ]
   },
-  "digest": "sha256:27141a7441326dc15d914c6f0381b950155cd16c58e1effc1c4e26659f9a8025"
+  "digest": "sha256:6ed5251d5281195849d373875a9ae10441fdb0e911505398e0b45cc0b7851784"
 }

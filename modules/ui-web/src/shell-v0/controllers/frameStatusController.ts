@@ -71,7 +71,8 @@ export class FrameStatusController implements ReactiveController {
   private contactLostAt: number | null = null;
   private finished: { title: string; at: number } | null = null;
   private activeWork: FrameStatus | null = null;
-  private installing = false;
+  private activeWorkSince: number | null = null;
+  private installingSince: number | null = null;
   private sawTransitioning = false;
   private needsKey: Set<string> | null = null;
   private transientUntil = 0;
@@ -83,7 +84,7 @@ export class FrameStatusController implements ReactiveController {
   private store: AdvisoryStore | null = null;
   private stopActivity: (() => void) | undefined;
   private activity: readonly UnifiedActionEntry[] = [];
-  private operations = new Map<string, DurableStatusOperation>();
+  private operations = new Map<string, DurableStatusOperation & { activeSince?: number }>();
   private roots: readonly IndexedRootView[] = [];
   private rootsLive = false;
   private readonly rootPaths = new Map<string, string>();
@@ -134,7 +135,7 @@ export class FrameStatusController implements ReactiveController {
     for (const stop of this.unsubs) stop();
     this.unsubs = [];
     this.stopStore?.(); this.stopStore = undefined;
-    this.activeWork = null; this.installing = false; this.sawTransitioning = false; this.needsKey = null;
+    this.activeWork = null; this.activeWorkSince = null; this.installingSince = null; this.sawTransitioning = false; this.needsKey = null;
     this.observedSources = new Set();
     clearInterval(this.timer);
     document.removeEventListener('jf-plugin-load-error', this.pluginError);
@@ -235,7 +236,9 @@ export class FrameStatusController implements ReactiveController {
         if (!response.ok) throw new Error('Operation observation unavailable');
         const outcome = operationOutcomeViewSchema.parse(await response.json());
         if (!current() || this.operations.get(key) !== operation) continue;
-        this.operations.set(key, { ...operation, outcome, fresh: true });
+        const activeSince = ['accepted', 'running'].includes(outcome.state) && outcome.phase !== 'awaiting_acceptance'
+          ? operation.activeSince ?? Date.now() : undefined;
+        this.operations.set(key, { ...operation, outcome, fresh: true, activeSince });
         // ST6 — the invocation task finishes with the durable operation, never on invocation return.
         if (operation.invocationTaskId && outcome.phase !== 'awaiting_acceptance' && ['complete', 'failed'].includes(outcome.state)) {
           completeTask(operation.invocationTaskId, outcome.state === 'complete' ? 'succeeded' : 'failed');
@@ -246,7 +249,8 @@ export class FrameStatusController implements ReactiveController {
         if (wasRunning && outcome.state === 'complete') {
           this.finished = { title: `${operation.label} finished`, at: Date.now() };
           emitEphemeralToast({ message: this.finished.title, classId: 'core.verdict.settled' });
-          this.notifyDesktop(workFinishedNotice(this.finished.title, `operation:${key}`));
+          this.notifyDesktop(workFinishedNotice(this.finished.title, `operation:${key}`,
+            operation.activeSince === undefined ? undefined : Date.now() - operation.activeSince));
         } else if (wasRunning && outcome.state === 'failed') this.notifyDesktop(workFailedNotice(`${operation.label} failed`, `operation:${key}`));
       } catch {
         if (current() && this.operations.get(key) === operation) this.operations.set(key, { ...operation, fresh: false });
@@ -321,29 +325,34 @@ export class FrameStatusController implements ReactiveController {
     let next = derive();
     const finishedBefore = this.finished;
     const p = next.progress;
-    if (p.activity.confirmed && ['indexing', 'enriching'].includes(p.phase)) this.activeWork = next;
+    if (p.activity.confirmed && ['indexing', 'enriching'].includes(p.phase)) {
+      this.activeWork = next;
+      this.activeWorkSince ??= now;
+    }
     // 595 §15.3 N1 — a witnessed transition (rebuild, schema switch, indexing) completes once on
     // reaching operational, even through an intermediate checking/degraded stop. First load and
     // reconnects never saw a transition and stay silent; one completion is announced once.
     const verdictKind = this.ai?.phase === 'connected' ? this.ai.verdict.kind : null;
-    if (verdictKind === 'transitioning') this.sawTransitioning = true;
+    if (verdictKind === 'transitioning') { this.sawTransitioning = true; this.activeWorkSince ??= now; }
     const settled = verdictKind === 'operational' && this.sawTransitioning;
     if (verdictKind === 'operational') this.sawTransitioning = false;
     if (completedLongWork(this.activeWork, next) || settled) {
-      this.activeWork = null;
+      const activeDurationMs = this.activeWorkSince === null ? undefined : now - this.activeWorkSince;
+      this.activeWork = null; this.activeWorkSince = null;
       if (!this.finished || this.finished.title !== 'Search is up to date' || now - this.finished.at >= FINISHED_DWELL_MS) {
         this.finished = { title: 'Search is up to date', at: now };
         emitEphemeralToast({ message: this.finished.title, classId: 'core.verdict.settled' });
-        this.notifyDesktop(workFinishedNotice(this.finished.title));
+        this.notifyDesktop(workFinishedNotice(this.finished.title, undefined, activeDurationMs));
       }
     }
-    if (this.ai?.snapshotLive && this.ai.aiEngine.kind === 'installing') this.installing = true;
-    if (this.installing && this.ai?.snapshotLive && ['online', 'install_failed'].includes(this.ai.aiEngine.kind)) {
-      this.installing = false;
+    if (this.ai?.snapshotLive && this.ai.aiEngine.kind === 'installing') this.installingSince ??= now;
+    if (this.installingSince !== null && this.ai?.snapshotLive && ['online', 'install_failed'].includes(this.ai.aiEngine.kind)) {
+      const activeDurationMs = now - this.installingSince;
+      this.installingSince = null;
       if (this.ai.aiEngine.kind === 'online') {
         this.finished = { title: 'AI install complete', at: now };
         emitEphemeralToast({ message: 'AI install complete', classId: 'core.ai-engine.settled' });
-        this.notifyDesktop(workFinishedNotice('AI install complete'));
+        this.notifyDesktop(workFinishedNotice('AI install complete', undefined, activeDurationMs));
       } else {
         emitEphemeralToast({ message: 'AI install failed', classId: 'core.ai-engine.failed' });
         this.notifyDesktop(workFailedNotice('AI install failed'));

@@ -41,6 +41,18 @@ Git command adapter (the before-state is a shared clone in the session's tempora
 is registered in the source repository) and a Node command adapter that adds `--maxWorkers=4` to
 Vitest. The evidence producer is unchanged.
 
+The duration repair defines long finished work as at least 60 seconds (`LONG_WORK_MIN_DURATION_MS`),
+measured from the first observed active phase for each indexing/transition episode, install or
+operation. Short or unknown-duration completions still reach the pill and Earlier; failures keep
+notifying at any length. Replay remains silent. Existing positive completion checks now observe
+60 seconds, with their assertions unchanged. `shell-s3d-duration-repaired.json` records the six
+new duration regressions failing by assertion on candidate 32149108492c1f93c6d9227774ef49a975b44390
+and passing after repair. `shell-s3d-duration-preserved.json` reruns every check in the two edited
+test files. The original twelve repaired checks are rerun in `shell-s3d-repaired.json` against the
+original base, retaining their assertion fail-before evidence. Temporary adapters replace only
+Git worktree creation/removal with shared temporary clones and cap Vitest at four workers; before
+runs copy node_modules, so each checkout has its own dependency and build directories.
+
 ```json
 {
   "entries": [
@@ -221,7 +233,7 @@ Vitest. The evidence producer is unchanged.
         }
       ],
       "repaired": false,
-      "evidence": "gates/test-intent/evidence/shell-s3d-preserved.json",
+      "evidence": "gates/test-intent/evidence/shell-s3d-duration-preserved.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 an agent request with the window focused stays in the app: the pill and its announcement are the notice",
         "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 an agent request C6 a request rediscovered after a reload notifies nothing and still counts as needing you",
@@ -235,7 +247,6 @@ Vitest. The evidence producer is unchanged.
     },
     {
       "items": [
-        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
         "modules/ui-web/src/shell-v0/router/tauriBridge.notices.test.ts",
         "modules/ui-web/src/utils/notify.test.ts"
       ],
@@ -261,12 +272,6 @@ Vitest. The evidence producer is unchanged.
       "repaired": false,
       "evidence": "gates/test-intent/evidence/shell-s3d-preserved.json",
       "newChecks": [
-        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification opens the review of the agent request",
-        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification opens the panel on a failed operation, with focus on its row",
-        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification finds an event listed only by its words in Earlier",
-        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification a request answered since opens the panel on what is true now",
-        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification never opens over a must-stop dialog",
-        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification C10 a remount listens once: the old listener is stopped",
         "modules/ui-web/src/shell-v0/router/tauriBridge.notices.test.ts#DE5 the shell contract the commands the frontend invokes are registered, and the clicked event has one name",
         "modules/ui-web/src/shell-v0/router/tauriBridge.notices.test.ts#DE5 the shell contract both sides agree on the overlay size the shell validates",
         "modules/ui-web/src/shell-v0/router/tauriBridge.notices.test.ts#DE5 installNoticeActivationBridge reports the clicked event id from the shell",
@@ -276,6 +281,40 @@ Vitest. The evidence producer is unchanged.
         "modules/ui-web/src/utils/notify.test.ts#sendDesktopNotification hands the event and its id to the shell, which shows it once and reports the click",
         "modules/ui-web/src/utils/notify.test.ts#sendDesktopNotification does nothing in a plain browser, and asks no permission",
         "modules/ui-web/src/utils/notify.test.ts#sendDesktopNotification a shell that cannot show it raises no error"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "A clicked notification opens the review of an agent request, or the panel on a failed operation or an event listed by its words; an item that has left opens the panel; a must-stop dialog stays on top. The listener stops with its owner, even mid-subscription, and a remount listens once. The frontend and the shell agree on the commands, the event name and the overlay size. Nothing happens in a plain browser, with no permission prompt.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "C10",
+          "quote": "Host lifecycle: shell teardown/remount and desktop hide-to-tray/reopen don't duplicate streams or listeners, orphan prompts, lose activity reporting or break idle locking.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "design decisions of the frame build, within the canonical design",
+          "choice": "clicking a notification brings the app forward and opens the status panel on that item, an agent request on its review; the shell delivers notifications because the notification plugin cannot report a desktop click; an item that has left opens the panel, and a must-stop dialog stays on top",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": false,
+      "evidence": "gates/test-intent/evidence/shell-s3d-duration-preserved.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification opens the review of the agent request",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification opens the panel on a failed operation, with focus on its row",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification finds an event listed only by its words in Earlier",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification a request answered since opens the panel on what is true now",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification never opens over a must-stop dialog",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification C10 a remount listens once: the old listener is stopped"
       ]
     },
     {
@@ -325,7 +364,7 @@ Vitest. The evidence producer is unchanged.
         }
       ],
       "repaired": false,
-      "evidence": "gates/test-intent/evidence/shell-s3d-preserved.json",
+      "evidence": "gates/test-intent/evidence/shell-s3d-duration-preserved.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts#DE5 routeDesktopNotice agent-request: a focused window keeps it in the app, in every setting",
         "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts#DE5 routeDesktopNotice work-finished: a focused window keeps it in the app, in every setting",
@@ -464,6 +503,92 @@ Vitest. The evidence producer is unchanged.
         "modules/shell/src-tauri/src/notices.rs#notices::tests::a_claim_expires_so_later_work_can_notify_and_the_ledger_stays_small",
         "modules/shell/src-tauri/src/notices.rs#notices::tests::zero_clears_the_badge",
         "modules/shell/src-tauri/src/notices.rs#notices::tests::the_overlay_clears_at_zero_and_rejects_a_wrong_size"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Finished work may notify only after at least 60 seconds of observed active work, measured separately for each indexing or transition episode, install, and operation. A shorter completion stays in the pill and Earlier; an unknown duration stays inside. Failures notify at any duration, subject to the existing focus, setting and replay rules.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "DE5",
+          "quote": "Notices only when you're not looking: in-app notice only for needs-you items when you're elsewhere in the app; nothing for what is on screen; OS notification only when the app is in the background, for agent requests waiting and long work finished or failed; taskbar badge counts needs-you; Settings › General › Notifications: Off / On / On with sound.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "design decisions of the frame build, within the canonical design",
+          "choice": "Finished work may notify only after at least 60 seconds of observed active work, measured separately for each indexing or transition episode, install, and operation. A shorter completion stays in the pill and Earlier; an unknown duration stays inside. Failures notify at any duration, subject to the existing focus, setting and replay rules.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s3d-duration-repaired.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 short work stays inside 59 seconds stays in the pill and Earlier; a later 60 second run notifies once",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 short work stays inside indexing durations reset between runs, so repeated short runs stay silent",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 short work stays inside a short operation completes without notifying",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 short work stays inside a short install completes silently, but a short failure notifies",
+        "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts#DE5 work duration 59 seconds stays in the app; 60 seconds notifies",
+        "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts#DE5 work duration an unknown duration stays in the app"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Failures remain eligible at zero, short, long and unknown durations; replay remains silent even for long finished work.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "DE5",
+          "quote": "Notices only when you're not looking: in-app notice only for needs-you items when you're elsewhere in the app; nothing for what is on screen; OS notification only when the app is in the background, for agent requests waiting and long work finished or failed; taskbar badge counts needs-you; Settings › General › Notifications: Off / On / On with sound.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "design decisions of the frame build, within the canonical design",
+          "choice": "Finished work may notify only after at least 60 seconds of observed active work, measured separately for each indexing or transition episode, install, and operation. A shorter completion stays in the pill and Earlier; an unknown duration stays inside. Failures notify at any duration, subject to the existing focus, setting and replay rules.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": false,
+      "evidence": "gates/test-intent/evidence/shell-s3d-duration-preserved.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts#DE5 work duration a failure notifies at any length, including an unknown duration",
+        "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts#DE5 work duration C6 replay stays silent even after long work"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "input re-encoding"
+      ],
+      "whatMoved": "Existing positive completion examples now provide or observe 60 seconds of active work. The component tests offset Date.now while leaving real timers running. All existing assertions remain unchanged; the routing fixture adds the duration now required for a long completion. Every check in both edited files is rerun in shell-s3d-duration-preserved.json.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "design decisions of the frame build, within the canonical design",
+          "choice": "Finished work may notify only after at least 60 seconds of observed active work, measured separately for each indexing or transition episode, install, and operation. A shorter completion stays in the pill and Earlier; an unknown duration stays inside. Failures notify at any duration, subject to the existing focus, setting and replay rules.",
+          "label": "agent choice"
+        }
       ]
     }
   ]

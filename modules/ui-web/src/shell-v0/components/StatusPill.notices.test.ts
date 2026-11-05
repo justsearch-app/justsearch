@@ -28,6 +28,7 @@ vi.mock('../router/tauriBridge.js', () => ({ installNoticeActivationBridge: vi.f
 let pill: StatusPill;
 let host: AuthorizationHost;
 let store: AdvisoryStore;
+let elapsed = 0;
 const panel = () => pill.shadowRoot!.querySelector<StatusPanel>('jf-status-panel')!;
 const root = () => panel().shadowRoot!;
 async function flush() {
@@ -75,6 +76,9 @@ function operation(key: string, label: string, first: Record<string, unknown>) {
 
 beforeEach(async () => {
   vi.clearAllMocks();
+  elapsed = 0;
+  const now = Date.now.bind(Date);
+  vi.spyOn(Date, 'now').mockImplementation(() => now() + elapsed);
   vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 503 })));
   __resetAiStateForTest(); __resetTasksForTest(); __resetUserStateForTest(); __resetModalityForTest();
   store = new AdvisoryStore(); store.start();
@@ -84,7 +88,7 @@ beforeEach(async () => {
 });
 afterEach(() => {
   pill.remove(); host.remove(); store.stop();
-  __resetAiStateForTest(); __resetTasksForTest(); __resetUserStateForTest(); __resetModalityForTest(); vi.unstubAllGlobals();
+  __resetAiStateForTest(); __resetTasksForTest(); __resetUserStateForTest(); __resetModalityForTest(); vi.unstubAllGlobals(); vi.restoreAllMocks();
 });
 
 describe('DE5 an agent request', () => {
@@ -139,6 +143,7 @@ describe('DE5 long work', () => {
     const advance = operation('op1', 'Rebuild search', { state: 'running', historySince: 0 });
     await advance();
     expect(sendDesktopNotification).not.toHaveBeenCalled();
+    elapsed += 60_000;
     await advance({ state: 'complete', historySince: 0 });
     await advance();
     expect(sent()).toEqual([{ id: 'operation:op1', title: 'Rebuild search finished', sound: false }]);
@@ -164,13 +169,14 @@ describe('DE5 long work', () => {
     await observe(verdict('operational'));
     expect(sendDesktopNotification).not.toHaveBeenCalled();
     await observe(verdict('transitioning'));
+    elapsed += 60_000;
     await observe(verdict('operational'));
     expect(sent()).toEqual([{ id: 'Search is up to date', title: 'Search is up to date', sound: false }]);
   });
   it('an AI install completing or failing notifies; finding one already online does not', async () => {
     await observe(engine('online'));
     expect(sendDesktopNotification).not.toHaveBeenCalled();
-    await observe(engine('installing')); await observe(engine('online'));
+    await observe(engine('installing')); elapsed += 60_000; await observe(engine('online'));
     await observe(engine('installing')); await observe(engine('install_failed'));
     expect(sent().map(notice => notice.title)).toEqual(['AI install complete', 'AI install failed']);
   });
@@ -181,6 +187,50 @@ describe('DE5 long work', () => {
       expect(pill.status.model.pill).toMatchObject({ kind: 'finished', label: 'Search is up to date' });
       expect(sendDesktopNotification).not.toHaveBeenCalled();
     } finally { vi.mocked(isWindowFocused).mockResolvedValue(false); }
+  });
+});
+
+describe('DE5 short work stays inside', () => {
+  it('59 seconds stays in the pill and Earlier; a later 60 second run notifies once', async () => {
+    await observe(verdict('transitioning'));
+    elapsed += 59_000;
+    await observe(verdict('operational'));
+    expect(sendDesktopNotification).not.toHaveBeenCalled();
+    expect(pill.status.model.pill).toMatchObject({ kind: 'finished', label: 'Search is up to date' });
+    expect(panel().model!.sections.earlier.some(row => row.title === 'Search is up to date')).toBe(true);
+    await observe(verdict('transitioning'));
+    elapsed += 60_000;
+    await observe(verdict('operational'));
+    await flush();
+    expect(sent()).toEqual([{ id: 'Search is up to date', title: 'Search is up to date', sound: false }]);
+  });
+  it('indexing durations reset between runs, so repeated short runs stay silent', async () => {
+    const indexing = { status: { worker: { core: { indexState: 'INDEXING', pendingJobs: 5 }, enrichment: {} } } as AiState['status'] };
+    for (let run = 0; run < 2; run++) {
+      await observe(indexing);
+      elapsed += 30_000;
+      await observe({});
+      expect(pill.status.model.pill).toMatchObject({ kind: 'finished', label: 'Search is up to date' });
+      expect(sendDesktopNotification).not.toHaveBeenCalled();
+    }
+    await observe(indexing);
+    elapsed += 60_000;
+    await observe({});
+    expect(sent()).toEqual([{ id: 'Search is up to date', title: 'Search is up to date', sound: false }]);
+  });
+  it('a short operation completes without notifying', async () => {
+    const advance = operation('short-op', 'Rebuild search', { state: 'running', historySince: 0 });
+    await advance();
+    await advance({ state: 'complete', historySince: 0 });
+    expect(sendDesktopNotification).not.toHaveBeenCalled();
+    expect(pill.status.model.pill).toMatchObject({ kind: 'finished', label: 'Rebuild search finished' });
+  });
+  it('a short install completes silently, but a short failure notifies', async () => {
+    await observe(engine('installing')); await observe(engine('online'));
+    expect(sendDesktopNotification).not.toHaveBeenCalled();
+    expect(pill.status.model.pill).toMatchObject({ kind: 'finished', label: 'AI install complete' });
+    await observe(engine('installing')); await observe(engine('install_failed'));
+    expect(sent().map(notice => notice.title)).toEqual(['AI install failed']);
   });
 });
 
