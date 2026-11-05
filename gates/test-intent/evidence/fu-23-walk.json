@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-05T12:55:26.240Z",
+  "revision": "49b3196bbace9328685595c56d8463de03f0dfb6",
+  "tree": "ea7e6b5638ab17336acf471a6a1d4a711014968d",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.LostRootVolumeRecordTest.recordWalkSkipsVanishedEntriesButKeepsExistingMatchesAndOtherFailures\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2906
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/LostRootVolumeRecordTest.java#recordWalkSkipsVanishedEntriesButKeepsExistingMatchesAndOtherFailures",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/LostRootVolumeRecordTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d97bf366b92a7d5f7bf356cbb284986710c7d0342a709b80490d18e48d475159",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "recordWalkSkipsVanishedEntriesButKeepsExistingMatchesAndOtherFailures()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:6e867e0a315bf29b1b0cc23afcfeebeb7046b68f2fcbcc86671aeafd2a1c1c50"
+}

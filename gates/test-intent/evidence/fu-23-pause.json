@@ -1,0 +1,61 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-05T12:55:20.198Z",
+  "revision": "49b3196bbace9328685595c56d8463de03f0dfb6",
+  "tree": "690bc6dd2eddbf9598b8b6d1f8c7fba6a3864018",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.loop.IndexingLoopPauseAcknowledgementTest.pauseBetweenLeaseAndPollRemainsPausingThroughPublicationAndResumeDrainsRetry\" --tests \"io.justsearch.indexerworker.loop.IndexingLoopPauseAcknowledgementTest.pauseBeforeLeaseClaimsNothingUntilResume\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 12208
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopPauseAcknowledgementTest.java#pauseBetweenLeaseAndPollRemainsPausingThroughPublicationAndResumeDrainsRetry",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopPauseAcknowledgementTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:34e4d0989cc8c1447852f7517363130ccd00b7b6dd92965cfeaa2e77035db44b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pauseBetweenLeaseAndPollRemainsPausingThroughPublicationAndResumeDrainsRetry()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopPauseAcknowledgementTest.java#pauseBeforeLeaseClaimsNothingUntilResume",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopPauseAcknowledgementTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:34e4d0989cc8c1447852f7517363130ccd00b7b6dd92965cfeaa2e77035db44b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pauseBeforeLeaseClaimsNothingUntilResume()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:cf7f4ca9ef635cc429ad8f256b6e0e9a2e92b4b4e1b256157e7e0fb0d1893a42"
+}
