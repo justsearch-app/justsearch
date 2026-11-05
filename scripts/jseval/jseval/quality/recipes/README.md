@@ -269,9 +269,10 @@ the accepted output of such a round, and the record shows which ones.
 
 Topical queries ask for all files about a topic. `jseval.quality.topical_labels`
 labels them; its steps are `extract`, `pool`, `excerpts`, `judge`, `project`,
-`sample`, `accept` and `freeze`, each resumable. Document text, excerpts,
-prompts, replies, model grades before the freeze and the user's sheets stay in
-`~/.cache/justsearch-quality/real-use-labels/`, never in Git.
+`sample`, `second-judge`, `spot`, `accept` and `freeze`, each resumable.
+Document text, excerpts, prompts, replies, model grades before the freeze and
+the owner's sheet stay in `~/.cache/justsearch-quality/real-use-labels/`, never
+in Git.
 
 ```sh
 source ~/.cache/justsearch-quality/real-use-queries/gpu.env
@@ -282,6 +283,12 @@ python scripts/dev/admission.py exclusive --purpose "real-use pools" --timeout 6
 python -m jseval.quality.topical_labels excerpts
 python -m jseval.quality.topical_labels judge --max-calls 10 --phase calibration
 python -m jseval.quality.topical_labels project
+python -m jseval.quality.topical_labels sample
+python -m jseval.quality.topical_labels second-judge --max-calls 2 --phase calibration
+python -m jseval.quality.topical_labels second-judge --max-calls 1000
+python -m jseval.quality.topical_labels spot     # 5 blocks for the owner, if the judges agree
+python -m jseval.quality.topical_labels accept
+python -m jseval.quality.topical_labels freeze
 ```
 
 - **Pools.** Per topical query: the union of the top 10 of three pipelines on
@@ -317,26 +324,52 @@ python -m jseval.quality.topical_labels project
 - **Labels.** Binary at the fixed cutoff grade >= 2 (relevant 1, else 0),
   judged zeros kept; raw grades and pool provenance go to
   `real-use-queries/topical-labels.json` at the freeze.
-- **Agreement sample**, fixed before any user grade: 150 pairs from the
-  complete graded pool (seed 20261105), at most 2 per query, 75 the model
-  calls relevant and 75 not, each half split by query language in proportion,
-  at least 30 graded 1 or 2. Pair ids and order carry no stratum. The sheet is
-  plain text: one block per pair with the question "Would you want this file
-  among the results for this search?" and `Answer:` yes, no or unsure. The
-  parser refuses missing, duplicate or altered blocks and reports unanswered
-  ones.
-- **Acceptance**, fixed: agreement is the unrounded share of answered yes/no
-  pairs where the user's answer equals the model's label. PASS at >= 0.80.
-  Fewer than 120 yes/no answers, or a 95% Wilson interval that contains 0.80,
-  draws a second batch of 150 new pairs with the same quotas; the decision is
-  then made on all yes/no answers by the same rule, never with a third batch.
-  A FAIL allows one rubric or prompt revision, a full re-label and a new
-  sample of new pairs; a second FAIL stops. The report adds the confusion
-  matrix, false positives and negatives by language and grade, unsure answers
-  and a weighted population estimate (information only).
-- **Freeze**, only after a PASS on exactly the current model labels: binary
-  qrels for every topical pair through the collection writer, counts and grade
-  histogram in the config, `topical` removed from `pending_kinds`. Known-item
+- **Agreement sample**, fixed before any grade was seen: 150 pairs from the
+  complete graded pool (seed 20261105), at most 2 per query, 75 the primary
+  judge calls relevant and 75 not, each half split by query language in
+  proportion, at least 30 graded 1 or 2. Pair ids and order carry no stratum.
+  No owner grades these 150 pairs: they are the second judge's set.
+- **Second judge.** `gpt-6.1-sol`, another model family, through `codex exec`
+  on the ChatGPT subscription only. Any `OPENAI_*` variable (API key, base URL
+  and other endpoint overrides), the CLI's own `CODEX_API_KEY`,
+  `CODEX_ACCESS_TOKEN`, `CODEX_HOME`, login-issuer and token-refresh overrides,
+  or a Bedrock token refuses before any call, even when empty, and
+  `codex login status` must report `Logged in using ChatGPT`. The call
+  (reviewed against codex-cli 0.166.0, `codex exec --help`):
+  `codex exec --ignore-user-config --ignore-rules --ephemeral
+  --skip-git-repo-check --sandbox read-only --model gpt-6.1-sol --json
+  --output-schema <grades schema> -c model_provider="openai"
+  -c approval_policy="never" -c web_search="disabled" -c project_doc_max_bytes=0
+  --disable <each tool feature> -`, with the prompt on stdin, in an empty
+  temporary folder. A reply whose event stream shows any tool item, or an
+  error event, is refused. It grades exactly the sample's 150 pairs with the
+  same rubric, excerpts and batching (one query per call, up to five files in
+  seeded random order). Its records (`second/` in the work folder) are bound
+  like the primary's, stamped with revision and dispatch time, and keep only a
+  digest of each reply; it pauses and stops with the same reasons
+  (`quota: ChatGPT usage limit reached`).
+- **Decision**, fixed before any second grade: the judges agree when both give
+  the same binary label (grade >= 2). Below 80% of the 150 pairs, unrounded
+  (119 of 150), FAIL, and the owner is not asked. At or above it, the owner's
+  spot check: 5 pairs drawn by a recorded seed (`20261105:<revision>:spot`)
+  from the pairs where the judges disagree, at least 2 the primary calls
+  relevant and the second not, 2 the other way and 2 from German queries,
+  each as far as such pairs exist; with fewer than 5 disagreements, all of
+  them plus primary grade-1/2 boundary pairs. The sheet is plain text, one
+  block per pair, no grades: the question "Would you want this file among the
+  results for this search?" and `Answer:` yes, no or unsure; the parser
+  refuses missing, duplicate or altered blocks, and every block must be
+  answered. An owner who sides against the primary judge (yes/no unlike its
+  label) on 4 or 5 of the 5 makes it FAIL; otherwise the spot result is
+  recorded as information and the decision is PASS. A FAIL allows one rubric
+  or prompt revision, a full re-label, a new sample of new pairs and the second
+  judge again; a second FAIL stops. The decision record adds the judges'
+  confusion matrix and disagreements by language and grade (information only).
+- **Freeze**, only after a PASS on exactly the current grades of both judges:
+  binary qrels for every topical pair through the collection writer, counts and
+  grade histogram in the config, `topical` removed from `pending_kinds`. The
+  record's provenance names the primary and second judge, their measured
+  agreement on the 150 pairs and the owner's spot-check result. Known-item
   labels and document identity are unchanged, so the prepared index is
   reused. A query whose pool holds no relevant file is excluded from scoring
   with the recorded reason `no relevant document in pool` (config `excluded`),

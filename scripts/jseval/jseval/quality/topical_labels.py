@@ -1,26 +1,35 @@
 """Labels for the real-use collection's topical queries (P5c): pool, excerpt, judge, sample,
-accept, freeze.
+second judge, spot check, accept, freeze.
 
-Topical queries ask for all files about a topic. The judge question and the user's sheet ask:
+Topical queries ask for all files about a topic. The judge question and the owner's sheet ask:
 "Would a person running this search want this file among the results?" Grades 0-3 (0 unrelated,
 1 touches the topic but not wanted, 2 wanted, 3 clearly central); the frozen labels are binary at
 the fixed cutoff grade >= 2, judged zeros kept, raw grades kept as audit data.
 
-``extract``   adopt the prepared real-use index through the core's pausable background lifecycle
-              and read every document's extracted text from it (into ``WORK``, never Git).
-``pool``      per topical query, the union of the top 10 of three trace-verified pipelines on that
-              one index (keyword alone exactly as the P5b gate, dense alone, the Search window's
-              refined default) and the members of the topic group the query was written from
-              (capped at 10). Runs inside the core's exclusive window, like scoring.
-``excerpts``  a configuration-neutral excerpt per pooled pair from the pooled index's extracted
-              text: name, first ~600 characters, the two non-overlapping ~600-character windows
-              with the highest query-term overlap. Judge and user see exactly this text.
-``judge``     ``claude -p`` on the subscription (``claude-opus-5-5``), up to 5 documents per call
-              in randomized order; per-pair checkpoints bound to their identity; pausable.
-``project``   calls and wall time still to go, from the recorded calls.
-``sample``    the fixed, seeded 150-pair agreement sample and its plain-text sheet.
-``accept``    the agreement decision on the filled sheets (rule fixed below, before any grade).
-``freeze``    canonical binary qrels through the collection writer, after a passing decision.
+``extract``       adopt the prepared real-use index through the core's pausable background
+                  lifecycle and read every document's extracted text from it (into ``WORK``).
+``pool``          per topical query, the union of the top 10 of three trace-verified pipelines on
+                  that one index (keyword alone exactly as the P5b gate, dense alone, the Search
+                  window's refined default) and the members of the topic group the query was
+                  written from (capped at 10). Runs inside the core's exclusive window.
+``excerpts``      a configuration-neutral excerpt per pooled pair from the pooled index's
+                  extracted text: name, first ~600 characters, the two non-overlapping
+                  ~600-character windows with the highest query-term overlap. Judges and owner see
+                  exactly this text.
+``judge``         the primary judge: ``claude -p`` on the Claude subscription (``claude-opus-5-5``),
+                  up to 5 documents per call in randomized order; per-pair checkpoints bound to
+                  their identity; pausable.
+``project``       calls and wall time still to go, from the recorded calls.
+``sample``        the fixed, seeded 150-pair agreement sample (no sheet: no owner grades it).
+``second-judge``  an independent judge of another model family, ``gpt-6.1-sol`` through
+                  ``codex exec`` on the ChatGPT subscription, grades exactly the sample's pairs
+                  with the same rubric, excerpts and batching.
+``spot``          the owner's 5-pair spot check, drawn from the judges' disagreements by a
+                  recorded seed, as a plain-text sheet without grades.
+``accept``        the decision (rule fixed below, before any grade): the judges agree on the binary
+                  label for >= 80% of the 150 pairs, and the owner does not side against the
+                  primary judge on 4 or 5 of the 5 spot pairs.
+``freeze``        canonical binary qrels through the collection writer, after a passing decision.
 
 Limit (named): labels are agreement on the excerpt; an answer outside it can be missed. No
 German compound-splitting rule exists in this codebase, so query terms match whole tokens of the
@@ -42,6 +51,7 @@ import signal
 import statistics
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import unicodedata
@@ -69,14 +79,16 @@ SEED = 20261105
 CUTOFF = 2  # binary label: relevant when grade >= CUTOFF
 NO_RELEVANT = "no relevant document in pool"
 
-# Agreement sample and acceptance, fixed before anyone sees a grade (design 5-6).
+# Agreement sample, second judge and spot check, fixed before anyone sees a grade (design 5-6).
 SAMPLE_SIZE = 150
 PER_QUERY = 2
 BOUNDARY_MIN = 30  # pairs graded 1 or 2
-PASS_MARK = 0.80
-USABLE_MIN = 120  # yes/no answers in the first batch
-WILSON_Z = 1.959963984540054
+PASS_MARK = 0.80  # judges' binary agreement on the sample, unrounded
 MAX_REVISION = 1  # at most one rubric/prompt revision
+SECOND_MODEL = "gpt-6.1-sol"
+SPOT_SIZE = 5
+SPOT_QUOTA = 2  # at least this many of each disagreement direction, and of German queries
+SPOT_AGAINST_FAIL = 4  # owner against the primary judge on this many spot pairs: FAIL
 ANSWERS = ("yes", "no", "unsure")
 QUESTION = "Would you want this file among the results for this search?"
 
@@ -413,11 +425,12 @@ def template() -> str:
 
 
 def identity(c: Collection, pools: dict, qid: str, doc: str, ex: dict,
-             *, template_text: str | None = None) -> dict:
-    """What a judgment is bound to; resume reuses a judgment only when all of it is equal."""
+             *, template_text: str | None = None, model: str | None = None) -> dict:
+    """What a judgment is bound to; resume reuses a judgment only when all of it is equal.
+    ``model`` is the judge's model (the primary ``MODEL`` unless given)."""
     return {"query_sha256": c.queries[qid].sha256, "content_sha256": c.content[doc],
             "extracted_sha256": ex["extracted_sha256"], "excerpt_sha256": ex["excerpt_sha256"],
-            "pool_generation": pools["generation"], "model": MODEL,
+            "pool_generation": pools["generation"], "model": MODEL if model is None else model,
             "template_sha256": sha256_text(template() if template_text is None else template_text)}
 
 
@@ -506,22 +519,51 @@ def append_rows(path: Path, rows: list[dict]) -> None:
         os.fsync(f.fileno())
 
 
-def current_judgments(c: Collection, pools: dict, ex: dict,
-                      *, revision: int = 0, after: float | None = None) -> dict[tuple[str, str], dict]:
-    """Latest judgments matching this revision and identity, dispatched after its opening decision.
-    Unstamped legacy judgments belong to revision 0 only.
-    """
+def _judgments(path: Path, model: str, c: Collection, pools: dict, ex: dict, *, revision: int,
+               after: float | None, wanted=None) -> dict[tuple[str, str], dict]:
     out = {}
     rubric = template()
-    for row in read_checkpoint(WORK / "judgments.jsonl"):
+    for row in read_checkpoint(path):
         if row.get("revision", 0) != revision:
             continue
         if after is not None and row.get("dispatched_at", 0) <= after:
             continue
         qid, doc = row.get("qid"), row.get("doc")
+        if wanted is not None and (qid, doc) not in wanted:
+            continue
         if qid in pools["queries"] and doc in pools["queries"][qid]["pairs"] and doc in ex.get(qid, {}):
-            if row.get("identity") == identity(c, pools, qid, doc, ex[qid][doc], template_text=rubric):
+            if row.get("identity") == identity(c, pools, qid, doc, ex[qid][doc], template_text=rubric,
+                                               model=model):
                 out[(qid, doc)] = row
+    return out
+
+
+def current_judgments(c: Collection, pools: dict, ex: dict,
+                      *, revision: int = 0, after: float | None = None) -> dict[tuple[str, str], dict]:
+    """Latest primary judgments matching this revision and identity, dispatched after its opening
+    decision. Unstamped legacy judgments belong to revision 0 only.
+    """
+    return _judgments(WORK / "judgments.jsonl", MODEL, c, pools, ex, revision=revision, after=after)
+
+
+def _second_path(name: str) -> Path:
+    return WORK / "second" / name
+
+
+def second_judgments(c: Collection, pools: dict, ex: dict, pairs: list[dict],
+                     *, revision: int = 0, after: float | None = None) -> dict[tuple[str, str], dict]:
+    """Latest second-judge judgments of the sample ``pairs``, bound like the primary's."""
+    return _judgments(_second_path("judgments.jsonl"), SECOND_MODEL, c, pools, ex, revision=revision,
+                      after=after, wanted={(p["qid"], p["doc"]) for p in pairs})
+
+
+def _batches(pairs: dict[str, list[str]], done, salt: str) -> list[tuple[str, list[str]]]:
+    out = []
+    for qid in sorted(pairs):
+        todo = sorted(d for d in pairs[qid] if (qid, d) not in done)
+        random.Random(f"{salt}:{qid}").shuffle(todo)
+        out += [(qid, todo[i:i + BATCH]) for i in range(0, len(todo), BATCH)]
+    random.Random(f"{salt}:calls").shuffle(out)
     return out
 
 
@@ -529,30 +571,141 @@ def batches(pools: dict, done, revision: int) -> list[tuple[str, list[str]]]:
     """Unjudged pairs per query in seeded random order, at most ``BATCH`` per call; the calls
     themselves in seeded random order (so a short calibration spreads over queries)."""
     _check_revision(revision)
-    out = []
-    for qid in sorted(pools["queries"]):
-        todo = sorted(d for d in pools["queries"][qid]["pairs"] if (qid, d) not in done)
-        random.Random(f"{SEED}:{revision}:{qid}").shuffle(todo)
-        out += [(qid, todo[i:i + BATCH]) for i in range(0, len(todo), BATCH)]
-    random.Random(f"{SEED}:{revision}:calls").shuffle(out)
-    return out
+    return _batches({q: list(p["pairs"]) for q, p in pools["queries"].items()}, done, f"{SEED}:{revision}")
+
+
+def second_batches(pairs: list[dict], done, revision: int) -> list[tuple[str, list[str]]]:
+    """The sample's unjudged pairs batched like the primary's (one query per call, at most
+    ``BATCH``, seeded random order), with the second judge's own seed."""
+    _check_revision(revision)
+    by_query = defaultdict(list)
+    for p in pairs:
+        by_query[p["qid"]].append(p["doc"])
+    return _batches(by_query, done, f"{SEED}:{revision}:second")
+
+
+# The second judge: ``codex exec`` (reviewed against codex-cli 0.166.0, ``codex exec --help``) on
+# the ChatGPT subscription. Presence of any of these, even empty, refuses before any call:
+# OPENAI_* covers OPENAI_API_KEY, OPENAI_BASE_URL and the other endpoint/organisation overrides;
+# the CODEX_* names are the CLI's own API key, access token, credential home, login issuer and
+# token refresh endpoint, and a remote executor; Bedrock is another provider.
+CODEX_OVERRIDE_PREFIXES = ("OPENAI_", "AZURE_OPENAI_")
+CODEX_OVERRIDES = frozenset({"CODEX_API_KEY", "CODEX_ACCESS_TOKEN", "CODEX_HOME",
+                             "CODEX_REFRESH_TOKEN_URL_OVERRIDE", "CODEX_APP_SERVER_LOGIN_ISSUER",
+                             "CODEX_APP_SERVER_LOGIN_CLIENT_ID", "CODEX_EXEC_SERVER_URL",
+                             "AWS_BEARER_TOKEN_BEDROCK"})
+CODEX_SUBSCRIPTION = "Logged in using ChatGPT"
+# Every feature that gives the agent a tool or extra context is off; ``codex exec`` keeps no
+# session (--ephemeral), loads no user config or rules, runs in a read-only sandbox with no
+# approvals, and must reply with the grades object (--output-schema).
+CODEX_FEATURES_OFF = ("shell_tool", "unified_exec", "apps", "plugins", "multi_agent", "image_generation",
+                      "view_image", "browser_use", "computer_use", "in_app_browser", "goals", "hooks",
+                      "memories", "skill_search", "sleep_tool", "tool_suggest", "shell_snapshot")
+# Items a tool-less reply may hold; an ``error`` item is a non-fatal CLI warning (a fatal error
+# arrives as an ``error``/``turn.failed`` event). Any other item is a tool the agent used.
+CODEX_REPLY_ITEMS = {"agent_message", "reasoning", "error"}
+
+
+class CodexError(RuntimeError):
+    """An error event of ``codex exec`` itself (never text of the model's reply)."""
+
+
+def codex_command(model: str, cwd: str, schema: str) -> list[str]:
+    command = ["codex", "exec", "--ignore-user-config", "--ignore-rules", "--ephemeral",
+               "--skip-git-repo-check", "--sandbox", "read-only", "--model", model, "--cd", cwd,
+               "--color", "never", "--json", "--output-schema", schema,
+               "-c", 'model_provider="openai"', "-c", 'approval_policy="never"',
+               "-c", 'web_search="disabled"', "-c", "project_doc_max_bytes=0"]
+    for feature in CODEX_FEATURES_OFF:
+        command += ["--disable", feature]
+    return command + ["-"]  # the prompt on stdin, never in the process list
+
+
+def grade_schema(ids: list[str]) -> dict:
+    return {"type": "object", "additionalProperties": False, "required": ["grades"],
+            "properties": {"grades": {"type": "array", "items": {
+                "type": "object", "additionalProperties": False, "required": ["id", "grade"],
+                "properties": {"id": {"type": "string", "enum": ids},
+                               "grade": {"type": "integer", "enum": [0, 1, 2, 3]}}}}}}
+
+
+def parse_codex_events(stdout: str) -> dict:
+    """The grades object of the last agent message of a ``codex exec --json`` event stream;
+    refuses error events, a failed turn and any tool use."""
+    message = None
+    for line in stdout.splitlines():
+        if not line.strip():
+            continue
+        event = json.loads(line)
+        kind = event.get("type")
+        if kind in ("error", "turn.failed", "thread.failed"):
+            err = event.get("error") if isinstance(event.get("error"), dict) else event
+            raise CodexError(f"codex error: {str(err.get('message'))[:300]}")
+        item = event.get("item") or {}
+        if kind in ("item.started", "item.updated", "item.completed") and item.get("type") not in CODEX_REPLY_ITEMS:
+            raise ValueError(f"codex used a tool: {item.get('type')}")
+        if kind == "item.completed" and item.get("type") == "agent_message":
+            message = item.get("text") or ""
+    if message is None:
+        raise ValueError("codex gave no reply")
+    start = message.find("{")
+    if start < 0:
+        raise ValueError("no JSON object in reply")
+    value, _ = json.JSONDecoder().raw_decode(message[start:])
+    if not isinstance(value, dict):
+        raise ValueError("reply is not a JSON object")
+    return value
+
+
+def ask_codex(prompt: str, ids: list[str], *, model: str = SECOND_MODEL,
+              timeout: float = CALL_TIMEOUT) -> tuple[dict, str]:
+    """One tool-less, session-less ``codex exec`` call on the ChatGPT subscription."""
+    if any(n.startswith(CODEX_OVERRIDE_PREFIXES) or n in CODEX_OVERRIDES for n in os.environ):
+        raise ruq.SubscriptionRequired("ChatGPT subscription required; remove API/provider overrides")
+    env = dict(os.environ)
+    WORK.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="codex-", dir=WORK) as cwd:
+        # Reads the stored credentials only; anything but a ChatGPT login fails closed.
+        try:
+            status = subprocess.run(["codex", "login", "status"], capture_output=True, text=True,
+                                    timeout=30, cwd=cwd, env=env, stdin=subprocess.DEVNULL)
+            lines = (status.stdout + status.stderr).strip().splitlines()
+            subscribed = status.returncode == 0 and lines[-1:] == [CODEX_SUBSCRIPTION]
+        except (OSError, subprocess.SubprocessError):
+            subscribed = False
+        if not subscribed:
+            raise ruq.SubscriptionRequired("ChatGPT subscription authentication could not be verified")
+        schema = Path(cwd) / "grades.schema.json"
+        schema.write_text(json.dumps(grade_schema(ids)), encoding="utf-8")
+        work = Path(cwd) / "work"
+        work.mkdir()
+        command = codex_command(model, str(work), str(schema))
+        r = subprocess.run(command, input=prompt, capture_output=True, text=True, timeout=timeout,
+                           cwd=cwd, env=env)
+    if r.returncode != 0 and not r.stdout:
+        raise subprocess.CalledProcessError(r.returncode, command[:2])
+    return parse_codex_events(r.stdout), r.stdout
 
 
 def _call(c: Collection, pools: dict, ex: dict, qid: str, docs: list[str], phase: str,
-          call_timeout: float, *, revision: int = 0) -> tuple[list[dict], dict]:
+          call_timeout: float, *, revision: int = 0, second: bool = False) -> tuple[list[dict], dict]:
     fids = [f"F{n}" for n in range(1, len(docs) + 1)]
     rubric = template()
-    identities = {d: identity(c, pools, qid, d, ex[qid][d], template_text=rubric) for d in docs}
+    model = SECOND_MODEL if second else MODEL
+    identities = {d: identity(c, pools, qid, d, ex[qid][d], template_text=rubric, model=model) for d in docs}
     prompt = judge_prompt(c.queries[qid].text, [(f, ex[qid][d]["excerpt"]) for f, d in zip(fids, docs)],
                           template_text=rubric)
     call_id = sha256_text(f"{time.time_ns()}:{qid}:{','.join(docs)}")[:16]
     started = time.monotonic()
     dispatched_at = time.time()
-    call = {"call_id": call_id, "qid": qid, "docs": docs, "phase": phase, "model": MODEL,
+    call = {"call_id": call_id, "qid": qid, "docs": docs, "phase": phase, "model": model,
             "prompt_sha256": sha256_text(prompt), "at": dispatched_at,
             "revision": revision, "dispatched_at": dispatched_at}
     try:
-        reply, raw = ruq.ask_claude(prompt, model=call["model"], timeout=call_timeout)
+        if second:
+            reply, raw = ask_codex(prompt, fids, model=model, timeout=call_timeout)
+        else:
+            reply, raw = ruq.ask_claude(prompt, model=model, timeout=call_timeout)
         grades = parse_grades(reply, fids)
     except ruq.SubscriptionRequired:
         raise
@@ -560,7 +713,8 @@ def _call(c: Collection, pools: dict, ex: dict, qid: str, docs: list[str], phase
         return [], {**call, "ok": False, "error": "timeout", "seconds": time.monotonic() - started}
     except (subprocess.SubprocessError, OSError, RuntimeError, ValueError) as e:
         # Only the CLI's own error result names a usage limit; other messages may quote text.
-        quota = isinstance(e, ValueError) and str(e).startswith("claude error:") and "limit" in str(e).lower()
+        quota = ((isinstance(e, CodexError) or isinstance(e, ValueError) and str(e).startswith("claude error:"))
+                 and "limit" in str(e).lower())
         return [], {**call, "ok": False, "error": "quota" if quota else type(e).__name__,
                     "seconds": time.monotonic() - started}
     seconds = time.monotonic() - started
@@ -568,23 +722,19 @@ def _call(c: Collection, pools: dict, ex: dict, qid: str, docs: list[str], phase
              "call_id": call_id, "position": n, "batch_size": len(docs), "phase": phase,
              "revision": revision, "dispatched_at": dispatched_at,
              "at": time.time()} for n, (f, d) in enumerate(zip(fids, docs), 1)]
-    return rows, {**call, "ok": True, "seconds": seconds, "raw": raw}
+    # The second judge's records keep only the reply's digest (allow-listed, no reply text).
+    return rows, {**call, "ok": True, "seconds": seconds,
+                  **({"reply_sha256": sha256_text(raw)} if second else {"raw": raw})}
 
 
-def judge(*, max_calls: int, concurrency: int = 1, phase: str = "labels", revision: int = 0,
-          max_seconds: float = 6 * 3600, call_timeout: float = CALL_TIMEOUT) -> dict:
-    """Judge unjudged pairs until done or a stop: ``paused`` (``WORK/PAUSE`` exists, or SIGTERM),
-    ``call limit``, ``time budget``, ``quota``, ``timeout`` or ``stalled`` (consecutive failed
-    calls). Every finished call's pairs are checkpointed before the next stop check."""
-    after = _revision_after(revision)
-    c, _ = _collection()
-    pools = load_pools(c)
-    ex = load_excerpts(pools)
+def _judge_loop(todo: list, submit, judgments: Path, calls_path: Path, *, max_calls: int,
+                concurrency: int, max_seconds: float, quota: str) -> dict:
+    """Runs ``submit(qid, docs)`` calls until done or a stop: ``paused`` (``WORK/PAUSE`` exists, or
+    SIGTERM), ``call limit``, ``time budget``, ``quota``, ``timeout`` or ``stalled`` (consecutive
+    failed calls). Every finished call's pairs are checkpointed before the next stop check."""
     lock = threading.Lock()
-    for name in ("judgments.jsonl", "calls.jsonl"):
-        read_checkpoint(WORK / name, repair=True)
-    done = current_judgments(c, pools, ex, revision=revision, after=after)
-    todo = batches(pools, done, revision)
+    for path in (judgments, calls_path):
+        read_checkpoint(path, repair=True)
     stop: list[str] = []
     previous = signal.signal(signal.SIGTERM, lambda *_: stop.append("paused (terminated)")) \
         if threading.current_thread() is threading.main_thread() else None
@@ -607,8 +757,7 @@ def judge(*, max_calls: int, concurrency: int = 1, phase: str = "labels", revisi
                         break
                     qid, docs = todo.pop(0)
                     calls += 1
-                    inflight[pool_.submit(_call, c, pools, ex, qid, docs, phase, call_timeout,
-                                          revision=revision)] = qid
+                    inflight[pool_.submit(submit, qid, docs)] = qid
                 if not inflight:
                     break
                 finished, _ = concurrent.futures.wait(inflight, return_when=concurrent.futures.FIRST_COMPLETED)
@@ -621,20 +770,60 @@ def judge(*, max_calls: int, concurrency: int = 1, phase: str = "labels", revisi
                         continue
                     with lock:
                         if rows:
-                            append_rows(WORK / "judgments.jsonl", rows)
-                        append_rows(WORK / "calls.jsonl", [call])
+                            append_rows(judgments, rows)
+                        append_rows(calls_path, [call])
                     judged += len(rows)
                     failures = [] if call["ok"] else failures + [call["error"]]
                     if call.get("error") == "quota" and not stop:
-                        stop.append("quota: Claude usage limit reached")
+                        stop.append(f"quota: {quota} usage limit reached")
     finally:
         if previous is not None:
             signal.signal(signal.SIGTERM, previous)
+    return {"stop": stop[0] if stop else None, "calls": calls, "judged_pairs": judged,
+            "seconds": round(time.monotonic() - started, 1)}
+
+
+def judge(*, max_calls: int, concurrency: int = 1, phase: str = "labels", revision: int = 0,
+          max_seconds: float = 6 * 3600, call_timeout: float = CALL_TIMEOUT) -> dict:
+    """The primary judge over every pooled pair; stops as ``_judge_loop`` says."""
+    after = _revision_after(revision)
+    c, _ = _collection()
+    pools = load_pools(c)
+    ex = load_excerpts(pools)
+    todo = batches(pools, current_judgments(c, pools, ex, revision=revision, after=after), revision)
+    run = _judge_loop(todo, lambda qid, docs: _call(c, pools, ex, qid, docs, phase, call_timeout,
+                                                     revision=revision),
+                      WORK / "judgments.jsonl", WORK / "calls.jsonl", max_calls=max_calls,
+                      concurrency=concurrency, max_seconds=max_seconds, quota="Claude")
     remaining = len(batches(pools, current_judgments(c, pools, ex, revision=revision, after=after), revision))
-    status = {"stopped": stop[0] if stop else "complete" if not remaining else "call limit reached",
-              "calls": calls, "judged_pairs": judged, "remaining_calls": remaining,
-              "seconds": round(time.monotonic() - started, 1), "phase": phase}
+    status = {"stopped": run["stop"] or ("complete" if not remaining else "call limit reached"),
+              "calls": run["calls"], "judged_pairs": run["judged_pairs"], "remaining_calls": remaining,
+              "seconds": run["seconds"], "phase": phase}
     _write_json(WORK / "judge-status.json", status)
+    return status
+
+
+def second_judge(*, max_calls: int, concurrency: int = 1, phase: str = "labels", revision: int = 0,
+                 max_seconds: float = 6 * 3600, call_timeout: float = CALL_TIMEOUT) -> dict:
+    """The second judge over exactly the drawn sample's pairs; stops as ``_judge_loop`` says."""
+    after = _revision_after(revision)
+    c, _ = _collection()
+    pools = load_pools(c)
+    ex = load_excerpts(pools)
+    pairs = load_sample(revision, current_judgments(c, pools, ex, revision=revision, after=after))["pairs"]
+    path = _second_path("judgments.jsonl")
+    todo = second_batches(pairs, second_judgments(c, pools, ex, pairs, revision=revision, after=after),
+                          revision)
+    run = _judge_loop(todo, lambda qid, docs: _call(c, pools, ex, qid, docs, phase, call_timeout,
+                                                     revision=revision, second=True),
+                      path, _second_path("calls.jsonl"), max_calls=max_calls, concurrency=concurrency,
+                      max_seconds=max_seconds, quota="ChatGPT")
+    remaining = len(second_batches(pairs, second_judgments(c, pools, ex, pairs, revision=revision,
+                                                           after=after), revision))
+    status = {"stopped": run["stop"] or ("complete" if not remaining else "call limit reached"),
+              "calls": run["calls"], "judged_pairs": run["judged_pairs"], "remaining_calls": remaining,
+              "seconds": run["seconds"], "phase": phase, "revision": revision}
+    _write_json(_second_path(f"judge-status-r{revision}.json"), status)
     return status
 
 
@@ -692,19 +881,17 @@ def _apportion(total: int, sizes: dict[str, int]) -> dict[str, int]:
     return out
 
 
-def draw_sample(rows: list[dict], *, batch: int, revision: int = 0, exclude=frozenset()) -> list[dict]:
+def draw_sample(rows: list[dict], *, revision: int = 0, exclude=frozenset()) -> list[dict]:
     """The seeded agreement sample (design 5); identical for any input order.
 
     Halves of ``SAMPLE_SIZE // 2`` model-relevant and model-not-relevant pairs, each split by
     query language in proportion to the half's population; at least ``BOUNDARY_MIN`` pairs graded
     1 or 2 (spread over the cells in proportion); at most ``PER_QUERY`` pairs per query. Pairs in
-    ``exclude`` (earlier batches and revisions) are never drawn again. Order and ids are shuffled
-    independently of the strata.
+    ``exclude`` (earlier revisions) are never drawn again. Order and ids are shuffled
+    independently of the strata. The seeds keep the batch number 1 of the drawn revision-0 sample.
     """
     _check_revision(revision)
-    if batch not in (1, 2):
-        raise LabelError("batches are 1 or 2")
-    rng = random.Random(f"{SEED}:{revision}:{batch}:sample")
+    rng = random.Random(f"{SEED}:{revision}:1:sample")
     pop = sorted((r for r in rows if (r["qid"], r["doc"]) not in exclude), key=lambda r: (r["qid"], r["doc"]))
     rng.shuffle(pop)
     cells = defaultdict(list)
@@ -737,8 +924,8 @@ def draw_sample(rows: list[dict], *, batch: int, revision: int = 0, exclude=froz
     _check_sample_halves(chosen)
     if sum(1 for r in chosen if r["grade"] in (1, 2)) < BOUNDARY_MIN:
         raise LabelError(f"sample quota unmet: fewer than {BOUNDARY_MIN} pairs at the 1/2 boundary")
-    random.Random(f"{SEED}:{revision}:{batch}:order").shuffle(chosen)
-    prefix = "ABCD"[2 * revision + batch - 1]
+    random.Random(f"{SEED}:{revision}:1:order").shuffle(chosen)
+    prefix = "AC"[revision]
     return [{**r, "id": f"{prefix}{n:03d}"} for n, r in enumerate(chosen, 1)]
 
 
@@ -807,143 +994,219 @@ def parse_sheet(text: str, name: str, pairs: list[dict], c: Collection, ex: dict
     return {"answers": answers, "unanswered": sorted(unanswered)}
 
 
-def _sample_paths(revision: int, batch: int) -> tuple[Path, Path]:
+def _sample_path(revision: int, kind: str = "b1") -> Path:
+    """``b1`` the agreement sample (the name of the drawn first batch), ``spot`` the spot check."""
     _check_revision(revision)
-    name = f"r{revision}-b{batch}"
-    return WORK / "samples" / f"{name}.json", WORK / "samples" / f"{name}.sheet.txt"
+    return WORK / "samples" / f"r{revision}-{kind}.json"
 
 
 def labels_sha256(done: dict) -> str:
     return sha256_text(canonical_json(sorted([q, d, r["grade"], r["identity"]] for (q, d), r in done.items())))
 
 
-def sample(batch: int, revision: int = 0) -> int:
+def sample(revision: int = 0) -> int:
+    """Draws the revision's agreement sample, the second judge's set of pairs."""
     after = _revision_after(revision)
-    if batch not in (1, 2):
-        raise LabelError("batches are 1 or 2")
-    record_path, sheet_path = _sample_paths(revision, batch)
+    record_path = _sample_path(revision)
     if record_path.exists():
         raise LabelError(f"{record_path.name} exists: a drawn sample is fixed")
-    if batch == 2:
-        decision = _json(WORK / f"acceptance-r{revision}.json")
-        if decision["outcome"] != "SECOND_BATCH":
-            raise LabelError("a second batch is drawn only when the first batch's decision asks for one")
     c, _ = _collection()
     pools = load_pools(c)
     ex = load_excerpts(pools)
     done = current_judgments(c, pools, ex, revision=revision, after=after)
     rows = population(c, pools, done)
-    if batch == 2 and decision["labels_sha256"] != labels_sha256(done):
-        raise LabelError("the model labels changed since the first batch's decision")
     exclude = set()
     for path in sorted((WORK / "samples").glob("r*-b*.json")):
         exclude |= {(p["qid"], p["doc"]) for p in _json(path)["pairs"]}
-    pairs = draw_sample(rows, batch=batch, revision=revision, exclude=exclude)
-    name = f"r{revision}-b{batch}"
-    sheet = render_sheet(name, pairs, c, ex)
+    pairs = draw_sample(rows, revision=revision, exclude=exclude)
     strata = Counter(f"{r['label']}/{r['lang']}/{r['grade']}" for r in rows)
-    _write_json(record_path, {"name": name, "seed": SEED, "revision": revision, "batch": batch,
+    _write_json(record_path, {"name": record_path.stem, "seed": SEED, "revision": revision, "batch": 1,
                               "labels_sha256": labels_sha256(done),
                               "pool_generation": pools["generation"], "population_strata": dict(strata),
-                              "pairs": pairs, "sheet_sha256": sha256_text(sheet)})
-    atomic_write_text(sheet_path, sheet)
-    print(canonical_json({"sheet": str(sheet_path), "pairs": len(pairs)}))
+                              "pairs": pairs})
+    print(canonical_json({"sample": str(record_path), "pairs": len(pairs)}))
     return 0
 
 
-# --------------------------------------------------------------------------- acceptance
+def load_sample(revision: int, done: dict) -> dict:
+    """The revision's drawn agreement sample, refused unless it is complete and drawn from
+    exactly the current primary labels."""
+    path = _sample_path(revision)
+    if not path.exists():
+        raise LabelError(f"no agreement sample drawn for revision {revision}; run sample")
+    record = _json(path)
+    _check_sample_halves(record["pairs"])
+    if record["labels_sha256"] != labels_sha256(done):
+        raise LabelError(f"{record['name']}: the model labels changed since this sample was drawn")
+    return record
 
 
-def wilson(k: int, n: int, z: float = WILSON_Z) -> tuple[float, float]:
-    if n == 0:
-        return 0.0, 1.0
-    p = k / n
-    centre = (p + z * z / (2 * n)) / (1 + z * z / n)
-    half = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / (1 + z * z / n)
-    return centre - half, centre + half
+# --------------------------------------------------------------------------- second judge and spot check
 
 
-def _agreement(answered: list[dict]) -> dict:
-    yn = [p for p in answered if p["answer"] in ("yes", "no")]
-    agree = sum(1 for p in yn if (p["answer"] == "yes") == (p["label"] == 1))
-    lo, hi = wilson(agree, len(yn))
-    return {"yes_no": len(yn), "agree": agree, "agreement": agree / len(yn) if yn else None,
-            "wilson95": [lo, hi]}
+def paired(pairs: list[dict], second: dict) -> list[dict]:
+    """The sample's pairs with the second judge's grade and label; refuses while any is missing."""
+    if missing := sum(1 for p in pairs if (p["qid"], p["doc"]) not in second):
+        raise LabelError(f"{missing} sample pairs have no second-judge grade yet; run second-judge")
+    return [{**p, "second_grade": (g := second[(p["qid"], p["doc"])]["grade"]), "second_label": label_of(g)}
+            for p in pairs]
 
 
-def decide(first: list[dict], second: list[dict] | None = None) -> dict:
-    """The fixed acceptance rule (design 6). Pairs carry ``answer`` (yes/no/unsure/None) and the
-    model's binary ``label``. Agreement is unrounded over answered yes/no pairs."""
-    one = _agreement(first)
-    if second is None:
-        if one["yes_no"] < USABLE_MIN:
-            outcome, reason = "SECOND_BATCH", f"unusable: {one['yes_no']} yes/no answers (< {USABLE_MIN})"
-        elif one["wilson95"][0] <= PASS_MARK <= one["wilson95"][1]:
-            outcome, reason = "SECOND_BATCH", f"close: the 95% Wilson interval contains {PASS_MARK}"
-        elif one["agreement"] >= PASS_MARK:
-            outcome, reason = "PASS", f"agreement >= {PASS_MARK}"
-        else:
-            outcome, reason = "FAIL", f"agreement < {PASS_MARK}"
-        return {"outcome": outcome, "reason": reason, "first": one, "decided_on": one}
-    both = _agreement(first + second)
-    ok = both["agreement"] is not None and both["agreement"] >= PASS_MARK
-    return {"outcome": "PASS" if ok else "FAIL",
-            "reason": f"all yes/no answers of both batches: agreement {'>=' if ok else '<'} {PASS_MARK}",
-            "first": one, "second": _agreement(second), "decided_on": both}
+def judge_agreement(rows: list[dict]) -> dict:
+    """The judges' agreement on the binary label, unrounded, over every sample pair."""
+    agree = sum(1 for r in rows if r["label"] == r["second_label"])
+    return {"pairs": len(rows), "agree": agree, "agreement": agree / len(rows) if rows else None,
+            "pass_mark": PASS_MARK}
 
 
-def acceptance_report(pairs: list[dict], strata: dict[str, int]) -> dict:
-    """Information beside the decision: confusion matrix, false positives and negatives by
-    language and grade, unsure and unanswered counts, a weighted population estimate."""
-    confusion = Counter(f"model_{'relevant' if p['label'] else 'not_relevant'}/user_{p['answer'] or 'unanswered'}"
-                        for p in pairs)
-    fp = Counter(f"{p['lang']}/grade_{p['grade']}" for p in pairs if p["label"] == 1 and p["answer"] == "no")
-    fn = Counter(f"{p['lang']}/grade_{p['grade']}" for p in pairs if p["label"] == 0 and p["answer"] == "yes")
-    by = defaultdict(list)
-    for p in pairs:
-        if p["answer"] in ("yes", "no"):
-            by[f"{p['label']}/{p['lang']}/{p['grade']}"].append((p["answer"] == "yes") == (p["label"] == 1))
-    weight = sum(strata[s] for s in by)
-    estimate = sum(strata[s] * sum(v) / len(v) for s, v in by.items()) / weight if weight else None
-    return {"confusion": dict(sorted(confusion.items())), "false_positives": dict(sorted(fp.items())),
-            "false_negatives": dict(sorted(fn.items())),
-            "unsure": sum(1 for p in pairs if p["answer"] == "unsure"),
-            "unanswered": sum(1 for p in pairs if not p["answer"]),
-            "weighted_population_estimate": estimate,
-            "weighted_population_share_covered": weight / sum(strata.values()) if strata else None,
-            "note": "information only; the decision is agreement on the sample, not a population guarantee"}
+def _spot_type(r: dict) -> tuple[str, str]:
+    if r["label"] == r["second_label"]:
+        return "agree", r["lang"]
+    return ("primary_only" if r["label"] else "second_only"), r["lang"]
 
 
-def accept(revision: int = 0, sheets: dict[int, Path] | None = None) -> dict:
+def _spot_score(types: Counter) -> int:
+    """Quota points: up to ``SPOT_QUOTA`` each for both disagreement directions and German."""
+    return sum(min(SPOT_QUOTA, sum(v for t, v in types.items() if test(t))) for test in (
+        lambda t: t[0] == "primary_only", lambda t: t[0] == "second_only", lambda t: t[1] == "de"))
+
+
+def _best_score(have: Counter, avail: Counter, slots: int) -> int:
+    """The best quota score reachable by adding ``slots`` pairs of the available types."""
+    types = sorted(avail)
+
+    def best(i: int, left: int, got: Counter) -> int:
+        if i == len(types):
+            return _spot_score(got) if left == 0 else -1
+        return max(best(i + 1, left - x, got + Counter({types[i]: x}))
+                   for x in range(min(avail[types[i]], left) + 1))
+    return best(0, slots, have)
+
+
+def select_spot(rows: list[dict], seed: str) -> list[dict]:
+    """The owner's ``SPOT_SIZE`` spot pairs, deterministic from ``seed`` and independent of input
+    order: disagreements first, at least ``SPOT_QUOTA`` the primary calls relevant and the second
+    not, ``SPOT_QUOTA`` the other way, and ``SPOT_QUOTA`` German queries (each where available);
+    with fewer than ``SPOT_SIZE`` disagreements, all of them plus primary grade-1/2 boundary
+    pairs. Within the quotas, pairs come in seeded random order."""
+    order = sorted(rows, key=lambda r: (r["qid"], r["doc"]))
+    rng = random.Random(seed)
+    rng.shuffle(order)
+    disagree = [r for r in order if r["label"] != r["second_label"]]
+    if len(disagree) >= SPOT_SIZE:
+        chosen, pool = [], disagree
+    else:
+        chosen = disagree
+        pool = [r for r in order if r["label"] == r["second_label"] and r["grade"] in (1, 2)]
+    if len(chosen) + len(pool) < SPOT_SIZE:
+        raise LabelError(f"fewer than {SPOT_SIZE} disagreement or boundary pairs for the spot check")
+    have = Counter(map(_spot_type, chosen))
+    target = _best_score(have, Counter(map(_spot_type, pool)), SPOT_SIZE - len(chosen))
+    for i, r in enumerate(pool):
+        if len(chosen) == SPOT_SIZE:
+            break
+        trial = have + Counter([_spot_type(r)])
+        if _best_score(trial, Counter(map(_spot_type, pool[i + 1:])), SPOT_SIZE - len(chosen) - 1) == target:
+            chosen, have = chosen + [r], trial
+    rng.shuffle(chosen)
+    return [{**r, "id": f"S{n}", "spot_type": "/".join(_spot_type(r))} for n, r in enumerate(chosen, 1)]
+
+
+def _state(revision: int):
+    """Everything a spot check or decision is bound to, verified."""
     after = _revision_after(revision)
     c, _ = _collection()
     pools = load_pools(c)
     ex = load_excerpts(pools)
     done = current_judgments(c, pools, ex, revision=revision, after=after)
-    batches_ = {}
-    for batch in (1, 2):
-        record_path, sheet_path = _sample_paths(revision, batch)
-        if not record_path.exists():
-            continue
-        record = _json(record_path)
-        _check_sample_halves(record["pairs"])
-        if record["labels_sha256"] != labels_sha256(done):
-            raise LabelError(f"{record['name']}: the model labels changed since this sample was drawn")
-        path = (sheets or {}).get(batch, sheet_path)
-        parsed = parse_sheet(path.read_text(encoding="utf-8"), record["name"], record["pairs"], c, ex)
-        batches_[batch] = [{**p, "answer": parsed["answers"].get(p["id"])} for p in record["pairs"]]
-        strata = record["population_strata"]
-    if 1 not in batches_:
-        raise LabelError("no first batch drawn for this revision")
-    result = decide(batches_[1], batches_.get(2))
+    record = load_sample(revision, done)
+    second = second_judgments(c, pools, ex, record["pairs"], revision=revision, after=after)
+    return c, pools, ex, done, record, second, paired(record["pairs"], second)
+
+
+def spot(revision: int = 0) -> int:
+    """Draws the owner's spot check once the second judge has graded every sample pair."""
+    c, _, ex, done, record, second, rows = _state(revision)
+    path = _sample_path(revision, "spot")
+    if path.exists():
+        raise LabelError(f"{path.name} exists: a drawn spot check is fixed")
+    seed = f"{SEED}:{revision}:spot"
+    pairs = select_spot(rows, seed)
+    sheet = render_sheet(path.stem, pairs, c, ex)
+    agreement = judge_agreement(rows)
+    _write_json(path, {"name": path.stem, "seed": seed, "revision": revision, "sample": record["name"],
+                       "labels_sha256": labels_sha256(done), "second_sha256": labels_sha256(second),
+                       "agreement": agreement, "pairs": pairs, "sheet_sha256": sha256_text(sheet)})
+    sheet_path = path.with_suffix(".sheet.txt")
+    atomic_write_text(sheet_path, sheet)
+    print(canonical_json({"sheet": str(sheet_path), "pairs": len(pairs), "agreement": agreement,
+                          "owner_check_decides": agreement["agreement"] >= PASS_MARK}))
+    return 0
+
+
+def spot_result(pairs: list[dict], answers: dict[str, str]) -> dict:
+    """How often the owner sided against the primary judge (a yes/no answer unlike its label)."""
+    against = sum(1 for p in pairs if answers.get(p["id"]) in ("yes", "no")
+                  and (answers[p["id"]] == "yes") != (p["label"] == 1))
+    return {"pairs": len(pairs), "against_primary": against, "fail_at": SPOT_AGAINST_FAIL,
+            "answers": dict(sorted(Counter(answers.get(p["id"]) or "unanswered" for p in pairs).items())),
+            "by_type": dict(sorted(Counter(p["spot_type"] for p in pairs).items()))}
+
+
+# --------------------------------------------------------------------------- acceptance
+
+
+def decide(agreement: dict, spot_check: dict | None) -> dict:
+    """The fixed rule (design 6): PASS when the judges agree on the binary label for at least
+    ``PASS_MARK`` of the sample pairs (unrounded) and the owner does not side against the primary
+    judge on ``SPOT_AGAINST_FAIL`` or more spot pairs; otherwise FAIL. Below the mark the spot
+    check is not needed."""
+    share = agreement["agreement"]
+    if share is None or share < PASS_MARK:
+        return {"outcome": "FAIL", "reason": f"judges agree on {agreement['agree']} of {agreement['pairs']} "
+                                             f"pairs (< {PASS_MARK})"}
+    if spot_check is None:
+        raise LabelError("the judges agree; the owner's spot check decides next: run spot, answer its sheet")
+    if spot_check["against_primary"] >= SPOT_AGAINST_FAIL:
+        return {"outcome": "FAIL", "reason": f"the owner sided against the primary judge on "
+                                             f"{spot_check['against_primary']} of {spot_check['pairs']} spot pairs"}
+    return {"outcome": "PASS", "reason": f"judges agree on {agreement['agree']} of {agreement['pairs']} pairs "
+                                         f"(>= {PASS_MARK}); owner against the primary judge on "
+                                         f"{spot_check['against_primary']} of {spot_check['pairs']} (information)"}
+
+
+def agreement_report(rows: list[dict]) -> dict:
+    """Information beside the decision: the judges' confusion matrix and disagreements by query
+    language and primary grade."""
+    confusion = Counter(f"primary_{'relevant' if r['label'] else 'not_relevant'}/"
+                        f"second_{'relevant' if r['second_label'] else 'not_relevant'}" for r in rows)
+    split = Counter(f"{r['lang']}/grade_{r['grade']}" for r in rows if r["label"] != r["second_label"])
+    return {"confusion": dict(sorted(confusion.items())), "disagreements": dict(sorted(split.items())),
+            "note": "information only; the decision is the judges' agreement and the owner's spot check"}
+
+
+def accept(revision: int = 0, sheet: Path | None = None) -> dict:
+    c, _, ex, done, record, second, rows = _state(revision)
+    agreement = judge_agreement(rows)
+    path = _sample_path(revision, "spot")
+    spot_check = None
+    if path.exists():
+        drawn = _json(path)
+        if drawn["labels_sha256"] != labels_sha256(done) or drawn["second_sha256"] != labels_sha256(second):
+            raise LabelError(f"{drawn['name']}: the judges' grades changed since the spot check was drawn")
+        text = (sheet or path.with_suffix(".sheet.txt")).read_text(encoding="utf-8")
+        parsed = parse_sheet(text, drawn["name"], drawn["pairs"], c, ex)
+        if parsed["unanswered"] and agreement["agreement"] >= PASS_MARK:
+            raise LabelError(f"answer every spot block (unanswered: {', '.join(parsed['unanswered'])})")
+        spot_check = spot_result(drawn["pairs"], parsed["answers"])
+    result = decide(agreement, spot_check)
     if result["outcome"] == "FAIL":
-        result["next"] = ("revise the rubric/prompt once, re-label everything and draw new pairs"
-                          if revision < MAX_REVISION else "stop and report to the user")
-    elif result["outcome"] == "SECOND_BATCH":
-        result["next"] = "draw the second batch of the same revision"
-    result.update(revision=revision, labels_sha256=labels_sha256(done),
-                  template_sha256=sha256_text(template()), at=time.time(),
-                  report=acceptance_report([p for b in batches_.values() for p in b], strata))
+        result["next"] = ("revise the rubric/prompt once, re-label everything, draw a new sample and "
+                          "judge it again with the second judge" if revision < MAX_REVISION
+                          else "stop and report to the user")
+    result.update(revision=revision, labels_sha256=labels_sha256(done), second_sha256=labels_sha256(second),
+                  template_sha256=sha256_text(template()), at=time.time(), sample=record["name"],
+                  agreement=agreement, spot_check=spot_check, report=agreement_report(rows))
     _write_json(WORK / f"acceptance-r{revision}.json", result)
     return result
 
@@ -976,14 +1239,11 @@ def frozen_collection(c: Collection, pools: dict, done: dict) -> tuple[Collectio
 
 
 def freeze(revision: int = 0) -> int:
-    after = _revision_after(revision)
-    c, _ = _collection()
-    pools = load_pools(c)
-    ex = load_excerpts(pools)
-    done = current_judgments(c, pools, ex, revision=revision, after=after)
+    c, pools, _, done, _, second, _ = _state(revision)
     decision = _json(WORK / f"acceptance-r{revision}.json")
-    if decision["outcome"] != "PASS" or decision["labels_sha256"] != labels_sha256(done):
-        raise LabelError("labels freeze only after a PASS decision on exactly the current model labels")
+    if (decision["outcome"] != "PASS" or decision["labels_sha256"] != labels_sha256(done)
+            or decision.get("second_sha256") != labels_sha256(second)):
+        raise LabelError("labels freeze only after a PASS decision on exactly the current judges' grades")
     new, excluded, audit = frozen_collection(c, pools, done)
     qcoll.write_collection(new, RECORD.parent / COLLECTION)
     config_path = qcoll.CONFIG_DIR / f"{COLLECTION}.json"
@@ -997,7 +1257,13 @@ def freeze(revision: int = 0) -> int:
     _write_json(RECORD / "topical-labels.json", {
         "model": MODEL, "template_sha256": sha256_text(template()), "cutoff": CUTOFF, "revision": revision,
         "pool_generation": pools["generation"], "index_generation": pools["index_generation"],
-        "requests": pools["requests"], "decision": {k: decision[k] for k in ("outcome", "reason", "decided_on")},
+        "requests": pools["requests"], "decision": {k: decision[k] for k in ("outcome", "reason")},
+        "primary_judge": {"model": MODEL, "via": "claude -p (Claude subscription)"},
+        "second_judge": {"model": SECOND_MODEL, "via": "codex exec (ChatGPT subscription)",
+                         "sample": decision["sample"]},
+        "agreement": decision["agreement"],
+        "spot_check": {**decision["spot_check"], "role": "information unless the owner sides against "
+                                                         f"the primary judge on {SPOT_AGAINST_FAIL} or more"},
         "excluded": raw["excluded"], "queries": audit})
     print(canonical_json(counts))
     return 0
@@ -1015,20 +1281,16 @@ def main(argv=None) -> int:
     p.add_argument("--timeout-sec", type=float, default=3 * 3600)
     p.add_argument("--cache-root", type=Path)
     steps.add_parser("excerpts")
-    p = steps.add_parser("judge")
-    p.add_argument("--max-calls", type=int, required=True)
-    p.add_argument("--concurrency", type=int, default=1)
-    p.add_argument("--phase", choices=("calibration", "labels"), default="labels")
-    p.add_argument("--revision", type=int, default=0)
-    p.add_argument("--max-seconds", type=float, default=6 * 3600)
+    for name in ("judge", "second-judge"):
+        p = steps.add_parser(name)
+        p.add_argument("--max-calls", type=int, required=True)
+        p.add_argument("--concurrency", type=int, default=1)
+        p.add_argument("--phase", choices=("calibration", "labels"), default="labels")
+        p.add_argument("--revision", type=int, default=0)
+        p.add_argument("--max-seconds", type=float, default=6 * 3600)
     steps.add_parser("project")
-    p = steps.add_parser("sample")
-    p.add_argument("--batch", type=int, choices=(1, 2), required=True)
-    p.add_argument("--revision", type=int, default=0)
-    p = steps.add_parser("accept")
-    p.add_argument("--revision", type=int, default=0)
-    p = steps.add_parser("freeze")
-    p.add_argument("--revision", type=int, default=0)
+    for name in ("sample", "spot", "accept", "freeze"):
+        steps.add_parser(name).add_argument("--revision", type=int, default=0)
     args = parser.parse_args(argv)
     try:
         if args.step == "extract":
@@ -1037,19 +1299,22 @@ def main(argv=None) -> int:
             return pool(args.timeout_sec, args.cache_root)
         if args.step == "excerpts":
             return excerpts()
-        if args.step == "judge":
-            status = judge(max_calls=args.max_calls, concurrency=args.concurrency, phase=args.phase,
-                           revision=args.revision, max_seconds=args.max_seconds)
+        if args.step in ("judge", "second-judge"):
+            status = (judge if args.step == "judge" else second_judge)(
+                max_calls=args.max_calls, concurrency=args.concurrency, phase=args.phase,
+                revision=args.revision, max_seconds=args.max_seconds)
             print(canonical_json(status))
             return 0 if status["stopped"] in ("complete", "call limit reached") else 3
         if args.step == "project":
             print(canonical_json(projection()))
             return 0
         if args.step == "sample":
-            return sample(args.batch, args.revision)
+            return sample(args.revision)
+        if args.step == "spot":
+            return spot(args.revision)
         if args.step == "accept":
             result = accept(args.revision)
-            print(canonical_json({k: result[k] for k in ("outcome", "reason", "decided_on")}))
+            print(canonical_json({k: result[k] for k in ("outcome", "reason", "agreement", "spot_check")}))
             return 0
         return freeze(args.revision)
     except LabelError as e:
