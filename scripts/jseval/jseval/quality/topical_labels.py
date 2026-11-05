@@ -701,7 +701,7 @@ def _verify_codex_home(home: Path, model: str) -> None:
 @contextlib.contextmanager
 def codex_home(model: str = SECOND_MODEL):
     """A fresh CODEX_HOME for one second-judge run: the tool's own config and a copy of the stored
-    ChatGPT login (never an API key) without its refresh token, verified tool-free before any call,
+    ChatGPT login (never an API key) with a placeholder refresh token, verified tool-free before any call,
     deleted afterwards. The copy cannot refresh, so the run can never rotate or overwrite the
     owner's stored login; a run whose access token expires stops with codex's error."""
     if any(n.startswith(CODEX_OVERRIDE_PREFIXES) or n in CODEX_OVERRIDES for n in os.environ):
@@ -727,11 +727,17 @@ def codex_home(model: str = SECOND_MODEL):
         shutil.rmtree(home)
 
 
+REFRESH_PLACEHOLDER = "disabled-in-isolated-home"
+
+
 def _without_refresh_token(raw: bytes) -> bytes:
-    """The stored login for the isolated home, minus the refresh token (never written back)."""
+    """The stored login for the isolated home with its refresh token replaced by a placeholder.
+
+    Codex requires the field to parse the login (it refuses a file without it), but a placeholder
+    cannot refresh, so a run can never rotate the owner's login; nothing is written back."""
     auth = json.loads(raw)
     if isinstance(auth, dict) and isinstance(auth.get("tokens"), dict):
-        auth["tokens"] = {k: v for k, v in auth["tokens"].items() if k != "refresh_token"}
+        auth["tokens"] = {**auth["tokens"], "refresh_token": REFRESH_PLACEHOLDER}
     return json.dumps(auth).encode("utf-8")
 
 
