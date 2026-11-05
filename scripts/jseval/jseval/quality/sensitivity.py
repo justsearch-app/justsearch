@@ -7,6 +7,7 @@ import math
 import os
 from pathlib import Path
 import re
+import time
 
 import httpx
 import psutil
@@ -212,15 +213,48 @@ def declaration(c, overrides, requested, sample, seed):
 def require_idle(status):
     """Missing counts cannot authorize a scoring-only encoder change."""
     s = readiness.flatten_status(status)
-    counts = ('pendingJobs', 'processingJobsCount', 'embeddingPendingCount', 'pendingNerCount')
+    counts = ('pendingJobs', 'processingJobsCount')
     if s.get('indexState') != 'IDLE' or any(s.get(k) != 0 for k in counts):
         raise SensitivityRefused('sensitivity refuses pending ingestion/enrichment work or unavailable idle evidence')
-    if any(s.get(k, 0) != 0 for k in ('pendingJobsCount', 'chunkEmbeddingPendingCount',
-                                      'spladePendingCount', 'chunkSpladePendingCount')):
+    if s.get('pendingJobsCount', 0) != 0:
         raise SensitivityRefused('sensitivity refuses pending ingestion/enrichment work')
+    # Match index._ready_reasons: a disabled stage can retain pending counts and
+    # incomplete audits forever. Chunk embedding also needs actual chunks.
+    stages = {
+        'embed': (s.get('embeddingEnabled', True), 'embeddingPendingCount'),
+        'ner': (s.get('nerEnabled', True), 'pendingNerCount'),
+        'chunk_embed': (s.get('embeddingEnabled', True) and s.get('chunkDocCount', 0) > 0,
+                        'chunkEmbeddingPendingCount'),
+        'splade': (s.get('spladeEnabled', True), 'spladePendingCount'),
+        'chunk_splade': (s.get('chunkSpladeEnabled', False), 'chunkSpladePendingCount'),
+    }
+    if any(enabled and s.get(pending) != 0 for enabled, pending in stages.values()):
+        raise SensitivityRefused('sensitivity refuses pending ingestion/enrichment work or unavailable idle evidence')
     for audit in s.get('completeness', []):
-        if audit.get('missing', 0) or audit.get('failed', 0):
+        if (stages.get(audit.get('stageId'), (False, ''))[0]
+                and (audit.get('missing', 0) or audit.get('failed', 0))):
             raise SensitivityRefused('sensitivity refuses pending enrichment work')
+
+
+def require_ready_idle(client, collection, sparse, deadline):
+    """Wait for ordinary adoption readiness before judging prepared-settings idle."""
+    from .index import _get, _ready_reasons, _readiness_refusal, TransientIndexRefused
+    last = None
+    while time.monotonic() < deadline:
+        try:
+            status = _get(client, '/api/status')
+            reasons = _ready_reasons(status, collection, sparse)
+            if not reasons:
+                require_idle(status)
+                return
+            refusal = _readiness_refusal(status, reasons)
+            if not isinstance(refusal, TransientIndexRefused):
+                raise refusal
+            last = str(refusal)
+        except httpx.HTTPError as e:
+            last = f'{type(e).__name__}: {e}'
+        time.sleep(min(2, max(0, deadline-time.monotonic())))
+    raise TransientIndexRefused(f'not ready, transient: prepared-settings readiness deadline expired: {last}')
 
 
 def confirm_identity(handle, entry):

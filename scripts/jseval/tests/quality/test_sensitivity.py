@@ -37,6 +37,20 @@ LAPTOP = {'JUSTSEARCH_RERANK_ENABLED': 'true', 'JUSTSEARCH_RERANK_GPU_ENABLED': 
           'JUSTSEARCH_EMBED_GPU_ENABLED': 'false', 'JUSTSEARCH_ORT_INTRA_OP_THREADS': '4'}
 
 
+def complete_quality_status(count=4):
+    return {'indexState': 'IDLE', 'pendingJobs': 0, 'pendingJobsCount': 0,
+            'processingJobsCount': 0, 'indexedDocuments': count,
+            'embeddingEnabled': True, 'embeddingPendingCount': 0,
+            'embeddingCoveragePercent': 100, 'chunkDocCount': count,
+            'chunkEmbeddingPendingCount': 0, 'chunkVectorCoveragePercent': 100,
+            'nerEnabled': True, 'completedNerCount': count, 'pendingNerCount': 0,
+            'failedNerCount': 0, 'spladeEnabled': False, 'spladePendingCount': count,
+            'chunkSpladeEnabled': False, 'chunkSpladePendingCount': count,
+            'completenessKnown': True,
+            'completeness': [{'stageId': stage, 'missing': 0, 'failed': 0}
+                             for stage in ('embed', 'ner', 'chunk_embed')]}
+
+
 def labelled(c, *, sample=None, seed=0, **kw):
     arm = sensitivity.declaration(c, {}, None, sample, seed)
     record = make_run(c, run_kind='sensitivity', sensitivity=arm, **kw)
@@ -198,8 +212,7 @@ def test_prepared_key_adoption_postscore_and_residue(tmp_path, monkeypatch, over
     monkeypatch.setattr(backend, 'stop_backend', Mock())
     monkeypatch.setattr(index, 'witness', lambda *a: witness)
     monkeypatch.setattr(index, '_materialize', lambda *a: materialized)
-    monkeypatch.setattr(index, '_get', lambda *a: {'indexState': 'IDLE', 'pendingJobs': 0,
-        'processingJobsCount': 0, 'embeddingPendingCount': 0, 'pendingNerCount': 0})
+    monkeypatch.setattr(index, '_get', lambda *a: complete_quality_status(len(c.documents)))
     monkeypatch.setattr(sensitivity, 'confirm_identity', lambda h, entry:
         confirmations.append(index.compute_index_key(c, cfg, h.env)[0]) or index_identity.ConfirmResult(True, [], {}))
     normal = Mock(return_value=index_identity.ConfirmResult(True, [], {}))
@@ -238,8 +251,10 @@ def test_adoption_refusal_never_quarantines(tmp_path, monkeypatch, failure):
     index._write(h.root/'entry.json', {'owner': index._population_owner(h.collection, 'key'), 'witness': {}})
     monkeypatch.setattr(index, 'compute_index_key', lambda *a: ('key', {}))
     monkeypatch.setattr(index, '_materialize', lambda *a: h.collection)
-    monkeypatch.setattr(index, '_get', lambda *a: {'indexState': 'IDLE', 'pendingJobs': int(failure == 'pending'),
-        'processingJobsCount': 0, 'embeddingPendingCount': 0, 'pendingNerCount': 0})
+    # Readiness polling is covered separately; isolate the strict idle/identity gates.
+    monkeypatch.setattr(index, '_ready_reasons', lambda *a: [])
+    monkeypatch.setattr(index, '_get', lambda *a: {**complete_quality_status(len(h.collection.documents)),
+        'pendingJobs': int(failure == 'pending')})
     monkeypatch.setattr(index, 'witness', Mock(side_effect=ValueError('witness changed')) if failure == 'witness' else lambda *a: {})
     monkeypatch.setattr(index, '_adoption_agreement', lambda *a: [])
     monkeypatch.setattr(sensitivity, 'confirm_identity', lambda *a: index_identity.ConfirmResult(False, ['identity changed'], {}))
@@ -255,11 +270,135 @@ def test_adoption_refusal_never_quarantines(tmp_path, monkeypatch, failure):
 @pytest.mark.parametrize('field', ['pendingJobs', 'pendingJobsCount', 'processingJobsCount',
     'embeddingPendingCount', 'pendingNerCount', 'chunkEmbeddingPendingCount', 'spladePendingCount', 'chunkSpladePendingCount'])
 def test_every_pending_stage_refuses(field):
-    status = {'indexState': 'IDLE', 'pendingJobs': 0, 'processingJobsCount': 0,
-              'embeddingPendingCount': 0, 'pendingNerCount': 0}
+    status = {**complete_quality_status(), 'spladeEnabled': True, 'chunkSpladeEnabled': True,
+              'spladePendingCount': 0, 'chunkSpladePendingCount': 0}
     sensitivity.require_idle(status)
     with pytest.raises(sensitivity.SensitivityRefused, match='pending'):
         sensitivity.require_idle({**status, field: 1})
+
+
+@pytest.mark.parametrize('nested', [False, True])
+def test_disabled_sparse_stages_do_not_refuse_complete_quality_index(nested):
+    collection = make_collection({'en/vague': 4})
+    status = complete_quality_status(len(collection.documents))
+    assert index._ready_reasons(status, collection, False) == []
+    if nested:
+        status = {'worker': {'enrichment': status}}
+    sensitivity.require_idle(status)
+
+
+@pytest.mark.parametrize('stage,flags,pending', [
+    ('embed', {'embeddingEnabled': False}, 'embeddingPendingCount'),
+    ('ner', {'nerEnabled': False}, 'pendingNerCount'),
+    ('chunk_embed', {'embeddingEnabled': False}, 'chunkEmbeddingPendingCount'),
+    ('chunk_embed', {'chunkDocCount': 0}, 'chunkEmbeddingPendingCount'),
+    ('splade', {}, 'spladePendingCount'),
+    ('chunk_splade', {}, 'chunkSpladePendingCount'),
+])
+def test_disabled_stage_counts_and_audits_do_not_refuse(stage, flags, pending):
+    status = {**complete_quality_status(), **flags, pending: 4}
+    status['completeness'].append({'stageId': stage, 'missing': 4, 'failed': 1})
+    sensitivity.require_idle(status)
+    # A disabled stage must not hide work (or missing evidence) in enabled NER/embed.
+    enabled_pending = 'embeddingPendingCount' if stage == 'ner' else 'pendingNerCount'
+    for value in (1, None):
+        with pytest.raises(sensitivity.SensitivityRefused, match='pending'):
+            sensitivity.require_idle({**status, enabled_pending: value})
+
+
+@pytest.mark.parametrize('stage,flags,pending', [
+    ('embed', {}, 'embeddingPendingCount'), ('ner', {}, 'pendingNerCount'),
+    ('chunk_embed', {}, 'chunkEmbeddingPendingCount'),
+    ('splade', {'spladeEnabled': True}, 'spladePendingCount'),
+    ('chunk_splade', {'chunkSpladeEnabled': True}, 'chunkSpladePendingCount'),
+])
+def test_enabled_stage_requires_zero_count_and_complete_audit(stage, flags, pending):
+    status = {**complete_quality_status(), **flags, pending: 0}
+    status.update(spladePendingCount=0, chunkSpladePendingCount=0)
+    sensitivity.require_idle(status)
+    for value in (1, None):
+        with pytest.raises(sensitivity.SensitivityRefused, match='pending'):
+            sensitivity.require_idle({**status, pending: value})
+    del status[pending]
+    with pytest.raises(sensitivity.SensitivityRefused, match='pending'):
+        sensitivity.require_idle(status)
+    status[pending] = 0
+    for field in ('missing', 'failed'):
+        status['completeness'] = [{'stageId': stage, field: 1}]
+        with pytest.raises(sensitivity.SensitivityRefused, match='enrichment'):
+            sensitivity.require_idle(status)
+
+
+@pytest.mark.parametrize('recovers', [True, False])
+def test_prepared_settings_wait_for_resolved_readiness(tmp_path, monkeypatch, recovers):
+    from .test_redesign import cached_handle
+    h = cached_handle(tmp_path, monkeypatch)
+    h.env['JUSTSEARCH_GPU_ENABLED'] = 'false'
+    h._sensitivity = {'JUSTSEARCH_RERANK_ENABLED': 'false'}
+    now = [100.0]
+    monkeypatch.setattr(time, 'monotonic', lambda: now[0])
+    monkeypatch.setattr(time, 'sleep', lambda seconds: now.__setitem__(0, now[0]+seconds))
+    ready = complete_quality_status(len(h.collection.documents))
+    initial = {'indexState': 'IDLE', 'spladeEnabled': True, 'completenessKnown': False}
+    observations, launches = [], []
+    client_class = httpx.Client
+    def transport(request):
+        assert request.url.path == '/api/status'
+        status = ready if recovers and observations else initial
+        observations.append(status)
+        return httpx.Response(200, json=status)
+    monkeypatch.setattr(httpx, 'Client', lambda **kw:
+        client_class(**kw, transport=httpx.MockTransport(transport)))
+    def start(config, data, env, *a, **kw):
+        if launches:
+            assert recovers and observations == [initial, ready]
+        launches.append(dict(env))
+        return backend.BackendInfo(Mock(), data)
+    monkeypatch.setattr(index, '_start_serving', start)
+    monkeypatch.setattr(index, '_confirm_ready', lambda *a, **kw: index_identity.ConfirmResult(True, [], {}))
+    quarantine = Mock(side_effect=AssertionError('no sensitivity quarantine'))
+    monkeypatch.setattr(index, '_quarantine', quarantine)
+    monkeypatch.setattr(index_identity, '_confirm_canary', Mock(side_effect=AssertionError('no CE canary')))
+    try:
+        if recovers:
+            assert h.wait(prepared_only=True, deadline=105) is h
+            assert launches == [h.env, {**h.env, **h._sensitivity}]
+        else:
+            with pytest.raises(index.TransientIndexRefused, match='deadline'):
+                h.wait(prepared_only=True, deadline=105)
+            assert launches == [h.env] and h._lock.closed
+        quarantine.assert_not_called()
+        assert (h.root/'entry.json').exists()
+    finally:
+        h.close()
+
+
+def test_scoring_readiness_precedes_idle_gate(tmp_path, monkeypatch):
+    from .test_redesign import cached_handle
+    h = cached_handle(tmp_path, monkeypatch)
+    h._backend = backend.BackendInfo(Mock(), h.data_dir)
+    h._backend.proc.poll.return_value = None
+    h.base_url = 'http://engine'
+    h._sensitivity = {'JUSTSEARCH_RERANK_ENABLED': 'false'}
+    index._write(h.root/'entry.json', {'owner': index._population_owner(h.collection, 'key'), 'witness': {}})
+    monkeypatch.setattr(index, 'compute_index_key', lambda *a: ('key', {}))
+    monkeypatch.setattr(index, '_materialize', lambda *a: h.collection)
+    calls = []
+    def witness(*a):
+        calls.append('ready')
+        return {}
+    monkeypatch.setattr(index, 'witness', witness)
+    monkeypatch.setattr(index, '_adoption_agreement', lambda *a: [])
+    def status(*a):
+        assert calls == ['ready'], 'idle was judged before ordinary adoption readiness'
+        return complete_quality_status(len(h.collection.documents))
+    monkeypatch.setattr(index, '_get', status)
+    monkeypatch.setattr(sensitivity, 'confirm_identity', lambda *a: index_identity.ConfirmResult(True, [], {}))
+    try:
+        result = index._confirm(h)
+        assert result.ok, result.failures
+    finally:
+        h.close()
 
 
 @pytest.mark.parametrize('arm', [None, {'JUSTSEARCH_RERANK_ENABLED': 'false'}])
@@ -317,6 +456,8 @@ def test_pending_or_unknown_work_refuses_before_override_launch(tmp_path, monkey
         return backend.BackendInfo(Mock(), data)
     monkeypatch.setattr(index, '_start_serving', start)
     monkeypatch.setattr(index, '_get', lambda *a: status)
+    # Even if the ordinary readiness predicate passes, idle evidence is mandatory.
+    monkeypatch.setattr(index, '_ready_reasons', lambda *a: [])
     monkeypatch.setattr(index, '_confirm_ready', lambda *a, **kw: index_identity.ConfirmResult(True, [], {}))
     quarantine = Mock(side_effect=AssertionError('sensitivity must never quarantine'))
     monkeypatch.setattr(index, '_quarantine', quarantine)
@@ -340,8 +481,7 @@ def test_sensitivity_identity_confirmation_keeps_every_non_ce_check(monkeypatch,
     for name in ('_confirm_binding', '_confirm_generation', '_confirm_counts', '_confirm_watched_roots'):
         monkeypatch.setattr(index_identity, name, lambda *a, name=name: calls.append(name))
     monkeypatch.setattr(index_identity, '_confirm_canary', Mock(side_effect=AssertionError('no CE')))
-    monkeypatch.setattr(index_identity, '_get_json', lambda *a: ({'indexState': 'IDLE', 'pendingJobs': 0,
-        'processingJobsCount': 0, 'embeddingPendingCount': 0, 'pendingNerCount': 0}, None))
+    monkeypatch.setattr(index_identity, '_get_json', lambda *a: (complete_quality_status(), None))
     assert sensitivity.confirm_identity(h, {'identity': {'key': 'live'}}).ok
     assert calls == ['_confirm_binding', '_confirm_generation', '_confirm_counts', '_confirm_watched_roots']
     assert live.call_args.kwargs == {'index_key': 'key'}

@@ -767,12 +767,13 @@ class IndexHandle:
                 # Retained attestations do not prove that the job store is idle now.
                 # Recover/check it with prepared settings before any override can
                 # reach startup ingestion. The data lock spans both writer lifetimes.
-                from .sensitivity import SensitivityRefused, require_idle
+                from .sensitivity import SensitivityRefused, require_ready_idle
                 self._backend = _start_serving(self.config, self.data_dir, self.env, port, deadline,
                     prepared_only=True, startup_admission=False)
                 try:
                     with httpx.Client(base_url=f"http://127.0.0.1:{port}", timeout=30) as client:
-                        require_idle(_get(client, "/api/status"))
+                        require_ready_idle(client, self.collection,
+                                           self.config.request.get("mode") == "splade", deadline)
                 except SensitivityRefused as e:
                     raise IndexRefused(f"not ready: {e}") from e
                 finally:
@@ -989,11 +990,11 @@ def _confirm(handle: IndexHandle, entry: dict | None = None) -> index_identity.C
                      else _json(handle.root / "entry.json"))
         _check_owner(entry["owner"], handle.collection, handle.index_key)
         m = _materialize(handle.collection, handle.config, handle.root)
+        current = witness(handle.base_url, handle.collection, m, handle.root / "documents", handle.config)
         if handle._sensitivity is not None:
             from .sensitivity import require_idle
             with httpx.Client(base_url=handle.base_url, timeout=30) as client:
                 require_idle(_get(client, "/api/status"))
-        current = witness(handle.base_url, handle.collection, m, handle.root / "documents", handle.config)
         failures.extend(_adoption_agreement(entry["witness"], current))
         if handle._sensitivity is not None:
             from .sensitivity import confirm_identity
