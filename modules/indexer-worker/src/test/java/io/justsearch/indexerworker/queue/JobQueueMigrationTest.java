@@ -143,7 +143,7 @@ final class JobQueueMigrationTest {
         var statement = connection.createStatement()) {
       try (ResultSet rs = statement.executeQuery("PRAGMA user_version")) {
         assertTrue(rs.next());
-        assertEquals(SqliteSchema.TARGET_VERSION, rs.getInt(1),
+        assertEquals(28, rs.getInt(1),
             "a V" + version + " queue must reach V27 so older readers refuse unsupported origin storage");
       }
       statement.execute("INSERT INTO switch_buffer "

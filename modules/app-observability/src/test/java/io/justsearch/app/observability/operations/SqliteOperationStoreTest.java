@@ -48,7 +48,7 @@ class SqliteOperationStoreTest {
     }
     try (var reopened = new SqliteOperationStore(path, CLOCK, step -> {});
         Connection db = connect(path); Statement statement = db.createStatement()) {
-      assertEquals(OperationSchema.VERSION, scalar(statement, "PRAGMA user_version"), "v5 must actually cross the semantic barrier");
+      assertEquals(7, scalar(statement, "PRAGMA user_version"), "v5 must actually cross the semantic barrier");
       assertEquals(73, scalar(statement, "SELECT seq FROM sqlite_sequence WHERE name='operations'"));
       assertEquals(1, scalar(statement, "SELECT count(*) FROM operations WHERE operation_key='v5-preserved' AND state='ACCEPTED'"));
       assertTrue(reopened.recovery().isEmpty());
@@ -62,7 +62,7 @@ class SqliteOperationStoreTest {
         Connection db = connect(path);
         Statement statement = db.createStatement()) {
       assertTrue(store.recovery().isEmpty());
-      assertEquals(OperationSchema.VERSION, scalar(statement, "PRAGMA user_version"));
+      assertEquals(7, scalar(statement, "PRAGMA user_version"));
       assertEquals(0, scalar(statement, "SELECT history_since_ms FROM operations_meta"));
       assertEquals(1, scalar(statement, "SELECT count(*) FROM operations_meta"));
       try (ResultSet result = statement.executeQuery("PRAGMA table_info(operations)")) {
@@ -121,7 +121,7 @@ class SqliteOperationStoreTest {
     }
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "interruptedQuarantineCannotResetTheHistoryFence({0})")
   @ValueSource(strings = {"quarantine-directory", "quarantine-operations.db",
       "quarantine-operations.db-wal", "quarantine-operations.db-shm", "quarantine-finalized", "before-schema-commit"})
   void interruptedQuarantineCannotResetTheHistoryFence(String interruptedStep) throws Exception {
@@ -137,7 +137,7 @@ class SqliteOperationStoreTest {
         Connection db = connect(path); Statement statement = db.createStatement()) {
       assertEquals(CLOCK.millis() + 300_001,
           scalar(statement, "SELECT history_since_ms FROM operations_meta"));
-      assertEquals(OperationSchema.VERSION, scalar(statement, "PRAGMA user_version"));
+      assertEquals(7, scalar(statement, "PRAGMA user_version"));
       Path preserved = reopened.recovery().orElseThrow().preservedDirectory();
       assertArrayEquals(corrupt, Files.readAllBytes(preserved.resolve("operations.db")));
       assertEquals("original WAL", Files.readString(preserved.resolve("operations.db-wal")));

@@ -177,19 +177,68 @@ by this builder. Evidence references below are the exact destinations for the co
         "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationHistoryPolicyTest.java",
         "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationPreparationStoreTest.java",
         "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/SqliteOperationStoreStartupContentionTest.java",
-        "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/SqliteOperationStoreTest.java",
+        "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/SqliteOperationStoreTest.java"
+      ],
+      "class": "New",
+      "behaviour": "R-A: Operations stores finish creation, migration, quarantine recovery and contention retry at literal schema version 7; existing rows, sequence, history fences, rollback and quarantine assertions stay intact.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "location": "task redesign-p2a request",
+          "quote": "operations v6 -> v7"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/redesign-p2a-version-expectations.json",
+      "newChecks": [
+        "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationHistoryPendingTest.java#frozenV4MigrationRollsBackAndOnlyFutureTransitionsAcquireDeliveryObligation",
+        "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationHistoryPolicyTest.java#v3MigrationIsAtomicPreservesPreparedDataAndDoesNotInventHistoricalVisibility",
+        "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationPreparationStoreTest.java#v2MigrationPreservesSequenceAndRollbackRestoresOldSchema",
+        "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/SqliteOperationStoreStartupContentionTest.java#wrappedBusyAtSchemaCommitRollsBackAndRetriesWithoutQuarantine",
+        "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/SqliteOperationStoreTest.java#RF55V5SemanticMigrationAdvancesVersionAndPreservesExistingRowsAndSequence",
+        "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/SqliteOperationStoreTest.java#freshStoreHasIndependentVersionAndSingletonFenceAndReopens",
+        "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/SqliteOperationStoreTest.java#interruptedQuarantineCannotResetTheHistoryFence"
+      ]
+    },
+    {
+      "items": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobCountsMigrationTest.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobQueueMigrationTest.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/SourceOriginLookupTest.java",
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/SourceOriginMigrationTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/SourceOriginMigrationTest.java"
+      ],
+      "class": "New",
+      "behaviour": "R-I: Queue stores finish creation and supported-version migration at literal schema version 28; the explicit target-version pin is 28, and existing admissions, counts, job rows and origin lookup assertions stay intact.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "location": "task redesign-p2a request",
+          "quote": "queue v27 -> v28"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/redesign-p2a-version-expectations.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobCountsMigrationTest.java#everySupportedVersionMigratesToV24WithoutChangingSavedRows",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobCountsMigrationTest.java#unreleasedQueueV23GainsMainAdmissionFenceWithoutLosingCounts",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobQueueMigrationTest.java#releasedVersionUpgradesToV27KeepingAdmissionCount",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobQueueMigrationTest.java#migratesV11ToCurrentPreservingQueueAndIdentityRowsAndRefusesTheNextVersion",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/SourceOriginLookupTest.java#importsResolveOnlyTheirOperationAndNormalizedRootAfterReopen",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/SourceOriginMigrationTest.java#freshAndV26QueuesHaveDurableOriginStorage"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/SqliteOperationStoreTest.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/AdmissionSourceWitnessTest.java"
       ],
       "class": "Adaptation",
       "moved": [
         "input re-encoding",
-        "signature"
+        "signature",
+        "instrumentation"
       ],
-      "whatMoved": "Latest-schema assertions use each store's authoritative target after its explicit version increment (the one queue-version pin moves 27 to 28). The v5 operations fixture removes only the new v7 columns before rewinding, so it remains an actual v5 shape. All row, sequence, quarantine, rollback, source-ownership and future-refusal predicates stay intact. AdmissionSourceWitnessTest passes the new nullable operation-key context to the hashing observer; it also supports the old private signature for before-state preservation. Its exact witness/component and before/after-mutation assertions are unchanged.",
+      "whatMoved": "The v5 operations fixture removes only the new v7 columns before rewinding, so it remains an actual v5 shape. AdmissionSourceWitnessTest passes the new nullable operation-key context to the hashing observer; it also supports the old private signature for before-state preservation. Its exact witness/component and before/after-mutation assertions are unchanged. The interrupted-quarantine parameterized case name now starts with its method name so the evidence selector resolves; only runner metadata changes. Schema-version expectations are accounted for separately in the New entries under decisions R-A and R-I.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -227,6 +276,33 @@ env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot node scripts/governance/gates/t
   --check modules/app-engine/src/test/java/io/justsearch/app/engine/ImportStoreMixedUpgradeTest.java
 ```
 
+Version expectations (decisions R-A: "operations v6 -> v7" and R-I: "queue v27 -> v28",
+location "task redesign-p2a request"; assertion fail-before required):
+
+```bash
+env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot node scripts/governance/gates/test-intent/run-evidence.mjs \
+  --out gates/test-intent/evidence/redesign-p2a-version-expectations.json \
+  --before a42d2cbed2cc46990f7872bef8715cd07e26eb80 \
+  --check modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationHistoryPendingTest.java#frozenV4MigrationRollsBackAndOnlyFutureTransitionsAcquireDeliveryObligation \
+  --check modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationHistoryPolicyTest.java#v3MigrationIsAtomicPreservesPreparedDataAndDoesNotInventHistoricalVisibility \
+  --check modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationPreparationStoreTest.java#v2MigrationPreservesSequenceAndRollbackRestoresOldSchema \
+  --check modules/app-observability/src/test/java/io/justsearch/app/observability/operations/SqliteOperationStoreStartupContentionTest.java#wrappedBusyAtSchemaCommitRollsBackAndRetriesWithoutQuarantine \
+  --check modules/app-observability/src/test/java/io/justsearch/app/observability/operations/SqliteOperationStoreTest.java#RF55V5SemanticMigrationAdvancesVersionAndPreservesExistingRowsAndSequence \
+  --check modules/app-observability/src/test/java/io/justsearch/app/observability/operations/SqliteOperationStoreTest.java#freshStoreHasIndependentVersionAndSingletonFenceAndReopens \
+  --check modules/app-observability/src/test/java/io/justsearch/app/observability/operations/SqliteOperationStoreTest.java#interruptedQuarantineCannotResetTheHistoryFence \
+  --check modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobCountsMigrationTest.java#everySupportedVersionMigratesToV24WithoutChangingSavedRows \
+  --check modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobCountsMigrationTest.java#unreleasedQueueV23GainsMainAdmissionFenceWithoutLosingCounts \
+  --check modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobQueueMigrationTest.java#releasedVersionUpgradesToV27KeepingAdmissionCount \
+  --check modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobQueueMigrationTest.java#migratesV11ToCurrentPreservingQueueAndIdentityRowsAndRefusesTheNextVersion \
+  --check modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/SourceOriginLookupTest.java#importsResolveOnlyTheirOperationAndNormalizedRootAfterReopen \
+  --check modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/SourceOriginMigrationTest.java#freshAndV26QueuesHaveDurableOriginStorage
+```
+
+The Windows file-lock version expectation in SqliteOperationStoreStartupContentionTest remains
+platform-conditional; Linux runs do not verify it. The selected cross-platform contention check
+covers the same final schema version. Every selected method has no @DisplayName, and parameterized
+case names resolve by method name.
+
 Primitive (new API, no fail-before):
 
 ```bash
@@ -238,7 +314,11 @@ env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot node scripts/governance/gates/t
   --check modules/app-engine/src/test/java/io/justsearch/app/engine/OriginApprovalExpiryTest.java
 ```
 
-Preservation (also run the corresponding Gradle selection in an isolated shared clone of the base):
+Preservation (also run the corresponding Gradle selection in an isolated shared clone of the base).
+The whole-class selections for SourceOriginLookupTest, SourceOriginMigrationTest and
+SqliteOperationStoreTest also include the changed version expectations, covered by the New entries
+above. Their other assertions remain preservation checks; the base preservation run uses its
+original version expectations, while the separate version run above overlays the new expectations:
 
 ```bash
 env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot node scripts/governance/gates/test-intent/run-evidence.mjs \

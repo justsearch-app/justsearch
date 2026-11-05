@@ -38,7 +38,7 @@ final class SourceOriginMigrationTest {
           assertTrue(rows.next(), "accepted declarations require durable source_origin storage");
         }
         try (var rows = statement.executeQuery("PRAGMA user_version")) {
-          assertTrue(rows.next()); assertEquals(SqliteSchema.TARGET_VERSION, rows.getInt(1));
+          assertTrue(rows.next()); assertEquals(28, rows.getInt(1));
         }
       }
       assertEquals(upgrade ? 1 : 0, queue.queueDepth(), "migration must preserve queue admissions");
