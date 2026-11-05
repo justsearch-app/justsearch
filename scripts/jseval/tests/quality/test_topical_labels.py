@@ -1017,9 +1017,9 @@ def test_every_call_runs_in_one_isolated_home_without_the_users_config_or_mcp_se
     assert home.parent == tl.WORK and home != fake_codex.user_config.parent
     for r in records:
         assert "mcp_servers" not in r["config"] and r["config"]["cli_auth_credentials_store"] == "file"
-        copied = {**SUBSCRIPTION_AUTH, "tokens": {k: v for k, v in SUBSCRIPTION_AUTH["tokens"].items()
-                                                  if k != "refresh_token"}}
-        assert json.loads(r["auth"]) == copied  # the copied ChatGPT login, without refresh token
+        copied = {**SUBSCRIPTION_AUTH, "tokens": {**SUBSCRIPTION_AUTH["tokens"],
+                                                  "refresh_token": tl.REFRESH_PLACEHOLDER}}
+        assert json.loads(r["auth"]) == copied  # the copied ChatGPT login, refresh token disabled
     assert not home.exists()  # deleted afterwards
     calls = tl.read_checkpoint(tl.WORK / "second" / "calls.jsonl")
     assert all(c["ok"] and c["phase"] == "calibration" and c["model"] == "gpt-6.1-sol" for c in calls)
@@ -1055,7 +1055,7 @@ def test_the_isolated_home_never_holds_or_writes_back_a_refresh_token(sampled, f
         return real_run(command, **kw)
     monkeypatch.setattr(tl.subprocess, "run", run)
     tl.second_judge(max_calls=1)
-    assert seen and all("refresh_token" not in t for t in seen)
+    assert seen and all(t.get("refresh_token") == tl.REFRESH_PLACEHOLDER for t in seen)
     assert fake_codex.auth.read_bytes() == before
 
 
