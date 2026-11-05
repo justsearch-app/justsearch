@@ -18,7 +18,27 @@ public final class EnrichmentSelection {
   private final Map<Lane, DocumentFieldOps.PendingIdPage> pages = new HashMap<>();
   private final Map<Lane, Set<String>> examined = new HashMap<>();
 
+  // Rows a stage settled are not re-selected for that stage against a stale NRT page in the same
+  // scheduler call; other stages still serve the same document.
+  private final Map<String, Set<String>> served = new HashMap<>();
+
+  /** Starts one scheduler call (an idle cycle or a busy turn). */
+  public void beginCycle() { served.clear(); }
+
+  /** Records the rows a lane turn settled for its stages in the current scheduler call. */
+  public void served(EnrichmentAccounting.Summary summary) {
+    summary.tickets().forEach((ticket, disposition) -> {
+      if (disposition == EnrichmentAccounting.Disposition.PUBLISHED
+          || disposition == EnrichmentAccounting.Disposition.COMPLETED_EMPTY
+          || disposition == EnrichmentAccounting.Disposition.FAILED_CHARGED
+          || disposition == EnrichmentAccounting.Disposition.REJECTED_OUTPUT) {
+        served.computeIfAbsent(ticket.stage().status, ignored -> new HashSet<>()).add(ticket.documentId());
+      }
+    });
+  }
+
   public void clear() {
+    beginCycle();
     cursors.clear();
     begin();
   }
@@ -37,7 +57,10 @@ public final class EnrichmentSelection {
         : fields.queryPendingPage(stage, limit, kind == PendingDocumentKind.PARENT, cursors.get(lane));
     pages.put(lane, page);
     if (page.ids().isEmpty()) cursors.remove(lane);
-    return page.ids();
+    var alreadyServed = served.getOrDefault(stage, Set.of());
+    examined.computeIfAbsent(lane, ignored -> new HashSet<>()).addAll(alreadyServed);
+    advance();
+    return page.ids().stream().filter(id -> !alreadyServed.contains(id)).toList();
   }
 
   void examined(Set<String> ids) {

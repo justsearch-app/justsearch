@@ -11,7 +11,7 @@ public final class LoopPacingPolicy {
 
   // Tempdoc 710 Wave-1.5 Move 4: pollBatchSize / embeddingBackfillBatchSize /
   // nerBackfillBatchSize / disambiguationBackfillBatchSize / spladeBackfillBatchSize /
-  // spladeInterleaveBatchSize / spladeInterleaveIntervalMs / commitIntervalMs /
+  // enrichmentInterleaveBatchSize / enrichmentInterleaveIntervalMs / commitIntervalMs /
   // maxDocsBeforeCommit moved off bare constants here onto
   // ResolvedConfig.Ai.BackfillPacing (justsearch.backfill.* config surface). Callers now read
   // the resolved pacing snapshot directly; isTimeCommitTriggered/isBufferCommitTriggered below

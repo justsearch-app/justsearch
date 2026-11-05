@@ -164,13 +164,15 @@ Scope:
 | **Backfill Pacing (tempdoc 710 Wave-1.5 Move 4)** | | | |
 | `JUSTSEARCH_BACKFILL_POLL_BATCH_SIZE` | `justsearch.backfill.poll_batch_size` | Int | Advanced/tuning knob. Primary-indexing job-queue poll batch size (default 16 — tempdoc 278 Phase 1 item 1b: raised from 1 to amortize per-batch queue overhead). |
 | `JUSTSEARCH_BACKFILL_EMBEDDING_BATCH_SIZE` | `justsearch.backfill.embedding_batch_size` | Int | Advanced/tuning knob. Doc-count per embedding backfill batch, parent and chunk (default 100). |
-| `JUSTSEARCH_BACKFILL_NER_BATCH_SIZE` | `justsearch.backfill.ner_batch_size` | Int | Advanced/tuning knob. Doc-count per NER backfill batch (default 100). |
+| `JUSTSEARCH_BACKFILL_NER_BATCH_SIZE` | `justsearch.backfill.ner_batch_size` | Int | Retained batch setting (default 100). The scheduler runs NER one document per turn; this setting no longer applies to scheduled NER. |
 | `JUSTSEARCH_BACKFILL_DISAMBIGUATION_BATCH_SIZE` | `justsearch.backfill.disambiguation_batch_size` | Int | Advanced/tuning knob. Doc-count per disambiguation backfill batch (default 500). |
 | `JUSTSEARCH_BACKFILL_SPLADE_BATCH_SIZE` | `justsearch.backfill.splade_batch_size` | Int | Advanced/tuning knob. Doc-count per idle-branch SPLADE backfill batch (default 200). |
-| `JUSTSEARCH_BACKFILL_SPLADE_INTERLEAVE_BATCH_SIZE` | `justsearch.backfill.splade_interleave_batch_size` | Int | Advanced/tuning knob. Doc-count per SPLADE batch interleaved into primary indexing (default 10 — tempdoc 278 Phase 4c; smaller than the idle-branch batch so interleaving stays cheap). |
-| `JUSTSEARCH_BACKFILL_SPLADE_INTERLEAVE_INTERVAL_MS` | `justsearch.backfill.splade_interleave_interval_ms` | Int | Advanced/tuning knob. Minimum time (ms) between interleaved SPLADE/BGE-M3 batches during primary indexing (default 5000 — tempdoc 278 Phase 4a; time-gated to limit primary-indexing overhead to ~13%). |
-| `JUSTSEARCH_BACKFILL_COMMIT_INTERVAL_MS` | `justsearch.backfill.commit_interval_ms` | Int | Advanced/tuning knob. Time-based commit trigger interval in ms (default 10000). Despite the `backfill.` key this drives the **primary indexing loop** (`LoopPacingPolicy.isTimeCommitTriggered`); no backfill op reads it (tempdoc 912 §E). |
-| `JUSTSEARCH_BACKFILL_MAX_DOCS_BEFORE_COMMIT` | `justsearch.backfill.max_docs_before_commit` | Int | Advanced/tuning knob. Buffer-based commit trigger: doc count since last commit (default 1000). Despite the `backfill.` key this drives the **primary indexing loop** (`LoopPacingPolicy.isBufferCommitTriggered`); no backfill op reads it (tempdoc 912 §E). |
+| `JUSTSEARCH_BACKFILL_ENRICHMENT_INTERLEAVE_BATCH_SIZE` | `justsearch.backfill.enrichment_interleave_batch_size` | Int | Advanced/tuning knob. Document count cap of one busy enrichment lane turn (dense parent, dense chunk, sparse parent, sparse chunk or NER) during primary indexing (default 10). A count cap, not a time quantum. BGE-M3 keeps its own `bge_m3_interleave_batch_size` cap. |
+| `JUSTSEARCH_BACKFILL_SPLADE_INTERLEAVE_BATCH_SIZE` | `justsearch.backfill.splade_interleave_batch_size` | Int | Legacy alias of `justsearch.backfill.enrichment_interleave_batch_size`; its value still applies, now to every busy lane turn. |
+| `JUSTSEARCH_BACKFILL_ENRICHMENT_INTERLEAVE_INTERVAL_MS` | `justsearch.backfill.enrichment_interleave_interval_ms` | Int | Advanced/tuning knob. Minimum time (ms) between busy enrichment turns during primary indexing (default 5000; 0 admits a turn on every primary iteration). Each due call admits one bounded lane turn; pending ingestion limits it to that turn but cannot veto it. |
+| `JUSTSEARCH_BACKFILL_SPLADE_INTERLEAVE_INTERVAL_MS` | `justsearch.backfill.splade_interleave_interval_ms` | Int | Legacy alias of `justsearch.backfill.enrichment_interleave_interval_ms`; its value still applies, now to every busy enrichment turn. |
+| `JUSTSEARCH_BACKFILL_COMMIT_INTERVAL_MS` | `justsearch.backfill.commit_interval_ms` | Int | Time-based Lucene commit threshold for primary indexing and enrichment (default 10000 ms). Since E4b (interim until E6) it also governs enrichment: the scheduler checks it after each lane turn while enrichment-dirty documents exist, and the end of every idle cycle, and a busy call that finds no eligible lane, commits anything dirty. A failed commit keeps the dirty count and is retried at the next check. |
+| `JUSTSEARCH_BACKFILL_MAX_DOCS_BEFORE_COMMIT` | `justsearch.backfill.max_docs_before_commit` | Int | Document count commit threshold for primary indexing and enrichment (default 1000). Since E4b it also counts enrichment-dirty documents (rows a writer accepted, including an accepted prefix before a failure) across busy and idle turns; there is no per-turn commit. |
 | `JUSTSEARCH_BACKFILL_CHUNK_SLOTS_PER_BATCH` | `justsearch.backfill.chunk_slots_per_batch` | Int | Advanced/tuning knob. Chunk-doc cache slots populated per combined-backfill batch (default 50). Tempdoc 691 §F-1 measured this cap is NOT the dense-corpus chunk-only-tail throughput lever (that tail is GPU-embedding-compute-bound, not cap-throttled) — exists for experimentation, not because raising it is known to help. |
 | `JUSTSEARCH_BACKFILL_BGE_M3_BATCH_SIZE` | `justsearch.backfill.bge_m3_batch_size` | Int | Advanced/tuning knob. Doc-count per idle-branch BGE-M3 backfill batch (default 50). Previously a stray literal bypassing `LoopPacingPolicy` entirely; unified onto this config surface. |
 | `JUSTSEARCH_BACKFILL_BGE_M3_INTERLEAVE_BATCH_SIZE` | `justsearch.backfill.bge_m3_interleave_batch_size` | Int | Advanced/tuning knob. Doc-count per BGE-M3 batch interleaved into primary indexing (default 10). |
@@ -409,3 +411,17 @@ are retired. Pipeline definition files were removed by ADR-0014; profile labels
 never selected an execution path. Search request flags or an explicit mode select
 the pipeline. A request with neither uses the backend's capability-derived AUTO
 selection; MCP and RAG retain their explicit hybrid defaults.
+
+Enrichment interleave aliases resolve before parsing or defaulting: the sources of both names
+form one ordinal chain (JVM properties outrank process environment values across either name)
+and the canonical name wins at equal source priority. Blank values are absent, so a blank
+canonical value does not hide the alias. A negative, malformed or overflowing winning value, or
+a zero batch cap, uses the default rather than a lower-priority source; a zero interval keeps
+its meaning. The batch cap remains a document count, not a service-time quantum.
+
+The enrichment status field `backfillMode` (the worker's backfill mode gauge) retains its name and
+now reports `active` when the last scheduler call (busy or idle) admitted a lane turn, otherwise
+`idle`, which includes calls where every lane was held or backed off. The former `combined` and
+`individual` values are retired with the mode probe (E4b). Admission and retained-window
+advancement do not imply published completion; existing dispositions and hold/backoff reasons
+retain their meanings.

@@ -30,15 +30,15 @@ The remaining named constants are compiled into the indicated class.
 | `justsearch.indexing.foreground_duty_pct` | 20 | `IndexingPacing` | Minimum share of wall time indexing keeps while foreground search RPCs are in flight (a duty cycle; replaced the `BREATH_HOLD_MS` pause) |
 | `justsearch.indexing.foreground_cooldown_ms` | 500 ms | `IndexingPacing` | How long after the last foreground RPC the Worker still counts as contended |
 | **Commit policy** | | | |
-| `justsearch.backfill.commit_interval_ms` | 10000 ms | `EnvRegistry` | Time-based Lucene commit trigger for primary indexing |
-| `justsearch.backfill.max_docs_before_commit` | 1000 | `EnvRegistry` | Count-based Lucene commit trigger for primary indexing |
+| `justsearch.backfill.commit_interval_ms` | 10000 ms | `EnvRegistry` | Time-based Lucene commit trigger for primary indexing and enrichment |
+| `justsearch.backfill.max_docs_before_commit` | 1000 | `EnvRegistry` | Count-based Lucene commit trigger for primary indexing and enrichment |
 | **Backfill pacing** | | | |
 | `justsearch.backfill.embedding_batch_size` | 100 | `EnvRegistry` | Doc and chunk embedding backfill batch |
-| `justsearch.backfill.ner_batch_size` | 100 | `EnvRegistry` | NER extraction backfill batch |
+| `justsearch.backfill.ner_batch_size` | 100 | `EnvRegistry` | Retained setting; the scheduler runs NER one document per turn, so this batch size no longer applies to scheduled NER |
 | `justsearch.backfill.disambiguation_batch_size` | 500 | `EnvRegistry` | Entity disambiguation backfill batch |
 | `justsearch.backfill.splade_batch_size` | 200 | `EnvRegistry` | SPLADE backfill batch (idle path) |
-| `justsearch.backfill.splade_interleave_batch_size` | 10 | `EnvRegistry` | SPLADE batch during primary indexing |
-| `justsearch.backfill.splade_interleave_interval_ms` | 5000 ms | `EnvRegistry` | Min interval between SPLADE interleaves |
+| `justsearch.backfill.enrichment_interleave_batch_size` | 10 | `EnvRegistry` | Document count cap of one busy enrichment lane turn during primary indexing (legacy alias `splade_interleave_batch_size`) |
+| `justsearch.backfill.enrichment_interleave_interval_ms` | 5000 ms | `EnvRegistry` | Minimum interval between busy enrichment turns (legacy alias `splade_interleave_interval_ms`) |
 
 ### Embedding Inference
 

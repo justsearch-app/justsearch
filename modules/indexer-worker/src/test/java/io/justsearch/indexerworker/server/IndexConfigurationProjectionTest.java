@@ -43,6 +43,23 @@ class IndexConfigurationProjectionTest {
         ConfigKey.INDEX_OCR_MAX_PAGES.configKey(), "17")));
   }
 
+  /** E4b D6: the canonical enrichment interleave names project the same effective values. */
+  @Test
+  void canonicalAndLegacyEnrichmentInterleaveNamesProjectOneEffectiveValue() throws Exception {
+    String baseline = bootVersion(Map.of());
+    for (String suffix : new String[] {"interval_ms", "batch_size"}) {
+      String value = suffix.equals("interval_ms") ? "7000" : "17";
+      String canonical = bootVersion(Map.of(
+          "justsearch.backfill.enrichment_interleave_" + suffix, value));
+      assertNotEquals(baseline, canonical, "the canonical " + suffix + " changes the effective value");
+      assertEquals(canonical, bootVersion(Map.of(
+          "justsearch.backfill.splade_interleave_" + suffix, value)), "the legacy alias projects identically");
+      assertEquals(baseline, bootVersion(Map.of(
+          "justsearch.backfill.enrichment_interleave_" + suffix,
+          suffix.equals("interval_ms") ? "5000" : "10")), "an explicit default is the default");
+    }
+  }
+
   @Test
   void hotReloadChangesTheActualOwnerVersion() throws Exception {
     assertNotEquals(

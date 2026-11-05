@@ -97,7 +97,7 @@ final class BackfillProbeCommitPersistenceTest extends LuceneExecutorTestBase {
         default -> throw new AssertionError("unexpected boundary " + batches);
       };
       System.out.println("cadence " + batches + " observed " + cycle.commits);
-      assertEquals(expected, cycle.commits, "commit after each five writing batches, probe included");
+      assertEquals(expected, cycle.commits, "commit at the five-document threshold, then at the cycle end");
     } finally {
       System.out.printf("cadence %d elapsed %.3fs%n", batches, (System.nanoTime() - started) / 1e9);
     }
@@ -181,7 +181,9 @@ final class BackfillProbeCommitPersistenceTest extends LuceneExecutorTestBase {
       }
       assertDurable(directory, "doc-8", "PENDING", null, "0");
       verify(cycle.embedding, times(1)).embedDocumentBatch(anyList());
-      assertEquals(List.of(new CommitEvent(CommitReason.BACKFILL_COMBINED_FINAL, 1)), cycle.commits);
+      // E4b: eight dirty documents reach the five-document threshold after the turn, so the
+      // finished unit is durable before the orderly break, which has nothing left to commit.
+      assertEquals(List.of(new CommitEvent(CommitReason.BACKFILL_COMBINED, 1)), cycle.commits);
     }
   }
 
@@ -295,6 +297,10 @@ final class BackfillProbeCommitPersistenceTest extends LuceneExecutorTestBase {
       ResolvedConfig config = mock(ResolvedConfig.class, RETURNS_DEEP_STUBS);
       var pacing = mock(ResolvedConfig.Ai.BackfillPacing.class);
       when(pacing.embeddingBackfillBatchSize()).thenReturn(batchSize);
+      // E4b retired the probe's five-writing-batch counter: the scheduler's dirty-document
+      // threshold (five one-document turns here) yields the same durability boundaries.
+      when(pacing.maxDocsBeforeCommit()).thenReturn(5);
+      when(pacing.commitIntervalMs()).thenReturn(Long.MAX_VALUE);
       when(config.ai().backfillPacing()).thenReturn(pacing);
       return new BackfillScheduler(runtime.documentFieldOps(), coordinator, runtime.indexCountOps(), commitOps,
           signals, IndexingPacing.unthrottled(), lifecycle, new AtomicBoolean(true), () -> config,

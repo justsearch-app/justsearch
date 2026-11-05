@@ -54,9 +54,9 @@ class BackfillSchedulerPersistenceTest extends LuceneExecutorTestBase {
       });
       assertTrue(scheduler(runtime, embedding).runIdleCycle());
       assertEquals(8, encodes.get());
-      assertEquals(List.of(CommitReason.BACKFILL_COMBINED, CommitReason.BACKFILL_COMBINED_FINAL), reasons);
-      assertEquals(List.of(5, 8), committedAfterEncodes,
-          "the probe's writing batch counts toward the five-batch cadence; the tail commits at the end");
+      assertEquals(List.of(CommitReason.BACKFILL_COMBINED_FINAL), reasons);
+      assertEquals(List.of(8), committedAfterEncodes,
+          "small turns below the document threshold commit at the orderly cycle end");
       for (int i = 0; i < 64; i++) assertDurable("parent-" + i, "COMPLETED", true);
     }
   }
@@ -139,7 +139,9 @@ class BackfillSchedulerPersistenceTest extends LuceneExecutorTestBase {
       assertEquals(List.of(0, 0, 32), starts, "the same scheduler resumes at its next unfinished window");
       assertEquals(15, new HashSet<>(shortEncoded).size());
       assertEquals(15, shortEncoded.size());
-      assertEquals(List.of(CommitReason.BACKFILL_COMBINED_FINAL), reasons);
+      // E4b: the scheduler's document/time thresholds or the cycle-end drain commit; the
+      // reopen below pins the durable outcome, not which of them fired.
+      assertEquals(1, reasons.size(), "one enrichment commit covers the completing cycle");
       assertDurable("long", "COMPLETED", true);
       for (int i = 0; i < 15; i++) assertDurable("short-" + i, "COMPLETED", true);
     }
@@ -207,7 +209,7 @@ class BackfillSchedulerPersistenceTest extends LuceneExecutorTestBase {
     when(config.ai().backfillPacing()).thenReturn(new ResolvedConfig.Ai.BackfillPacing(
         defaults.pollBatchSize(), 8, defaults.nerBackfillBatchSize(),
         defaults.disambiguationBackfillBatchSize(), defaults.spladeBackfillBatchSize(),
-        defaults.spladeInterleaveBatchSize(), defaults.spladeInterleaveIntervalMs(),
+        defaults.enrichmentInterleaveBatchSize(), defaults.enrichmentInterleaveIntervalMs(),
         defaults.commitIntervalMs(), defaults.maxDocsBeforeCommit(), defaults.chunkSlotsPerBatch(),
         defaults.bgeM3BackfillBatchSize(), defaults.bgeM3InterleaveBatchSize(),
         defaults.foregroundDutyPct(), defaults.foregroundCooldownMs()));

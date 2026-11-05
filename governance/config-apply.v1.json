@@ -435,6 +435,14 @@
       "applyScope": "component:index"
     },
     {
+      "key": "justsearch.backfill.enrichment_interleave_batch_size",
+      "applyScope": "component:index"
+    },
+    {
+      "key": "justsearch.backfill.enrichment_interleave_interval_ms",
+      "applyScope": "component:index"
+    },
+    {
       "key": "justsearch.backfill.max_docs_before_commit",
       "applyScope": "component:index"
     },

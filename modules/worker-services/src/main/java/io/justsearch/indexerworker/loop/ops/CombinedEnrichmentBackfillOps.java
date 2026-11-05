@@ -331,7 +331,7 @@ public final class CombinedEnrichmentBackfillOps {
     if (selection != null) selection.begin();
     var outcome = processCombinedBackfill(context, BulkPacePolicy.DEFAULTS, selection, true, maxUnits);
     // Keep individual callers' immediate durability until the E4b commit-owner cutover.
-    if (outcome.wroteAnything() && outcome.accounting().counters().entrySet().stream()
+    if (maxUnits == Integer.MAX_VALUE && outcome.wroteAnything() && outcome.accounting().counters().entrySet().stream()
         .anyMatch(entry -> entry.getKey().endsWith(".accepted") && entry.getValue() > 0)) {
       try {
         context.commitOps().commitAndTrack(stage == EnrichmentAccounting.Stage.EMBED
@@ -1026,18 +1026,8 @@ public final class CombinedEnrichmentBackfillOps {
       }
       writeMs = (System.nanoTime() - tWrite) / 1_000_000;
 
-      // Commit every 5 writing batches (334 Phase 10). Lucene 10.4 fixed the MMapDirectory
-      // .si arena leak (issue #15068): confined arenas are closed immediately. This
-      // should prevent the 24GB native memory growth that killed deferred commits in
-      // Phase 8 (tested on Lucene 9.x). If OOM recurs, revert to per-batch commits.
-      // NRT refresh is suspended during the tight loop (managed by caller) to prevent
-      // mmap accumulation from ControlledRealTimeReopenThread reader snapshots.
-      if (written > 0 && ++context.batchesSinceCommit()[0] >= 5) {
-        context
-            .commitOps()
-            .commitAndTrack(io.justsearch.adapters.lucene.runtime.CommitReason.BACKFILL_COMBINED);
-        context.batchesSinceCommit()[0] = 0;
-      }
+      // E4b: the scheduler owns enrichment commits (document/time thresholds, idle drain); the
+      // probe-era five-writing-batch commit is retired.
 
       if (context.indexingCoordinator().enrichmentAuthority() != authority) {
         accounting.rejectedRetiredOutcomes();

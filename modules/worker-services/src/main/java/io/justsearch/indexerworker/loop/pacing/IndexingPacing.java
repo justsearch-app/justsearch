@@ -108,7 +108,7 @@ public final class IndexingPacing {
    * Long.MIN_VALUE} = never paced.
    */
   private final ThreadLocal<long[]> threadState =
-      ThreadLocal.withInitial(() -> new long[] {Long.MIN_VALUE, 0L, 0L});
+      ThreadLocal.withInitial(() -> new long[] {Long.MIN_VALUE, 0L, 0L, 0L});
 
   private final AtomicLong pacedIntervalsTotal = new AtomicLong();
   private final AtomicLong yieldedMsTotal = new AtomicLong();
@@ -215,6 +215,11 @@ public final class IndexingPacing {
     return searchBusy() ? MAX_DEBT_MS : Math.max(0L, bulk.generationMaxDebtMs(MAX_DEBT_MS));
   }
 
+  /** Cumulative foreground pacing waits on the calling thread; excludes device acquisition. */
+  public long yieldedNanosOnCurrentThread() {
+    return threadState.get()[3];
+  }
+
   /**
    * The throttle point. Accounts the work done since this thread was last released (its wall time
    * less the time it waited at a device gate) and, while {@link #foregroundBusy()}, yields the wall
@@ -266,6 +271,7 @@ public final class IndexingPacing {
     st[1] = foregroundBusy() ? Math.max(0L, debtNanos) : 0L;
     st[2] = DeviceEncoderGate.waitedNanosOnCurrentThread();
 
+    st[3] += Math.max(0L, st[0] - now);
     recordWindow(workedNanos, yieldedNanos + waitedNanos);
     if (yieldedNanos > 0L) {
       pacedIntervalsTotal.incrementAndGet();
