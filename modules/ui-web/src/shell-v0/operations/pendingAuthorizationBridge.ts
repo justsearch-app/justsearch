@@ -37,10 +37,10 @@
 import type { MultiplexedStream } from '../streaming/MultiplexedStream.js';
 import type { SseEnvelope } from '../streaming/envelope-types.js';
 import { SHELL_EVENT_STREAM_IDS } from '../streaming/shellEventStreamIds.js';
-import { requestAuthorization, withdrawAuthorization, type AuthorizationPrompt } from './authorizationBroker.js';
+import { requestAuthorization, withdrawAuthorization, isOutsideTransport as outside, type AuthorizationPrompt } from './authorizationBroker.js';
 import { getOperationClient, isStaleAuthorization } from './OperationClient.js';
 import { emitEphemeralToast } from '../components/advisory/ephemeralToast.js';
-import { openActionLedgerStream } from './ActionLedgerClient.js';
+import { openActionLedgerStream, type UnifiedActionEntry } from './ActionLedgerClient.js';
 import { subscribeStatus } from '../utils/statusPoll.js';
 
 /** Wire shape of the SLIMMED `PendingAuthorizationEvent` — routing info only, no decision content. */
@@ -64,11 +64,11 @@ function isoTime(value: string | number | undefined): string | undefined {
 }
 
 /**
- * The person's own gesture in an app window (the Engine grants these only with window authority). Every
- * other named source — agents, outside HTTP callers, other apps, schedules, the backend itself, and any
- * source added later — is not the person's action here: it waits in Needs you (DE3).
+ * L15 — how long after a request's ledger row its own broadcast may still arrive. A request this window
+ * saw neither live nor in the retained snapshot (HTTP callers have none) is rediscovered from its row
+ * after that, without an announcement.
  */
-const OWN_TRANSPORTS = new Set(['BUTTON', 'PALETTE', 'RAIL']);
+const BROADCAST_GRACE_MS = 5_000;
 
 /**
  * B2 — the retained side of the same pending store: the advisory stream's snapshot keeps every
@@ -126,8 +126,24 @@ export function startPendingAuthorizationBridge(
       }).finally(() => { entry.checking = false; });
     }
   };
-  const stopActivity = openActionLedgerStream({ multiplex, onActivity: reconcile });
-  const stopStatus = subscribeStatus(snapshot => { if (snapshot) reconcile(); });
+  // L15 — an outside request still open in the ledger (no answer, expiry or withdrawal recorded) that this
+  // window never presented: one made before it opened (a reload, a later window) or whose broadcast it
+  // missed. Its details are read by id, as for the retained snapshot; a gone request is withdrawn.
+  const startedAt = Date.now();
+  let ledger: readonly UnifiedActionEntry[] = [];
+  const rediscover = (): void => {
+    const closed = new Set(ledger.flatMap(row => row.gate?.pendingId && row.gate.disposition !== 'GATED' ? [row.gate.pendingId] : []));
+    for (const row of ledger) {
+      const gate = row.gate;
+      const at = Date.parse(row.occurredAt);
+      if (!gate?.pendingId || gate.disposition !== 'GATED' || !gate.operationId || closed.has(gate.pendingId)
+          || !outside(gate.transport) || !(at < startedAt || at <= Date.now() - BROADCAST_GRACE_MS)) continue;
+      admit({ pendingId: gate.pendingId, operationId: gate.operationId, transport: gate.transport ?? '',
+        createdAt: row.occurredAt }, true);
+    }
+  };
+  const stopActivity = openActionLedgerStream({ multiplex, onActivity: rows => { ledger = rows; reconcile(); rediscover(); } });
+  const stopStatus = subscribeStatus(snapshot => { if (snapshot) { reconcile(); rediscover(); } });
 
   const stopSub = multiplex.subscribe<{ lastPayload: PendingAuthorizationPayload | null }>(
     SHELL_EVENT_STREAM_IDS.PENDING_AUTHORIZATIONS,
@@ -247,7 +263,7 @@ async function presentAndExecute(
     ...(detail.argsSummary ? { argsSummary: detail.argsSummary } : {}),
     ...(detail.rationale ? { purpose: detail.rationale } : {}),
     ...(detail.requestedBy ? { requestedBy: detail.requestedBy } : {}),
-    ...(payload.transport && !OWN_TRANSPORTS.has(payload.transport) ? {
+    ...(outside(payload.transport) ? {
       // DE3 — an agent's request waits in Needs you; its review reads the live details again.
       arrival: 'needs-you' as const, live,
       ...(isoTime(payload.createdAt) ? { askedAt: isoTime(payload.createdAt)! } : {}),

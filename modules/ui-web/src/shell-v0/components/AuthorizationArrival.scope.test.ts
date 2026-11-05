@@ -147,7 +147,8 @@ it.each([undefined, 'Claude Desktop'])('C protected dialog consent names operati
   await flush();
   const label = host.shadowRoot!.querySelector('[data-testid="authorization-allow-always"]')!;
   const box = label.querySelector<HTMLInputElement>('input')!;
-  expect(label.textContent!.trim()).toBe(scope('core.ingest-files'));
+  // L17 — the dialog names the operation as the panel does, never by its internal id.
+  expect(label.textContent!.trim()).toBe(scope('Ingest Files'));
   expect(box.labels?.[0], 'the visible scope is also the accessible name').toBe(label);
 });
 

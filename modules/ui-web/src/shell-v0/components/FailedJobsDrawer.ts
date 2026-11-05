@@ -17,6 +17,7 @@ import './Button.js';
 import './RowActions.js';
 import { icon } from './Icon.js';
 import { TransientController } from '../primitives/transientController.js';
+import { FocusKeeper } from '../primitives/focusKeeper.js';
 import {
   isFailedJobsOpen,
   failedJobsFolderPathHash,
@@ -111,6 +112,8 @@ export class FailedJobsDrawer extends JfElement {
 
   constructor() {
     super();
+    // L21 — a row that leaves (retried, cancelled, refreshed away) hands focus to its neighbour, else Close.
+    new FocusKeeper(this, () => this.renderRoot.querySelector<HTMLElement>('.head-actions jf-button[label="Close"]'));
     this.inline = false;
     this.folderPathHash = '';
     this.observedCount = 0;
@@ -423,10 +426,10 @@ export class FailedJobsDrawer extends JfElement {
   }
 
   private renderBody(): TemplateResult {
-    if (this.loading && (!this.inline || !this.rows.length)) return html`<div class="loading">Loading…</div>`;
-    // Keep one keyed row part through both successful and failed refreshes: an open band
-    // and its opener belong to the file, even when another file disappears or changes order.
-    if (this.error && (!this.inline || !this.rows.length)) return html`<div class="empty">Couldn't load failed files: ${this.error}</div>`;
+    // L21 — a refresh (here or in the drawer) keeps the listed rows: an open band and its opener
+    // belong to their file, and stay while that file is still listed. A file that leaves takes its band.
+    if (this.loading && !this.rows.length) return html`<div class="loading">Loading…</div>`;
+    if (this.error && !this.rows.length) return html`<div class="empty">Couldn't load failed files: ${this.error}</div>`;
     if (this.rows.length === 0)
       return html`<div class="empty">No failed files in this folder.</div>`;
     return html`${this.error ? html`<div class="empty" role="status">Couldn't refresh failed files: ${this.error}. Showing the last known list.</div>` : nothing}

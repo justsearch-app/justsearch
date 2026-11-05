@@ -39,6 +39,7 @@ import type { SurfaceTabs, SurfaceTabItem } from '../components/SurfaceTabs.js';
 import { getSurface } from '../../api/registry/SurfaceCatalogClient.js';
 import { present } from '../display/present.js';
 import { offerReversal, ReversalClosedError } from '../state/ownReversals.js';
+import { FocusKeeper } from '../primitives/focusKeeper.js';
 import '../components/ConfirmBand.js';
 import { emitEphemeralToast } from '../components/advisory/ephemeralToast.js';
 import type { ConfirmBand } from '../components/ConfirmBand.js';
@@ -442,6 +443,8 @@ export class LibrarySurface extends JfElement {
 
   constructor() {
     super();
+    // L21 — focus stays on its control across row updates; when its row leaves, a neighbour (else Add folder) takes it.
+    new FocusKeeper(this, () => this.renderRoot.querySelector<HTMLElement>('[data-add-folder]'));
     this.apiBase = '';
     this.host_ = undefined as unknown as PluginHostApi;
     this.roots = [];
@@ -907,6 +910,12 @@ export class LibrarySurface extends JfElement {
     // DE1 — a removal band whose folder left the list (removed in another window) is no longer asking.
     if (changed.has('roots') && this.removeConfirm && !this.roots.some(root => root.pathHash === this.removeConfirm?.hash)) {
       this.removeConfirm = null;
+    }
+    // L18 — the same for a collection: a band whose source left the list closes for good; it opens
+    // again only on a press, never because the source came back.
+    if (changed.has('otherSources') && this.collectionConfirm
+      && !this.otherSources.sources.some(source => source.collection === this.collectionConfirm)) {
+      this.collectionConfirm = null;
     }
     const active = deepActiveElement();
     this.focusedFolderToggle = active instanceof HTMLElement && active.matches('.folder-toggle')
@@ -1804,9 +1813,13 @@ export class LibrarySurface extends JfElement {
       actionLabel: `Add ${name} again`,
       restoresFolder: path,
       reversed: `Added ${name} again. Reading its files.`,
-      // Adding a folder that is already back (another window, the Library) is an idempotent
-      // success in the engine; an overlap or a missing folder is reported and can be retried.
+      // L20 — a folder another window (or the Library) already added back closes this offer: it says
+      // so and sends no add. An overlap or a missing folder is reported by the add and can be retried.
       reverse: async () => {
+        const preview = await host.data.fetch('/api/indexing-roots/preview', { method: 'POST',
+          headers: { 'content-type': 'application/json' }, body: JSON.stringify({ path }) })
+          .then(res => res.ok ? res.json() as Promise<{ alreadyWatched?: unknown }> : null).catch(() => null);
+        if (preview?.alreadyWatched === true) throw new ReversalClosedError(`${name} is already back in your library.`);
         const result = await host.data.invokeOperation(OP_ADD, collection && collection !== 'default' ? { path, collection } : { path });
         if (!result.success) throw new Error(result.message || 'Add refused');
       },

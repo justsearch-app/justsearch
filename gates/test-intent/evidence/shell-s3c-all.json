@@ -1,0 +1,1304 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-05T14:27:07.116Z",
+  "revision": "7ed8454d853098e7a1d4ebad081676d335f13440",
+  "tree": "397d89ec35eb8eb96b564865bf5ee0f5e441691b",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/AuthorizationArrival.restore.test.ts\" \"src/shell-v0/components/AuthorizationArrival.scope.test.ts\" \"src/shell-v0/components/AuthorizationHost.test.ts\" \"src/shell-v0/operations/OperationClient.test.ts\" \"src/shell-v0/operations/authorizationReject.test.ts\" \"src/shell-v0/operations/pendingAuthorizationBridge.test.ts\" \"src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts\" \"src/shell-v0/state/frameStatus.test.ts\" \"src/shell-v0/views/LibrarySurface.folderActions.test.ts\" \"src/api/statusCompletion.test.ts\" \"src/shell-v0/controllers/AgentSessionController.denyFailure.test.ts\" \"src/shell-v0/state/frameStatus.decisions.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/oi_xj252/tmp/test-intent-vitest-57737-1793888756613.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2870
+    },
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts\" \"src/shell-v0/chrome/Shell.s3c-lockdown.test.ts\" \"src/shell-v0/views/LibrarySurface.focusKeeper-lockdown.test.ts\" \"src/shell-v0/views/SettingsSurface.focusKeeper-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/oi_xj252/tmp/test-intent-vitest-57737-1793888759483.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 67630
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationArrival.restore.test.ts#L15 an open ledger row the Engine no longer holds reads \"no longer pending\" once it says so",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationArrival.restore.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6f9003216fab4ef81c3f5f9e1e7aaff2d59019fc9b041902b22df14d7e0b30b2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L15 an open ledger row the Engine no longer holds reads \"no longer pending\" once it says so",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationArrival.scope.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationArrival.scope.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a6b08f6866dba89b90fd2ac3ca00149eb94bfd70de6173339e2e083758f4629b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "A five live MCP TYPED_CONFIRM arrivals announce once each when their advisory arrives first",
+          "status": "passed"
+        },
+        {
+          "name": "A five live MCP INLINE_CONFIRM arrivals announce once each when their advisory arrives first",
+          "status": "passed"
+        },
+        {
+          "name": "A a live MCP typed arrival announces once when the event arrives first",
+          "status": "passed"
+        },
+        {
+          "name": "A a live AGENT_LOOP typed arrival announces once when the event arrives first",
+          "status": "passed"
+        },
+        {
+          "name": "A a live WORKFLOW typed arrival announces once when the event arrives first",
+          "status": "passed"
+        },
+        {
+          "name": "A a live LLM_EMISSION typed arrival announces once when the event arrives first",
+          "status": "passed"
+        },
+        {
+          "name": "A a live HTTP_API typed arrival announces once when the event arrives first",
+          "status": "passed"
+        },
+        {
+          "name": "A a live URL_BAR typed arrival announces once when the event arrives first",
+          "status": "passed"
+        },
+        {
+          "name": "A a live URL_DEEPLINK typed arrival announces once when the event arrives first",
+          "status": "passed"
+        },
+        {
+          "name": "A a live PLUGIN_EMITTED typed arrival announces once when the event arrives first",
+          "status": "passed"
+        },
+        {
+          "name": "A a live SCHEDULED typed arrival announces once when the event arrives first",
+          "status": "passed"
+        },
+        {
+          "name": "A a live RULE_ENGINE typed arrival announces once when the event arrives first",
+          "status": "passed"
+        },
+        {
+          "name": "A a live SYSTEM_INTERNAL typed arrival announces once when the event arrives first",
+          "status": "passed"
+        },
+        {
+          "name": "A a live NOT_YET_KNOWN typed arrival announces once when the event arrives first",
+          "status": "passed"
+        },
+        {
+          "name": "A reload, reconnect snapshots and a later window restore requests silently",
+          "status": "passed"
+        },
+        {
+          "name": "C panel consent names operation and access scope for requester undefined",
+          "status": "passed"
+        },
+        {
+          "name": "C panel consent names operation and access scope for requester Claude Desktop",
+          "status": "passed"
+        },
+        {
+          "name": "C protected dialog consent names operation and access scope for requester undefined",
+          "status": "passed"
+        },
+        {
+          "name": "C protected dialog consent names operation and access scope for requester Claude Desktop",
+          "status": "passed"
+        },
+        {
+          "name": "C durable offering remains suppressed for {\"riskTier\":\"HIGH\"}",
+          "status": "passed"
+        },
+        {
+          "name": "C durable offering remains suppressed for {\"riskTier\":\"MEDIUM\",\"allowAlwaysSupported\":false}",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1d120014eb6c8f76be3c58a54ce7355260f54f5f0b4fed1d801488fff97fea5b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a native double-click on Allow always grants only the first plugin, across reload",
+          "status": "passed"
+        },
+        {
+          "name": "repeated native activation of the same button answers one prompt",
+          "status": "passed"
+        },
+        {
+          "name": "Enter pressed and held on the next prompt before it arms answers nothing",
+          "status": "passed"
+        },
+        {
+          "name": "a fresh Enter press after the delay answers the next prompt exactly once",
+          "status": "passed"
+        },
+        {
+          "name": "a deliberate click after the delay answers the next prompt exactly once",
+          "status": "passed"
+        },
+        {
+          "name": "S1 a checkbox click on the next approval’s Always allow 30 ms after it appears does not tick it; a later deliberate Approve sends allowAlways false",
+          "status": "passed"
+        },
+        {
+          "name": "S1 a label click on the next approval’s Always allow 30 ms after it appears does not tick it; a later deliberate Approve sends allowAlways false",
+          "status": "passed"
+        },
+        {
+          "name": "S1 a deliberate click on Always allow after arming ticks it and the approval sends allowAlways true",
+          "status": "passed"
+        },
+        {
+          "name": "S1 a key pressed in the next typed approval before it arms, and its auto-repeat after, enters nothing; typing after it arms does",
+          "status": "passed"
+        },
+        {
+          "name": "S2 a typed ceremony closed by Escape releases modality; the pill opens the panel and Review reopens it in its modality",
+          "status": "passed"
+        },
+        {
+          "name": "S2 a typed ceremony closed by dialog.close() releases modality; the pill opens the panel and Review reopens it in its modality",
+          "status": "passed"
+        },
+        {
+          "name": "S2 a capability ceremony closed by Escape releases modality; the pill opens the panel and Review reopens it in its modality",
+          "status": "passed"
+        },
+        {
+          "name": "S2 a capability ceremony closed by dialog.close() releases modality; the pill opens the panel and Review reopens it in its modality",
+          "status": "passed"
+        },
+        {
+          "name": "S2 a lightweight ceremony closed by dialog.close() releases modality; the pill opens the panel and Review reopens it in its modality",
+          "status": "passed"
+        },
+        {
+          "name": "DE4 typed → capability → agent-typed: each protected request opens in the top layer above a skin overlay; an agent request opens no dialog on arrival",
+          "status": "passed"
+        },
+        {
+          "name": "DE4 typed → agent-typed → capability: each protected request opens in the top layer above a skin overlay; an agent request opens no dialog on arrival",
+          "status": "passed"
+        },
+        {
+          "name": "DE4 capability → typed → agent-typed: each protected request opens in the top layer above a skin overlay; an agent request opens no dialog on arrival",
+          "status": "passed"
+        },
+        {
+          "name": "DE4 capability → agent-typed → typed: each protected request opens in the top layer above a skin overlay; an agent request opens no dialog on arrival",
+          "status": "passed"
+        },
+        {
+          "name": "DE4 agent-typed → typed → capability: each protected request opens in the top layer above a skin overlay; an agent request opens no dialog on arrival",
+          "status": "passed"
+        },
+        {
+          "name": "DE4 agent-typed → capability → typed: each protected request opens in the top layer above a skin overlay; an agent request opens no dialog on arrival",
+          "status": "passed"
+        },
+        {
+          "name": "X1/X2 the panel review in dark at 1280×800 fits without sideways overflow",
+          "status": "passed"
+        },
+        {
+          "name": "X1/X2 the panel review in dark at 900×800 fits without sideways overflow",
+          "status": "passed"
+        },
+        {
+          "name": "X1/X2 the panel review in dark at 600×400 fits without sideways overflow",
+          "status": "passed"
+        },
+        {
+          "name": "X1/X2 the panel review in light at 1280×800 fits without sideways overflow",
+          "status": "passed"
+        },
+        {
+          "name": "X1/X2 the panel review in light at 900×800 fits without sideways overflow",
+          "status": "passed"
+        },
+        {
+          "name": "X1/X2 the panel review in light at 600×400 fits without sideways overflow",
+          "status": "passed"
+        },
+        {
+          "name": "X1/X2 the panel review in forced at 1280×800 fits without sideways overflow",
+          "status": "passed"
+        },
+        {
+          "name": "X1/X2 the panel review in forced at 900×800 fits without sideways overflow",
+          "status": "passed"
+        },
+        {
+          "name": "X1/X2 the panel review in forced at 600×400 fits without sideways overflow",
+          "status": "passed"
+        },
+        {
+          "name": "DE3 an Allow pressed while the review is still reading the live details sends nothing; unavailable details stay answerable",
+          "status": "passed"
+        },
+        {
+          "name": "DE3 the list Allow reads the live details as part of the press: unavailable or different details allow nothing",
+          "status": "passed"
+        },
+        {
+          "name": "DE3 a typed request's Approve in the security check reads the live details as part of the press",
+          "status": "passed"
+        },
+        {
+          "name": "C12 a native double-click on the first row's Allow answers only the first request",
+          "status": "passed"
+        },
+        {
+          "name": "C12 a click where the next row moved in answers nothing; a fresh click after the delay answers it once",
+          "status": "passed"
+        },
+        {
+          "name": "C12 Enter held on the first row's Allow answers at most one request",
+          "status": "passed"
+        },
+        {
+          "name": "DE3 initial and fresh pending details with no arguments refuse Allow, send no approval, and stay answerable",
+          "status": "passed"
+        },
+        {
+          "name": "DE3 initial and fresh pending details with null arguments refuse Allow, send no approval, and stay answerable",
+          "status": "passed"
+        },
+        {
+          "name": "DE3 initial and fresh pending details with non-text arguments refuse Allow, send no approval, and stay answerable",
+          "status": "passed"
+        },
+        {
+          "name": "DE3 a live-details read answering 200 with an empty body allows nothing and the request stays answerable",
+          "status": "passed"
+        },
+        {
+          "name": "DE3 a live-details read answering 200 with no operation allows nothing and the request stays answerable",
+          "status": "passed"
+        },
+        {
+          "name": "DE3 a live-details read answering 200 with no arguments allows nothing and the request stays answerable",
+          "status": "passed"
+        },
+        {
+          "name": "DE3 a live-details read answering 200 with no requester allows nothing and the request stays answerable",
+          "status": "passed"
+        },
+        {
+          "name": "DE3 a live-details read answering 200 with a malformed operation allows nothing and the request stays answerable",
+          "status": "passed"
+        },
+        {
+          "name": "DE3 a live-details read answering 200 with a null body allows nothing and the request stays answerable",
+          "status": "passed"
+        },
+        {
+          "name": "C12 a Deny pressed 100 ms after an Allow whose read is slow abandons that Allow: the failed Deny leaves nothing sent",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ac5863c3326a84535d7fdb102fa796ac35ca74c4be104eacc2c5e828b9f65535",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "authorizationBroker fails closed (deny) when no presenter is registered",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> enriched prompt (tempdoc 550 P1) renders risk, args summary, and an irreversibility warning when provided; never the Engine's gate text",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> enriched prompt (tempdoc 550 P1) omits the enriched rows when the prompt carries no context (back-compat)",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> L17 plain words in the protected dialog a typed agent request says who asks, what happens and what to type, with no internal names",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> L17 plain words in the protected dialog the agent in Search is named as such",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> (tempdoc 550 C3) registers as the broker presenter and resolves true on Approve (INLINE)",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> (tempdoc 550 C3) thesis IV: checking \"always allow\" then Approve resolves allowAlways=true",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> (tempdoc 550 C3) 875: hides the allow-always checkbox for a HIGH-risk prompt (the backend will not honour it)",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> (tempdoc 550 C3) 875: keeps the allow-always checkbox for a MEDIUM-risk prompt (the grant is still honoured)",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> (tempdoc 550 C3) 875: hides the allow-always checkbox when the route cannot carry it (agent tool-call ceremony)",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> (tempdoc 550 C3) resolves false on Deny",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> (tempdoc 550 C3) TYPED gate: Approve is disabled until the op id is typed",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> (tempdoc 550 C3) denies an in-flight prompt when the host is torn down (fail-closed)",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> capability consent (tempdoc 550 G9) presents a jf-consent-request through the one ceremony surface and resolves allow-always",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> capability consent (tempdoc 550 G9) resolves deny on the capability Deny button",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> capability consent (tempdoc 550 G9) leaves a pending capability request UNTOUCHED on teardown (no persisted deny)",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> run-scoped drain (tempdoc 605 Move 2) a concluding run drains its own ceremony fail-closed (superseded) so the NEXT run surfaces — the M1 fix",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> run-scoped drain (tempdoc 605 Move 2) does NOT drain another run's ceremony or a plugin capability request",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> run-scoped drain (tempdoc 605 Move 2) a run-less ceremony (no owningRunId, e.g. a Shell effect dispatch) is never drained by a run conclusion",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/operations/OperationClient.test.ts",
+      "file": "modules/ui-web/src/shell-v0/operations/OperationClient.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a17f8d448f6b931267a9c1f2ab57e0dbf3a3ce01538308e69aa06927ed41ed08",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "OperationClient invokes via POST to /api/operations/{id}/invoke with JSON body",
+          "status": "passed"
+        },
+        {
+          "name": "OperationClient returns success payload with message + executionId + structuredData",
+          "status": "passed"
+        },
+        {
+          "name": "OperationClient throws OperationError with errorClass on handler failure",
+          "status": "passed"
+        },
+        {
+          "name": "OperationClient parses typed errorCode + errorDetails + retryable from wire shape",
+          "status": "passed"
+        },
+        {
+          "name": "OperationClient L19 a failed own action for a stopped worker-online says what failed and what to do, without internal names",
+          "status": "passed"
+        },
+        {
+          "name": "OperationClient L19 a failed own action for a stopped inference-online says what failed and what to do, without internal names",
+          "status": "passed"
+        },
+        {
+          "name": "OperationClient handles failure responses missing the new typed fields gracefully",
+          "status": "passed"
+        },
+        {
+          "name": "OperationClient throws OperationError with OPERATION_NOT_FOUND on 404",
+          "status": "passed"
+        },
+        {
+          "name": "OperationClient throws NETWORK_ERROR on fetch rejection",
+          "status": "passed"
+        },
+        {
+          "name": "OperationClient throws SERIALIZATION_ERROR when response is not valid JSON",
+          "status": "passed"
+        },
+        {
+          "name": "OperationClient forwards idempotencyKey + confirmationToken in request body",
+          "status": "passed"
+        },
+        {
+          "name": "OperationClient strips trailing slash from apiBase",
+          "status": "passed"
+        },
+        {
+          "name": "OperationClient throws if operationId is empty",
+          "status": "passed"
+        },
+        {
+          "name": "OperationClient surfaces pendingId on a 428 CONFIRMATION_REQUIRED error",
+          "status": "passed"
+        },
+        {
+          "name": "OperationClient invokeWithConsent: on a 428 with consent, approves BY pendingId and re-invokes with the capsule",
+          "status": "passed"
+        },
+        {
+          "name": "OperationClient invokeWithConsent: a 428 WITHOUT consent rethrows the gate (no approve attempted)",
+          "status": "passed"
+        },
+        {
+          "name": "OperationClient approveByPendingId POSTs {pendingId} and returns the approval capability",
+          "status": "passed"
+        },
+        {
+          "name": "OperationClient approveByPendingId throws OperationError CAPSULE_MINT_FAILED with the status attached on a 410 (expired/unknown pending)",
+          "status": "passed"
+        },
+        {
+          "name": "OperationClient invokeWithConsent: an expired pending (approve POSTs 410) propagates CAPSULE_MINT_FAILED to the caller, not swallowed",
+          "status": "passed"
+        },
+        {
+          "name": "OperationClient invokeWithConsent (invoke-first): a 428 routes the prompt to requestConsent; approve → re-invoke",
+          "status": "passed"
+        },
+        {
+          "name": "OperationClient invokeWithConsent (invoke-first): requestConsent declines → the gate error is rethrown, no approve",
+          "status": "passed"
+        },
+        {
+          "name": "OperationClient.undo — trust-gated reversal (tempdoc 875 §C.7) a 428 opens the confirmation flow and retries with a capsule bound to the canonical {\"executionId\"} arguments",
+          "status": "passed"
+        },
+        {
+          "name": "OperationClient.undo — trust-gated reversal (tempdoc 875 §C.7) a confirmed retry resolves with the undo result",
+          "status": "passed"
+        },
+        {
+          "name": "OperationClient.undo — trust-gated reversal (tempdoc 875 §C.7) a declined ceremony rethrows the gate error and never mints a capsule",
+          "status": "passed"
+        },
+        {
+          "name": "OperationClient.undo — trust-gated reversal (tempdoc 875 §C.7) a 403 TRUST_DENIED surfaces as a denial, not a generic failure, and is never retried",
+          "status": "passed"
+        },
+        {
+          "name": "OperationClient.undo — trust-gated reversal (tempdoc 875 §C.7) an AUTO-gated undo (direct 200) resolves without opening any dialog",
+          "status": "passed"
+        },
+        {
+          "name": "OperationClient exact prepared approval continuation preserves server key and nonce outside public args (undo=false)",
+          "status": "passed"
+        },
+        {
+          "name": "OperationClient exact prepared approval continuation preserves server key and nonce outside public args (undo=true)",
+          "status": "passed"
+        },
+        {
+          "name": "OperationClient exact prepared approval continuation refuses a lost or changed approval reference without retry: {\"capsule\":\"token\"}",
+          "status": "passed"
+        },
+        {
+          "name": "OperationClient exact prepared approval continuation refuses a lost or changed approval reference without retry: {\"capsule\":\"token\",\"preparationNonce\":\"cea77faa-e010-45b0-a3c0-c0a177b9ddae\"}",
+          "status": "passed"
+        },
+        {
+          "name": "OperationClient exact prepared approval continuation refuses a lost or changed approval reference without retry: {\"capsule\":\"token\",\"operationKey\":\"019940e2-3400-7000-8000-000000000001\",\"preparationNonce\":\"another-preparation\"}",
+          "status": "passed"
+        },
+        {
+          "name": "OperationClient exact prepared approval continuation refuses a lost or changed approval reference without retry: {\"capsule\":\"token\",\"operationKey\":\"another-key\",\"preparationNonce\":\"cea77faa-e010-45b0-a3c0-c0a177b9ddae\"}",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/operations/authorizationReject.test.ts",
+      "file": "modules/ui-web/src/shell-v0/operations/authorizationReject.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ef9e3c8a8ec47116da2415cfba8bd9ffea9bbbe2328aded762ba61f73cf41192",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Deny posts cancellation before removing the request and never approves",
+          "status": "passed"
+        },
+        {
+          "name": "an unreachable Engine keeps the ceremony answerable and reports cancellation failure",
+          "status": "passed"
+        },
+        {
+          "name": "a second window drops every copy immediately on a terminal pending stream event",
+          "status": "passed"
+        },
+        {
+          "name": "a lost rejection response is safely retried and a terminal refusal completes cancellation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts",
+      "file": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationBridge.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0397ad28ce74b3d41cf82fec07efb9a407be6b74e456e2b4d57a9f1dca25810f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pendingAuthorizationBridge (tempdoc 655) B2 after a reload or in a second window, requests still waiting in the Engine rejoin the ceremony queue once",
+          "status": "passed"
+        },
+        {
+          "name": "pendingAuthorizationBridge (tempdoc 655) fetches detail, presents the ceremony, and executes on approval",
+          "status": "passed"
+        },
+        {
+          "name": "pendingAuthorizationBridge (tempdoc 655) does not present the ceremony when peekPending returns null (already expired/consumed)",
+          "status": "passed"
+        },
+        {
+          "name": "pendingAuthorizationBridge (tempdoc 655) does not present the ceremony when peekPending throws (network error)",
+          "status": "passed"
+        },
+        {
+          "name": "pendingAuthorizationBridge (tempdoc 655) does not call approveAndExecutePending when the human denies",
+          "status": "passed"
+        },
+        {
+          "name": "pendingAuthorizationBridge (tempdoc 655) passes allowAlways through to the execute call",
+          "status": "passed"
+        },
+        {
+          "name": "pendingAuthorizationBridge (tempdoc 655) dedups a replayed pendingId (e.g. ring-buffer replay on reconnect)",
+          "status": "passed"
+        },
+        {
+          "name": "pendingAuthorizationBridge (tempdoc 655) ignores a payload missing pendingId or operationId",
+          "status": "passed"
+        },
+        {
+          "name": "pendingAuthorizationBridge (tempdoc 655) is a no-op with no multiplex supplied",
+          "status": "passed"
+        },
+        {
+          "name": "pendingAuthorizationBridge (tempdoc 655) reports the failure to the user (not just console) when approveAndExecutePending rejects with a 410-shaped error",
+          "status": "passed"
+        },
+        {
+          "name": "pendingAuthorizationBridge (tempdoc 655) reports the failure when approveAndExecutePending resolves 200 OK but executed:false (server declined/failed silently)",
+          "status": "passed"
+        },
+        {
+          "name": "pendingAuthorizationBridge (tempdoc 655) reports the failure when approveAndExecutePending resolves executed:true, executeSuccess:false",
+          "status": "passed"
+        },
+        {
+          "name": "pendingAuthorizationBridge (tempdoc 655) does NOT report a failure on a genuinely successful approve+execute (no false positives)",
+          "status": "passed"
+        },
+        {
+          "name": "pendingAuthorizationBridge (tempdoc 655) reports a fail-closed ceremony (no host / host torn down) through the same channel",
+          "status": "passed"
+        },
+        {
+          "name": "pendingAuthorizationBridge (tempdoc 655) stays silent on an explicit human deny (a decision is not a failure)",
+          "status": "passed"
+        },
+        {
+          "name": "pendingAuthorizationBridge (tempdoc 655) re-peeks immediately before POSTing and skips the doomed POST when the pending died during the ceremony",
+          "status": "passed"
+        },
+        {
+          "name": "pendingAuthorizationBridge (tempdoc 655) proceeds with the POST when the re-peek itself fails transiently (network blip), instead of blocking the approval",
+          "status": "passed"
+        },
+        {
+          "name": "pendingAuthorizationBridge (tempdoc 655) DE3 a MCP request waits in Needs you, announced as a live arrival",
+          "status": "passed"
+        },
+        {
+          "name": "pendingAuthorizationBridge (tempdoc 655) DE3 a AGENT_LOOP request waits in Needs you, announced as a live arrival",
+          "status": "passed"
+        },
+        {
+          "name": "pendingAuthorizationBridge (tempdoc 655) DE3 a WORKFLOW request waits in Needs you, announced as a live arrival",
+          "status": "passed"
+        },
+        {
+          "name": "pendingAuthorizationBridge (tempdoc 655) DE3 a LLM_EMISSION request waits in Needs you, announced as a live arrival",
+          "status": "passed"
+        },
+        {
+          "name": "pendingAuthorizationBridge (tempdoc 655) DE3 a HTTP_API request waits in Needs you, announced as a live arrival",
+          "status": "passed"
+        },
+        {
+          "name": "pendingAuthorizationBridge (tempdoc 655) DE3 a URL_BAR request waits in Needs you, announced as a live arrival",
+          "status": "passed"
+        },
+        {
+          "name": "pendingAuthorizationBridge (tempdoc 655) DE3 a URL_DEEPLINK request waits in Needs you, announced as a live arrival",
+          "status": "passed"
+        },
+        {
+          "name": "pendingAuthorizationBridge (tempdoc 655) DE3 a PLUGIN_EMITTED request waits in Needs you, announced as a live arrival",
+          "status": "passed"
+        },
+        {
+          "name": "pendingAuthorizationBridge (tempdoc 655) DE3 a SCHEDULED request waits in Needs you, announced as a live arrival",
+          "status": "passed"
+        },
+        {
+          "name": "pendingAuthorizationBridge (tempdoc 655) DE3 a RULE_ENGINE request waits in Needs you, announced as a live arrival",
+          "status": "passed"
+        },
+        {
+          "name": "pendingAuthorizationBridge (tempdoc 655) DE3 a SYSTEM_INTERNAL request waits in Needs you, announced as a live arrival",
+          "status": "passed"
+        },
+        {
+          "name": "pendingAuthorizationBridge (tempdoc 655) DE3 a NOT_YET_KNOWN request waits in Needs you, announced as a live arrival",
+          "status": "passed"
+        },
+        {
+          "name": "pendingAuthorizationBridge (tempdoc 655) DE3 a undefined request waits in Needs you, announced as a live arrival",
+          "status": "passed"
+        },
+        {
+          "name": "pendingAuthorizationBridge (tempdoc 655) DE3 the person's own BUTTON request keeps its dialog on arrival",
+          "status": "passed"
+        },
+        {
+          "name": "pendingAuthorizationBridge (tempdoc 655) DE3 the person's own PALETTE request keeps its dialog on arrival",
+          "status": "passed"
+        },
+        {
+          "name": "pendingAuthorizationBridge (tempdoc 655) DE3 the person's own RAIL request keeps its dialog on arrival",
+          "status": "passed"
+        },
+        {
+          "name": "pendingAuthorizationBridge (tempdoc 655) DE3 every source the Engine can name is pinned: only window gestures keep a dialog",
+          "status": "passed"
+        },
+        {
+          "name": "pendingAuthorizationBridge (tempdoc 655) DE3 a request rediscovered after a reload waits in Needs you without counting as a live arrival",
+          "status": "passed"
+        },
+        {
+          "name": "pendingAuthorizationBridge (tempdoc 655) DE3 reviewing reads the live details again: fresh fields, null when gone, a failure when unreadable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts",
+      "file": "modules/ui-web/src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6f6d5f27642daa627c2ece55422ff4fe78326b988f3f059f1e0c09550a674355",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "withdraws the second client prompt when the first client answers and activity arrives (XA1)",
+          "status": "passed"
+        },
+        {
+          "name": "withdraws an unknown request on the next shared status update (XA1)",
+          "status": "passed"
+        },
+        {
+          "name": "answering a stale prompt closes it with a neutral note and sends no approval (XA1)",
+          "status": "passed"
+        },
+        {
+          "name": "keeps a still-pending prompt usable after activity and status checks (XA1)",
+          "status": "passed"
+        },
+        {
+          "name": "denying a stale prompt closes with a neutral note and no server change (XA1)",
+          "status": "passed"
+        },
+        {
+          "name": "handles a 410 race after the final peek with a neutral note (XA1)",
+          "status": "passed"
+        },
+        {
+          "name": "removes queued stale prompts without resetting the live prompt or showing the stale one (XA1)",
+          "status": "passed"
+        },
+        {
+          "name": "does not dismiss a pending prompt on a failed state lookup (XA1)",
+          "status": "passed"
+        },
+        {
+          "name": "withdraws an original caller prompt after the bridge detail lookup failed (XA1)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5ca7493599892b14051c5a284e8cecdc8b7805fb74e798a202c4ab93e8f26105",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "frame status projection ST1 keeps concurrent facts discoverable while the pill chooses one urgency",
+          "status": "passed"
+        },
+        {
+          "name": "frame status projection ST2 separates contact from poll freshness and waits a full poll before unreachable",
+          "status": "passed"
+        },
+        {
+          "name": "frame status projection ST6 durable acceptance and gaps suppress an invocation-return completion",
+          "status": "passed"
+        },
+        {
+          "name": "frame status projection ST7 read state never decides active/resolved and Earlier stays newest first",
+          "status": "passed"
+        },
+        {
+          "name": "frame status projection ST8 C6 terminal replay is silent; only an observed active-to-ready edge completes",
+          "status": "passed"
+        },
+        {
+          "name": "frame status projection ST6 AI downloads preserve measured progress and the existing pause/resume route",
+          "status": "passed"
+        },
+        {
+          "name": "frame status projection ref-09 agent request deadlines read as their consequence relative to now, never as a raw time",
+          "status": "passed"
+        },
+        {
+          "name": "frame status projection ref-09 the needs-you pill carries its count for the badge",
+          "status": "passed"
+        },
+        {
+          "name": "frame status projection C12 the broadcast advisory and the request-scoped prompt for one authorization give one decision route",
+          "status": "passed"
+        },
+        {
+          "name": "frame status projection L4b a waiting approval is in Needs you only; it enters Earlier once answered, expired or withdrawn",
+          "status": "passed"
+        },
+        {
+          "name": "frame status projection L4b an MCP request also recorded as a GATED ledger row waits in Needs you only; the row joins Earlier once it is answered or expires",
+          "status": "passed"
+        },
+        {
+          "name": "frame status projection ST1 working shows the most important running item with its measured progress only",
+          "status": "passed"
+        },
+        {
+          "name": "frame status projection ST2 a reachable engine with a stale poll says checking, never reconnecting, and never claims calm",
+          "status": "passed"
+        },
+        {
+          "name": "frame status projection C12 deduplicates the same backend authorization by pending id",
+          "status": "passed"
+        },
+        {
+          "name": "indexing detail moved from the task tray (813 §5/§20) stage rows mark only finished stages, extraction has no fraction, and file rows come after stages",
+          "status": "passed"
+        },
+        {
+          "name": "indexing detail moved from the task tray (813 §5/§20) a terminal indexing failure is a current problem, never a completion",
+          "status": "passed"
+        },
+        {
+          "name": "concurrent source facts ST1 search restriction index.failed precedes decisions and remains actionable",
+          "status": "passed"
+        },
+        {
+          "name": "concurrent source facts ST1 search restriction index.blocked_legacy precedes decisions and remains actionable",
+          "status": "passed"
+        },
+        {
+          "name": "concurrent source facts ST1 search restriction index.schema_open_refused precedes decisions and remains actionable",
+          "status": "passed"
+        },
+        {
+          "name": "concurrent source facts ST4 keeps all decisions, holds and running work visible together, including all overlapping holds",
+          "status": "passed"
+        },
+        {
+          "name": "concurrent source facts ST5 active folder failures and AI failure leave Problems on recovery without turning acknowledgement into recovery",
+          "status": "passed"
+        },
+        {
+          "name": "concurrent source facts B1 a folder whose scan errored is a problem right now, as the Library headline counts it, and the pill never claims calm",
+          "status": "passed"
+        },
+        {
+          "name": "concurrent source facts ST6 answering, per-folder work, rebuild and background runs retain separate freshness and real fractions",
+          "status": "passed"
+        },
+        {
+          "name": "concurrent source facts ST7 Earlier orders advisories and completed operations newest first regardless of read state",
+          "status": "passed"
+        },
+        {
+          "name": "concurrent source facts ST4 update available retains its existing Settings action",
+          "status": "passed"
+        },
+        {
+          "name": "concurrent source facts ST4 update repair_required retains its existing Settings action",
+          "status": "passed"
+        },
+        {
+          "name": "round 7 repairs R1 a passing notice never takes the pill from a more urgent state; engine waits say nothing while unreachable",
+          "status": "passed"
+        },
+        {
+          "name": "round 7 repairs R3 permission rows read in plain words, never the raw grant action",
+          "status": "passed"
+        },
+        {
+          "name": "round 7 repairs R3 a removal notice keeps its add-again action and plain consequence in Earlier",
+          "status": "passed"
+        },
+        {
+          "name": "round 7 repairs R4 folder rows are named by folder with the path as detail, never by collection",
+          "status": "passed"
+        },
+        {
+          "name": "L1/ST7 the way back after a folder removal, in every window a window that did not remove the folder (or a reload) offers \"Add <folder> again\" from the removal record",
+          "status": "passed"
+        },
+        {
+          "name": "L1/ST7 the way back after a folder removal, in every window an older removal record without a path, a failed removal and other operations offer no re-add",
+          "status": "passed"
+        },
+        {
+          "name": "L1/ST7 the way back after a folder removal, in every window the re-add is not offered while the folder is watched again (added back here or elsewhere)",
+          "status": "passed"
+        },
+        {
+          "name": "L1/ST7 the way back after a folder removal, in every window the window that removed it shows one row: its own notice, whose action goes once it can no longer run",
+          "status": "passed"
+        },
+        {
+          "name": "DE6 no Undo where no reversal exists a completed operation without a backend undo offers no Undo; a forget offers \"Add back to search\"",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d9f75adec5ddae75753a80507296eb5f1d3ec0d342b16266334f42c7635c9460",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "keeps a refused Add draft reachable and allows correction and retry",
+          "status": "passed"
+        },
+        {
+          "name": "explains a preview overlap (inside) and blocks click and Enter before Add",
+          "status": "passed"
+        },
+        {
+          "name": "explains a preview overlap (containing) and blocks click and Enter before Add",
+          "status": "passed"
+        },
+        {
+          "name": "submits Add once while waiting and announces its outcome",
+          "status": "passed"
+        },
+        {
+          "name": "switching member tabs during Add retains the pending outcome and draft until acceptance",
+          "status": "passed"
+        },
+        {
+          "name": "a cancelled native picker leaves a closed form and an existing draft unchanged",
+          "status": "passed"
+        },
+        {
+          "name": "exposes row removal progress, suppresses repeats and keeps the other row usable",
+          "status": "passed"
+        },
+        {
+          "name": "R3 a completed removal offers to add the same folder again, once, with its plain consequence",
+          "status": "passed"
+        },
+        {
+          "name": "L20 Ctrl+Z after another window already added the folder back says so and sends no add",
+          "status": "passed"
+        },
+        {
+          "name": "R3 a failed add-again says so and can be tried again",
+          "status": "passed"
+        },
+        {
+          "name": "a refused removal retains the row, explains retry without a live-watch claim, and retries",
+          "status": "passed"
+        },
+        {
+          "name": "reconciles an uncertain removal response with current roots (NETWORK_ERROR)",
+          "status": "passed"
+        },
+        {
+          "name": "reconciles an uncertain removal response with current roots (SERIALIZATION_ERROR)",
+          "status": "passed"
+        },
+        {
+          "name": "reconciles an uncertain removal response with current roots (HANDLER_FAILURE)",
+          "status": "passed"
+        },
+        {
+          "name": "ignores an old removal response after returning and reads the current roots",
+          "status": "passed"
+        },
+        {
+          "name": "names legacy inner folders and ancestor coverage in Remove confirmations",
+          "status": "passed"
+        },
+        {
+          "name": "distinguishes accepted reindex from the recorded completion and failure",
+          "status": "passed"
+        },
+        {
+          "name": "explains an empty reindex scope and offline folders without claiming a full reindex",
+          "status": "passed"
+        },
+        {
+          "name": "R1 browser Add reveals and focuses Folders from folders and Cancel restores focus",
+          "status": "passed"
+        },
+        {
+          "name": "R1 browser Add reveals and focuses Folders from core.browse-surface and Cancel restores focus",
+          "status": "passed"
+        },
+        {
+          "name": "R1 desktop Add reveals and focuses Folders from folders and Cancel restores focus",
+          "status": "passed"
+        },
+        {
+          "name": "R1 desktop Add reveals and focuses Folders from core.browse-surface and Cancel restores focus",
+          "status": "passed"
+        },
+        {
+          "name": "R1 a late picker selects Folders, but a response from before reconnect cannot open a form",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/api/statusCompletion.test.ts",
+      "file": "modules/ui-web/src/api/statusCompletion.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:fbc2cdad856e3d10264f0462e1aaacb1179857fdee7991a51930b7a920f56b57",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "approved server execution publishes canonical OFF before the client returns",
+          "status": "passed"
+        },
+        {
+          "name": "does not refresh for skipped, failed or unconfirmed approval {\"executed\":false,\"executeSuccess\":true}",
+          "status": "passed"
+        },
+        {
+          "name": "does not refresh for skipped, failed or unconfirmed approval {\"executed\":true,\"executeSuccess\":false}",
+          "status": "passed"
+        },
+        {
+          "name": "does not refresh for skipped, failed or unconfirmed approval {\"executed\":true}",
+          "status": "passed"
+        },
+        {
+          "name": "mounted authorization host and real pending bridge refresh after the typed approval",
+          "status": "passed"
+        },
+        {
+          "name": "host stream publishes successful execution before delivering completion",
+          "status": "passed"
+        },
+        {
+          "name": "direct stream publishes successful execution before delivering completion",
+          "status": "passed"
+        },
+        {
+          "name": "resume stream publishes successful execution before delivering completion",
+          "status": "passed"
+        },
+        {
+          "name": "reattach stream publishes successful execution before delivering completion",
+          "status": "passed"
+        },
+        {
+          "name": "host stream refreshes when reconnect omitted the operation name",
+          "status": "passed"
+        },
+        {
+          "name": "direct stream refreshes when reconnect omitted the operation name",
+          "status": "passed"
+        },
+        {
+          "name": "host stream ignores failed and known read-only tools",
+          "status": "passed"
+        },
+        {
+          "name": "direct stream ignores failed and known read-only tools",
+          "status": "passed"
+        },
+        {
+          "name": "plugin operation capability reaches the same canonical completion owner",
+          "status": "passed"
+        },
+        {
+          "name": "trusted plugin raw operation fetch observes the execution receipt without consuming it",
+          "status": "passed"
+        },
+        {
+          "name": "command invocation completing through plugin data observes status",
+          "status": "passed"
+        },
+        {
+          "name": "virtual invocation completing through plugin data observes status",
+          "status": "passed"
+        },
+        {
+          "name": "consented retry waits for execution rather than capsule minting",
+          "status": "passed"
+        },
+        {
+          "name": "fifty approved executions coalesce into one canonical observation",
+          "status": "passed"
+        },
+        {
+          "name": "core.ingest-files execution reaches canonical completion",
+          "status": "passed"
+        },
+        {
+          "name": "core.file-operations execution reaches canonical completion",
+          "status": "passed"
+        },
+        {
+          "name": "plugin.change-runtime execution reaches canonical completion",
+          "status": "passed"
+        },
+        {
+          "name": "domain HTTP operation request observes its already-decoded receipt",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0fcaac1f4cb3777d54d1505f24f5147c609e5b263b867e756b70c5f5b9cb8756",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "11 the narrow area menu closes when the window widens past its button, and focus stays on the switcher",
+          "status": "passed"
+        },
+        {
+          "name": "11 at 1280 px a notice beside a problem leaves the switcher centred; pill and notice stay readable",
+          "status": "passed"
+        },
+        {
+          "name": "11 at 600 px the pill shows the number of problems, as it does for needs-you",
+          "status": "passed"
+        },
+        {
+          "name": "L6 a plugin item whose words are in its own shadow root keeps them as its tooltip; an empty one its declared label",
+          "status": "passed"
+        },
+        {
+          "name": "11 a long plugin item's provenance chip keeps whole words; its full text stays available",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationArrival.restore.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationArrival.restore.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6f9003216fab4ef81c3f5f9e1e7aaff2d59019fc9b041902b22df14d7e0b30b2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L15 after a reload an HTTP request the Engine still holds stays in Needs you, silently, until its outcome",
+          "status": "passed"
+        },
+        {
+          "name": "L15 an open ledger row the Engine no longer holds reads \"no longer pending\" once it says so",
+          "status": "passed"
+        },
+        {
+          "name": "L12 a live request that names no source waits in Needs you with one announcement; no dialog opens",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.denyFailure.test.ts",
+      "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.denyFailure.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c28a58c9896027fc0d7d6ea8a1c813c0321f006b56d5414ffbd4dd4ea7a52cd6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L13 a Deny the run could not take keeps the request in Needs you, answerable, saying it could not be cancelled",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.decisions.test.ts",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.decisions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b43c4529d3b5fbcd6b89072c5f98c04d4035ab48e37c1891714d30da35123484",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L16 one Allow is one Earlier row showing its latest state",
+          "status": "passed"
+        },
+        {
+          "name": "L16 each of two Allows keeps its own row and its own outcome",
+          "status": "passed"
+        },
+        {
+          "name": "L16 rows that are not this decision's steps stay their own rows",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.focusKeeper-lockdown.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.focusKeeper-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6044ae89268244691353876bf61310781ed92ddcb8cf1b3bf2f3aa743d47b7e2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L21 focus stays on its control when the folder rows reorder (themed=false)",
+          "status": "passed"
+        },
+        {
+          "name": "L21 focus stays on its control when the folder rows reorder (themed=true)",
+          "status": "passed"
+        },
+        {
+          "name": "L21 focus stays on a source's control when the sources reorder",
+          "status": "passed"
+        },
+        {
+          "name": "L21 a band whose folder another update removed hands focus to the next folder, never the page (themed=false)",
+          "status": "passed"
+        },
+        {
+          "name": "L21 a band whose folder another update removed hands focus to the next folder, never the page (themed=true)",
+          "status": "passed"
+        },
+        {
+          "name": "L18 a collection band closes for good when its source leaves; it opens again only on a press",
+          "status": "passed"
+        },
+        {
+          "name": "L21 a band whose source another update removed hands focus to the next source",
+          "status": "passed"
+        },
+        {
+          "name": "L21 a confirmed collection removal hands focus to the next source",
+          "status": "passed"
+        },
+        {
+          "name": "L21 a failed-files refresh keeps an open band for a file still listed, with focus; a file that leaves hands focus on",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.focusKeeper-lockdown.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.focusKeeper-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9ba57606a9c410c9f48c3c145eb55e9538c3883d70d581a1f5d496a7c9b25e91",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L21 a confirmed delete of the last custom theme by keyboard hands focus to a neighbour, never the page",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:cbbf5265103beaaf505029fd996d458948d229640ed3f4c613818c3cab4ac2ed"
+}

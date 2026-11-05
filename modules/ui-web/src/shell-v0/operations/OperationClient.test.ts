@@ -111,6 +111,23 @@ describe('OperationClient', () => {
 
   // Backward-compat: success responses don't carry errorCode/errorDetails/retryable;
   // they remain undefined on OperationError (which only fires on failure anyway).
+  it.each([
+    ['worker-online', 'Required capability unavailable: worker-online. The knowledge worker is not reachable; retry shortly, or run core.recover-component for the affected component.', /reads your files is not running.*Try again.*System › Health/],
+    ['inference-online', 'Required capability unavailable: inference-online. Inference is not running; call core.set-chat-enabled {"enabled":true} (or core.activate-runtime-variant after install) to bring it up, then retry.', /AI models are not running.*AI Brain/],
+  ])('L19 a failed own action for a stopped %s says what failed and what to do, without internal names', async (capability, engine, plain) => {
+    // The Engine's preflight refusal as OperationExecutorImpl words it for agents.
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(fakeResponse({ success: false, message: engine,
+      errorClass: 'HANDLER_ERROR', errorCode: 'CAPABILITY_UNAVAILABLE', errorDetails: { capability }, retryable: true }, 500));
+    const client = new OperationClient({ apiBase: '', fetchImpl });
+    const error = await client.invokeWithConsent('core.clear-failed-jobs', { args: {} }).catch((e: unknown) => e) as OperationError;
+    expect(error).toBeInstanceOf(OperationError);
+    expect(error.message).toMatch(plain);
+    expect(error.message).not.toMatch(/worker-online|inference-online|core\.|capability|set-chat-enabled/i);
+    // The capability stays in the details for logs and Activity.
+    expect(error.errorDetails).toEqual({ capability });
+    expect(error.errorCode).toBe('CAPABILITY_UNAVAILABLE');
+  });
+
   it('handles failure responses missing the new typed fields gracefully', async () => {
     const fetchImpl = vi
       .fn<typeof fetch>()

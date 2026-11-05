@@ -166,7 +166,8 @@ describe('frame status projection', () => {
     expect(waiting.sections.needs.map(f => f.id)).toEqual(['authorization:7f1c2a9e-mcp']);
     // The earlier, already answered request for the same operation stays history.
     expect(requested(waiting)).toEqual([`activity:${earlierGate.id}`]);
-    const answered = derive({ authorizations: [], advisories: [broadcast], activity: [earlierGate, gated] });
+    // Answered elsewhere: the Engine says it no longer waits (withdrawn), and this window lists it no more.
+    const answered = derive({ authorizations: [], advisories: [broadcast], activity: [earlierGate, gated], withdrawn: new Set([request.pendingId]) });
     expect(answered.sections.needs).toEqual([]);
     expect(requested(answered)).toEqual(expect.arrayContaining([`activity:${gated.id}`, `activity:${earlierGate.id}`]));
     const expired = derive({ authorizations: [{ ...request, expiresAt: new Date(now - 1).toISOString() }], advisories: [broadcast], activity: [gated] });

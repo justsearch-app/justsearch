@@ -28,6 +28,7 @@ import { live } from 'lit/directives/live.js';
 import { ifDefined } from 'lit/directives/if-defined.js';
 import { keyed } from 'lit/directives/keyed.js';
 import { JfElement } from '../primitives/JfElement.js';
+import { FocusKeeper } from '../primitives/focusKeeper.js';
 import { authorizedFetch } from '../api/authorizedFetch.js';
 // Tempdoc 511 §511-followup-B: reset-settings now routes through
 // `<jf-operation>` → ActionButton → OperationClient internally; the
@@ -384,6 +385,8 @@ export class SettingsSurface extends JfElement {
 
   constructor() {
     super();
+    // L21 — a deleted theme or revoked plugin hands focus to its neighbour, never the page.
+    new FocusKeeper(this);
     this.apiBase = '';
     this.host_ = undefined as unknown as PluginHostApi;
     this.ui = {};

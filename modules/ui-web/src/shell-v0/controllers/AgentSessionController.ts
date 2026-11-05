@@ -433,6 +433,11 @@ function maxKnown(current: number | null, reported: unknown): number | null {
   return current === null ? reported : Math.max(current, reported);
 }
 
+/** The run's gate refused a rejection with this HTTP status; the call is still waiting. */
+class RejectionStatusError extends Error {
+  constructor(readonly status: number) { super(`The request could not be cancelled (HTTP ${status}). Try again.`); }
+}
+
 export class AgentSessionController implements CoreAgentRunHandlers {
   // --- Observable state ---
   conversation: ConversationEntry[] = [];
@@ -1186,10 +1191,14 @@ export class AgentSessionController implements CoreAgentRunHandlers {
           const fresh = await readLive();
           return fresh && fields(fresh);
         },
+        // L13 — Deny cancels the run's gate first; when that fails the request stays in Needs you,
+        // answerable, and says it could not be cancelled (the run keeps waiting for an answer).
+        reject: () => this.sendRejection(callId, 'Denied in authorization ceremony', owningRunId),
       });
       if (!isCurrent() || decision.superseded) return;
       if (decision.approved) await this.approveCall(callId, owningRunId);
-      else await this.rejectCall(callId, 'Denied in authorization ceremony', owningRunId);
+      // A denial was already sent by `reject`; a ceremony that closed without one still refuses the call.
+      else if (decision.failedClosed) await this.rejectCall(callId, 'Denied in authorization ceremony', owningRunId);
     } catch {
       if (!isCurrent()) return;
       emitEphemeralToast({
@@ -2265,25 +2274,28 @@ export class AgentSessionController implements CoreAgentRunHandlers {
   }
 
   async rejectCall(callId: string, reason?: string, runId?: string): Promise<void> {
+    try {
+      await this.sendRejection(callId, reason, runId);
+    } catch (error) {
+      this.onError({
+        error: error instanceof RejectionStatusError
+          ? `Couldn't send your rejection (HTTP ${error.status}) — the action was not rejected. The run may be stale or the backend out of date.`
+          : 'Couldn’t reach the backend to send your rejection — the action was not rejected.',
+      });
+    }
+  }
+
+  /** POST the rejection; throws when the run's gate did not take it (the call is then still waiting). */
+  private async sendRejection(callId: string, reason?: string, runId?: string): Promise<void> {
     // Tempdoc 605 Move 1 — reject the run that OWNED the ceremony (M2), defaulting to the current run.
     const sessionId = runId ?? this.sessionId;
     if (!sessionId) return;
-    try {
-      const res = await this.transport.request(`${this.apiBase}/api/chat/reject`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId, callId, reason }),
-      });
-      if (!res.ok) {
-        this.onError({
-          error: `Couldn't send your rejection (HTTP ${res.status}) — the action was not rejected. The run may be stale or the backend out of date.`,
-        });
-      }
-    } catch {
-      this.onError({
-        error: 'Couldn’t reach the backend to send your rejection — the action was not rejected.',
-      });
-    }
+    const res = await this.transport.request(`${this.apiBase}/api/chat/reject`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId, callId, reason }),
+    });
+    if (!res.ok) throw new RejectionStatusError(res.status);
   }
 
   /**

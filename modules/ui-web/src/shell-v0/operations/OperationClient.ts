@@ -140,6 +140,20 @@ export class OperationError extends Error {
   }
 }
 
+/**
+ * L19 — a part of the Engine the action needs is not running. The Engine's own message is written for
+ * agents ("Required capability unavailable: worker-online … run core.recover-component"); people get
+ * what failed and what to do next. The capability stays in the error's details.
+ */
+function capabilityWords(capability: unknown): string {
+  if (capability === 'worker-online') {
+    return 'The part of the engine that reads your files is not running right now. Try again in a moment; '
+      + 'if it keeps failing, restart it from System › Health.';
+  }
+  if (capability === 'inference-online') return 'The AI models are not running right now. Turn them on in AI Brain, then try again.';
+  return 'A part of the engine this needs is not running right now. Try again in a moment, or check System › Health.';
+}
+
 /** A resolved/expired approval is a neutral closure, not a failed execution. */
 export function isStaleAuthorization(error: unknown): boolean {
   return error instanceof OperationError && (error.errorClass === 'AUTHORIZATION_NO_LONGER_PENDING'
@@ -267,7 +281,8 @@ export class OperationClient {
             }
           : parsed.errorDetails;
       throw new OperationError(
-        parsed.message ?? `Operation ${operationId} failed`,
+        parsed.errorCode === 'CAPABILITY_UNAVAILABLE' ? capabilityWords(parsed.errorDetails?.capability)
+          : parsed.message ?? `Operation ${operationId} failed`,
         parsed.errorClass ?? 'UNKNOWN',
         res.status,
         parsed.errorCode,

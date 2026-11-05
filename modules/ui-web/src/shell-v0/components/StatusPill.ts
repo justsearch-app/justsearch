@@ -71,8 +71,12 @@ export class StatusPill extends JfElement {
     jf-status-badge { min-width: 0; max-width: 100%; }
     jf-status-badge::part(badge) { min-width: 0; max-width: 100%; box-sizing: border-box; }
     .transient-action { font: inherit; color: var(--text-tint); background: var(--surface-2); border: 0; border-radius: var(--frame-pill-radius); padding: var(--jf-space-1) var(--jf-space-2); }
-    .beside-notice { align-self: center; min-width: 0; max-width: var(--frame-menu-width); padding-inline: var(--jf-space-2); color: var(--text-secondary);
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    /* L3/top bar — the notice beside the pill gives way first: it wraps onto lines inside the bar (never
+       cut), so the switcher stays centred while the pill and its action keep their words. */
+    .beside-notice { align-self: center; flex: 0 1 auto; min-width: 0; max-width: var(--frame-menu-width); padding-inline: var(--jf-space-2);
+      color: var(--text-secondary); font-size: var(--font-size-xs); line-height: 1.2; white-space: normal; overflow-wrap: normal;
+      max-block-size: var(--frame-topbar-height); }
+    .trigger { flex: none; }
     .transient-action { white-space: nowrap; flex: none; }
     .content { display: inline-flex; align-items: center; gap: var(--jf-space-2); min-width: 0; }
     .trigger.stale { outline: var(--frame-hairline) dashed var(--border-emphasized); }
@@ -103,6 +107,7 @@ export class StatusPill extends JfElement {
       padding-inline: var(--jf-space-1); box-sizing: border-box; border-radius: var(--frame-pill-radius);
       background: var(--accent-warning); color: var(--accent-on-warning); font-size: var(--font-size-xs);
       font-weight: var(--jf-weight-medium); font-variant-numeric: tabular-nums; }
+    .count.problems { background: var(--accent-danger); color: var(--accent-on-danger); }
     .ring { width: var(--frame-status-ring); height: var(--frame-status-ring); flex-shrink: 0; }
     .ring circle { fill: none; stroke-width: 2.5; }
     .ring .track { stroke: var(--border-emphasized); }
@@ -111,7 +116,7 @@ export class StatusPill extends JfElement {
     @media (forced-colors: active) {
       .trigger { color: ButtonText; background: ButtonFace; border-color: ButtonText; }
       .symbol { color: ButtonText !important; } button:focus-visible { outline-color: Highlight; }
-      .count { background: ButtonText; color: ButtonFace; forced-color-adjust: none; }
+      .count, .count.problems { background: ButtonText; color: ButtonFace; forced-color-adjust: none; }
       .ring .track { stroke: GrayText; } .ring .arc { stroke: ButtonText; }
       .overlay { background: transparent; }
       .notice-below { border-color: CanvasText; }
@@ -254,7 +259,7 @@ export class StatusPill extends JfElement {
         this.close();
         const id = `proposal:${p.id}`;
         const decision = requestAuthorization({ pendingId: id, operationId: p.effect.operationId,
-          gateBehavior: 'TYPED_CONFIRM', allowAlwaysSupported: false, purpose: p.rationale ?? '' });
+          gateBehavior: 'TYPED_CONFIRM', allowAlwaysSupported: false, ...(p.rationale ? { reason: p.rationale } : {}) });
         this.authorizationHost?.()?.reviewStatusRequest(id);
         const answer = await decision;
         if (answer.approved && listPending().some(row => row.id === p.id)) acceptPendingWithConsent(p.id);
@@ -324,13 +329,15 @@ export class StatusPill extends JfElement {
     const label = transient?.toast?.message ?? `${pill.label}${pill.percent != null ? ` · ${pill.percent}%` : ''}`;
     const symbols = { calm: '●', working: '◌', needs: '!', problems: '!', unreachable: '×', limited: '!', finished: '✓', unknown: '?' };
     // ref-09: the count sits in a badge and the words follow it; a known fraction draws a ring.
-    const icon = !transient && pill.kind === 'needs' && pill.count != null
-      ? html`<span class="count" aria-hidden="true">${pill.count}</span>`
+    // Needs you and problems show their count (ref-22: also when the pill is its icon alone).
+    const icon = !transient && (pill.kind === 'needs' || pill.kind === 'problems') && pill.count != null
+      ? html`<span class="count ${pill.kind}" aria-hidden="true">${pill.count}</span>`
       : !transient && pill.kind === 'working' && pill.percent != null
         ? html`<svg class="ring" viewBox="0 0 20 20" aria-hidden="true" data-percent=${pill.percent}><circle class="track" cx="10" cy="10" r="8"></circle>
           <circle class="arc" cx="10" cy="10" r="8" pathLength="100" stroke-dasharray="${pill.percent} 100" transform="rotate(-90 10 10)"></circle></svg>`
         : html`<span class="symbol" aria-hidden="true">${symbols[pill.kind]}</span>`;
-    const text = transient?.toast?.message ?? (pill.kind === 'needs' && pill.count != null ? (pill.count === 1 ? 'Needs you' : 'Need you') : pill.label);
+    const text = transient?.toast?.message ?? (pill.kind === 'needs' && pill.count != null ? (pill.count === 1 ? 'Needs you' : 'Need you')
+      : pill.kind === 'problems' && pill.count != null ? 'Problems right now' : pill.label);
     const shown = transient ?? beside;
     // DE6 — the notice's action shows while it can still run; a real reversal carries the Ctrl+Z hint.
     const action = shown && toastActionAvailable(shown) ? shown : undefined;

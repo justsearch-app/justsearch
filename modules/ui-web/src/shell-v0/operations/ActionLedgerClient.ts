@@ -128,9 +128,14 @@ export interface UnifiedActionEntry {
    * humanized operation, so a presenter can word the row without parsing {@link label}. The optional
    * pending id ties a gate row to its exact request (L4b/L5); legacy rows have no request identity.
    */
-  readonly gate?: { readonly disposition: string; readonly operation: string; readonly pendingId?: string };
-  /** Present on grant-lifecycle rows: the structured action (ISSUED | CONSUMED | REVOKED) and the humanized subject. */
-  readonly grant?: { readonly action: string; readonly subject: string };
+  readonly gate?: { readonly disposition: string; readonly operation: string; readonly pendingId?: string;
+    /** The raw operation id and the source that asked (L15: a reload rediscovers an outside request from its row). */
+    readonly operationId?: string; readonly transport?: string };
+  /**
+   * Present on grant-lifecycle rows: the structured action (ISSUED | CONSUMED | REVOKED), the humanized
+   * subject and the grant's source (`APPROVAL`: a one-time permission minted by an Allow; `ALLOW_ALWAYS`).
+   */
+  readonly grant?: { readonly action: string; readonly subject: string; readonly transport?: string };
   /** L1 — a successful folder removal's folder (path, and collection when recorded): the way back. */
   readonly removedFolder?: { readonly path: string; readonly collection?: string };
   /**
@@ -327,8 +332,11 @@ export function projectBackend(e: BackendLedgerEntry): UnifiedActionEntry {
     // tempdoc 558 Deepening 3 — structured outcome (operation rows: SUCCESS/FAILURE/UNDONE; absent
     // elsewhere). Conditional-spread so an absent outcome stays absent (exactOptionalPropertyTypes-safe).
     ...(e.outcome ? { outcome: e.outcome } : {}),
-    ...(e.kind === 'gate' && e.disposition ? { gate: { disposition: e.disposition, operation: opLabel(e.operationId), ...(e.pendingId ? { pendingId: e.pendingId } : {}) } } : {}),
-    ...(e.kind === 'grant' && e.action ? { grant: { action: e.action, subject: e.subject ? opLabel(e.subject) : '' } } : {}),
+    ...(e.kind === 'gate' && e.disposition ? { gate: { disposition: e.disposition, operation: opLabel(e.operationId),
+      ...(e.pendingId ? { pendingId: e.pendingId } : {}), ...(e.operationId ? { operationId: e.operationId } : {}),
+      ...(e.transport ? { transport: e.transport } : {}) } } : {}),
+    ...(e.kind === 'grant' && e.action ? { grant: { action: e.action, subject: e.subject ? opLabel(e.subject) : '',
+      ...(e.transport ? { transport: e.transport } : {}) } } : {}),
     ...removedFolderOf(e),
     ...(e.kind === 'operation'
       && ['core.bulk-reindex', 'core.rebuild-index', 'core.activate-installed-models'].includes(e.operationId ?? '')
