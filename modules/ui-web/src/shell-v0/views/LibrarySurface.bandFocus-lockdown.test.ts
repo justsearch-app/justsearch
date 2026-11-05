@@ -200,6 +200,6 @@ it('failed-file band stays with its file across refreshes and errors and restore
   await page.keyboard.press('Enter'); await band.locator('jf-button.confirm').click();
   await expect.poll(() => band.count()).toBe(0);
   // The band closes when invocation starts; focus returns once the pending action re-enables its opener.
-  await page.waitForFunction(el => el?.matches(':enabled'), await opener.elementHandle());
+  await page.waitForFunction(el => el?.matches(':enabled'), await opener.elementHandle(), { timeout: 15_000 });
   await expect.poll(() => opener.evaluate(el => el.matches(':focus'))).toBe(true);
 }, 30_000);
