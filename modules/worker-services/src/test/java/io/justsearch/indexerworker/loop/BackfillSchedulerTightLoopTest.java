@@ -68,6 +68,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
  *       primary indexing always beats backfill.
  * </ol>
  *
+ * <p>E4b: the combined tight loop is gone; the same three containments now bind the scheduler's
+ * idle cycle of lane turns (a lane that returns without advancing is not offered again that cycle).
+ *
  * <p>Bite check (verified, tempdoc 798 review): reverting the tight loop's drive to {@code
  * wroteAnything()} makes case 1 fail on both of its assertions — the loop grinds on the
  * never-advancing pair for the full budget instead of handing control back after one batch.
@@ -241,6 +244,9 @@ class BackfillSchedulerTightLoopTest {
   void advancingButNeverDrainingPopulation_budgetReturnsControl() throws Exception {
     wireAdvancingButNeverDraining();
     lenient().when(documentFieldOps.queryDocIdsByField(anyString(), anyString(), anyInt()))
+        .thenAnswer(call -> List.of("fresh-" + batchWrites.get() + "-a", "fresh-" + batchWrites.get() + "-b"));
+    // E4b: the sparse-parent lane selects parents only, through the non-chunk query.
+    lenient().when(documentFieldOps.queryNonChunkDocIdsByField(anyString(), anyString(), anyInt()))
         .thenAnswer(call -> List.of("fresh-" + batchWrites.get() + "-a", "fresh-" + batchWrites.get() + "-b"));
     lenient().when(documentFieldOps.getDocumentContentBatch(anyList())).thenAnswer(call -> {
       Map<String, String> contents = new HashMap<>();

@@ -67,16 +67,16 @@ class EnrichmentStorageBackoffTest extends LuceneExecutorTestBase {
       h.seedThree(stage);
       h.failSecondMutation();
       h.turn(stage);
-      assertEquals(1, h.receipts.size());
-      var receipt = h.receipts.getFirst();
-      assertEquals(1, receipt.acceptedIds().size());
+      // E4b: NER units publish one document each, so the accepted prefix spans the receipts.
+      var receipt = h.failedReceipt();
+      assertEquals(1, h.accepted().size());
       assertEquals(List.of(), receipt.rejectedIds());
       assertTrue(receipt.storageFailures().isEmpty());
       assertNotNull(receipt.failure());
       assertThrows(RuntimeException.class, receipt::result);
       h.refresh();
       for (String id : List.of("a", "b", "c")) {
-        if (receipt.acceptedIds().contains(id)) continue;
+        if (h.accepted().contains(id)) continue;
         assertEquals("PENDING", h.value(id, status(stage)));
         assertEquals("2", h.value(id, retry(stage)), "unaccepted rows are not charged or reset");
       }
@@ -91,7 +91,7 @@ class EnrichmentStorageBackoffTest extends LuceneExecutorTestBase {
         h.seed("other", Map.of(SchemaFields.EMBEDDING_STATUS, "PENDING", SchemaFields.EMBEDDING_RETRY_COUNT, "2"));
       }
       h.scheduler.runIdleCycle();
-      h.scheduler.runInterleavedSplade(System.currentTimeMillis());
+      h.scheduler.runInterleavedEnrichment(System.currentTimeMillis());
       h.refresh();
       assertEquals(calls, h.calls.get(), "no failed-stage unit may start through idle or busy service");
       assertEquals(stage.equals("ner") ? "COMPLETED" : "COMPLETED_EMPTY",
@@ -126,14 +126,16 @@ class EnrichmentStorageBackoffTest extends LuceneExecutorTestBase {
     }
   }
 
-  @Test void combinedFailureAttributesUnacceptedStagesAndReleasesAcceptedDenseOwners() throws Exception {
+  /**
+   * E4b transfer of the combined owner-release case: dense windowed units publish their own
+   * documents, so the accepted owner releases its slot, the complete unaccepted owner is retained
+   * and recovers without recomputing its windows, only dense is held, and NER keeps advancing.
+   */
+  @Test void denseLaneFailureReleasesAcceptedOwnersAndRecoversCompleteOwnersWithoutRecomputing() throws Exception {
     try (var h = new Harness("combined")) {
-      h.denseEnabled = true; h.sparseEnabled = true;
-      // NER is configured but has no work in the failed write, so it must remain eligible.
-      h.nerEnabled = true;
+      h.denseEnabled = true; h.nerEnabled = true;
       for (String id : List.of("a", "b", "c")) h.seed(id, Map.of(
           SchemaFields.EMBEDDING_STATUS, "PENDING", SchemaFields.EMBEDDING_RETRY_COUNT, "2",
-          SchemaFields.SPLADE_STATUS, "PENDING", SchemaFields.SPLADE_RETRY_COUNT, "2",
           SchemaFields.NER_STATUS, "COMPLETED_EMPTY"));
       when(h.dense.documentWindowCount(anyString())).thenReturn(2);
       when(h.dense.embedDocumentWindows(anyString(), anyInt(), anyInt())).thenAnswer(call -> {
@@ -141,37 +143,33 @@ class EnrichmentStorageBackoffTest extends LuceneExecutorTestBase {
         return new EmbeddingProvider.WindowSlice(List.of(vector(), vector()), 0, 2);
       });
       h.failSecondMutation(); h.scheduler.runIdleCycle();
-      assertEquals(1, h.receipts.size());
-      var receipt = h.receipts.getFirst();
-      assertEquals(List.of("a"), receipt.acceptedIds());
-      assertTrue(receipt.rejectedIds().isEmpty()); assertNotNull(receipt.failure());
+      assertEquals(List.of("a"), h.accepted());
+      assertNotNull(h.failedReceipt().failure());
       var progress = h.progress();
-      assertEquals(List.of("b", "c"), progress.owners(), "accepted owner releases its slot even on a later write failure");
-      assertTrue(progress.isComplete("b")); assertTrue(progress.isComplete("c"));
+      assertEquals(List.of("b"), progress.owners(), "the accepted owner released its slot");
+      assertTrue(progress.isComplete("b"));
       h.refresh();
-      for (String id : List.of("b", "c")) {
-        assertEquals("2", h.value(id, SchemaFields.EMBEDDING_RETRY_COUNT));
-        assertEquals("2", h.value(id, SchemaFields.SPLADE_RETRY_COUNT));
-      }
-      int denseCalls = h.calls.get(), sparseCalls = h.sparseCalls.get();
+      for (String id : List.of("b", "c")) assertEquals("2", h.value(id, SchemaFields.EMBEDDING_RETRY_COUNT));
+      int denseCalls = h.calls.get();
       h.fail.set(false);
       for (int cycle = 0; cycle < 5; cycle++) {
         String id = "ner-" + cycle;
         h.seed(id, Map.of(SchemaFields.NER_STATUS, "PENDING", SchemaFields.NER_RETRY_COUNT, "2"));
-        h.scheduler.runIdleCycle(); h.scheduler.runInterleavedSplade(System.currentTimeMillis()); h.refresh();
+        h.scheduler.runIdleCycle(); h.scheduler.runInterleavedEnrichment(System.currentTimeMillis()); h.refresh();
         assertEquals("COMPLETED_EMPTY", h.value(id, SchemaFields.NER_STATUS));
-        assertEquals(denseCalls, h.calls.get()); assertEquals(sparseCalls, h.sparseCalls.get());
-        assertEquals(2, progress.owners().size(), "backoff must not grow retained state");
+        assertEquals(denseCalls, h.calls.get());
+        assertEquals(1, progress.owners().size(), "backoff must not grow retained state");
       }
-      // Resetting sparse does not reset dense: each provider owns only its own backoff.
-      h.replace("sparse"); h.scheduler.runInterleavedSplade(System.currentTimeMillis());
-      assertTrue(h.sparseCalls.get() > sparseCalls); assertEquals(denseCalls, h.calls.get());
+      // Replacing a peer provider does not reset dense: each provider owns only its own backoff.
+      h.replace("ner"); h.scheduler.runInterleavedEnrichment(System.currentTimeMillis());
+      assertEquals(denseCalls, h.calls.get());
       h.clock.addAndGet(120_000_000_000L);
       for (int cycle = 0; cycle < 12; cycle++) h.scheduler.runIdleCycle();
       h.refresh();
       for (String id : List.of("a", "b", "c")) assertEquals("COMPLETED", h.value(id, SchemaFields.EMBEDDING_STATUS));
       assertTrue(progress.owners().isEmpty(), "all accepted complete owners release retained state");
-      assertEquals(denseCalls, h.calls.get(), "complete unaccepted owners recover without recomputing native windows");
+      assertEquals(denseCalls + 1, h.calls.get(),
+          "the complete unaccepted owner recovers without recomputing; only never-computed c runs");
       // The recovered stage still charges exactly one retry for a later genuine row failure.
       h.seed("row-error", Map.of(SchemaFields.NER_STATUS, "PENDING", SchemaFields.NER_RETRY_COUNT, "1"));
       when(h.ner.extractEntitiesBatch(anyList())).thenThrow(new IllegalArgumentException("bad row"));
@@ -180,35 +178,57 @@ class EnrichmentStorageBackoffTest extends LuceneExecutorTestBase {
     }
   }
 
+  /**
+   * E4b: every lane publishes its own stage (BGE-M3 its dense and sparse pair together), so a
+   * failed write holds all and only the stages it carried in its unaccepted rows, while the other
+   * lanes keep advancing the same rows. Supersedes the bundled combined write.
+   */
   @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
-  @ValueSource(strings = {"dense-sparse", "dense-ner", "ner-sparse", "all"})
-  void combinedPublicationHoldsAllAndOnlyStagesInUnacceptedRows(String stages) throws Exception {
+  @ValueSource(strings = {"dense-sparse", "dense-ner", "ner-sparse", "all", "bge-ner"})
+  void lanePublicationHoldsAllAndOnlyStagesInItsUnacceptedRows(String stages) throws Exception {
     try (var h = new Harness("attribution")) {
-      h.denseEnabled = !stages.equals("ner-sparse");
-      h.sparseEnabled = !stages.equals("dense-ner");
+      h.bgeEnabled = stages.equals("bge-ner");
+      h.denseEnabled = !stages.equals("ner-sparse") && !h.bgeEnabled;
+      h.sparseEnabled = !stages.equals("dense-ner") && !h.bgeEnabled;
       h.nerEnabled = !stages.equals("dense-sparse");
+      var statuses = new ArrayList<String>();
+      if (h.denseEnabled || h.bgeEnabled) statuses.add(SchemaFields.EMBEDDING_STATUS);
+      if (h.sparseEnabled || h.bgeEnabled) statuses.add(SchemaFields.SPLADE_STATUS);
+      if (h.nerEnabled) statuses.add(SchemaFields.NER_STATUS);
       for (String id : List.of("a", "b", "c")) {
         var fields = new HashMap<String, Object>();
-        if (h.denseEnabled) { fields.put(SchemaFields.EMBEDDING_STATUS, "PENDING"); fields.put(SchemaFields.EMBEDDING_RETRY_COUNT, "2"); }
-        if (h.sparseEnabled) { fields.put(SchemaFields.SPLADE_STATUS, "PENDING"); fields.put(SchemaFields.SPLADE_RETRY_COUNT, "2"); }
-        fields.put(SchemaFields.NER_STATUS, h.nerEnabled ? "PENDING" : "COMPLETED_EMPTY");
-        fields.put(SchemaFields.NER_RETRY_COUNT, "2");
+        for (String status : statuses) { fields.put(status, "PENDING"); fields.put(retryOf(status), "2"); }
+        if (!h.nerEnabled) { fields.put(SchemaFields.NER_STATUS, "COMPLETED_EMPTY"); fields.put(SchemaFields.NER_RETRY_COUNT, "2"); }
         h.seed(id, fields);
       }
-      h.failSecondMutation(); h.scheduler.runIdleCycle();
-      assertEquals(1, h.receipts.size()); assertEquals(List.of("a"), h.receipts.getFirst().acceptedIds());
+      h.failSecondMutation(); h.scheduler.runIdleCycle(); h.refresh();
+      var failed = h.failedReceipt();
+      assertEquals(List.of("a"), failed.acceptedIds());
+      Set<String> held = h.statusesOf(failed);
+      assertEquals(h.bgeEnabled ? Set.of(SchemaFields.EMBEDDING_STATUS, SchemaFields.SPLADE_STATUS) : Set.of(statuses.getFirst()),
+          held, "a lane write carries only the stages that lane owns");
+      for (String status : statuses) {
+        for (String id : List.of("b", "c")) {
+          if (held.contains(status)) {
+            assertEquals("PENDING", h.value(id, status), id + " " + status);
+            assertEquals("2", h.value(id, retryOf(status)), "unaccepted rows are not charged");
+          } else {
+            assertEquals(done(status), h.value(id, status), "independent lanes keep advancing the same rows");
+          }
+        }
+      }
       int denseCalls = h.calls.get(), sparseCalls = h.sparseCalls.get(), nerCalls = h.nerCalls.get();
       h.fail.set(false);
-      h.scheduler.runIdleCycle(); h.scheduler.runInterleavedSplade(System.currentTimeMillis());
-      assertEquals(denseCalls, h.calls.get(), "combined dense failure must reach later idle units");
-      assertEquals(sparseCalls, h.sparseCalls.get(), "writer failure must override pre-publication sparse success");
-      assertEquals(nerCalls, h.nerCalls.get(), "combined NER failure must reach later idle units");
+      h.seed("later", Map.of(statuses.getLast(), "PENDING"));
+      h.scheduler.runIdleCycle(); h.scheduler.runInterleavedEnrichment(System.currentTimeMillis()); h.refresh();
+      if (held.contains(SchemaFields.EMBEDDING_STATUS)) assertEquals(denseCalls, h.calls.get(), "held dense stage waits");
+      if (held.contains(SchemaFields.SPLADE_STATUS) && !h.bgeEnabled) assertEquals(sparseCalls, h.sparseCalls.get(), "held sparse stage waits");
+      if (held.contains(SchemaFields.NER_STATUS)) assertEquals(nerCalls, h.nerCalls.get(), "held NER stage waits");
+      if (!held.contains(statuses.getLast())) assertEquals(done(statuses.getLast()), h.value("later", statuses.getLast()));
       h.clock.addAndGet(120_000_000_000L);
       for (int cycle = 0; cycle < 8; cycle++) h.scheduler.runIdleCycle();
       h.refresh();
-      if (h.denseEnabled) assertEquals("COMPLETED", h.value("c", SchemaFields.EMBEDDING_STATUS));
-      if (h.sparseEnabled) assertEquals("COMPLETED", h.value("c", SchemaFields.SPLADE_STATUS));
-      if (h.nerEnabled) assertEquals("COMPLETED_EMPTY", h.value("c", SchemaFields.NER_STATUS));
+      for (String status : statuses) assertEquals(done(status), h.value("c", status), status);
     }
   }
 
@@ -222,7 +242,7 @@ class EnrichmentStorageBackoffTest extends LuceneExecutorTestBase {
       int sparseCalls = h.sparseCalls.get();
       h.fail.set(false);
       h.seed("new-dense", Map.of(SchemaFields.EMBEDDING_STATUS, "PENDING", SchemaFields.EMBEDDING_RETRY_COUNT, "2"));
-      h.scheduler.runIdleCycle(); h.scheduler.runInterleavedSplade(System.currentTimeMillis()); h.refresh();
+      h.scheduler.runIdleCycle(); h.scheduler.runInterleavedEnrichment(System.currentTimeMillis()); h.refresh();
       assertEquals("COMPLETED", h.value("new-dense", SchemaFields.EMBEDDING_STATUS), "accepted-only stage stays eligible");
       assertEquals(sparseCalls, h.sparseCalls.get(), "unaccepted sparse stage waits for expiry");
     }
@@ -248,7 +268,7 @@ class EnrichmentStorageBackoffTest extends LuceneExecutorTestBase {
       assertEquals(2, h.calls.get(), "storage failure must escape per-document inference fallback");
       assertEquals(2, h.receipts.size(), "there is no retry write after a systemic publication failure");
       assertEquals("2", h.value("b", retry(stage))); assertEquals("2", h.value("c", retry(stage)));
-      h.fail.set(false); h.scheduler.runIdleCycle(); h.scheduler.runInterleavedSplade(System.currentTimeMillis());
+      h.fail.set(false); h.scheduler.runIdleCycle(); h.scheduler.runInterleavedEnrichment(System.currentTimeMillis());
       assertEquals(2, h.calls.get(), "later entry points share the fallback write's backoff");
     }
   }
@@ -262,7 +282,7 @@ class EnrichmentStorageBackoffTest extends LuceneExecutorTestBase {
       assertNotNull(h.receipts.getFirst().failure()); h.refresh();
       for (String id : List.of("b", "c")) assertEquals("2", h.value(id, SchemaFields.SPLADE_RETRY_COUNT));
       int calls = h.calls.get(); h.fail.set(false);
-      h.scheduler.runInterleavedSplade(System.currentTimeMillis()); h.scheduler.runIdleCycle();
+      h.scheduler.runInterleavedEnrichment(System.currentTimeMillis()); h.scheduler.runIdleCycle();
       assertEquals(calls, h.calls.get(), "existing individual sparse backoff is shared with busy service");
     }
   }
@@ -407,8 +427,8 @@ class EnrichmentStorageBackoffTest extends LuceneExecutorTestBase {
 
   private void assertCancelledSuffixRecovers(Harness h, String stage) throws Exception {
     h.refresh();
-    assertEquals(List.of("a"), h.receipts.getFirst().acceptedIds());
-    assertNotNull(h.receipts.getFirst().failure());
+    assertEquals(List.of("a"), h.accepted());
+    assertNotNull(h.failedReceipt().failure());
     assertEquals(stage.equals("ner") ? "COMPLETED_EMPTY" : "COMPLETED", h.value("a", status(stage)));
     for (String id : List.of("b", "c")) {
       assertEquals("PENDING", h.value(id, status(stage)));
@@ -449,8 +469,8 @@ class EnrichmentStorageBackoffTest extends LuceneExecutorTestBase {
   @Test void acceptedPrefixReceiptsAlreadyHoldOnTheBase() throws Exception {
     try (var h = new Harness("receipt")) {
       h.enable("ner"); h.seedThree("ner"); h.failSecondMutation(); h.scheduler.runIdleCycle();
-      var receipt = h.receipts.getFirst();
-      assertEquals(List.of("a"), receipt.acceptedIds()); assertTrue(receipt.rejectedIds().isEmpty());
+      var receipt = h.failedReceipt();
+      assertEquals(List.of("a"), h.accepted()); assertTrue(receipt.rejectedIds().isEmpty());
       assertNotNull(receipt.failure()); h.refresh();
       assertEquals("COMPLETED_EMPTY", h.value("a", SchemaFields.NER_STATUS));
       for (String id : List.of("b", "c")) {
@@ -469,6 +489,13 @@ class EnrichmentStorageBackoffTest extends LuceneExecutorTestBase {
         : stage.equals("embed") ? SchemaFields.EMBEDDING_RETRY_COUNT : SchemaFields.SPLADE_RETRY_COUNT;
   }
   private static float[] vector() { return new float[] {1, 0, 0, 0}; }
+  private static String retryOf(String status) {
+    return status.equals(SchemaFields.NER_STATUS) ? SchemaFields.NER_RETRY_COUNT
+        : status.equals(SchemaFields.SPLADE_STATUS) ? SchemaFields.SPLADE_RETRY_COUNT : SchemaFields.EMBEDDING_RETRY_COUNT;
+  }
+  private static String done(String status) {
+    return status.equals(SchemaFields.NER_STATUS) ? "COMPLETED_EMPTY" : "COMPLETED";
+  }
 
   private final class Harness implements AutoCloseable {
     final RunningRuntime runtime;
@@ -479,6 +506,7 @@ class EnrichmentStorageBackoffTest extends LuceneExecutorTestBase {
     Throwable publicationFailure = new IOException("injected systemic storage outage");
     final AtomicInteger writes = new AtomicInteger(), calls = new AtomicInteger(), sparseCalls = new AtomicInteger(), nerCalls = new AtomicInteger();
     final List<LuceneRuntimeTypes.EnrichmentPublicationReceipt> receipts = new ArrayList<>();
+    final Map<LuceneRuntimeTypes.EnrichmentPublicationReceipt, Set<String>> receiptFields = new IdentityHashMap<>();
     EmbeddingProvider dense;
     SpladeEncoder sparse;
     NerService ner;
@@ -515,8 +543,12 @@ class EnrichmentStorageBackoffTest extends LuceneExecutorTestBase {
       var realCoordinator = runtime.indexingCoordinator();
       var coordinator = mock(IndexingCoordinator.class, org.mockito.AdditionalAnswers.delegatesTo(realCoordinator));
       doAnswer(call -> {
-        var receipt = realCoordinator.publishEnrichmentBatch(call.getArgument(0), call.getArgument(1), call.getArgument(2));
-        receipts.add(receipt); return receipt;
+        List<Map.Entry<String, Map<String, Object>>> updates = call.getArgument(0);
+        var receipt = realCoordinator.publishEnrichmentBatch(updates, call.getArgument(1), call.getArgument(2));
+        receipts.add(receipt);
+        receiptFields.put(receipt, updates.stream().flatMap(update -> update.getValue().keySet().stream())
+            .collect(java.util.stream.Collectors.toSet()));
+        return receipt;
       }).when(coordinator).publishEnrichmentBatch(anyList(), anyMap(), any());
       var signals = mock(WorkerSignalBus.class);
       when(signals.isIndexingHeld()).thenAnswer(call -> held.get());
@@ -527,7 +559,7 @@ class EnrichmentStorageBackoffTest extends LuceneExecutorTestBase {
       when(config.ai().backfillPacing()).thenAnswer(call -> {
         var d = ResolvedConfig.Ai.BackfillPacing.DEFAULTS;
         return new ResolvedConfig.Ai.BackfillPacing(d.pollBatchSize(), batchSize, batchSize,
-            d.disambiguationBackfillBatchSize(), batchSize, d.spladeInterleaveBatchSize(),
+            d.disambiguationBackfillBatchSize(), batchSize, d.enrichmentInterleaveBatchSize(),
             0L, d.commitIntervalMs(), d.maxDocsBeforeCommit(),
             d.chunkSlotsPerBatch(), d.bgeM3BackfillBatchSize(), d.bgeM3InterleaveBatchSize(),
             d.foregroundDutyPct(), d.foregroundCooldownMs());
@@ -581,8 +613,22 @@ class EnrichmentStorageBackoffTest extends LuceneExecutorTestBase {
         });
       }
     }
-    void turn(String stage) { if (stage.contains("interleaved")) scheduler.runInterleavedSplade(System.currentTimeMillis()); else scheduler.runIdleCycle(); }
+    void turn(String stage) { if (stage.contains("interleaved")) scheduler.runInterleavedEnrichment(System.currentTimeMillis()); else scheduler.runIdleCycle(); }
     void failSecondMutation() { writes.set(0); fail.set(true); }
+    /** Rows accepted across the turn's receipts (NER units publish one document each). */
+    List<String> accepted() { return receipts.stream().flatMap(receipt -> receipt.acceptedIds().stream()).toList(); }
+    /** The one failed publication, which ends its lane's service. */
+    LuceneRuntimeTypes.EnrichmentPublicationReceipt failedReceipt() {
+      var failed = receipts.stream().filter(receipt -> receipt.failure() != null).toList();
+      assertEquals(1, failed.size(), "exactly one publication failed: " + receipts);
+      return failed.getFirst();
+    }
+    Set<String> statusesOf(LuceneRuntimeTypes.EnrichmentPublicationReceipt receipt) {
+      var statuses = new HashSet<>(receiptFields.get(receipt));
+      statuses.retainAll(Set.of(SchemaFields.EMBEDDING_STATUS, SchemaFields.CHUNK_EMBEDDING_STATUS,
+          SchemaFields.SPLADE_STATUS, SchemaFields.NER_STATUS));
+      return statuses;
+    }
     void refresh() throws IOException { runtime.commitOps().maybeRefreshBlocking(); }
     String value(String id, String field) { return runtime.documentFieldOps().getDocumentField(id, field); }
     void seedThree(String stage) throws Exception {

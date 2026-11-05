@@ -237,21 +237,19 @@ public final class OperationalMetrics {
     batchTimingCount.computeIfAbsent(key, k -> new LongAdder()).increment();
   }
 
-  // Tempdoc 710 Move 2 item 4: last-known backfill mode ("combined" | "individual" | "idle"),
-  // written once per BackfillScheduler.runIdleCycle() call. Exposed on the enrichment status
-  // surface (EnrichmentProgressView.backfillMode) so operators can see WHICH pass is running
-  // without grepping worker.log — previously observable nowhere (710 S-B3 finding).
+  // Last scheduler call (busy or idle): active means at least one lane turn was admitted.
+  // This retains the existing gauge name; combined/individual values have been retired.
   private volatile String backfillMode = "idle";
 
-  /** Records which backfill pass ran this idle cycle. See {@link #getBackfillMode}. */
+  /** Records admission activity for the last scheduler call. See {@link #getBackfillMode}. */
   public void recordBackfillMode(String mode) {
     this.backfillMode = mode == null ? "idle" : mode;
   }
 
   /**
-   * The most recently observed backfill mode: {@code "combined"} (single-RMW-per-doc pass across
-   * embed+SPLADE+NER), {@code "individual"} (per-stage passes), or {@code "idle"} (no backfill
-   * work was available/eligible last cycle, or no cycle has run yet).
+   * {@code "active"} when the last busy or idle scheduler call admitted a lane turn;
+   * {@code "idle"} otherwise, including holds and provider backoff. Admission does not imply
+   * completion: retained window advancement, rejection and cancellation retain their counters.
    */
   public String getBackfillMode() {
     return backfillMode;

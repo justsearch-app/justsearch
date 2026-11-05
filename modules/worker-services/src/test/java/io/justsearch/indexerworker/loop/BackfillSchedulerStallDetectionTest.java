@@ -2,15 +2,15 @@
 package io.justsearch.indexerworker.loop;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
@@ -44,27 +44,25 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
 
 /**
- * Round-15 post-round finding, fix 3 — non-termination has to be DETECTABLE.
+ * Round-15 post-round finding, fix 3 — non-termination has to be DETECTABLE; E4b (D8) changed the
+ * discriminator.
  *
- * <p>The field incident ran 12+ minutes emitting nothing but the ordinary INFO summary line, 54
- * times, byte-identical. Tempdoc 798's non-convergence WARN exists and did not fire, and that is
- * not a bug in 798: its discriminator is "the budget expired and NOTHING advanced", while this
- * incident advanced 56-80 documents per cycle. The discriminator it lacked is WORK-SET IDENTITY —
- * a draining backfill's selection changes as its head drains, a stalled one's does not, whatever
- * its per-cycle counters say.
- *
- * <p>Both directions are pinned here, because a detector that fires on healthy progress is worse
- * than none: operators learn to ignore it, which is exactly the trap tempdoc 750 recorded for round
- * 8 (a signature that repeats on a HEALTHY build).
+ * <p>The work-set-identity detector warned whenever the same documents were selected cycle after
+ * cycle, irrespective of progress, so a long document advancing its retained windows looked like a
+ * stall. E4b replaces selection identity with eligible-service evidence: a lane that keeps
+ * receiving eligible turns which return without publishing, terminally failing or advancing a
+ * window is the frozen unit. Here every write is rejected as stale, so the unit returns but never
+ * advances. Both directions stay pinned, because a detector that fires on healthy progress is
+ * worse than none.
  */
 @DisplayName("BackfillScheduler stall detection (round-15 post-round finding)")
 @ExtendWith(MockitoExtension.class)
 class BackfillSchedulerStallDetectionTest {
 
-  /** Must mirror {@code BackfillScheduler.STALL_SIGNATURE_CYCLES}. */
+  /** Must mirror {@code BackfillScheduler.STALL_TURNS}: one non-advancing turn per cycle here. */
   private static final int STALL_CYCLES = 5;
 
-  private static final String WARN_NEEDLE = "selected an IDENTICAL work-set";
+  private static final String WARN_NEEDLE = "consecutive eligible turns without advancing";
 
   @Mock DocumentFieldOps documentFieldOps;
   @Mock IndexingCoordinator indexingCoordinator;
@@ -74,6 +72,9 @@ class BackfillSchedulerStallDetectionTest {
   @Mock JobQueue jobQueue;
   @Mock EmbeddingProvider embeddingProvider;
   @Mock NerService nerService;
+
+  /** Whether the writer rejects every row as stale, so a returned unit advances nothing. */
+  private boolean frozen;
 
   /** Documents still PENDING for embedding. */
   private final Set<String> pending = new LinkedHashSet<>();
@@ -103,9 +104,11 @@ class BackfillSchedulerStallDetectionTest {
         .when(commitOps)
         .withNrtSuspended(any());
 
+    // Only embedding is pending; NER is terminal, so its pending population is empty.
     lenient()
         .when(documentFieldOps.queryDocIdsByField(anyString(), anyString(), anyInt()))
-        .thenAnswer(inv -> List.copyOf(pending));
+        .thenAnswer(inv -> SchemaFields.EMBEDDING_STATUS.equals(inv.getArgument(0))
+            ? List.copyOf(pending) : List.of());
 
     lenient()
         .when(documentFieldOps.getDocumentContentBatch(anyList()))
@@ -151,6 +154,7 @@ class BackfillSchedulerStallDetectionTest {
         .thenAnswer(
             inv -> {
               List<Map.Entry<String, Map<String, Object>>> batch = inv.getArgument(0);
+              if (frozen) return new LuceneRuntimeTypes.BatchUpdateResult(0, batch.size());
               for (Map.Entry<String, Map<String, Object>> e : batch) {
                 if (SchemaFields.EMBEDDING_STATUS_COMPLETED.equals(
                     e.getValue().get(SchemaFields.EMBEDDING_STATUS))) {
@@ -212,8 +216,8 @@ class BackfillSchedulerStallDetectionTest {
                 defaults.nerBackfillBatchSize(),
                 defaults.disambiguationBackfillBatchSize(),
                 defaults.spladeBackfillBatchSize(),
-                defaults.spladeInterleaveBatchSize(),
-                defaults.spladeInterleaveIntervalMs(),
+                10, // busy count cap and interval (literal: both accessor spellings compile)
+                5_000L,
                 defaults.commitIntervalMs(),
                 defaults.maxDocsBeforeCommit(),
                 0,
@@ -231,12 +235,9 @@ class BackfillSchedulerStallDetectionTest {
         .count();
   }
 
-  /**
-   * Runs one cycle against a work-set that is restored to {@code docIds} beforehand — the field
-   * shape: real encoder work and real writes every cycle, and the head of the queue nonetheless
-   * identical the next time it is selected.
-   */
-  private void runFrozenCycle(BackfillScheduler scheduler, List<String> docIds) {
+  /** Runs one cycle with {@code docIds} pending; a frozen cycle's writes are all rejected. */
+  private void runCycle(BackfillScheduler scheduler, List<String> docIds, boolean frozenCycle) {
+    frozen = frozenCycle;
     pending.clear();
     pending.addAll(docIds);
     scheduler.runIdleCycle();
@@ -248,104 +249,49 @@ class BackfillSchedulerStallDetectionTest {
     return out;
   }
 
-  /**
-   * PINS: the stall WARN fires when the work-set is frozen while encoder work is still happening.
-   *
-   * <p>Note what this fixture does NOT do: it does not stop the work. Every cycle encodes, writes,
-   * and reports PROGRESS — {@code progressed()} is true throughout. That is the whole point. The
-   * field incident advanced 56-80 documents per cycle, which is exactly why tempdoc 798's
-   * "budget spent with ZERO advancement" WARN stayed silent for 12+ minutes. A detector that keys
-   * on progress cannot see this state; one that keys on work-set identity can.
-   */
   @Test
-  @DisplayName("an identical work-set across N cycles logs the stall WARN")
-  void frozenWorkSetLogsTheStallWarn() {
+  // an eligible unit that keeps returning without advancing logs the stall WARN
+  void frozenEligibleUnitLogsTheStallWarn() {
     BackfillScheduler scheduler = scheduler();
-    List<String> head = ids(0, 6);
-    for (int cycle = 0; cycle < STALL_CYCLES; cycle++) {
-      runFrozenCycle(scheduler, head);
-    }
-
-    assertTrue(
-        warnCount() >= 1,
-        "a work-set unchanged across "
-            + STALL_CYCLES
-            + " cycles while encoder work is still being attempted must WARN; the field ran this"
-            + " state for 12+ minutes and logged nothing but the ordinary INFO summary");
-    assertFalse(
-        logAppender.list.stream()
-            .anyMatch(e -> e.getLevel() == Level.WARN && e.getFormattedMessage().contains("ZERO")),
-        "tempdoc 798's non-convergence WARN must NOT be what fired here — documents advanced every"
-            + " cycle. If it did, this fixture is not reproducing the field state and the new"
-            + " detector is untested");
+    for (int cycle = 0; cycle < STALL_CYCLES - 1; cycle++) runCycle(scheduler, ids(0, 6), true);
+    assertEquals(0, warnCount(), "fewer than the episode threshold of returned turns stays quiet");
+    runCycle(scheduler, ids(0, 6), true);
+    assertEquals(1, warnCount(), "returned eligible service that advances nothing must WARN");
+    verify(embeddingProvider, atLeast(STALL_CYCLES)).embedDocumentBatch(anyList());
   }
 
   /** PINS: one WARN per stall episode, not one per cycle — a per-cycle WARN is log spam. */
   @Test
-  @DisplayName("the stall WARN is deduplicated across a single episode")
+  // the stall WARN is deduplicated across a single episode
   void stallWarnIsDeduplicatedPerEpisode() {
     BackfillScheduler scheduler = scheduler();
-    List<String> head = ids(0, 6);
-    for (int cycle = 0; cycle < STALL_CYCLES * 3; cycle++) {
-      runFrozenCycle(scheduler, head);
-    }
-
-    assertEquals(
-        1,
-        warnCount(),
-        "the stall WARN must fire once per episode; "
-            + warnCount()
-            + " occurrences over "
-            + (STALL_CYCLES * 3)
-            + " cycles is the per-cycle spam that trains operators to ignore it");
+    for (int cycle = 0; cycle < STALL_CYCLES * 3; cycle++) runCycle(scheduler, ids(0, 6), true);
+    assertEquals(1, warnCount(), "the stall WARN must fire once per episode");
   }
 
   /**
-   * PINS: healthy progress does not WARN.
-   *
-   * <p>Same cycle count, same encoder work, same writes — the ONE difference is that the head of
-   * the queue moves, because each cycle's documents drain and new ones arrive (ongoing ingest). A
-   * detector that fires on this is a false alarm on every large corpus, which is the trap tempdoc
-   * 750 recorded for round 8: a repeating signature that is HEALTHY.
+   * PINS: healthy progress does not WARN, including the old false positive: the same head is
+   * selected every cycle, yet each cycle publishes it, so the lane is advancing.
    */
   @Test
-  @DisplayName("a draining work-set never logs the stall WARN")
-  void drainingWorkSetDoesNotWarn() {
+  // publishing service never logs the stall WARN, even with an identical work-set
+  void publishingWorkSetDoesNotWarn() {
     BackfillScheduler scheduler = scheduler();
     for (int cycle = 0; cycle < STALL_CYCLES * 3; cycle++) {
-      runFrozenCycle(scheduler, ids(cycle * 6, cycle * 6 + 6));
+      runCycle(scheduler, cycle % 2 == 0 ? ids(0, 6) : ids(cycle * 6, cycle * 6 + 6), false);
     }
-
-    assertEquals(
-        0,
-        warnCount(),
-        "healthy draining progress must not trip the stall detector; a false positive here makes"
-            + " the signal worthless");
+    assertEquals(0, warnCount());
   }
 
-  /**
-   * PINS: a stall episode that recovers re-arms the detector.
-   *
-   * <p>Without the reset a second, genuine stall after a recovery would be silent — the same class
-   * of defect (a diagnostic that exists but cannot fire) this fix removes.
-   */
+  /** PINS: a stall episode that recovers re-arms the detector. */
   @Test
-  @DisplayName("the detector re-arms after the work-set changes")
+  // the detector re-arms after the lane advances again
   void detectorReArmsAfterRecovery() {
     BackfillScheduler scheduler = scheduler();
-    for (int cycle = 0; cycle < STALL_CYCLES; cycle++) {
-      runFrozenCycle(scheduler, ids(0, 6));
-    }
+    for (int cycle = 0; cycle < STALL_CYCLES; cycle++) runCycle(scheduler, ids(0, 6), true);
     assertEquals(1, warnCount(), "precondition: the first episode warned once");
-
-    // ...the head moves (episode over), then freezes again on a different selection.
-    for (int cycle = 0; cycle < STALL_CYCLES; cycle++) {
-      runFrozenCycle(scheduler, ids(100, 106));
-    }
-
-    assertEquals(
-        2,
-        warnCount(),
-        "a second stall episode after a recovery must warn again; observed " + warnCount());
+    runCycle(scheduler, ids(0, 6), false);
+    for (int cycle = 0; cycle < STALL_CYCLES; cycle++) runCycle(scheduler, ids(100, 106), true);
+    assertEquals(2, warnCount(), "a second stall episode after a recovery must warn again");
   }
 }

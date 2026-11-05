@@ -882,9 +882,10 @@ public class IndexingLoop implements Closeable {
           continue;
         }
 
-        // Tempdoc 516 Slice 4d (W6): time-gated interleaved SPLADE/BGE-M3 backfill is owned
-        // by the scheduler (tempdoc 278 item 4a). Limits primary-indexing overhead (~13%).
-        backfillScheduler.runInterleavedSplade(now);
+        // E4b: one bounded enrichment lane turn at the interleave interval, chosen by the
+        // scheduler's service ledger (tempdoc 278 item 4a time gate). Pending ingestion limits
+        // the call to that turn; it does not veto it.
+        backfillScheduler.runInterleavedEnrichment(now);
 
         // If a forced reindex is in progress, check whether rebuild has completed.
         tryFinalizeEmbeddingRebuild();
@@ -1304,8 +1305,6 @@ public class IndexingLoop implements Closeable {
   JobBatchExtractor getExtractor() {
     return extractor;
   }
-
-  // Tempdoc 516 Slice 4d (W6): recordSpladeBackfillResult moved to BackfillScheduler.
 
   // Tempdoc 516 Slice 4a.2 (W5.1): indexChunks delegate inlined into JobBatchWriter (single
   // caller).

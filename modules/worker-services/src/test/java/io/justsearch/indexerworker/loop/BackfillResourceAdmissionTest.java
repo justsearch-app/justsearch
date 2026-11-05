@@ -138,7 +138,7 @@ final class BackfillResourceAdmissionTest {
     hold.set(reason.equals("bulk")); main.set(reason.equals("main"));
     when(sparse.isGpuAvailable()).thenReturn(gpu); when(bge.isGpuAvailable()).thenReturn(gpu);
     state.put(SchemaFields.SPLADE_STATUS, "PENDING");
-    scheduler(false, false, !unified, unified, false).runInterleavedSplade(Long.MAX_VALUE);
+    scheduler(false, false, !unified, unified, false).runInterleavedEnrichment(Long.MAX_VALUE);
     assertEquals(gpu ? "PENDING" : "COMPLETED", state.get(SchemaFields.SPLADE_STATUS));
     assertDoesNotThrow(() -> verify(sparse, times(!gpu && !unified ? 1 : 0)).encodeBatch(anyList()));
     assertDoesNotThrow(() -> verify(bge, times(!gpu && unified ? 1 : 0)).encodeBatch(anyList()));
@@ -269,7 +269,7 @@ final class BackfillResourceAdmissionTest {
     when(bge.isBulkOnCpu()).thenReturn(true);
     state.put(SchemaFields.SPLADE_STATUS, "PENDING");
     var scheduler = scheduler(false, false, false, true, false);
-    if (interleaved) scheduler.runInterleavedSplade(Long.MAX_VALUE);
+    if (interleaved) scheduler.runInterleavedEnrichment(Long.MAX_VALUE);
     else scheduler.runIdleCycle();
     assertEquals("COMPLETED", state.get(SchemaFields.SPLADE_STATUS));
     assertDoesNotThrow(() -> verify(bge).encodeBatch(anyList()));

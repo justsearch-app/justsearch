@@ -67,8 +67,17 @@ public final class WindowedEmbedProgress {
   public void route(String docId, String content, Route route) {
     nextWindow(docId, content);
     if (!canAdmit(docId)) return;
-    byDocId.computeIfAbsent(docId, ignored -> new Partial(fingerprintOf(content))).route = route;
+    Partial partial = byDocId.computeIfAbsent(docId, ignored -> new Partial(fingerprintOf(content)));
+    if (partial.route != route) routesRetained++;
+    partial.route = route;
   }
+
+  /** Routing decisions retained so far: a turn that retains one kept progress for its owner. */
+  public long routesRetained() {
+    return routesRetained;
+  }
+
+  private long routesRetained;
 
   public void restartWindows(String docId, String content) {
     if (!canAdmit(docId)) return;

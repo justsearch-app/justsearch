@@ -285,7 +285,7 @@ class BackfillSchedulerModeRecordingTest {
     boolean didWork = scheduler.runIdleCycle();
 
     assertTrue(didWork, "combined pass should report work for the seeded pending doc");
-    assertEquals("combined", OperationalMetrics.getInstance().getBackfillMode());
+    assertEquals("active", OperationalMetrics.getInstance().getBackfillMode());
     long embedCompletedAfter =
         OperationalMetrics.getInstance()
             .getEnrichmentCompleted()
@@ -314,7 +314,7 @@ class BackfillSchedulerModeRecordingTest {
 
     scheduler.runIdleCycle();
 
-    assertEquals("individual", OperationalMetrics.getInstance().getBackfillMode());
+    assertEquals("active", OperationalMetrics.getInstance().getBackfillMode());
     long embedCompletedAfter =
         OperationalMetrics.getInstance()
             .getEnrichmentCompleted()
@@ -403,6 +403,6 @@ class BackfillSchedulerModeRecordingTest {
                 .getOrDefault(BatchTimingKeys.EMBED, 0L)
             > embedCompletedBefore,
         "the embedding stage must have advanced the seeded document");
-    assertEquals("individual", OperationalMetrics.getInstance().getBackfillMode());
+    assertEquals("active", OperationalMetrics.getInstance().getBackfillMode());
   }
 }

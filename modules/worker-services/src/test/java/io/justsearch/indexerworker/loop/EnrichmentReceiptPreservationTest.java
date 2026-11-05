@@ -64,10 +64,12 @@ class EnrichmentReceiptPreservationTest extends LuceneExecutorTestBase {
       commitSeed(runtime);
       IndexingCoordinator coordinator = runtime.indexingCoordinator();
       var once = new AtomicBoolean();
-      // Another writer changes one stage field of "conc" while the probe batch is encoded.
+      // Another writer changes the dense stage's own field of "conc" while its unit is encoded.
+      // E4b: lanes publish their own stages, so only a change to a field the write carries
+      // rejects it (a concurrent NER-field change no longer rejects the dense write).
       var embedding = embedding(texts -> {
         if (once.compareAndSet(false, true)) {
-          coordinator.updateDocument("conc", Map.of(SchemaFields.NER_RETRY_COUNT, "1"));
+          coordinator.updateDocument("conc", Map.of(SchemaFields.EMBEDDING_RETRY_COUNT, "1"));
         }
       });
 
@@ -78,8 +80,9 @@ class EnrichmentReceiptPreservationTest extends LuceneExecutorTestBase {
       assertEquals(1, embedCalls.stream().filter(call -> call.contains("content conc")).count(),
           "the rejected document is not re-encoded in the same cycle; calls=" + embedCalls);
       assertEquals("PENDING", fields.getDocumentField("conc", SchemaFields.EMBEDDING_STATUS));
-      assertEquals("PENDING", fields.getDocumentField("conc", SchemaFields.NER_STATUS));
-      assertEquals("1", fields.getDocumentField("conc", SchemaFields.NER_RETRY_COUNT));
+      assertEquals("1", fields.getDocumentField("conc", SchemaFields.EMBEDDING_RETRY_COUNT));
+      assertEquals("COMPLETED_EMPTY", fields.getDocumentField("conc", SchemaFields.NER_STATUS),
+          "the independent NER lane still serves the document");
       for (String id : List.of("a", "b")) {
         assertEquals("COMPLETED", fields.getDocumentField(id, SchemaFields.EMBEDDING_STATUS), id);
         assertEquals("COMPLETED_EMPTY", fields.getDocumentField(id, SchemaFields.NER_STATUS), id);
@@ -101,7 +104,8 @@ class EnrichmentReceiptPreservationTest extends LuceneExecutorTestBase {
       assertEquals("FAILED", fields.getDocumentField("only", SchemaFields.EMBEDDING_STATUS));
       assertEquals("0", fields.getDocumentField("only", SchemaFields.EMBEDDING_RETRY_COUNT));
       var metrics = OperationalMetrics.getInstance();
-      assertEquals("individual", metrics.getBackfillMode(),
+      // E4b retired "individual"/"combined": an admitted lane turn reports "active".
+      assertEquals("active", metrics.getBackfillMode(),
           "a pass that moved a document to FAILED did work");
       assertEquals(1L, metrics.getEnrichmentCompleted().get("embed"),
           "the completion counter keeps its input; the correction is reported as an outcome");

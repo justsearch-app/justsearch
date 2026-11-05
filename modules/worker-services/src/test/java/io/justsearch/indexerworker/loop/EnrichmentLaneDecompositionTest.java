@@ -364,7 +364,9 @@ class EnrichmentLaneDecompositionTest extends LuceneExecutorTestBase {
                         new org.apache.lucene.index.Term(SchemaFields.SPLADE, "old"))));
       }
       verify(h.sparse, never()).encodeBatch(anyList());
-      if (!combined) verify(h.dense, never()).embedWithSpans(anyString(), any(int[][].class));
+      // E4b: one dense lane runs the common kernel; single-pass classification follows only the
+      // late-chunking setting, no longer whether a sparse provider is configured.
+      if (!late) verify(h.dense, never()).embedWithSpans(anyString(), any(int[][].class));
     }
   }
 
@@ -428,17 +430,19 @@ class EnrichmentLaneDecompositionTest extends LuceneExecutorTestBase {
       field.setAccessible(true);
       var progress = (WindowedEmbedProgress) field.get(h.scheduler);
       assertEquals(WindowedEmbedProgress.Route.WINDOW, progress.route("parent", "long body"));
-      int remainingTurns = combined ? 3 : 2;
+      // E4b: with or without a sparse provider the one dense lane classifies once, then resumes
+      // the retained windows one bounded unit per cycle.
+      int remainingTurns = 3;
       for (int i = 0; i < remainingTurns; i++) {
         h.scheduler.runIdleCycle();
         h.refresh();
         if (i < remainingTurns - 1) {
           assertEquals("PENDING", h.value("parent", SchemaFields.EMBEDDING_STATUS));
-          assertEquals((i + (combined ? 1 : 2)) * 32, progress.nextWindow("parent", "long body"));
+          assertEquals((i + 1) * 32, progress.nextWindow("parent", "long body"));
         }
       }
       assertEquals(List.of(0, 32, 64), offsets);
-      assertEquals(combined ? 1 : 0, classification.get());
+      assertEquals(1, classification.get());
       assertEquals("COMPLETED", h.value("parent", SchemaFields.EMBEDDING_STATUS));
       assertTrue(progress.owners().isEmpty());
       h.runtime.commitOps().commitAndTrack();
