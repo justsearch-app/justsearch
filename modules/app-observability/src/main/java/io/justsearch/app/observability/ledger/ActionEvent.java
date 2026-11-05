@@ -210,7 +210,7 @@ public sealed interface ActionEvent
     public static final String OPERATION_ID = "core.scan-root";
   }
 
-  /** A trust-gate firing. {@code disposition} ∈ GATED / DENIED / APPROVED (the outcome union). */
+  /** A trust-gate firing. {@code disposition} ∈ GATED / DENIED / APPROVED / EXPIRED / WITHDRAWN. */
   record Gate(
       String id,
       Instant occurredAt,

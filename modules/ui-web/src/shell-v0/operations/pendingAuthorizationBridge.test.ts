@@ -451,4 +451,59 @@ describe('pendingAuthorizationBridge (tempdoc 655)', () => {
 
     stop();
   });
+
+  it.each(['MCP', 'AGENT_LOOP', 'WORKFLOW', 'LLM_EMISSION'])('DE3 a %s request waits in Needs you, announced as a live arrival', async (transport) => {
+    peekPendingMock.mockResolvedValue(detailFor('agent', { requestedBy: 'Claude Desktop' }));
+    requestAuthorizationMock.mockReturnValue(new Promise(() => {}));
+    const stop = startPendingAuthorizationBridge('http://test', { multiplex: multiplexOn(fakeEs) });
+    fakeEs.emitFrame(pendingFrame(1, 'agent', { transport, createdAt: '2026-07-02T09:59:00Z' }));
+    await flush();
+    expect(requestAuthorizationMock.mock.calls[0]?.[0]).toMatchObject({ pendingId: 'agent', arrival: 'needs-you', live: true,
+      askedAt: '2026-07-02T09:59:00Z', requestedBy: 'Claude Desktop' });
+    stop();
+  });
+
+  it.each(['BUTTON', 'PALETTE', undefined])('DE3 the person\'s own %s request keeps its dialog on arrival', async (transport) => {
+    peekPendingMock.mockResolvedValue(detailFor('own'));
+    requestAuthorizationMock.mockReturnValue(new Promise(() => {}));
+    const stop = startPendingAuthorizationBridge('http://test', { multiplex: multiplexOn(fakeEs) });
+    fakeEs.emitFrame(pendingFrame(1, 'own', transport ? { transport } : {}));
+    await flush();
+    const prompt = requestAuthorizationMock.mock.calls[0]?.[0];
+    expect(prompt).toMatchObject({ pendingId: 'own' });
+    expect(prompt.arrival).toBeUndefined();
+    stop();
+  });
+
+  it('DE3 a request rediscovered after a reload waits in Needs you without counting as a live arrival', async () => {
+    const future = new Date(Date.now() + 240_000).toISOString();
+    const snapshot = { advisories: [{ event: { classId: 'authorization.pending', occurredAt: '2026-07-02T09:58:00Z',
+      classExtras: { pendingId: 'kept', operationId: 'core.ingest-files', riskTier: 'MEDIUM', gateBehavior: 'INLINE_CONFIRM', expiresAt: future } } }] };
+    const retained = { subscribe: (cb: (s: typeof snapshot) => void) => { cb(snapshot); return () => {}; } };
+    peekPendingMock.mockResolvedValue(detailFor('kept', { expiresAt: future, gateBehavior: 'INLINE_CONFIRM' }));
+    requestAuthorizationMock.mockReturnValue(new Promise(() => {}));
+    const stop = startPendingAuthorizationBridge('http://test', { multiplex: multiplexOn(fakeEs), retained });
+    await flush();
+    expect(requestAuthorizationMock.mock.calls[0]?.[0]).toMatchObject({ pendingId: 'kept', arrival: 'needs-you', live: false,
+      askedAt: '2026-07-02T09:58:00Z' });
+    stop();
+  });
+
+  it('DE3 reviewing reads the live details again: fresh fields, null when gone, a failure when unreadable', async () => {
+    peekPendingMock.mockResolvedValueOnce(detailFor('fresh'));
+    requestAuthorizationMock.mockReturnValue(new Promise(() => {}));
+    const stop = startPendingAuthorizationBridge('http://test', { multiplex: multiplexOn(fakeEs) });
+    fakeEs.emitFrame(pendingFrame(1, 'fresh', { transport: 'MCP' }));
+    await flush();
+    const refresh = requestAuthorizationMock.mock.calls[0]?.[0].refresh as () => Promise<unknown>;
+    expect(refresh, 'the review can read the live details').toBeTypeOf('function');
+    peekPendingMock.mockResolvedValueOnce(detailFor('fresh', { argsSummary: '/frozen/target', expiresAt: '2026-07-02T10:05:00Z' }));
+    await expect(refresh()).resolves.toMatchObject({ argsSummary: '/frozen/target', expiresAt: '2026-07-02T10:05:00Z',
+      operationId: 'core.ingest-files', gateBehavior: 'TYPED_CONFIRM', riskTier: 'MEDIUM' });
+    peekPendingMock.mockResolvedValueOnce(null);
+    await expect(refresh()).resolves.toBeNull();
+    peekPendingMock.mockRejectedValueOnce(new TypeError('offline'));
+    await expect(refresh()).rejects.toThrow('offline');
+    stop();
+  });
 });

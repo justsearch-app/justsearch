@@ -1143,14 +1143,14 @@ export class AgentSessionController implements CoreAgentRunHandlers {
     const isCurrent = (): boolean => revision === this.approvalLookupRevision
       && this.toolCalls[callId] === pendingCall && pendingCall?.status === 'pending'
       && (this.sessionId ?? undefined) === owningRunId && this.isStreaming && !this.replayMode && !this.stopAttempt.intent;
-    try {
+    // Read the live server gate; null when it no longer waits. Frozen display never comes from the frame.
+    const readLive = async (): Promise<Record<string, unknown> | null> => {
       if (!owningRunId) throw new Error('Approval has no live run identity');
       const query = new URLSearchParams({ sessionId: owningRunId, callId });
       const response = await this.transport.request(`${this.apiBase}/api/chat/approval?${query}`, { cache: 'no-store' });
-      if (!isCurrent()) return;
+      if (response.status === 404) return null;
       if (!response.ok) throw new Error('Live approval lookup failed');
       const detail = await response.json() as Record<string, unknown>;
-      if (!isCurrent()) return;
       if (detail.callId !== callId || typeof detail.operationId !== 'string' || !detail.operationId
           || typeof detail.argsSummary !== 'string'
           || typeof detail.riskTier !== 'string' || !['LOW', 'MEDIUM', 'HIGH'].includes(detail.riskTier)
@@ -1158,15 +1158,32 @@ export class AgentSessionController implements CoreAgentRunHandlers {
             || !['AUTO', 'INLINE_CONFIRM', 'TYPED_CONFIRM', 'DENY'].includes(detail.gateBehavior)))) {
         throw new Error('Live approval response is incomplete');
       }
+      return detail;
+    };
+    const fields = (detail: Record<string, unknown>) => ({
+      operationId: detail.operationId as string,
+      gateBehavior: detail.gateBehavior as string | null
+        ?? (detail.riskTier === 'HIGH' ? 'TYPED_CONFIRM' : 'INLINE_CONFIRM'),
+      riskTier: detail.riskTier as string,
+      argsSummary: detail.argsSummary as string,
+    });
+    try {
+      const detail = await readLive();
+      if (!isCurrent()) return;
+      if (!detail) throw new Error('Live approval lookup failed');
+      // DE3 — the agent's request waits in Needs you (announced once); it opens no dialog on arrival.
       const decision = await requestAuthorization({
         pendingId: callId,
-        operationId: detail.operationId,
         owningRunId,
-        gateBehavior: detail.gateBehavior as string | null
-          ?? (detail.riskTier === 'HIGH' ? 'TYPED_CONFIRM' : 'INLINE_CONFIRM'),
-        riskTier: detail.riskTier,
-        argsSummary: detail.argsSummary,
+        ...fields(detail),
         allowAlwaysSupported: false,
+        arrival: 'needs-you',
+        live: true,
+        askedAt: new Date().toISOString(),
+        refresh: async () => {
+          const fresh = await readLive();
+          return fresh && fields(fresh);
+        },
       });
       if (!isCurrent() || decision.superseded) return;
       if (decision.approved) await this.approveCall(callId, owningRunId);

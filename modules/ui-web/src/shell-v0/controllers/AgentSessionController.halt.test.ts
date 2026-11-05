@@ -204,7 +204,7 @@ describe('Halt follows the backend across windows and reloads', () => {
     expect(ctrl.terminalOutcome).toBe('cancelled'); expect(ctrl.isStreaming).toBe(false);
   });
 
-  it.each(['refused', 'cancelled-stream', 'cancelled-record'] as const)('R3 an open manual ceremony closes on Halt but the run-ended toast waits for %s', async (outcome) => {
+  it.each(['refused', 'cancelled-stream', 'cancelled-record'] as const)('R3 a waiting manual approval is withdrawn on Halt but the run-ended toast waits for %s', async (outcome) => {
     const host = document.createElement('jf-authorization-host') as AuthorizationHost;
     document.body.appendChild(host);
     const notices: string[] = [];
@@ -214,9 +214,12 @@ describe('Halt follows the backend across windows and reloads', () => {
       const ctrl = await start();
       backend.emit('tool_call_pending', { callId: 'manual', toolName: 'core.search', arguments: '{}', risk: 'LOW', gateBehavior: 'inline_confirm' });
       await flush(); await host.updateComplete;
-      expect(host.shadowRoot!.querySelector('[data-testid="authorization-ceremony"]')).not.toBeNull();
+      // DE3 — the agent's request waits in Needs you (no dialog on arrival); Halt withdraws it there.
+      const waiting = () => host.statusRequests().filter((item) => item.kind === 'authorize' && item.prompt.pendingId === 'manual');
+      expect(waiting()).toHaveLength(1);
+      expect(host.shadowRoot!.querySelector('dialog')!.open).toBe(false);
       tasks.push(ctrl.cancelSession()); await flush(); await host.updateComplete;
-      expect(host.shadowRoot!.querySelector('[data-testid="authorization-ceremony"]')).toBeNull();
+      expect(waiting()).toHaveLength(0);
       expect(notices.filter((message) => message.includes('because the run ended'))).toEqual([]);
       backend.responses[0]!.release(outcome === 'refused' ? 409 : 200); await flush();
       expect(notices.filter((message) => message.includes('because the run ended'))).toEqual([]);

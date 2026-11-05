@@ -30,6 +30,7 @@ import {
 // via the broker; tests register a presenter to control the human decision deterministically.
 import {
   setAuthorizationPresenter,
+  type AuthorizationPrompt,
   setAuthorizationCanceller,
 } from '../operations/authorizationBroker.js';
 // Tempdoc 605 — the run-conclusion notice routes through the 559 single system-message channel;
@@ -1954,6 +1955,33 @@ describe('private live tool approval display', () => {
     await vi.waitFor(() => expect(requests.filter(c => String(c[0]).endsWith('/api/chat/approve'))).toHaveLength(1));
     const approval = requests.find(c => String(c[0]).endsWith('/api/chat/approve'))!;
     expect(JSON.parse(approval[1].body)).toEqual({ sessionId: 'private-run', callId: 'private-call' });
+  });
+
+  it('DE3 the agent request waits in Needs you; its review reads the live gate again', async () => {
+    ctrl.sessionId = 'private-run';
+    let reply: Response | Error = new Response(JSON.stringify(detail), { status: 200 });
+    let first = true;
+    globalThis.fetch = vi.fn(async (url: string) => {
+      if (!String(url).includes('/api/chat/approval?')) return new Response('{}', { status: 200 });
+      if (first) { first = false; return new Response(JSON.stringify(detail), { status: 200 }); }
+      if (reply instanceof Error) throw reply;
+      return reply;
+    }) as unknown as typeof fetch;
+    const presenter = vi.fn(() => new Promise<{ approved: boolean; allowAlways: boolean }>(() => {}));
+    setAuthorizationPresenter(presenter);
+    ctrl.onToolCallPending(pending);
+    await vi.waitFor(() => expect(presenter).toHaveBeenCalledTimes(1));
+    const prompt = (presenter.mock.calls[0] as unknown as [AuthorizationPrompt])[0];
+    expect(prompt).toMatchObject({ pendingId: 'private-call', owningRunId: 'private-run', arrival: 'needs-you', live: true,
+      allowAlwaysSupported: false, operationId: 'core.frozen-target' });
+    reply = new Response(JSON.stringify({ ...detail, argsSummary: 'C:/fresh.md' }), { status: 200 });
+    await expect(prompt.refresh!()).resolves.toMatchObject({ argsSummary: 'C:/fresh.md', operationId: 'core.frozen-target' });
+    reply = new Response('{}', { status: 404 });
+    await expect(prompt.refresh!()).resolves.toBeNull();
+    reply = new Response('{}', { status: 500 });
+    await expect(prompt.refresh!()).rejects.toThrow();
+    reply = new Error('offline');
+    await expect(prompt.refresh!()).rejects.toThrow('offline');
   });
 
   it.each([404, 500, 200, 0])('refuses unavailable or malformed live details (status %s) without raw fallback', async (status) => {

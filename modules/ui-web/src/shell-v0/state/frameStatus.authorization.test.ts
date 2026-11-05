@@ -92,3 +92,14 @@ it('an expired advisory and its keyed gate produce exactly one Earlier row', () 
     expect(model.sections.earlier[0]!.title).toContain('Denied automatically');
   }
 });
+
+it.each(['APPROVED', 'DENIED'])('L9 a same-key copy withdrawn by a %s answer adds no Earlier row: one row per decision', disposition => {
+  const activity = unifiedActivity([gate('first', 'answered', 'GATED', -4000), gate('second', 'copy', 'GATED', -3000),
+    gate('answer', 'answered', disposition, -2000), gate('withdrawn', 'copy', 'WITHDRAWN', -2000)], []);
+  for (const authorizations of [[{ pendingId: 'copy', operationId: 'core.apply-excludes' }], []]) {
+    const model = deriveFrameStatus({ ai: null, now, contactLostAt: null, activity, authorizations });
+    expect(model.sections.needs).toHaveLength(0);
+    expect(model.sections.earlier.map(row => row.id)).toEqual(['activity:answer']);
+    expect(model.sections.earlier[0]!.title).toContain(disposition === 'APPROVED' ? 'Allowed' : 'Denied by you');
+  }
+});

@@ -53,7 +53,7 @@ export interface BackendLedgerEntry {
   readonly sourceId?: string;
   // Tempdoc 550 Outcome face — present on kind='gate' rows (trust-gate firings).
   readonly pendingId?: string;
-  readonly disposition?: string; // GATED | DENIED | APPROVED
+  readonly disposition?: string; // GATED | DENIED | APPROVED | EXPIRED | WITHDRAWN
   readonly gateBehavior?: string;
   // Tempdoc 550 G6 — backend execution id for undo-supported operations. The FE links it to
   // the dispatching Effect Journal entry (via markUndoableOperation), letting unifiedActivity

@@ -21,7 +21,7 @@ import { emitEphemeralToast } from './advisory/ephemeralToast.js';
 import type { MultiplexedStream } from '../streaming/MultiplexedStream.js';
 import './StatusBadge.js';
 import './SystemNotice.js';
-import { transientPlacement, type StatusAction } from '../state/frameStatus.js';
+import { transientPlacement, STATUS_REVIEW_EVENT, type StatusAction } from '../state/frameStatus.js';
 import type { AdvisoryStore, AdvisoryRecord } from './advisory/AdvisoryStore.js';
 import type { AuthorizationHost } from './AuthorizationHost.js';
 import './StatusPanel.js';
@@ -57,6 +57,8 @@ export class StatusPill extends JfElement {
   readonly status = new FrameStatusController(this);
   private readonly transient = new TransientController(this, {
     layer: 'transient', id: 'frame-status', managesDismiss: true, close: () => this.close(),
+    // Escape inside a request's review steps back to the list; the request keeps waiting.
+    escape: () => this.shadowRoot?.querySelector<StatusPanel>('jf-status-panel')?.back() ?? false,
   });
   constructor() {
     super(); this.store = null; this.apiBase = ''; this.pluginsVisible = true;
@@ -119,6 +121,7 @@ export class StatusPill extends JfElement {
     super.connectedCallback();
     connectedPill = this;
     document.addEventListener('keydown', this.keydown);
+    document.addEventListener(STATUS_REVIEW_EVENT, this.reviewRequest);
     this.status.setMultiplex(this.multiplex);
     window.addEventListener('blur', this.windowBlur);
     document.addEventListener('visibilitychange', this.visibility);
@@ -130,6 +133,7 @@ export class StatusPill extends JfElement {
     super.disconnectedCallback();
     if (connectedPill === this) connectedPill = null;
     document.removeEventListener('keydown', this.keydown);
+    document.removeEventListener(STATUS_REVIEW_EVENT, this.reviewRequest);
     window.removeEventListener('blur', this.windowBlur);
     document.removeEventListener('visibilitychange', this.visibility);
     this.narrowQuery?.removeEventListener('change', this.narrowChange);
@@ -178,6 +182,8 @@ export class StatusPill extends JfElement {
   close(restoreFocus = true): void {
     if (!this.open) return;
     this.open = false;
+    const panel = this.shadowRoot?.querySelector<StatusPanel>('jf-status-panel');
+    if (panel) { panel.reviewing = null; panel.gone = false; }
     if (restoreFocus) this.shadowRoot?.querySelector<HTMLButtonElement>('.trigger')?.focus({ preventScroll: true });
   }
   /**
@@ -191,6 +197,19 @@ export class StatusPill extends JfElement {
     if (event.defaultPrevented || shouldIgnoreKeyEvent(event) || modalOwnsFocus()) return;
     if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 's'
       && !isTypingTarget(deepActiveElement())) { event.preventDefault(); this.toggle(); }
+  };
+  /** Open the panel on one Needs-you row's review (a waiting run's Review); a typed one opens its dialog. */
+  private readonly reviewRequest = (event: Event): void => {
+    const id = (event as CustomEvent<string>).detail;
+    const row = this.status.model.sections.needs.find(fact => fact.id === id);
+    if (modalOwnsFocus()) return;
+    const typed = row?.review?.typed ? row.actions?.find(action => action.kind === 'authorization') : undefined;
+    if (typed) { void this.act(typed); return; }
+    this.open = true;
+    void this.updateComplete.then(() => {
+      const panel = this.shadowRoot?.querySelector<StatusPanel>('jf-status-panel');
+      if (row?.review && this.open) panel?.openReview(row);
+    });
   };
   private readonly executing = new Set<string>();
   private async act(action: StatusAction): Promise<void> {
@@ -215,6 +234,14 @@ export class StatusPill extends JfElement {
     if (action.kind === 'authorization' || action.kind === 'consent') {
       this.close(); this.authorizationHost?.()?.reviewStatusRequest(action.target); return;
     }
+    // DE3 — the panel answers an agent request through the host's one decision path (C12).
+    if (action.kind === 'authorization-allow' || action.kind === 'authorization-allow-always' || action.kind === 'authorization-deny') {
+      await this.authorizationHost?.()?.answerStatusRequest(action.target, action.kind !== 'authorization-deny',
+        action.kind === 'authorization-allow-always');
+      return;
+    }
+    if (action.kind === 'authorization-review') { await this.authorizationHost?.()?.openStatusReview(action.target); return; }
+    if (action.kind === 'review') return;
     if (action.kind === 'reject-proposal') { rejectPending(Number(action.target)); return; }
     if (action.kind === 'proposal') {
       const p = listPending().find(row => String(row.id) === action.target);

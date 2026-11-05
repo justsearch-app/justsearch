@@ -16,7 +16,6 @@ import { openActionLedgerStream, type UnifiedActionEntry } from '../operations/A
 import type { MultiplexedStream } from '../streaming/MultiplexedStream.js';
 import type { AuthorizationHost } from '../components/AuthorizationHost.js';
 import { emitEphemeralToast } from '../components/advisory/ephemeralToast.js';
-import { advisoryClassChrome } from '../components/advisory/AdvisoryClassChrome.js';
 import { sendDesktopNotification } from '../../utils/notify.js';
 import type { PresenceRun } from './AgentSessionController.js';
 import { getOperationClient } from '../operations/OperationClient.js';
@@ -28,6 +27,7 @@ import { presentVerdict, type VerdictPresentation } from '../state/verdict.js';
 import { presentAiEngineVerdict, type AiEngineVerdictPresentation } from '../state/aiVerdict.js';
 import { isIndexingObservation } from '../state/readinessNotice.js';
 import { resolvePathLazy } from '../hooks/resolvePathLazy.js';
+import { needsTypedConfirm } from '../components/acceptPendingEffect.js';
 
 /** Which observation a needs-you row comes from (C6: only an observed source can announce an arrival). */
 function needsSource(id: string): string {
@@ -91,6 +91,8 @@ export class FrameStatusController implements ReactiveController {
   private presence: readonly PresenceRun[] = [];
   private presenceLive = false;
   private deadlines = new Map<string, string>();
+  /** Agent requests already announced in this window: one announcement per arrival (DE3). */
+  private readonly announced = new Set<string>();
   /** Sources observed in the previous refresh; only these can announce a needs-you arrival. */
   private observedSources = new Set<string>();
 
@@ -148,14 +150,8 @@ export class FrameStatusController implements ReactiveController {
           const presentation = presentationForSeverity(record.event.severity);
           if (presentation.live === 'alert') { this.assertive = record.toast?.message ?? ''; this.assertiveKey = record.key; }
           else { this.polite = record.toast?.message ?? ''; this.politeKey = record.key; }
-        } else if (!initial && record.liveArrival && !record.acknowledged && record.sourceRenderHint === 'REQUIRES_ACK') {
-          this.assertive = 'An approval request needs you.';
-          this.assertiveKey = record.key;
-          void isWindowFocused().then(focused => {
-            if (!focused && this.connected) void sendDesktopNotification(advisoryClassChrome(record.event.classId).label,
-              typeof record.event.classExtras.operationId === 'string' ? record.event.classExtras.operationId : undefined);
-          });
         }
+        // Agent requests announce through their arrival in Needs you (refresh), once, never twice.
       }
       initial = false;
       this.refresh();
@@ -209,7 +205,9 @@ export class FrameStatusController implements ReactiveController {
     } catch { if (current()) this.presenceLive = false; }
     for (const request of this.host.authorizationHost?.()?.statusRequests() ?? []) {
       if (!current()) break;
-      if (request.kind !== 'authorize' || request.prompt.pendingId.startsWith('proposal:')) continue;
+      // Only the engine's pending store is asked here. A run's own tool approval (owningRunId) is not
+      // a pending-store id: its run withdraws it (cancelAuthorizationsForRun), never a 404 from here.
+      if (request.kind !== 'authorize' || request.prompt.pendingId.startsWith('proposal:') || request.prompt.owningRunId) continue;
       try {
         const detail = await getOperationClient(this.host.apiBase).peekPending(request.prompt.pendingId);
         if (!current()) break;
@@ -294,11 +292,14 @@ export class FrameStatusController implements ReactiveController {
       title: 'Plugin load failed', detail: `${key}: ${error.message}`,
       actions: [{ kind: 'navigate', target: 'core.settings-surface', label: 'Open plugin settings' },
         { kind: 'plugin-copy', target: key, label: 'Copy details' }, { kind: 'dismiss-plugin', target: key, label: 'Dismiss' }] }));
-    const requests = this.host.authorizationHost?.()?.statusRequests() ?? [];
+    const authorizationHost = this.host.authorizationHost?.() ?? null;
+    const requests = authorizationHost?.statusRequests() ?? [];
     const derive = (): FrameStatus => deriveFrameStatus({ ai: this.ai, now, contactLostAt: this.contactLostAt,
-      advisories: this.snapshot.advisories, proposals: listPending(), tasks: listTasks(),
+      advisories: this.snapshot.advisories, tasks: listTasks(),
+      proposals: listPending().map(p => ({ ...p, typed: p.effect.kind === 'invoke-operation' && needsTypedConfirm(p.effect, p.originator) })),
       authorizations: requests.flatMap(item => item.kind === 'authorize'
-        ? [{ ...item.prompt, expiresAt: item.prompt.expiresAt ?? this.deadlines.get(item.prompt.pendingId) }] : []),
+        ? [{ ...item.prompt, expiresAt: item.prompt.expiresAt ?? this.deadlines.get(item.prompt.pendingId),
+          state: authorizationHost?.statusRequestState(item.prompt.pendingId) ?? null }] : []),
       consents: listPendingConsentRequests().map(c => ({ id: String(c.id), pluginId: c.contributorId, capability: c.capability })),
       update: getAppUpdateStatus(), conditions: this.conditions, finished: this.finished,
       roots: this.roots, rootPaths: this.rootPaths, rootsLive: this.rootsLive && !!this.ai?.indexingStatusLive,
@@ -363,6 +364,24 @@ export class FrameStatusController implements ReactiveController {
       const n = next.sections.needs.length;
       this.assertive = `${n} ${n === 1 ? 'item needs' : 'items need'} you.`;
       this.assertiveKey = `needs:${[...needsKey].sort().join('|')}`;
+    }
+    // DE3 — an agent request that arrived live in this window is announced once, assertively; a
+    // request rediscovered after a reload or replayed by a reconnect is listed without a word.
+    const arrivals: StatusFact[] = [];
+    for (const item of requests) {
+      if (item.kind !== 'authorize' || item.prompt.arrival !== 'needs-you' || this.announced.has(item.prompt.pendingId)) continue;
+      this.announced.add(item.prompt.pendingId);
+      if (this.announced.size > 500) this.announced.delete(this.announced.values().next().value!);
+      const row = next.sections.needs.find(fact => fact.id === `authorization:${item.prompt.pendingId}`);
+      if (item.prompt.live && row) arrivals.push(row);
+    }
+    if (arrivals.length) {
+      this.assertive = arrivals.length === 1 ? `Needs you: ${arrivals[0]!.title}.` : `${arrivals.length} agent requests need you.`;
+      this.assertiveKey = arrivals.map(row => row.id).join('|');
+      const first = arrivals[0]!;
+      void isWindowFocused().then(focused => {
+        if (!focused && this.connected) void sendDesktopNotification(first.title, first.detail);
+      });
     }
     this.needsKey = needsKey;
     // R1 — while a more urgent state holds the pill, a hover or focus pause cannot extend a notice

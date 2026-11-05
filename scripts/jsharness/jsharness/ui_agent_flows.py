@@ -178,29 +178,52 @@ async def setup_run_budget(page):
 
 
 async def approval(page, *, failure):
+    """The agent's request waits in the status panel's Needs you (no dialog on arrival); the panel's
+    review answers it once. Updated from the arrival ceremony (decision 4: agent requests are reviewed
+    in the tray); the run still waits, one live lookup feeds one request, and one approval is sent."""
     fixture = await start(page)
     if failure:
         fixture.replies[("POST", APPROVE)] = fixtures.FixtureReply(status=503)
     pending = {"callId": "approval-call", "toolName": "core.search", "arguments": '{"query":"fixture"}',
         "risk": "low", "gateBehavior": "inline_confirm"}
     await fixture.stream.emit("tool_call_pending", pending)
-    ceremony = page.get_by_test_id("authorization-ceremony")
-    await expect(ceremony).to_be_visible(timeout=TIMEOUT)
+    trigger = page.locator(S.CSS_STATUS_PILL_TRIGGER)
+    await expect(trigger).to_have_class(re.compile(r"\bneeds\b"), timeout=TIMEOUT)
+    await expect(page.get_by_test_id("authorization-ceremony")).to_have_count(0)
     await fixture.stream.emit("tool_call_pending", pending)
-    # A later visible frame proves the replay was consumed before counting ceremonies/lookups.
+    # A later visible frame proves the replay was consumed before counting requests/lookups.
     await fixture.stream.emit("progress", {"phase": "approval", "message": "Approval replay consumed",
         "iteration": 1, "maxIterations": 10})
     await note(page, "Approval replay consumed")
-    await expect(ceremony).to_have_count(1)
+    # The run waits on the one request.
+    await expect(run(page)).to_have_attribute("data-phase", "holding")
+    await expect(page.get_by_test_id("sv3-run-prompt")).to_have_attribute("data-kind", "approval")
     lookups = fixture.matching("GET", "/api/chat/approval")
     assert len(lookups) == 1 and f"sessionId={fixture.session_id}" in lookups[0].query, lookups
-    # A newly presented ceremony ignores activation for 400 ms (AuthorizationHost ARMING_DELAY_MS),
-    # so a stray double-click cannot answer it; a person's deliberate click comes after that.
+    row = page.locator(f'jf-status-panel article[data-fact="authorization:{pending["callId"]}"]')
+    if failure:
+        # From the pill: What's going on lists it once under Needs you; its Review opens in the panel.
+        await trigger.click()
+        await expect(row).to_have_count(1, timeout=TIMEOUT)
+        await row.get_by_role("button", name="Review", exact=True).click()
+    else:
+        # From the waiting run: its Review opens the same review in the panel.
+        await page.get_by_test_id("sv3-run-approval-review").click()
+    review = page.get_by_test_id("status-review")
+    await expect(review).to_be_visible(timeout=TIMEOUT)
+    await expect(review.locator("h2")).to_contain_text("the agent in Search")
+    # A newly opened review ignores answers for 400 ms (ARMING_DELAY_MS), so the click that opened it
+    # cannot also answer it; a person's deliberate answer comes after that.
     await page.wait_for_timeout(450)
-    await page.get_by_test_id("authorization-approve").click()
+    await review.locator('[data-answer="allow"]').click()
     request = await fixture.wait_request("POST", APPROVE)
     assert request.body == {"sessionId": fixture.session_id, "callId": pending["callId"]}, request
     await asyncio.wait_for(request.answered.wait(), TIMEOUT / 1000)
+    # The answered request leaves the review; the panel stays open on the list until closed.
+    await expect(review).to_have_count(0, timeout=TIMEOUT)
+    await expect(row).to_have_count(0)
+    await page.keyboard.press("Escape")
+    await expect(trigger).to_have_attribute("aria-expanded", "false")
     if failure:
         await note(page, "the action was not approved")
     else:
@@ -210,14 +233,15 @@ async def approval(page, *, failure):
             "aria-label", re.compile("executing", re.I))
         await activity(fixture, page, "Continuing after approval.")
         await expect(run(page)).to_have_attribute("data-phase", "running")
-    await expect(ceremony).to_have_count(0)
-    assert len(fixture.matching("GET", "/api/chat/approval")) == 1, fixture.requests
+    await expect(row).to_have_count(0)
+    await expect(page.get_by_test_id("authorization-ceremony")).to_have_count(0)
+    assert len(fixture.matching("GET", "/api/chat/approval")) == 2, fixture.requests  # arrival + review
     assert len(fixture.matching("POST", APPROVE)) == 1, fixture.requests
     only_run(fixture)
 
 
 async def setup_run_approval(page):
-    """F3: a replay opens one ceremony; approving permits the next released event."""
+    """F3: a replayed request waits once in Needs you; approving it in the panel permits the next released event."""
     await approval(page, failure=False)
 
 

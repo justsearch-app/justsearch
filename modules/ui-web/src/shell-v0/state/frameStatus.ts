@@ -24,7 +24,45 @@ const RECONNECT_GRACE_MS = 10_000; // One complete status-poll interval.
 export const FINISHED_DWELL_MS = 6_000;
 const FILE_ACTIVITY_ID = 'indexing-files';
 export type StatusSection = 'needs' | 'problems' | 'running' | 'earlier';
-export interface StatusAction { readonly label: string; readonly kind: 'navigate' | 'advisory' | 'proposal' | 'reject-proposal' | 'authorization' | 'consent' | 'cancel-task' | 'plugin-copy' | 'dismiss-plugin' | 'install-toggle' | 'background-runs'; readonly target: string; }
+export interface StatusAction { readonly label: string; readonly kind: 'navigate' | 'advisory' | 'proposal' | 'reject-proposal' | 'authorization' | 'consent' | 'cancel-task' | 'plugin-copy' | 'dismiss-plugin' | 'install-toggle' | 'background-runs'
+  | 'authorization-allow' | 'authorization-allow-always' | 'authorization-deny' | 'authorization-review'
+  /** Opens the row's review inside the panel (the panel handles it; nothing leaves the panel). */
+  | 'review'; readonly target: string; }
+/** Ask the status pill to open the review of one Needs-you row (detail: the row id), e.g. from a waiting run. */
+export const STATUS_REVIEW_EVENT = 'jf-review-status-request';
+/** One consequence line of a request under review: what it touches, its risk, whether it can be undone. */
+export interface StatusReviewLine { readonly icon: 'target' | 'risk' | 'undo' | 'info'; readonly text: string; readonly path?: boolean }
+/**
+ * DE3 — an agent's request reviewed inside the status panel (ref-10): who asked, the question, its
+ * consequences, the requester's own words marked as theirs, the deadline and what happens on timeout,
+ * and the answers. A typed request is not answered here: its Review opens the security dialog.
+ */
+export interface StatusReview {
+  readonly who: string;
+  readonly whoDetail: string;
+  readonly question: string;
+  readonly lines: readonly StatusReviewLine[];
+  /** Text the requester wrote; shown as written by it and not checked by JustSearch. */
+  readonly reason?: string;
+  readonly reasonBy?: string;
+  /** What happens if nobody answers ("Denied automatically in 4 min"). */
+  readonly timeout: string;
+  /** Share of the answer time left, when both ends are known. */
+  readonly remaining?: number;
+  /** Why "always allow" is not offered; absent when it is offered (then `allowAlways` is set). */
+  readonly askedEveryTime?: string;
+  readonly typed: boolean;
+  readonly unavailable: boolean;
+  readonly busy: boolean;
+  readonly error?: string;
+  /** `performance.now()` time after which an answer counts (arming). */
+  readonly readyAt: number;
+  readonly allow: StatusAction;
+  readonly deny: StatusAction;
+  readonly allowAlways?: StatusAction;
+  /** Sent when the review opens: re-arms the request and reads its live details again. */
+  readonly open?: StatusAction;
+}
 export interface StatusFact {
   readonly id: string;
   readonly section: StatusSection;
@@ -45,10 +83,19 @@ export interface StatusFact {
   readonly deadline?: string;
   /** How a finished or historical item ended; drawn as an icon plus words, never colour alone. */
   readonly tone?: 'success' | 'failure' | 'warning' | 'neutral';
+  /** Agent requests: what the panel's review shows and answers. */
+  readonly review?: StatusReview;
+  /** An answer that did not go through ("The request could not be cancelled. Try again."). */
+  readonly error?: string;
 }
 interface PendingStatusAuthorization {
   readonly pendingId: string; readonly operationId: string; readonly argsSummary?: string;
   readonly requestedBy?: string; readonly expiresAt?: string;
+  readonly gateBehavior?: string; readonly riskTier?: string; readonly undoSupported?: boolean;
+  readonly arrival?: 'needs-you'; readonly askedAt?: string; readonly owningRunId?: string;
+  /** The waiting request's answer state, owned by the authorization host. */
+  readonly state?: { readonly busy: boolean; readonly error?: string; readonly unavailable: boolean;
+    readonly readyAt: number; readonly durable: boolean } | null;
 }
 export interface DurableStatusOperation {
   readonly id: string; readonly label: string; readonly outcome: OperationOutcomeView | null;
@@ -60,7 +107,7 @@ interface FrameStatusInput {
   readonly now: number;
   readonly contactLostAt: number | null;
   readonly advisories?: readonly AdvisoryRecord[];
-  readonly proposals?: readonly PendingEffect[];
+  readonly proposals?: readonly (PendingEffect & { readonly typed?: boolean })[];
   readonly authorizations?: readonly PendingStatusAuthorization[];
   readonly consents?: readonly { readonly id: string; readonly pluginId: string; readonly capability: string }[];
   readonly tasks?: readonly Task[];
@@ -109,6 +156,51 @@ export function authorizationDeadline(expiresAt: string, now: number): string | 
   if (!Number.isFinite(ms)) return undefined;
   const minutes = Math.ceil(ms / 60_000);
   return `Denied automatically ${ms < 60_000 ? 'in less than a minute' : minutes < 60 ? `in ${minutes} min` : `in about ${Math.round(minutes / 60)} h`}`;
+}
+
+function asked(askedAt: string | undefined, now: number): string {
+  const ms = askedAt ? now - Date.parse(askedAt) : NaN;
+  if (!Number.isFinite(ms)) return '';
+  const minutes = Math.floor(Math.max(0, ms) / 60_000);
+  return ` · asked ${minutes < 1 ? 'just now' : minutes < 60 ? `${minutes} min ago` : `about ${Math.round(minutes / 60)} h ago`}`;
+}
+
+const RISK_WORDS: Readonly<Record<string, string>> = {
+  HIGH: 'High risk', MEDIUM: 'Medium risk', LOW: 'Low risk',
+};
+
+/** ref-10 — the review of one agent request: everything the person needs to decide it. */
+function authorizationReview(request: PendingStatusAuthorization, label: string, now: number): StatusReview {
+  const appAgent = !!request.owningRunId;
+  const who = appAgent ? 'The agent in Search' : request.requestedBy ?? 'An agent';
+  const typed = request.gateBehavior === 'TYPED_CONFIRM';
+  const state = request.state;
+  const deadline = request.expiresAt ? authorizationDeadline(request.expiresAt, now) : undefined;
+  const total = request.expiresAt && request.askedAt ? Date.parse(request.expiresAt) - Date.parse(request.askedAt) : NaN;
+  const remaining = request.expiresAt && total > 0 ? Math.max(0, Math.min(1, (Date.parse(request.expiresAt) - now) / total)) : undefined;
+  const lines: StatusReviewLine[] = [
+    ...(request.argsSummary ? [{ icon: 'target' as const, text: request.argsSummary, path: true }] : []),
+    ...(request.riskTier && RISK_WORDS[request.riskTier] ? [{ icon: 'risk' as const,
+      text: `${RISK_WORDS[request.riskTier]}${typed ? ' · you confirm it by typing its name' : ''}` }] : []),
+    ...(request.undoSupported === false ? [{ icon: 'undo' as const, text: 'No undo: it cannot be reversed' }]
+      : request.undoSupported === true ? [{ icon: 'undo' as const, text: 'It can be undone afterwards from Activity' }] : []),
+  ];
+  const durable = state?.durable === true;
+  return {
+    who, whoDetail: `${appAgent ? 'Agent in this window' : 'Agent on this computer'}${asked(request.askedAt, now)}`,
+    question: `Let ${who.replace(/^(The|An) /, word => word.toLowerCase())} run “${label}”?`, lines,
+    timeout: deadline ?? (appAgent ? 'No deadline: it waits until you answer or the run stops' : 'No deadline: it waits until you answer'),
+    ...(remaining === undefined ? {} : { remaining }),
+    ...(durable ? { allowAlways: { kind: 'authorization-allow-always' as const, target: request.pendingId, label: `Always allow “${label}” for ${who}` } }
+      : { askedEveryTime: request.riskTier === 'HIGH' ? `“${label}” is asked every time; it can't be allowed permanently.`
+        : appAgent ? 'The agent in Search asks every time; its requests can\'t be allowed permanently.'
+          : 'This request is asked every time.' }),
+    typed, unavailable: state?.unavailable ?? false, busy: state?.busy ?? false,
+    ...(state?.error ? { error: state.error } : {}), readyAt: state?.readyAt ?? 0,
+    allow: { kind: 'authorization-allow', target: request.pendingId, label: 'Allow this time' },
+    deny: { kind: 'authorization-deny', target: request.pendingId, label: 'Deny' },
+    open: { kind: 'authorization-review', target: request.pendingId, label: 'Review' },
+  };
 }
 
 function advisoryStatusFact(record: AdvisoryRecord): StatusFact {
@@ -215,6 +307,8 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
     if (entry.isRoutine || entry.operationOutcomeKey) continue;
     const pendingId = entry.gate?.pendingId;
     if (pendingId && (waiting.has(pendingId) || entry.gate?.disposition === 'GATED' && terminal.has(pendingId))) continue;
+    // L9 — a same-key copy withdrawn by another request's answer is not a decision: one row per decision.
+    if (entry.gate?.disposition === 'WITHDRAWN') continue;
     const expiry = pendingId && input.advisories?.some(record => record.event.classId === 'authorization.pending'
       && record.event.classExtras.pendingId === pendingId && typeof record.event.classExtras.expiresAt === 'string'
       && Date.parse(record.event.classExtras.expiresAt) <= now);
@@ -245,17 +339,39 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
   // Deduplicate the broadcast and request-scoped representations by the engine-issued identity.
   for (const request of input.authorizations ?? []) {
     if (terminal.has(request.pendingId) || request.expiresAt && Date.parse(request.expiresAt) <= now) continue;
+    const label = present({ kind: 'operation', id: request.operationId }).label;
+    const review = request.arrival === 'needs-you' ? authorizationReview(request, label, now) : undefined;
     add({ id: `authorization:${request.pendingId}`, section: 'needs',
-      title: `${request.requestedBy ?? 'An agent'} requests ${present({ kind: 'operation', id: request.operationId }).label}`,
+      title: `${review?.who ?? request.requestedBy ?? 'An agent'} requests ${label}`,
       ...(request.argsSummary ? { detail: request.argsSummary } : {}),
       ...(request.expiresAt && authorizationDeadline(request.expiresAt, now) ? { deadline: authorizationDeadline(request.expiresAt, now)! } : {}),
-      actions: [{ kind: 'authorization', target: request.pendingId, label: 'Review request' }] });
+      ...(review ? { review, ...(review.error ? { error: review.error } : {}) } : {}),
+      // ref-09: an agent request answers in place or opens its review; a typed one opens the security dialog.
+      actions: !review ? [{ kind: 'authorization', target: request.pendingId, label: 'Review request' }]
+        : review.typed ? [{ kind: 'authorization', target: request.pendingId, label: 'Review' }]
+          : [{ ...review.allow, label: 'Allow' }, review.deny, { kind: 'review', target: `authorization:${request.pendingId}`, label: 'Review' }] });
   }
-  for (const p of [...input.proposals ?? []].sort((a, b) => (a.confidence ?? 1) - (b.confidence ?? 1))) add({ id: `proposal:${p.id}`, section: 'needs',
-    ...(p.confidence == null ? {} : { confidence: p.confidence }),
-    title: `Agent suggestion: ${present({ kind: 'effect', effect: p.effect }).label}`,
-    detail: [p.rationale, p.confidence == null ? '' : `Confidence: ${Math.round(p.confidence * 100)}%`].filter(Boolean).join(' · '),
-    actions: [{ kind: 'proposal', target: String(p.id), label: 'Allow suggestion' }, { kind: 'reject-proposal', target: String(p.id), label: 'Reject' }] });
+  for (const p of [...input.proposals ?? []].sort((a, b) => (a.confidence ?? 1) - (b.confidence ?? 1))) {
+    const label = present({ kind: 'effect', effect: p.effect }).label;
+    const allow: StatusAction = { kind: 'proposal', target: String(p.id), label: 'Allow suggestion' };
+    const reject: StatusAction = { kind: 'reject-proposal', target: String(p.id), label: 'Reject' };
+    const who = p.originator === 'agent' ? 'The agent' : p.originator === 'user' ? 'You' : 'JustSearch';
+    // A suggestion that needs typing is answered in the security dialog, never in the panel.
+    const review: StatusReview | undefined = p.typed ? undefined : {
+      who, whoDetail: `Suggestion${asked(p.proposedAt, now)}`, question: `Apply “${label}”?`,
+      lines: p.confidence == null ? [] : [{ icon: 'info', text: `${who === 'You' ? 'Confidence' : 'The agent rates its confidence'}: ${Math.round(p.confidence * 100)}%` }],
+      ...(p.rationale ? { reason: p.rationale, reasonBy: who === 'The agent' ? 'the agent' : who } : {}),
+      timeout: 'No deadline: it waits until you answer', askedEveryTime: 'Suggestions are asked every time.',
+      typed: false, unavailable: false, busy: false, readyAt: 0,
+      allow: { ...allow, label: 'Allow this time' }, deny: { ...reject, label: 'Deny' },
+    };
+    add({ id: `proposal:${p.id}`, section: 'needs',
+      ...(p.confidence == null ? {} : { confidence: p.confidence }),
+      title: `Agent suggestion: ${label}`,
+      detail: [p.rationale, p.confidence == null ? '' : `Confidence: ${Math.round(p.confidence * 100)}%`].filter(Boolean).join(' · '),
+      ...(review ? { review } : {}),
+      actions: [allow, reject, ...(review ? [{ kind: 'review' as const, target: `proposal:${p.id}`, label: 'Review' }] : [])] });
+  }
   for (const c of input.consents ?? []) add({ id: `consent:${c.id}`, section: 'needs',
     title: `${c.pluginId} requests ${c.capability}`, actions: [{ kind: 'consent', target: c.id, label: 'Review permissions' }] });
   // The SSE file window is a narrower scope of the aggregate. Rows the aggregate no longer confirms

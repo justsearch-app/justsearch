@@ -51,7 +51,20 @@ interface PendingAuthorizationPayload {
   readonly sourceTier?: string;
   readonly riskTier?: string;
   readonly gateBehavior?: string;
+  /** Which transport's gate produced it; agent and other-app transports wait in Needs you (DE3). */
+  readonly transport?: string;
+  /** ISO-8601, or epoch seconds/milliseconds depending on the stream's date encoding. */
+  readonly createdAt?: string | number;
 }
+
+function isoTime(value: string | number | undefined): string | undefined {
+  if (typeof value === 'string') return Number.isFinite(Date.parse(value)) ? value : undefined;
+  if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
+  return new Date(value < 1e11 ? value * 1000 : value).toISOString();
+}
+
+/** Requests from agents and other apps, as opposed to the person's own action in a window. */
+const AGENT_TRANSPORTS = new Set(['MCP', 'AGENT_LOOP', 'WORKFLOW', 'LLM_EMISSION']);
 
 /**
  * B2 — the retained side of the same pending store: the advisory stream's snapshot keeps every
@@ -60,7 +73,7 @@ interface PendingAuthorizationPayload {
  */
 interface RetainedPendingSource {
   subscribe(listener: (snapshot: { readonly advisories: readonly {
-    readonly event: { readonly classId: string; readonly classExtras: Readonly<Record<string, unknown>> };
+    readonly event: { readonly classId: string; readonly occurredAt?: string; readonly classExtras: Readonly<Record<string, unknown>> };
   }[] }) => void): () => void;
 }
 
@@ -134,8 +147,10 @@ export function startPendingAuthorizationBridge(
       const expiresAt = str(extras.expiresAt);
       // An expired request cannot be approved; read state never decides validity (peek does).
       if (expiresAt && Date.parse(expiresAt) <= Date.now()) continue;
+      // The retained record is the MCP projection (PendingAuthorizationAdvisoryProjector): an agent's.
       admit({ pendingId: str(extras.pendingId), operationId: str(extras.operationId),
-        gateBehavior: str(extras.gateBehavior), riskTier: str(extras.riskTier) }, true);
+        gateBehavior: str(extras.gateBehavior), riskTier: str(extras.riskTier), transport: 'MCP',
+        createdAt: record.event.occurredAt }, true);
     }
   });
 
@@ -169,7 +184,7 @@ export function startPendingAuthorizationBridge(
     // A retained request whose state could not be read (or whose host was not mounted yet) is
     // tried again on the next snapshot: a transport failure is neither expiry nor an answer.
     const retry = retained ? () => { if (!stopped) handledIds.delete(pendingId); } : undefined;
-    void presentAndExecute(apiBase, payload, () => !stopped && waiting.get(pendingId) === entry, retry)
+    void presentAndExecute(apiBase, payload, () => !stopped && waiting.get(pendingId) === entry, retry, !retained)
       .finally(() => { if (waiting.get(pendingId) === entry) waiting.delete(pendingId); });
   }
 
@@ -190,6 +205,8 @@ async function presentAndExecute(
   isCurrent: () => boolean,
   /** Retained discoveries only: the request could not be presented now and may be tried again. */
   retry?: () => void,
+  /** This window saw the announcement live (not a reload or reconnect rediscovery). */
+  live = false,
 ): Promise<void> {
   const pendingId = payload.pendingId as string;
   const client = getOperationClient(apiBase);
@@ -221,6 +238,16 @@ async function presentAndExecute(
     ...(detail.argsSummary ? { argsSummary: detail.argsSummary } : {}),
     ...(detail.rationale ? { purpose: detail.rationale } : {}),
     ...(detail.requestedBy ? { requestedBy: detail.requestedBy } : {}),
+    ...(payload.transport && AGENT_TRANSPORTS.has(payload.transport) ? {
+      // DE3 — an agent's request waits in Needs you; its review reads the live details again.
+      arrival: 'needs-you' as const, live,
+      ...(isoTime(payload.createdAt) ? { askedAt: isoTime(payload.createdAt)! } : {}),
+      refresh: async () => {
+        const fresh = await client.peekPending(pendingId);
+        return fresh && { operationId: fresh.operationId, gateBehavior: fresh.gateBehavior, riskTier: fresh.riskTier,
+          argsSummary: fresh.argsSummary, expiresAt: fresh.expiresAt, requestedBy: fresh.requestedBy };
+      },
+    } : {}),
   };
   const decision = await requestAuthorization(prompt);
   if (!isCurrent() || decision.superseded) return;

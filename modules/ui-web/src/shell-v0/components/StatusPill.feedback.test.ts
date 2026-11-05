@@ -3,11 +3,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { StatusPill } from './StatusPill.js';
 import type { StatusPanel } from './StatusPanel.js';
-import { AdvisoryStore, type AdvisoryRecord, type AdvisorySnapshot } from './advisory/AdvisoryStore.js';
+import { AdvisoryStore } from './advisory/AdvisoryStore.js';
 import { emitEphemeralToast } from './advisory/ephemeralToast.js';
 import { __feedForTest, __feedContactForTest, __resetAiStateForTest, type StatusSnapshot } from '../state/aiStateStore.js';
 import { dispatchPluginError, dispatchPluginLoaded } from '../state/pluginLoadEvents.js';
 import { sendDesktopNotification } from '../../utils/notify.js';
+import { AuthorizationHost } from './AuthorizationHost.js';
+import { requestAuthorization } from '../operations/authorizationBroker.js';
 vi.mock('../../utils/windowFocus.js', () => ({ isWindowFocused: async () => false }));
 vi.mock('../../utils/notify.js', () => ({ sendDesktopNotification: vi.fn(async () => {}) }));
 let pill: StatusPill;
@@ -57,20 +59,20 @@ describe('status feedback ownership', () => {
     action.dispatchEvent(new FocusEvent('blur')); await vi.advanceTimersByTimeAsync(6000); await flush();
     expect(button().textContent).toContain('A concurrent action completed');
   });
-  it('C6 retained snapshots and late discovery stay silent; live REQUIRES_ACK arrivals retain desktop escalation', async () => {
-    const listeners = new Set<(s: AdvisorySnapshot) => void>();
-    let snapshot: AdvisorySnapshot = { advisories: [], unreadCount: 0, isConnected: true, lastFrameKind: 'snapshot' };
-    const stub = { subscribe: (cb: (s: AdvisorySnapshot) => void) => { listeners.add(cb); cb(snapshot); return () => listeners.delete(cb); } };
-    pill.store = stub as unknown as AdvisoryStore; await flush();
-    const record = (key: string, liveArrival: boolean): AdvisoryRecord => ({ key, liveArrival, origin: 'stream', acknowledged: false, sourceRenderHint: 'REQUIRES_ACK', event: {
-      id: key, classId: 'authorization.pending', occurredAt: new Date().toISOString(), renderHint: 'REQUIRES_ACK', classExtras: { pendingId: key, operationId: 'core.test' }, primaryAction: null, bodyI18nKey: null, diagnosticsLink: null, provenance: null,
-    } });
-    snapshot = { ...snapshot, advisories: [record('old', false)] }; listeners.forEach(cb => cb(snapshot)); await flush();
-    expect(pill.status.assertive).toBe(''); expect(sendDesktopNotification).not.toHaveBeenCalled();
-    snapshot = { ...snapshot, lastFrameKind: 'update', advisories: [...snapshot.advisories, record('new', true)] }; listeners.forEach(cb => cb(snapshot)); await flush();
-    expect(sendDesktopNotification).toHaveBeenCalledTimes(1);
-    listeners.forEach(cb => cb(snapshot)); await flush(); expect(sendDesktopNotification).toHaveBeenCalledTimes(1);
-    pill.remove(); document.body.append(pill); await flush(); expect(sendDesktopNotification).toHaveBeenCalledTimes(1);
+  it('C6 rediscovered agent requests stay silent; a live arrival is escalated to the desktop once', async () => {
+    // DE3 — agent requests announce through their arrival in Needs you (the host), not the advisory.
+    const host = new AuthorizationHost(); document.body.append(host);
+    pill.authorizationHost = () => host; await flush();
+    const ask = (pendingId: string, live: boolean) => void requestAuthorization({ pendingId, operationId: 'core.test',
+      gateBehavior: 'INLINE_CONFIRM', arrival: 'needs-you', live });
+    try {
+      ask('old', false); await host.updateComplete; pill.status.refresh(); await flush();
+      expect(pill.status.assertive).toBe(''); expect(sendDesktopNotification).not.toHaveBeenCalled();
+      ask('new', true); await host.updateComplete; pill.status.refresh(); await flush();
+      expect(sendDesktopNotification).toHaveBeenCalledTimes(1);
+      pill.status.refresh(); await flush(); expect(sendDesktopNotification).toHaveBeenCalledTimes(1);
+      pill.remove(); document.body.append(pill); await flush(); expect(sendDesktopNotification).toHaveBeenCalledTimes(1);
+    } finally { host.remove(); }
   });
   it('B3 C6 a hold observed at startup or after a reconnect is silent; a live hold arrival is announced once in plain grammar', async () => {
     const held = (state: string) => __feedForTest({ status: { operating: { indexing: { state, reasons: ['user_paused'], untilEpochMs: null, waitingForResume: true } },

@@ -78,6 +78,48 @@ public final class PendingAuthorizationStore {
         .map(Decision::decidedAt);
   }
 
+  /**
+   * The outcome agents and the app read for an operation key (L10/L11): the recorded execution
+   * outcome, unless a request for that key was denied, still waits, or reached its deadline
+   * unanswered. The HTTP history route and the MCP outcome tool both answer through this, so they
+   * agree. Reading it may observe a deadline that passed (the same lazy expiry as {@link #peek}).
+   */
+  public synchronized io.justsearch.app.api.operations.OperationOutcomeView outcome(
+      String operationKey, io.justsearch.app.api.operations.OperationOutcomeView recorded) {
+    if (operationKey == null) return recorded;
+    boolean waiting = pendingForKey(operationKey).isPresent();
+    var decision = decisions.get(operationKey);
+    if (decision != null && decision.disposition() == io.justsearch.app.observability.operations.AuthorizationDisposition.DENIED) {
+      return terminal(recorded, decision, "USER_DENIED", "Operation denied by the user");
+    }
+    if (waiting) {
+      return new io.justsearch.app.api.operations.OperationOutcomeView(
+          io.justsearch.app.api.operations.OperationOutcomeView.State.UNKNOWN, "awaiting-approval",
+          recorded.historySince(), null, null, null, null, null, null, "Operation awaits your approval");
+    }
+    if (decision != null && decision.disposition() == io.justsearch.app.observability.operations.AuthorizationDisposition.EXPIRED
+        && recorded.state() == io.justsearch.app.api.operations.OperationOutcomeView.State.UNKNOWN) {
+      return terminal(recorded, decision, "APPROVAL_EXPIRED",
+          "Denied automatically: nobody answered before the deadline");
+    }
+    return recorded;
+  }
+
+  private static io.justsearch.app.api.operations.OperationOutcomeView terminal(
+      io.justsearch.app.api.operations.OperationOutcomeView recorded, Decision decision, String reason, String message) {
+    return new io.justsearch.app.api.operations.OperationOutcomeView(
+        io.justsearch.app.api.operations.OperationOutcomeView.State.FAILED, null, recorded.historySince(), null,
+        decision.decidedAt().toEpochMilli(), null, null, reason, null, message);
+  }
+
+  /** When an unanswered request for this key reached its deadline and no copy still waits. */
+  public synchronized Optional<Instant> expiredAt(String operationKey) {
+    if (operationKey == null || pendingForKey(operationKey).isPresent()) return Optional.empty();
+    return Optional.ofNullable(decisions.get(operationKey))
+        .filter(row -> row.disposition() == io.justsearch.app.observability.operations.AuthorizationDisposition.EXPIRED)
+        .map(Decision::decidedAt);
+  }
+
   /** Distinguish a remembered answer from an expired or unknown pending lookup. */
   public synchronized boolean hasDecisionForKey(String operationKey) {
     return operationKey != null && decisions.containsKey(operationKey);
@@ -222,7 +264,7 @@ public final class PendingAuthorizationStore {
     for (var pending : java.util.List.copyOf(pendings.values())) {
       if (pending.isExpired(now)) {
         pendings.remove(pending.id());
-        publish(pending, io.justsearch.app.observability.operations.AuthorizationDisposition.EXPIRED);
+        expire(pending);
       }
     }
     if (pendings.size() >= MAX_ENTRIES) {
@@ -248,8 +290,9 @@ public final class PendingAuthorizationStore {
     // A gate may have been in flight when another copy received the answer.
     var decided = Optional.ofNullable(operationKey == null ? null : decisions.get(operationKey));
     if (decided.isPresent()) {
+      // L9: this copy was answered by another request for the same key; it is not a second decision.
       remember(pending, decided.get().disposition());
-      publish(pending, decided.get().disposition());
+      publish(pending, io.justsearch.app.observability.operations.AuthorizationDisposition.WITHDRAWN);
     } else {
       pendings.put(id, pending);
     }
@@ -267,7 +310,7 @@ public final class PendingAuthorizationStore {
     }
     if (pending.isExpired(clock.instant())) {
       pendings.remove(id, pending);
-      publish(pending, io.justsearch.app.observability.operations.AuthorizationDisposition.EXPIRED);
+      expire(pending);
       return Optional.empty();
     }
     return Optional.of(pending);
@@ -284,7 +327,7 @@ public final class PendingAuthorizationStore {
     PendingAuthorization pending = pendings.remove(id);
     if (pending == null) return Optional.empty();
     if (pending.isExpired(clock.instant())) {
-      publish(pending, io.justsearch.app.observability.operations.AuthorizationDisposition.EXPIRED);
+      expire(pending);
       return Optional.empty();
     }
     decide(pending, io.justsearch.app.observability.operations.AuthorizationDisposition.APPROVED);
@@ -323,9 +366,26 @@ public final class PendingAuthorizationStore {
         }
       }
     }
-    // Remove every sibling and remember the answer before invoking any subscriber.
+    // Remove every sibling and remember the answer before invoking any subscriber. Only the answered
+    // request records the decision; its same-key copies are withdrawn by it (L9: one decision, one row).
     for (var row : answered) remember(row, disposition);
-    for (var row : answered) publish(row, disposition);
+    for (var row : answered) {
+      publish(row, row == pending ? disposition : io.justsearch.app.observability.operations.AuthorizationDisposition.WITHDRAWN);
+    }
+  }
+
+  /**
+   * An unanswered request reached its deadline. When no copy of its key still waits, the key is
+   * answered "denied automatically" (L11): a repeated call does not ask again.
+   */
+  private void expire(PendingAuthorization pending) {
+    String key = pending.operationKey();
+    Instant now = clock.instant();
+    if (key != null && pendings.values().stream()
+        .noneMatch(row -> key.equals(row.operationKey()) && !row.isExpired(now))) {
+      remember(pending, io.justsearch.app.observability.operations.AuthorizationDisposition.EXPIRED);
+    }
+    publish(pending, io.justsearch.app.observability.operations.AuthorizationDisposition.EXPIRED);
   }
 
   /** Test/diagnostic: current live entry count (does not prune). */

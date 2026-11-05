@@ -1,0 +1,76 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-05T01:24:34.983Z",
+  "revision": "51bfa7756ce7f6313350eaaaf70d6a5cec4dc8b5",
+  "tree": "85115a636f343d8894f5fd0a2bf421838e81b460",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/controllers/AgentSessionController.halt.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/b4bhr7bs/tmp/test-intent-vitest-57585-1793841872804.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2177
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.halt.test.ts#R3 a waiting manual approval is withdrawn on Halt but the run-ended toast waits for refused",
+      "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.halt.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:88965693ead5317109b8bf1b153eb8896b0aa95d62883ffb70f49a5a59f2ecaa",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Halt follows the backend across windows and reloads R3 a waiting manual approval is withdrawn on Halt but the run-ended toast waits for refused",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.halt.test.ts#R3 a waiting manual approval is withdrawn on Halt but the run-ended toast waits for cancelled-stream",
+      "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.halt.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:88965693ead5317109b8bf1b153eb8896b0aa95d62883ffb70f49a5a59f2ecaa",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Halt follows the backend across windows and reloads R3 a waiting manual approval is withdrawn on Halt but the run-ended toast waits for cancelled-stream",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.halt.test.ts#R3 a waiting manual approval is withdrawn on Halt but the run-ended toast waits for cancelled-record",
+      "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.halt.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:88965693ead5317109b8bf1b153eb8896b0aa95d62883ffb70f49a5a59f2ecaa",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Halt follows the backend across windows and reloads R3 a waiting manual approval is withdrawn on Halt but the run-ended toast waits for cancelled-record",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:95b0be70cfe8460b2e54adaf35f1491400e765f419d7e88e1b8a5226c5eed4e4"
+}

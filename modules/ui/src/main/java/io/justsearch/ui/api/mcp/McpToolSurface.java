@@ -594,20 +594,9 @@ public final class McpToolSurface {
     if (facade == null) return errorContent("Operation history is unavailable", ApiErrorCode.SERVICE_UNAVAILABLE);
     try {
       String key = (String) arguments.get("operationKey");
-      var outcome = facade.operationOutcome(key);
-      var deniedAt = pendingAuthorizationStore == null ? Optional.<Instant>empty()
-          : pendingAuthorizationStore.rejectedAt(key);
-      if (deniedAt.isPresent()) {
-        outcome = new io.justsearch.app.api.operations.OperationOutcomeView(
-            io.justsearch.app.api.operations.OperationOutcomeView.State.FAILED, null,
-            outcome.historySince(), null, deniedAt.get().toEpochMilli(), null, null,
-            "USER_DENIED", null, "Operation denied by the user");
-      } else if (pendingAuthorizationStore != null && pendingAuthorizationStore.pendingForKey(key).isPresent()) {
-        outcome = new io.justsearch.app.api.operations.OperationOutcomeView(
-            io.justsearch.app.api.operations.OperationOutcomeView.State.UNKNOWN, "awaiting-approval",
-            outcome.historySince(), null, null, null, null, null, null,
-            "Operation awaits your approval");
-      }
+      var recorded = facade.operationOutcome(key);
+      // The same answer GET /api/operation-history/{operationKey} gives (L10).
+      var outcome = pendingAuthorizationStore == null ? recorded : pendingAuthorizationStore.outcome(key, recorded);
       return Map.of("content", List.of(Map.of("type", "text", "text", MAPPER.writeValueAsString(outcome))),
           "structuredContent", outcome);
     } catch (OperationStoreException e) {
@@ -1645,6 +1634,10 @@ public final class McpToolSurface {
       if (pendingAuthorizationStore != null && pendingAuthorizationStore.rejectedAt(operationKey).isPresent()) {
         return errorContent(Map.of("error", "Operation denied by the user", "errorCode", "USER_DENIED",
             "retryable", false, "operationKey", operationKey));
+      }
+      if (pendingAuthorizationStore != null && pendingAuthorizationStore.expiredAt(operationKey).isPresent()) {
+        return errorContent(Map.of("error", "Operation denied automatically: nobody answered before the deadline",
+            "errorCode", "APPROVAL_EXPIRED", "retryable", false, "operationKey", operationKey));
       }
       String argsJson = MAPPER.writeValueAsString(publicArguments);
       // Tempdoc 655: validate against the Operation's OWN declared schema — the real enforcement

@@ -21,6 +21,8 @@ declare global {
     requestPlugin(id: string): void;
     consentState(): ConsentState;
     requestApproval(id: string, typed: boolean): void;
+    requestAgent(id: string, typed: boolean): void;
+    answers: Record<string, boolean>;
   }
 }
 
@@ -56,6 +58,13 @@ beforeAll(async () => {
             window.requestApproval = (id, typed) => {
               void requestAuthorization({ pendingId: id, operationId: 'core.' + id, gateBehavior: typed ? 'TYPED_CONFIRM' : 'INLINE_CONFIRM' })
                 .then(decision => decision.approved ? client.approveByPendingId(id, decision.allowAlways) : null);
+            };
+            // DE3 — an agent's request: it waits in Needs you; a typed one opens the security check from Review.
+            window.answers = {};
+            window.requestAgent = (id, typed) => {
+              void requestAuthorization({ pendingId: id, operationId: 'core.' + id, gateBehavior: typed ? 'TYPED_CONFIRM' : 'INLINE_CONFIRM',
+                riskTier: typed ? 'HIGH' : 'MEDIUM', requestedBy: 'Claude Desktop', arrival: 'needs-you', live: true })
+                .then(decision => { window.answers[id] = decision.approved; });
             };
             window.consentState = () => ({
               granted: Object.fromEntries(['first', 'second'].map(id => [id, checkCapability('plugin.' + id, 'fs.read') ?? null])),
@@ -307,3 +316,95 @@ it.each(closes)('S2 a %s ceremony closed by %s releases modality; the pill opens
   expect(sent, 'nothing was decided').toEqual([]);
   expect((await state(page)).pending).toEqual(kind === 'capability' ? ['plugin.first'] : []);
 });
+
+type Protected = 'typed' | 'capability' | 'agent-typed';
+const permutations = (items: Protected[]): Protected[][] => items.length <= 1 ? [items]
+  : items.flatMap(item => permutations(items.filter(other => other !== item)).map(rest => [item, ...rest]));
+
+it.each(permutations(['typed', 'capability', 'agent-typed']))(
+  'DE4 %s → %s → %s: each protected request opens in the top layer above a skin overlay; an agent request opens no dialog on arrival',
+  async (...order) => {
+    const page = await opened();
+    await approvals(page);
+    // A skin's own overlay at the highest z-index cannot cover or spoof the security check.
+    await page.evaluate(() => {
+      const skin = document.createElement('div');
+      skin.id = 'skin-overlay';
+      skin.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(255,0,0,.2)';
+      document.body.append(skin);
+    });
+    const dialog = page.locator('jf-authorization-host dialog');
+    const isOpen = () => dialog.evaluate(d => (d as HTMLDialogElement).open);
+    await page.evaluate(() => window.requestAgent('agent-inline', false));
+    for (const kind of order) {
+      if (kind === 'capability') await page.evaluate(() => window.requestPlugin('first'));
+      else if (kind === 'typed') await page.evaluate(() => window.requestApproval('own-typed', true));
+      else await page.evaluate(() => window.requestAgent('agent-typed', true));
+    }
+    const seen: string[] = [];
+    for (let step = 0; step < 3; ++step) {
+      if (!await isOpen()) {
+        // Only the agent's typed request is left: it waits until Review opens the security check.
+        expect(order.indexOf('agent-typed')).toBeGreaterThanOrEqual(0);
+        // The skin's overlay also covers the pill; it steps aside only while the pill is used.
+        await page.evaluate(() => { document.getElementById('skin-overlay')!.style.display = 'none'; });
+        await page.locator('jf-status-pill .trigger').click();
+        await page.locator('jf-status-pill jf-status-panel [data-fact="authorization:agent-typed"]').getByRole('button', { name: 'Review' }).click();
+        await expect.poll(isOpen).toBe(true);
+        await page.evaluate(() => { document.getElementById('skin-overlay')!.style.display = ''; });
+      }
+      expect(await dialog.evaluate(d => d.matches(':modal')), 'the security check is modal (top layer)').toBe(true);
+      const shown = await dialog.getAttribute('data-testid') === 'capability-ceremony' ? 'capability'
+        : await dialog.evaluate(d => d.textContent!.includes('core.agent-typed')) ? 'agent-typed' : 'typed';
+      expect(await dialog.evaluate(d => d.textContent!.includes('core.agent-inline')), 'the inline agent request never opens').toBe(false);
+      await expect.poll(() => page.getByTestId('security-check-header').isVisible()).toBe(true);
+      const box = (await dialog.boundingBox())!;
+      expect(await page.evaluate(([x, y]) => document.elementFromPoint(x!, y!)?.id !== 'skin-overlay', [box.x + box.width / 2, box.y + 20]),
+        'nothing paints over the security check').toBe(true);
+      if (shown === 'capability') {
+        expect(await page.getByTestId('capability-allow-once').getAttribute('variant'), 'Allow once is the primary').toBe('primary');
+        expect(await page.getByTestId('capability-allow-always').getAttribute('variant')).not.toBe('primary');
+      }
+      seen.push(shown);
+      await page.waitForTimeout(450);
+      await page.getByTestId(shown === 'capability' ? 'capability-deny' : 'authorization-deny').click();
+      const marker = shown === 'capability' ? 'plugin.first' : shown === 'agent-typed' ? 'core.agent-typed' : 'core.own-typed';
+      await expect.poll(async () => await isOpen() && await dialog.evaluate((d, text) => d.textContent!.includes(text), marker)).toBe(false);
+    }
+    expect(seen.slice().sort()).toEqual(['agent-typed', 'capability', 'typed']);
+    // The agent's typed request was presented only when reviewed, after the others that opened on arrival.
+    expect(seen.indexOf('agent-typed')).toBe(2);
+    expect(await page.evaluate(() => window.answers)).toEqual({ 'agent-typed': false });
+    expect(await isOpen()).toBe(false);
+    await page.evaluate(() => document.getElementById('skin-overlay')!.remove());
+    await page.locator('jf-status-pill .trigger').click();
+    await page.locator('jf-status-pill jf-status-panel [data-fact="authorization:agent-inline"]').waitFor();
+  },
+  30_000,
+);
+
+const looks = (['dark', 'light', 'forced'] as const).flatMap(look =>
+  ([[1280, 800], [900, 800], [600, 400]] as const).map(([width, height]) => [look, width, height] as const));
+
+it.each(looks)('X1/X2 the panel review in %s at %s×%s fits without sideways overflow', async (look, width, height) => {
+  context = await browser.newContext({ viewport: { width, height }, ...(look === 'forced' ? { forcedColors: 'active' as const } : {}) });
+  const page = await context.newPage();
+  await page.goto(url);
+  await page.locator('body[data-ready="true"]').waitFor();
+  // The frame's own tokens (panel width, spacing), as the app loads them.
+  await page.addStyleTag({ url: '/src/shell-v0/themes/default.css' });
+  if (look === 'light') await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'));
+  await page.evaluate(() => window.requestAgent('downloads-' + 'segment/'.repeat(30) + 'end', false));
+  await page.locator('jf-status-pill .trigger').click();
+  await page.locator('jf-status-pill jf-status-panel article[data-fact^="authorization:"]').getByRole('button', { name: 'Review' }).click();
+  const review = page.locator('jf-status-pill jf-status-panel [data-testid="status-review"]');
+  await expect.poll(() => review.count(), { message: 'the review opens inside the panel', timeout: 5_000 }).toBe(1);
+  const fits = await page.evaluate(() => {
+    const panel = document.querySelector('jf-status-pill')!.shadowRoot!.querySelector('jf-status-panel')!.shadowRoot!.querySelector<HTMLElement>('.panel')!;
+    const box = panel.getBoundingClientRect();
+    return { page: document.documentElement.scrollWidth <= window.innerWidth, panel: panel.scrollWidth <= panel.clientWidth,
+      inside: box.left >= 0 && box.right <= window.innerWidth };
+  });
+  expect(fits).toEqual({ page: true, panel: true, inside: true });
+  if (process.env.REVIEW_SHOTS) await page.screenshot({ path: path.join(process.env.REVIEW_SHOTS, `review-${look}-${width}x${height}.png`) });
+}, 30_000);
