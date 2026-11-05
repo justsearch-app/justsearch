@@ -251,6 +251,9 @@ function parseArgs(argv) {
       case '--skip-build':
         out.skipBuild = true;
         break;
+      case '--stop-with-stdin':
+        out.stopWithStdin = true;
+        break;
       case '--hot-reload':
         out.hotReload = true;
         break;
@@ -2482,8 +2485,31 @@ async function removeOwnStartRecords(runId, runPath) {
   if (active?.runId === runId) await fsp.rm(activePath, { force: true }).catch(() => {});
 }
 
+/**
+ * `--stop-with-stdin`: the caller holds stdin open and this start ends with it, because the pipe
+ * closes however the caller ends. A fixture that times out or is killed while this start still
+ * queues for admission has no run it could stop, and the start would otherwise go on to launch a
+ * stack nobody owns.
+ */
+const callerStdin = { closed: false, stop: () => process.exit(1) };
+function watchCallerStdin() {
+  const closed = () => {
+    if (callerStdin.closed) return;
+    callerStdin.closed = true;
+    callerStdin.stop();
+  };
+  process.stdin.once('end', closed);
+  process.stdin.once('close', closed);
+  process.stdin.once('error', closed);
+  process.stdin.resume();
+  process.stdin.unref?.();
+}
+
 async function cmdStart(opts) {
+  if (opts.stopWithStdin) watchCallerStdin();
   const releaseHeavy = await acquireHeavy('dev-runner engine start');
+  // Admitted: the start finishes and then stops, so nothing it launched is left half-recorded.
+  callerStdin.stop = () => {};
   try {
     return await cmdStartHeavy(opts, releaseHeavy);
   } finally {
@@ -3634,6 +3660,8 @@ async function runAdmittedStart(opts, ctx) {
   };
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
+  callerStdin.stop = shutdown;
+  if (callerStdin.closed) shutdown();
 
   // Tempdoc 606 3b: `reaping` (declared above) is set while the reaper deliberately tears the
   // stack down, so the exit handlers don't process.exit() mid-cleanup (killing the supervisor
