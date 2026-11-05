@@ -814,3 +814,14 @@ Evidence was emitted by the unmodified run-evidence.mjs. Its temporary Git adapt
 | git diff --check | Passed. |
 
 Independent verification and renewed test-intent acceptance remain with the orchestrator.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-s2v-acc3",
+  "verdict": "accept",
+  "digest": "sha256:45d32c1469a27766a5231f67da0e3b2bfbd5d4168d4b3af1e10c6f782809fe4d",
+  "note": "Acceptance by independent verifier session verifier-s2v-acc3 (Codex): accept, no must-fix. Transcribed by the orchestrator."
+}
+```
