@@ -3,7 +3,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { AuthorizationHost } from '../components/AuthorizationHost.js';
 import '../components/AuthorizationHost.js';
-import { OperationClient } from './OperationClient.js';
 import { startPendingAuthorizationBridge } from './pendingAuthorizationBridge.js';
 import { MultiplexedStream } from '../streaming/MultiplexedStream.js';
 import { SHELL_EVENT_STREAM_IDS } from '../streaming/shellEventStreamIds.js';
