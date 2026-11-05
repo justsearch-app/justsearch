@@ -752,3 +752,14 @@ which is what that route returned there. No independent acceptance is claimed by
   "note": "After the security repair on fcccb2528c: missing, null, number and object arguments in either read refuse and send nothing; matching empty strings allow (14 unit, 14 Chromium cases); entry 20's type checks fail before by assertion and are marked repaired; all 45 Chromium checks pass. Earlier rounds: round 1 and 2 accepted the changeset with product failures since repaired; round 3 rejected entry 20. Transcribed by the orchestrator from the verifier's answer (Codex sandbox)."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1aa86-560e-7693-b31d-ce438d61b078",
+  "verdict": "accept",
+  "digest": "sha256:dbe7f11fdcc469946bbe928448fc7dedb10874be2b654f769c836af18e81bffc",
+  "note": "After repairs A and C on ae182f7c4c: typed and inline MCP arrivals now announce once, assertively, restoration stays silent; the always-allow choice states its real scope in the panel and the protected dialog including accessible names; offering restrictions unchanged; 45 Chromium security checks pass before and after. Transcribed by the orchestrator from the verifier's answer (Codex sandbox)."
+}
+```
