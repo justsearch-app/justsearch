@@ -8,6 +8,8 @@ import sys
 from unittest.mock import Mock
 
 import pytest
+
+from .conftest import ready_distribution
 from click.testing import CliRunner
 
 from jseval import _paths, backend, index_identity
@@ -85,6 +87,7 @@ def test_quality_requests_ten_minute_drain(tmp_path, monkeypatch):
     c = make_collection()
     monkeypatch.setattr(backend, 'source_identity', lambda _: ('commit', None))
     monkeypatch.setattr(backend, 'require_prepared', lambda *a: None)
+    ready_distribution(monkeypatch)
     monkeypatch.setattr(backend, 'bind_command', lambda _, cmd: cmd)
     monkeypatch.setattr(run.platform, 'processor', lambda: 'test CPU')
     monkeypatch.setattr(run.collections, 'resolve_collection', lambda _: (c, config_for(c)))
@@ -136,7 +139,7 @@ def test_standalone_pointer_models_name_required_flag(tmp_path):
     (models/'onnx').mkdir(parents=True)
     (models/'onnx/model.onnx').write_text('version https://git-lfs.github.com/spec/v1\noid sha256:abc\nsize 1234\n')
     with pytest.raises(index.IndexRefused, match='--models-dir'):
-        index.model_hashes(models)
+        index.model_hashes(models, llm_off=True)
 
 
 def test_missing_standalone_enron_names_collection_argument(tmp_path, monkeypatch):
