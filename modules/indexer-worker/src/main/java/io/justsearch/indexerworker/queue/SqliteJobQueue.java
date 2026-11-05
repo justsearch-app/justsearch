@@ -594,12 +594,41 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     }
   }
 
+  private volatile java.util.function.UnaryOperator<String> sourceOriginOperation = key -> key;
+  private volatile java.util.function.Supplier<List<IngestCollectionPolicy.RootBinding>> sourceOriginRoots;
+
   @Override
-  public java.util.Optional<String> sourceOriginId(IndexJob claim) {
+  public void useSourceOriginAuthority(java.util.function.UnaryOperator<String> operationOwner,
+      java.util.function.Supplier<List<IngestCollectionPolicy.RootBinding>> roots) {
+    sourceOriginOperation = Objects.requireNonNull(operationOwner);
+    sourceOriginRoots = Objects.requireNonNull(roots);
+  }
+
+  @Override
+  public java.util.Optional<String> movedSourceOriginId(Path destination, String formerOriginId) {
+    var declarations = sourceOriginRoots;
+    var declared = declarations == null ? declaredCollectionRoots.get() : declarations.get();
     lockTimed();
     try {
       ensureOpen();
-      return SqliteSourceOrigins.find(connection, claim);
+      return SqliteSourceOrigins.moved(connection, destination, formerOriginId, declared);
+    } catch (SQLException failure) {
+      throw new IllegalStateException("Destination origin lookup is unavailable", failure);
+    } finally {
+      unlockAfterChanges();
+    }
+  }
+
+  @Override
+  public java.util.Optional<String> sourceOriginId(IndexJob claim) {
+    // Never call the operation store or the declaration owner under the queue lock.
+    String operation = claim.scanId() == null ? null : sourceOriginOperation.apply(claim.scanId());
+    var declarations = sourceOriginRoots;
+    var declared = declarations == null ? declaredCollectionRoots.get() : declarations.get();
+    lockTimed();
+    try {
+      ensureOpen();
+      return SqliteSourceOrigins.find(connection, claim, operation, declared, declarations != null);
     } catch (SQLException failure) {
       throw new IllegalStateException("Source origin lookup is unavailable", failure);
     } finally {
@@ -5133,13 +5162,15 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       int[] updates =
           inTransaction(
               () -> {
+                boolean unchanged = outcome != null && outcome.outcomeClass() == IngestionOutcomeClass.SKIPPED_POLICY
+                    && "UNCHANGED".equals(outcome.reasonCode());
                 String sql = """
                     UPDATE jobs
-                    SET state = 'DONE', force_reindex = 0, content_hash = ?, last_updated = ?,
+                    SET state = 'DONE', %s content_hash = ?, last_updated = ?,
                         last_outcome_class = ?, last_reason_code = ?, last_retry_policy = ?,
                         last_diagnostic_summary = ?, last_outcome_at = ?
                     WHERE path = ?
-                    """;
+                    """.formatted(unchanged ? "retry_after = NULL," : "force_reindex = 0,");
                 List<Integer> rowCounts = new ArrayList<>(eligible.size());
                 try (PreparedStatement stmt = connection.prepareStatement(sql)) {
                   for (JobQueue.IngestionLedgerTransition transition : eligible) {

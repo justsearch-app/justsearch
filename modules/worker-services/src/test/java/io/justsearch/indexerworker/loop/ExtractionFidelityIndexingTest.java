@@ -126,7 +126,9 @@ class ExtractionFidelityIndexingTest extends LuceneExecutorTestBase {
         assertTrue(runtime.documentFieldOps().getDocumentContent(child).contains("UniqueSecret"));
         assertFalse(runtime.documentFieldOps().getDocumentContent(child).contains("Historical"));
       }
-      assertTrue(extractor.extractAll(List.of(claim)).isEmpty(), "current source and policy skip repeated extraction");
+      var unchanged = extractor.extractAll(List.of(claim));
+      assertEquals(1, unchanged.size(), "current content still publishes its envelope");
+      assertNull(unchanged.getFirst().artifact(), "current source and policy skip repeated extraction");
     }
     try (var runtime = open()) {
       assertTrue(runtime.documentFieldOps().getDocumentContent(id).contains("UniqueSecret"));
@@ -146,8 +148,9 @@ class ExtractionFidelityIndexingTest extends LuceneExecutorTestBase {
           () -> mock(PathResolutionStore.class), () -> identity, (stage, ms, reason) -> {}, () -> false,
           delta -> {}, new FileMutationFence());
       var claim = new JobQueue.IndexJob(file, null, null, null, null, null, false, null, file);
-      assertTrue(extractor.extractAll(List.of(claim)).isEmpty());
-      verify(journal).recordOutcomeSafely(eq(file), eq("UNCHANGED"), any());
+      var unchanged = extractor.extractAll(List.of(claim));
+      assertEquals(1, unchanged.size()); assertNull(unchanged.getFirst().artifact());
+      verify(journal, never()).recordOutcomeSafely(eq(file), eq("UNCHANGED"), any());
       verify(parser, never()).extractArtifact(any());
     }
   }

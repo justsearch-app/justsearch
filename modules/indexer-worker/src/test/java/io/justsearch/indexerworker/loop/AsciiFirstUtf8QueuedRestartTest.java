@@ -148,12 +148,11 @@ class AsciiFirstUtf8QueuedRestartTest extends LuceneExecutorTestBase {
       var claims = queue.pollPending(1);
       assertEquals(1, claims.size(), "work must survive the restart");
       var ordinary = extractor.extractAll(claims);
-      assertEquals(old ? 1 : 0, ordinary.size(), "only an older extraction policy requires ordinary repair");
-      if (old) {
-        writer.write(ordinary.getFirst(), null);
-        refresh(runtime);
-        assertCorrect(runtime, id, sourceSha);
-      }
+      assertEquals(1, ordinary.size(), "current queued work still publishes provenance without extraction");
+      assertEquals(old, ordinary.getFirst().artifact() != null, "only an older extraction policy requires parsing");
+      writer.write(ordinary.getFirst(), null);
+      refresh(runtime);
+      assertCorrect(runtime, id, sourceSha);
       journal.drainPending();
       assertEquals(0, queue.queueDepth());
       if (!old) assertEquals(original, snapshot(runtime, id), "current queued work preserves all fields and chunks");

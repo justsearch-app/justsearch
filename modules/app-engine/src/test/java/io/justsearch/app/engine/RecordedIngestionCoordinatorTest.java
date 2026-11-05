@@ -1659,6 +1659,150 @@ final class RecordedIngestionCoordinatorTest {
     }
   }
 
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
+  @ValueSource(booleans = {false, true})
+  void gatedImportPublishesItsParentOriginOnAllRowsIncludingReopenedReplay(boolean missingOrigin) throws Exception {
+    Path fixturePath = temp.resolve("gated-origin");
+    String parentKey;
+    String childKey;
+    String origin;
+    Path file;
+    RecordedRootPlan frozen;
+    try (Fixture f = new Fixture(fixturePath, 1)) {
+      Path root = Files.createDirectory(temp.resolve("unwatched-import"));
+      // Isolate durable grant containment from source ownership: this approved fixture root
+      // is not a watched declaration. Approval re-evaluation itself belongs to P2.
+      f.authority.scope().bindIndexedRoots(context -> List.of(root));
+      file = Files.writeString(root.resolve("long.txt"), "gated import provenance words and sentences.\n".repeat(600));
+      var handlers = new HandlerRegistry();
+      handlers.register(AgentToolsOperationCatalog.INGEST_FILES,
+          new IngestTool(f.coordinator, context -> List.of(new RootBinding(root, "documents")),
+              context -> GENERATION, List::of));
+      var dispatcher = new OperationExecutorImpl(f.runner, f.admission, handlers, null, Map.of(),
+          CLOCK, new CoreTrustEvaluator(), CoreIntentSourceCatalog.catalog());
+      var operation = new AgentToolsOperationCatalog().findByIdValue(AgentToolsOperationCatalog.INGEST_FILES.value()).orElseThrow();
+      var seed = f.request(); parentKey = OperationKeys.generate(CLOCK);
+      bindProducer(f.coordinator, (plan, key, epoch, context, cancellation) -> {
+        f.queue.enqueueRecordedEntries(key, epoch, List.of(JobQueue.EnqueueEntry.ofUnknownSize(file)
+            .withinRoot(plan.roots().getFirst().path())), "documents");
+        return CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.COMPLETE);
+      });
+      String arguments = new tools.jackson.databind.ObjectMapper().writeValueAsString(
+          Map.of("paths", List.of(root.toString()), "collection", "documents"));
+      assertTrue(dispatcher.dispatch(operation, arguments, seed.provenance(), Optional.empty(), seed.context(), parentKey).success());
+      var parent = f.operations.find(parentKey).orElseThrow();
+      frozen = new RecordedIngestPlanResolver().resolve(parent, f.operations.acceptedPreparation(parent.id()).orElseThrow());
+      var child = f.operations.findIngestChild(parentKey, frozen).orElseThrow(); childKey = child.key();
+      assertFalse(parentKey.equals(childKey), "exercise the real gate/ingest-child mismatch");
+      assertEquals(parentKey, io.justsearch.app.api.operations.RecordedIngestChild.parentKey(child.descriptor()));
+      try (var db = java.sql.DriverManager.getConnection("jdbc:sqlite:" + fixturePath.resolve("jobs.db"));
+          var query = db.createStatement(); var rows = query.executeQuery("SELECT origin_id,operation_key FROM source_origin WHERE kind='IMPORT'")) {
+        assertTrue(rows.next()); origin = rows.getString(1); assertEquals(parentKey, rows.getString(2));
+      }
+      if (missingOrigin) {
+        try (var db = java.sql.DriverManager.getConnection("jdbc:sqlite:" + fixturePath.resolve("jobs.db")); var query = db.createStatement()) {
+          query.executeUpdate("DELETE FROM source_origin");
+        }
+      }
+      // Leave the walk's claim unacknowledged so a real recovery replays it after reopen.
+      var claims = f.queue.pollPending(1); assertEquals(1, claims.size()); assertEquals(childKey, claims.getFirst().scanId());
+      publishRecordedOrigin(f.queue, claims, temp.resolve("origin-index"), missingOrigin ? null : origin, false);
+      f.queue.returnUnfinishedClaims(claims);
+    }
+    try (var operations = new SqliteOperationStore(fixturePath.resolve("operations.db"))) {
+      var runner = new OperationAttemptRunnerImpl(operations, CLOCK,
+          Set.of(OperationKind.INGEST, OperationKind.REINDEX, OperationKind.ACCEPT_GAPS), null, new RecordedIngestPlanResolver());
+      var authority = OperationAuthority.load(fixturePath.resolve("authority"));
+      authority.scope().bindIndexedRoots(context -> List.of(file.getParent()));
+      var coordinator = new RecordedIngestionCoordinator(operations, runner, new EngineAdmissionController(2, 2, 1), authority);
+      try (var queue = new SqliteJobQueue(fixturePath.resolve("jobs.db"), coordinator::recordedClaimDecision)) {
+        queue.open();
+        try (var _ = coordinator.attach(queue, () -> Optional.of(GENERATION), () -> true)) {
+          bindProducer(coordinator, (plan, key, epoch, context, cancellation) -> {
+            assertEquals(childKey, key, "recovery keeps the accepted child identity");
+            queue.enqueueRecordedEntries(key, epoch, List.of(JobQueue.EnqueueEntry.ofUnknownSize(file)
+                .withinRoot(plan.roots().getFirst().path())), "documents");
+            return CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.COMPLETE);
+          });
+          coordinator.maintain();
+          // Recovery restores the immutable accepted origin if it was lost at the handoff.
+          var claims = queue.pollPending(1); assertEquals(1, claims.size()); assertEquals(childKey, claims.getFirst().scanId());
+          publishRecordedOrigin(queue, claims, temp.resolve("origin-index"), origin, true);
+          coordinator.maintain();
+          var terminal = operations.find(parentKey).orElseThrow();
+          assertEquals(OperationState.COMPLETE, terminal.state(), terminal.toString());
+          coordinator.stopProducers(1000);
+        }
+      }
+    }
+  }
+
+  private static void publishRecordedOrigin(JobQueue queue, List<JobQueue.IndexJob> claims, Path index,
+      String expectedOrigin, boolean acknowledge) throws Exception {
+    try (var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var lucene = new io.justsearch.adapters.lucene.runtime.LuceneExecutorRegistrations(executors);
+        var runtime = io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(
+            new io.justsearch.configuration.JustSearchConfigurationLoader().loadFieldCatalog())
+            .atPath(index).withExecutorRegistrations(lucene).open()) {
+      runtime.commitOps().stopCommitTimer();
+      var parser = org.mockito.Mockito.mock(io.justsearch.indexerworker.extract.TimeboxedContentExtractor.class);
+      var policy = io.justsearch.indexerworker.extract.TikaExtractionPolicy.defaults();
+      org.mockito.Mockito.when(parser.extractionPolicy()).thenReturn(policy);
+      org.mockito.Mockito.when(parser.extractArtifact(org.mockito.ArgumentMatchers.any())).thenAnswer(call ->
+          io.justsearch.indexerworker.extract.ExtractionArtifact.full(new io.justsearch.indexerworker.extract.ContentExtractor.ExtractionResult(
+              Files.readString(call.getArgument(0)), "long", "text/plain"), policy, "gated-origin", false));
+      var metrics = org.mockito.Mockito.mock(io.justsearch.indexerworker.metrics.OperationalMetrics.class);
+      var journal = new io.justsearch.indexerworker.loop.IngestionOutcomeJournal(queue, metrics, null, () -> false);
+      var authorityType = Class.forName("io.justsearch.indexerworker.loop.WorkerIngestionAuthority");
+      var authorityConstructor = authorityType.getDeclaredConstructor(); authorityConstructor.setAccessible(true);
+      Object authority = authorityConstructor.newInstance();
+      var roots = org.mockito.Mockito.mock(io.justsearch.indexerworker.loop.SourcePresence.RootCheck.class);
+      org.mockito.Mockito.when(roots.admits(org.mockito.ArgumentMatchers.any())).thenReturn(true);
+      org.mockito.Mockito.when(roots.admitsFile(org.mockito.ArgumentMatchers.any())).thenReturn(true);
+      var useRootCheck = authorityType.getDeclaredMethod("useRootCheck", io.justsearch.indexerworker.loop.SourcePresence.RootCheck.class);
+      useRootCheck.setAccessible(true); useRootCheck.invoke(authority, roots);
+      var identities = org.mockito.Mockito.mock(io.justsearch.indexerworker.identity.DocumentIdentityStore.class);
+      org.mockito.Mockito.when(identities.resolve(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyLong()))
+          .thenReturn(new io.justsearch.indexerworker.identity.DocumentIdentityStore.Identity("hash", "gated-stable-uid", 1, 1));
+      var fence = new io.justsearch.indexerworker.loop.FileMutationFence();
+      var stats = new io.justsearch.indexerworker.loop.ops.BatchStats();
+      var stale = org.mockito.Mockito.mock(io.justsearch.indexerworker.loop.StaleSnapshotResolver.class);
+      var extractor = (io.justsearch.indexerworker.loop.JobBatchExtractor)
+          io.justsearch.indexerworker.loop.JobBatchExtractor.class.getConstructors()[0].newInstance(authority, journal, queue, parser,
+          runtime.documentFieldOps(), runtime.indexCountOps(), stats, stale,
+          org.mockito.Mockito.mock(io.justsearch.indexerworker.loop.StaleSourceHandler.class),
+          io.justsearch.indexerworker.loop.pacing.IndexingPacing.unthrottled(), new AtomicBoolean(true), new java.util.HashSet<>(),
+          (java.util.function.Supplier<io.justsearch.indexerworker.path.PathResolutionStore>) () ->
+              org.mockito.Mockito.mock(io.justsearch.indexerworker.path.PathResolutionStore.class),
+          (java.util.function.Supplier<io.justsearch.indexerworker.identity.DocumentIdentityStore>) () -> identities,
+          (io.justsearch.indexerworker.loop.ops.IndexingDocumentOps.StageRecorder) (stage, ms, reason) -> {},
+          (java.util.function.BooleanSupplier) () -> false, (java.util.function.LongConsumer) ignored -> {}, fence);
+      var writer = (io.justsearch.indexerworker.loop.JobBatchWriter)
+          io.justsearch.indexerworker.loop.JobBatchWriter.class.getConstructors()[0].newInstance(authority, runtime.indexingCoordinator(),
+          org.mockito.Mockito.mock(io.justsearch.indexerworker.coordination.WorkerSignalBus.class),
+          org.mockito.Mockito.mock(io.justsearch.indexerworker.loop.EmbeddingProviderLifecycle.class),
+          (java.util.function.Supplier<io.justsearch.indexerworker.splade.SpladeEncoder>) () -> null,
+          journal, queue, parser, metrics, stats, stale, (java.util.function.LongConsumer) ignored -> {},
+          (io.justsearch.indexerworker.loop.ops.IndexingDocumentOps.StageRecorder) (stage, ms, reason) -> {},
+          (java.util.function.BooleanSupplier) () -> false, (java.util.function.BooleanSupplier) () -> false,
+          (java.util.function.Supplier<io.justsearch.adapters.lucene.runtime.RunningRuntime>) () -> null, fence);
+      for (var job : extractor.extractAll(claims)) writer.write(job, null);
+      runtime.commitOps().commitAndTrack(); runtime.commitOps().maybeRefreshBlocking();
+      try (var directory = org.apache.lucene.store.FSDirectory.open(index); var reader = org.apache.lucene.index.DirectoryReader.open(directory)) {
+        var searcher = new org.apache.lucene.search.IndexSearcher(reader);
+        var rows = searcher.search(new org.apache.lucene.search.MatchAllDocsQuery(), 1000);
+        assertTrue(rows.totalHits.value() > 2, "inspect a committed parent and multiple chunks");
+        for (var hit : rows.scoreDocs) {
+          var stored = searcher.storedFields().document(hit.doc);
+          assertEquals(expectedOrigin, stored.get("origin_id"), "the gate's origin follows the distinct child walk key");
+          assertEquals("1", stored.get("envelope_version"));
+          assertEquals("documents", stored.get("collection"));
+        }
+      }
+      if (acknowledge) journal.drainPending();
+    }
+  }
+
   private enum RegisteredDispatchCase {
     FILE_INGEST,
     DIRECTORY_INGEST,
