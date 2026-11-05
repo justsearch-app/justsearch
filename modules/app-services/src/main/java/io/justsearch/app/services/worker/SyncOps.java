@@ -124,11 +124,9 @@ final class SyncOps {
     }
 
     private SyncDirectoryResponse executeSyncDirectory(String rootPath, boolean force,
-            EngineContext engineContext, boolean watchedOnly) {
+            EngineContext engineContext, WatchedRootsState.RootProducerFence fence) {
         SyncDirectoryRequest request =
                 SyncDirectoryRequest.newBuilder().setRootPath(rootPath).setForce(force).build();
-        var fence = rootsState == null ? null
-                : rootsState.captureRootProducer(Path.of(rootPath), watchedOnly);
         return rpc.execute(
                 "syncDirectory",
                 KnowledgeClient.RpcDeadlineCategory.LONG_RUNNING,
@@ -180,11 +178,13 @@ final class SyncOps {
 
     private SyncDirectoryResponse syncDirectoryOwned(String rootPath, boolean force,
             EngineContext engineContext, boolean watchedOnly) {
+        Path root = Path.of(rootPath).toAbsolutePath().normalize();
+        var fence = rootsState == null ? null : rootsState.captureRootProducer(root, watchedOnly);
+        String policy = KnowledgeClient.resolvedExcludePatterns();
         try {
-            SyncDirectoryResponse response = executeSyncDirectory(rootPath, force, engineContext, watchedOnly);
+            SyncDirectoryResponse response = executeSyncDirectory(rootPath, force, engineContext, fence);
 
             if (response.getError().isEmpty()) {
-                Path root = Path.of(rootPath).toAbsolutePath().normalize();
                 if (response.getDeleteDetectionUnverified()) {
                     recordUnverified.accept(root, true);
                 } else if (!response.getSkipped()) {
@@ -195,7 +195,8 @@ final class SyncOps {
                 }
             }
 
-            recordRootAvailability(rootPath, response);
+            recordRootAvailability(rootPath, response, fence,
+                    policy.equals(KnowledgeClient.resolvedExcludePatterns()));
 
             if (response.getSkipped()) {
                 log.debug("SyncDirectory skipped for {} (force={})", rootPath, force);
@@ -223,25 +224,33 @@ final class SyncOps {
      * #758: a sync the Worker refused because the folder at the
      * root's path is not the volume it was first seen on makes the root read unavailable at once,
      * the periodic sync included; the next sync it accepts (the volume is back) clears that, and
-     * the root reads indexed again. Every other outcome leaves the root's walk state alone.
+     * the root reads indexed again. Complete, current whole-root coverage also repairs the
+     * incomplete-coverage warning; partial and unverified outcomes leave it alone.
      */
-    private void recordRootAvailability(String rootPath, SyncDirectoryResponse response) {
+    private void recordRootAvailability(String rootPath, SyncDirectoryResponse response,
+            WatchedRootsState.RootProducerFence fence, boolean samePolicy) {
         if (rootsState == null) {
             return;
         }
         Path root = Path.of(rootPath).toAbsolutePath().normalize();
-        boolean changed;
-        if (RootLifecycleOps.isRootUnavailableReason(response.getError())) {
-            // Round 8: a root whose drive is not confirmed after an upgrade shows that reason.
-            changed = rootsState.markRootUnavailable(root,
-                    RootLifecycleOps.unavailableReasonFor(response.getError()));
-        } else if (response.getError().isEmpty()) {
-            changed = rootsState.markRootReturned(root);
-        } else {
-            changed = false;
-        }
-        if (changed) {
-            rootsState.persist();
+        synchronized (rootsState) {
+            boolean changed;
+            if (fence == null || !fence.sameRegistration()) return;
+            if (RootLifecycleOps.isRootUnavailableReason(response.getError())) {
+                // Round 8: a root whose drive is not confirmed after an upgrade shows that reason.
+                changed = rootsState.markRootUnavailable(root,
+                        RootLifecycleOps.unavailableReasonFor(response.getError()));
+            } else if (response.getError().isEmpty() && !response.getSkipped()
+                    && !response.getDeleteDetectionUnverified() && !response.getDeferredToSwitchBuffer()
+                    && samePolicy && fence.currentCoverage()) {
+                changed = rootsState.completeCoverage(root, fence, response.getEligibleFiles());
+                changed |= rootsState.markRootReturned(root);
+            } else {
+                changed = false;
+            }
+            if (changed) {
+                rootsState.persist();
+            }
         }
     }
 

@@ -1159,6 +1159,8 @@ message SyncDirectoryResponse {
   // root's index-vs-disk delete correspondence is UNVERIFIED. Distinct from `skipped` (transient
   // user-activity yield): this is a real "we couldn't verify" the FE surfaces, never silently "✓".
   bool delete_detection_unverified = 6;
+  // Eligible regular files observed, including unchanged files that needed no queue write.
+  int64 eligible_files = 7;
 }
 
 // === VDU (Vision Document Understanding) Result Update ===

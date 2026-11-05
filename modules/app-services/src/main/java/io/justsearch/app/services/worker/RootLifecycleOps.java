@@ -8,7 +8,6 @@ import io.justsearch.app.api.knowledge.IngestCollectionPolicy;
 import io.justsearch.ipc.DeleteByIdResponse;
 import io.justsearch.ipc.DeleteByPathResponse;
 import io.justsearch.ipc.ScanRootProgress;
-import io.justsearch.ipc.SyncDirectoryResponse;
 import io.justsearch.ipc.CircuitBreakerOpenException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -326,13 +325,13 @@ final class RootLifecycleOps {
             EngineContext engineContext) {
         submitWalk.accept(ownedContext -> fence.run(() -> {
             if (pruneFirst) syncOps.pruneMissing(normalized.toString(), ownedContext);
-            walkAndSubmitOwned(normalized, collection, mode, rootAdded, ownedContext);
+            walkAndSubmitOwned(normalized, collection, mode, fence, rootAdded, ownedContext);
             return null;
         }, () -> null), engineContext);
     }
 
     private void walkAndSubmitOwned(Path normalized, String collection, io.justsearch.ipc.ScanMode mode,
-            boolean rootAdded, EngineContext engineContext) {
+            WatchedRootsState.RootProducerFence fence, boolean rootAdded, EngineContext engineContext) {
         if (!watchedRoots.containsKey(normalized)) {
             log.debug("Walk cancelled before start: root {} removed", normalized);
             return;
@@ -351,13 +350,15 @@ final class RootLifecycleOps {
                             progressConsumer, engineContext);
 
             synchronized (watchedRootsState) {
-                if (!watchedRoots.containsKey(normalized)) {
+                if (!fence.sameRegistration()) {
                     log.debug("Walk completed but root {} was removed mid-scan; skipping state update", normalized);
                     return;
                 }
                 String reason = terminal == null ? "EMPTY_STREAM" : terminal.getTerminalReasonCode();
                 if (reason == null || reason.isEmpty()) {
-                    if (admittedTotal[0] > 0) {
+                    if (terminal == null || !terminal.getComplete() || !fence.currentCoverage()
+                            || !excludeGlobs.equals(excludeMatcherSupplier.get().patterns())) return;
+                    if (terminal.getFilesWalked() > terminal.getFilesSkipped() || admittedTotal[0] > 0) {
                         watchedRootsState.markIndexed(normalized);
                     } else {
                         // Empty/all-excluded is completed, distinct from a walk still in progress.
@@ -374,7 +375,7 @@ final class RootLifecycleOps {
         } catch (RuntimeException e) {
             log.error("Walk aborted for root {} after submission failure", normalized, e);
             synchronized (watchedRootsState) {
-                if (watchedRoots.containsKey(normalized)) {
+                if (fence.sameRegistration()) {
                     watchedRootsState.markWalkFailed(normalized, e.getMessage());
                     watchedRootsState.persist();
                 }
@@ -744,12 +745,7 @@ final class RootLifecycleOps {
             // the disk walk and enqueues in batches internally.
             if (!force && !hasExcludes) {
                 // The Engine worker owns the producer fence; a caller may time out before it exits.
-                SyncDirectoryResponse r = syncOps.syncWatchedDirectory(root.toString(), true, engineContext);
-                if (r != null && !r.getSkipped() && r.getError().isEmpty()) {
-                    synchronized (watchedRootsState) {
-                        if (watchedRoots.containsKey(root)) watchedRootsState.markIndexed(root);
-                    }
-                }
+                syncOps.syncWatchedDirectory(root.toString(), true, engineContext);
                 continue;
             }
 

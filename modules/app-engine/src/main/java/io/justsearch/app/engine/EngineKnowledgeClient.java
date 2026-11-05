@@ -29,6 +29,7 @@ import io.justsearch.ipc.ScanRootRequest;
 import io.justsearch.ipc.SubscribeIndexingJobsRequest;
 import java.util.Objects;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
@@ -1480,8 +1481,11 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     var walk = scheduleRootWalk(rootWalkExecutor(), ownedContext -> {
       fence.run(() -> {
         try (var work = admission.attach(ownedContext)) {
-          var terminal = foregroundLoad.call(work, () ->
-              scanRootWork(request, cancellation, ignored -> {}, work, recorded, delivery));
+          var policyAtStart = new AtomicReference<RecordedCoveragePolicy>();
+          var terminal = foregroundLoad.call(work, () -> {
+            policyAtStart.set(captureRecordedCoveragePolicy(root.excludePatterns()));
+            return scanRootWork(request, cancellation, ignored -> {}, work, recorded, delivery);
+          });
           outcome.set(cancellation.isCancelled() || "CLIENT_CANCELLED".equals(terminal.getTerminalReasonCode())
               ? JobQueue.WalkEnumerationOutcome.CANCELLED
               : terminal.getComplete() && terminal.getTerminalReasonCode().isEmpty()
@@ -1490,9 +1494,14 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
             // #758: the reindex walk records a root-level refusal
             // as the root's state at once, as the boot walk does, instead of leaving it to read
             // indexed until the periodic sync asks.
-            roots.recordRecordedWalk(root.path(),
+            var currentPolicy = captureRecordedCoveragePolicy(null);
+            boolean samePolicy = policyAtStart.get() != null && currentPolicy != null
+                && policyAtStart.get().digest().equals(currentPolicy.digest());
+            roots.recordRecordedWalk(root, fence,
                 outcome.get() == JobQueue.WalkEnumerationOutcome.COMPLETE,
-                terminal.getTerminalReasonCode());
+                terminal.getTerminalReasonCode(),
+                terminal.getFilesWalked() - terminal.getFilesSkipped(),
+                samePolicy ? currentPolicy.globs() : null);
           }
         }
         return null;
@@ -1515,6 +1524,25 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     } catch (RuntimeException | Error failure) {
       view.release();
       throw failure;
+    }
+  }
+
+  private record RecordedCoveragePolicy(List<String> globs, String digest) {}
+
+  /** No persisted identity: a completion without its enumeration-time policy cannot certify coverage. */
+  private static RecordedCoveragePolicy captureRecordedCoveragePolicy(List<String> frozenGlobs) {
+    var store = io.justsearch.configuration.resolved.ConfigStore.globalOrNull();
+    if (store == null) return null;
+    try {
+      var policy = io.justsearch.configuration.excludes.ExclusionPatterns.fromRawJsonStrict(
+          store.get().ui().excludePatterns(), io.justsearch.configuration.PlatformPaths.isWindows());
+      var globs = frozenGlobs == null ? policy.legacyGlobPatterns() : frozenGlobs;
+      var values = Map.of("globs", globs, "literals", policy.savedPatterns().stream()
+          .filter(io.justsearch.configuration.excludes.LiteralExclusion.class::isInstance).toList());
+      return new RecordedCoveragePolicy(globs,
+          io.justsearch.configuration.AppliedConfigurationVersion.digest(values.keySet(), values));
+    } catch (IllegalArgumentException invalidPolicy) {
+      return null;
     }
   }
 
