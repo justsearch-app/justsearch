@@ -47,6 +47,8 @@ export class ConfirmBand extends JfElement {
   /** The control that opened the band; focus returns there on cancel. Defaults to the focused element. */
   opener: HTMLElement | null = null;
   private answered = false;
+  /** A document is a window, including bands nested inside different shadow roots. */
+  private static readonly openBands = new WeakMap<Document, ConfirmBand>();
 
   constructor() {
     super();
@@ -58,7 +60,7 @@ export class ConfirmBand extends JfElement {
   }
 
   static styles = css`
-    :host { display: block; }
+    :host { display: block; min-width: 0; max-width: 100%; }
     .band {
       display: grid;
       gap: var(--jf-space-2);
@@ -68,7 +70,11 @@ export class ConfirmBand extends JfElement {
       color: var(--text-primary);
       font-size: var(--font-size-sm);
     }
-    .heading { margin: 0; font-weight: var(--jf-weight-medium); }
+    .heading { margin: 0; font-weight: var(--jf-weight-medium); overflow-wrap: anywhere; }
+    .band > * { min-width: 0; }
+    jf-button { min-width: 0; max-width: 100%; }
+    jf-button::part(control) { min-width: 0; max-width: 100%; box-sizing: border-box; }
+    .action-label { min-width: 0; overflow-wrap: anywhere; }
     .consequence { margin: 0; color: var(--text-secondary); overflow-wrap: anywhere; }
     .answers { display: flex; flex-wrap: wrap; align-items: center; gap: var(--jf-space-2); }
     .hint { color: var(--text-secondary); font-size: var(--font-size-xs); }
@@ -87,11 +93,20 @@ export class ConfirmBand extends JfElement {
       this.opener = active instanceof HTMLElement && active !== document.body ? active : null;
     }
     this.answered = false;
+    const previous = ConfirmBand.openBands.get(this.ownerDocument);
+    ConfirmBand.openBands.set(this.ownerDocument, this);
+    if (previous && previous !== this) {
+      // Clear the previous owner's draft too; reopening it must ask afresh. Do not restore its
+      // focus: this band's Keep it now owns focus. An action already running is not interrupted.
+      previous.answered = true;
+      previous.dispatchEvent(new CustomEvent(CONFIRM_BAND_CANCEL, { bubbles: true, composed: true }));
+    }
     // Capture: a parent window (Settings, a drawer) must not close on the Escape that cancels the band.
     this.addEventListener('keydown', this.onKeyDown, true);
   }
 
   override disconnectedCallback(): void {
+    if (ConfirmBand.openBands.get(this.ownerDocument) === this) ConfirmBand.openBands.delete(this.ownerDocument);
     this.removeEventListener('keydown', this.onKeyDown, true);
     super.disconnectedCallback();
   }
@@ -107,7 +122,7 @@ export class ConfirmBand extends JfElement {
     const keep = this.shadowRoot?.querySelector<Rendered>('jf-button.keep');
     await keep?.updateComplete;
     await keep?.shadowRoot?.querySelector<Rendered>('jf-control')?.updateComplete;
-    if (this.isConnected && !this.answered) keep?.focus();
+    if (this.isConnected && !this.answered && ConfirmBand.openBands.get(this.ownerDocument) === this) keep?.focus();
   }
 
   private readonly onKeyDown = (event: KeyboardEvent): void => {
@@ -145,8 +160,8 @@ export class ConfirmBand extends JfElement {
       ${this.heading ? html`<p class="heading">${this.heading}</p>` : nothing}
       <p class="consequence" id="consequence">${this.consequence}</p>
       <div class="answers">
-        <jf-button class="confirm" tone="error" .disabled=${this.busy}
-          .onActivate=${() => this.confirm()}>${icon({ name: 'trash-2', size: 14 })} ${this.actionLabel}</jf-button>
+        <jf-button class="confirm" tone="error" title=${this.actionLabel} .disabled=${this.busy}
+          .onActivate=${() => this.confirm()}>${icon({ name: 'trash-2', size: 14 })} <span class="action-label">${this.actionLabel}</span></jf-button>
         <jf-button class="keep" .disabled=${this.busy} .onActivate=${() => this.cancel()}>${this.keepLabel}</jf-button>
         <span class="hint" aria-hidden="true"><kbd>Esc</kbd> keeps it</span>
       </div>

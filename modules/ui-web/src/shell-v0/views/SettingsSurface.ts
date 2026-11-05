@@ -149,6 +149,7 @@ import type { Audience } from '../../api/types/registry.js';
 import '../aggregate-substrate/components/JfOperation.js';
 import type { OpErrorEventDetail } from '../components/OpButton.js';
 import '../components/ConfirmBand.js';
+import { emitEphemeralToast } from '../components/advisory/ephemeralToast.js';
 import { ModalController } from '../primitives/modalController.js';
 import type { ConfirmBand } from '../components/ConfirmBand.js';
 import {
@@ -2680,6 +2681,7 @@ export class SettingsSurface extends JfElement {
     try {
       this.themeDeleteError = null;
       this.host_.theme.deleteTheme?.(entry.id);
+      emitEphemeralToast({ classId: 'core.own-action', message: `${entry.displayName} deleted`, severity: 'success' });
       this.requestUpdate();
     } catch {
       this.themeDeleteError = `Couldn't delete ${entry.displayName}. It has been kept. Try again.`;
@@ -2788,6 +2790,7 @@ export class SettingsSurface extends JfElement {
       // will also fire from `removePluginSurfaceContributions`, but
       // updating now makes the UI feel instantaneous.
       this.plugins = registry.list();
+      emitEphemeralToast({ classId: 'core.own-action', message: `Plugin ${id} revoked`, severity: 'success' });
     } catch (err) {
       this.error = err instanceof Error ? err.message : String(err);
     }

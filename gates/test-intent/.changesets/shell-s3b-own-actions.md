@@ -44,6 +44,15 @@ dependency copies. A temporary Git command adapter makes the evidence runner cre
 instead of registering worktrees; a Node command adapter adds `--maxWorkers=4` to its Vitest calls.
 The evidence producer itself is unchanged, and source Git metadata is untouched.
 
+Acceptor-2 repair: `shell-s3b-acceptor2-repaired.json` compares cross-kind single-band ownership,
+missing success receipts and long-name containment against `2ba5a3ebf37f0c2684e22444af65ed08798a4bba`.
+The band/focus/layout and visible polite theme receipt checks run in real isolated Chromium.
+`shell-s3b-acceptor2-all.json` re-executes every check in every edited/added test file, plus the
+existing folder, cancel and reindex receipt checks. `shell-s3b-acceptor2-prior.json` re-executes
+the prior repaired browser assertions against their original b1b5ae0f3c baseline. Temporary Git/Node
+command adapters use shared clones, private dependency copies and `--maxWorkers=4`; no source git
+metadata, shared dev stack or another session's service is used. No existing assertion is weakened.
+
 ```json
 {
   "entries": [
@@ -231,9 +240,43 @@ The evidence producer itself is unchanged, and source Git metadata is untouched.
     {
       "items": [
         "modules/ui-web/src/shell-v0/components/ActionButton.render.test.ts",
-        "modules/ui-web/src/shell-v0/components/ConfirmBand.test.ts",
-        "modules/ui-web/src/shell-v0/views/LibrarySurface.ownActions.test.ts",
         "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "The in-place band (ConfirmBand): consequence sentence, danger button named with the verb and object, Keep it; focus to Keep it; Escape or Keep it cancels once and returns focus to the opener without reaching the window behind; the verb answers once (double-click, repeated activation, auto-repeating Enter/Space); no answer while the host runs the action. Library Remove (under the folder, or under the problem that offered it), catalog operations with an inline confirmation (each with a consequence sentence, a fallback that says it runs now with no undo), Settings' delete custom theme and revoke plugin use it; a folder removed in another window while its band is open closes the band and nothing is removed twice.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "DE1",
+          "quote": "Own risky actions confirm in place (band under the item: consequence sentence, verb button, Keep it; focus to Keep it; Escape cancels and restores focus): remove folder, remove other-app collection, cancel rebuild, delete custom theme, revoke plugin, clear failed jobs, rebuild, reset settings. Catalog \"Are you sure?\" confirmations get consequence text.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "The in-place band replaces today's window-blocking dialogs and \"Are you sure?\" prompts for: remove folder, remove other-app collection, cancel rebuild, delete custom theme, revoke plugin, clear failed jobs, rebuild, reset settings.",
+          "location": "task t-20261103-shell request (S3b builder brief, 2026-11-05)"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "C1",
+          "quote": "Ordinary operation feedback keeps a visible, accessible destination: failures and successes of the person's own actions show at the place of the action (inline receipt) or in the pill; never silently dropped.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s3b-acceptor2-all.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/ActionButton.render.test.ts#an operation without its own sentence still says it runs now with no undo",
+        "modules/ui-web/src/shell-v0/components/ActionButton.render.test.ts#Escape in the band cancels it without firing",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions.test.ts#deleting a custom theme asks in a band naming the theme; Keep it deletes nothing, the verb deletes once",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions.test.ts#revoking a plugin asks in a band under its row; the verb revokes it"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/ConfirmBand.test.ts",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.ownActions.test.ts"
       ],
       "class": "New",
       "behaviour": "The in-place band (ConfirmBand): consequence sentence, danger button named with the verb and object, Keep it; focus to Keep it; Escape or Keep it cancels once and returns focus to the opener without reaching the window behind; the verb answers once (double-click, repeated activation, auto-repeating Enter/Space); no answer while the host runs the action. Library Remove (under the folder, or under the problem that offered it), catalog operations with an inline confirmation (each with a consequence sentence, a fallback that says it runs now with no undo), Settings' delete custom theme and revoke plugin use it; a folder removed in another window while its band is open closes the band and nothing is removed twice.",
@@ -266,20 +309,40 @@ The evidence producer itself is unchanged, and source Git metadata is untouched.
         "modules/ui-web/src/shell-v0/components/ConfirmBand.test.ts#a double-click on the danger button answers once, and no later answer runs",
         "modules/ui-web/src/shell-v0/components/ConfirmBand.test.ts#an auto-repeating Enter or Space (a key held since the opener) answers nothing",
         "modules/ui-web/src/shell-v0/components/ConfirmBand.test.ts#while the host runs the action, neither answer is offered",
-        "modules/ui-web/src/shell-v0/components/ActionButton.render.test.ts#an operation without its own sentence still says it runs now with no undo",
-        "modules/ui-web/src/shell-v0/components/ActionButton.render.test.ts#Escape in the band cancels it without firing",
         "modules/ui-web/src/shell-v0/views/LibrarySurface.ownActions.test.ts#opens the band under the folder with its consequence and verb, focuses Keep it, and keeping removes nothing",
         "modules/ui-web/src/shell-v0/views/LibrarySurface.ownActions.test.ts#a double-click on the verb removes once; Escape while it runs does not cancel it",
         "modules/ui-web/src/shell-v0/views/LibrarySurface.ownActions.test.ts#a second window removed the same folder while the band was open: the band goes and nothing is removed twice",
-        "modules/ui-web/src/shell-v0/views/LibrarySurface.ownActions.test.ts#Remove offered by a missing folder's problem asks under that problem",
-        "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions.test.ts#deleting a custom theme asks in a band naming the theme; Keep it deletes nothing, the verb deletes once",
-        "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions.test.ts#revoking a plugin asks in a band under its row; the verb revokes it"
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.ownActions.test.ts#Remove offered by a missing folder's problem asks under that problem"
       ]
     },
     {
       "items": [
-        "modules/ui-web/src/shell-v0/plugin-api/capabilities/ui.confirm.test.ts",
         "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Delete all local data stays a typed confirmation in a modal dialog (who asked, the question, what is deleted, what stays, that it cannot be undone, the exact phrase with letters remaining, Cancel left and the verb right). Host confirmation dialogs ask a question and answer with a verb (\"Continue?\" / \"Continue\" by default, never \"Confirm\"), and only a destructive request is drawn as danger (repairing an install is not).",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "DE2",
+          "quote": "Irreversible wide acts keep typed confirmation in a dialog: delete all local data (keeps its interaction seam for presentations), apply exclusions as today, exact-target forget, typed operation approvals. Pausing a download and repairing an install are no longer danger dialogs.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Typed confirmation in a dialog stays only for: delete all local data (keep its interaction seam for presentations), apply exclusions as today, exact-target forget, and typed operation approvals (already done in the previous step; do not change). Pausing a download and repairing an install are no longer danger dialogs.",
+          "location": "task t-20261103-shell request (S3b builder brief, 2026-11-05)"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s3b-acceptor2-all.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions.test.ts#opens a modal dialog that names who asked, what is deleted, what stays, that it cannot be undone, and the phrase"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/plugin-api/capabilities/ui.confirm.test.ts"
       ],
       "class": "New",
       "behaviour": "Delete all local data stays a typed confirmation in a modal dialog (who asked, the question, what is deleted, what stays, that it cannot be undone, the exact phrase with letters remaining, Cancel left and the verb right). Host confirmation dialogs ask a question and answer with a verb (\"Continue?\" / \"Continue\" by default, never \"Confirm\"), and only a destructive request is drawn as danger (repairing an install is not).",
@@ -299,7 +362,6 @@ The evidence producer itself is unchanged, and source Git metadata is untouched.
       ],
       "evidence": "gates/test-intent/evidence/shell-s3b-new.json",
       "newChecks": [
-        "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions.test.ts#opens a modal dialog that names who asked, what is deleted, what stays, that it cannot be undone, and the phrase",
         "modules/ui-web/src/shell-v0/plugin-api/capabilities/ui.confirm.test.ts#without options it asks \"Continue?\" and answers \"Continue\", not as danger",
         "modules/ui-web/src/shell-v0/plugin-api/capabilities/ui.confirm.test.ts#a titled, non-destructive request keeps its question and verb and is not a danger dialog",
         "modules/ui-web/src/shell-v0/plugin-api/capabilities/ui.confirm.test.ts#a destructive request is drawn as danger and keeps its typed phrase"
@@ -504,7 +566,7 @@ The evidence producer itself is unchanged, and source Git metadata is untouched.
       "moved": [
         "input re-encoding"
       ],
-      "whatMoved": "The collection's confirmation moved from showConfirmDialog to the band under the source: the oracle (the count and collection are named before anything is deleted, the DELETE carries exactly that collection, declining issues nothing) is read from the band's heading/consequence and answered with its verb or Keep it.",
+      "whatMoved": "The collection's confirmation moved from showConfirmDialog to the band under the source: the oracle (the count and collection are named before anything is deleted, the DELETE carries exactly that collection, declining issues nothing) is read from the band's heading/consequence and answered with its verb or Keep it. The additional success-receipt oracle is recorded separately as New (C1); all original collection assertions remain.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -519,7 +581,7 @@ The evidence producer itself is unchanged, and source Git metadata is untouched.
           "location": "task t-20261103-shell request (S3b builder brief, 2026-11-05)"
         }
       ],
-      "evidence": "gates/test-intent/evidence/shell-s3b-adapted.json"
+      "evidence": "gates/test-intent/evidence/shell-s3b-acceptor2-all.json"
     },
     {
       "items": [
@@ -678,7 +740,7 @@ The evidence producer itself is unchanged, and source Git metadata is untouched.
         "rename",
         "input re-encoding"
       ],
-      "whatMoved": "MEDIUM/INLINE: the prompt is the band; the verb fires once (Yes renamed to the verb) and Keep it returns to idle without firing (Cancel renamed). HIGH/TYPED: the typed form's answer is the verb (the label) instead of \"Confirm\"; enabling on the exact phrase and firing once are unchanged.",
+      "whatMoved": "MEDIUM/INLINE: the prompt is the band; the verb fires once (Yes renamed to the verb) and Keep it returns to idle without firing (Cancel renamed). HIGH/TYPED: the typed form's answer is the verb (the label) instead of \"Confirm\"; enabling on the exact phrase and firing once are unchanged. Acceptor-2: restored the original generic index.flush oracle (no invocation before consent; exactly index.flush/MEDIUM after the verb) in the fallback check. The clear-failed-jobs sentence/invocation check is a separate New entry; the generic invocation oracle is not replaced by it.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -693,7 +755,7 @@ The evidence producer itself is unchanged, and source Git metadata is untouched.
           "location": "task t-20261103-shell request (S3b builder brief, 2026-11-05)"
         }
       ],
-      "evidence": "gates/test-intent/evidence/shell-s3b-adapted.json"
+      "evidence": "gates/test-intent/evidence/shell-s3b-acceptor2-all.json"
     },
     {
       "items": [
@@ -962,7 +1024,7 @@ The evidence producer itself is unchanged, and source Git metadata is untouched.
         }
       ],
       "repaired": true,
-      "evidence": "gates/test-intent/evidence/shell-s3b-acceptor-repaired.json",
+      "evidence": "gates/test-intent/evidence/shell-s3b-acceptor2-prior.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions-lockdown.test.ts#DE1 switching from Delete Alpha to Delete Beta leaves one band, focuses Keep it, and Escape restores Delete Beta",
         "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions-lockdown.test.ts#C1 a real quota failure keeps the custom theme and its active state, reports it by the grid, and permits retry (active=false)",
@@ -1025,6 +1087,94 @@ The evidence producer itself is unchanged, and source Git metadata is untouched.
       "newChecks": [
         "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
         "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions-lockdown.test.ts",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions.test.ts",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.otherSources.test.ts",
+        "modules/ui-web/src/shell-v0/components/OpButton.ownReceipts.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "DE1: bands of every kind share one document-wide slot; folder→collection, collection→folder and transitions across Library/Settings leave one band, focus its Keep it and restore its own opener on Escape. C1: successful theme deletion, plugin revocation, collection removal and catalog clear-failed-jobs/rebuild/reset emit a success receipt to the existing pill channel, only after success; Chromium verifies visible Alpha deleted and its polite announcement. Rebuild acceptance does not claim completion. X2: a valid unbroken 200-character theme name wraps in heading/consequence/action text, with the complete action accessible and in its title; the band does not overflow and both buttons remain within the window at all three sizes. Every check fails by assertion on the accepted faulty candidate, then passes after.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Expected: one band open in the whole window at a time, of any kind; opening any band closes the other, moves focus to the new band's \"Keep it\"; Escape returns focus to the control that opened it.",
+          "location": "task t-20261103-shell request (bounded acceptor-2 repair brief on 2ba5a3ebf3, 2026-11-05)"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Expected: a receipt in the pill or at the grid (\"Alpha deleted\"), announced politely. Check the other band actions (remove folder, remove collection, cancel rebuild, revoke plugin, clear failed jobs, rebuild, reset settings) have a success receipt too; add one where missing.",
+          "location": "task t-20261103-shell request (bounded acceptor-2 repair brief on 2ba5a3ebf3, 2026-11-05)"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Expected: long names wrap or truncate with their full text available (title/accessible name), the band and its buttons stay inside the window at 600×400, 900×800 and 1280×800.",
+          "location": "task t-20261103-shell request (bounded acceptor-2 repair brief on 2ba5a3ebf3, 2026-11-05)"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s3b-acceptor2-repaired.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions-lockdown.test.ts#DE1 folder, collection and theme bands share one window slot and Escape restores the latest opener",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions-lockdown.test.ts#C1 deleting Alpha shows a success receipt in the pill and announces it politely",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions-lockdown.test.ts#X2 a 200-character theme name keeps the band and both answers within 600×400",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions-lockdown.test.ts#X2 a 200-character theme name keeps the band and both answers within 900×800",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions-lockdown.test.ts#X2 a 200-character theme name keeps the band and both answers within 1280×800",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions.test.ts#deleting a custom theme asks in a band naming the theme; Keep it deletes nothing, the verb deletes once",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions.test.ts#revoking a plugin asks in a band under its row; the verb revokes it",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.otherSources.test.ts#confirms first, then issues the DELETE for that collection",
+        "modules/ui-web/src/shell-v0/components/OpButton.ownReceipts.test.ts#C1 core.clear-failed-jobs acknowledges success in the pill only after the band is answered and the response succeeds",
+        "modules/ui-web/src/shell-v0/components/OpButton.ownReceipts.test.ts#C1 core.rebuild-index acknowledges success in the pill only after the band is answered and the response succeeds",
+        "modules/ui-web/src/shell-v0/components/OpButton.ownReceipts.test.ts#C1 core.reset-settings acknowledges success in the pill only after the band is answered and the response succeeds"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/ActionButton.render.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Clear-failed-jobs has its own consequence and named verb, focuses Keep it, invokes exactly once, then closes. It supplements the restored generic index.flush invocation oracle.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Expected: restore a generic invocation check that actually invokes (the original oracle), and keep the clear-failed-jobs check as its own New entry.",
+          "location": "task t-20261103-shell request (bounded acceptor-2 repair brief on 2ba5a3ebf3, 2026-11-05)"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s3b-acceptor2-all.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/ActionButton.render.test.ts#asks in place with the consequence and the verb, never \"Are you sure?\", and fires once on the verb"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/ActionButton.render.test.ts",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions.test.ts",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.otherSources.test.ts",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions-lockdown.test.ts",
+        "modules/ui-web/src/shell-v0/components/OpButton.ownReceipts.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Re-executed every check in every edited or added test file. Preservation checks cover the original generic invocation oracle, band cancellation, typed/disabled/pending behavior, quota failure/retry, collection enumeration and refused catalog actions (no false success receipt). Also re-executed the existing Library folder-removal/re-add, reindex accepted/completed, and cancel-rebuild receipt checks; these existing success receipts remain intact.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Re-run the evidence for every check in every test file you edit.",
+          "location": "task t-20261103-shell request (bounded acceptor-2 repair brief on 2ba5a3ebf3, 2026-11-05)"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s3b-acceptor2-all.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/ActionButton.render.test.ts",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions.test.ts",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.otherSources.test.ts",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions-lockdown.test.ts",
+        "modules/ui-web/src/shell-v0/components/OpButton.ownReceipts.test.ts",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.gapDecision.test.ts"
       ]
     }
   ]

@@ -18,10 +18,13 @@ import { __resetForTest as resetSurfaceCatalog, __seedForTest as seedSurfaceCata
 import { __resetSessionRegistryForTest } from '../plugin-api/sessionRegistry.js';
 import { setCustomThemeEntries, __resetCatalogForTest } from '../themes/themesCatalog.js';
 import { __resetThemeStateForTest } from '../state/themeState.js';
+import { EPHEMERAL_TOAST_EVENT, type EphemeralToastSpec } from '../components/advisory/ephemeralToast.js';
 import type { PluginManifest } from '../plugin-api/plugin-types.js';
 
 type Answer = HTMLElement & { onActivate: () => unknown };
 type Band = HTMLElement & { heading: string; consequence: string; actionLabel: string; updateComplete: Promise<unknown>; focusKeep(): Promise<void> };
+const receipts: EphemeralToastSpec[] = [];
+const receive = (event: Event) => receipts.push((event as CustomEvent<EphemeralToastSpec>).detail);
 const settle = () => new Promise<void>(resolve => setTimeout(resolve, 0));
 
 async function mount(category: string, extra: Parameters<typeof createMockHostApi>[0] = {}) {
@@ -42,12 +45,13 @@ async function answer(found: Band, which: 'confirm' | 'keep') {
 }
 
 beforeEach(() => {
+  receipts.length = 0; document.addEventListener(EPHEMERAL_TOAST_EVENT, receive);
   vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ui: {} }), { status: 200 })));
   __resetThemeStateForTest(); __resetCatalogForTest(); resetSurfaceCatalog();
   seedSurfaceCatalog({ schemaVersion: '1', catalogVersion: 1, namespace: 'core', primitive: 'Surface', entries: [] });
   __resetSessionRegistryForTest();
 });
-afterEach(() => { document.body.replaceChildren(); __resetCatalogForTest(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+afterEach(() => { document.removeEventListener(EPHEMERAL_TOAST_EVENT, receive); document.body.replaceChildren(); __resetCatalogForTest(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 describe('Settings own risky actions ask in place (DE1)', () => {
   it('deleting a custom theme asks in a band naming the theme; Keep it deletes nothing, the verb deletes once', async () => {
@@ -63,11 +67,13 @@ describe('Settings own risky actions ask in place (DE1)', () => {
     await answer(found, 'keep'); await el.updateComplete;
     expect(band(el, '.theme-delete-confirm')).toBeNull();
     expect(deleteTheme).not.toHaveBeenCalled();
+    expect(receipts).toEqual([]);
     del.onActivate(); await el.updateComplete;
     found = band(el, '.theme-delete-confirm')!;
     await answer(found, 'confirm'); await answer(found, 'confirm'); await el.updateComplete;
     expect(deleteTheme).toHaveBeenCalledTimes(1);
     expect(deleteTheme).toHaveBeenCalledWith('custom.x');
+    expect(receipts).toEqual([expect.objectContaining({ classId: 'core.own-action', severity: 'success', message: 'My Custom deleted' })]);
     expect(confirm).not.toHaveBeenCalled();
   });
 
@@ -84,6 +90,7 @@ describe('Settings own risky actions ask in place (DE1)', () => {
     expect(found.consequence).toContain('comes back only when it is loaded again');
     await answer(found, 'confirm'); await el.updateComplete;
     expect(registry.list().map(p => p.manifest.id)).not.toContain('alpha');
+    expect(receipts).toEqual([expect.objectContaining({ classId: 'core.own-action', severity: 'success', message: 'Plugin alpha revoked' })]);
     expect(confirm).not.toHaveBeenCalled();
   });
 });

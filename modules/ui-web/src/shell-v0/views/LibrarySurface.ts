@@ -40,6 +40,7 @@ import { getSurface } from '../../api/registry/SurfaceCatalogClient.js';
 import { present } from '../display/present.js';
 import { offerReversal, ReversalClosedError } from '../state/ownReversals.js';
 import '../components/ConfirmBand.js';
+import { emitEphemeralToast } from '../components/advisory/ephemeralToast.js';
 import type { ConfirmBand } from '../components/ConfirmBand.js';
 import { folderName } from '../state/frameStatus.js';
 import { takeIndexingRuleFocus, subscribeIndexingRuleFocus, type IndexingRuleControl } from '../router/indexingRuleIntent.js';
@@ -1301,6 +1302,7 @@ export class LibrarySurface extends JfElement {
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}`);
       }
+      emitEphemeralToast({ classId: 'core.own-action', message: `Removed collection ${source.collection}`, severity: 'success' });
       await this.refresh();
     } catch (err) {
       this.error = err instanceof Error ? err.message : String(err);

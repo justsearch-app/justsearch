@@ -100,9 +100,16 @@ describe('ActionButton — MEDIUM risk (DE1 in-place band)', () => {
 
   it('an operation without its own sentence still says it runs now with no undo', async () => {
     const el = await mountBtn({ operationId: 'index.flush', label: 'Flush', risk: 'MEDIUM' });
+    const events = captureInvoke(el);
     (el.shadowRoot?.querySelector('button.invoke') as HTMLButtonElement).click();
     await el.updateComplete;
+    expect(events).toEqual([]);
     expect(band(el)!.consequence).toBe("Flush runs now. It can't be undone from here.");
+    await band(el)!.updateComplete;
+    bandButton(el, 'confirm').onActivate!();
+    expect(events).toEqual([{ operationId: 'index.flush', risk: 'MEDIUM' }]);
+    await el.updateComplete;
+    expect(band(el)).toBeNull();
     el.remove();
   });
 

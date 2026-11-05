@@ -13,6 +13,7 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import './LibrarySurface.js';
 import type { LibrarySurface } from './LibrarySurface.js';
+import { EPHEMERAL_TOAST_EVENT, type EphemeralToastSpec } from '../components/advisory/ephemeralToast.js';
 import type { PluginHostApi } from '../plugin-api/plugin-types.js';
 import {
   __resetAiStateForTest,
@@ -270,6 +271,9 @@ describe('LibrarySurface — "Other sources" section (811 C-2a)', () => {
   });
 
   it('confirms first, then issues the DELETE for that collection', async () => {
+    const receipts: EphemeralToastSpec[] = [];
+    const receive = (event: Event) => receipts.push((event as CustomEvent<EphemeralToastSpec>).detail);
+    document.addEventListener(EPHEMERAL_TOAST_EVENT, receive);
     const { el, host, calls } = await setup({ collectionFacet: { 'mcp-ingest': 12 } });
     try {
       const remove = removeButton(el, 'mcp-ingest');
@@ -293,7 +297,9 @@ describe('LibrarySurface — "Other sources" section (811 C-2a)', () => {
       const del = calls.find((c) => c.path === '/api/indexing/collections');
       expect(del?.method).toBe('DELETE');
       expect(del?.body).toEqual({ collection: 'mcp-ingest' });
+      expect(receipts).toEqual([expect.objectContaining({ classId: 'core.own-action', severity: 'success', message: 'Removed collection mcp-ingest' })]);
     } finally {
+      document.removeEventListener(EPHEMERAL_TOAST_EVENT, receive);
       el.remove();
     }
   });
