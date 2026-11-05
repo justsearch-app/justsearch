@@ -862,18 +862,30 @@ public final class DocumentFieldOps {
     return queryDocIdsByField(field, value, limit, false);
   }
 
+  public enum PendingDocumentKind { ALL, PARENT, CHUNK }
+
   public record PendingIdPage(List<String> ids, boolean exhausted) {}
 
   /** One bounded, ID-ordered keyset page. Exclusions are examined by the caller, so an
    * excluded or poison head cannot pin the sweep. The key survives reader replacement. */
   public PendingIdPage queryPendingPage(
       String field, int limit, boolean excludeChunks, String afterId) throws IOException {
+    return queryPendingPage(field, limit, excludeChunks ? PendingDocumentKind.PARENT
+        : PendingDocumentKind.ALL, afterId);
+  }
+
+  public PendingIdPage queryPendingPage(
+      String field, int limit, PendingDocumentKind kind, String afterId) throws IOException {
+    java.util.Objects.requireNonNull(kind);
     if (limit <= 0) throw new IllegalArgumentException("Page size must be positive");
     return bridge.withSearcher(searcher -> {
       var query = new BooleanQuery.Builder()
           .add(new TermQuery(new Term(field, "PENDING")), BooleanClause.Occur.FILTER);
-      if (excludeChunks) query.add(new TermQuery(new Term(SchemaFields.IS_CHUNK, "true")),
-          BooleanClause.Occur.MUST_NOT);
+      if (kind != PendingDocumentKind.ALL) {
+        query.add(new TermQuery(new Term(SchemaFields.IS_CHUNK, "true")),
+            kind == PendingDocumentKind.CHUNK ? BooleanClause.Occur.FILTER
+                : BooleanClause.Occur.MUST_NOT);
+      }
       if (afterId != null) query.add(org.apache.lucene.search.TermRangeQuery.newStringRange(
           idField, afterId, null, false, false), BooleanClause.Occur.FILTER);
       var sort = new org.apache.lucene.search.Sort(

@@ -153,6 +153,7 @@ public final class EmbeddingBackfillOps {
       // Phase 2: Batch embed all collected content
       batch.started(batchDocIds, EnrichmentAccounting.Stage.EMBED);
       List<float[]> vectors = batch.inferenceCancellation(() -> !context.runningSupplier().getAsBoolean(), () -> providerRetired(context, embeddingProvider)).call(() -> embeddingProvider.embedDocumentBatch(batchContents));
+      accounting.acquired(embeddingProvider);
       if (vectors != null && vectors.size() == batchDocIds.size()) {
         for (int i = 0; i < vectors.size(); i++) {
           if (vectors.get(i) != null && vectors.get(i).length > 0) {
@@ -195,7 +196,7 @@ public final class EmbeddingBackfillOps {
           if (stopped(context, batch, embeddingProvider, "Backfill")) { accounting.cancelRemaining(); break; }
           int[] counts =
               embedAndUpdateSingle(
-                  context, batch, embeddingProvider, batchDocIds.get(i), batchContents.get(i), failures);
+                  context, batch, embeddingProvider, batchDocIds.get(i), batchContents.get(i), failures, accounting);
           if (counts == null) {
             accounting.cancelRemaining();
             break;
@@ -262,7 +263,8 @@ public final class EmbeddingBackfillOps {
         accounting.retired(EnrichmentAccounting.Stage.EMBED);
         accounting.retired(EnrichmentAccounting.Stage.CHUNK_EMBED);
       }
-      accounting.cancelled(EnrichmentAccounting.Stage.EMBED, e);
+      if (!accounting.cancelled(EnrichmentAccounting.Stage.EMBED, e)
+          && !providerRetired(context, selectedProvider)) accounting.acquisitionUnavailable(selectedProvider, e);
       context.log().error("Error during embedding backfill", e);
       return StageOutcome.observed(false, 0, methodStart, accounting);
     }
@@ -341,12 +343,13 @@ public final class EmbeddingBackfillOps {
 
   private static int[] embedAndUpdateSingle(
       BackfillContext context, EnrichmentBatch batch, EmbeddingProvider embeddingProvider, String docId, String content,
-      List<String> failures) {
+      List<String> failures, EnrichmentAccounting accounting) {
     int processed = 0;
     int failed = 0;
     try {
       if (stopped(context, batch, embeddingProvider, "Backfill")) return null;
       float[] vector = batch.inferenceCancellation(() -> !context.runningSupplier().getAsBoolean(), () -> providerRetired(context, embeddingProvider)).call(() -> embeddingProvider.embedDocument(content, LocalSessionAcquisition.backgroundInference()));
+      accounting.acquired(embeddingProvider);
       if (vector != null && vector.length > 0) batch.computed(docId, EnrichmentAccounting.Stage.EMBED);
       if (providerRetired(context, embeddingProvider)) {
         batch.retired(EnrichmentAccounting.Stage.EMBED);
@@ -366,6 +369,7 @@ public final class EmbeddingBackfillOps {
       if (batch.storageFailed()) throw e;
       if (batch.retired(() -> providerRetired(context, embeddingProvider), EnrichmentAccounting.Stage.EMBED)) return null;
       if (batch.cancelled(EnrichmentAccounting.Stage.EMBED, e)) return null;
+      if (accounting.acquisitionUnavailable(embeddingProvider, e)) return null;
       if (checkInterrupt(context, embeddingProvider, "Backfill")
           || SpladeBackfillOps.isSystemicFailure(e)) return null;
       context.log().error("Backfill failed for doc {}: {}", docId, e.getMessage());
@@ -501,6 +505,7 @@ public final class EmbeddingBackfillOps {
       // Phase 2: Batch embed
       batch.started(batchChunkIds, EnrichmentAccounting.Stage.CHUNK_EMBED);
       List<float[]> vectors = batch.inferenceCancellation(() -> !context.runningSupplier().getAsBoolean(), () -> providerRetired(context, embeddingProvider)).call(() -> embeddingProvider.embedDocumentBatch(batchContents));
+      accounting.acquired(embeddingProvider);
       if (vectors != null && vectors.size() == batchChunkIds.size()) {
         for (int i = 0; i < vectors.size(); i++) {
           if (vectors.get(i) != null && vectors.get(i).length > 0) {
@@ -538,6 +543,7 @@ public final class EmbeddingBackfillOps {
             String fallbackText = batchContents.get(i);
             float[] vector =
                 batch.inferenceCancellation(() -> !context.runningSupplier().getAsBoolean(), () -> providerRetired(context, embeddingProvider)).call(() -> embeddingProvider.embedDocument(fallbackText, LocalSessionAcquisition.backgroundInference()));
+      accounting.acquired(embeddingProvider);
             if (vector != null && vector.length > 0) batch.computed(chunkId, EnrichmentAccounting.Stage.CHUNK_EMBED);
             if (providerRetired(context, embeddingProvider)) {
               batch.retired(EnrichmentAccounting.Stage.CHUNK_EMBED);
@@ -557,6 +563,7 @@ public final class EmbeddingBackfillOps {
             if (accounting.storageFailed()) throw e;
             if (batch.retired(() -> providerRetired(context, embeddingProvider), EnrichmentAccounting.Stage.CHUNK_EMBED)) break;
             if (accounting.cancelled(EnrichmentAccounting.Stage.CHUNK_EMBED, e)) break;
+            if (accounting.acquisitionUnavailable(embeddingProvider, e)) break;
             if (stopped(context, batch, embeddingProvider, "Chunk backfill")
                 || SpladeBackfillOps.isSystemicFailure(e)) break;
             context.log().error("Chunk backfill failed for {}: {}", chunkId, e.getMessage());
@@ -605,7 +612,8 @@ public final class EmbeddingBackfillOps {
         accounting.retired(EnrichmentAccounting.Stage.EMBED);
         accounting.retired(EnrichmentAccounting.Stage.CHUNK_EMBED);
       }
-      accounting.cancelled(EnrichmentAccounting.Stage.CHUNK_EMBED, e);
+      if (!accounting.cancelled(EnrichmentAccounting.Stage.CHUNK_EMBED, e)
+          && !providerRetired(context, selectedProvider)) accounting.acquisitionUnavailable(selectedProvider, e);
       context.log().error("Error during chunk embedding backfill", e);
       return StageOutcome.observed(false, 0, methodStart, accounting);
     }

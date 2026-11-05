@@ -48,6 +48,13 @@ public final class NerBackfillOps {
     }
   }
 
+  /** One document is the NER native unit; the selection cursor is shared with the batch caller. */
+  public static StageOutcome processNerUnit(BackfillContext source, EnrichmentSelection selection) {
+    return processNerBackfill(new BackfillContext(source.documentFieldOps(), source.indexingCoordinator(),
+        source.commitOps(), source.pacing(), source.nerServiceSupplier(), source.runningSupplier(),
+        1, source.log(), source.unitAllowed()), selection);
+  }
+
   /**
    * Processes one batch of NER backfill.
    *
@@ -133,6 +140,7 @@ public final class NerBackfillOps {
           }
           batch.started(List.of(docId), EnrichmentAccounting.Stage.NER);
           List<NerResult> nerBatch = batch.inferenceCancellation(() -> !context.runningSupplier().getAsBoolean(), unavailable).call(() -> nerService.extractEntitiesBatch(List.of(content)));
+          accounting.acquired(nerService);
           NerResult result = nerBatch.isEmpty() ? NerResult.EMPTY : nerBatch.get(0);
 
           Map<String, Object> updates = new HashMap<>();
@@ -162,6 +170,7 @@ public final class NerBackfillOps {
             accounting.cancelRemaining();
             break;
           }
+          if (accounting.acquisitionUnavailable(selectedService, e)) break;
           markedFailed +=
               batch.failure(docId, SchemaFields.NER_RETRY_COUNT, NerBackfillOps::computeNerFailureUpdate);
           failed++;

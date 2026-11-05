@@ -16,10 +16,40 @@ import java.util.*;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 
-/** M3a: a lazy session failure is retried and then FAILED, never COMPLETED_EMPTY. */
+/** E4-D5a: lazy acquisition is provider-local; genuine row failures retain their retry policy. */
 final class NerLazyCreationRetryTest {
   @Test
-  void acquisitionFailuresFollowTheExistingDocumentRetryPolicy() throws Exception {
+  void acquisitionFailuresLeaveNonzeroRetriesPendingWithoutPublication() throws Exception {
+    DocumentFieldOps fields = mock(DocumentFieldOps.class);
+    IndexingCoordinator index = mock(IndexingCoordinator.class);
+    NerService ner = mock(NerService.class);
+    when(ner.isAvailable()).thenReturn(true);
+    BackfillSnapshotTestSupport.install(fields, index, true, Set.of());
+    when(fields.queryDocIdsByField(eq(SchemaFields.NER_STATUS), eq("PENDING"), anyInt()))
+        .thenReturn(List.of("doc"));
+    when(fields.getDocumentContent("doc")).thenReturn("Ada Lovelace in London");
+    when(fields.getDocumentField("doc", SchemaFields.NER_RETRY_COUNT)).thenReturn("2");
+    when(ner.extractEntitiesBatch(anyList())).thenThrow(
+        new SessionTemporarilyUnavailableException("ner: CPU session creation failed"));
+    var context = new NerBackfillOps.BackfillContext(fields, index, mock(CommitOps.class),
+        IndexingPacing.unthrottled(), () -> ner, () -> true, 10,
+        LoggerFactory.getLogger(NerLazyCreationRetryTest.class));
+    var publications = new java.util.concurrent.atomic.AtomicInteger();
+    when(index.updateDocumentsBatch(anyList())).thenAnswer(call -> {
+      publications.incrementAndGet();
+      return new io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.BatchUpdateResult(1, 0);
+    });
+    var outcome = assertDoesNotThrow(() -> NerBackfillOps.processNerBackfill(context));
+    assertEquals(0, publications.get(), "an unavailable lease never writes a row retry or terminal status");
+    assertTrue(outcome.success());
+    assertEquals(0, outcome.docsProcessed());
+    verify(index, never()).publishEnrichmentBatch(anyList(), anyMap());
+    assertTrue(outcome.accounting().tickets().values().stream().allMatch(disposition ->
+        disposition == EnrichmentAccounting.Disposition.DEFERRED));
+  }
+
+  @Test
+  void rowFailuresFollowTheExistingDocumentRetryPolicy() throws Exception {
     DocumentFieldOps fields = mock(DocumentFieldOps.class);
     IndexingCoordinator index = mock(IndexingCoordinator.class);
     CommitOps commits = mock(CommitOps.class);
@@ -30,7 +60,7 @@ final class NerLazyCreationRetryTest {
         .thenReturn(List.of("doc"));
     when(fields.getDocumentContent("doc")).thenReturn("Ada Lovelace in London");
     when(ner.extractEntitiesBatch(anyList())).thenThrow(
-        new SessionTemporarilyUnavailableException("ner: CPU session creation failed"));
+        new IllegalArgumentException("invalid document input"));
     var context = new NerBackfillOps.BackfillContext(fields, index, commits,
         IndexingPacing.unthrottled(), () -> ner, () -> true, 10,
         LoggerFactory.getLogger(NerLazyCreationRetryTest.class));

@@ -76,6 +76,26 @@ public final class SpladeBackfillOps {
 
   public static StageOutcome processSpladeBackfill(
       BackfillContext context, EnrichmentSelection selection) {
+    return processSpladeBackfill(context, selection, null);
+  }
+
+  /** A bounded parent-only sparse unit, with its own keyset cursor. */
+  public static StageOutcome processParentBackfill(
+      BackfillContext context, EnrichmentSelection selection) {
+    return processSpladeBackfill(context, selection,
+        DocumentFieldOps.PendingDocumentKind.PARENT);
+  }
+
+  /** A bounded chunk-only sparse unit; disabled chunks are never selected. */
+  public static StageOutcome processChunkBackfill(
+      BackfillContext context, EnrichmentSelection selection) {
+    if (!context.chunkSpladeEnabled()) return StageOutcome.none();
+    return processSpladeBackfill(context, selection,
+        DocumentFieldOps.PendingDocumentKind.CHUNK);
+  }
+
+  private static StageOutcome processSpladeBackfill(BackfillContext context,
+      EnrichmentSelection selection, DocumentFieldOps.PendingDocumentKind kind) {
     if (selection != null) selection.begin();
     var authority = context.indexingCoordinator().enrichmentAuthority();
     long t0 = System.nanoTime();
@@ -87,7 +107,9 @@ public final class SpladeBackfillOps {
             || context.spladeEncoderSupplier().get() != encoder);
     try {
       List<String> pendingIds =
-          context.chunkSpladeEnabled()
+          kind != null ? EnrichmentSelection.page(selection, context.documentFieldOps(),
+              SchemaFields.SPLADE_STATUS, Math.min(context.batchSize(), BulkPacePolicy.DEFAULTS.spladePhaseDocs()), kind)
+              : context.chunkSpladeEnabled()
               ? EnrichmentSelection.page(selection, context.documentFieldOps(),
               SchemaFields.SPLADE_STATUS, context.batchSize(), false)
               : EnrichmentSelection.page(selection, context.documentFieldOps(),
@@ -200,6 +222,7 @@ public final class SpladeBackfillOps {
             batch.started(batchDocIds.subList(sliceStart, sliceEnd), EnrichmentAccounting.Stage.SPLADE);
             List<String> sliceTexts = batchContents.subList(sliceStart, sliceEnd);
             sliceVecs = batch.inferenceCancellation(() -> !context.runningSupplier().getAsBoolean(), unavailable).call(() -> encoder.encodeBatch(sliceTexts));
+            accounting.acquired(encoder);
           } finally {
             pacer.afterUnit(sliceEnd - sliceStart);
           }
@@ -227,6 +250,11 @@ public final class SpladeBackfillOps {
         }
         boolean cancelled = accounting.cancelled(EnrichmentAccounting.Stage.SPLADE, e);
         if (!cancelled) {
+          if (accounting.acquisitionUnavailable(encoder, e)) {
+            processed += publishSparseVectors(batch, batchDocIds, sparseVecs);
+            commitIfNeeded(context, processed, failed, markedFailed);
+            return StageOutcome.observed(false, processed, t0, accounting);
+          }
           context.log().error("SPLADE batch encoding failed: {}", e.getMessage());
           if (context.spladeEncoderSupplier().get() != encoder || isSystemicFailure(e)) {
             commitIfNeeded(context, processed, failed, markedFailed);
@@ -250,6 +278,7 @@ public final class SpladeBackfillOps {
               String fallbackText = batchContents.get(i);
               Map<String, Float> sparseVec = batch.inferenceCancellation(() -> !context.runningSupplier().getAsBoolean(), unavailable).call(() -> encoder.encode(
                   fallbackText, LocalSessionAcquisition.backgroundInference()));
+              accounting.acquired(encoder);
               accounting.computed(batchDocIds.get(i), EnrichmentAccounting.Stage.SPLADE);
               if (batch.retired(unavailable, EnrichmentAccounting.Stage.SPLADE)) break;
               Map<String, Object> updates = new HashMap<>();
@@ -261,6 +290,7 @@ public final class SpladeBackfillOps {
               if (accounting.storageFailed()) throw e2;
               if (batch.retired(unavailable, EnrichmentAccounting.Stage.SPLADE)) break;
               if (accounting.cancelled(EnrichmentAccounting.Stage.SPLADE, e2)) break;
+              if (accounting.acquisitionUnavailable(encoder, e2)) break;
               if (context.spladeEncoderSupplier().get() != encoder || isSystemicFailure(e2)) {
                 commitIfNeeded(context, processed, failed, markedFailed);
                 return StageOutcome.observed(false, processed, t0, accounting);
