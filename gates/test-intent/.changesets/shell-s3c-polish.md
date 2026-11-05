@@ -366,12 +366,14 @@ the person's own action, so it waits in Needs you. The own-transport cases of th
         "modules/app-services/src/test/java/io/justsearch/app/services/registry/executor/OperationExecutorImplTest.java"
       ],
       "class": "New",
-      "behaviour": "History is true: Earlier joins an Allow's permission and outcome rows only by the request id the Engine wrote on them. Two Allows of one operation 1.5 s apart (first run succeeds, second fails) read 'Allowed · completed' and 'Allowed · failed' on their own rows; a long first run that fails after a later Allow was used keeps its failure on its own decision; rows without the id (older rows) are never joined, the decision reads 'Allowed' and they keep their own words. The Engine writes the id on the ISSUED and CONSUMED rows of a capsule an Allow minted (none for other capsules) and on the live and journaled completion row of each run that capsule admitted; a run no request allowed carries none, and legacy rows read back unchanged.",
+      "behaviour": "History is true: Earlier joins an Allow's permission and outcome rows only by the request id the Engine wrote on them. Two Allows of one operation 1.5 s apart (first run succeeds, second fails) read 'Allowed · completed' and 'Allowed · failed' on their own rows; a long first run that fails after a later Allow was used keeps its failure on its own decision; rows without the id (older rows) are never joined, the decision reads 'Allowed' and they keep their own words. The Engine writes the id on the ISSUED and CONSUMED rows of a capsule an Allow minted (none for other capsules) and on the live and journaled completion row of each run that capsule admitted; a run no request allowed carries none, and legacy rows read back unchanged. (Linking by the request's own id is the orchestrator's design for this scenario, recorded in the task's round decision; an Earlier row that names another request's outcome is a false record under ST7.)",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "L16, history must be true. Today Earlier joins an Allow's later ledger rows (Permission Allowed, Permission Used, Completed) to the Allow by operation and a 2 s timing window. [...] Orchestrator decision (binding): link the rows by the request's own identity. Carry the request's pendingId [...] as an optional, additive field on the permission-allowed, permission-used and completion rows wherever the engine knows which pending/capsule it is executing [...] readers tolerate its absence; no migration, no other field changes. Earlier joins only on that id. Rows without it (older rows, paths that cannot know it) are never joined to a decision: the decision row shows just \"Allowed\" and the other rows keep their own truthful labels.",
-          "location": "task t-20261103-shell request (S3c repair brief, 2026-11-05)"
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "ST7",
+          "quote": "Earlier lists persisted advisories and completed operations newest first, with read/unread (existing acknowledgements), Mark all read, and Undo only where the journal/backend supports reversal; \"Add back to search\" (re-index) where forget cannot be reversed. Read/unread, seen/unseen and active/resolved stay separate.",
+          "label": "agent-drafted, owner-adopted"
         }
       ],
       "repaired": true,
@@ -379,11 +381,30 @@ the person's own action, so it waits in Needs you. The own-transport cases of th
       "newChecks": [
         "modules/ui-web/src/shell-v0/state/frameStatus.decisions.test.ts#L16 two Allows of one operation 1.5 s apart keep their own outcomes when the first run succeeds and the second fails",
         "modules/ui-web/src/shell-v0/state/frameStatus.decisions.test.ts#L16 a long first run that fails after a later Allow was used keeps its failure on its own decision",
-        "modules/ui-web/src/shell-v0/state/frameStatus.decisions.test.ts#L16 rows without a request id are never joined to a decision; each keeps its own words",
         "modules/app-observability/src/test/java/io/justsearch/app/observability/ledger/ApprovalLinkedRowsTest.java#grantAndOperationRowsKeepTheirRequestIdentityAcrossTheJournalAndLegacyRowsHaveNone",
         "modules/app-observability/src/test/java/io/justsearch/app/observability/ledger/ApprovalLinkedRowsTest.java#eachRunsCompletionRowNamesTheRequestThatAllowedIt",
         "modules/app-services/src/test/java/io/justsearch/app/services/intent/ConsentCapsuleServiceTest.java#anAllowsPermissionRowsNameItsRequestAndOtherCapsulesNameNone",
         "modules/app-services/src/test/java/io/justsearch/app/services/registry/executor/OperationExecutorImplTest.java#anAllowedRunsCompletionRowNamesTheRequestThatAllowedIt"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/frameStatus.decisions.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Rows without a request id (older ledger rows, paths that cannot know it) are never joined to a decision: the decision reads 'Allowed' and the other rows keep their own words. This already held on the baseline (it did not join rows at all) and is pinned here because the repair adds id-based joining.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "ST7",
+          "quote": "Earlier lists persisted advisories and completed operations newest first, with read/unread (existing acknowledgements), Mark all read, and Undo only where the journal/backend supports reversal; \"Add back to search\" (re-index) where forget cannot be reversed. Read/unread, seen/unseen and active/resolved stay separate.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s3c-l16-legacy.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/state/frameStatus.decisions.test.ts#L16 rows without a request id are never joined to a decision; each keeps its own words"
       ]
     },
     {
@@ -482,5 +503,16 @@ the person's own action, so it waits in Needs you. The own-transport cases of th
   "verdict": "accept",
   "digest": "sha256:aeed90971fed7b2f4923c48fc665145ca96a5eab4875bcc1de9a7d63d0e2e692",
   "note": "After the top-bar notice repair: redirect notices stay within the bar at three sizes with full tooltip and accessible name, windows named plainly with an id fallback (54 Chromium cases, centre error 0 px); the unknown-address notice unchanged. Transcribed by the orchestrator from the verifier's answer (Codex sandbox)."
+}
+```
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "01a1accc-5bee-7942-a44e-5c61d3bd6f73",
+  "verdict": "reject",
+  "digest": "sha256:aeed90971fed7b2f4923c48fc665145ca96a5eab4875bcc1de9a7d63d0e2e692",
+  "note": "Audit (PR audit-selected): entry 15 cited an orchestrator decision as owner-words, and its repaired checks included the legacy no-request-id case, which passes on the baseline (its recorded failure came from an intermediate revision). Evidence integrity and the other 39 repair checks held. Repaired since: entry 15 cites ST7; the legacy case moved to its own non-repaired entry with its own evidence. Transcribed by the orchestrator from the auditor's answer (Codex sandbox)."
 }
 ```
