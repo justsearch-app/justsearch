@@ -534,7 +534,7 @@ final class RestoredMtimeQueuedRestartTest extends LuceneExecutorTestBase {
       }
       refresh(runtime);
       if (complete) journal.drainPending();
-      return jobs.size();
+      return (int) jobs.stream().filter(job -> job.artifact() != null).count();
     }
   }
 

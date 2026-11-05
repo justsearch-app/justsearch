@@ -80,8 +80,10 @@ class IndexingDocumentOpsScalarIntegrationTest extends LuceneExecutorTestBase {
           SchemaFields.EXTRACTION_POLICY_ID, timebox.extractionPolicy().policyId(),
           SchemaFields.CONTENT, "legacy content")));
       refresh(runtime);
-      assertTrue(extractor.extractAll(List.of(claim)).isEmpty());
-      verify(journal).recordOutcomeSafely(eq(file), eq("UNCHANGED"), any());
+      var unchanged = extractor.extractAll(List.of(claim));
+      assertEquals(1, unchanged.size()); assertNull(unchanged.getFirst().artifact());
+      verify(journal, never()).recordOutcomeSafely(eq(file), eq("UNCHANGED"), any());
+      writer.write(unchanged.getFirst(), null); refresh(runtime);
       assertNull(runtime.documentFieldOps().getDocumentField(id, QUALITY));
 
       // Explicit Rebuild Index uses the same forced-path set; unchanged input must be extracted.

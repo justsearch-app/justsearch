@@ -451,6 +451,8 @@ public final class WritePathOps {
     private final Map<String, String> revision = new HashMap<>();
     private SparseRead sparse;
     private final Map<Integer, Document> stored = new HashMap<>();
+    // Source-wide fan-out may revisit a chunk explicitly patched in the same snapshot.
+    private final Map<String, Map<String, Object>> appliedUpdates = new HashMap<>();
 
     String content(String parentId) {
       return content.get(parentId);
@@ -501,6 +503,13 @@ public final class WritePathOps {
       ParentSliceCache parentCache, Map<String, Object> expectedFields,
       DocumentFieldOps.EnrichmentInput input, FieldMapper.DroppedVectorReport droppedVectors)
       throws IOException {
+    var priorUpdates = parentCache.appliedUpdates.get(docId);
+    if (priorUpdates != null && (!java.util.Collections.disjoint(priorUpdates.keySet(), io.justsearch.indexing.SourceEnvelope.FIELDS)
+        || !java.util.Collections.disjoint(updates.keySet(), io.justsearch.indexing.SourceEnvelope.FIELDS))) {
+      var combined = new HashMap<>(priorUpdates);
+      combined.putAll(updates);
+      updates = combined;
+    }
     var topDocs = searcher.search(new TermQuery(new Term(idField, docId)), 1);
     if (topDocs.scoreDocs.length == 0) {
       log.debug("readModifyWrite: document not found: {}", docId);
@@ -704,6 +713,7 @@ public final class WritePathOps {
     rmwSnap.writer().updateDocument(new Term(idField, docId), newDoc);
     // Account per completed mutation, including the applied prefix of a batch that later fails.
     session.pendingDocs.incrementAndGet();
+    parentCache.appliedUpdates.put(docId, updates);
     log.debug("readModifyWrite: updated document: {}", docId);
     return true;
   }
@@ -935,7 +945,8 @@ public final class WritePathOps {
               } else {
                 if (fields.containsKey(SparsePayload.FIELD))
                   throw new IOException("Invalid stored sparse payload: expected one binary value");
-                var sparse = parentCache.sparse == null
+                // Fan-out children may lie outside the explicit batch's sparse prefetch.
+                var sparse = parentCache.sparse == null || !parentCache.stored.containsKey(globalDocId)
                     ? sparseFeatures(searcher, Set.of(globalDocId)) : parentCache.sparse;
                 if (sparse.failures().containsKey(globalDocId)) throw sparse.failures().get(globalDocId);
                 fields.put(SchemaFields.SPLADE, sparse.features().getOrDefault(globalDocId, Map.of()));
@@ -1019,6 +1030,42 @@ public final class WritePathOps {
     return session.fieldMapper.fieldDef(candidate) != null ? candidate : null;
   }
 
+  /** Explicit backing files own their evidence; pathless chunks inherit their linked parent. */
+  private static boolean inheritsSource(Document child, String sourcePath) {
+    String path = child.get(SchemaFields.PATH);
+    return path == null || path.isBlank() || java.util.Objects.equals(path, sourcePath);
+  }
+
+  /** Parent and inheriting chunks share one serialized writer snapshot. Exceptions propagate even
+   * after the parent write, so the caller cannot acknowledge a partially published source. */
+  private boolean readModifyWriteSource(IndexSearcher searcher, String id, Map<String, Object> updates,
+      ParentSliceCache cache, Map<String, Object> expected) throws IOException {
+    if (!readModifyWrite(searcher, id, updates, cache, expected)) return false;
+    Map<String, Object> envelope = new HashMap<>();
+    for (String field : io.justsearch.indexing.SourceEnvelope.FIELDS) if (updates.containsKey(field)) envelope.put(field, updates.get(field));
+    if (envelope.isEmpty()) return true;
+    var parent = searcher.search(new TermQuery(new Term(idField, id)), 1);
+    var stored = searcher.storedFields();
+    var parentDoc = stored.document(parent.scoreDocs[0].doc, Set.of(SchemaFields.PATH, SchemaFields.IS_CHUNK));
+    if ("true".equals(parentDoc.get(SchemaFields.IS_CHUNK))) return true;
+    String path = parentDoc.get(SchemaFields.PATH);
+    if (path == null || path.isBlank()) path = id;
+    Query query = new BooleanQuery.Builder()
+        .add(new TermQuery(new Term(SchemaFields.PARENT_DOC_ID, id)), BooleanClause.Occur.FILTER)
+        .add(new TermQuery(new Term(SchemaFields.IS_CHUNK, "true")), BooleanClause.Occur.FILTER).build();
+    org.apache.lucene.search.ScoreDoc after = null;
+    while (true) {
+      var page = searcher.searchAfter(after, query, 1024);
+      if (page.scoreDocs.length == 0) break;
+      for (var hit : page.scoreDocs) {
+        var child = stored.document(hit.doc, Set.of(idField, SchemaFields.PATH));
+        if (inheritsSource(child, path)) readModifyWrite(searcher, child.get(idField), envelope, cache);
+      }
+      after = page.scoreDocs[page.scoreDocs.length - 1];
+    }
+    return true;
+  }
+
   /**
    * Batch read-modify-write: executes {@link #readModifyWrite} for each entry against the same
    * point-in-time searcher snapshot. The caller provides a leased searcher (via {@link
@@ -1044,7 +1091,7 @@ public final class WritePathOps {
     for (Map.Entry<String, Map<String, Object>> entry : batchUpdates) {
       long t0 = System.nanoTime();
       try {
-        if (readModifyWrite(searcher, entry.getKey(), entry.getValue(), parentCache)) updated++;
+        if (readModifyWriteSource(searcher, entry.getKey(), entry.getValue(), parentCache, Map.of())) updated++;
         else notFound++;
       } catch (SparsePreservationException failure) {
         storageFailure = failure;
@@ -1079,7 +1126,7 @@ public final class WritePathOps {
    *
    * @return number of documents updated (parent + chunks), or 0 if old path not found
    */
-  int updateDocumentPaths(IndexSearcher searcher, String oldPath, String newPath)
+  int updateDocumentPaths(IndexSearcher searcher, String oldPath, String newPath, Map<String, Object> envelope)
       throws IOException {
     if (oldPath.equals(newPath)) return 0;
     int lastSep = Math.max(newPath.lastIndexOf('/'), newPath.lastIndexOf('\\'));
@@ -1088,24 +1135,38 @@ public final class WritePathOps {
     var source = searcher.search(new TermQuery(new Term(idField, oldPath)), 1);
     var destination = searcher.search(new TermQuery(new Term(idField, newPath)), 1);
     if (source.scoreDocs.length == 0 && destination.scoreDocs.length == 0) return 0;
+    // A destination alone does not prove this mapping moved it. Only surviving old chunks
+    // establish a partial rename to resume; an unrelated missing source must leave it untouched.
+    if (source.scoreDocs.length == 0 && searcher.count(new BooleanQuery.Builder()
+        .add(new TermQuery(new Term(SchemaFields.PARENT_DOC_ID, oldPath)), BooleanClause.Occur.FILTER)
+        .add(new TermQuery(new Term(SchemaFields.IS_CHUNK, "true")), BooleanClause.Occur.FILTER).build()) == 0) return 0;
     int count = 0;
     if (source.scoreDocs.length > 0) {
       // Delete only before the source parent moves. A retry with only a destination parent
       // must retain that parent and every child already moved in the previous attempt.
       if (searcher.count(IndexCountOps.idAndChunksQuery(newPath)) > 0) deleteByIdAndChunks(newPath);
-      readModifyWrite(searcher, oldPath,
-          Map.of(SchemaFields.DOC_ID, newPath, SchemaFields.PATH, newPath,
-              SchemaFields.FILENAME, newFilename), parentCache);
+      var updates = new HashMap<String, Object>(envelope);
+      updates.putAll(Map.of(SchemaFields.DOC_ID, newPath, SchemaFields.PATH, newPath,
+          SchemaFields.FILENAME, newFilename));
+      readModifyWrite(searcher, oldPath, updates, parentCache);
       parentCache.alias(oldPath, newPath);
       count++;
     } else {
+      if (!envelope.isEmpty()) {
+        readModifyWrite(searcher, newPath, envelope, parentCache);
+        count++;
+      }
       String content = searcher.storedFields().document(destination.scoreDocs[0].doc)
           .get(SchemaFields.CONTENT);
       if (content != null) parentCache.putContent(oldPath, content);
       parentCache.alias(oldPath, newPath);
     }
+    Query parents = new TermQuery(new Term(SchemaFields.PARENT_DOC_ID, oldPath));
+    if (!envelope.isEmpty() && source.scoreDocs.length == 0) parents = new BooleanQuery.Builder()
+        .add(parents, BooleanClause.Occur.SHOULD)
+        .add(new TermQuery(new Term(SchemaFields.PARENT_DOC_ID, newPath)), BooleanClause.Occur.SHOULD).build();
     BooleanQuery chunkQuery = new BooleanQuery.Builder()
-        .add(new TermQuery(new Term(SchemaFields.PARENT_DOC_ID, oldPath)), BooleanClause.Occur.FILTER)
+        .add(parents, BooleanClause.Occur.FILTER)
         .add(new TermQuery(new Term(SchemaFields.IS_CHUNK, "true")), BooleanClause.Occur.FILTER)
         .build();
     org.apache.lucene.search.ScoreDoc after = null;
@@ -1113,9 +1174,14 @@ public final class WritePathOps {
       var page = searcher.searchAfter(after, chunkQuery, 1024);
       if (page.scoreDocs.length == 0) break;
       for (var hit : page.scoreDocs) {
-        String chunkId = searcher.storedFields().document(hit.doc).get(idField);
-        if (readModifyWrite(searcher, chunkId,
-            Map.of(SchemaFields.PARENT_DOC_ID, newPath, SchemaFields.PATH, newPath), parentCache)) count++;
+        var child = searcher.storedFields().document(hit.doc, Set.of(idField, SchemaFields.PATH));
+        var updates = new HashMap<String, Object>();
+        updates.put(SchemaFields.PARENT_DOC_ID, newPath);
+        if (inheritsSource(child, oldPath) || inheritsSource(child, newPath)) {
+          updates.put(SchemaFields.PATH, newPath);
+          updates.putAll(envelope);
+        }
+        if (readModifyWrite(searcher, child.get(idField), updates, parentCache)) count++;
       }
       after = page.scoreDocs[page.scoreDocs.length - 1];
     }
@@ -1163,7 +1229,7 @@ public final class WritePathOps {
         refreshSnap.searcherManager().maybeRefreshBlocking();
       }
       return bridge.withSearcherNoRefresh(searcher ->
-          readModifyWrite(searcher, docId, updates, new ParentSliceCache(), expectedFields));
+          readModifyWriteSource(searcher, docId, updates, new ParentSliceCache(), expectedFields));
     } catch (IOException e) {
       log.error("Failed to update document {}", docId, e);
       throw IndexRuntimeIOException.fromIndexOperation(e, "Failed to update document");
@@ -1298,7 +1364,7 @@ public final class WritePathOps {
     }
   }
 
-  int updateDocumentPaths(String oldPath, String newPath) {
+  int updateDocumentPaths(String oldPath, String newPath, Map<String, Object> envelope) {
     guardWritable();
     if (oldPath == null || oldPath.isBlank() || newPath == null || newPath.isBlank()) {
       return 0;
@@ -1308,7 +1374,7 @@ public final class WritePathOps {
       if (refreshSnap != null && refreshSnap.searcherManager() != null) {
         refreshSnap.searcherManager().maybeRefreshBlocking();
       }
-      return bridge.withSearcherNoRefresh(searcher -> updateDocumentPaths(searcher, oldPath, newPath));
+      return bridge.withSearcherNoRefresh(searcher -> updateDocumentPaths(searcher, oldPath, newPath, envelope));
     } catch (IOException e) {
       log.error("Failed to update document paths {} -> {}", oldPath, newPath, e);
       throw IndexRuntimeIOException.fromIndexOperation(e, "Failed to update document paths");

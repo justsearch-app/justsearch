@@ -68,7 +68,11 @@ final class SourceWitnessCertificationTest extends LuceneExecutorTestBase {
           if (timing.equals("after-hash") && mutated.compareAndSet(false, true)) rewrite(file, "after!");
           return hash;
         });
-        assertTrue(assertDoesNotThrow(() -> h.extractor.extractAll(List.of(claim))).isEmpty());
+        var admitted = assertDoesNotThrow(() -> h.extractor.extractAll(List.of(claim)));
+        for (var job : admitted) {
+          assertNull(job.artifact(), "unchanged content must not reach the parser");
+          assertDoesNotThrow(() -> h.writer.write(job, null));
+        }
       }
       assertDoesNotThrow(() -> {
         verify(h.queue, never()).markClaimDone(any(), any(), any());
@@ -186,6 +190,7 @@ final class SourceWitnessCertificationTest extends LuceneExecutorTestBase {
       var basic = new java.util.concurrent.atomic.AtomicInteger();
       var ctime = new java.util.concurrent.atomic.AtomicInteger();
       var other = new java.util.concurrent.atomic.AtomicInteger();
+      List<ExtractedJob> unchanged;
       try (var hashes = mockStatic(SourceContentHash.class, CALLS_REAL_METHODS);
           var _ = mockStatic(FileFreshnessSnapshot.class, call -> {
             if (call.getMethod().getName().equals("capture") && file.equals(call.getArgument(0))) {
@@ -205,13 +210,14 @@ final class SourceWitnessCertificationTest extends LuceneExecutorTestBase {
             }
             return call.callRealMethod();
           })) {
-        assertTrue(h.extractor.extractAll(List.of(claim(file))).isEmpty());
+        unchanged = h.extractor.extractAll(List.of(claim(file)));
         hashes.verify(() -> SourceContentHash.sha256WithinRoot(file, temporary), times(1));
       }
       System.out.println("C3 unchanged source attribute probes: captures=" + captures.get() + ", basic=" + basic.get()
           + ", ctime=" + ctime.get() + ", other=" + other.get());
       verify(h.parser, never()).extractArtifact(any());
-      verify(h.queue).markClaimDone(any(), any(), any());
+      assertEquals(1, unchanged.size()); assertNull(unchanged.getFirst().artifact());
+      verify(h.queue, never()).markClaimDone(any(), any(), any());
     }
   }
 

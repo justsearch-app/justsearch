@@ -17,6 +17,7 @@ import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.splade.SpladeEncoder;
 import io.justsearch.indexerworker.util.PathNormalizer;
 import io.justsearch.indexing.SchemaFields;
+import io.justsearch.indexing.SourceEnvelope;
 import io.justsearch.indexing.api.IndexDocument;
 import io.opentelemetry.api.GlobalOpenTelemetry;
 import io.opentelemetry.api.trace.Span;
@@ -139,7 +140,7 @@ public final class JobBatchWriter {
     writeFailures.finish(retryAtMs);
   }
 
-  /** Builds and writes an already-extracted job. Mirrors prior IndexingLoop.writeExtractedJob. */
+  /** Publishes an admitted source, or only its envelope when content is unchanged. */
   public void write(ExtractedJob ex, float[] precomputedEmbedding) {
     Span writeSpan = maybeSpan("indexing.write");
     writeSpan.setAttribute("doc.path", ex.filePath().toString());
@@ -177,6 +178,24 @@ public final class JobBatchWriter {
         batchStats.recordSkipped();
         return;
       }
+      if (ex.artifact() == null) {
+        var sourceEnvelope = publicationEnvelope(ex);
+        String id = ex.envelope().normalizedPath();
+        publishedPath = id;
+        var active = activeLexicalSource.get();
+        if (active != null) active.indexingCoordinator().updateDocument(id, sourceEnvelope.patch());
+        if (!indexingCoordinator.updateDocument(id, sourceEnvelope.patch())) {
+          throw new IllegalStateException("Unchanged source disappeared before envelope publication");
+        }
+        indexedDelta.accept(1);
+        // Metadata success cannot certify the parser/embedding pipeline for failed peers.
+        batchStats.recordSkipped();
+        journal.enqueueTransition(new JobQueue.IngestionLedgerTransition(ex.claim(),
+            LedgerEntryFactory.forEnvelope(ex.envelope(), ex.collection(), null,
+                contentExtractor.extractionPolicy(), ex.provenance())),
+            journal.skipped(IngestionReasonCodes.UNCHANGED));
+        return;
+      }
       SpladeEncoder splade = spladeEncoderSupplier.get();
       IndexingDocumentOps.ParentIndexMetadata parentMetadata =
           IndexingDocumentOps.deriveParentMetadata(ex.filePath(), ex.artifact().result(), splade, log);
@@ -202,11 +221,8 @@ public final class JobBatchWriter {
               ex.docUid()),
           chunkPlan);
 
-      if (storageSnapshot == null) {
-        storageSnapshot = io.justsearch.indexerworker.services.StorageObservationSnapshot.capture();
-      }
-      var envelope = storageSnapshot.envelope(
-          ex.sourceRealPath() == null ? ex.filePath() : ex.sourceRealPath(), ex.envelope().originId()).fields();
+      var sourceEnvelope = publicationEnvelope(ex);
+      var envelope = sourceEnvelope.fields();
       var fields = new java.util.HashMap<>(doc.fields());
       fields.putAll(envelope);
       doc = new IndexDocument(fields);
@@ -236,6 +252,8 @@ public final class JobBatchWriter {
         IndexingDocumentOps.indexDeclaredChunks(ex.filePath(), ex.artifact().result(),
             lexicalSource.indexingCoordinator(), lexicalMetadata, ex.collection(), ex.docUid(),
             false, chunkPlan, envelope);
+      } else if (lexicalSource != null) {
+        lexicalSource.indexingCoordinator().updateDocument(ex.envelope().normalizedPath(), sourceEnvelope.patch());
       }
       boolean acceptedEmbedding = indexingCoordinator.indexSingle(doc);
       // Tempdoc 819 / 821 §O.1 (+ #470 D2): when the document carries a completed embedding (the
@@ -322,7 +340,7 @@ public final class JobBatchWriter {
         if (presence == SourcePresence.Verdict.ABSENT
             || presence == SourcePresence.Verdict.SOURCE_UNREADABLE) record.accept(false);
         else writeFailures.failure(e, ex.filePath(), ex.sourceRealPath(), record);
-        journal.recordFailedMetric(ex.filePath(), ex.artifact().result().mimeType());
+        journal.recordFailedMetric(ex.filePath(), ex.artifact() == null ? null : ex.artifact().result().mimeType());
         batchStats.recordFailed();
       }
     } finally {
@@ -333,6 +351,15 @@ public final class JobBatchWriter {
         fileMutationFence.unlock();
       }
     }
+  }
+
+  /** Observe after document construction, immediately before this source's first writes. */
+  private SourceEnvelope publicationEnvelope(ExtractedJob ex) {
+    if (storageSnapshot == null) {
+      storageSnapshot = io.justsearch.indexerworker.services.StorageObservationSnapshot.capture();
+    }
+    return storageSnapshot.envelope(ex.sourceRealPath() == null ? ex.filePath() : ex.sourceRealPath(),
+        jobQueue.sourceOriginId(ex.claim()).orElse(null));
   }
 
   /**

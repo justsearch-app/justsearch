@@ -3,6 +3,7 @@ package io.justsearch.indexerworker.loop;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -361,7 +362,7 @@ final class JobBatchExtractorForcedPathTest {
   }
 
   @Test
-  @DisplayName("not forced: the same untouched file IS skipped as UNCHANGED")
+  @DisplayName("unforcedPathTakesTheUnchangedBranch(): not forced: the same untouched file IS skipped as UNCHANGED")
   void unforcedPathTakesTheUnchangedBranch() throws Exception {
     Path file = Files.writeString(tempDir.resolve("doc.txt"), "unchanged content");
     Harness h = newHarness(ConcurrentHashMap.newKeySet());
@@ -371,11 +372,12 @@ final class JobBatchExtractorForcedPathTest {
 
     // The inverse arm: identical file, identical mocks, empty forced set. Without this, the test
     // above could pass because extraction always runs, proving nothing about the force.
-    assertEquals(List.of(), extracted, "an unchanged doc yields no extracted job");
+    assertEquals(1, extracted.size(), "unchanged content still needs an envelope publication");
+    assertNull(extracted.getFirst().artifact());
     verify(h.documentFieldOps()).isUnmodified(eq(forcedKey(file)), anyLong(), anyLong(), anyString(), anyString());
     verify(h.contentExtractor(), never()).extractArtifact(any());
-    verify(h.journal()).recordOutcomeSafely(eq(file), eq("UNCHANGED"), any());
-    verify(h.batchStats()).recordSkipped();
+    verify(h.journal(), never()).recordOutcomeSafely(eq(file), eq("UNCHANGED"), any());
+    verify(h.batchStats(), never()).recordSkipped();
   }
 
   @Test
@@ -426,7 +428,7 @@ final class JobBatchExtractorForcedPathTest {
   }
 
   @Test
-  @DisplayName("unchanged bytes with the same non-default collection tag remain UNCHANGED")
+  @DisplayName("sameCollectionTagStillTakesTheUnchangedBranch(): unchanged bytes with the same non-default collection tag remain UNCHANGED")
   void sameCollectionTagStillTakesTheUnchangedBranch() throws Exception {
     Path file = Files.writeString(tempDir.resolve("same-collection.txt"), "unchanged content");
     Harness h = newHarness(ConcurrentHashMap.newKeySet());
@@ -441,15 +443,15 @@ final class JobBatchExtractorForcedPathTest {
 
     List<ExtractedJob> extracted = h.extractor().extractAll(List.of(claim));
 
-    assertEquals(
-        List.of(), extracted, "same collection and unchanged bytes should skip extraction");
+    assertEquals(1, extracted.size(), "same collection skips parsing, then publishes metadata");
+    assertNull(extracted.getFirst().artifact());
     verify(h.contentExtractor(), never()).extractArtifact(any());
-    verify(h.journal()).recordOutcomeSafely(eq(file), eq("UNCHANGED"), any());
-    verify(h.jobQueue()).markClaimDone(eq(claim), any(), any());
+    verify(h.journal(), never()).recordOutcomeSafely(eq(file), eq("UNCHANGED"), any());
+    verify(h.jobQueue(), never()).markClaimDone(eq(claim), any(), any());
   }
 
   @Test
-  @DisplayName("blank and null default collection tags compare as the same collection")
+  @DisplayName("blankClaimCollectionMatchesIndexedDefaultCollection(): blank and null default collection tags compare as the same collection")
   void blankClaimCollectionMatchesIndexedDefaultCollection() throws Exception {
     Path file =
         Files.writeString(
@@ -460,10 +462,10 @@ final class JobBatchExtractorForcedPathTest {
 
     List<ExtractedJob> extracted = h.extractor().extractAll(List.of(claim));
 
-    assertEquals(
-        List.of(), extracted, "blank and null default collection tags should skip extraction");
+    assertEquals(1, extracted.size(), "blank and null collection tags skip parsing, then publish metadata");
+    assertNull(extracted.getFirst().artifact());
     verify(h.contentExtractor(), never()).extractArtifact(any());
-    verify(h.journal()).recordOutcomeSafely(eq(file), eq("UNCHANGED"), any());
+    verify(h.journal(), never()).recordOutcomeSafely(eq(file), eq("UNCHANGED"), any());
   }
 
   @Test
@@ -580,7 +582,7 @@ final class JobBatchExtractorForcedPathTest {
   }
 
   @Test
-  @DisplayName("the pre-P3 key for that same shape is inert: marked, never looked up")
+  @DisplayName("preP3KeyForTheSameShapeSilentlyFailsToForce(): the pre-P3 key for that same shape is inert: marked, never looked up")
   void preP3KeyForTheSameShapeSilentlyFailsToForce() throws Exception {
     Path dir = Files.createDirectories(tempDir.resolve("sub"));
     Files.writeString(dir.resolve("doc.txt"), "unchanged content");
@@ -590,12 +592,14 @@ final class JobBatchExtractorForcedPathTest {
     forcedPaths.add(preP3Key(submitted));
     Harness h = newHarness(forcedPaths);
 
-    h.extractor().extractAll(List.of(rootedJob(submitted, null)));
+    var metadata = h.extractor().extractAll(List.of(rootedJob(submitted, null)));
+    assertEquals(1, metadata.size());
+    assertNull(metadata.getFirst().artifact());
 
     // This is the failure mode P3 removes, pinned as a standing negative control: reverting any
     // marker to the pre-P3 derivation makes the test above fail with exactly this behaviour.
     verify(h.contentExtractor(), never()).extractArtifact(any());
-    verify(h.journal()).recordOutcomeSafely(any(), eq("UNCHANGED"), any());
+    verify(h.journal(), never()).recordOutcomeSafely(any(), eq("UNCHANGED"), any());
     assertEquals(
         Set.of(preP3Key(submitted)),
         forcedPaths,
