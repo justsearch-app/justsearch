@@ -591,7 +591,7 @@ def test_kr9_headers_record_identity_digests_without_machine_paths(checkout, mod
     # The key keeps the literal value; the record keeps its digest.
     assert components["runtime"]["JUSTSEARCH_ORT_PROFILING_DIR"] == str(tmp_path / "profiles")
     identity = ix.identity_digests(components)
-    assert set(identity) == {"distribution", "harness", "jdk", "jvm_options", "library_path", "ocr",
+    assert set(identity) == {"distribution", "harness", "jdk", "jvm_options", "library_path", "gpu", "ocr",
                              "models", "runtime", "documents"}
     h = header(c, index_key=key, identity=identity, index_state={"runtime": inputs.recorded(components["runtime"])})
     text = json.dumps(h.to_dict())

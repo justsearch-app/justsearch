@@ -10,6 +10,7 @@ import importlib
 import json
 import os
 from pathlib import Path
+import platform
 import re
 import shutil
 import subprocess
@@ -106,6 +107,11 @@ def jvm_options(environ) -> dict[str, str]:
     for name in LOADER_VARIABLES:
         if environ.get(name, "").strip():
             raise InputRefused(f"{name} changes which native libraries load; unset it for a reusable index")
+    # The tokenizer library: HeadlessApp's class init refuses both outright (set at all, or any
+    # flavor but cpu); refused here first so the reason is named.
+    if "RUST_LIBRARY_PATH" in environ or environ.get("RUST_FLAVOR", "cpu") != "cpu":
+        raise InputRefused("RUST_LIBRARY_PATH or a RUST_FLAVOR other than cpu selects a tokenizer "
+                           "library outside the snapshot; unset them for a reusable index")
     return out
 
 
@@ -154,15 +160,126 @@ def jdk_digest(home: Path) -> dict[str, str]:
 # --------------------------------------------------------------------------- native / GPU
 
 
+# Native code comes only from the snapshot, the pinned JDK and the pinned ORT native folder
+# (JUSTSEARCH_ONNXRUNTIME_NATIVE_PATH, keyed by content; so are JUSTSEARCH_NATIVE_PATH and
+# LD_LIBRARY_PATH). The engine also discovers native code itself, in CPU mode as in GPU mode:
+#
+# In its data folder (JUSTSEARCH_HOME and JUSTSEARCH_DATA_DIR are both the entry's data folder),
+# all under native-bin/, which is therefore refused whole:
+# - native-bin/llama-server/variants/cuda12: HeadlessApp.maybeMirrorOrtNativePath sets
+#   justsearch.onnxruntime.native_path to it, guarded only by the enterprise GPU policy, and
+#   HeadlessApp.applyOrtNativePack turns that into ORT's onnxruntime.native.path, which reroutes
+#   every ORT native, the CPU core included (OrtCudaHelper.applyOrtNativePackProperty);
+#   OrtCudaHelper.resolveOrtNativePath preloads CUDA libraries from it on Linux;
+#   HeadlessApp.maybeAutoSelectCuda12Variant selects its llama-server.
+# - native-bin/onnxruntime/variants/<id>: HeadlessApp.variantOrtNativeDir, the same mirror; the id
+#   comes from JUSTSEARCH_ONNXRUNTIME_VARIANT_ID or the llama-server path.
+# - native-bin/llama-server: HeadlessApp.resolveDefaultServerExecutable,
+#   InferenceConfig.findExistingServerExecutable, RuntimeActivationService.resolveVariantsRoot.
+# - native-bin/tesseract: TikaOcrRuntime's bundle roots (after the pinned JUSTSEARCH_TESSERACT_PATH).
+# The same readers' repository fallbacks (<repo>/native-bin, <repo>/modules/ui/native-bin and, on
+# Windows only, GpuAutoDetection's <repo>/tmp/ort-variant-test) resolve against
+# JUSTSEARCH_REPO_ROOT, the hashed snapshot.
+DATA_NATIVE_FOLDER = "native-bin"
+# DJL's tokenizer library: HuggingFaceNativeRuntime.prepareCpuCache keeps a libtokenizers.so
+# already present in Utils.getEngineCacheDir("tokenizers") without checking its bytes. That folder
+# is ENGINE_CACHE_DIR (environment before system property), else DJL_CACHE_DIR, else ~/.djl.ai.
+# Each launch points ENGINE_CACHE_DIR at this data subfolder, emptied first (fresh_engine_cache),
+# so the library is always extracted from the snapshot's tokenizers jar.
+ENGINE_CACHE_ENV, ENGINE_CACHE_FOLDER = "ENGINE_CACHE_DIR", "engine-cache"
+# Per-model GPU switches: each overrides JUSTSEARCH_GPU_ENABLED for its model
+# (ResolvedConfigBuilder.resolveEmbedGpuEnabled/resolveModelGpuEnabled: per-model key, then the
+# master switch). They are ordinary settings, so the key keeps their literal values (runtime);
+# any value that is not plainly false also makes the launch GPU mode.
+MODEL_GPU_SWITCHES = ("JUSTSEARCH_EMBED_GPU_ENABLED", "JUSTSEARCH_SPLADE_GPU_ENABLED",
+                      "JUSTSEARCH_NER_GPU_ENABLED", "JUSTSEARCH_BGE_M3_GPU_ENABLED",
+                      "JUSTSEARCH_RERANK_GPU_ENABLED", "JUSTSEARCH_RERANK_CHUNKS_GPU_ENABLED")
+# The CUDA driver library, loaded by name through the system loader (GpuDriverApiProbe.probe).
+CUDA_DRIVER = "libcuda.so.1"
+_LDCONFIG_ARCH = {"x86_64": "x86-64", "aarch64": "AArch64"}
+
+
+def gpu_mode(env) -> bool:
+    """True when the master switch or any per-model switch can put a model on the GPU."""
+    if env.get("JUSTSEARCH_GPU_ENABLED", "").strip().lower() == "true":
+        return True
+    return any(env[name].strip().lower() not in ("", "false", "0", "no")
+               for name in MODEL_GPU_SWITCHES if name in env)
+
+
 def native_selection(env) -> None:
     """GPU use and ORT/CUDA natives must be explicit; automatic discovery is never keyed."""
     gpu = env.get("JUSTSEARCH_GPU_ENABLED", "").strip().lower()
     if gpu not in ("true", "false"):
         raise InputRefused("automatic GPU/native discovery is not pinned: set JUSTSEARCH_GPU_ENABLED=false "
                            "(CPU), or true together with JUSTSEARCH_ONNXRUNTIME_NATIVE_PATH")
-    if gpu == "true" and not env.get("JUSTSEARCH_ONNXRUNTIME_NATIVE_PATH", "").strip():
-        raise InputRefused("GPU enabled without JUSTSEARCH_ONNXRUNTIME_NATIVE_PATH: CUDA natives would "
-                           "come from automatic discovery; set the native directory explicitly")
+    if gpu_mode(env) and not env.get("JUSTSEARCH_ONNXRUNTIME_NATIVE_PATH", "").strip():
+        raise InputRefused("GPU enabled (master or per-model switch) without "
+                           "JUSTSEARCH_ONNXRUNTIME_NATIVE_PATH: CUDA natives would come from "
+                           "automatic discovery; set the native directory explicitly")
+
+
+def data_native_fallbacks(data: Path) -> None:
+    """Refuse native code the engine would discover in its data folder, CPU and GPU mode alike."""
+    if os.path.lexists(data / DATA_NATIVE_FOLDER):
+        raise InputRefused(f"the data folder holds {DATA_NATIVE_FOLDER}/, native code the engine "
+                           f"discovers and loads outside the key; remove it")
+
+
+def fresh_engine_cache(data: Path) -> Path:
+    """The launch's DJL engine cache, emptied so no earlier extraction is reused."""
+    cache = data / ENGINE_CACHE_FOLDER
+    if os.path.lexists(cache):
+        if cache.is_symlink() or not cache.is_dir():
+            cache.unlink()
+        else:
+            shutil.rmtree(cache)
+    cache.mkdir(parents=True)
+    return cache
+
+
+def _run_text(command: list[str], what: str) -> str:
+    try:
+        out = subprocess.run(command, capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.SubprocessError) as e:
+        raise InputRefused(f"GPU mode: {what} unreadable: {e}") from None
+    if out.returncode != 0:
+        raise InputRefused(f"GPU mode: {what} unreadable: {(out.stderr or out.stdout).strip()[-300:]}")
+    return out.stdout
+
+
+def cuda_driver_library(library_path: str) -> Path:
+    """The libcuda.so.1 the system loader resolves: LD_LIBRARY_PATH, then the loader cache."""
+    for entry in library_path.split(os.pathsep) if library_path else []:
+        candidate = Path(entry) / CUDA_DRIVER
+        if candidate.is_file():
+            return candidate.resolve()
+    arch = _LDCONFIG_ARCH.get(platform.machine())
+    ldconfig = shutil.which("ldconfig") or next(
+        (p for p in ("/sbin/ldconfig", "/usr/sbin/ldconfig") if os.access(p, os.X_OK)), None)
+    if arch is None or ldconfig is None:
+        raise InputRefused(f"GPU mode: cannot resolve {CUDA_DRIVER} (no ldconfig for {platform.machine()})")
+    for line in _run_text([ldconfig, "-p"], "the loader cache (ldconfig -p)").splitlines():
+        m = re.match(r"\s*(\S+) \(([^)]*)\) => (/.+)$", line)
+        if m and m.group(1) == CUDA_DRIVER and arch in m.group(2).split(",") and Path(m.group(3)).is_file():
+            return Path(m.group(3)).resolve()
+    raise InputRefused(f"GPU mode: the system loader resolves no {CUDA_DRIVER}")
+
+
+def gpu_driver(env) -> dict | None:
+    """GPU mode: the NVIDIA driver version and the bytes of the CUDA driver library; else None."""
+    if not gpu_mode(env):
+        return None
+    smi = shutil.which("nvidia-smi")
+    if not smi:
+        raise InputRefused("GPU mode: nvidia-smi unavailable, so the driver version cannot be read")
+    text = _run_text([smi, "--query-gpu=driver_version", "--format=csv,noheader"],
+                     "the driver version (nvidia-smi)")
+    versions = sorted({line.strip() for line in text.splitlines() if line.strip()})
+    if not versions or not all(re.fullmatch(r"[0-9][0-9.]*", v) for v in versions):
+        raise InputRefused(f"GPU mode: nvidia-smi reported no driver version ({text.strip()[-200:]!r})")
+    library = cuda_driver_library(env.get("LD_LIBRARY_PATH", ""))
+    return {"driver_version": versions, "libcuda": _hashing(distribution.file_sha256, library)}
 
 
 # --------------------------------------------------------------------------- OCR

@@ -95,6 +95,11 @@ where it lives:
 - the JDK (resolved once and passed as `JAVA_HOME`), JVM options, the ORT/CUDA
   native folders and `LD_LIBRARY_PATH`, the tesseract executable, its libraries
   and language data (resolved once and passed explicitly);
+- in GPU mode (`JUSTSEARCH_GPU_ENABLED=true`, or any per-model
+  `JUSTSEARCH_*_GPU_ENABLED` switch that is not false), the NVIDIA driver
+  version `nvidia-smi` reports and the bytes of the `libcuda.so.1` the system
+  loader resolves (`LD_LIBRARY_PATH`, then `ldconfig -p`). GPU mode is refused
+  when either cannot be read;
 - the whole models root (`--models-dir`): every package model discovery can
   select, BGE-M3 included. Only files whose readers cannot change index
   contents are left out: ORT's legacy optimized siblings (only ever deleted),
@@ -118,6 +123,27 @@ where it lives:
   receives those absolute paths. Locations the snapshot's `application.yaml`
   names must lie inside the snapshot.
 
+Native code comes only from the snapshot, the JDK and the pinned
+`JUSTSEARCH_ONNXRUNTIME_NATIVE_PATH` (plus `LD_LIBRARY_PATH`, keyed by content).
+The engine also looks for native packs of its own, in CPU mode as in GPU mode:
+everything it discovers in its data folder lies under `native-bin/` (the CUDA
+runtime pack and ONNX Runtime variants that redirect every ORT library, the
+llama-server and tesseract bundles), so a `native-bin/` folder in an entry's data
+folder refuses before every launch and at adoption. The same lookups in the
+repository resolve inside the snapshot. The tokenizer library is extracted from
+the snapshot's jar on every launch: `ENGINE_CACHE_DIR` points at the entry's
+`engine-cache/` folder, emptied first, because the engine reuses whatever an
+earlier extraction left in DJL's cache (`~/.djl.ai` by default) without
+checking it; `RUST_LIBRARY_PATH` or a `RUST_FLAVOR` other than `cpu` refuses.
+
+**Known limit: system libraries.** Libraries the engine or its runtimes load
+from the operating system by name are not hashed: the C library, the C++
+runtime, and every driver component other than `libcuda.so.1` (NVML, for
+example). After an operating-system or driver update, build fresh indexes:
+run `quality prepare` (and the scoring commands after it) with `--cache-root`
+pointing at a new folder under `~/.cache/justsearch-quality/`. Nothing is
+reused from a cache root that holds no entries.
+
 Quality engines never use ORT's optimized-graph cache
 (`JUSTSEARCH_ORT_OPTIMIZED_CACHE_MAX_MB=0`, its folder inside the entry's data
 folder): a cached graph is loaded without verifying its bytes. The engine
@@ -134,7 +160,9 @@ is unchanged, the index is reused. A Java edit, a dependency, `SSOT/` or
 a runtime setting or the preparation harness builds a new index. An input that
 cannot be resolved, hashed or validated is refused with its reason: automatic
 GPU discovery (set `JUSTSEARCH_GPU_ENABLED=false`, or `true` with
-`JUSTSEARCH_ONNXRUNTIME_NATIVE_PATH`), JVM argument files, VM option files,
+`JUSTSEARCH_ONNXRUNTIME_NATIVE_PATH`; a per-model GPU switch needs the native
+folder too), an unreadable GPU driver version or `libcuda.so.1`, a `native-bin/`
+folder in the data folder, a tokenizer library override, JVM argument files, VM option files,
 agents, `LD_PRELOAD`, an extraction-command override or any option value not on
 the allow-list, a per-package model location (`JUSTSEARCH_*_MODEL_PATH`; point
 `--models-dir` at a models root instead), a `models/` folder in the data folder,

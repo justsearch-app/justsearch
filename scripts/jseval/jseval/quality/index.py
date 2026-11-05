@@ -179,6 +179,8 @@ def compute_index_key(collection: Collection, config: IndexConfig,
             "jdk": inputs.jdk_digest(Path(env["JAVA_HOME"])),
             "jvm_options": {name: env.get(name, "") for name in inputs.JVM_OPTION_VARIABLES},
             "library_path": inputs.library_path(env.get("LD_LIBRARY_PATH", "")),
+            # GPU mode only: the driver version and the libcuda.so.1 the system loader resolves.
+            "gpu": inputs.gpu_driver(env),
             "ocr": inputs.ocr_digest(Path(env["JUSTSEARCH_TESSERACT_PATH"]), Path(env["JUSTSEARCH_TESSDATA_PATH"])),
             "models": inputs.model_hashes(Path(env["JUSTSEARCH_MODELS_DIR"]), llm_off=inputs.llm_off(env)),
             # Ports/data folders are lifecycle-owned; everything else is conservatively shaping.
@@ -260,15 +262,29 @@ def _snapshot_install(root: Path) -> None:
         distribution.publish(root, source, digest)
 
 
+def _native_fallbacks(data: Path) -> None:
+    try:
+        inputs.data_native_fallbacks(data)
+    except inputs.InputRefused as e:
+        raise InputUnavailable(f"not ready: {e}") from None
+
+
 def _launch_env(config: IndexConfig, data: Path, env: Mapping[str, str]) -> dict[str, str]:
-    """Override lifecycle paths; code and repo resources come from the immutable snapshot."""
+    """Override lifecycle paths; code and repo resources come from the immutable snapshot.
+
+    Runs before every launch: refuses native code the engine would discover in the data
+    folder and empties the launch's DJL engine cache (inputs.DATA_NATIVE_FOLDER and
+    inputs.ENGINE_CACHE_ENV say why).
+    """
     snapshot = distribution.path(env[DISTRIBUTION_ENV])
     # Model discovery also tries <data>/models (data and home folder) and <snapshot>/models
     # (repo root; a snapshot never holds one): all must stay absent so only the hashed root serves.
     if (data / "models").exists() or (snapshot / "models").exists():
         raise InputUnavailable("not ready: a models folder outside the hashed models root would serve "
                                "model discovery (data or snapshot folder)")
+    _native_fallbacks(data)
     return {**env, ORT_CACHE_DIR: str(data / "ort-optimized"),
+            inputs.ENGINE_CACHE_ENV: str(inputs.fresh_engine_cache(data)),
             "JUSTSEARCH_HOME": str(data), "JUSTSEARCH_DATA_DIR": str(data),
             "JUSTSEARCH_INDEX_BASE_PATH": str(data / "index/default"),
             "JUSTSEARCH_REPO_ROOT": str(snapshot),
@@ -849,6 +865,7 @@ def prepare_index(collection: Collection, config: IndexConfig, *, prepared_only:
             _check_owner(_json(entry_path)["owner"], collection, key)
             if not owner_path.exists():
                 raise IndexRefused("cache entry has no owned index")
+            _native_fallbacks(data)
             if prepared_only:
                 backend.require_prepared_data(data)
             # Retention keeps the snapshot of every adopted entry.
@@ -979,9 +996,11 @@ def _start_serving(config: IndexConfig, data: Path, env: dict, port: int,
     for attempt in range(3):
         if time.monotonic() >= deadline:
             break
+        # Refused inputs propagate as they are; they are no startup failure to retry.
+        overrides = _launch_env(config, data, env)
         try:
             return backend.start_backend(repo_root=config.repo_root, data_dir=data, port=port,
-                env_overrides=_launch_env(config, data, env),
+                env_overrides=overrides,
                 distribution=distribution.path(env[DISTRIBUTION_ENV]),
                 health_timeout_sec=max(.001, min(180, deadline-time.monotonic())),
                 startup_admission=startup_admission, prepared_only=prepared_only)

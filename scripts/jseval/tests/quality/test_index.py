@@ -578,6 +578,8 @@ def test_gpu_selection_is_inherited_and_keyed_and_lifecycle_paths_override_inher
     monkeypatch.setenv("JUSTSEARCH_GPU_ENABLED", "true")
     monkeypatch.setenv("JUSTSEARCH_ONNXRUNTIME_NATIVE_PATH", str(natives))
     monkeypatch.setenv("JUSTSEARCH_RERANK_GPU_ENABLED", "true")
+    # The driver reading is covered by test_native_closure; keep this one off the machine's GPU.
+    monkeypatch.setattr(ix.inputs, "gpu_driver", lambda env: {"driver_version": ["1.0"], "libcuda": "0" * 64})
     env = pinned_env(config)
     # The caller's GPU selection reaches the engine and shapes the reusable index key.
     assert env["JUSTSEARCH_GPU_ENABLED"] == env["JUSTSEARCH_RERANK_GPU_ENABLED"] == "true"
@@ -590,9 +592,10 @@ def test_gpu_selection_is_inherited_and_keyed_and_lifecycle_paths_override_inher
     assert ix.compute_index_key(c, config, env)[0] != gpu_key
     assert env["JUSTSEARCH_SPLADE_ENABLED"] == env["JUSTSEARCH_RAG_CHUNK_SPLADE_ENABLED"] == "false"
     assert "JUSTSEARCH_DATA_DIR" not in env and "JUSTSEARCH_INDEX_BASE_PATH" not in env
-    launch = ix._launch_env(config, Path("/owned/data"), env)
-    assert launch["JUSTSEARCH_HOME"] == "/owned/data"
-    assert launch["JUSTSEARCH_INDEX_BASE_PATH"] == "/owned/data/index/default"
+    owned = tmp_path / "owned/data"
+    launch = ix._launch_env(config, owned, env)
+    assert launch["JUSTSEARCH_HOME"] == str(owned)
+    assert launch["JUSTSEARCH_INDEX_BASE_PATH"] == str(owned / "index/default")
     # Code and repo resources come from the snapshot, never the checkout.
     snapshot = distribution.path(env[ix.DISTRIBUTION_ENV])
     assert launch["JUSTSEARCH_REPO_ROOT"] == str(snapshot)
