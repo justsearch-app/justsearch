@@ -14,7 +14,7 @@ From an installed `scripts/jseval` environment:
 ```sh
 export JUSTSEARCH_DATASET_CACHE="$HOME/.cache/justsearch-quality/dataset-cache"
 export JUSTSEARCH_GPU_ENABLED=false
-export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-} -Djava.awt.headless=true"
+export JAVA_TOOL_OPTIONS=-Djava.awt.headless=true
 python -m jseval quality corpus fetch real-use
 python -m jseval quality corpus materialize real-use
 python -m jseval quality known-answers real-use-slice
