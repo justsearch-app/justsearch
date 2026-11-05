@@ -220,8 +220,11 @@ public interface AiInstallService {
   /** Refuses ({@link IllegalStateException}) while a part's files are being removed. */
   default void refuseWhileRemovingFiles() {}
 
-  /** Request cancellation of an in-flight install. */
-  void cancel();
+  /**
+   * Request cancellation of an in-flight install. False when the install's completion has already
+   * been admitted (its settings change is committing or committed): nothing is cancelled then.
+   */
+  boolean cancel();
 
   /**
    * Repair an installed AI runtime. <b>Repair is start</b>: this re-derives the whole install plan

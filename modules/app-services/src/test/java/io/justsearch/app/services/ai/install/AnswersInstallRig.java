@@ -53,6 +53,12 @@ final class AnswersInstallRig implements AutoCloseable {
   CompletionStage<OperationResult> completion;
 
   AnswersInstallRig(Path home) throws Exception {
+    this(home, null);
+  }
+
+  /** As above, with the settings owner's component preparation supplied by the test. */
+  AnswersInstallRig(Path home, io.justsearch.app.services.settings.SettingsComponentComposer components)
+      throws Exception {
     this.home = home;
     server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
     server.createContext("/answer-model", exchange -> {
@@ -83,7 +89,9 @@ final class AnswersInstallRig implements AutoCloseable {
     prior = ConfigStore.globalOrNull();
     published = new ConfigStore(ConfigStoreRebuilder.prepare(initial));
     ConfigStore.setGlobal(published);
-    fixture = new RuntimeIntentTestFixture(home.resolve("intent"), store, published);
+    fixture = components == null
+        ? new RuntimeIntentTestFixture(home.resolve("intent"), store, published)
+        : new RuntimeIntentTestFixture(home.resolve("intent"), store, published, components);
     settings = new SettingsServiceImpl(store, fixture.runner());
     installer = spy(new AiInstallService(null, store, null, null, home, null, settings));
     doReturn(new ModelRegistry(2, "local answer model fixture", List.of(chat)))
@@ -127,7 +135,10 @@ final class AnswersInstallRig implements AutoCloseable {
   public void close() throws Exception {
     release.countDown();
     try {
-      if (completion != null) completion.toCompletableFuture().get(30, TimeUnit.SECONDS);
+      // Waits for the run to end; a test asserts its outcome itself (a cancelled run fails it).
+      if (completion != null) {
+        completion.toCompletableFuture().handle((result, failure) -> result).get(30, TimeUnit.SECONDS);
+      }
     } finally {
       try { fixture.close(); }
       finally {

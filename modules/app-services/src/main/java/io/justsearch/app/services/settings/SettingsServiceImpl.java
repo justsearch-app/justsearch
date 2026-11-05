@@ -167,6 +167,22 @@ public final class SettingsServiceImpl implements SettingsService {
       io.justsearch.app.api.settings.SettingsWitness expected,
       io.justsearch.core.context.EngineContext context,
       SettingsCandidateContext candidateContext) {
+    return applyInternalAdmitted(candidate, expected, context, candidateContext, null);
+  }
+
+  @Override
+  public OperationAttemptRunner.Result applyInternal(io.justsearch.app.api.UiSettings candidate,
+      io.justsearch.app.api.settings.SettingsWitness expected,
+      io.justsearch.core.context.EngineContext context,
+      SettingsCandidateContext candidateContext, java.util.function.BooleanSupplier commitAdmission) {
+    return applyInternalAdmitted(candidate, expected, context, candidateContext,
+        Objects.requireNonNull(commitAdmission, "commitAdmission"));
+  }
+
+  private OperationAttemptRunner.Result applyInternalAdmitted(io.justsearch.app.api.UiSettings candidate,
+      io.justsearch.app.api.settings.SettingsWitness expected,
+      io.justsearch.core.context.EngineContext context,
+      SettingsCandidateContext candidateContext, java.util.function.BooleanSupplier commitAdmission) {
     Objects.requireNonNull(candidate, "candidate");
     Objects.requireNonNull(expected, "expected");
     Objects.requireNonNull(context, "context");
@@ -209,7 +225,9 @@ public final class SettingsServiceImpl implements SettingsService {
               () -> attempts.acceptPrepared(scope.request(), saved.orElseThrow().nonce());
         }).get();
     return attempts.start(accepted, record -> io.justsearch.agent.api.registry.OperationExecution.finished(
-        !SettingsCandidateContext.NONE.equals(candidateContext)
+        commitAdmission != null
+            ? attempts.applySettingsAdmitted(record, expected, frozen, candidateContext, commitAdmission)
+            : !SettingsCandidateContext.NONE.equals(candidateContext)
             ? attempts.applySettings(record, expected, frozen, candidateContext)
             : attempts.applySettings(record, expected, frozen)));
   }

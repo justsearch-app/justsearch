@@ -148,6 +148,14 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     this.operationLeases = leases == null ? OperationLeaseService.noOp() : leases;
   }
   private final AtomicBoolean cancelFlag = new AtomicBoolean(false);
+  /**
+   * The one boundary between cancellation and successful completion. {@link #cancel()} sets the
+   * cancel flag only under it, and a completion's settings commit (or, without one, its completed
+   * bookkeeping) is admitted only under it, from inside the settings owner's commit admission. So
+   * exactly one wins: a cancelled install commits nothing, a completed one cancels nothing.
+   */
+  private final Object completionBoundary = new Object();
+  private boolean completionAdmitted;
   private final AiInstallStatus status = new AiInstallStatus();
   private volatile boolean activationDownloadComplete;
   private volatile DownloadExecutor downloadExecutor;
@@ -1202,7 +1210,10 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
       this.picturePreferenceAtInstallStart = enablePictureReadingOnCompletion ? preferenceAtStart : null;
       this.enableChatOnCompletion = enableChatOnCompletion;
       this.chatPreferenceAtInstallStart = enableChatOnCompletion ? preferenceAtStart : null;
-      cancelFlag.set(false);
+      synchronized (completionBoundary) {
+        completionAdmitted = false;
+        cancelFlag.set(false);
+      }
       pause.resume();
       status.cancelRequested = false;
       status.startedAtEpochMs = System.currentTimeMillis();
@@ -1299,19 +1310,44 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     return running.get();
   }
 
-  public void cancel() {
+  @Override
+  public boolean cancel() {
     synchronized (lock) {
+      synchronized (completionBoundary) {
+        if (completionAdmitted) {
+          status.message = ALREADY_COMPLETED;
+          touch();
+          return false;
+        }
+        cancelFlag.set(true);
+      }
       status.cancelRequested = true;
       status.message = "Cancellation requested.";
       touch();
     }
-    cancelFlag.set(true);
     // A run halted between items is waiting on the pause monitor, not on the transport, so the
     // cancel flag alone would not be read until the wait's next slice. Wakes it without resuming it:
     // a cancelled run must not look like a continued one.
     pause.wakeForCancellation();
     DownloadExecutor exec = downloadExecutor;
     if (exec != null) exec.cancel();
+    return true;
+  }
+
+  /** What cancellation reports once the install's completion was admitted. */
+  public static final String ALREADY_COMPLETED = "Already completed; nothing was cancelled.";
+
+  /**
+   * Claims completion at the boundary {@link #cancel()} takes. Called from inside the settings
+   * owner's commit admission (or, for a completion without a settings change, just before its
+   * bookkeeping); false means cancellation won and nothing may complete.
+   */
+  private boolean admitCompletion() {
+    synchronized (completionBoundary) {
+      if (cancelFlag.get()) return false;
+      completionAdmitted = true;
+      return true;
+    }
   }
 
   /**
@@ -1883,10 +1919,14 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
         return;
       }
 
-      if (enablePictureReadingOnCompletion) completePictureReadingInstall();
-      if (enableChatOnCompletion) completeChatInstall();
+      if ((enablePictureReadingOnCompletion && !completePictureReadingInstall())
+          || (enableChatOnCompletion && !completeChatInstall())) {
+        cancelled();
+        return;
+      }
       if (enableRerankerOnCompletion) completeRerankerInstall(registry);
-      else applyCompletionState();
+      else if (admitCompletion()) applyCompletionState();
+      else cancelled();
     } finally {
       if (acquisitionFreeze != null) {
         acquisitionFreeze.close();
@@ -2738,8 +2778,11 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     commitSettings(prepared.candidateSettings(), prepared.settingsWitness(), "ai-install-onnx-models");
   }
 
-  /** A newer picture-reader choice wins over the enable consented before this download. */
-  private void completePictureReadingInstall() {
+  /**
+   * A newer picture-reader choice wins over the enable consented before this download. False when
+   * cancellation won before the enable was admitted (nothing was saved).
+   */
+  private boolean completePictureReadingInstall() {
     if (settingsStore == null || picturePreferenceAtInstallStart == null) {
       throw new IllegalStateException("Settings authority unavailable");
     }
@@ -2751,22 +2794,22 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     if (!Objects.equals(latest.settings().getPictureReadingEnabled(),
         picturePreferenceAtInstallStart.settings().getPictureReadingEnabled())
         || latest.settings().getPictureReadingPreferenceRevision()
-            > picturePreferenceAtInstallStart.witness().acceptedRevision()) return;
+            > picturePreferenceAtInstallStart.witness().acceptedRevision()) return true;
     UiSettings candidate = latest.settings();
     candidate.setPictureReadingEnabled(true);
     candidate.setPictureReadingPreferenceRevision(
         Math.addExact(latest.witness().acceptedRevision(), 1));
-    if (cancelFlag.get()) return;
-    commitSettings(candidate, latest.witness(), "ai-install-picture-reading");
+    return commitCompletionSettings(candidate, latest.witness(), "ai-install-picture-reading");
   }
 
   /**
    * Answers consented with a missing answer model are switched on here, once its files are on disk
    * (switching on at the start is refused while the model is missing, and nothing would retry). A
    * newer answers choice saved during the download wins: a changed value, or an explicit choice the
-   * settings owner stamped after this install started (also one repeating the same value).
+   * settings owner stamped after this install started (also one repeating the same value). False
+   * when cancellation won before the enable was admitted (answers stay as they were).
    */
-  private void completeChatInstall() {
+  private boolean completeChatInstall() {
     if (settingsStore == null || chatPreferenceAtInstallStart == null) {
       throw new IllegalStateException("Settings authority unavailable");
     }
@@ -2778,16 +2821,16 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     if (!Objects.equals(latest.settings().getChatEnabled(),
         chatPreferenceAtInstallStart.settings().getChatEnabled())
         || latest.settings().getChatPreferenceRevision()
-            > chatPreferenceAtInstallStart.witness().acceptedRevision()) return;
+            > chatPreferenceAtInstallStart.witness().acceptedRevision()) return true;
     UiSettings candidate = latest.settings();
     candidate.setChatEnabled(true);
     candidate.setChatPreferenceRevision(Math.addExact(latest.witness().acceptedRevision(), 1));
-    if (cancelFlag.get()) return;
-    commitSettings(candidate, latest.witness(), "ai-install-answers");
+    if (!commitCompletionSettings(candidate, latest.witness(), "ai-install-answers")) return false;
     try { chatIntentChanged.run(); }
     catch (RuntimeException failure) {
       log.warn("Answers were switched on but answer-server reconciliation was not notified", failure);
     }
+    return true;
   }
 
   /** Binds the answer-server reconciliation notice the completion enable sends. */
@@ -2839,12 +2882,12 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
       }
     }
     synchronized (lock) {
-      if (cancelFlag.get()) {
+      boolean admitted = prepared != null
+          ? commitCompletionSettings(candidate, prepared.settingsWitness(), "ai-install-onnx-models")
+          : admitCompletion();
+      if (!admitted) {
         cancelled();
         return;
-      }
-      if (prepared != null) {
-        commitSettings(candidate, prepared.settingsWitness(), "ai-install-onnx-models");
       }
       applyCompletionState(diskTruth);
       if ("completed".equals(status.state) && activationRequired) markActivationRequired();
@@ -3026,6 +3069,51 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     }
     if (result.record().state() != io.justsearch.app.api.operations.OperationState.COMPLETE) {
       throw new IllegalStateException("Settings commitment is unresolved");
+    }
+  }
+
+  /**
+   * A completion's settings change, admitted by the settings owner only through {@link
+   * #admitCompletion()} at its commit boundary. False when cancellation won there (nothing was
+   * saved); any other refusal propagates as from {@link #commitSettings}.
+   */
+  private boolean commitCompletionSettings(UiSettings candidate,
+      io.justsearch.app.api.settings.SettingsWitness witness, String producer) {
+    if (settingsService == null) throw new IllegalStateException("Recorded settings owner unavailable");
+    boolean admittedBefore;
+    synchronized (completionBoundary) { admittedBefore = completionAdmitted; }
+    var context = io.justsearch.app.services.intent.EngineProvenance.internal(producer,
+        io.justsearch.core.context.EngineContext.Survival.INTERACTIVE,
+        io.justsearch.core.context.EngineContext.Urgency.BACKGROUND);
+    io.justsearch.app.api.operations.OperationAttemptRunner.Result result;
+    try {
+      result = settingsService.applyInternal(candidate, witness, context,
+          io.justsearch.app.api.settings.SettingsCandidateContext.NONE, this::admitCompletion);
+    } catch (RuntimeException | Error failure) {
+      if (completionLost(admittedBefore)) return false;
+      throw failure;
+    }
+    if (!result.response().success()) {
+      if (completionLost(admittedBefore)) return false;
+      log.warn("AI install settings refused: producer={}, code={}, details={}",
+          producer, result.response().errorCode().orElse(null), result.response().errorDetails());
+      throw new io.justsearch.app.api.settings.SettingsCommitOwner.Refused(result.response());
+    }
+    if (result.record().state() != io.justsearch.app.api.operations.OperationState.COMPLETE) {
+      throw new IllegalStateException("Settings commitment is unresolved");
+    }
+    return true;
+  }
+
+  /**
+   * After an unsuccessful completion commit: true when cancellation won the boundary. Otherwise a
+   * claim this commit made is withdrawn, so a later cancellation is not told the install completed.
+   */
+  private boolean completionLost(boolean admittedBefore) {
+    synchronized (completionBoundary) {
+      if (cancelFlag.get()) return true;
+      completionAdmitted = admittedBefore;
+      return false;
     }
   }
 

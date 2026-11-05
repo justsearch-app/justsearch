@@ -75,8 +75,10 @@ public final class BrainInstallServiceImpl implements BrainInstallService {
 
   @Override
   public Map<String, Object> cancelInstall() throws Exception {
-    helper.cancel();
-    return statusAsMap();
+    boolean cancelled = helper.cancel();
+    Map<String, Object> status = statusAsMap();
+    if (!cancelled) status.put(ALREADY_COMPLETED_KEY, true);
+    return status;
   }
 
   @Override

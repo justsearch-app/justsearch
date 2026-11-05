@@ -31,6 +31,19 @@ public interface SettingsService {
     throw new UnsupportedOperationException("Transient settings candidate context is unavailable");
   }
 
+  /**
+   * The same internal attempt, whose commitment the caller's own boundary must also admit: it is
+   * asked under the runner's commit-admission lock immediately before replacement; false refuses
+   * the commit as a precommit cancellation (nothing is saved).
+   */
+  default io.justsearch.app.api.operations.OperationAttemptRunner.Result applyInternal(
+      UiSettings candidate, io.justsearch.app.api.settings.SettingsWitness expected,
+      io.justsearch.core.context.EngineContext context,
+      io.justsearch.app.api.settings.SettingsCandidateContext candidateContext,
+      java.util.function.BooleanSupplier commitAdmission) {
+    throw new UnsupportedOperationException("Caller commit admission is unavailable");
+  }
+
   /** Public partial mutation; the caller retains one witness and key for every retry. */
   io.justsearch.app.api.operations.OperationAttemptRunner.Result applyPublic(
       io.justsearch.app.api.settings.SettingsV2 input, String modeIntentHeader,

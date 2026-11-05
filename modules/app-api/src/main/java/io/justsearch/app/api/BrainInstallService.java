@@ -97,6 +97,10 @@ public interface BrainInstallService {
   /** Refuses ({@link IllegalStateException}) while a part's files are being removed. */
   default void refuseWhileRemovingFiles() {}
 
+  /** Status key present (true) when the install had already completed and nothing was cancelled. */
+  String ALREADY_COMPLETED_KEY = "alreadyCompleted";
+
+  /** Install status after the request; carries {@link #ALREADY_COMPLETED_KEY} when it was refused. */
   Map<String, Object> cancelInstall() throws Exception;
 
   /**
