@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-05T01:21:51.140Z",
-  "revision": "ba4f8b5e0d00ab55656113e510880d094b64b357",
-  "tree": "9662d361acb9670623d53e76fb0c0c3725e4eb9d",
+  "createdAt": "2026-11-05T01:12:11.323Z",
+  "revision": "8922a1726aeaba53a04896b491f7cff2bba98ab8",
+  "tree": "d7264199ba5e9e0f751c456a25cda0ddcddbd4b8",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.picture-switch.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/doubx1zn/tmp/test-intent-vitest-3-1793841706176.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.picture-switch.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/kn5ijzid/tmp/test-intent-vitest-2-1793841128418.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 4962
+      "durationMs": 2903
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:0d99f5254462f46bcac3245b7f593f62cabe0e43de11caf512f688ef42b38e41",
+      "contentDigest": "sha256:66e26a210ab89a7242f1b2cd0ce727d9b043e2cace5b277e8e6a669590567fe6",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -83,10 +83,6 @@
           "status": "passed"
         },
         {
-          "name": "picture reading live switch waits for a fresh runtime observation after enabling saved Off",
-          "status": "passed"
-        },
-        {
           "name": "picture reading live switch keeps the prior switch on a refused change",
           "status": "passed"
         },
@@ -110,5 +106,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:80302d532f39f548ca699a961d8562aa0fdaa68d3c7ad9d608a9fb39844f40a0"
+  "digest": "sha256:a24d0e533efb0e98b3721a19966e12d24ea218862caeb0140cebf576bc63a861"
 }

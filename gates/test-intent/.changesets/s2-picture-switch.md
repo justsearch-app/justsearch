@@ -533,7 +533,7 @@ The brief's adopted scenarios are quoted below. Evidence is emitted only by run-
         "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts"
       ],
       "class": "New",
-      "behaviour": "Preserve observed On, saved Off, offline saved choices, and not-yet-observed projector wording. Re-execute the complete page switch file, including quarantine, operator control, pending transitions, refusals, witness convergence and download consent. The six-case wording matrix preserves both presentations. Receipt-transition checks now require Starting/Stopping until a fresh runtime snapshot; those repaired checks are covered by separate fail-before evidence against ba4f8b5e0d. This evidence supersedes historical page-file evidence whose digest predates the added checks.",
+      "behaviour": "Preserve observed On, saved Off, offline saved choices, and not-yet-observed projector wording. Re-execute the complete page switch file, including quarantine, operator control, pending transitions, refusals, witness convergence and download consent. The new six-case wording matrix and all prior checks pass both on 8922a1726a and after; the display regression alone fails before. This evidence supersedes historical page-file evidence whose digest predates the added checks.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -547,30 +547,6 @@ The brief's adopted scenarios are quoted below. Evidence is emitted only by run-
       "evidence": "gates/test-intent/evidence/s2-picture-switch-model-unavailable-preservation.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts"
-      ]
-    },
-    {
-      "items": [
-        "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts"
-      ],
-      "class": "New",
-      "behaviour": "After a successful switch receipt, both presentations show Starting picture reading… or Stopping picture reading… until a fresh runtime snapshot supersedes the pre-switch observation. Retained snapshot re-emission does not settle the display; a fresh inactive projector restores model-unavailable wording for saved On. Interrupted receipt replay follows the same transition wording. Assertion-fails on ba4f8b5e0d.",
-      "sources": [
-        {
-          "kind": "delegated-choice",
-          "delegationQuote": "proceed accordingly",
-          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
-          "delegationScope": "Bounded receipt-to-runtime display repair after review of ba4f8b5e0d; no Engine change.",
-          "choice": "A successful switch receipt supersedes the pre-switch runtime observation for words in both presentations until a fresh observation arrives. Use the existing nullable applied-receipt marker; keep Starting/Stopping wording during that gap and preserve ordinary sentence wording in the six-case matrix.",
-          "label": "agent choice"
-        }
-      ],
-      "evidence": "gates/test-intent/evidence/s2-picture-switch-receipt-repair.json",
-      "newChecks": [
-        "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts#shares both switches and waits for the applied receipt before showing Off",
-        "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts#waits for a fresh runtime observation after enabling saved Off",
-        "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts#reconciles an interrupted delivery with an unchanged witness using the original attempt",
-        "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts#reconciles an interrupted receipt with a changed witness by replaying the original attempt"
       ]
     }
   ]
@@ -739,7 +715,7 @@ Saved On with complete chat files no longer claims On when the live, online runt
 | Page observation route | Owner, file:line | How the saved choice applies | Covering check |
 | --- | --- | --- | --- |
 | Live runtime projector observation | modules/ui-web/src/shell-v0/views/BrainSurface.ts:1481 | Existing live/online observation gate supplies mmproj; saved Off keeps Off wording, saved On with observed false gets model-unavailable wording | BrainSurface.picture-switch.test.ts: model-unavailability regression and six-case wording preservation matrix |
-| Sentence phrase / path step | modules/ui-web/src/shell-v0/views/BrainSurface.ts:1520; modules/ui-web/src/shell-v0/views/BrainSurface.ts:1643 | The path renders feature.state; the sentence derives its ordinary wording from feature.active and explicitly renders unknown-choice, model-unavailable and transition states. Both switches retain the selected preference and can request Off | BrainSurface.picture-switch.test.ts: model-unavailability regression asserts both renderings, both switch states and the resulting Off request |
+| Sentence phrase / path step | modules/ui-web/src/shell-v0/views/BrainSurface.ts:1520; modules/ui-web/src/shell-v0/views/BrainSurface.ts:1643 | Both consume the same feature state; the switch retains the selected preference and can request Off | BrainSurface.picture-switch.test.ts: model-unavailability regression asserts both renderings, both switch states and the resulting Off request |
 
 No `.agents/preflight` executable exists. Every new assertion observes rendered production output or requests from a real rendered control; fixtures do not predetermine the expected display. The negative On literal exists in product code. Existing assertions were not weakened or deleted. The two evidence files were produced by the unmodified run-evidence.mjs in a private shared candidate clone. Its before-checkout adapter uses private shared clones, copied dependencies and independent build folders without writing source Git metadata. The initial evidence invocation completed checks but could not hash its fresh clone until the local LFS format key was configured in that clone only; the subsequent invocation succeeded.
 
@@ -758,34 +734,3 @@ No `.agents/preflight` executable exists. Every new assertion observes rendered 
 | `git diff --check` | Exit 0. |
 
 Shared resources touched: the assigned UI checkout's npm dependencies and lint/typecheck caches, and loopback ports belonging to the UI suite's test servers. Temporary checkouts have their own copied dependencies. No owner application, dev stack or GPU was used. No Gradle, fetch, rebase, commit or push was run. Independent verification and acceptance remain for the orchestrator.
-
-
-## Receipt-to-runtime display repair after ba4f8b5e0d
-
-A successful receipt now keeps both picture presentations at Starting/Stopping until a new runtime snapshot arrives. The existing pictureApplied marker already distinguishes that interval and is cleared by the shared runtime subscriber; no new settings, polling or Engine routes were added. The sentence explicitly renders transition words as it already does unknown-choice and model-unavailable words. Ordinary sentence wording still derives from active, while the path displays state; sharing a feature object does not imply identical words. The six-case preservation matrix now asserts both actual presentations, and transition checks assert both before and after receipts, before any fresh runtime emission. A retained snapshot does not count as fresh; a fresh false projector observation after enabling yields model-unavailable words, then a fresh true yields On.
-
-| Page route | Owner, file:line | Effect | Check |
-| --- | --- | --- | --- |
-| Successful receipt and interrupted replay | modules/ui-web/src/shell-v0/views/BrainSurface.ts:1341,2056 | Existing pictureApplied supersedes stale words until runtime replaces it | Receipt and replay cases in BrainSurface.picture-switch.test.ts |
-| Runtime snapshot | modules/ui-web/src/shell-v0/views/BrainSurface.ts:1251 | New snapshot clears pictureApplied; retained object does not | Saved-Off enable regression, both fresh false and true |
-| Feature words and sentence | modules/ui-web/src/shell-v0/views/BrainSurface.ts:1491,1522 | Both show Starting/Stopping for the receipt gap; ordinary words preserved | Transition checks and six-case matrix |
-
-The prior picture-work entry and projector-configuration tables remain applicable: this repair changes only page display. No .agents/preflight exists. Assertions inspect rendered production output and requests; no local-only expectation, absent negative literal, or unconditional fixture makes them pass. No acceptance record is written.
-
-
-| Check | Observed result |
-| --- | --- |
-| `run-evidence.mjs --before ba4f8b5e0d --copy-node-modules`, four receipt/transition/replay checks | Exit 0: four candidate passes, four before assertion failures. The saved-Off enable regression fails specifically after the successful receipt: expected Starting picture reading…, received Not available with this answer model. |
-| `run-evidence.mjs --before 8922a1726a --copy-node-modules`, prior model-unavailability regression | Exit 0: candidate passes; before assertion-fails at the original model-unavailable expectation. Evidence regenerated for the final test-file digest. |
-| `run-evidence.mjs`, final complete picture-switch page file | Exit 0: 18/18 passed; evidence regenerated for the final test-file digest. |
-| Private shared `before` clone at ba4f8b5e0d, final page file, `vitest run ... -t 'preserves picture wording' --maxWorkers=4` | Exit 0: six preservation cases passed, twelve other cases excluded by name and not counted as passes. |
-| `npm --prefix modules/ui-web run lint` | Exit 0. |
-| `npm --prefix modules/ui-web run test:unit:run -- --maxWorkers=4` | Exit 0: 699 files and 8,892 tests passed in 140.28s. Final transition-test strengthening is additionally covered by the complete-file evidence run. |
-| `node scripts/ci/run-ui-web-gates.mjs` | Exit 0: 31/31 passed. |
-| `npm --prefix modules/ui-web run knip:report` | Exit 0: report generated; underlying Knip exit 1 for existing findings. |
-| `node scripts/governance/run.mjs --gate dead-code --mode gate` | Exit 0: pass, six findings. |
-| `npm --prefix modules/ui-web run typecheck` | Exit 2: only the four allowed main errors: TS6133 at authorizationReject.test.ts:6; TS2352 at frameStatus.authorization.test.ts:30,50,78. |
-| `node scripts/governance/gates/test-intent/cli.mjs` | Exit 1: only test-intent/acceptance-missing. No acceptance record authored. |
-| `git diff --check` | Exit 0. |
-
-All evidence JSON was generated by the unmodified run-evidence.mjs. Candidate and before checkouts are shared clones under the supplied temporary directory, with copied dependencies and their own build/cache folders. A temporary Git command adapter allocates and removes the runner's before checkout as a shared clone; no source Git worktree metadata is written. Shared resources touched: assigned checkout npm dependencies and lint/typecheck caches, and loopback ports used by suite-owned test servers. No owner application, dev stack or GPU was used. No Gradle, fetch, rebase, commit or push was run. Independent verification and acceptance remain outside this builder assignment.

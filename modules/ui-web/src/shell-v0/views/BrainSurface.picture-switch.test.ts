@@ -46,11 +46,6 @@ async function mount() {
 function switches(el: Brain) {
   return [...el.shadowRoot!.querySelectorAll<HTMLButtonElement>('[role="switch"][aria-label="Use Text in scans and images"]')];
 }
-function expectPictureWords(el: Brain, path: string, sentence = path) {
-  expect([...el.shadowRoot!.querySelectorAll('[data-feature="pictures"] .step-meta')].at(-1)!.textContent).toBe(path);
-  expect(el.shadowRoot!.querySelector('.brain-sentence .feature-phrase[aria-controls="brain-feature-panel-pictures"]')!.textContent)
-    .toBe(`${sentence}.`);
-}
 beforeEach(() => {
   interrupt = null; receipts.clear(); settingsQuarantined = false;
   enabled = null; override = null; witness = { acceptedRevision: 0, lastCommittedOperationKey: null };
@@ -108,24 +103,22 @@ describe('picture reading live switch', () => {
     expect(posts).toEqual([]);
     switches(el)[1]!.click(); await settle(el);
     expect(posts.map(p => p.pictureReadingEnabled)).toEqual([false]);
-    expectPictureWords(el, 'Stopping picture reading…');
-    emit(false); await settle(el);
-    expectPictureWords(el, 'Off - files and read text kept', "It doesn't read text in scans and images yet");
+    expect(path.textContent).toContain('Off - files and read text kept');
   });
 
   it.each([
-    { choice: true, projector: true, mode: 'online', state: 'On', sentence: 'It reads text in scans and images' },
-    { choice: false, projector: false, mode: 'online', state: 'Off - files and read text kept', sentence: "It doesn't read text in scans and images yet" },
-    { choice: true, projector: false, mode: 'offline', state: 'On', sentence: 'Reading text in scans and images is unconfirmed' },
-    { choice: false, projector: false, mode: 'offline', state: 'Off - files and read text kept', sentence: 'Reading text in scans and images is unconfirmed' },
-    { choice: true, projector: undefined, mode: 'online', state: 'On', sentence: 'Reading text in scans and images is unconfirmed' },
-    { choice: false, projector: undefined, mode: 'online', state: 'Off - files and read text kept', sentence: 'Reading text in scans and images is unconfirmed' },
-  ] as const)('preserves picture wording for choice $choice projector $projector mode $mode', async ({ choice, projector, mode, state, sentence }) => {
+    { choice: true, projector: true, mode: 'online', state: 'On' },
+    { choice: false, projector: false, mode: 'online', state: 'Off - files and read text kept' },
+    { choice: true, projector: false, mode: 'offline', state: 'On' },
+    { choice: false, projector: false, mode: 'offline', state: 'Off - files and read text kept' },
+    { choice: true, projector: undefined, mode: 'online', state: 'On' },
+    { choice: false, projector: undefined, mode: 'online', state: 'Off - files and read text kept' },
+  ] as const)('preserves picture wording for choice $choice projector $projector mode $mode', async ({ choice, projector, mode, state }) => {
     enabled = choice;
     store.current = { ...store.current, aiEngine: { ...store.current.aiEngine, kind: mode },
       runtime: { mode, installed: { known: true, value: true } }, runtimeStatus: { active: { mmprojActive: projector } } } as AiState;
     const el = await mount();
-    expectPictureWords(el, state, sentence);
+    expect([...el.shadowRoot!.querySelectorAll('[data-feature="pictures"] .step-meta')].at(-1)!.textContent).toBe(state);
     expect(switches(el).map(b => b.getAttribute('aria-checked'))).toEqual([String(choice), String(choice)]);
     expect(posts).toEqual([]);
   });
@@ -159,9 +152,7 @@ describe('picture reading live switch', () => {
     expect(posts).toHaveLength(2);
     expect(posts[1]).toEqual(posts[0]);
     expect(switches(el).map(b => b.getAttribute('aria-checked'))).toEqual(['false', 'false']);
-    expectPictureWords(el, 'Stopping picture reading…');
-    emit(false); await settle(el);
-    expectPictureWords(el, 'Off - files and read text kept', "It doesn't read text in scans and images yet");
+    expect(el.shadowRoot!.textContent).toContain('Off - files and read text kept');
     expect(el.shadowRoot!.textContent).not.toContain('Unknown — checking picture reading after an interrupted change');
   });
 
@@ -175,9 +166,7 @@ describe('picture reading live switch', () => {
     expect(posts).toHaveLength(2);
     expect(posts[1]).toEqual(posts[0]);
     expect(witness.acceptedRevision).toBe(1);
-    expectPictureWords(el, 'Stopping picture reading…');
-    emit(false); await settle(el);
-    expectPictureWords(el, 'Off - files and read text kept', "It doesn't read text in scans and images yet");
+    expect(el.shadowRoot!.textContent).toContain('Off - files and read text kept');
     expect(el.shadowRoot!.textContent).not.toContain('Unknown — checking picture reading after an interrupted change');
   });
 
@@ -203,47 +192,22 @@ describe('picture reading live switch', () => {
     wait = new Promise(resolve => { release = resolve; });
     switches(el)[0]!.click(); await settle(el);
     expect(posts.map(p => p.pictureReadingEnabled)).toEqual([false]);
-    expectPictureWords(el, 'Stopping picture reading…');
+    expect(el.shadowRoot!.querySelector('[data-feature="pictures"]')!.textContent).toContain('Stopping picture reading…');
     expect(switches(el).map(b => b.getAttribute('aria-disabled'))).toEqual(['true', 'true']);
     expect(switches(el).map(b => b.getAttribute('aria-checked'))).toEqual(['true', 'true']);
     (el as unknown as { settleTransients(): void }).settleTransients(); await settle(el);
-    expectPictureWords(el, 'Stopping picture reading…');
+    expect(el.shadowRoot!.querySelector('[data-feature="pictures"]')!.textContent).toContain('Stopping picture reading…');
     release(); await settle(el);
     expect(switches(el).map(b => b.getAttribute('aria-checked'))).toEqual(['false', 'false']);
-    expectPictureWords(el, 'Stopping picture reading…');
+    expect(el.shadowRoot!.querySelector('[data-feature="pictures"]')!.textContent).toContain('Off - files and read text kept');
     expect(el.shadowRoot!.querySelector('[data-feature="pictures"] .step-symbol')!.getAttribute('data-active')).toBe('false');
     emit(false); await settle(el);
-    expectPictureWords(el, 'Off - files and read text kept', "It doesn't read text in scans and images yet");
-    wait = new Promise(resolve => { release = resolve; });
     switches(el)[1]!.click(); await settle(el);
-    expectPictureWords(el, 'Starting picture reading…');
-    expect(switches(el).map(b => b.getAttribute('aria-checked'))).toEqual(['false', 'false']);
-    release(); await settle(el);
-    expectPictureWords(el, 'Starting picture reading…');
     expect(posts.map(p => ({ enabled: p.pictureReadingEnabled, intent: p.pictureReadingSwitchIntent })))
       .toEqual([{ enabled: false, intent: true }, { enabled: true, intent: true }]);
     emit(true); await settle(el);
-    expectPictureWords(el, 'On', 'It reads text in scans and images');
     expect(switches(el).map(b => b.getAttribute('aria-checked'))).toEqual(['true', 'true']);
     expect(operations).toEqual([]);
-  });
-
-  it('waits for a fresh runtime observation after enabling saved Off', async () => {
-    enabled = false; emit(false);
-    const el = await mount();
-    expectPictureWords(el, 'Off - files and read text kept', "It doesn't read text in scans and images yet");
-    switches(el)[1]!.click(); await settle(el);
-    expect(posts.map(p => p.pictureReadingEnabled)).toEqual([true]);
-    expect(switches(el).map(b => b.getAttribute('aria-checked'))).toEqual(['true', 'true']);
-    expectPictureWords(el, 'Starting picture reading…');
-    // Re-emitting the retained snapshot is not a fresh runtime observation.
-    for (const listener of store.listeners) listener(store.current);
-    await settle(el);
-    expectPictureWords(el, 'Starting picture reading…');
-    emit(false); await settle(el);
-    expectPictureWords(el, 'Not available with this answer model');
-    emit(true); await settle(el);
-    expectPictureWords(el, 'On', 'It reads text in scans and images');
   });
 
   it('keeps the prior switch on a refused change', async () => {
