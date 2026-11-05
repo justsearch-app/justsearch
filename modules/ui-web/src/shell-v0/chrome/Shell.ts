@@ -146,6 +146,7 @@ import { bumpScopeVersion } from '../substrates/evaluationContext/index.js';
 import {
   restoreJournalFromStorage,
   markUndoableOperation,
+  markRemovedFolderOperation,
   undoLastEffect,
   peekLastEffectUndo,
   redoLastEffect,
@@ -1109,7 +1110,9 @@ export class Shell extends JfElement {
           // §32 U2 — undoSupported ops return an executionId; associate it
           // with the journal entry so the audit log can offer "Undo"
           // (→ POST /api/undo/{operationId}).
-          if (result.executionId && detail.journalEntryId !== undefined) {
+          if (operationId === 'core.remove-watched-root' && detail.journalEntryId !== undefined) {
+            markRemovedFolderOperation(detail.journalEntryId, result.structuredData?.removedFolder);
+          } else if (result.executionId && detail.journalEntryId !== undefined) {
             markUndoableOperation(
               detail.journalEntryId,
               operationId,

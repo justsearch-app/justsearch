@@ -29,11 +29,57 @@ fail by assertion. `shell-s3b-preservation.json` records checks that pass before
 `shell-s3b-new.json` covers new behaviour on new components (their before-state cannot load them),
 and `shell-s3b-adapted.json` the rewritten existing checks.
 
+Journal inverse repair: `shell-s3b-folder-undo-repaired.json` runs against a279e9812f;
+`shell-s3b-folder-undo-preservation.json` covers visible re-add failure. Only the existing
+inverse Effect shape is persisted: successful receipts supply its path and collection.
+
 All added checks are durable; none is scaffolding. No independent acceptance is recorded yet.
 
 ```json
 {
   "entries": [
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.folderUndo.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "A palette/user or agent removal becomes reversible only when its successful receipt records the folder. Ctrl+Z re-adds that exact resolved path and collection. Pathless receipts and older argument-less persisted inverses offer no Undo or Ctrl+Z target; a working inverse survives restore. Activity hides its bulk Undo when no reversible agent action exists.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Design rule (binding): never show Undo where no real reversal exists.",
+          "location": "task t-20261103-shell request (bounded journal-inverse repair brief, 2026-11-05)"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s3b-folder-undo-repaired.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.folderUndo.test.ts#a user removal followed by Ctrl+Z re-adds the folder from the successful receipt",
+        "modules/ui-web/src/shell-v0/chrome/Shell.folderUndo.test.ts#a agent removal followed by Ctrl+Z re-adds the folder from the successful receipt",
+        "modules/ui-web/src/shell-v0/chrome/Shell.folderUndo.test.ts#a successful removal without a recorded path offers no Undo or Ctrl+Z target",
+        "modules/ui-web/src/shell-v0/chrome/Shell.folderUndo.test.ts#an older persisted removal with an argument-less inverse offers no Undo after restore",
+        "modules/ui-web/src/shell-v0/chrome/Shell.folderUndo.test.ts#a removal receipt keeps its working re-add inverse across a journal restore",
+        "modules/ui-web/src/shell-v0/chrome/Shell.folderUndo.test.ts#Activity offers no Undo when the agent only removed a folder without a recorded path"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.folderUndo.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Preservation: a failed re-add reports its failure through the shell and the status pill.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "A re-add that fails says so at the place of the action or in the pill (never silent).",
+          "location": "task t-20261103-shell request (bounded journal-inverse repair brief, 2026-11-05)"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s3b-folder-undo-preservation.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.folderUndo.test.ts#a failed re-add reports the failure in the status pill"
+      ]
+    },
     {
       "items": [
         "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/RemovedFolderRecordTest.java",

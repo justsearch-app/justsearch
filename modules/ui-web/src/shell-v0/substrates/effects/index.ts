@@ -35,7 +35,8 @@ import type { Effect } from '../effect.js';
 import type { Provenance } from '../../primitives/provenance.js';
 
 /**
- * The journal entry record. Append-only; entries are never mutated.
+ * The journal entry record. Effects are append-only; a successful removal receipt may
+ * complete its inverse after dispatch, replacing the entry without changing the effect.
  *
  *   `id`         — monotonic unique id (cursor + chained-action refs).
  *   `effect`     — the closed-union Effect that was dispatched.
@@ -194,7 +195,14 @@ export function restoreJournalFromStorage(): void {
     const parsed = JSON.parse(raw) as PersistedJournal;
     if (parsed?.version !== 1) return;
     if (!Array.isArray(parsed.entries)) return;
-    _entries.push(...parsed.entries);
+    // Older removals persisted an argument-less add operation as their inverse. It cannot
+    // restore a folder; retain only a re-add carrying the path captured on success.
+    _entries.push(...parsed.entries.map(entry => entry.effect.kind === 'invoke-operation'
+      && entry.effect.operationId === 'core.remove-watched-root'
+      && !(entry.inverse?.kind === 'invoke-operation'
+        && entry.inverse.operationId === 'core.add-watched-root'
+        && typeof entry.inverse.args?.path === 'string' && entry.inverse.args.path.trim())
+      ? { ...entry, inverse: null } : entry));
     if (typeof parsed.nextId === 'number') {
       _nextId = Math.max(_nextId, parsed.nextId);
     }
@@ -296,6 +304,9 @@ function deriveInverse(effect: Effect): Effect | null {
     case 'toast':
       return null;
     case 'invoke-operation': {
+      // Removal is reversible only after its successful receipt supplies the removed path.
+      // The invocation arguments alone do not prove a folder was actually removed.
+      if (effect.operationId === 'core.remove-watched-root') return null;
       // §25.γ5 — consult manifest-declared inverses first. Plugins
       // (and first-party manifests) can ship per-operation declarative
       // inverses via `contributes.effectInverses` without waiting for
@@ -617,6 +628,26 @@ export function importJournalArchive(json: string): readonly Effect[] {
 /** Entry at id, or undefined. */
 export function getJournalEntry(id: number): JournalEntry | undefined {
   return _entries.find((e) => e.id === id);
+}
+
+/** Complete a removal's inverse from its successful receipt, using the existing inverse wire shape. */
+export function markRemovedFolderOperation(journalEntryId: number, removedFolder: unknown): void {
+  const index = _entries.findIndex(entry => entry.id === journalEntryId);
+  const entry = _entries[index];
+  if (!entry || entry.effect.kind !== 'invoke-operation'
+      || entry.effect.operationId !== 'core.remove-watched-root'
+      || !removedFolder || typeof removedFolder !== 'object') return;
+  const folder = removedFolder as { path?: unknown; collection?: unknown };
+  if (typeof folder.path !== 'string' || !folder.path.trim()) return;
+  const completed: JournalEntry = { ...entry, inverse: {
+    kind: 'invoke-operation', operationId: 'core.add-watched-root',
+    args: { path: folder.path,
+      ...(typeof folder.collection === 'string' && folder.collection.trim()
+        ? { collection: folder.collection } : {}) },
+  } };
+  _entries[index] = completed;
+  writePersisted();
+  notifyAllWith(_listeners, completed);
 }
 
 /**

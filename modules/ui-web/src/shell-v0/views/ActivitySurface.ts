@@ -146,9 +146,9 @@ export class ActivitySurface extends JfElement {
         ${this.renderOwnReversals()}
         ${listJournalByOriginator('agent').some(e => e.pendingOutcome !== 'rejected') ? html`
           <div class="agent-actions">
-            <jf-button size="sm" label="Undo all AI actions" data-testid="activity-undo-all"
+            ${previewUndoAllByOriginator('agent').length ? html`<jf-button size="sm" label="Undo all AI actions" data-testid="activity-undo-all"
               .onActivate=${() => { this.undoPreview = previewUndoAllByOriginator('agent');
-                if (!this.undoPreview.length) applyEffect({ kind: 'toast', message: 'Nothing to undo', severity: 'info' }); }}>Undo all AI actions</jf-button>
+                if (!this.undoPreview.length) applyEffect({ kind: 'toast', message: 'Nothing to undo', severity: 'info' }); }}>Undo all AI actions</jf-button>` : nothing}
             <jf-button size="sm" label="Save as macro" data-testid="activity-save-macro"
               .onActivate=${() => void this.saveMacro()}>Save as macro</jf-button>
           </div>` : nothing}
