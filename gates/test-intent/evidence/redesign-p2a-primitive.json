@@ -1,0 +1,121 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-05T10:40:10.097Z",
+  "revision": "d2e4ebf12ad9ecf7ff14a75dc27899395228e8e3",
+  "tree": "7d8c8a5860599590a16fe0dc2a2c12af49802f0e",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.bootstrap.OriginApprovalEvaluatorTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2863
+    },
+    {
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.queue.StrictSourceOriginLoadingTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3128
+    },
+    {
+      "command": "./gradlew :modules:app-observability:test --tests \"io.justsearch.app.observability.operations.ImportApprovalStatePersistenceTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2788
+    },
+    {
+      "command": "./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.OriginApprovalExpiryTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3595
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/OriginApprovalEvaluatorTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/OriginApprovalEvaluatorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f4469d7c4b4fc0467022b3d8a920409388e565208a8318aa60b5f66e0382928e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "durableOriginEvidenceNeedsNeitherOperationHistoryNorWatchedCoverage()",
+          "status": "passed"
+        },
+        {
+          "name": "strictBasisGateAndTransportValidationNeverInferPermission()",
+          "status": "passed"
+        },
+        {
+          "name": "sessionRequiresExactLiveAcceptedOwnerFromThisAuthority()",
+          "status": "passed"
+        },
+        {
+          "name": "activeBindingRequiresExactParentPlanRevisionAndUninterruptedSelection()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/StrictSourceOriginLoadingTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/StrictSourceOriginLoadingTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3583bc67a0f678c69d98cadf6f0adf8dc9dd28fe2b1c984009f117cf97c31a5a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "strictOriginLoadingRoundTripsBindingAndRejectsMalformedEvidence()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/ImportApprovalStatePersistenceTest.java",
+      "file": "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/ImportApprovalStatePersistenceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:10343b62f00f42008c3423d85ff658f2b04bad03314ffffe8c39828c17632f6b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "activeSelectionAndInterruptionRoundTripWithoutReinterpretingRowState()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/OriginApprovalExpiryTest.java",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/OriginApprovalExpiryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1d62b20921ad2445576384998bb7c71b6b260e486a539d6cd64348f8ab1b10cc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "originOnlyEvaluationSurvivesActualCompletedOperationAndJobHistoryExpiry()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:10008af4ef0630ba5699302c33f6b9a3499fee1c5db39be9529559dedee98a83"
+}
