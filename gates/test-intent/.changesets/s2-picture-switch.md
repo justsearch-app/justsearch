@@ -338,7 +338,11 @@ The brief's adopted scenarios are quoted below. Evidence is emitted only by run-
       ],
       "evidence": "gates/test-intent/evidence/s2-picture-switch-profile-repair.json",
       "newChecks": [
-        "modules/app-services/src/test/java/io/justsearch/app/services/chat/PictureReadingProfileRepairTest.java"
+        "modules/app-services/src/test/java/io/justsearch/app/services/chat/PictureReadingProfileRepairTest.java#profileActivationCannotReopenSavedOff",
+        "modules/app-services/src/test/java/io/justsearch/app/services/chat/PictureReadingProfileRepairTest.java#reconfigureRetainingAnActivatedProfileCannotReopenSavedOff",
+        "modules/app-services/src/test/java/io/justsearch/app/services/chat/PictureReadingProfileRepairTest.java#switchesBothWaysAfterActivationAndRetainedProfilePreparation",
+        "modules/app-services/src/test/java/io/justsearch/app/services/chat/PictureReadingProfileRepairTest.java#operatorProjectorKeepsItsPathAndRefusesSwitchesAfterProfilePreparation",
+        "modules/app-services/src/test/java/io/justsearch/app/services/chat/PictureReadingProfileRepairTest.java#environmentProjectorSourceRefusesSwitchesRegardlessOfItsOrdinal"
       ]
     },
     {
@@ -448,6 +452,61 @@ The brief's adopted scenarios are quoted below. Evidence is emitted only by run-
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/BrainSurface.redesign.test.ts#keeps runtime evidence in the sentence and disables feature switches when observations become unknown"
       ]
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/chat/PictureReadingProfileRepairTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Repair round 3: preparing a transient profile preserves its available projector for an absent or true picture preference; explicit false still strips it. Capture the production generative owner configuration passed to the lifecycle manager. Null and true fail by assertion before 81dee656b2; the unchanged GenerativeSettingsComponentOwnerTest regression is also rerun without changing its expectations.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "N2",
+          "quote": "Saved settings keep their meaning across the stored settings schema change (stored schema 8 today -> 9; public API v2): existing installs load with no explicit choice (today's behaviour: picture reading on when its file is present), older settings versions migrate, corrupt settings are quarantined as today; declinedAiPackages stays acquisition preference only.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "V2",
+          "quote": "Switching picture reading at every stage (Engine starting, between documents, during reading, while saving a result) ends consistent: no late result after Off is lost or half-written; completed text stays searchable. The choice survives restart, upgrade, a profile or model change, Repair and runtime activation; a second window converges; failures (server restart fails, file missing or mismatched, settings write fails, process dies midway) leave a truthful prior or recovered state. A user-run (external) answer server: the switch refuses with a reason and never stops that server.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s2-picture-switch-profile-null-repair.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/chat/PictureReadingProfileRepairTest.java#transientProfileKeepsTheProjectorUnlessExplicitlyOff"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/chat/PictureReadingProfileRepairTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Preservation matrix through ConfigStoreRebuilder.prepare and InferenceConfig.fromResolvedConfig: null and true preserve the installed profile projector; false disables it, both after profile activation and after retained-profile core.reconfigure preparation. These checks pass on 81dee656b2 as well as the repaired candidate.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "N2",
+          "quote": "Saved settings keep their meaning across the stored settings schema change (stored schema 8 today -> 9; public API v2): existing installs load with no explicit choice (today's behaviour: picture reading on when its file is present), older settings versions migrate, corrupt settings are quarantined as today; declinedAiPackages stays acquisition preference only.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "V2",
+          "quote": "Switching picture reading at every stage (Engine starting, between documents, during reading, while saving a result) ends consistent: no late result after Off is lost or half-written; completed text stays searchable. The choice survives restart, upgrade, a profile or model change, Repair and runtime activation; a second window converges; failures (server restart fails, file missing or mismatched, settings write fails, process dies midway) leave a truthful prior or recovered state. A user-run (external) answer server: the switch refuses with a reason and never stops that server.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s2-picture-switch-profile-choice-preservation.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/chat/PictureReadingProfileRepairTest.java#profileAndReconfigureBuildersKeepTheNullablePictureChoice"
+      ]
     }
   ]
 }
@@ -462,7 +521,7 @@ Paths below are relative to `modules/`. The repaired production configuration pr
 | --- | --- | --- | --- |
 | Idle automatic pass, including a loaded answer server | app-services/src/main/java/io/justsearch/app/services/vdu/VduOfflineTriggerSampler.java:172 | Both branches enter the coordinator; its bound admission reads the configured resolved projector choice | PictureReadingCoordinatorTest.offBlocksAllProcedureEntriesBeforeRecoveryOrClaims; new PictureReadingProfileRepairTest |
 | Manual UI / HTTP operation and agents/MCP | app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/TriggerOfflineProcessingHandler.java:36; app-services/src/main/java/io/justsearch/app/services/brainruntime/BrainRuntimeServiceImpl.java:54 | Registry handler and facade share the coordinator callback; no separate eligibility rules | PictureReadingSettingsHttpTest; PictureReadingCoordinatorTest.offBlocksAllProcedureEntriesBeforeRecoveryOrClaims |
-| Startup, retained-owner recovery and retry passes | app-services/src/main/java/io/justsearch/app/services/vdu/OfflineCoordinator.java:140,318,322 | Admission checked before recovery or claims; Off itself does not rewrite pending or terminal states | PictureReadingCoordinatorTest.offBlocksAllProcedureEntriesBeforeRecoveryOrClaims; onResumesPendingOnlyWithoutRereadingCompletedPictures |
+| Startup, retained-owner recovery and retry passes | app-services/src/main/java/io/justsearch/app/services/vdu/OfflineCoordinator.java:140,193,318,322 | Admission checked before recovery or claims; Off itself does not rewrite pending or terminal states | PictureReadingCoordinatorTest.offBlocksAllProcedureEntriesBeforeRecoveryOrClaims; onResumesPendingOnlyWithoutRereadingCompletedPictures |
 | Waiting for an indexing hold / entering picture server mode | app-services/src/main/java/io/justsearch/app/services/vdu/OfflineCoordinator.java:311; app-services/src/main/java/io/justsearch/app/services/vdu/VduBatchProcessor.java:233 | Fence withdraws the hold wait; batch rechecks admission before each claim after server entry | PictureReadingCoordinatorTest.offWithdrawsAnExplicitWaitWithoutResumingTheIndexingPolicy; offDuringServerEntryDoesNotClaimAnyPicture |
 | Between documents and multipage checkpoints | app-services/src/main/java/io/justsearch/app/services/vdu/VduBatchProcessor.java:233,270 | Bound admission closes; existing deferral releases the owned claim and refunds retry; serialized fence waits for old pass exit | PictureReadingCoordinatorTest.offDuringReadingReturnsTheClaimAndOnUsesANewAttempt |
 | Late result / result write already in progress | app-services/src/main/java/io/justsearch/app/services/vdu/OfflineCoordinator.java:380; worker-services/src/main/java/io/justsearch/indexerworker/services/WorkerIngestService.java:2604 | Fence waits for acknowledged publication and cleanup; existing worker claim/revision/exclusion checks reject stale results | PictureReadingCoordinatorTest.offWaitsForAResultAlreadyBeingSavedAndKeepsIt; failedPublicationDuringOffRefusesTheFenceAndKeepsThePriorChoice. Real deletion/exclusion and process-death races remain for independent verification |
@@ -471,12 +530,13 @@ Paths below are relative to `modules/`. The repaired production configuration pr
 | Projector configuration route | Owner, file:line | How Off / operator provenance applies | Covering check |
 | --- | --- | --- | --- |
 | Initial settings contribution / pre-inference boot refresh | app-services/src/main/java/io/justsearch/app/services/config/ConfigStoreRebuilder.java:275; app-services/src/main/java/io/justsearch/app/services/bootstrap/BootstrapInferenceFactory.java:145 | Saved false contributes none; inference resolves no projector; env/JVM overrides retain their precedence | PictureReadingPreferenceTest; PictureReadingProfileRepairTest.operatorProjectorKeepsItsPathAndRefusesSwitchesAfterProfilePreparation |
-| Named profile activation | app-services/src/main/java/io/justsearch/app/services/config/ConfigStoreRebuilder.java:108 | Repaired: activation contributes its projector only without a resolved per-file choice; saved none and genuine operator paths survive | PictureReadingProfileRepairTest.profileActivationCannotReopenSavedOff |
+| Named profile activation | app-services/src/main/java/io/justsearch/app/services/config/ConfigStoreRebuilder.java:108 | Repaired: activation contributes its projector only without a resolved per-file choice; saved none and genuine operator paths survive | PictureReadingProfileRepairTest.profileActivationCannotReopenSavedOff; profileAndReconfigureBuildersKeepTheNullablePictureChoice |
 | core.reconfigure, ordinary settings refresh, retained profile | app-services/src/main/java/io/justsearch/app/services/settings/SettingsCommitCoordinator.java:174; app-services/src/main/java/io/justsearch/app/services/config/ConfigStoreRebuilder.java:94 | Retained profile uses the same repaired preparation; its internal source is not operator authority | PictureReadingProfileRepairTest.reconfigureRetainingAnActivatedProfileCannotReopenSavedOff; switchesBothWaysAfterActivationAndRetainedProfilePreparation |
-| Explicit switch / profile-bearing prepared generative apply | app-services/src/main/java/io/justsearch/app/services/GenerativeSettingsComponentOwner.java:80,143,148 | Repaired: refuse by source identity, retain the resolved projector path, then apply withPictureReading; verification remains required when enabling | PictureReadingProfileRepairTest.switchesBothWaysAfterActivationAndRetainedProfilePreparation; operatorProjectorKeepsItsPathAndRefusesSwitchesAfterProfilePreparation; environmentProjectorSourceRefusesSwitchesRegardlessOfItsOrdinal |
+| Explicit switch / profile-bearing prepared generative apply | app-services/src/main/java/io/justsearch/app/services/GenerativeSettingsComponentOwner.java:80,143,155 | Repaired: refuse by source identity, select the requested profile projector unless an operator supplies it, then apply withPictureReading; verification remains required when enabling | PictureReadingProfileRepairTest.switchesBothWaysAfterActivationAndRetainedProfilePreparation; operatorProjectorKeepsItsPathAndRefusesSwitchesAfterProfilePreparation; environmentProjectorSourceRefusesSwitchesRegardlessOfItsOrdinal; transientProfileKeepsTheProjectorUnlessExplicitlyOff |
 | Install completion / Repair / runtime activation | app-services/src/main/java/io/justsearch/app/services/ai/install/AiInstallService.java:2566; app-services/src/main/java/io/justsearch/app/services/ai/runtime/RuntimeActivationService.java:974 | Existing settings owner and candidate context lead to the same builder and generative owner | PictureReadingInstallIntentTest; PictureReadingProfileRepairTest. Full installation and Repair remain independent real-system checks |
 | Consented missing-file picture enable completion | app-services/src/main/java/io/justsearch/app/services/ai/install/AiInstallService.java:1476,2328 | Completion reads the latest settings witness; the picture-choice revision preserves a newer explicit Off while unrelated saves remain eligible for enable | PictureReadingInstallCompletionTest: all three cases exercise real HTTP acquisition and durable completion; native preparation remains a fixture |
 | Prepared lifecycle transaction, crash recovery | app-inference/src/main/java/io/justsearch/app/inference/InferenceLifecycleManager.java:2385; app-services/src/main/java/io/justsearch/app/services/settings/SettingsCommitCoordinator.java:1512 | Prepared candidates apply withPictureReading; recovery uses the same context and prepared owner | PictureReadingConfigurationTest.preparedPictureChangeWaitsForRepliesAndAbortRestoresTheProjector; real crash recovery remains unverified here |
+| Legacy profile switch / runtime model overrides | app-inference/src/main/java/io/justsearch/app/inference/OnlineAiServiceImpl.java:196,400; app-inference/src/main/java/io/justsearch/app/inference/InferenceLifecycleManager.java:2759 | Both construct a requested configuration and use the same managed apply that strips the projector while the resolved choice is none | PictureReadingConfigurationTest.runtimeAndProfileAppliesCannotReattachAProjectorWhileOff covers the shared apply owner; no separate real-system legacy-profile run is claimed |
 | Runtime apply, residency reload and VDU configuration / restore | app-inference/src/main/java/io/justsearch/app/inference/InferenceLifecycleManager.java:2759,2077,2125 | Common apply strips projector from resolved none; transition fence waits for the VDU hold/restore before publishing new settings | PictureReadingConfigurationTest.runtimeAndProfileAppliesCannotReattachAProjectorWhileOff; PictureReadingCoordinatorTest.offDuringReadingReturnsTheClaimAndOnUsesANewAttempt |
 | Admission predicate readers | app-inference/src/main/java/io/justsearch/app/inference/InferenceLifecycleManager.java:1103; app-services/src/main/java/io/justsearch/app/services/bootstrap/phases/OfflineCoordinatorBuilder.java:90 | The manager reads its configured resolved snapshot; coordinator and batch share that supplier plus a temporary fence | PictureReadingProfileRepairTest.assertOff via activation and refresh checks; PictureReadingCoordinatorTest |
 
@@ -563,3 +623,46 @@ No preflight executable exists under `.agents`. All Gradle commands unset DISPLA
 | `git diff --check` | Passed. |
 
 Open for the orchestrator: independent live verification/acceptance, the separately reproduced baseline projector assertion, and completion of the PMD refresh after its daemon failure. Remote main advanced during checks (latest inspected 51bfa7756ce7f6313350eaaaf70d6a5cec4dc8b5); its incoming changes include jseval tooling and authorization/operation transport code used by these paths. The reported checks ran against cd1ab03860, so rebasing and checking that new transport integration remain open. The assigned branch remains at cd1ab03860 with uncommitted repairs. Rebase is pending because the worktree is dirty and this builder is instructed not to commit; nothing was stashed, reset, committed or pushed.
+
+
+## Repair round 3 bounded repair
+
+The settings owner once again selects the requested profile's available projector when no operator per-file override owns it, then applies the resolved picture-reading preference. This restores the existing null-choice behavior without reopening explicit Off. The original `GenerativeSettingsComponentOwnerTest.transientProfilePreparesTheModelAndProjectorPairWithoutChangingResolvedSettings` was not edited: it failed by assertion on 81dee656b2 before the repair, passed on unchanged main 51bfa7756c, and passed on the repaired candidate's temporary shared clone. The new transient-profile null/true/false matrix passes after the repair; null and true fail by assertion before 81dee656b2. The production activation and retained-profile reconfigure builder matrix passes both before and after. Round 1's five checks were rerun and their evidence regenerated against their original baseline.
+
+The assertion sweep covered every changed JVM test, frontend test, fixture/golden, and the updater Rust test in this branch. Observations are production outputs, captured owner arguments, durable reopened settings, process arguments or observable calls. The frontend negative strings and the On/Off alternatives occur in product code. Mock pending-state transitions only demonstrate coordinator behavior; they do not establish real indexing, deletion or exclusion correctness. No assertion was weakened, skipped or deleted. The two new parameterized methods explicitly include method names in their display names so the evidence runner selects every case.
+
+Resources touched: shared Gradle and npm caches, js-gradle-slot admission, isolated test profiles and session-owned loopback fake servers. No owner application, dev stack or GPU was used. All temporary candidate, before and main checkouts are shared clones under the supplied temporary folder, each with its own build directory. Source Git metadata was not changed; no fetch, rebase, commit or push was run. There is no `.agents/preflight` executable.
+
+
+| Round 3 check | Observed result |
+| --- | --- |
+| Original profile regression, unchanged test | Assertion failure before 81dee656b2 (expected compact projector, got null); passed on unchanged main 51bfa7756c and on the repaired candidate clone. |
+| `run-evidence.mjs`, original five profile-repair methods | Passed candidate; all five assertion-failed on original repair baseline 7273c984c2. |
+| `run-evidence.mjs --before 81dee656b2`, new transient-profile matrix | All three null/true/false cases passed candidate; null and true assertion-failed before. |
+| New activation / retained-profile reconfigure builder matrix | All three null/true/false cases passed candidate and unchanged 81dee656b2 with only the candidate check overlaid. |
+| `npm --prefix modules/ui-web run lint` | Exit 0. |
+| `npm --prefix modules/ui-web run typecheck` | Exit 2: TS6133 in `src/shell-v0/operations/authorizationReject.test.ts:6`; TS2352 in `src/shell-v0/state/frameStatus.authorization.test.ts:30,50,78`. Unchanged main 51bfa7756c reproduces all four errors using its own copied dependencies/cache. These files were not edited. |
+| `npm --prefix modules/ui-web run test:unit:run -- --maxWorkers=4` | Exit 0: 699 files, 8,884 tests passed. |
+| `node scripts/ci/run-ui-web-gates.mjs` | Exit 0: 31/31 passed. |
+| `npm --prefix modules/ui-web run knip:report` | Exit 0: report generated (underlying Knip returned 1 for existing findings). |
+| `node scripts/governance/run.mjs --gate dead-code --mode gate` | Exit 0: pass, six findings. |
+| `node scripts/governance/gates/test-intent/cli.mjs` | Exit 1: only `test-intent/acceptance-missing`. No acceptance record written. |
+| Unchanged main `:modules:ui:test`, full task, display unset | Exit 1 in 11m 20s: 2,440 tests, two failed, two skipped. `NvidiaSmiAvailabilityHttpTest.anInstalledNvidiaSmiIsAvailableWhenNvmlSuppliesTheMemory` reproduces the candidate's installed-tool-available expected true / actual false assertion. The isolated checkout additionally fails `StatusIsolationHttpTest.actualFrontendRefreshPublishesPostActionStateFromProductionHttpRoute` at line 314 because its copied dependencies lack esbuild, which the candidate resolves from an ancestor installation; this is checkout setup, not a main behavior regression. That check passed in the candidate's first complete UI run. A focused main NVIDIA run passed both methods, so the comparison uses the complete main task, not that narrower pass. |
+| Main `:modules:ui:test --tests io.justsearch.ui.api.StatusIsolationHttpTest.actualFrontendRefreshPublishesPostActionStateFromProductionHttpRoute`, with esbuild copied into its own dependency tree | Exit 0 in 18s. The prior extra failure was missing-checkout dependency setup. Only existing esbuild and its platform binary were copied; no product/test code changed. |
+
+The candidate's unchanged StatusIsolationHttpTest reads esbuild from `/home/elias/dev/justsearch/node_modules`; that ancestor dependency tree was not written. The main comparison used copies of esbuild and its platform package under its own temporary checkout.
+
+
+The first full candidate invocation failed in app-services test compilation because the new Mockito matcher was ambiguous between two existing overloads; the matcher was corrected to name Component. That invocation continued through the other requested tasks. Its complete UI task ran 2,443 cases with one failure (`NvidiaSmiAvailabilityHttpTest.anInstalledNvidiaSmiIsAvailableWhenNvmlSuppliesTheMemory`) and two skips. The same assertion was reproduced by the complete unchanged-main UI task above. The final complete candidate invocation passed, including that NVIDIA method; its prior environment/suite-sensitive failure is retained here instead of being hidden by the pass.
+
+The final complete invocation used `env -u DISPLAY js-gradle-slot ./gradlew -PskipWebBuild=true --continue` with all five modules' full `test`, `pmdMain`, and `pmdTest` tasks and `:modules:ui:installDist`. It ended `BUILD SUCCESSFUL in 11m 37s`; no test filter was used. All ten PMD tasks and installDist passed (unchanged completed tasks were up-to-date).
+
+| Final complete JVM task | Cases | Passed | Skipped | Failed |
+| --- | ---: | ---: | ---: | ---: |
+| `:modules:core:test` | 132 | 132 | 0 | 0 |
+| `:modules:app-api:test` | 486 | 481 | 5 | 0 |
+| `:modules:app-inference:test` | 590 | 589 | 1 | 0 |
+| `:modules:app-services:test` | 5106 | 5095 | 11 | 0 |
+| `:modules:ui:test` | 2443 | 2441 | 2 | 0 |
+
+The unchanged GenerativeSettingsComponentOwnerTest ran all seven cases with zero skips/failures. PictureReadingProfileRepairTest ran all eleven cases with zero skips/failures. `git diff --check` passed. Independent verification and the test-intent acceptance record remain outside this builder assignment.

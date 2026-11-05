@@ -1,0 +1,54 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-05T00:40:52.075Z",
+  "revision": "81dee656b2bac8e1358e3c985d464b8c4f8c24ea",
+  "tree": "57bbd9dc47519f97a6f0bd0c5c3b6e7d49696f9b",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.chat.PictureReadingProfileRepairTest.profileAndReconfigureBuildersKeepTheNullablePictureChoice\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2144
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/PictureReadingProfileRepairTest.java#profileAndReconfigureBuildersKeepTheNullablePictureChoice",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/PictureReadingProfileRepairTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4e36644eb9ad06ca6d9beae1cddf7d715566a4c931c34709e6b90beef4627e48",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "profileAndReconfigureBuildersKeepTheNullablePictureChoice(null)",
+          "status": "passed"
+        },
+        {
+          "name": "profileAndReconfigureBuildersKeepTheNullablePictureChoice(true)",
+          "status": "passed"
+        },
+        {
+          "name": "profileAndReconfigureBuildersKeepTheNullablePictureChoice(false)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:2f7dc541d5722cf6110d10bf2cedfe321df7039d7e846fa3e15bd2006ebd0ccb"
+}

@@ -33,6 +33,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 
 final class PictureReadingProfileRepairTest {
   @TempDir Path directory;
@@ -62,6 +66,60 @@ final class PictureReadingProfileRepairTest {
     var refreshed = ConfigStoreRebuilder.prepare(settings(false), null, serving);
     assertEquals("compact", refreshed.ai().chatProfile());
     assertOff(refreshed);
+  }
+
+  @ParameterizedTest(name = "transientProfileKeepsTheProjectorUnlessExplicitlyOff({0})")
+  @NullSource
+  @ValueSource(booleans = {true, false})
+  void transientProfileKeepsTheProjectorUnlessExplicitlyOff(Boolean enabled) throws Exception {
+    var models = Files.createDirectories(directory.resolve("models"));
+    var profile = ChatModelProfile.COMPACT;
+    var model = models.resolve(profile.modelFile());
+    Files.createDirectories(model.getParent());
+    Files.writeString(model, "model fixture");
+    var projector = Files.writeString(models.resolve(profile.mmprojFile()), "projector fixture");
+    var builder = ResolvedConfig.builder().putDefault("justsearch.models.dir", models.toString());
+    if (Boolean.FALSE.equals(enabled)) builder.putDefault("justsearch.mmproj.model", "none");
+    var desired = builder.build();
+    var settings = settings(enabled);
+    var manager = mock(InferenceLifecycleManager.class);
+    when(manager.prepareResolvedConfig(any(), eq(desired), eq(false), eq(false)))
+        .thenReturn(mock(InferenceLifecycleManager.PreparedConfigApply.class));
+    var handle = observation();
+    when(handle.transitionIfUnchanged(any(EngineComponentSnapshot.Component.class), any(), any(), any()))
+        .thenReturn(true);
+
+    var prepared = new GenerativeSettingsComponentOwner(manager, handle, directory, false)
+        .prepare(settings, desired, Set.of("chatProfile"), new SettingsCandidateContext(profile));
+
+    var config = ArgumentCaptor.forClass(InferenceConfig.class);
+    verify(manager).prepareResolvedConfig(config.capture(), eq(desired), eq(false), eq(false));
+    assertEquals(model, config.getValue().modelPath());
+    assertEquals(Boolean.FALSE.equals(enabled) ? null : projector, config.getValue().mmprojPath());
+    assertEquals(profile.id(), config.getValue().chatProfileId());
+    prepared.abort();
+  }
+
+  @ParameterizedTest(name = "profileAndReconfigureBuildersKeepTheNullablePictureChoice({0})")
+  @NullSource
+  @ValueSource(booleans = {true, false})
+  void profileAndReconfigureBuildersKeepTheNullablePictureChoice(Boolean enabled) throws Exception {
+    var models = Files.createDirectories(directory.resolve("models"));
+    var profile = ChatModelProfile.COMPACT;
+    var model = models.resolve(profile.modelFile());
+    Files.createDirectories(model.getParent());
+    Files.writeString(model, "model fixture");
+    var projector = Files.writeString(models.resolve(profile.mmprojFile()), "projector fixture");
+    var settings = settings(enabled);
+    var activated = ConfigStoreRebuilder.prepare(settings, profile, null);
+    var reconfigured = ConfigStoreRebuilder.prepare(settings, null, activated);
+    for (var desired : List.of(activated, reconfigured)) {
+      var inference = InferenceConfig.fromResolvedConfig(desired, directory);
+      assertEquals(model, inference.modelPath());
+      assertEquals(Boolean.FALSE.equals(enabled) ? null : projector, inference.mmprojPath());
+      assertEquals(profile.id(), inference.chatProfileId());
+      assertEquals(!Boolean.FALSE.equals(enabled), InferenceConfig.pictureReadingEnabled(desired));
+    }
   }
 
   @Test
@@ -145,7 +203,7 @@ final class PictureReadingProfileRepairTest {
     assertEquals("PICTURE_READING_OVERRIDDEN", failure.response().errorCode().orElseThrow());
   }
 
-  private UiSettings settings(boolean enabled) {
+  private UiSettings settings(Boolean enabled) {
     var settings = new UiSettings();
     settings.setChatEnabled(false);
     settings.setPictureReadingEnabled(enabled);

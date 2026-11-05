@@ -140,8 +140,15 @@ public final class GenerativeSettingsComponentOwner implements FixedSettingsComp
         throw refused(PREPARATION_REFUSED, "Chat profile model is unavailable",
             Map.of("profile", profile.id(), "model", model.toString()), null);
       }
+      Path projector = inference.mmprojPath();
+      var projectorSource = desired.resolution("justsearch.mmproj.model");
+      if (projectorSource == null || !projectorSource.isResolved()
+          || !Set.of("env_var", "jvm_arg", "yaml").contains(projectorSource.sourceName())) {
+        Path profileProjector = modelsDir.resolve(profile.mmprojFile());
+        projector = Files.isRegularFile(profileProjector) ? profileProjector : null;
+      }
       inference = new InferenceConfig(inference.serverExecutable(), model,
-          inference.mmprojPath(), inference.serverPort(),
+          projector, inference.serverPort(),
           inference.contextSize(), inference.gpuLayers(), inference.vduMode(), profile.id(),
           inference.chatPromptCacheMiB());
     }
