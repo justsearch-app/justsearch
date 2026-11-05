@@ -112,7 +112,7 @@ The brief's adopted scenarios are quoted below; choices the scenarios leave open
           "delegationQuote": "proceed accordingly",
           "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
           "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
-          "choice": "Fourth decision 2a/3: Best match first must be saved Off and the Worker must report the reranker with no live session (no report yet refuses). Answers must not be On, picture reading must be saved Off (no saved choice means automatic, which counts as on), no managed or user-run answer server may run, no self-test, picture-reading, install or freeze hold may be open, and no external endpoint may be configured ('An answer server you run yourself is configured'). Operator overrides of the part's model refuse, and downloaded files waiting to be activated refuse. Other programs that open model files without JustSearch knowing are out of scope: on Windows the capture rename fails while a file is open, so that file is kept; on Linux an open file stays readable to that program until it closes it.",
+          "choice": "Fourth decision 2a/3: Best match first must be saved Off and the Worker must report the reranker with no live session (no report yet refuses). Answers must not be On, picture reading must be saved Off (no saved choice means automatic, which counts as on), no managed or user-run answer server may run, no self-test, picture-reading, install or freeze hold may be open, and no external endpoint may be configured ('An answer server you run yourself is configured'). Operator overrides of the part's model refuse, and downloaded files waiting to be activated refuse. Other programs that open model files without JustSearch knowing are out of scope: on Windows the capture rename fails while that program holds the file open without delete sharing, so that file is kept; a program that opened it with delete sharing does not stop the rename; the captured file is then deleted through JustSearch's verified handle only if that program also shares reading and is not writing it, and the deletion completes when that program closes it (as on Linux, where an open file stays readable to that program until it closes it); otherwise the file is kept and put back ('kept - could not be deleted').",
           "label": "agent choice"
         },
         {
@@ -604,7 +604,7 @@ The brief's adopted scenarios are quoted below; choices the scenarios leave open
           "delegationQuote": "proceed accordingly",
           "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
           "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
-          "choice": "Repair round 3, Windows deletion: the captured file is opened once (CreateFileW, read and delete access, read sharing only, not following a link or reparse point, no backup semantics so a folder cannot be opened); its NTFS identity, link count and size are read from that handle and its SHA-256 by reading the same handle; only then is the handle's delete disposition set (SetFileInformationByHandle, FileDispositionInfo) and the handle closed. The decision named StandardOpenOption.DELETE_ON_CLOSE; a delete-on-close open cannot be withdrawn after a failed check and would delete a mismatched file, so the disposition is set only after the checks pass, which deletes exactly the opened file. When the handle cannot be opened or marked (in use for writing, a sharing violation, the calls unavailable) the file is kept and put back ('kept - could not be deleted'). On POSIX the entry is checked to be the verified file and then unlinked by name relative to the checked removal folder's handle, and a put-back by hard link drops the captured name by name (also in recovery): a program running under the user's own account could swap a file at the moment of deletion; such a program can already change the user's files directly (threat model decided after the final review). A platform with neither handle keeps the file. A file another program had already opened with delete sharing is deleted once that program closes it, as on Linux.",
+          "choice": "Repair round 3, Windows deletion: the captured file is opened once (CreateFileW, read and delete access, read sharing only, not following a link or reparse point, no backup semantics so a folder cannot be opened); its NTFS identity, link count and size are read from that handle and its SHA-256 by reading the same handle; only then is the handle's delete disposition set (SetFileInformationByHandle, FileDispositionInfo) and the handle closed. The decision named StandardOpenOption.DELETE_ON_CLOSE; a delete-on-close open cannot be withdrawn after a failed check and would delete a mismatched file, so the disposition is set only after the checks pass, which deletes exactly the opened file. When the handle cannot be opened or marked (in use for writing, a sharing violation, the calls unavailable) the file is kept and put back ('kept - could not be deleted'). On POSIX the entry is checked to be the verified file and then unlinked by name relative to the checked removal folder's handle, and a put-back by hard link drops the captured name by name (also in recovery): a program running under the user's own account could swap a file at the moment of deletion; such a program can already change the user's files directly (threat model decided after the final review). A platform with neither handle keeps the file. A file another program had already opened with read and delete sharing, and is not writing, is deleted once that program closes it, as on Linux; one it holds without delete sharing fails the capture rename and is kept.",
           "label": "agent choice"
         },
         {
@@ -691,7 +691,7 @@ The brief's adopted scenarios are quoted below; choices the scenarios leave open
           "delegationQuote": "proceed accordingly",
           "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
           "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
-          "choice": "Threat model decided by the user after the final review ('Treat programs running under your own account as trusted (named as a limit)'): other accounts are kept out by the owner-only removal folder, as before. Two steps still act on a captured file by name and are kept: on POSIX the entry is checked to be the verified file and then unlinked by name relative to the checked removal folder's handle, and a put-back by hard link drops the captured name by name (also in recovery). Limit: another program running under your account could swap a file at the moment of deletion; such a program can already change your files directly. Other programs that open files in the models folder without JustSearch knowing are out of scope: on Windows the capture rename fails while a file is open, so that file is kept; on Linux an open file stays readable to that program until it closes it.",
+          "choice": "Threat model decided by the user after the final review ('Treat programs running under your own account as trusted (named as a limit)'): other accounts are kept out by the owner-only removal folder, as before. Two steps still act on a captured file by name and are kept: on POSIX the entry is checked to be the verified file and then unlinked by name relative to the checked removal folder's handle, and a put-back by hard link drops the captured name by name (also in recovery). Limit: another program running under your account could swap a file at the moment of deletion; such a program can already change your files directly. Other programs that open files in the models folder without JustSearch knowing are out of scope: on Windows the capture rename fails while that program holds the file open without delete sharing, so that file is kept; a program that opened it with delete sharing does not stop the rename; the captured file is then deleted through JustSearch's verified handle only if that program also shares reading and is not writing it, and the deletion completes when that program closes it (as on Linux, where an open file stays readable to that program until it closes it); otherwise the file is kept and put back ('kept - could not be deleted').",
           "label": "agent choice"
         }
       ],
@@ -907,7 +907,7 @@ The brief's adopted scenarios are quoted below; choices the scenarios leave open
       "moved": [
         "input re-encoding"
       ],
-      "whatMoved": "'a missing declined answer package asks for its real size and licence and downloads after consent' used to reach the consent through DELETE .../chat/decline, whose fixture response flipped the declined component to to-download before the plan preview was read. The page now reads that same plan as GET /api/ai/install/plan-preview?include=chat without saving anything first (third decision), so the fixture serves the included plan for that request in the same shape the decline used to produce. Inputs, the click, the observed dialog text and licence, and the expected operations (core.start-ai-install then core.set-chat-enabled) are unchanged.",
+      "whatMoved": "'a missing declined answer package asks for its real size and licence and downloads after consent' used to reach the consent through DELETE .../chat/decline, whose fixture response flipped the declined component to to-download before the plan preview was read. The page now reads that same plan as GET /api/ai/install/plan-preview?include=chat without saving anything first (third decision), so the fixture serves the included plan for that request in the same shape the decline used to produce. Inputs, the click and the observed dialog text and licence are unchanged; the expected operations are unchanged by this move (the later Obsolete entry for this file retires the core.set-chat-enabled after the start, review suggestion 1).",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -925,6 +925,164 @@ The brief's adopted scenarios are quoted below; choices the scenarios leave open
           "label": "agent-drafted, owner-adopted"
         }
       ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.answers-completion.test.ts"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Review suggestions 1 and 2 on the page. With the answer model removed (declined, answers off): switching answers on, or the panel's Start answers action, opens the download consent and saves nothing; Cancel saves nothing; Accept starts exactly one core.start-ai-install carrying acceptTerms, enableChatOnCompletion, includePackages [chat] and the previewed planDigest, and no core.set-chat-enabled (before the change the page sent core.set-chat-enabled right after the start, which the Engine refuses while the model is missing). The Start AI, Resume Chat AI and Start Chat AI escape actions use the same route, but they are not rendered while AI is installed, so this file checks the reachable Start answers action.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "X2",
+          "quote": "Removal refuses with a plain reason (switch it off first; a download, repair, import or activation is running; an index generation or recovery still needs it; a file is shared with a wanted part) and deletes nothing in that case. After removal: the part shows Not downloaded, Repair does not bring it back, the install total counts it again, \"Download again\" asks for consent and downloads only what is missing.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "N1",
+          "quote": "Answers on/off, Best match first, picture reading and Pause answers while indexing switches keep their behaviour and files; search by exact words and by meaning, indexing and its pacing work as today; installs, consent, decline and Repair of parts not removed keep today's behaviour; source documents, the index and conversations are never touched.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
+          "choice": "Review suggestion 1 (after new-sequence round 1, 8afb51c12b): answers consented with a missing answer model (the answers switch, Start answers, and the escape actions below) are switched on by the install owner when the accepted download completes with the answer model's files on disk, the way Best match first and picture reading completion enables apply, never at the start (switching on at the start is refused while the model is missing and nothing retried it). core.start-ai-install gains the optional boolean enableChatOnCompletion; the page sends it instead of calling core.set-chat-enabled after the start. A newer answers choice saved during the download wins: a changed answers value, or the answers switch (core.set-chat-enabled) repeating the saved value. The completion enable then nudges answer-server reconciliation, as a public settings write changing answers does. Download again from Downloaded files carries no enable and switches nothing on.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
+          "choice": "Review suggestion 2: Start AI, Resume Chat AI and Start Chat AI (the panel's answers escape actions) turn answers on the way the answers switch does: when the answer model's files were removed (declined) they open the download consent through the same route (preview only, nothing saved until the accepted download starts), otherwise they switch answers on as before. Observed while testing: these three actions render only when AI is not installed, while installing or when activation is required, and in those states the action is Install AI, Cancel or Activate, so after Answers removal the reachable action is Start answers, which already used that route; the change keeps the three consistent, and no page check can fail before it.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s2-remove-files-review-ui.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.answers-completion.test.ts#the answers switch: accepting starts the download with the completion enable and switches nothing on now",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.answers-completion.test.ts#Start answers: asks first, Cancel saves nothing, Accept starts the download without switching answers on"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AnswersInstallCompletionTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AnswersInstallRig.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Review suggestion 1 in the Engine: the real start operation, installer, HTTP acquisition (held until released, a delayed completion) and durable settings owner, with answers off and the answer model missing. With enableChatOnCompletion the answers stay off while the download runs and are on after it completes; an unrelated save during the download keeps the consented enable and is preserved. Before the change the flag was ignored and answers stayed off after the download. The same file also checks that answers switched off again during the download (off to off) stay off and nothing else is saved, and that an install without the flag leaves answers off (these two hold before and after; their evidence is in the next entry).",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "X2",
+          "quote": "Removal refuses with a plain reason (switch it off first; a download, repair, import or activation is running; an index generation or recovery still needs it; a file is shared with a wanted part) and deletes nothing in that case. After removal: the part shows Not downloaded, Repair does not bring it back, the install total counts it again, \"Download again\" asks for consent and downloads only what is missing.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "N1",
+          "quote": "Answers on/off, Best match first, picture reading and Pause answers while indexing switches keep their behaviour and files; search by exact words and by meaning, indexing and its pacing work as today; installs, consent, decline and Repair of parts not removed keep today's behaviour; source documents, the index and conversations are never touched.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
+          "choice": "Review suggestion 1 (after new-sequence round 1, 8afb51c12b): answers consented with a missing answer model (the answers switch, Start answers, and the escape actions below) are switched on by the install owner when the accepted download completes with the answer model's files on disk, the way Best match first and picture reading completion enables apply, never at the start (switching on at the start is refused while the model is missing and nothing retried it). core.start-ai-install gains the optional boolean enableChatOnCompletion; the page sends it instead of calling core.set-chat-enabled after the start. A newer answers choice saved during the download wins: a changed answers value, or the answers switch (core.set-chat-enabled) repeating the saved value. The completion enable then nudges answer-server reconciliation, as a public settings write changing answers does. Download again from Downloaded files carries no enable and switches nothing on.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s2-remove-files-review-engine.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AnswersInstallCompletionTest.java#consentedAnswersAreSwitchedOnWhenTheDelayedDownloadCompletes",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AnswersInstallCompletionTest.java#anUnrelatedSaveDuringTheDownloadKeepsTheConsentedEnable"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AnswersInstallCompletionNoticeTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/settings/AnswersPreferenceRevisionTest.java"
+      ],
+      "class": "New",
+      "behaviour": "The completion enable notifies answer-server reconciliation once, after the enable is saved, and stamps the answers revision; a newer Off choice made by the answers switch during the download is stamped (also off to off) and the skipped enable notifies nothing. The answers choice revision: settings of every stored version without it load with 0 and their saved answers and declines unchanged, not quarantined; a revision at the settings revision loads, one ahead of it is quarantined; the settings owner stamps a changed answers value and the answers switch repeating a value, not an ordinary save echoing it, and keeps the last answers revision through later unrelated saves and a reopen. Also run here: AnswersInstallCompletionTest's two checks that hold before and after.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "N1",
+          "quote": "Answers on/off, Best match first, picture reading and Pause answers while indexing switches keep their behaviour and files; search by exact words and by meaning, indexing and its pacing work as today; installs, consent, decline and Repair of parts not removed keep today's behaviour; source documents, the index and conversations are never touched.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "N2",
+          "quote": "If saved settings change shape: existing installs load with today's behaviour, older settings versions migrate, corrupt settings are quarantined as today (stored schema 9 today; the desktop updater's Rust test in modules/shell/src-tauri/src/updater.rs and governance/store-recoverability.v1.json pin the version). Prefer reusing the existing declinedAiPackages acquisition preference over a new field.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
+          "choice": "Review suggestion 1 (after new-sequence round 1, 8afb51c12b): answers consented with a missing answer model (the answers switch, Start answers, and the escape actions below) are switched on by the install owner when the accepted download completes with the answer model's files on disk, the way Best match first and picture reading completion enables apply, never at the start (switching on at the start is refused while the model is missing and nothing retried it). core.start-ai-install gains the optional boolean enableChatOnCompletion; the page sends it instead of calling core.set-chat-enabled after the start. A newer answers choice saved during the download wins: a changed answers value, or the answers switch (core.set-chat-enabled) repeating the saved value. The completion enable then nudges answer-server reconciliation, as a public settings write changing answers does. Download again from Downloaded files carries no enable and switches nothing on.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
+          "choice": "Answers choice revision (needed by suggestion 1; answers had none): UiSettings gains chatPreferenceRevision (omitted while 0), stamped by the settings owner like picture reading's revision: the accepted revision when the answers value changes or when the candidate requests it (the answers switch always does, also for a same value); ordinary saves keep the previous one. A saved revision ahead of the settings revision is quarantined as corrupt; settings without it (every existing install and older version) load with 0 and today's behaviour; the schema version stays 9, so the updater pin and store-recoverability register are unchanged. Runtime activation's commit over a chat switch made during its self-test treats the stamped revision as part of that switch (aligned and rebased with it), so that behaviour is unchanged.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s2-remove-files-review-new.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AnswersInstallCompletionNoticeTest.java#theCompletionEnableNotifiesReconciliationOnceAfterItIsSaved",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AnswersInstallCompletionNoticeTest.java#aNewerOffChoiceIsStampedAndTheSkippedEnableNotifiesNothing",
+        "modules/app-services/src/test/java/io/justsearch/app/services/settings/AnswersPreferenceRevisionTest.java#existingSettingsOfEveryVersionLoadWithoutARevisionAndAreNotQuarantined",
+        "modules/app-services/src/test/java/io/justsearch/app/services/settings/AnswersPreferenceRevisionTest.java#aRevisionAheadOfTheSettingsRevisionIsQuarantined",
+        "modules/app-services/src/test/java/io/justsearch/app/services/settings/AnswersPreferenceRevisionTest.java#theOwnerStampsChangedAndRepeatedAnswersChoicesButNotOrdinarySaves",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AnswersInstallCompletionTest.java#answersSwitchedOffAgainDuringTheDownloadStayOff",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AnswersInstallCompletionTest.java#anInstallWithoutTheConsentedEnableLeavesAnswersOff"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.redesign.test.ts"
+      ],
+      "class": "Obsolete",
+      "behaviour": "'a missing declined answer package asks for its real size and licence and downloads after consent' expected core.start-ai-install followed by core.set-chat-enabled after Accept. That second call is retired: answers are switched on by the Engine when the download completes, so the expected operations are now the one core.start-ai-install, carrying acceptTerms, enableChatOnCompletion and includePackages [chat]. The click, the dialog's size and licence and the locked switch while the consent is open are unchanged.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
+          "choice": "Review suggestion 1 (after new-sequence round 1, 8afb51c12b): answers consented with a missing answer model (the answers switch, Start answers, and the escape actions below) are switched on by the install owner when the accepted download completes with the answer model's files on disk, the way Best match first and picture reading completion enables apply, never at the start (switching on at the start is refused while the model is missing and nothing retried it). core.start-ai-install gains the optional boolean enableChatOnCompletion; the page sends it instead of calling core.set-chat-enabled after the start. A newer answers choice saved during the download wins: a changed answers value, or the answers switch (core.set-chat-enabled) repeating the saved value. The completion enable then nudges answer-server reconciliation, as a public settings write changing answers does. Download again from Downloaded files carries no enable and switches nothing on.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "X2",
+          "quote": "Removal refuses with a plain reason (switch it off first; a download, repair, import or activation is running; an index generation or recovery still needs it; a file is shared with a wanted part) and deletes nothing in that case. After removal: the part shows Not downloaded, Repair does not bring it back, the install total counts it again, \"Download again\" asks for consent and downloads only what is missing.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "conflictSearch": "decision records searched for a conflict: none. The brief's decisions (user decisions on consent and switching, design D4 and its settlement, the third decision on Download again, the review suggestions decided by the orchestrator) and this changeset's entries were searched for core.set-chat-enabled after an accepted download and for answers enabled at install start; only the earlier Adaptation entry for this file names that sequence, and it is updated to point here."
     }
   ]
 }

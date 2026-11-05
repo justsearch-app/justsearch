@@ -182,7 +182,9 @@ describe('AI Brain redesign behaviour', () => {
     expect(calls).toEqual([]);
     expect(switches(el, 'Answer questions')[1]!.getAttribute('aria-disabled')).toBe('true');
     await clickButton(el, 'Accept and download');
-    expect(calls.map(call => call.id)).toEqual(['core.start-ai-install', 'core.set-chat-enabled']);
+    // Answers are switched on by the Engine when the download completes, not at its start.
+    expect(calls.map(call => call.id)).toEqual(['core.start-ai-install']);
+    expect(calls[0]!.args).toMatchObject({ acceptTerms: true, enableChatOnCompletion: true, includePackages: ['chat'] });
   });
   it('accept is disabled until the manifest and every download size are known, with retry', async () => {
     preview.components = [component('embedding', 'to-download')]; preview.totalDownloadBytes = 1024;

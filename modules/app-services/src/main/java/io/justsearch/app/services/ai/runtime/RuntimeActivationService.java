@@ -1179,6 +1179,7 @@ public final class RuntimeActivationService
       }
       UiSettings rebased = MAPPER.readValue(MAPPER.writeValueAsString(next), UiSettings.class);
       rebased.setChatEnabled(fresh.settings().getChatEnabled());
+      rebased.setChatPreferenceRevision(fresh.settings().getChatPreferenceRevision());
       try {
         return commitCandidate(rebased, fresh.witness(), "runtime-variant-apply", profile);
       } catch (SettingsCommitOwner.Refused refused) {
@@ -1196,6 +1197,8 @@ public final class RuntimeActivationService
   private static boolean onlyChatSwitched(UiSettings earlier, UiSettings later) {
     UiSettings aligned = MAPPER.readValue(MAPPER.writeValueAsString(later), UiSettings.class);
     aligned.setChatEnabled(earlier.getChatEnabled());
+    // The switch stamps its own revision with the choice (answers completion guard).
+    aligned.setChatPreferenceRevision(earlier.getChatPreferenceRevision());
     return MAPPER.valueToTree(earlier).equals(MAPPER.valueToTree(aligned));
   }
 

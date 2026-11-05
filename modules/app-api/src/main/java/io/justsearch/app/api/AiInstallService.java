@@ -174,6 +174,20 @@ public interface AiInstallService {
   }
 
   /**
+   * Also carries the consented answers enable: answers are switched on when the download completes
+   * with the answer model's files present, unless a newer answers choice was saved meanwhile.
+   */
+  default Attempt startInstall(boolean acceptTerms, boolean enableRerankerOnCompletion,
+      boolean enablePictureReadingOnCompletion, boolean enableChatOnCompletion,
+      Set<String> includePackages, String planDigest) {
+    if (enableChatOnCompletion) {
+      throw new UnsupportedOperationException("Answers install intent unavailable");
+    }
+    return startInstall(acceptTerms, enableRerankerOnCompletion, enablePictureReadingOnCompletion,
+        includePackages, planDigest);
+  }
+
+  /**
    * The download plan as it would be with {@code includePackages} downloaded again, without
    * changing any saved choice (the consent preview for "Download again").
    */

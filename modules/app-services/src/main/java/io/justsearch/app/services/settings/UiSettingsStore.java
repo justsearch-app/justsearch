@@ -379,6 +379,9 @@ public final class UiSettingsStore {
       if (settings.getRerankerPreferenceRevision() > witness.acceptedRevision()) {
         throw new CorruptDurableStoreException("ui-settings", "reranker preference is ahead of settings revision");
       }
+      if (settings.getChatPreferenceRevision() > witness.acceptedRevision()) {
+        throw new CorruptDurableStoreException("ui-settings", "answers preference is ahead of settings revision");
+      }
       QueryRoleSelection queryRoles = null;
       JsonNode queryNode = root.get("queryRoles");
       if (queryNode != null) {

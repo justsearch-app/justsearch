@@ -201,6 +201,10 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
   private boolean enableRerankerOnCompletion;
   private boolean enablePictureReadingOnCompletion;
   private UiSettingsStore.Snapshot picturePreferenceAtInstallStart;
+  private boolean enableChatOnCompletion;
+  private UiSettingsStore.Snapshot chatPreferenceAtInstallStart;
+  /** Tells answer-server reconciliation that the completion switched answers on (composition-bound). */
+  private volatile Runnable chatIntentChanged = () -> {};
   private UiSettingsStore.Snapshot rerankerPreferenceAtInstallStart;
 
   /**
@@ -1119,6 +1123,14 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
   @Override
   public Attempt startInstall(boolean acceptTerms, boolean enableRerankerOnCompletion,
       boolean enablePictureReadingOnCompletion, Set<String> includePackages, String planDigest) {
+    return startInstall(acceptTerms, enableRerankerOnCompletion, enablePictureReadingOnCompletion,
+        false, includePackages, planDigest);
+  }
+
+  @Override
+  public Attempt startInstall(boolean acceptTerms, boolean enableRerankerOnCompletion,
+      boolean enablePictureReadingOnCompletion, boolean enableChatOnCompletion,
+      Set<String> includePackages, String planDigest) {
     if (!acceptTerms) {
       throw new AiInstallException(
           400, ApiErrorCode.TERMS_REQUIRED, "You must accept the model terms before downloading.");
@@ -1136,8 +1148,8 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     try {
       // An interrupted removal puts its captured files back before anything plans downloads.
       removal.recoverIfNeeded();
-      return startInstallRun(enableRerankerOnCompletion, enablePictureReadingOnCompletion, include,
-          planDigest, filesUser);
+      return startInstallRun(enableRerankerOnCompletion, enablePictureReadingOnCompletion,
+          enableChatOnCompletion, include, planDigest, filesUser);
     } catch (RuntimeException | Error failure) {
       filesUser.close();
       throw failure;
@@ -1145,8 +1157,8 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
   }
 
   private Attempt startInstallRun(boolean enableRerankerOnCompletion,
-      boolean enablePictureReadingOnCompletion, Set<String> include, String planDigest,
-      ModelFileRemovalFence.Ticket filesUser) {
+      boolean enablePictureReadingOnCompletion, boolean enableChatOnCompletion, Set<String> include,
+      String planDigest, ModelFileRemovalFence.Ticket filesUser) {
     Set<String> acceptedDeclines = null;
     if (!include.isEmpty()) {
       // "Download again": the guard is taken first so no other start can interleave, then the
@@ -1170,8 +1182,8 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     // Read after any withdrawal, so a completion enable commits against the current witness.
     final UiSettingsStore.Snapshot preferenceAtStart;
     try {
-      preferenceAtStart = (enableRerankerOnCompletion || enablePictureReadingOnCompletion)
-          && settingsStore != null ? settingsStore.inspect() : null;
+      preferenceAtStart = (enableRerankerOnCompletion || enablePictureReadingOnCompletion
+          || enableChatOnCompletion) && settingsStore != null ? settingsStore.inspect() : null;
     } catch (RuntimeException | Error unreadable) {
       if (acceptedDeclines != null) installStartFailed(unreadable);
       throw unreadable;
@@ -1188,6 +1200,8 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
       this.rerankerPreferenceAtInstallStart = enableRerankerOnCompletion ? preferenceAtStart : null;
       this.enablePictureReadingOnCompletion = enablePictureReadingOnCompletion;
       this.picturePreferenceAtInstallStart = enablePictureReadingOnCompletion ? preferenceAtStart : null;
+      this.enableChatOnCompletion = enableChatOnCompletion;
+      this.chatPreferenceAtInstallStart = enableChatOnCompletion ? preferenceAtStart : null;
       cancelFlag.set(false);
       pause.resume();
       status.cancelRequested = false;
@@ -1870,6 +1884,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
       }
 
       if (enablePictureReadingOnCompletion) completePictureReadingInstall();
+      if (enableChatOnCompletion) completeChatInstall();
       if (enableRerankerOnCompletion) completeRerankerInstall(registry);
       else applyCompletionState();
     } finally {
@@ -2743,6 +2758,41 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
         Math.addExact(latest.witness().acceptedRevision(), 1));
     if (cancelFlag.get()) return;
     commitSettings(candidate, latest.witness(), "ai-install-picture-reading");
+  }
+
+  /**
+   * Answers consented with a missing answer model are switched on here, once its files are on disk
+   * (switching on at the start is refused while the model is missing, and nothing would retry). A
+   * newer answers choice saved during the download wins: a changed value, or an explicit choice the
+   * settings owner stamped after this install started (also one repeating the same value).
+   */
+  private void completeChatInstall() {
+    if (settingsStore == null || chatPreferenceAtInstallStart == null) {
+      throw new IllegalStateException("Settings authority unavailable");
+    }
+    var truth = recomputeCompletenessFromDiskBestEffort();
+    if (truth == null || truth.packagesWithMissingRequiredFiles().contains("chat")) {
+      throw new IllegalStateException("Answer model files are not ready");
+    }
+    var latest = settingsStore.inspect();
+    if (!Objects.equals(latest.settings().getChatEnabled(),
+        chatPreferenceAtInstallStart.settings().getChatEnabled())
+        || latest.settings().getChatPreferenceRevision()
+            > chatPreferenceAtInstallStart.witness().acceptedRevision()) return;
+    UiSettings candidate = latest.settings();
+    candidate.setChatEnabled(true);
+    candidate.setChatPreferenceRevision(Math.addExact(latest.witness().acceptedRevision(), 1));
+    if (cancelFlag.get()) return;
+    commitSettings(candidate, latest.witness(), "ai-install-answers");
+    try { chatIntentChanged.run(); }
+    catch (RuntimeException failure) {
+      log.warn("Answers were switched on but answer-server reconciliation was not notified", failure);
+    }
+  }
+
+  /** Binds the answer-server reconciliation notice the completion enable sends. */
+  public void setChatIntentChanged(Runnable notice) {
+    chatIntentChanged = Objects.requireNonNull(notice, "notice");
   }
 
   /** The enable intent and installed query path are committed by one completion batch. */

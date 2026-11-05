@@ -318,6 +318,11 @@ public final class ServicePhase {
             in.knowledgeServer(),
             enterprisePolicy,
             chatHolds, settings);
+    // Answers consented with a missing model are switched on by the install's completion; like a
+    // public settings write that changes answers, it nudges answer-server reconciliation.
+    aiInstallHelper.setChatIntentChanged(() -> {
+      if (settingsReconciler != null) settingsReconciler.specChanged();
+    });
     // Design D4: the settings owner, pack import and runtime activation read the install owner's
     // removal lock from the shared settings store; bound before any of them can run.
     in.settingsStore().bindModelFileRemovalFence(aiInstallHelper.removalFence());

@@ -1411,6 +1411,9 @@
         "enablePictureReadingOnCompletion" : {
           "type" : "boolean"
         },
+        "enableChatOnCompletion" : {
+          "type" : "boolean"
+        },
         "includePackages" : {
           "type" : "array",
           "maxItems" : 8,

@@ -1656,6 +1656,17 @@ export class BrainSurface extends JfElement {
     await this.changeAcquisition(feature.id, feature.selected, feature.installed);
   }
 
+  /**
+   * Start AI / Resume Chat AI / Start Chat AI turn answers on the way the answers switch does: when
+   * the answer model's files were removed (declined), they open the download consent and save
+   * nothing until the accepted download starts (design D4); otherwise they switch answers on.
+   */
+  private async turnAnswersOn(): Promise<void> {
+    const chat = this.brainFeatures().chat;
+    if (this.hasInstalledAi() && !chat.installed && !chat.selected) await this.changeFeature(chat);
+    else await this.setChatEnabled(true);
+  }
+
   private async changeAcquisition(id: string, selected: boolean, installed: boolean): Promise<void> {
     if (this.hasInstalledAi() && !installed && !selected) {
       // Switching on a missing part after install asks first; its decline is withdrawn only when
@@ -2175,12 +2186,12 @@ export class BrainSurface extends JfElement {
       const data = (await this.invokeOp('core.start-ai-install', { acceptTerms: true,
         ...(feature === 'reranker' ? { enableRerankerOnCompletion: true } : {}),
         ...(feature === 'pictures' ? { enablePictureReadingOnCompletion: true } : {}),
+        // Answers are switched on by the Engine once the answer model is downloaded: switching on
+        // now is refused while the model is missing, and nothing would retry it.
+        ...(feature === 'chat' ? { enableChatOnCompletion: true } : {}),
         ...(include.length > 0 ? { includePackages: include, planDigest } : {}),
       })) as InstallStatus;
-      if (data) {
-        void refreshAiInstallNow();
-        if (feature === 'chat') await this.setChatEnabled(true);
-      }
+      if (data) void refreshAiInstallNow();
     });
   }
 
@@ -2660,7 +2671,7 @@ export class BrainSurface extends JfElement {
           return {
             label: 'Start AI',
             iconName: 'check-circle-2' as const,
-            onClick: () => void this.setChatEnabled(true),
+            onClick: () => void this.turnAnswersOn(),
             availability: chatUnavailableReason
               ? unavailableBecause(chatUnavailableReason)
               : onlineDisabled
@@ -2693,7 +2704,7 @@ export class BrainSurface extends JfElement {
           return {
             label: 'Resume Chat AI',
             iconName: 'check-circle-2' as const,
-            onClick: () => void this.setChatEnabled(true),
+            onClick: () => void this.turnAnswersOn(),
             availability: chatUnavailableReason
               ? unavailableBecause(chatUnavailableReason)
               : onlineDisabled
@@ -2710,7 +2721,7 @@ export class BrainSurface extends JfElement {
           return {
             label: 'Start Chat AI',
             iconName: 'check-circle-2' as const,
-            onClick: () => void this.setChatEnabled(true),
+            onClick: () => void this.turnAnswersOn(),
             availability: chatUnavailableReason
               ? unavailableBecause(chatUnavailableReason)
               : onlineDisabled

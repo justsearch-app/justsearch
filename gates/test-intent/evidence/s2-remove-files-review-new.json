@@ -1,0 +1,136 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-05T17:32:52.627Z",
+  "revision": "8afb51c12b6439ac3f9d0eac79bd20edcf228a2e",
+  "tree": "31afec206115c47f37ea248c8beb7cc0cbb7fe1a",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.ai.install.AnswersInstallCompletionNoticeTest.theCompletionEnableNotifiesReconciliationOnceAfterItIsSaved\" --tests \"io.justsearch.app.services.ai.install.AnswersInstallCompletionNoticeTest.aNewerOffChoiceIsStampedAndTheSkippedEnableNotifiesNothing\" --tests \"io.justsearch.app.services.settings.AnswersPreferenceRevisionTest.existingSettingsOfEveryVersionLoadWithoutARevisionAndAreNotQuarantined\" --tests \"io.justsearch.app.services.settings.AnswersPreferenceRevisionTest.aRevisionAheadOfTheSettingsRevisionIsQuarantined\" --tests \"io.justsearch.app.services.settings.AnswersPreferenceRevisionTest.theOwnerStampsChangedAndRepeatedAnswersChoicesButNotOrdinarySaves\" --tests \"io.justsearch.app.services.ai.install.AnswersInstallCompletionTest.answersSwitchedOffAgainDuringTheDownloadStayOff\" --tests \"io.justsearch.app.services.ai.install.AnswersInstallCompletionTest.anInstallWithoutTheConsentedEnableLeavesAnswersOff\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 13238
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AnswersInstallCompletionNoticeTest.java#theCompletionEnableNotifiesReconciliationOnceAfterItIsSaved",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AnswersInstallCompletionNoticeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:900993f259b00fd026f58b2539bf0aecf2c3761e230e51fbf370f107065410cb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theCompletionEnableNotifiesReconciliationOnceAfterItIsSaved(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AnswersInstallCompletionNoticeTest.java#aNewerOffChoiceIsStampedAndTheSkippedEnableNotifiesNothing",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AnswersInstallCompletionNoticeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:900993f259b00fd026f58b2539bf0aecf2c3761e230e51fbf370f107065410cb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aNewerOffChoiceIsStampedAndTheSkippedEnableNotifiesNothing(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/settings/AnswersPreferenceRevisionTest.java#existingSettingsOfEveryVersionLoadWithoutARevisionAndAreNotQuarantined",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/settings/AnswersPreferenceRevisionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b1b335261cd4566ef6863706aa302e1ec2b663b4e7d88770b88349245982bf38",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "existingSettingsOfEveryVersionLoadWithoutARevisionAndAreNotQuarantined(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/settings/AnswersPreferenceRevisionTest.java#aRevisionAheadOfTheSettingsRevisionIsQuarantined",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/settings/AnswersPreferenceRevisionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b1b335261cd4566ef6863706aa302e1ec2b663b4e7d88770b88349245982bf38",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRevisionAheadOfTheSettingsRevisionIsQuarantined(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/settings/AnswersPreferenceRevisionTest.java#theOwnerStampsChangedAndRepeatedAnswersChoicesButNotOrdinarySaves",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/settings/AnswersPreferenceRevisionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b1b335261cd4566ef6863706aa302e1ec2b663b4e7d88770b88349245982bf38",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theOwnerStampsChangedAndRepeatedAnswersChoicesButNotOrdinarySaves(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AnswersInstallCompletionTest.java#answersSwitchedOffAgainDuringTheDownloadStayOff",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AnswersInstallCompletionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7144948a0e8f44276c55fadc4867a8eb848d0d5cf1412569a4d0e8da84910d4d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "answersSwitchedOffAgainDuringTheDownloadStayOff(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AnswersInstallCompletionTest.java#anInstallWithoutTheConsentedEnableLeavesAnswersOff",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AnswersInstallCompletionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7144948a0e8f44276c55fadc4867a8eb848d0d5cf1412569a4d0e8da84910d4d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anInstallWithoutTheConsentedEnableLeavesAnswersOff(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:72e9a83a67027eb2ee0016e1e4ab215470c693fe047b1da7f335e5ba8164169a"
+}

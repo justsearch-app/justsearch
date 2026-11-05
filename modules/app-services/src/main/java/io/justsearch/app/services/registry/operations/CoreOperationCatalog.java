@@ -1151,6 +1151,7 @@ public final class CoreOperationCatalog implements OperationCatalog {
         Interface.of("{\"type\":\"object\",\"properties\":{\"acceptTerms\":{\"type\":\"boolean\"},"
             + "\"enableRerankerOnCompletion\":{\"type\":\"boolean\"},"
             + "\"enablePictureReadingOnCompletion\":{\"type\":\"boolean\"},"
+            + "\"enableChatOnCompletion\":{\"type\":\"boolean\"},"
             + "\"includePackages\":{\"type\":\"array\",\"maxItems\":8,\"uniqueItems\":true,"
             + "\"items\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":64}},"
             + "\"planDigest\":{\"type\":\"string\",\"pattern\":\"^[0-9a-f]{64}$\"}}}",

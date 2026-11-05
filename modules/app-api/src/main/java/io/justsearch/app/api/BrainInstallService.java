@@ -78,6 +78,17 @@ public interface BrainInstallService {
     return startInstall(acceptTerms, enableRerankerOnCompletion, enablePictureReadingOnCompletion);
   }
 
+  /** Also carries the consented answers enable to the install's completion. */
+  default AiInstallService.Attempt startInstall(boolean acceptTerms, boolean enableRerankerOnCompletion,
+      boolean enablePictureReadingOnCompletion, boolean enableChatOnCompletion,
+      java.util.Set<String> includePackages, String planDigest) throws Exception {
+    if (enableChatOnCompletion) {
+      throw new UnsupportedOperationException("Answers install intent unavailable");
+    }
+    return startInstall(acceptTerms, enableRerankerOnCompletion, enablePictureReadingOnCompletion,
+        includePackages, planDigest);
+  }
+
   /** Removes one part's downloaded files when nothing uses them; refuses with a plain reason. */
   default AiInstallService.RemovalAttempt removeFiles(String packageId, String previewDigest) {
     throw new UnsupportedOperationException("Removing files is unavailable");

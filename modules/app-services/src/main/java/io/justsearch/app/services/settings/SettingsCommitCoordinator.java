@@ -1039,6 +1039,14 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
               : active.priorSettings.getPictureReadingPreferenceRevision());
       boolean chatComponentChanged = !active.recoveryReset() && !Objects.equals(
           active.priorSettings.getChatEnabled(), preparedCandidate.getChatEnabled());
+      // The answers choice is stamped like picture reading's: a changed value, or an explicit
+      // same-value choice the answers switch requested for this revision. An install completion
+      // consented earlier compares it, so a newer choice saved during the download wins.
+      boolean chatChoiceRequested = !active.recoveryReset()
+          && preparedCandidate.getChatPreferenceRevision() == next.acceptedRevision();
+      preparedCandidate.setChatPreferenceRevision(chatComponentChanged || chatChoiceRequested
+          ? next.acceptedRevision() : active.recoveryReset() ? 0
+              : active.priorSettings.getChatPreferenceRevision());
       ResolvedConfig resolved = Objects.requireNonNull(prepareConfig.apply(preparedCandidate, candidateContext), "Prepared config");
       ResolvedConfig serving = config.get();
       var changedKeys = active.recoveryReset()

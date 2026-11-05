@@ -56,6 +56,14 @@ public final class BrainInstallServiceImpl implements BrainInstallService {
   }
 
   @Override
+  public AiInstallService.Attempt startInstall(boolean acceptTerms, boolean enableReranker,
+      boolean enablePictureReading, boolean enableChat, java.util.Set<String> includePackages,
+      String planDigest) {
+    return helper.startInstall(acceptTerms, enableReranker, enablePictureReading, enableChat,
+        includePackages, planDigest);
+  }
+
+  @Override
   public AiInstallService.RemovalAttempt removeFiles(String packageId, String previewDigest) {
     return helper.removeFiles(packageId, previewDigest);
   }
