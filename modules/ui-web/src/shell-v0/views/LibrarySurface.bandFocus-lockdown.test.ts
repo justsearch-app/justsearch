@@ -111,7 +111,7 @@ async function open(themed = false): Promise<Page> {
     contentType: 'application/json', body: route.request().url().includes('/failed/by-prefix')
       ? '{"jobs":[],"count":0}' : route.request().url().includes('/invoke') ? '{"success":true}' : route.request().url().includes('collection-facet')
         ? '{"totalHits":0,"results":[],"facets":{"collection":{"mcp-ingest":12}}}' : '{}' }));
-  await page.goto(url);
+  await page.goto(url, { timeout: 45_000 });
   await page.locator('body[data-ready="true"]').waitFor({ state: 'attached', timeout: 45_000 });
   await page.evaluate(themed => window.prepareListBands(themed), themed);
   expect(errors).toEqual([]);
