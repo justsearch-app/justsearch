@@ -38,7 +38,9 @@ import '../components/SurfaceTabs.js';
 import type { SurfaceTabs, SurfaceTabItem } from '../components/SurfaceTabs.js';
 import { getSurface } from '../../api/registry/SurfaceCatalogClient.js';
 import { present } from '../display/present.js';
-import { emitEphemeralToast } from '../components/advisory/ephemeralToast.js';
+import { offerReversal, ReversalClosedError } from '../state/ownReversals.js';
+import '../components/ConfirmBand.js';
+import type { ConfirmBand } from '../components/ConfirmBand.js';
 import { folderName } from '../state/frameStatus.js';
 import { takeIndexingRuleFocus, subscribeIndexingRuleFocus, type IndexingRuleControl } from '../router/indexingRuleIntent.js';
 import { takeMemberTabIntent, subscribeMemberTab } from '../router/memberTabIntent.js';
@@ -262,6 +264,9 @@ export class LibrarySurface extends JfElement {
     excludesConflict: { state: true },
     addBusy: { state: true },
     removingHashes: { state: true },
+    removeConfirm: { state: true },
+    collectionConfirm: { state: true },
+    cancelRebuildConfirm: { state: true },
     actionMessage: { state: true },
     reindexOutcome: { state: true },
     reindexOutcomeError: { state: true },
@@ -339,6 +344,15 @@ export class LibrarySurface extends JfElement {
   private lastReindexReadAtMs = 0;
   private surfaceSerial = 0;
   private confirmingHashes = new Set<string>();
+  /** DE1 — the removal waiting in its in-place band, with the registrations it affects. */
+  declare removeConfirm: { readonly hash: string; readonly origin: 'row' | 'attention'; readonly resolved: string;
+    readonly enclosing: boolean; readonly nested: readonly string[]; readonly heading: string;
+    readonly consequence: string; readonly actionLabel: string } | null;
+  /** DE1 — the other-app collection whose removal is waiting in its band. */
+  declare collectionConfirm: string | null;
+  /** DE1 — Cancel rebuild is waiting in its band, for the rebuild with this key. */
+  declare cancelRebuildConfirm: boolean;
+  private cancelRebuildKey: string | null = null;
   private refreshSerial = 0;
   private rootsObserved = false;
   declare pendingPath: string;
@@ -450,6 +464,9 @@ export class LibrarySurface extends JfElement {
     this.excludesConflict = false;
     this.addBusy = false;
     this.removingHashes = new Set();
+    this.removeConfirm = null;
+    this.collectionConfirm = null;
+    this.cancelRebuildConfirm = false;
     this.actionMessage = null;
     this.bulkOutcome = null;
     this.reindexOutcome = null;
@@ -843,6 +860,9 @@ export class LibrarySurface extends JfElement {
     this.addBusy = false;
     this.removingHashes = new Set();
     this.confirmingHashes.clear();
+    this.removeConfirm = null;
+    this.collectionConfirm = null;
+    this.cancelRebuildConfirm = false;
     this.actionMessage = null;
     this.reindexOutcome = null;
     this.reindexOutcomeError = false;
@@ -883,6 +903,10 @@ export class LibrarySurface extends JfElement {
 
   protected override willUpdate(changed: Map<string, unknown>): void {
     super.willUpdate(changed);
+    // DE1 — a removal band whose folder left the list (removed in another window) is no longer asking.
+    if (changed.has('roots') && this.removeConfirm && !this.roots.some(root => root.pathHash === this.removeConfirm?.hash)) {
+      this.removeConfirm = null;
+    }
     const active = deepActiveElement();
     this.focusedFolderToggle = active instanceof HTMLElement && active.matches('.folder-toggle')
       && this.shadowRoot?.activeElement ? active : null;
@@ -1071,6 +1095,7 @@ export class LibrarySurface extends JfElement {
         : statusText + (this.retryWaiting && this.indexingActivity.detail ? ` · ${this.indexingActivity.detail}` : ''),
       metaText: this.removingHashes.has(pathHash) ? 'Removing folder…' : this.folderActivityText(fs.metaText),
       removalBusy: this.removingHashes.has(pathHash),
+      ...(this.removeConfirm?.origin === 'row' && this.removalPlan(pathHash) ? { removeConfirm: this.removalPlan(pathHash)! } : {}),
       failed: fs.failed, failedLastKnown: fs.failedIsLastKnown === true,
       filesFound: (root.fileCount ?? -1) >= 0
         ? `${unknown ? 'Last known ' : ''}${(root.fileCount ?? 0).toLocaleString()} files found` : 'Files found: unknown',
@@ -1091,6 +1116,8 @@ export class LibrarySurface extends JfElement {
 
   private folderIntent(intent: FolderRowIntent, pathHash: string): void {
     if (intent === 'remove') void this.handleRemoveRoot(pathHash);
+    else if (intent === 'confirm-remove') { if (this.removeConfirm?.hash === pathHash) void this.confirmRemoveRoot(); }
+    else if (intent === 'keep') { if (this.removeConfirm?.hash === pathHash) this.keepRoot(); }
     else if (intent === 'show-failed') openFailedJobs(pathHash);
     else if (intent === 'reindex') void this.handleReindexToVerify();
     else void this.revealFolder(pathHash);
@@ -1127,6 +1154,8 @@ export class LibrarySurface extends JfElement {
       @jf-folder-card-show-failed=${(e: CustomEvent<{ pathHash: string }>) => this.folderIntent('show-failed', e.detail.pathHash)}
       @jf-folder-card-reveal=${(e: CustomEvent<{ pathHash: string }>) => this.folderIntent('reveal', e.detail.pathHash)}
       @jf-folder-card-reindex=${(e: CustomEvent<{ pathHash: string }>) => this.folderIntent('reindex', e.detail.pathHash)}
+      @jf-folder-card-confirm-remove=${(e: CustomEvent<{ pathHash: string }>) => this.folderIntent('confirm-remove', e.detail.pathHash)}
+      @jf-folder-card-keep=${(e: CustomEvent<{ pathHash: string }>) => this.folderIntent('keep', e.detail.pathHash)}
     ></jf-declared-surface>`;
   }
 
@@ -1250,13 +1279,18 @@ export class LibrarySurface extends JfElement {
    * nothing else on this surface can show them the documents first.
    */
   private async handleRemoveCollection(source: OtherSource): Promise<void> {
-    const noun = source.docCount === 1 ? 'document' : 'documents';
-    const ok = await this.host_.ui.showConfirmDialog(
-      `Remove ${source.docCount.toLocaleString()} ${noun} ingested as '${source.collection}'? `
-        + 'They were added outside your watched folders, so nothing will re-index them.',
-      { confirmLabel: 'Remove', destructive: true },
-    );
-    if (!ok) return;
+    // DE1 — the band under this source asks; its verb runs the removal ({@link confirmRemoveCollection}).
+    if (this.collectionConfirm === source.collection) {
+      await this.updateComplete;
+      this.renderRoot.querySelector<ConfirmBand>('.other-source-confirm jf-confirm-band')?.focusKeep();
+      return;
+    }
+    this.collectionConfirm = source.collection;
+  }
+
+  private async confirmRemoveCollection(source: OtherSource): Promise<void> {
+    if (this.collectionConfirm !== source.collection) return;
+    this.collectionConfirm = null;
     this.error = null;
     try {
       const res = await this.doFetch('/api/indexing/collections', {
@@ -1386,16 +1420,26 @@ export class LibrarySurface extends JfElement {
     }
   }
 
+  /** DE1 — Cancel rebuild asks in place, under the rebuild it would stop. */
+  private requestCancelReindex(): void {
+    if (!this.reindexCancelKey || this.reindexCancelBusy || this.reindexCancelRecorded || this.gapDecisionBusy) return;
+    if (this.cancelRebuildConfirm) {
+      void this.updateComplete.then(() => this.renderRoot.querySelector<ConfirmBand>('.gap-decision jf-confirm-band')?.focusKeep());
+      return;
+    }
+    this.cancelRebuildKey = this.reindexCancelKey;
+    this.cancelRebuildConfirm = true;
+  }
+
   private async cancelCurrentReindex(): Promise<void> {
     const key = this.reindexCancelKey;
-    if (!key || this.reindexCancelBusy || this.reindexCancelRecorded || this.gapDecisionBusy) return;
+    const asked = this.cancelRebuildKey;
+    this.cancelRebuildConfirm = false;
+    this.cancelRebuildKey = null;
+    // The band answered for the rebuild it named; a different rebuild is not cancelled by it.
+    if (!key || key !== asked || this.reindexCancelBusy || this.reindexCancelRecorded || this.gapDecisionBusy) return;
     const attemptSerial = ++this.reindexCancelAttemptSerial;
-    const confirmed = await this.host_.ui.showConfirmDialog(
-      'Cancel this rebuild? Your current index stays available while the unfinished index is removed.',
-      { confirmLabel: 'Cancel rebuild', destructive: true },
-    );
-    if (!confirmed || !this.isConnected || key !== this.reindexCancelKey
-        || attemptSerial !== this.reindexCancelAttemptSerial) return;
+    if (!this.isConnected) return;
     this.reindexCancelBusy = true;
     this.reindexCancelError = null;
     this.reindexCancelErrorCode = null;
@@ -1508,11 +1552,13 @@ export class LibrarySurface extends JfElement {
         const patterns = this.excludesText.split('\n').map((value) => value.trim()).filter(Boolean);
         this.excludesAttempt = createSettingsAttempt({ ui: { excludePatterns: [...patterns, ...this.excludesLiterals] } }, this.excludesWitness);
       }
+      const before = { text: this.excludesSavedText ?? '', literals: [...this.excludesSavedLiterals] };
       const result = await executeSettingsAttempt((path, init) => this.doFetch(path, init), this.excludesAttempt);
       this.excludesWitness = result.witness;
       this.excludesAttempt = null;
       this.excludesSavedText = this.excludesText;
       this.excludesSavedLiterals = [...this.excludesLiterals];
+      this.offerSkipRuleUndo(before, { text: this.excludesText, literals: [...this.excludesLiterals] }, result.witness);
       this.excludesInvalidPatterns = [];
       await this.loadExcludesPolicy();
       this.excludesNotice = isOverride(this.excludesPolicy)
@@ -1538,6 +1584,48 @@ export class LibrarySurface extends JfElement {
       this.excludesError = err instanceof Error ? err.message : String(err);
       return false;
     }
+  }
+
+  /**
+   * DE6 — a saved skip-rule change is reversed by saving the rules as they were. The reversal is
+   * bound to the save it reverses: if anything saved the settings since (another window, Reset),
+   * the engine refuses the stale witness and the undo closes instead of overwriting that change.
+   * Save changes only what future indexing skips, so writing the old list back reverses it fully.
+   */
+  private offerSkipRuleUndo(before: { text: string; literals: ExactPathExclusion[] },
+      after: { text: string; literals: ExactPathExclusion[] }, witness: SettingsWitness): void {
+    const rules = (text: string) => text.split('\n').map(rule => rule.trim()).filter(Boolean);
+    const added = rules(after.text).filter(rule => !rules(before.text).includes(rule));
+    const removed = rules(before.text).filter(rule => !rules(after.text).includes(rule));
+    const literalsChanged = JSON.stringify(before.literals) !== JSON.stringify(after.literals);
+    if (!added.length && !removed.length && !literalsChanged) return;
+    const message = literalsChanged || added.length + removed.length > 1 ? 'Skip rules changed'
+      : added.length ? 'Skip rule added' : 'Skip rule removed';
+    const named = [...added.map(rule => `${rule} is skipped from now on`), ...removed.map(rule => `${rule} is no longer skipped`)];
+    let attempt: SettingsAttempt | null = null;
+    offerReversal({
+      message,
+      detail: `${named.length ? `${named.join('; ')}. ` : ''}Undo saves the skip rules as they were before.`,
+      reversed: 'Skip rules are back as they were',
+      reverse: () => this.queueSettingsWrite(async () => {
+        attempt ??= createSettingsAttempt({ ui: { excludePatterns: [...rules(before.text), ...before.literals] } }, witness);
+        try {
+          await executeSettingsAttempt((path, init) => this.doFetch(path, init), attempt);
+        } catch (err) {
+          const code = err instanceof SettingsAttemptError ? err.code : '';
+          const state = err instanceof SettingsAttemptError ? err.response?.['state'] : undefined;
+          if (code === 'VERSION_CONFLICT') {
+            throw new ReversalClosedError('the settings were saved again since, so the earlier skip rules were not restored.');
+          }
+          // An uncertain outcome keeps its exact attempt (same key) so a retry checks that write;
+          // a terminal refusal starts afresh.
+          if (state === 'FAILED' || state === 'CANCELLED' || ['SETTINGS_READ_ONLY', 'INVALID_REQUEST', 'INVALID_PATH',
+            'OPERATION_KEY_INVALID', 'OPERATION_KEY_REUSED', 'OPERATION_KEY_EXPIRED'].includes(code)) attempt = null;
+          throw err;
+        }
+        if (this.isConnected && !this.excludesDirty && !this.excludesAttempt) await this.loadExcludes();
+      }),
+    });
   }
 
   /**
@@ -1701,35 +1789,49 @@ export class LibrarySurface extends JfElement {
   }
 
   /**
-   * R3 — removal has no undo. The notice (pill, then Earlier) offers to add the same folder again,
-   * which reads its files again. It does not depend on the Library staying open.
+   * DE6/L1 — removal is reversed by adding the same folder again (its files are read again). The
+   * offer shows in the pill, then in Earlier, and Ctrl+Z runs it; it does not depend on the Library
+   * staying open. Other windows and a reload offer the same from the engine's removal record.
    */
   private offerAddAgain(path: string, collection: string | undefined, nested: number): void {
     const name = folderName(path);
     const host = this.host_;
-    let adding = false;
-    emitEphemeralToast({
+    offerReversal({
       message: `Removed ${name} from your library`,
       detail: `${path}. Adding it again reads its files again${nested ? `; the ${nested === 1 ? 'folder' : `${nested} folders`} inside it must be added separately` : ''}.`,
       actionLabel: `Add ${name} again`,
-      onAction: () => {
-        if (adding) return;
-        adding = true;
-        void host.data.invokeOperation(OP_ADD, collection && collection !== 'default' ? { path, collection } : { path })
-          .then(result => {
-            if (!result.success) throw new Error(result.message || 'Add refused');
-            emitEphemeralToast({ message: `Added ${name} again. Reading its files.`, severity: 'success' });
-          })
-          .catch((err: unknown) => {
-            adding = false;
-            emitEphemeralToast({ message: `Could not add ${name} again. ${err instanceof Error ? err.message : String(err)}`, severity: 'error' });
-          });
+      restoresFolder: path,
+      reversed: `Added ${name} again. Reading its files.`,
+      // Adding a folder that is already back (another window, the Library) is an idempotent
+      // success in the engine; an overlap or a missing folder is reported and can be retried.
+      reverse: async () => {
+        const result = await host.data.invokeOperation(OP_ADD, collection && collection !== 'default' ? { path, collection } : { path });
+        if (!result.success) throw new Error(result.message || 'Add refused');
       },
     });
   }
 
-  private async handleRemoveRoot(pathHash: string): Promise<void> {
+  /** The band's words for removing one folder (DE1, ref-06). */
+  private removalPlan(pathHash: string): { heading: string; consequence: string; actionLabel: string } | null {
+    const plan = this.removeConfirm;
+    if (!plan || plan.hash !== pathHash || !this.roots.some(root => root.pathHash === pathHash)) return null;
+    return { heading: plan.heading, consequence: plan.consequence, actionLabel: plan.actionLabel };
+  }
+
+  /**
+   * DE1 — Remove asks in place: the band under the folder (or under the problem that offered it)
+   * names what leaves search, what stays on disk, and the way back. Affected registrations are
+   * checked first; the removal itself runs only from the band's verb ({@link confirmRemoveRoot}).
+   */
+  private async handleRemoveRoot(pathHash: string, origin: 'row' | 'attention' = 'row'): Promise<void> {
     if (this.removingHashes.has(pathHash) || this.confirmingHashes.has(pathHash)) return;
+    if (this.removeConfirm?.hash === pathHash) {
+      // Asked again while it is asking: bring the answer back into view instead of a second band.
+      this.removeConfirm = { ...this.removeConfirm, origin };
+      await this.updateComplete;
+      this.renderRoot.querySelector('jf-confirm-band')?.focusKeep();
+      return;
+    }
     const resolved = this.resolvedPaths[pathHash];
     if (!resolved) {
       this.error = 'Path resolution pending; retry in a moment.';
@@ -1737,8 +1839,6 @@ export class LibrarySurface extends JfElement {
     }
     const serial = this.surfaceSerial;
     this.confirmingHashes.add(pathHash);
-    let affected = [pathHash];
-    let acquired = false;
     try {
       // Confirm every legacy registration affected by subtree removal. The wire remains hash-only.
       await Promise.all(this.roots.map(async (root) => {
@@ -1755,25 +1855,53 @@ export class LibrarySurface extends JfElement {
       const paths = this.roots.map(root => ({ hash: root.pathHash ?? '', path: this.resolvedPaths[root.pathHash ?? ''] ?? '' }));
       const enclosing = paths.find(other => other.hash !== pathHash && this.pathInside(resolved, other.path));
       const nested = paths.filter(other => other.hash !== pathHash && this.pathInside(other.path, resolved));
-      const nestedHashes = nested.map(other => other.hash);
-      if (nestedHashes.some(hash => this.removingHashes.has(hash))) {
+      if (nested.some(other => this.removingHashes.has(other.hash))) {
         this.error = 'A folder inside this one is being removed. Wait for its outcome, then retry.';
         return;
       }
+      const name = folderName(resolved);
+      const files = this.roots.find(root => root.pathHash === pathHash)?.fileCount ?? -1;
       const consequence = enclosing
-        ? `Its files stay searchable because the enclosing watched folder ${enclosing.path} covers them. Only the selected registrations and their own watchers are removed.`
-        : 'Files indexed from this folder will be removed from search results, and any enrichment still running for it is stopped and discarded.';
+        ? `Its files stay searchable because the enclosing watched folder ${enclosing.path} covers them. Only this registration and its own watcher are removed.`
+        : `${files >= 0 ? `Its ${files.toLocaleString()} ${files === 1 ? 'file leaves' : 'files leave'}` : 'Its files leave'} search and any enrichment still running for it is stopped. Your files on disk stay where they are, and adding ${name} again reads it from scratch.`;
       const inner = nested.length ? ` This also removes these watched folders: ${nested.map(other => other.path).join(', ')}.` : '';
-      const ok = await this.host_.ui.showConfirmDialog(`Remove ${resolved}? ${consequence}${inner}`,
-        { confirmLabel: 'Remove', destructive: true });
-      if (!ok || serial !== this.surfaceSerial) return;
-      if ([pathHash, ...nestedHashes].some(hash => this.removingHashes.has(hash))) return;
-      const collection = this.roots.find(root => root.pathHash === pathHash)?.collection;
-      affected = [pathHash, ...nestedHashes];
-      this.removingHashes = new Set([...this.removingHashes, ...affected]);
-      acquired = true;
       this.error = null;
-      this.actionMessage = `Removing folder ${resolved}…`;
+      this.removeConfirm = { hash: pathHash, origin, resolved, enclosing: !!enclosing, nested: nested.map(other => other.hash),
+        heading: `Remove ${name} from your library?`, consequence: `${consequence}${inner}`, actionLabel: `Remove ${name}` };
+    } finally {
+      if (serial === this.surfaceSerial) {
+        this.confirmingHashes.delete(pathHash);
+        if (this.error) {
+          await this.updateComplete;
+          this.renderRoot.querySelector<HTMLElement>('.error-banner')?.focus();
+        }
+      }
+    }
+  }
+
+  private keepRoot(): void {
+    this.removeConfirm = null;
+  }
+
+  /** The band's verb: remove the folder (and the registrations inside it) it named. */
+  private async confirmRemoveRoot(): Promise<void> {
+    const plan = this.removeConfirm;
+    if (!plan) return;
+    this.removeConfirm = null;
+    const { hash: pathHash, resolved, nested: nestedHashes } = plan;
+    if (!this.roots.some(root => root.pathHash === pathHash)) {
+      // Removed meanwhile (another window): nothing left to remove here.
+      this.actionMessage = `${folderName(resolved)} is no longer in your library.`;
+      return;
+    }
+    if ([pathHash, ...nestedHashes].some(hash => this.removingHashes.has(hash))) return;
+    const serial = this.surfaceSerial;
+    const collection = this.roots.find(root => root.pathHash === pathHash)?.collection;
+    const affected = [pathHash, ...nestedHashes];
+    this.removingHashes = new Set([...this.removingHashes, ...affected]);
+    this.error = null;
+    this.actionMessage = `Removing folder ${resolved}…`;
+    try {
       let removed = false;
       try {
         const result = await this.host_.data.invokeOperation(OP_REMOVE, { path: resolved });
@@ -1799,8 +1927,8 @@ export class LibrarySurface extends JfElement {
         // The synchronous result proves removal; invalidate older list reads before publishing it.
         this.refreshSerial++;
         this.roots = this.roots.filter(root => !affected.includes(root.pathHash ?? ''));
-        this.actionMessage = enclosing ? 'Folder removed. Its files stay searchable through the enclosing watched folder.' : 'Folder removed from Library and search results.';
-        this.offerAddAgain(resolved, collection, nested.length);
+        this.actionMessage = plan.enclosing ? 'Folder removed. Its files stay searchable through the enclosing watched folder.' : 'Folder removed from Library and search results.';
+        this.offerAddAgain(resolved, collection, nestedHashes.length);
         await this.refresh({ live: true, force: true });
         if (serial === this.surfaceSerial) {
           await this.updateComplete;
@@ -1816,8 +1944,7 @@ export class LibrarySurface extends JfElement {
       }
     } finally {
       if (serial === this.surfaceSerial) {
-        this.confirmingHashes.delete(pathHash);
-        if (acquired) this.removingHashes = new Set([...this.removingHashes].filter(hash => !affected.includes(hash)));
+        this.removingHashes = new Set([...this.removingHashes].filter(hash => !affected.includes(hash)));
         if (this.error) {
           await this.updateComplete;
           this.renderRoot.querySelector<HTMLElement>('.error-banner')?.focus();
@@ -2018,22 +2145,36 @@ export class LibrarySurface extends JfElement {
           ${icon({ name: 'trash-2', size: 14 })} Remove
         </jf-button>
       </div>
+      ${this.collectionConfirm === source.collection ? html`<div class="other-source-confirm">
+        <jf-confirm-band heading=${`Remove the ${source.docCount.toLocaleString()} ${noun} added as ${source.collection}?`}
+          consequence="They leave search for good: they were added from outside your watched folders, so nothing adds them back. Files on disk are not touched."
+          action-label=${`Remove ${source.collection}`}
+          @confirm-band-confirm=${() => void this.confirmRemoveCollection(source)}
+          @confirm-band-cancel=${() => { this.collectionConfirm = null; }}></jf-confirm-band></div>` : nothing}
     `;
   }
 
-  private attentionItems(): { key: string; title: string; detail?: string; actions?: TemplateResult }[] {
-    const items: { key: string; title: string; detail?: string; actions?: TemplateResult }[] = [];
+  /** DE1 — a removal asked for from a folder's problem answers in place, under that problem. */
+  private attentionBand(hash: string): TemplateResult | typeof nothing {
+    const plan = this.removeConfirm?.origin === 'attention' ? this.removalPlan(hash) : null;
+    return plan ? html`<jf-confirm-band heading=${plan.heading} consequence=${plan.consequence} action-label=${plan.actionLabel}
+      @confirm-band-confirm=${() => void this.confirmRemoveRoot()} @confirm-band-cancel=${() => this.keepRoot()}></jf-confirm-band>` : nothing;
+  }
+
+  private attentionItems(): { key: string; title: string; detail?: string; actions?: TemplateResult; band?: TemplateResult | typeof nothing }[] {
+    const items: { key: string; title: string; detail?: string; actions?: TemplateResult; band?: TemplateResult | typeof nothing }[] = [];
     for (const root of this.roots) {
       const hash = root.pathHash ?? '';
       const name = folderRowLabel(hash, this.resolvedPaths[hash]).label;
       const status = this.rowStatus(root);
       for (const item of folderAttention(root, status, name)) items.push({ key: item.key, title: item.title, detail: item.detail,
+        band: item.kind === 'missing' || item.kind === 'walk' ? this.attentionBand(hash) : nothing,
         actions: item.kind === 'missing' ? html`<jf-operation context="button" operation-id="core.reconcile-root" .args=${{ pathHash: hash }} api-base=${this.apiBase}
           @op-success=${() => void this.refresh({ force: true })}></jf-operation>
           <jf-button variant="ghost" label="Remove from library" .disabled=${this.removingHashes.has(hash)}
-            .onActivate=${() => this.handleRemoveRoot(hash)}>Remove from library</jf-button>`
+            .onActivate=${() => this.handleRemoveRoot(hash, 'attention')}>Remove from library</jf-button>`
           : item.kind === 'walk' ? html`<jf-button variant="ghost" .disabled=${this.removingHashes.has(hash)}
-          .onActivate=${() => root.walkError?.startsWith('Removal incomplete.') ? this.handleRemoveRoot(hash) : this.handleReindexToVerify()}
+          .onActivate=${() => root.walkError?.startsWith('Removal incomplete.') ? this.handleRemoveRoot(hash, 'attention') : this.handleReindexToVerify()}
           >${root.walkError?.startsWith('Removal incomplete.') ? 'Retry removal' : 'Reindex'}</jf-button>`
           : item.kind === 'files' ? html`<jf-failed-jobs-drawer inline .folderPathHash=${hash} .observedCount=${status.failed}
           .lastKnown=${status.failedIsLastKnown === true} .host_=${this.host_} api-base=${this.apiBase}></jf-failed-jobs-drawer>
@@ -2070,6 +2211,7 @@ export class LibrarySurface extends JfElement {
           <div class="attention-title"><span>${icon({ name: 'alert-triangle', size: 16 })}</span>${item.title}</div>
           ${item.detail ? html`<p role=${item.key === 'bulk' ? 'alert' : nothing}>${item.detail}</p>` : nothing}
           <div class="attention-actions">${item.actions ?? nothing}</div>
+          ${item.band ?? nothing}
         </section>`)}
       ${this.renderReindexDecision()}
       ${(this.unfinishedForgets?.items.length ?? 0) > 0 ? this.renderUnfinishedForgets() : nothing}
@@ -2445,8 +2587,13 @@ export class LibrarySurface extends JfElement {
         ` : nothing}
         <jf-button label="Cancel rebuild" variant="ghost"
           .disabled=${this.reindexCancelBusy || this.reindexCancelRecorded || this.gapDecisionBusy}
-          .onActivate=${() => void this.cancelCurrentReindex()}>Cancel rebuild</jf-button>
+          .onActivate=${() => this.requestCancelReindex()}>Cancel rebuild</jf-button>
       </div>
+      ${this.cancelRebuildConfirm && this.cancelRebuildKey === this.reindexCancelKey ? html`<jf-confirm-band
+        heading="Cancel this rebuild?" action-label="Cancel rebuild"
+        consequence="The unfinished new index is removed and your current index stays available; search keeps using it. The work done so far is lost, and starting again rebuilds from the beginning."
+        @confirm-band-confirm=${() => void this.cancelCurrentReindex()}
+        @confirm-band-cancel=${() => { this.cancelRebuildConfirm = false; this.cancelRebuildKey = null; }}></jf-confirm-band>` : nothing}
       ${this.gapDecisionError ? html`<p role="alert">${this.gapDecisionError}
         ${this.gapDecisionErrorCode && !this.gapDecisionError.endsWith(` (Code: ${this.gapDecisionErrorCode})`) ? html`<small style="display: block">Code: ${this.gapDecisionErrorCode}</small>` : nothing}</p>` : nothing}
       ${this.reindexCancelError ? html`<p role="alert">${this.reindexCancelError}

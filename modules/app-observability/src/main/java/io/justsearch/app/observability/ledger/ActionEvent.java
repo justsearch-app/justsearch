@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.observability.ledger;
 
+import io.justsearch.app.api.operations.OperationReceipt;
 import java.time.Instant;
 import java.util.Optional;
 
@@ -66,7 +67,11 @@ public sealed interface ActionEvent
     INDEX
   }
 
-  /** A completed operation invocation. {@code outcome} ∈ SUCCESS / FAILURE / UNDONE. */
+  /**
+   * A completed operation invocation. {@code outcome} ∈ SUCCESS / FAILURE / UNDONE. A successful
+   * folder removal carries the folder it removed ({@code removedFolder}), so every window can offer
+   * to add it back; every other row, and rows recorded before the field existed, carry none.
+   */
   record Operation(
       String id,
       Instant occurredAt,
@@ -75,8 +80,20 @@ public sealed interface ActionEvent
       String operationId,
       String outcome,
       Optional<String> executionId,
-      Optional<String> correlationId)
+      Optional<String> correlationId,
+      Optional<OperationReceipt.RemovedFolder> removedFolder)
       implements ActionEvent {
+    public Operation {
+      java.util.Objects.requireNonNull(removedFolder, "removedFolder");
+    }
+
+    /** An operation row without a removal record. */
+    public Operation(String id, Instant occurredAt, String originator, String transport,
+        String operationId, String outcome, Optional<String> executionId, Optional<String> correlationId) {
+      this(id, occurredAt, originator, transport, operationId, outcome, executionId, correlationId,
+          Optional.empty());
+    }
+
     @Override
     public ActionEventKind kind() {
       return ActionEventKind.OPERATION;

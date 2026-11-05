@@ -43,12 +43,14 @@ export function createUiApi(tier: PluginTrustTier, deps: UiDeps): PluginUi {
   return {
     showNotification: showNotificationFn,
     showConfirmDialog: async (message: string, options?: ConfirmDialogOptions): Promise<boolean> => {
+      // §8 words: the dialog asks a question and answers with a verb, never "Confirm"; only a
+      // destructive request is drawn as danger (DE2).
       return confirmAsync({
-        title: 'Confirm',
+        title: options?.title ?? 'Continue?',
         message,
-        confirmLabel: options?.confirmLabel ?? 'Confirm',
+        confirmLabel: options?.confirmLabel ?? 'Continue',
         cancelLabel: options?.cancelLabel ?? 'Cancel',
-        variant: options?.destructive ? ('danger' as const) : undefined,
+        variant: options?.destructive ? ('danger' as const) : ('info' as const),
         ...(options?.typedConfirmWord !== undefined ? { typedConfirmWord: options.typedConfirmWord } : {}),
       });
     },

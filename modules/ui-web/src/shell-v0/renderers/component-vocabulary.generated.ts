@@ -37,6 +37,7 @@ export type ComponentTag =
   | 'jf-citations-panel'
   | 'jf-command-palette'
   | 'jf-composer'
+  | 'jf-confirm-band'
   | 'jf-confirm-dialog'
   | 'jf-context-inspector-pane'
   | 'jf-context-menu'
@@ -193,6 +194,7 @@ export const COMPONENT_TAGS: readonly ComponentTag[] = [
   'jf-citations-panel',
   'jf-command-palette',
   'jf-composer',
+  'jf-confirm-band',
   'jf-confirm-dialog',
   'jf-context-inspector-pane',
   'jf-context-menu',

@@ -135,6 +135,16 @@ function removeButton(
   ) as (HTMLElement & { onActivate: () => void }) | null;
 }
 
+type OtherSourceBand = HTMLElement & { heading: string; consequence: string; actionLabel: string; updateComplete: Promise<unknown> };
+/** DE1 — the in-place band under an other-app source (null when none is open). */
+function otherSourceBand(el: HTMLElement): OtherSourceBand | null {
+  return el.shadowRoot!.querySelector<OtherSourceBand>('.other-source-confirm jf-confirm-band');
+}
+async function answerBand(band: OtherSourceBand, which: 'confirm' | 'keep'): Promise<void> {
+  await band.updateComplete;
+  band.shadowRoot!.querySelector<HTMLElement & { onActivate(): void }>(`jf-button.${which}`)!.onActivate();
+}
+
 describe('LibrarySurface — "Other sources" section (811 C-2a)', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
@@ -266,13 +276,19 @@ describe('LibrarySurface — "Other sources" section (811 C-2a)', () => {
       expect(remove).not.toBeNull();
       remove?.onActivate();
       await new Promise((resolve) => setTimeout(resolve, 0));
+      await el.updateComplete;
 
-      const confirm = host.ui.showConfirmDialog as unknown as ReturnType<typeof vi.fn>;
-      expect(confirm).toHaveBeenCalledTimes(1);
-      const message = confirm.mock.calls[0]?.[0] as string;
-      expect(message).toContain('12 documents');
-      expect(message).toContain("'mcp-ingest'");
-      expect(confirm.mock.calls[0]?.[1]).toMatchObject({ destructive: true });
+      // DE1 — the band under this source names how much leaves search and that nothing adds it back.
+      const band = otherSourceBand(el)!;
+      expect(band).not.toBeNull();
+      expect(band.heading).toContain('12 documents');
+      expect(band.heading).toContain('mcp-ingest');
+      expect(band.consequence).toContain('nothing adds them back');
+      expect(band.actionLabel).toBe('Remove mcp-ingest');
+      expect(calls.some((c) => c.path === '/api/indexing/collections')).toBe(false);
+      await answerBand(band, 'confirm');
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(host.ui.showConfirmDialog).not.toHaveBeenCalled();
 
       const del = calls.find((c) => c.path === '/api/indexing/collections');
       expect(del?.method).toBe('DELETE');
@@ -287,8 +303,12 @@ describe('LibrarySurface — "Other sources" section (811 C-2a)', () => {
     try {
       removeButton(el, 'mcp-ingest')?.onActivate();
       await new Promise((resolve) => setTimeout(resolve, 0));
+      await el.updateComplete;
+      await answerBand(otherSourceBand(el)!, 'keep');
+      await el.updateComplete;
 
-      expect(host.ui.showConfirmDialog).toHaveBeenCalledTimes(1);
+      expect(otherSourceBand(el)).toBeNull();
+      expect(host.ui.showConfirmDialog).not.toHaveBeenCalled();
       expect(calls.some((c) => c.path === '/api/indexing/collections')).toBe(false);
     } finally {
       el.remove();

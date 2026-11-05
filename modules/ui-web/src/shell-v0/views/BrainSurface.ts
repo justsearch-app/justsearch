@@ -86,6 +86,7 @@ import { confirmAsync } from '../components/ConfirmDialog.js';
 import { ModalController } from '../primitives/modalController.js';
 import { TransientController } from '../primitives/transientController.js';
 import { composeBrainSentence, type BrainFeature, type BrainFeatureId } from '../state/brainPage.js';
+import { emitEphemeralToast } from '../components/advisory/ephemeralToast.js';
 import type { PluginHostApi } from '../plugin-api/plugin-types.js';
 // Sandbox round 7 — the install consent dialog names the real packages, licences and terms links
 // from the registry the backend will actually install from, instead of the hardcoded "several GB".
@@ -1793,6 +1794,7 @@ export class BrainSurface extends JfElement {
   }): Promise<boolean> {
     if (this.host_) {
       return this.host_.ui.showConfirmDialog(opts.message, {
+        title: opts.title,
         ...(opts.confirmLabel !== undefined ? { confirmLabel: opts.confirmLabel } : {}),
         ...(opts.cancelLabel !== undefined ? { cancelLabel: opts.cancelLabel } : {}),
         destructive: opts.variant === 'danger',
@@ -1969,18 +1971,14 @@ export class BrainSurface extends JfElement {
    * `Range` request (integrity-verified either way). The confirmation states that — pause, not discard.
    */
   private async cancelInstall(): Promise<void> {
-    const ok = await this.hostConfirm({
-      title: 'Pause the download?',
-      message:
-        'Cancelling pauses the download. Everything already downloaded stays on disk and the next install resumes from where it stopped instead of starting over. Files that finished downloading stay installed.',
-      variant: 'warning',
-      confirmLabel: 'Pause download',
-      cancelLabel: 'Keep downloading',
-    });
-    if (!ok) return;
+    // DE2 — pausing keeps everything downloaded and the next install resumes, so it no longer asks
+    // first; it says what happened instead (C1).
     await this.withBusy('install-cancel', async () => {
       const data = (await this.invokeOp('core.cancel-ai-install', {})) as InstallStatus;
-      if (data) void refreshAiInstallNow();
+      if (data) {
+        void refreshAiInstallNow();
+        emitEphemeralToast({ message: 'Download paused. Everything downloaded so far is kept, and installing again resumes where it stopped.' });
+      }
     });
   }
 
@@ -1994,7 +1992,8 @@ export class BrainSurface extends JfElement {
       const ok = await this.hostConfirm({
         title: 'Repair AI installation?',
         message: `This re-runs the install pipeline, re-downloading any missing or corrupt model files. Existing valid files are preserved.\nDownload: ${content.downloadTotal ?? 'size unknown'}.\n${details || 'Package sizes and licences are unknown.'}`,
-        variant: 'warning',
+        // DE2 — repairing downloads and accepts the listed terms; it destroys nothing, so not a danger dialog.
+        variant: 'info',
         confirmLabel: 'Repair',
       });
       if (!ok) return;

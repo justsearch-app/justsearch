@@ -9,6 +9,7 @@ import io.justsearch.app.observability.operations.AuthorizationOutcomeEntry;
 import io.justsearch.app.observability.operations.OperationHistoryEntry;
 import io.justsearch.app.observability.stream.SseStreamChannel;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Consumer;
 
 /**
@@ -84,12 +85,24 @@ public final class ActionLedgerChangeRegistry {
 
   /** Operations source delivery acknowledges only this forced, idempotent journal acceptance. */
   public boolean persistOperation(OperationHistoryEntry entry) {
-    return journal.append(ActionLedgerProjection.projectOperation(Objects.requireNonNull(entry, "entry")));
+    return persistOperation(entry, Optional.empty());
+  }
+
+  /** As {@link #persistOperation(OperationHistoryEntry)}, with the row's removal record (L1). */
+  public boolean persistOperation(OperationHistoryEntry entry,
+      Optional<io.justsearch.app.api.operations.OperationReceipt.RemovedFolder> removedFolder) {
+    return journal.append(ActionLedgerProjection.projectOperation(Objects.requireNonNull(entry, "entry"), removedFolder));
   }
 
   /** Immediate committed-row visibility without moving journal I/O onto the producer thread. */
   public void publishLiveOperation(OperationHistoryEntry entry) {
-    publishLive(ActionLedgerProjection.projectOperation(Objects.requireNonNull(entry, "entry")));
+    publishLiveOperation(entry, Optional.empty());
+  }
+
+  /** As {@link #publishLiveOperation(OperationHistoryEntry)}, with the row's removal record (L1). */
+  public void publishLiveOperation(OperationHistoryEntry entry,
+      Optional<io.justsearch.app.api.operations.OperationReceipt.RemovedFolder> removedFolder) {
+    publishLive(ActionLedgerProjection.projectOperation(Objects.requireNonNull(entry, "entry"), removedFolder));
   }
 
   /** Relay a navigation as a unified UPDATE row. */

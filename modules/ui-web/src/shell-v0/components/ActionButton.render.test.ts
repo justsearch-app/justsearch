@@ -3,14 +3,17 @@
 /**
  * Render tests for ActionButton. Covers:
  *  - LOW risk: click immediately fires `action-invoke`.
- *  - MEDIUM risk: click → confirm prompt → "Yes" fires; "Cancel" doesn't.
+ *  - MEDIUM risk: click → the in-place band (consequence, verb, Keep it)
+ *    → the verb fires; Keep it doesn't (DE1).
  *  - HIGH risk: click → typed-confirm prompt → typing the operation
- *    id enables the confirm button; mismatched typing keeps it disabled.
+ *    id enables the verb button; mismatched typing keeps it disabled.
  *  - disabled / pending suppress invoke.
  */
 
 import { describe, expect, it } from 'vitest';
 import './ActionButton.js';
+import './ConfirmBand.js';
+import { deepActiveElement } from '../utils/keyboardHandler.js';
 import type { ActionButton, ActionInvokeEventDetail } from './ActionButton.js';
 
 async function mountBtn(
@@ -48,49 +51,91 @@ describe('ActionButton — LOW risk', () => {
   });
 });
 
-describe('ActionButton — MEDIUM risk', () => {
-  it('shows a confirm prompt and only fires on Yes', async () => {
+/** Whether focus (followed through shadow roots) is on `host` or inside its shadow tree. */
+function focusWithin(host: Element): boolean {
+  let node: Node | null = deepActiveElement();
+  while (node) {
+    if (node === host) return true;
+    const root = node.getRootNode();
+    node = root instanceof ShadowRoot ? root.host : null;
+  }
+  return false;
+}
+
+type BandButton = HTMLElement & { onActivate: (() => void) | null; disabled: boolean };
+function band(el: ActionButton) {
+  return el.shadowRoot?.querySelector('jf-confirm-band') ?? null;
+}
+function bandButton(el: ActionButton, which: 'confirm' | 'keep'): BandButton {
+  return band(el)!.shadowRoot!.querySelector<BandButton>(`jf-button.${which}`)!;
+}
+
+describe('ActionButton — MEDIUM risk (DE1 in-place band)', () => {
+  it('asks in place with the consequence and the verb, never "Are you sure?", and fires once on the verb', async () => {
     const el = await mountBtn({
-      operationId: 'index.flush',
-      label: 'Flush',
+      operationId: 'core.clear-failed-jobs',
+      label: 'Clear Failed Jobs',
       risk: 'MEDIUM',
     });
     const events = captureInvoke(el);
     const btn = el.shadowRoot?.querySelector('button.invoke') as HTMLButtonElement;
     btn.click();
-    await el.updateComplete;
-    expect(events).toEqual([]);
-    expect(el.shadowRoot?.textContent).toContain('Are you sure?');
-
-    const buttons = el.shadowRoot?.querySelectorAll(
-      'button.invoke',
-    ) as NodeListOf<HTMLButtonElement>;
-    // [original-button (still rendered for visual continuity), Yes, Cancel]
-    const yes = Array.from(buttons).find(
-      (b) => b.textContent?.trim() === 'Yes',
-    );
-    yes?.click();
-    expect(events).toEqual([{ operationId: 'index.flush', risk: 'MEDIUM' }]);
-    el.remove();
-  });
-
-  it('Cancel returns to idle without firing', async () => {
-    const el = await mountBtn({
-      operationId: 'index.flush',
-      label: 'Flush',
-      risk: 'MEDIUM',
-    });
-    const events = captureInvoke(el);
-    const btn = el.shadowRoot?.querySelector('button.invoke') as HTMLButtonElement;
-    btn.click();
-    await el.updateComplete;
-    const cancel = Array.from(
-      el.shadowRoot?.querySelectorAll('button.invoke') ?? [],
-    ).find((b) => b.textContent?.trim() === 'Cancel');
-    (cancel as HTMLButtonElement | undefined)?.click();
     await el.updateComplete;
     expect(events).toEqual([]);
     expect(el.shadowRoot?.textContent).not.toContain('Are you sure?');
+    const b = band(el)!;
+    await b.updateComplete;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(b.consequence).toContain('Failed files leave the failed list');
+    expect(b.consequence).toContain("can't be undone");
+    expect(bandButton(el, 'confirm').textContent).toContain('Clear Failed Jobs');
+    expect(focusWithin(bandButton(el, 'keep'))).toBe(true);
+    bandButton(el, 'confirm').onActivate!();
+    bandButton(el, 'confirm')?.onActivate?.();
+    expect(events).toEqual([{ operationId: 'core.clear-failed-jobs', risk: 'MEDIUM' }]);
+    await el.updateComplete;
+    expect(band(el)).toBeNull();
+    el.remove();
+  });
+
+  it('an operation without its own sentence still says it runs now with no undo', async () => {
+    const el = await mountBtn({ operationId: 'index.flush', label: 'Flush', risk: 'MEDIUM' });
+    (el.shadowRoot?.querySelector('button.invoke') as HTMLButtonElement).click();
+    await el.updateComplete;
+    expect(band(el)!.consequence).toBe("Flush runs now. It can't be undone from here.");
+    el.remove();
+  });
+
+  it('Keep it returns to idle without firing and returns focus to the button that asked', async () => {
+    const el = await mountBtn({
+      operationId: 'index.flush',
+      label: 'Flush',
+      risk: 'MEDIUM',
+    });
+    const events = captureInvoke(el);
+    const btn = el.shadowRoot?.querySelector('button.invoke') as HTMLButtonElement;
+    btn.focus();
+    btn.click();
+    await el.updateComplete;
+    await band(el)!.updateComplete;
+    bandButton(el, 'keep').onActivate!();
+    await el.updateComplete;
+    expect(events).toEqual([]);
+    expect(band(el)).toBeNull();
+    expect(el.shadowRoot?.activeElement).toBe(el.shadowRoot?.querySelector('button.invoke'));
+    el.remove();
+  });
+
+  it('Escape in the band cancels it without firing', async () => {
+    const el = await mountBtn({ operationId: 'index.flush', label: 'Flush', risk: 'MEDIUM' });
+    const events = captureInvoke(el);
+    (el.shadowRoot?.querySelector('button.invoke') as HTMLButtonElement).click();
+    await el.updateComplete;
+    await band(el)!.updateComplete;
+    bandButton(el, 'keep').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, composed: true }));
+    await el.updateComplete;
+    expect(events).toEqual([]);
+    expect(band(el)).toBeNull();
     el.remove();
   });
 });
@@ -112,13 +157,14 @@ describe('ActionButton — HIGH risk', () => {
     ) as HTMLInputElement;
     expect(typeInput).not.toBeNull();
 
-    // Confirm button is the one with text "Confirm"
+    // The typed form's answer is the verb (the label), never "Confirm" (§8 words).
+    expect(Array.from(el.shadowRoot?.querySelectorAll('button') ?? []).map((b) => b.textContent?.trim()))
+      .not.toContain('Confirm');
     const findConfirm = (): HTMLButtonElement | undefined =>
-      Array.from(
-        el.shadowRoot?.querySelectorAll('button.invoke') ?? [],
-      ).find((b) => b.textContent?.trim() === 'Confirm') as
+      el.shadowRoot?.querySelector('.confirm-row button.invoke[data-risk]') as
         | HTMLButtonElement
         | undefined;
+    expect(findConfirm()?.textContent?.trim()).toBe('Reset');
 
     expect(findConfirm()?.disabled).toBe(true);
 
@@ -157,9 +203,7 @@ describe('ActionButton — HIGH risk', () => {
     typeInput.value = 'I CONFIRM';
     typeInput.dispatchEvent(new Event('input'));
     await el.updateComplete;
-    const confirm = Array.from(
-      el.shadowRoot?.querySelectorAll('button.invoke') ?? [],
-    ).find((b) => b.textContent?.trim() === 'Confirm') as
+    const confirm = el.shadowRoot?.querySelector('.confirm-row button.invoke[data-risk]') as
       | HTMLButtonElement
       | undefined;
     confirm?.click();

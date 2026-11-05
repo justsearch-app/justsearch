@@ -327,3 +327,61 @@ describe('round 7 repairs', () => {
     expect(folderName('/home/me/Documents/')).toBe('Documents');
   });
 });
+
+describe('L1/ST7 the way back after a folder removal, in every window', () => {
+  const removal = (removedFolder?: unknown, outcome = 'SUCCESS'): BackendLedgerEntry => ({
+    id: 'operation:0194f72c-0000-7000-8000-00000000000a', kind: 'operation', occurredAt: '2026-11-05T09:00:00Z',
+    originator: 'user', transport: 'BUTTON', operationId: 'core.remove-watched-root', outcome,
+    ...(removedFolder === undefined ? {} : { removedFolder: removedFolder as BackendLedgerEntry['removedFolder'] }),
+  });
+  const localNotice = (path: string, available = true): AdvisoryRecord => ({ key: 'local:9', origin: 'local', acknowledged: false,
+    sourceRenderHint: 'EPHEMERAL', toast: { message: 'Removed Notes from your library', actionLabel: 'Add Notes again', onAction: () => {},
+      reversal: true, restoresFolder: path, actionAvailable: () => available },
+    event: { id: 'local:9', classId: 'core.own-action', occurredAt: '2026-11-05T09:00:00Z', renderHint: 'EPHEMERAL', severity: 'info',
+      classExtras: {}, diagnosticsLink: null, provenance: null, primaryAction: null, primaryActionKind: null, bodyI18nKey: null } } as unknown as AdvisoryRecord);
+
+  it('a window that did not remove the folder (or a reload) offers "Add <folder> again" from the removal record', () => {
+    const row = derive({ activity: [projectBackend(removal({ path: 'C:\\Users\\Sam\\Notes', collection: 'reports' }))] })
+      .sections.earlier.find(fact => fact.id.startsWith('activity:'))!;
+    expect(row.title).toBe('Removed Notes from your library');
+    expect(row.detail).toContain('Adding it again reads its files again');
+    expect(row.actions![0]).toEqual({ kind: 'add-folder-again', target: 'C:\\Users\\Sam\\Notes', label: 'Add Notes again', collection: 'reports' });
+  });
+
+  it('an older removal record without a path, a failed removal and other operations offer no re-add', () => {
+    for (const entry of [removal(), removal({ path: '/notes' }, 'FAILURE'), removal({ path: 42 }),
+      { ...removal({ path: '/notes' }), operationId: 'core.add-watched-root' }]) {
+      const rows = derive({ activity: [projectBackend(entry)] }).sections.earlier;
+      expect(rows.flatMap(fact => fact.actions ?? []).map(action => action.kind)).not.toContain('add-folder-again');
+    }
+  });
+
+  it('the re-add is not offered while the folder is watched again (added back here or elsewhere)', () => {
+    const roots = [{ pathHash: 'n', collection: 'default', status: 'indexed', fileCount: 3 }] as NonNullable<FrameStatusInput['roots']>;
+    const activity = [projectBackend(removal({ path: 'C:\\Users\\Sam\\Notes\\' }))];
+    const back = derive({ activity, roots, rootPaths: new Map([['n', 'c:\\users\\sam\\notes']]), rootsLive: true }).sections.earlier;
+    expect(back.flatMap(fact => fact.actions ?? []).map(action => action.kind)).not.toContain('add-folder-again');
+  });
+
+  it('the window that removed it shows one row: its own notice, whose action goes once it can no longer run', () => {
+    const activity = [projectBackend(removal({ path: '/home/sam/Notes' }))];
+    const own = derive({ activity, advisories: [localNotice('/home/sam/Notes')] }).sections.earlier;
+    expect(own.map(fact => fact.title)).toEqual(['Removed Notes from your library']);
+    expect(own[0]!.actions).toEqual([{ kind: 'advisory', target: 'local:9', label: 'Add Notes again' }]);
+    const done = derive({ activity, advisories: [localNotice('/home/sam/Notes', false)] }).sections.earlier;
+    expect(done[0]!.actions).toEqual([]);
+  });
+});
+
+describe('DE6 no Undo where no reversal exists', () => {
+  it('a completed operation without a backend undo offers no Undo; a forget offers "Add back to search"', () => {
+    const completed = (operationId: string, kind: string | null): AdvisoryRecord => ({ key: operationId, origin: 'stream', acknowledged: false,
+      sourceRenderHint: 'PERSISTED', event: { id: operationId, classId: 'operation.completed', occurredAt: '2026-11-05T09:00:00Z',
+        renderHint: 'PERSISTED', classExtras: { operationId, outcome: 'SUCCESS' }, diagnosticsLink: null, provenance: null,
+        primaryAction: { target: 'core.reindex', defaultArgsJson: null }, primaryActionKind: kind, bodyI18nKey: null } } as unknown as AdvisoryRecord);
+    const labels = (record: AdvisoryRecord) => derive({ advisories: [record] }).sections.earlier[0]!.actions!.map(action => action.label);
+    expect(labels(completed('core.clear-failed-jobs', null))).not.toContain('Undo');
+    expect(labels(completed('core.forget-source', null))).toEqual(['Add back to search']);
+    expect(labels(completed('core.file-operations', 'undo'))).toEqual(['Undo']);
+  });
+});

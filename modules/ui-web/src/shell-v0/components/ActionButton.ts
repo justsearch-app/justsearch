@@ -13,8 +13,10 @@
  *
  * Risk-driven UI:
  *   - LOW: button click immediately fires `action-invoke`.
- *   - MEDIUM: button click → confirm() prompt → fires on yes.
- *   - HIGH: button click → typed-confirmation form (user types
+ *   - MEDIUM (INLINE): button click → the in-place confirmation band
+ *     (`<jf-confirm-band>`: consequence sentence, verb button, Keep it)
+ *     → fires on the verb.
+ *   - HIGH (TYPED): button click → typed-confirmation form (user types
  *     the operation id) → fires on match.
  *
  * The HIGH ceremony is deliberately in-component for V0; later
@@ -30,8 +32,10 @@
  *   ></jf-action-button>
  */
 
-import { html, css, type TemplateResult } from 'lit';
+import { html, css, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
+import { operationConsequence } from './operationConsequence.js';
+import './ConfirmBand.js';
 
 export type Risk = 'LOW' | 'MEDIUM' | 'HIGH';
 
@@ -133,17 +137,21 @@ export class ActionButton extends JfElement {
   `;
 
   override render(): TemplateResult {
-    if (this.confirmStage === 'awaiting-typed') {
-      const expected = this.requireConfirmText || this.operationId;
-      const matches = this.typedConfirm === expected;
-      return html`
-        <button
-          class="invoke"
-          data-risk=${this.risk}
-          ?disabled=${this.disabled || this.pending}
-        >
-          ${this.label}
-        </button>
+    // One stable invoke button: a stage change only adds the confirmation after it, so the control
+    // that opened a confirmation is still there to take focus back when it is cancelled.
+    const expected = this.requireConfirmText || this.operationId;
+    const matches = this.typedConfirm === expected;
+    return html`
+      <button
+        class="invoke"
+        data-risk=${this.risk}
+        aria-expanded=${this.confirmStage === 'idle' ? nothing : 'true'}
+        ?disabled=${this.disabled || this.pending}
+        @click=${this.handleInitialClick}
+      >
+        ${this.label}
+      </button>
+      ${this.confirmStage === 'awaiting-typed' ? html`
         <div class="confirm-row">
           <span>Type <code>${expected}</code> to confirm:</span>
           <input
@@ -159,40 +167,18 @@ export class ActionButton extends JfElement {
             ?disabled=${!matches || this.disabled || this.pending}
             @click=${this.fireInvoke}
           >
-            Confirm
+            ${this.label}
           </button>
           <button class="invoke" @click=${this.cancelConfirm}>Cancel</button>
-        </div>
-      `;
-    }
-
-    if (this.confirmStage === 'awaiting-confirm') {
-      return html`
-        <button class="invoke" data-risk=${this.risk}>${this.label}</button>
-        <div class="confirm-row">
-          <span>Are you sure?</span>
-          <button
-            class="invoke"
-            data-risk=${this.risk}
-            ?disabled=${this.disabled || this.pending}
-            @click=${this.fireInvoke}
-          >
-            Yes
-          </button>
-          <button class="invoke" @click=${this.cancelConfirm}>Cancel</button>
-        </div>
-      `;
-    }
-
-    return html`
-      <button
-        class="invoke"
-        data-risk=${this.risk}
-        ?disabled=${this.disabled || this.pending}
-        @click=${this.handleInitialClick}
-      >
-        ${this.label}
-      </button>
+        </div>` : nothing}
+      ${this.confirmStage === 'awaiting-confirm' ? html`
+        <jf-confirm-band
+          consequence=${operationConsequence(this.operationId, this.label)}
+          action-label=${this.label}
+          ?busy=${this.disabled || this.pending}
+          @confirm-band-confirm=${this.fireInvoke}
+          @confirm-band-cancel=${this.cancelConfirm}
+        ></jf-confirm-band>` : nothing}
     `;
   }
 
@@ -213,7 +199,7 @@ export class ActionButton extends JfElement {
   }
 
   private readonly handleInitialClick = (): void => {
-    if (this.disabled || this.pending) {
+    if (this.disabled || this.pending || this.confirmStage !== 'idle') {
       return;
     }
     const kind = this.resolvedConfirmKind();
@@ -247,6 +233,7 @@ export class ActionButton extends JfElement {
   private readonly cancelConfirm = (): void => {
     this.confirmStage = 'idle';
     this.typedConfirm = '';
+    this.shadowRoot?.querySelector<HTMLButtonElement>('button.invoke')?.focus();
   };
 }
 

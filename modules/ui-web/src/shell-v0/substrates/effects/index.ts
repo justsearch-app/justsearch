@@ -752,6 +752,19 @@ export function undoLastEffect(
 }
 
 /**
+ * The entry {@link undoLastEffect} would reverse next, without moving the cursor (same walk). Lets
+ * the shell's Undo command choose between this journal and a newer own-action reversal by time.
+ */
+export function peekLastEffectUndo(): JournalEntry | null {
+  for (let i = _undoCursor - 1; i >= 0; i--) {
+    const entry = _entries[i];
+    if (!entry || entry.pendingOutcome !== undefined || entry.inverse === null) continue;
+    return entry;
+  }
+  return null;
+}
+
+/**
  * 543-fwd #1 (redo) — re-apply the next undone effect, advancing the SAME
  * `_undoCursor` that `undoLastEffect` retracts. Symmetric to undoLastEffect:
  * walks FORWARD from the cursor, skipping pending-lifecycle markers and
@@ -891,6 +904,34 @@ export function undoAllByOriginator(
     }
   }
   return count;
+}
+
+/**
+ * DE6 — reverse EXACTLY a confirmed preview: the entries the person saw, in the order shown
+ * (newest-first), and nothing that arrived after the preview was drawn. An entry that is no longer
+ * reversible by the time of the confirmation (vetoed, gone) is skipped and returned, so the caller
+ * can say what was not undone. A failing reversal stops the run; it and the rest are returned too.
+ */
+export function undoEntries(
+  previewed: readonly JournalEntry[],
+  applyFn: (effect: Effect) => void,
+): { readonly reversed: number; readonly skipped: readonly JournalEntry[] } {
+  let reversed = 0;
+  const skipped: JournalEntry[] = [];
+  for (let i = 0; i < previewed.length; i++) {
+    const shown = previewed[i]!;
+    const entry = getJournalEntry(shown.id);
+    const undo = entry && entry.pendingOutcome !== 'rejected' ? undoEffectFor(entry) : null;
+    if (undo === null) { skipped.push(shown); continue; }
+    try {
+      applyFn(undo);
+      reversed++;
+    } catch {
+      skipped.push(...previewed.slice(i));
+      break;
+    }
+  }
+  return { reversed, skipped };
 }
 
 /**

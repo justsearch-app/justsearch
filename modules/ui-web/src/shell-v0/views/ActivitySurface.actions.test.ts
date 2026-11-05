@@ -84,4 +84,27 @@ describe('Activity owns the retired digest actions', () => {
     expect(note, 'the irreversible remainder is named').not.toBeNull();
     expect(note?.textContent).toContain("can't be undone");
   });
+  it('DE6 confirming the undo preview reverses exactly the previewed set, once, not an action that arrived since', async () => {
+    recordEffect({ kind: 'open-pane', paneId: 'a' }, CORE_PROVENANCE, { originator: 'agent' });
+    mount();
+    await flush();
+    const closes: string[] = [];
+    const onClosePane = ((e: Event) => closes.push(`pane:${(e as CustomEvent).detail.paneId}`)) as EventListener;
+    document.addEventListener('jf-close-pane', onClosePane);
+    try {
+      await activateJfButton(host.shadowRoot?.querySelector('[data-testid="activity-undo-all"]'));
+      await flush();
+      expect(host.shadowRoot?.querySelectorAll('[data-testid="activity-undo-row"]').length).toBe(1);
+      // The agent acts again while the preview is open: it was not shown, so it is not undone.
+      recordEffect({ kind: 'open-pane', paneId: 'late' }, CORE_PROVENANCE, { originator: 'agent' });
+      await flush();
+      const yes = host.shadowRoot?.querySelector('[data-testid="activity-undo-confirm-yes"]');
+      await activateJfButton(yes);
+      await activateJfButton(yes);
+      await flush();
+      expect(closes).toEqual(['pane:a']);
+    } finally {
+      document.removeEventListener('jf-close-pane', onClosePane);
+    }
+  });
 });
