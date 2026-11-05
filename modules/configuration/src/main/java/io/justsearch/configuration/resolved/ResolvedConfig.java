@@ -363,16 +363,18 @@ public record ResolvedConfig(
      * @param nerBackfillBatchSize doc-count per NER backfill batch.
      * @param disambiguationBackfillBatchSize doc-count per disambiguation backfill batch.
      * @param spladeBackfillBatchSize doc-count per idle-branch SPLADE backfill batch.
-     * @param spladeInterleaveBatchSize doc-count per SPLADE batch interleaved into the primary
-     *     indexing branch (tempdoc 278 Phase 4c — smaller than the idle-branch batch so
-     *     interleaving stays cheap).
-     * @param spladeInterleaveIntervalMs minimum time between interleaved SPLADE/BGE-M3 batches
-     *     during primary indexing (tempdoc 278 Phase 4a — time-gated to limit primary-indexing
-     *     overhead to ~13%).
+     * @param enrichmentInterleaveBatchSize document count cap of one busy enrichment lane turn
+     *     during primary indexing ({@code justsearch.backfill.enrichment_interleave_batch_size},
+     *     legacy alias {@code splade_interleave_batch_size}); a count cap, not a time quantum.
+     * @param enrichmentInterleaveIntervalMs minimum time between busy enrichment turns during
+     *     primary indexing ({@code justsearch.backfill.enrichment_interleave_interval_ms}, legacy
+     *     alias {@code splade_interleave_interval_ms}; tempdoc 278 Phase 4a time gate).
      * @param commitIntervalMs time-based commit trigger: commit if this much time has elapsed
-     *     since the last commit and at least one document is pending.
+     *     since the last commit and at least one document is pending. Since E4b it also governs
+     *     enrichment-dirty documents of the enrichment scheduler (interim until E6).
      * @param maxDocsBeforeCommit buffer-based commit trigger: commit once this many documents have
-     *     been indexed since the last commit, regardless of elapsed time.
+     *     been indexed since the last commit, regardless of elapsed time. Since E4b it also counts
+     *     enrichment-dirty documents (interim until E6).
      * @param chunkSlotsPerBatch chunk-doc cache slots populated per combined-backfill batch
      *     (formerly the bare {@code chunkSlotsPerBatch = 50} literal in {@code
      *     CombinedEnrichmentBackfillOps}). Tempdoc 691 §F-1 measured this cap is NOT the
@@ -383,7 +385,7 @@ public record ResolvedConfig(
      *     pacing constant — previously bypassed {@code LoopPacingPolicy} entirely as a stray
      *     literal in {@code BackfillScheduler}; unified onto this record).
      * @param bgeM3InterleaveBatchSize doc-count per BGE-M3 batch interleaved into the primary
-     *     indexing branch (BGE-M3's counterpart to {@code spladeInterleaveBatchSize}).
+     *     indexing branch (BGE-M3's counterpart to {@code enrichmentInterleaveBatchSize}).
      * @param foregroundDutyPct minimum share of wall time (1..100) that indexing and backfill keep
      *     while foreground search-family RPCs are in flight (tempdoc 885 item 3,
      *     {@code justsearch.indexing.foreground_duty_pct}, default 20). This is a duty cycle, not a
@@ -399,8 +401,8 @@ public record ResolvedConfig(
         int nerBackfillBatchSize,
         int disambiguationBackfillBatchSize,
         int spladeBackfillBatchSize,
-        int spladeInterleaveBatchSize,
-        long spladeInterleaveIntervalMs,
+        int enrichmentInterleaveBatchSize,
+        long enrichmentInterleaveIntervalMs,
         long commitIntervalMs,
         int maxDocsBeforeCommit,
         int chunkSlotsPerBatch,

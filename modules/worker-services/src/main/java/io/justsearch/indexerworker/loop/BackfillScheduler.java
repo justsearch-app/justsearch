@@ -26,7 +26,11 @@ import io.justsearch.indexerworker.ner.NerService;
 import io.justsearch.indexerworker.splade.SpladeEncoder;
 import io.justsearch.indexing.SchemaFields;
 import java.util.ArrayDeque;
+import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.LongSupplier;
@@ -35,69 +39,81 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Schedules backfill work for the {@link IndexingLoop} idle branch + interleaved SPLADE for
- * the primary-indexing branch.
+ * The one enrichment scheduler (E4b): it owns when enrichment runs, from busy primary processing
+ * ({@link #runInterleavedEnrichment}) and from idle time ({@link #runIdleCycle}).
  *
- * <p>Tempdoc 516 Slice 4d (Wave 6) — extracted from {@link IndexingLoop}. Owns the per-cycle
- * backfill orchestration: the combined enrichment tight loop, the per-stage fallback path
- * (embedding / chunk-embed / NER / SPLADE), and disambiguation. Owns per-stage retry-backoff
- * state and {@code lastSpladeInterleaveTime}. The disambiguation service owns reconciliation progress.
+ * <p><b>Lanes and units.</b> Five lanes rotate: dense parent, dense chunk, sparse parent, sparse
+ * chunk and NER. When BGE-M3 is configured it is one unified lane that owns everything its
+ * operation selects (sparse-pending parents and chunks, writing dense and sparse together) and
+ * replaces the dense-parent and both sparse lanes; dense chunk and NER stay separate. A turn runs
+ * exactly one admitted E3 unit of its lane, which finishes with its result or retained progress
+ * kept; hard stops and deadlines keep their E3 meaning inside the unit.
  *
- * <p>P5 boundary: a concrete final class with three entry points (runIdleCycle,
- * runInterleavedSplade, resetState). No strategy interface.
+ * <p><b>Ledger.</b> Each lane {@code i} keeps charged service {@code S_i}. A turn goes to the
+ * eligible lane with the least {@code S_i}; ties go to the first tied lane after a round-robin
+ * pointer that advances past each chosen lane. Every admitted turn is charged {@code max(measured
+ * time, 10 ms)}: wall time from the unit's selection to its publication receipt, failed and
+ * zero-completion attempts included, foreground pacing waits excluded. A lane that (re)becomes
+ * eligible gets {@code S_i = max(S_i, min S_j)} over the lanes that stayed eligible, so debt is
+ * kept and catch-up bursts are impossible. The ledger, cursors, retained routes and holds are in
+ * memory; a restart starts a fresh ledger.
  *
- * <p>Cross-seam contract: encoders/services are read via supplier closures over
- * {@link IndexingLoop}'s volatile fields so the existing async-load swap-on-the-fly semantics
- * are preserved without IndexingLoop having to push updates.
+ * <p><b>Bound.</b> While lane {@code i} stays continuously eligible, every other lane receives
+ * between two turns of {@code i} at most {@code (S_i - S_j) + C_max} of charged service, where
+ * {@code C_max} is the largest single-turn charge; with {@code k} eligible lanes and initial
+ * spread {@code D}, {@code i} waits at most {@code (k-1)(D + C_max)} of charged service. There is
+ * no wall-clock promise: acquisition waits (up to 5 min), pacing waits and the spacing of busy
+ * calls after primary batches are outside it.
+ *
+ * <p><b>Callers.</b> A due busy call admits one turn at the interleave interval; pending ingestion
+ * limits it to that turn but cannot veto it. An idle cycle repeats turns until its deadline (or as
+ * many turns as its budget holds at the charge floor), a hard stop, pending ingestion (after the
+ * admitted unit finishes), or no eligible lane can still advance this cycle.
+ *
+ * <p><b>Commits (interim).</b> The scheduler counts enrichment-dirty documents for both callers
+ * and commits after a turn once the existing document or time threshold is reached, and at the
+ * end of every idle cycle and every busy call that finds no eligible lane if anything is dirty. A
+ * failed commit keeps the dirty count and is retried at the next check.
  */
 public final class BackfillScheduler {
-
   private static final Logger log = LoggerFactory.getLogger(BackfillScheduler.class);
 
-  /**
-   * Hard wall-clock budget for one {@link #runIdleCycle()} backfill burst (tempdoc 798).
-   *
-   * <p>Containment of last resort: whatever the input, control returns to {@code IndexingLoop
-   * .runLoop()} — and therefore to the job-queue poll — within this window. The livelock this
-   * bounds spun ~64 times/second on 2 documents for 20+ minutes and produced 59,420 identical
-   * INFO lines with zero WARN and zero ERROR, so tripping the budget logs at WARN.
-   */
+  /** Wall-clock budget of one idle cycle (tempdoc 798 containment). */
   private static final long CYCLE_BUDGET_MS = 5_000L;
+  private static final long CYCLE_BUDGET_NANOS = CYCLE_BUDGET_MS * 1_000_000L;
+  /** Floor of a turn's charge, so zero-time outcomes cannot monopolise the ledger. */
+  private static final long MIN_CHARGE_NANOS = 10_000_000L;
+  /** Turns one idle cycle may admit: its budget at the charge floor, whatever the clock does. */
+  private static final int MAX_CYCLE_TURNS = (int) (CYCLE_BUDGET_NANOS / MIN_CHARGE_NANOS);
+  /** Consecutive returned turns without advancement before one diagnostic episode. */
+  private static final int STALL_TURNS = 5;
 
   /**
-   * The embed stage's reserved share of one cycle (round-15 post-round finding; the starvation
-   * residual recorded in tempdoc 813 §18).
-   *
-   * <p>Phases 3b/3c of the combined pass run after the embed stage and open by consulting the stop
-   * signal, so an embed stage allowed to spend the whole {@link #CYCLE_BUDGET_MS} makes SPLADE and
-   * NER structurally unrunnable — live evidence: {@code splade=0ms(ok=0)} and {@code ner=0ms(ok=0)}
-   * on 54 consecutive cycles with SPLADE stuck at 1.05% coverage, both advancing the instant embed
-   * finished. Past this point embed stops STARTING new units so the remaining ~40% reaches the
-   * other stages; see {@code CombinedEnrichmentBackfillOps.embedShareSpent} for why that is not the
-   * same signal as the yield/abort disjunction and why it does not apply to an embed-only backlog.
-   *
-   * <p>Cycle-absolute, not per-batch, on purpose: within one cycle the first batch takes the embed
-   * share and later batches then serve the other stages, which is the round-robin the reservation
-   * exists to produce.
+   * Rotation order. BGE-M3, when configured, takes the dense-parent position and replaces the
+   * dense-parent and both sparse lanes; the two are never eligible together.
    */
-  private static final long EMBED_BUDGET_SHARE_MS = 3_000L;
+  enum Lane { DENSE_PARENT, BGE_M3, DENSE_CHUNK, SPARSE_PARENT, SPARSE_CHUNK, NER }
 
+  /** One admitted turn, as the test-visible observer and the DEBUG line report it. */
+  record Turn(Lane lane, String caller, long chargeNanos, StageOutcome outcome, boolean advancement,
+      boolean interrupted) {}
+
+  /** Test-visible per-turn observer (set reflectively by scheduler tests); no public API. */
+  private java.util.function.Consumer<Turn> turnObserver = turn -> {};
+
+  private static final List<Lane> ROTATION = List.of(Lane.values());
+  private final Map<Lane, Long> service = new EnumMap<>(Lane.class);
+  private final Set<Lane> eligible = EnumSet.noneOf(Lane.class);
+  private final Map<Lane, Integer> unsuccessful = new EnumMap<>(Lane.class);
+  /** Round-robin tie pointer: index into {@link #ROTATION}. */
+  private int nextLane;
   /**
-   * Consecutive cycles with an identical combined work-set before the stall WARN fires (round-15
-   * post-round finding).
-   *
-   * <p>Five ~5 s cycles is ~25 s of selecting the same documents — long past any legitimate
-   * "one big batch spanning a couple of cycles" and far short of the 12+ minutes the field incident
-   * ran before anyone noticed, because nothing in the log distinguished it from healthy progress.
+   * The dense operation's own per-call exclusion: documents it published, or saw rejected while
+   * their revision stayed the same, are not re-encoded in the same scheduler call.
    */
-  private static final int STALL_SIGNATURE_CYCLES = 5;
-
-  // Tempdoc 710 Wave-1.5 Move 4: the per-stage backfill batch sizes (formerly static fields
-  // computed once from LoopPacingPolicy, plus the BGE-M3 pair which bypassed LoopPacingPolicy
-  // entirely as bare literals here) all moved onto ResolvedConfig.Ai.BackfillPacing
-  // (justsearch.backfill.* config surface). See the pacing() helper below — call sites read the
-  // live snapshot the same way resolvedConfigSupplier.get().rag().chunkVectorsEnabled() already
-  // does elsewhere in this class.
+  private final Set<String> densePublished = new HashSet<>();
+  private long dirtyDocuments;
+  private long lastEnrichmentCommitNanos;
 
   /** Scheduler-local monotonic domain for cycle, embed-share and retry deadlines. */
   private final LongSupplier monotonicNanos;
@@ -116,7 +132,7 @@ public final class BackfillScheduler {
   private final Supplier<NerService> nerServiceSupplier;
   private final Supplier<DisambiguationService> disambiguationServiceSupplier;
 
-  private long lastSpladeInterleaveTime = 0;
+  private long lastEnrichmentInterleaveTime = 0;
   private static final class StageBackoff {
     Object provider;
     int failures;
@@ -126,8 +142,7 @@ public final class BackfillScheduler {
   private final java.util.IdentityHashMap<Object, StageBackoff> acquisitionBackoffs =
       new java.util.IdentityHashMap<>();
 
-  private final java.util.EnumMap<Stage, StageBackoff> stageBackoffs =
-      new java.util.EnumMap<>(Stage.class);
+  private final EnumMap<Stage, StageBackoff> stageBackoffs = new EnumMap<>(Stage.class);
 
   /**
    * Cross-cycle per-window accumulator for long documents (round-15 post-round finding). Lives here
@@ -139,12 +154,6 @@ public final class BackfillScheduler {
   /** Per-stage keyset positions survive idle turns and reader refreshes. */
   private final io.justsearch.indexerworker.loop.ops.EnrichmentSelection enrichmentSelection =
       new io.justsearch.indexerworker.loop.ops.EnrichmentSelection();
-
-  /** Stall detection state (round-15 post-round finding) — see {@link #noteWorkSet}. */
-  private long lastWorkSetSignature = 0;
-
-  private int repeatedWorkSetCycles = 0;
-  private boolean stallWarnedThisEpisode = false;
 
   public BackfillScheduler(
       DocumentFieldOps documentFieldOps,
@@ -182,6 +191,7 @@ public final class BackfillScheduler {
       Supplier<DisambiguationService> disambiguationServiceSupplier,
       LongSupplier monotonicNanos) {
     this.monotonicNanos = java.util.Objects.requireNonNull(monotonicNanos, "monotonicNanos");
+    this.lastEnrichmentCommitNanos = monotonicNanos.getAsLong();
     this.documentFieldOps = documentFieldOps;
     this.indexingCoordinator = indexingCoordinator;
     this.indexCountOps = indexCountOps;
@@ -242,193 +252,243 @@ public final class BackfillScheduler {
   }
 
   /**
-   * Runs one backfill cycle from the idle branch. Returns {@code true} if any backfill stage
-   * (combined or individual) reported progress, so the caller can pick the active-vs-truly-idle
-   * sleep duration.
-   *
-   * <p>Self-committing: combined-backfill tight loop commits every 5 batches + a final
-   * commit; individual stages commit per their own contracts.
-   *
-   * <p>Bounded by construction (tempdoc 798): every loop inside terminates on PROGRESS rather than
-   * activity, yields to pending ingest work, and is capped by {@link #CYCLE_BUDGET_MS}. Control
-   * returns to the caller's job-queue poll regardless of what the enrichment population does.
+   * Repeats fair turns until the cycle deadline (or its turn bound), a hard stop, pending
+   * ingestion, or no eligible lane that can still advance this cycle. Returns whether any turn
+   * advanced work, for the caller's active-versus-idle sleep choice.
    */
   public boolean runIdleCycle() {
-    if (signalBus.isIndexingHeld()) return false;
-    for (Stage stage : Stage.values()) backoff(stage);
-    boolean backfillDidWork = false;
-    final long cycleStartNanos = monotonicNanos.getAsLong();
-    final long cycleDeadlineNanos =
-        cycleStartNanos + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(CYCLE_BUDGET_MS);
-    final long embedShareDeadlineNanos =
-        cycleStartNanos + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(EMBED_BUDGET_SHARE_MS);
-
-    boolean runBackfill = !signalBus.isEnergyReduced();
-    if (runBackfill) {
-      var batchCommitCounter = new int[] {0};
-      Set<String> publishedDocIds = new HashSet<>();
-      CombinedEnrichmentBackfillOps.CombinedOutcome outcome =
-          processCombinedBackfillIfApplicable(
-              batchCommitCounter, cycleDeadlineNanos, embedShareDeadlineNanos,
-              publishedDocIds);
-      recordCombinedOutcome(outcome);
-      // The mode-selection probe is the batch that re-selects the head of the pending queue each
-      // cycle — the one whose signature repeated byte-identically for 12+ minutes in the field.
-      noteWorkSet(outcome);
-      // docs/tempdocs/711-rmw-preservation-and-followup-designs.md: deferred combined work
-      // must not fall through to individual writes that omit non-stored SPLADE postings.
-      boolean useCombined = outcome.wroteAnything() || outcome.recordTiming();
-      if (useCombined) {
-        // Tempdoc 710 Move 2 item 4: this cycle used the combined pass — the only path taken
-        // between here and the next runIdleCycle() call (the tight loop below stays combined
-        // until it drains or is interrupted), so the mode is settled at this point.
-        OperationalMetrics.getInstance().recordBackfillMode("combined");
-        backfillDidWork = outcome.wroteAnything();
-        // Tempdoc 809 finding 3: an aborted probe means a stop condition came up DURING that batch
-        // — pending ingest, the cycle budget, or a bulk deletion that invalidated the documents it
-        // had selected. Starting a fresh tight-loop batch would re-select and re-encode against
-        // that same condition, which is how the mid-batch signal ended up costing a further ~5s of
-        // GPU instead of returning control. Mode selection itself is unchanged: this cycle still
-        // used the combined pass, and the next idle cycle picks the enrichment up where it stopped.
-        final boolean[] useCombinedRef = {
-            outcome.wroteAnything() && !outcome.aborted()};
-        final int[] tightLoopBatches = {1};
-        // Tempdoc 809 finding 3: the mode-selection probe above is a full batch and is now
-        // interruptible too, so it can be the call that spends the budget. Seeding from it keeps
-        // the 798 WARN honest — without this, a cycle whose ONLY batch overran would report
-        // nothing at all.
-        final boolean[] budgetTripped = {outcome.aborted() && monotonicNanos.getAsLong() >= cycleDeadlineNanos};
-        // Tempdoc 798 review F3: cumulative across the whole cycle, mode-selection probe included.
-        // Budget exhaustion means very different things depending on this flag, and the diagnostic
-        // must not assert non-convergence when enrichment was demonstrably converging.
-        final boolean[] anyProgressThisCycle = {outcome.progressed()};
-        // 334 Phase 8: NRT suspend during tight loop prevents mmap accumulation from
-        // ControlledRealTimeReopenThread while commits are deferred (every 5 batches).
-        commitOps.withNrtSuspended(
-            () -> {
-              while (useCombinedRef[0]) {
-                if (!running.get() || signalBus.isIndexingHeld() || Thread.currentThread().isInterrupted()) break;
-                // Tempdoc 885 item 3: yield to foreground load, do not abandon the cycle for it.
-                indexingPacing.pace();
-                if (signalBus.isEnergyReduced()) break; // tempdoc 630: energy-reduced
-                // Tempdoc 798: primary indexing outranks background enrichment. Backfill resumes
-                // next idle cycle; a queued ingest job the user is waiting on cannot.
-                if (signalBus.hasPendingIngest()) break;
-                if (monotonicNanos.getAsLong() >= cycleDeadlineNanos) {
-                  budgetTripped[0] = true;
-                  break;
-                }
-                CombinedEnrichmentBackfillOps.CombinedOutcome tightLoopOutcome =
-                    processCombinedBackfillIfApplicable(
-                        batchCommitCounter,
-                        cycleDeadlineNanos,
-                        embedShareDeadlineNanos,
-                        publishedDocIds);
-                recordCombinedOutcome(tightLoopOutcome);
-                // Tempdoc 798: PROGRESS, not activity. `wroteAnything()` stays true forever for a
-                // document that is rewritten every batch without ever advancing a stage.
-                useCombinedRef[0] = tightLoopOutcome.progressed();
-                if (tightLoopOutcome.progressed()) anyProgressThisCycle[0] = true;
-                if (useCombinedRef[0]) {
-                  tightLoopBatches[0]++;
-                }
-                // Tempdoc 809 finding 3: the batch left its own document set unfinished because a
-                // stop condition came up mid-batch. That condition is still true, so starting
-                // another batch would only re-discover it after another sub-batch of GPU work.
-                // Re-read the deadline first: an aborted batch is the most likely way the budget
-                // is now spent, and breaking without this would silently drop 798's WARN.
-                if (tightLoopOutcome.aborted()) {
-                  if (monotonicNanos.getAsLong() >= cycleDeadlineNanos) budgetTripped[0] = true;
-                  break;
-                }
-              }
-              if (batchCommitCounter[0] > 0) {
-                commitOps.commitAndTrack(CommitReason.BACKFILL_COMBINED_FINAL);
-              }
-            });
-        if (budgetTripped[0]) {
-          // Tempdoc 798 review F3: the budget is smaller than two large legitimate enrichment
-          // batches, so its most common trigger is a healthy cycle that simply ran out of window.
-          // Only a cycle in which NOTHING advanced is the non-convergence this WARN describes;
-          // crying wolf on the healthy case trains operators to ignore the one signal 798 added.
-          // Both branches return control to the job-queue poll — only the log level differs.
-          if (anyProgressThisCycle[0]) {
-            log.info(
-                "Combined enrichment backfill reached its {}ms cycle budget after {} batches while"
-                    + " still advancing documents — returning to the job-queue poll; the remaining"
-                    + " enrichment resumes next idle cycle (tempdoc 798).",
-                CYCLE_BUDGET_MS,
-                tightLoopBatches[0]);
-          } else {
-            log.warn(
-                "Combined enrichment backfill hit its {}ms cycle budget after {} batches with ZERO"
-                    + " stage advancement — returning to the job-queue poll (tempdoc 798). This is"
-                    + " the non-converging shape: the same documents are rewritten every batch"
-                    + " without any stage advancing.",
-                CYCLE_BUDGET_MS,
-                tightLoopBatches[0]);
-          }
-        }
-        if (tightLoopBatches[0] > 1) {
-          log.debug("Tight backfill loop: {} consecutive batches", tightLoopBatches[0]);
-        }
-      } else {
-        // Pre-stamped BEFORE the pass runs on purpose: mid-pass observability is the gauge's whole
-        // purpose (710 S-B3), so an operator polling DURING a long individual pass must see
-        // "individual" rather than the previous cycle's value.
-        OperationalMetrics.getInstance().recordBackfillMode("individual");
-        backfillDidWork = runIndividualBackfills(cycleDeadlineNanos);
-        if (!backfillDidWork) {
-          // ...but a pass that ran and advanced NOTHING is exactly what getBackfillMode() documents
-          // as "idle" ("no backfill work was available/eligible last cycle"). Leaving "individual"
-          // standing left a last-known gauge looking like live activity for as long as the worker
-          // stayed idle — the worker half of the owner's 2026-08-07 finding (813 §20a), where a
-          // fully-settled index reported backfillMode="individual" indefinitely.
-          OperationalMetrics.getInstance().recordBackfillMode("idle");
-        }
+    boolean activity = false;
+    boolean admitted = false;
+    long deadline = monotonicNanos.getAsLong() + CYCLE_BUDGET_NANOS;
+    int turns = 0;
+    enrichmentSelection.beginCycle();
+    densePublished.clear();
+    // A lane that returned without advancing, or whose unit was cancelled or held, is not offered
+    // again in this cycle; it is eligible again next cycle on the same clock.
+    var finished = EnumSet.noneOf(Lane.class);
+    try {
+      while (monotonicNanos.getAsLong() < deadline && turns < MAX_CYCLE_TURNS) {
+        Turn turn = runTurn("idle", deadline, finished);
+        if (turn == null) break;
+        admitted = true;
+        turns++;
+        activity |= turn.advancement();
+        if (!turn.advancement() || turn.interrupted()) finished.add(turn.lane());
+        // Primary indexing outranks background enrichment: the admitted unit finished, no other.
+        if (signalBus.hasPendingIngest()) break;
       }
-    } else {
-      OperationalMetrics.getInstance().recordBackfillMode("idle");
+    } finally {
+      commitEnrichment(true);
     }
-
-    if (!signalBus.isEnergyReduced() && monotonicNanos.getAsLong() < cycleDeadlineNanos) {
-      backfillDidWork |= runDisambiguationIfReady(backfillDidWork);
+    if (monotonicNanos.getAsLong() >= deadline || turns >= MAX_CYCLE_TURNS) {
+      // Tempdoc 798: only a budget spent with nothing advanced is the non-converging shape.
+      if (activity) {
+        log.info("Enrichment reached its {}ms cycle budget while still advancing documents —"
+            + " returning to the job-queue poll; the remainder resumes next idle cycle"
+            + " (tempdoc 798).", CYCLE_BUDGET_MS);
+      } else {
+        log.warn("Enrichment hit its {}ms cycle budget with ZERO stage advancement — returning to"
+            + " the job-queue poll (tempdoc 798).", CYCLE_BUDGET_MS);
+      }
     }
-    return backfillDidWork;
+    if (!hardStopBackfillWork() && monotonicNanos.getAsLong() < deadline) {
+      boolean disambiguated = runDisambiguationIfReady(activity);
+      activity |= disambiguated;
+      admitted |= disambiguated;
+    }
+    OperationalMetrics.getInstance().recordBackfillMode(admitted ? "active" : "idle");
+    return activity;
   }
 
   /**
-   * Records one {@link CombinedEnrichmentBackfillOps.CombinedOutcome}'s per-stage counts/timing
-   * into {@link OperationalMetrics} (tempdoc 710 Move 2 item 4 — replaces the {@code finally}
-   * block that used to live inside {@code CombinedEnrichmentBackfillOps.processCombinedBackfill}).
-   * A no-op when {@code outcome.attempted()} is false (nothing ran this call).
+   * One due busy call admits at most one lane turn at the enrichment interleave interval, even
+   * while ingestion remains pending (a soft yield, not a veto).
    */
-  private void recordCombinedOutcome(CombinedEnrichmentBackfillOps.CombinedOutcome outcome) {
-    recordBackoffOutcomes(outcome.accounting());
-    OperationalMetrics.getInstance().recordEnrichmentOutcomes(outcome.accounting().counters());
-    if (!outcome.attempted()) {
+  public void runInterleavedEnrichment(long now) {
+    if (now - lastEnrichmentInterleaveTime < pacing().enrichmentInterleaveIntervalMs()) return;
+    if (hardStopBackfillWork()) {
+      OperationalMetrics.getInstance().recordBackfillMode("idle");
       return;
     }
-    OperationalMetrics metrics = OperationalMetrics.getInstance();
-    metrics.recordEnrichmentCompleted(BatchTimingKeys.EMBED, outcome.embedProcessed());
-    metrics.recordEnrichmentCompleted(BatchTimingKeys.SPLADE, outcome.spladeProcessed());
-    metrics.recordEnrichmentCompleted(BatchTimingKeys.NER, outcome.nerProcessed());
+    lastEnrichmentInterleaveTime = now;
+    enrichmentSelection.beginCycle();
+    densePublished.clear();
+    Turn turn = runTurn("busy", Long.MAX_VALUE, Set.of());
+    if (turn == null) {
+      commitEnrichment(true);
+      OperationalMetrics.getInstance().recordBackfillMode("idle");
+    }
+  }
+
+  private Turn runTurn(String caller, long deadline, Set<Lane> finished) {
+    // Pacing waits belong to foreground responsiveness, never to a lane's service debt.
+    indexingPacing.pace();
+    if (hardStopBackfillWork() || monotonicNanos.getAsLong() >= deadline) return null;
+    Lane chosen = chooseLane(finished);
+    if (chosen == null) return null;
+    OperationalMetrics.getInstance().recordBackfillMode("active");
+    var authority = indexingCoordinator.enrichmentAuthority();
+    long epoch = indexingCoordinator.bulkDeleteEpoch();
+    long routes = windowedEmbedProgress.routesRetained();
+    long start = monotonicNanos.getAsLong();
+    long yielded = indexingPacing.yieldedNanosOnCurrentThread();
+    StageOutcome outcome = processLane(chosen, caller.equals("busy"), deadline);
+    // A source or authority change during the unit ends this lane's cycle, as cancellation does.
+    boolean interrupted = interrupted(outcome)
+        || authority != indexingCoordinator.enrichmentAuthority()
+        || epoch != indexingCoordinator.bulkDeleteEpoch();
+    long charge = Math.max(MIN_CHARGE_NANOS, monotonicNanos.getAsLong() - start
+        - (indexingPacing.yieldedNanosOnCurrentThread() - yielded));
+    service.merge(chosen, charge, Long::sum);
+    enrichmentSelection.served(outcome.accounting());
+    recordStageOutcome(switch (chosen) {
+      case DENSE_PARENT, DENSE_CHUNK -> BatchTimingKeys.EMBED;
+      case SPARSE_PARENT, SPARSE_CHUNK, BGE_M3 -> BatchTimingKeys.SPLADE;
+      case NER -> BatchTimingKeys.NER;
+    }, outcome);
+    if ((chosen == Lane.SPARSE_PARENT || chosen == Lane.SPARSE_CHUNK || chosen == Lane.BGE_M3)
+        && outcome.accounting().storageFailures().isEmpty()
+        && outcome.accounting().acquisitions().stream().allMatch(EnrichmentAccounting.Acquisition::available)) {
+      // The sparse operations report "not a systemic failure" through success.
+      recordBackfillResult(Stage.SPLADE, outcome.success());
+    }
     var counters = outcome.accounting().counters();
-    if (counters.containsKey("embed.selected") || counters.containsKey("chunk_embed.selected")
-        || outcome.embedProcessed() > 0) {
-      metrics.recordStageTiming(BatchTimingKeys.EMBED, outcome.embedProcessed(), outcome.embedMs());
+    // Advancement: a published, charged or terminal outcome, or retained progress. A charged row
+    // is not re-selected in the same call, so a failing row cannot keep its lane busy.
+    boolean advancement = counters.entrySet().stream().anyMatch(entry -> entry.getValue() > 0
+        && (entry.getKey().endsWith(".published") || entry.getKey().endsWith(".completed_empty")
+            || entry.getKey().endsWith(".rejected_output") || entry.getKey().endsWith(".failed_charged")
+            || entry.getKey().endsWith(".failed") || entry.getKey().endsWith(".window_advances")))
+        // A retained classification or fallback route is retained progress of its unit.
+        || windowedEmbedProgress.routesRetained() != routes;
+    // Every accepted row is enrichment-dirty, even when a later write in the unit failed.
+    dirtyDocuments += outcome.accounting().tickets().entrySet().stream()
+        .filter(entry -> switch (entry.getValue()) {
+          case PUBLISHED, COMPLETED_EMPTY, FAILED_CHARGED, REJECTED_OUTPUT -> true;
+          default -> false;
+        }).map(entry -> entry.getKey().documentId()).distinct().count();
+    noteService(chosen, outcome, advancement);
+    Turn turn = new Turn(chosen, caller, charge, outcome, advancement, interrupted);
+    log.debug("Enrichment turn lane={} caller={} chargeMs={} advancement={} outcome={}",
+        chosen, caller, charge / 1_000_000L, advancement, counters);
+    turnObserver.accept(turn);
+    commitEnrichment(false);
+    return turn;
+  }
+
+  /** Least charged eligible lane, ties after the round-robin pointer; re-entry keeps debt. */
+  private Lane chooseLane(Set<Lane> finished) {
+    Set<Lane> current = EnumSet.noneOf(Lane.class);
+    for (Lane lane : ROTATION) if (laneEligible(lane)) current.add(lane);
+    // The minimum over lanes that stayed eligible; when every lane enters together, over all of
+    // them, so their existing debt relative to each other is kept.
+    Set<Lane> stayed = EnumSet.copyOf(current);
+    stayed.retainAll(eligible);
+    long minimum = (stayed.isEmpty() ? current : stayed).stream()
+        .mapToLong(this::charged).min().orElse(0L);
+    for (Lane lane : current) {
+      if (!eligible.contains(lane)) service.put(lane, Math.max(charged(lane), minimum));
     }
-    if (counters.containsKey("splade.selected") || counters.containsKey("splade.attempts")
-        || counters.containsKey("splade.computed")
-        || outcome.spladeProcessed() > 0) {
-      metrics.recordStageTiming(BatchTimingKeys.SPLADE, outcome.spladeProcessed(), outcome.spladeMs());
+    eligible.clear();
+    eligible.addAll(current);
+    Lane chosen = null;
+    for (int offset = 0; offset < ROTATION.size(); offset++) {
+      Lane lane = ROTATION.get((nextLane + offset) % ROTATION.size());
+      if (eligible.contains(lane) && !finished.contains(lane)
+          && (chosen == null || charged(lane) < charged(chosen))) {
+        chosen = lane;
+      }
     }
-    if (counters.containsKey("ner.selected") || outcome.nerProcessed() > 0) {
-      metrics.recordStageTiming(BatchTimingKeys.NER, outcome.nerProcessed(), outcome.nerMs());
+    if (chosen != null) nextLane = (ROTATION.indexOf(chosen) + 1) % ROTATION.size();
+    return chosen;
+  }
+
+  private long charged(Lane lane) {
+    return service.getOrDefault(lane, 0L);
+  }
+
+  /** Whether a turn ended in cancellation, a storage failure or an unavailable provider. */
+  private static boolean interrupted(StageOutcome outcome) {
+    var accounting = outcome.accounting();
+    return !accounting.storageFailures().isEmpty()
+        || accounting.acquisitions().stream().anyMatch(acquisition -> !acquisition.available())
+        || accounting.tickets().containsValue(EnrichmentAccounting.Disposition.CANCELLED);
+  }
+
+  /**
+   * Stall diagnostic from eligible service, not selection identity: retained window advancement
+   * is progress, and holds or backoff are not unsuccessful service. One WARN per episode.
+   */
+  private void noteService(Lane lane, StageOutcome outcome, boolean advancement) {
+    if (advancement) {
+      unsuccessful.remove(lane);
+    } else if (outcome.attempted() && !interrupted(outcome)
+        && unsuccessful.merge(lane, 1, Integer::sum) == STALL_TURNS) {
+      log.warn("Enrichment lane {} received {} consecutive eligible turns without advancing any"
+          + " document (no publication, terminal outcome or window advancement): its eligible"
+          + " units are not draining.", lane, STALL_TURNS);
     }
-    metrics.recordBatchTiming(BatchTimingKeys.FETCH, outcome.fetchMs());
-    metrics.recordBatchTiming(BatchTimingKeys.WRITE, outcome.writeMs());
-    metrics.recordBatchTiming(BatchTimingKeys.TOTAL, outcome.totalMs());
+  }
+
+  private boolean laneEligible(Lane lane) {
+    boolean bge = bgeM3EncoderSupplier.get() != null;
+    NerService ner = nerServiceSupplier.get();
+    boolean allowed = switch (lane) {
+      // BGE-M3 owns parent dense inference; chunk dense keeps its own lane as before.
+      case DENSE_PARENT, DENSE_CHUNK -> (lane == Lane.DENSE_CHUNK || !bge)
+          && embeddingLifecycle.embeddingProvider().isAvailable()
+          && embeddingLifecycle.allowEmbeddingWrites()
+          && unitAllowed(embeddingLifecycle.embeddingProvider().isUsingGpu())
+          && stageAllowed(lane == Lane.DENSE_PARENT ? Stage.EMBED : Stage.CHUNK_EMBED)
+          && (lane == Lane.DENSE_PARENT || resolvedConfigSupplier.get().rag().chunkVectorsEnabled());
+      case SPARSE_PARENT, SPARSE_CHUNK -> !bge && spladeEncoderSupplier.get() != null
+          && sparseUnitAllowed() && stageAllowed(Stage.SPLADE)
+          && (lane == Lane.SPARSE_PARENT || chunkSpladeEnabled());
+      case NER -> ner != null && ner.isAvailable() && stageAllowed(Stage.NER)
+          && unitAllowed(LoopPacingPolicy.requiresGpu(ner.isGpuAvailable(), ner.getOrtCudaStatus()));
+      // Held if its provider is held or any stage it represents has a storage hold.
+      case BGE_M3 -> bge && sparseUnitAllowed() && stageAllowed(Stage.SPLADE)
+          && stageAllowed(Stage.EMBED) && stageAllowed(Stage.CHUNK_EMBED);
+    };
+    if (!allowed) return false;
+    String field = switch (lane) {
+      case DENSE_PARENT -> SchemaFields.EMBEDDING_STATUS;
+      case DENSE_CHUNK -> SchemaFields.CHUNK_EMBEDDING_STATUS;
+      case SPARSE_PARENT, SPARSE_CHUNK, BGE_M3 -> SchemaFields.SPLADE_STATUS;
+      case NER -> SchemaFields.NER_STATUS;
+    };
+    var kind = switch (lane) {
+      case SPARSE_PARENT -> DocumentFieldOps.PendingDocumentKind.PARENT;
+      case SPARSE_CHUNK -> DocumentFieldOps.PendingDocumentKind.CHUNK;
+      case BGE_M3 -> chunkSpladeEnabled() ? DocumentFieldOps.PendingDocumentKind.ALL
+          : DocumentFieldOps.PendingDocumentKind.PARENT;
+      default -> DocumentFieldOps.PendingDocumentKind.ALL;
+    };
+    try {
+      // Same overloads as the lane selectors, so eligibility and selection read one population.
+      return !(kind == DocumentFieldOps.PendingDocumentKind.CHUNK
+          ? documentFieldOps.queryPendingPage(field, 1, kind, null)
+          : documentFieldOps.queryPendingPage(field, 1,
+              kind == DocumentFieldOps.PendingDocumentKind.PARENT, null)).ids().isEmpty();
+    } catch (java.io.IOException failure) {
+      log.warn("Cannot establish enrichment lane eligibility for {}", lane, failure);
+      return false;
+    }
+  }
+
+  private void commitEnrichment(boolean orderlyYield) {
+    if (dirtyDocuments == 0) return;
+    long now = monotonicNanos.getAsLong();
+    if (!orderlyYield && !LoopPacingPolicy.isTimeCommitTriggered(
+        (now - lastEnrichmentCommitNanos) / 1_000_000L, dirtyDocuments, pacing().commitIntervalMs())
+        && !LoopPacingPolicy.isBufferCommitTriggered(dirtyDocuments, pacing().maxDocsBeforeCommit())) return;
+    try {
+      commitOps.commitAndTrack(orderlyYield ? CommitReason.BACKFILL_COMBINED_FINAL : CommitReason.BACKFILL_COMBINED);
+      dirtyDocuments = 0;
+      lastEnrichmentCommitNanos = now;
+    } catch (RuntimeException failure) {
+      log.warn("Enrichment commit failed; dirty documents remain pending for the next check", failure);
+    }
   }
 
   /**
@@ -447,26 +507,6 @@ public final class BackfillScheduler {
     }
   }
 
-  /**
-   * Interleaves SPLADE/BGE-M3 backfill during primary indexing (tempdoc 278 item 4a).
-   * Time-gated: one small batch every spladeInterleaveIntervalMs to limit primary-indexing
-   * overhead (~13%).
-   */
-  public void runInterleavedSplade(long now) {
-    for (Stage stage : Stage.values()) backoff(stage);
-    if (spladeEncoderSupplier.get() == null && bgeM3EncoderSupplier.get() == null) return;
-    // Spec E section 1.3 item 5: no interleaved sparse batch starts while bulk GPU work is held.
-    if (signalBus.isIndexingHeld() || !sparseUnitAllowed()) return;
-    if (!stageAllowed(Stage.SPLADE)) return;
-    long spladeIntervalMs = pacing().spladeInterleaveIntervalMs();
-    if (now - lastSpladeInterleaveTime < spladeIntervalMs) return;
-    StageOutcome outcome = processSpladeBackfillInterleaved();
-    recordStageOutcome(BatchTimingKeys.SPLADE, outcome);
-    lastSpladeInterleaveTime = System.currentTimeMillis();
-    if (outcome.accounting().storageFailures().isEmpty()
-        && outcome.accounting().acquisitions().stream().noneMatch(a -> !a.available())) recordSpladeBackfillResult(outcome.success());
-  }
-
   private boolean unitAllowed(boolean gpu) {
     return !signalBus.isEnergyReduced()
         && (!gpu || (!signalBus.isBulkHeld() && !signalBus.isMainGpuActive()));
@@ -482,119 +522,17 @@ public final class BackfillScheduler {
 
   /** Resets backoff/latch state. Called from {@code resetForProfiling}. */
   public void resetState() {
-    lastSpladeInterleaveTime = 0;
+    lastEnrichmentInterleaveTime = 0;
     stageBackoffs.clear();
     acquisitionBackoffs.clear();
     windowedEmbedProgress.clear();
     enrichmentSelection.clear();
-    lastWorkSetSignature = 0;
-    repeatedWorkSetCycles = 0;
-    stallWarnedThisEpisode = false;
-  }
-
-  /** Reports useful advancement for sleep pacing, preserving stage continuation rules. */
-  private boolean runIndividualBackfills(long cycleDeadlineNanos) {
-    boolean anyActivity = false;
-    boolean embeddingCanProgress = embeddingLifecycle.embeddingProvider().isAvailable()
-        && embeddingLifecycle.allowEmbeddingWrites()
-        && unitAllowed(embeddingLifecycle.embeddingProvider().isUsingGpu())
-        && stageAllowed(Stage.EMBED);
-    if (embeddingCanProgress) {
-      StageOutcome outcome = processEmbeddingBackfill(cycleDeadlineNanos);
-      recordStageOutcome(BatchTimingKeys.EMBED, outcome);
-      anyActivity |= outcome.docsProcessed() > 0;
-    }
-    // Chunk vectors after parent embedding completes. 334 Phase 8 tight loop.
-    if (embeddingLifecycle.embeddingProvider().isAvailable()
-        && embeddingLifecycle.allowEmbeddingWrites()
-        && unitAllowed(embeddingLifecycle.embeddingProvider().isUsingGpu())
-        && stageAllowed(Stage.CHUNK_EMBED)
-        && resolvedConfigSupplier.get().rag().chunkVectorsEnabled()) {
-      int pendingDocEmbeddings =
-          indexCountOps.countByField(
-              SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING);
-      if (pendingDocEmbeddings == 0) {
-        StageOutcome chunkOutcome = processChunkEmbeddingBackfill(cycleDeadlineNanos);
-        recordStageOutcome(BatchTimingKeys.EMBED, chunkOutcome);
-        anyActivity |= chunkOutcome.docsProcessed() > 0;
-        boolean chunkDidWork = chunkOutcome.success();
-        // Tempdoc 798 review F3: same distinction as the combined loop — a budget hit while chunks
-        // were genuinely embedding is a healthy long cycle, not non-convergence.
-        boolean anyChunkProgress = chunkOutcome.docsProcessed() > 0;
-        while (chunkDidWork) {
-          if (!running.get() || signalBus.isIndexingHeld() || Thread.currentThread().isInterrupted()) break;
-          indexingPacing.pace(); // tempdoc 885 item 3: duty cycle, not a stop
-          if (!unitAllowed(embeddingLifecycle.embeddingProvider().isUsingGpu())
-              || !stageAllowed(Stage.CHUNK_EMBED)) break;
-          if (signalBus.hasPendingIngest()) break; // tempdoc 798: primary indexing outranks backfill
-          if (monotonicNanos.getAsLong() >= cycleDeadlineNanos) {
-            if (anyChunkProgress) {
-              log.info(
-                  "Chunk-embedding backfill reached its {}ms cycle budget while still embedding"
-                      + " chunks — returning to the job-queue poll; the remainder resumes next idle"
-                      + " cycle (tempdoc 798).",
-                  CYCLE_BUDGET_MS);
-            } else {
-              log.warn(
-                  "Chunk-embedding backfill hit its {}ms cycle budget with ZERO chunks embedded —"
-                      + " returning to the job-queue poll (tempdoc 798).",
-                  CYCLE_BUDGET_MS);
-            }
-            break;
-          }
-          chunkOutcome = processChunkEmbeddingBackfill(cycleDeadlineNanos);
-          recordStageOutcome(BatchTimingKeys.EMBED, chunkOutcome);
-          chunkDidWork = chunkOutcome.success();
-          if (chunkOutcome.docsProcessed() > 0) {
-            anyChunkProgress = true;
-            anyActivity = true;
-          }
-        }
-      }
-    }
-    NerService nerService = nerServiceSupplier.get();
-    if (nerService != null && nerService.isAvailable() && stageAllowed(Stage.NER)) {
-      boolean embeddingsReady;
-      if (!embeddingCanProgress) {
-        embeddingsReady = true;
-      } else {
-        int pendingEmbeddings =
-            indexCountOps.countByField(
-                SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING);
-        boolean chunksPending = false;
-        if (resolvedConfigSupplier.get().rag().chunkVectorsEnabled()) {
-          chunksPending =
-              indexCountOps.countByField(
-                      SchemaFields.CHUNK_EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING)
-                  > 0;
-        }
-        embeddingsReady = pendingEmbeddings == 0 && !chunksPending;
-      }
-      if (embeddingsReady) {
-        StageOutcome outcome = processNerBackfill(cycleDeadlineNanos);
-        recordStageOutcome(BatchTimingKeys.NER, outcome);
-        anyActivity |= outcome.docsProcessed() > 0;
-      }
-    }
-    // SPLADE after embedding nearly completes (tempdoc 312 item 39, relaxed 334 item 37).
-    if ((spladeEncoderSupplier.get() != null || bgeM3EncoderSupplier.get() != null)
-        && stageAllowed(Stage.SPLADE)) {
-      int pendingEmbedForSplade =
-          embeddingCanProgress
-              ? indexCountOps.countByField(
-                  SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING)
-              : 0;
-      if (pendingEmbedForSplade < pacing().embeddingBackfillBatchSize()) {
-        StageOutcome outcome = processSpladeBackfill(cycleDeadlineNanos);
-        recordStageOutcome(BatchTimingKeys.SPLADE, outcome);
-        anyActivity |= outcome.docsProcessed() > 0;
-        boolean success = outcome.success();
-        if (outcome.accounting().storageFailures().isEmpty()
-        && outcome.accounting().acquisitions().stream().noneMatch(a -> !a.available())) recordSpladeBackfillResult(success);
-
-      }
-    }
-    return anyActivity;
+    densePublished.clear();
+    service.clear();
+    eligible.clear();
+    unsuccessful.clear();
+    nextLane = 0;
+    // Dirty publication state survives a profiling reset until a successful commit.
   }
 
   private boolean runDisambiguationIfReady(boolean alreadyDidWork) {
@@ -680,6 +618,7 @@ public final class BackfillScheduler {
     }
     for (Stage stage : Stage.values()) {
       if (summary.storageFailures().contains(stage)) recordBackfillResult(stage, false);
+      // Sparse success is the operation's "not systemic" result, recorded by the turn.
       else if (stage != Stage.SPLADE && summary.tickets().entrySet().stream().anyMatch(entry ->
           entry.getKey().stage() == stage && switch (entry.getValue()) {
             case PUBLISHED, COMPLETED_EMPTY, FAILED_CHARGED, REJECTED_OUTPUT -> true;
@@ -690,244 +629,50 @@ public final class BackfillScheduler {
     }
   }
 
-  private void recordSpladeBackfillResult(boolean success) {
-    recordBackfillResult(Stage.SPLADE, success);
-  }
-
-  // ==================== Backfill delegates ====================
-
-  /**
-   * Non-termination detector (round-15 post-round finding): WARNs when the combined backfill keeps
-   * selecting the IDENTICAL work-set cycle after cycle while still attempting encoder work.
-   *
-   * <p>The gap this closes is not "no diagnostic existed" but "the wrong discriminator was used".
-   * 798's WARN fires only when a budget-spending cycle advanced NOTHING; the field incident
-   * advanced 56-80 documents per cycle and never moved its queue head, so it took the healthy INFO
-   * branch 54 times in a row. Progress is therefore deliberately NOT part of this condition —
-   * work-set identity is. A draining backfill's selection changes as its head drains; a stalled
-   * one's does not, whatever its per-cycle counters say.
-   *
-   * <p>Deduplicated per episode: one WARN, not one per cycle. The episode ends when the signature
-   * changes, which re-arms it.
-   */
-  private void noteWorkSet(CombinedEnrichmentBackfillOps.CombinedOutcome outcome) {
-    long signature = outcome.workSetSignature();
-    // No selection (nothing pending), or the pass returned before any stage ran: neither is an
-    // observation about whether enrichment is draining, so neither may extend OR reset an episode.
-    if (signature == 0 || !outcome.recordTiming()) {
-      return;
-    }
-    if (signature != lastWorkSetSignature) {
-      lastWorkSetSignature = signature;
-      repeatedWorkSetCycles = 1;
-      stallWarnedThisEpisode = false;
-      return;
-    }
-    repeatedWorkSetCycles++;
-    if (repeatedWorkSetCycles >= STALL_SIGNATURE_CYCLES && !stallWarnedThisEpisode) {
-      stallWarnedThisEpisode = true;
-      log.warn(
-          "Combined enrichment backfill has selected an IDENTICAL work-set for {} consecutive"
-              + " cycles while still attempting encoder work — the queue head is not draining."
-              + " Per-cycle counters can look healthy in this state (documents ARE being encoded);"
-              + " what is not happening is documents LEAVING the pending population. The known"
-              + " cause is documents whose enrichment cannot finish inside one cycle budget"
-              + " (round-15 post-round finding). Check the combined-backfill summary line's"
-              + " windowDocsResuming= and deferredForOtherStages= counters.",
-          repeatedWorkSetCycles);
-    }
-  }
-
-  /**
-   * The composite "stop starting new enrichment work" signal handed to one combined batch (tempdoc
-   * 809 finding 3). Exactly the conditions the tight loop below breaks on, evaluated at the batch's
-   * internal sub-batch boundaries instead of only between batches — a batch is ~150 documents and
-   * was measured at ~63 s, so between-batches was a 12x overshoot of the very budget it enforced.
-   *
-   * <p>Tempdoc 885 item 3: this is also the batch's pacing tick, so the call is deliberately not
-   * side-effect-free — it may yield before answering. Foreground load left the stop set: under a
-   * duty cycle a contended batch runs slower, it does not stop. The remaining reasons are all
-   * genuine stops. Callers invoke it exactly once per sub-batch boundary.
-   */
-  private boolean paceAndCheckStopBackfillWork(long cycleDeadlineNanos) {
-    indexingPacing.pace();
-    return hardStopBackfillWork()
-        || monotonicNanos.getAsLong() >= cycleDeadlineNanos;
-  }
-
-  /** Stop reasons that must not be hidden by a first-unit scheduling floor. */
   private boolean hardStopBackfillWork() {
-    return !running.get()
-        || signalBus.isIndexingHeld()
-        || Thread.currentThread().isInterrupted()
-        || signalBus.isEnergyReduced()
-        || signalBus.hasPendingIngest();
+    return !running.get() || signalBus.isIndexingHeld()
+        || Thread.currentThread().isInterrupted() || signalBus.isEnergyReduced();
   }
 
-  private CombinedEnrichmentBackfillOps.CombinedOutcome processCombinedBackfillIfApplicable(
-      int[] batchesSinceCommit,
-      long cycleDeadlineNanos,
-      long embedShareDeadlineNanos,
-      Set<String> publishedDocIds) {
-    // BGE-M3 owns the dense/sparse pair in the individual unified pass; this combined
-    // implementation serves the separate dense, SPLADE and NER encoders only.
-    if (bgeM3EncoderSupplier.get() != null) {
-      return CombinedEnrichmentBackfillOps.CombinedOutcome.none();
-    }
-    StageAvailability available = stageAvailability();
-    int availCount = (available.embedding() ? 1 : 0) + (available.sparse() ? 1 : 0)
-        + (available.ner() ? 1 : 0);
-    // docs/tempdocs/711-rmw-preservation-and-followup-designs.md: retain combined publication
-    // protection through sparse recovery, even if encoder retirement reduces stage availability.
-    if (availCount < 2 && backoff(Stage.SPLADE).failures == 0) {
-      return CombinedEnrichmentBackfillOps.CombinedOutcome.none();
-    }
-
-    return CombinedEnrichmentBackfillOps.processCombinedBackfill(
-        backfillContext(batchesSinceCommit, cycleDeadlineNanos, embedShareDeadlineNanos,
-            publishedDocIds, false), enrichmentSelection);
-  }
-
-  private CombinedEnrichmentBackfillOps.BackfillContext backfillContext(int[] batchesSinceCommit,
-      long cycleDeadlineNanos, long embedShareDeadlineNanos, Set<String> publishedDocIds,
-      boolean individualDense) {
-    ResolvedConfig.Ai.BackfillPacing pacing = pacing();
-    return new CombinedEnrichmentBackfillOps.BackfillContext(
-            documentFieldOps,
-            indexingCoordinator,
-            commitOps,
-            indexingPacing,
-            embeddingLifecycle::embeddingProvider,
-            spladeEncoderSupplier,
-            nerServiceSupplier,
-            () -> running.get() && !signalBus.isIndexingHeld(),
-            embeddingLifecycle::allowEmbeddingWrites,
-            pacing.embeddingBackfillBatchSize(),
-            log,
-            resolvedConfigSupplier.get().rag().chunkVectorsEnabled(),
-            resolvedConfigSupplier.get().rag().chunkSpladeEnabled(),
-            !individualDense && resolvedConfigSupplier.get().ai().embedding().lateChunkingEnabled(),
-            individualDense ? pacing.embeddingBackfillBatchSize() : pacing.chunkSlotsPerBatch(),
-            new ArrayDeque<>(),
-            new ArrayDeque<>(),
-            batchesSinceCommit != null ? batchesSinceCommit : new int[] {0},
-            () -> paceAndCheckStopBackfillWork(cycleDeadlineNanos),
-            individualDense ? () -> false : this::hardStopBackfillWork,
-            () -> monotonicNanos.getAsLong() >= embedShareDeadlineNanos,
-            windowedEmbedProgress,
-            publishedDocIds,
-            () -> stageAllowed(Stage.SPLADE),
-            this::recordSpladeBackfillResult, this::unitAllowed, this::stageAllowed);
-  }
-
-  private StageOutcome processEmbeddingBackfill(long cycleDeadlineNanos) {
-    if (!stageAllowed(Stage.EMBED) || bgeM3EncoderSupplier.get() != null) return StageOutcome.none();
-    // Individual backfill keeps its ordinary/windowed artifact policy; single-pass remains combined-only.
-    return CombinedEnrichmentBackfillOps.processDenseBackfill(
-        backfillContext(null, cycleDeadlineNanos, Long.MAX_VALUE, new HashSet<>(), true),
-        enrichmentSelection, Stage.EMBED);
-  }
-
-  private StageOutcome processChunkEmbeddingBackfill(long cycleDeadlineNanos) {
-    if (!stageAllowed(Stage.CHUNK_EMBED)) return StageOutcome.none();
-    return CombinedEnrichmentBackfillOps.processDenseBackfill(
-        backfillContext(null, cycleDeadlineNanos, Long.MAX_VALUE, new HashSet<>(), true),
-        enrichmentSelection, Stage.CHUNK_EMBED);
-  }
-
-  private StageOutcome processNerBackfill(long cycleDeadlineNanos) {
-    if (!stageAllowed(Stage.NER)) return StageOutcome.none();
-    return NerBackfillOps.processNerBackfill(
-        new NerBackfillOps.BackfillContext(
-            documentFieldOps,
-            indexingCoordinator,
-            commitOps,
-            indexingPacing,
-            nerServiceSupplier,
-            () -> running.get() && !signalBus.isIndexingHeld(),
-            pacing().nerBackfillBatchSize(),
-            log, () -> {
-              NerService current = nerServiceSupplier.get();
-              return monotonicNanos.getAsLong() < cycleDeadlineNanos
-                  && unitAllowed(current != null && LoopPacingPolicy.requiresGpu(
-                      current.isGpuAvailable(), current.getOrtCudaStatus()));
-            }), enrichmentSelection);
-  }
-
-  /**
-   * Whether chunk documents are SPLADE work at all (tempdoc 712 {@code rag.chunk_splade.enabled}).
-   *
-   * <p>Flag off, no lane may select a chunk on {@code splade_status}: chunks written during an
-   * earlier flag-on window still carry PENDING ({@code ChunkDocumentWriter} omits the field
-   * entirely while the flag is off), so a lane that ignores this flag encodes sparse data
-   * the configuration says not to produce, and the chunk-sparse retrieval leg
-   * ({@code SearchExecutor#chunkMerge}) then scores against a population that depends on how far
-   * backfill happened to get.
-   */
   private boolean chunkSpladeEnabled() {
     return resolvedConfigSupplier.get().rag().chunkSpladeEnabled();
   }
 
-  private StageOutcome processSpladeBackfill(long cycleDeadlineNanos) {
-    if (!stageAllowed(Stage.SPLADE)) return StageOutcome.none();
-    BgeM3Encoder bge = bgeM3EncoderSupplier.get();
-    if (bge != null) {
-      return BgeM3BackfillOps.processBgeM3Backfill(
-          new BgeM3BackfillOps.BackfillContext(
-              documentFieldOps,
-              indexingCoordinator,
-              commitOps,
-              signalBus,
-              bgeM3EncoderSupplier,
-              () -> running.get() && !signalBus.isIndexingHeld(),
-              pacing().bgeM3BackfillBatchSize(),
-              true,
-              chunkSpladeEnabled(),
-              log, () -> monotonicNanos.getAsLong() < cycleDeadlineNanos && sparseUnitAllowed()), enrichmentSelection);
-    }
-    return SpladeBackfillOps.processSpladeBackfill(
-        new SpladeBackfillOps.BackfillContext(
-            documentFieldOps,
-            indexingCoordinator,
-            commitOps,
-            indexingPacing,
-            spladeEncoderSupplier,
-            () -> running.get() && !signalBus.isIndexingHeld(),
-            pacing().spladeBackfillBatchSize(),
-            true,
-            chunkSpladeEnabled(),
-            log, () -> monotonicNanos.getAsLong() < cycleDeadlineNanos && sparseUnitAllowed()), enrichmentSelection);
-  }
-
-  private StageOutcome processSpladeBackfillInterleaved() {
-    if (!stageAllowed(Stage.SPLADE)) return StageOutcome.none();
-    BgeM3Encoder bge = bgeM3EncoderSupplier.get();
-    if (bge != null) {
-      return BgeM3BackfillOps.processBgeM3Backfill(
-          new BgeM3BackfillOps.BackfillContext(
-              documentFieldOps,
-              indexingCoordinator,
-              commitOps,
-              signalBus,
-              bgeM3EncoderSupplier,
-              () -> running.get() && !signalBus.isIndexingHeld(),
-              pacing().bgeM3InterleaveBatchSize(),
-              false,
-              chunkSpladeEnabled(),
-              log, this::sparseUnitAllowed), enrichmentSelection);
-    }
-    return SpladeBackfillOps.processSpladeBackfill(
-        new SpladeBackfillOps.BackfillContext(
-            documentFieldOps,
-            indexingCoordinator,
-            commitOps,
-            indexingPacing,
-            spladeEncoderSupplier,
-            () -> running.get() && !signalBus.isIndexingHeld(),
-            pacing().spladeInterleaveBatchSize(),
-            false,
-            chunkSpladeEnabled(),
-            log, this::sparseUnitAllowed), enrichmentSelection);
+  private StageOutcome processLane(Lane lane, boolean busy, long deadline) {
+    int cap = busy ? pacing().enrichmentInterleaveBatchSize() : pacing().embeddingBackfillBatchSize();
+    return switch (lane) {
+      case DENSE_PARENT, DENSE_CHUNK -> CombinedEnrichmentBackfillOps.processDenseUnit(
+          new CombinedEnrichmentBackfillOps.BackfillContext(documentFieldOps, indexingCoordinator,
+              commitOps, indexingPacing, embeddingLifecycle::embeddingProvider, () -> null, () -> null,
+              () -> !hardStopBackfillWork(), embeddingLifecycle::allowEmbeddingWrites, cap, log,
+              resolvedConfigSupplier.get().rag().chunkVectorsEnabled(), false,
+              resolvedConfigSupplier.get().ai().embedding().lateChunkingEnabled(),
+              busy ? cap : pacing().chunkSlotsPerBatch(), new ArrayDeque<>(), new ArrayDeque<>(),
+              new int[] {0}, () -> hardStopBackfillWork() || monotonicNanos.getAsLong() >= deadline,
+              this::hardStopBackfillWork, () -> false, windowedEmbedProgress, densePublished,
+              () -> false, success -> {}, this::unitAllowed, this::stageAllowed),
+          enrichmentSelection, lane == Lane.DENSE_PARENT ? Stage.EMBED : Stage.CHUNK_EMBED);
+      case SPARSE_PARENT, SPARSE_CHUNK -> {
+        var context = new SpladeBackfillOps.BackfillContext(documentFieldOps, indexingCoordinator,
+            commitOps, indexingPacing, spladeEncoderSupplier, () -> !hardStopBackfillWork(),
+            busy ? cap : pacing().spladeBackfillBatchSize(), false, chunkSpladeEnabled(), log,
+            () -> monotonicNanos.getAsLong() < deadline && sparseUnitAllowed());
+        yield lane == Lane.SPARSE_PARENT
+            ? SpladeBackfillOps.processParentBackfill(context, enrichmentSelection)
+            : SpladeBackfillOps.processChunkBackfill(context, enrichmentSelection);
+      }
+      case NER -> NerBackfillOps.processNerUnit(new NerBackfillOps.BackfillContext(
+          documentFieldOps, indexingCoordinator, commitOps, indexingPacing, nerServiceSupplier,
+          () -> !hardStopBackfillWork(), 1, log,
+          () -> monotonicNanos.getAsLong() < deadline && unitAllowed(nerServiceSupplier.get() != null
+              && LoopPacingPolicy.requiresGpu(nerServiceSupplier.get().isGpuAvailable(),
+                  nerServiceSupplier.get().getOrtCudaStatus()))), enrichmentSelection);
+      case BGE_M3 -> BgeM3BackfillOps.processBgeM3Backfill(new BgeM3BackfillOps.BackfillContext(
+          documentFieldOps, indexingCoordinator, commitOps, signalBus, bgeM3EncoderSupplier,
+          () -> !hardStopBackfillWork(), busy ? pacing().bgeM3InterleaveBatchSize()
+              : pacing().bgeM3BackfillBatchSize(), false, chunkSpladeEnabled(), log,
+          () -> monotonicNanos.getAsLong() < deadline && sparseUnitAllowed()), enrichmentSelection);
+    };
   }
 
   private boolean processDisambiguationBackfill() {

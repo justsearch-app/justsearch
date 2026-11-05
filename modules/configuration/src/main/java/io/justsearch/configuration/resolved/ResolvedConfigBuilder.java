@@ -711,6 +711,24 @@ public final class ResolvedConfigBuilder {
       resolvedKeys.add(key);
     }
     TreeMap<Integer, SourceEntry> sources = entries.get(key);
+    if (key.equals("justsearch.backfill.enrichment_interleave_batch_size")
+        || key.equals("justsearch.backfill.enrichment_interleave_interval_ms")) {
+      // E4b: the legacy SPLADE names are aliases. Both names' sources join one ordinal chain
+      // before parsing; at equal ordinals a non-blank canonical value wins.
+      String legacy = key.replace("enrichment_interleave_", "splade_interleave_");
+      if (buildPhaseActive) resolvedKeys.add(legacy);
+      var merged = new TreeMap<Integer, SourceEntry>(Comparator.reverseOrder());
+      if (entries.get(legacy) != null) merged.putAll(entries.get(legacy));
+      if (sources != null) {
+        sources.forEach((ordinal, entry) -> {
+          SourceEntry aliased = merged.get(ordinal);
+          if (aliased == null || (entry.rawValue() != null && !entry.rawValue().isBlank())) {
+            merged.put(ordinal, entry);
+          }
+        });
+      }
+      sources = merged;
+    }
     if (sources == null || sources.isEmpty()) {
       return new ConfigResolution(key, null, "none", 0, null, List.of());
     }
@@ -1161,6 +1179,25 @@ public final class ResolvedConfigBuilder {
   }
 
   /**
+   * Resolves an enrichment interleave setting across its canonical and legacy names (see {@link
+   * #resolve}), then parses the winner. A malformed, out-of-range or overflowing winner yields
+   * the default; it does not fall back to a lower-priority source.
+   */
+  private long resolveEnrichmentInterleave(String suffix, long fallback, long minimum, long maximum) {
+    String key = "justsearch.backfill.enrichment_interleave_" + suffix;
+    var winner = resolve(key);
+    if (winner.value() == null) return fallback;
+    try {
+      long value = Long.parseLong(winner.value().trim());
+      if (value >= minimum && value <= maximum) return value;
+    } catch (NumberFormatException malformed) {
+      // Defaulted below.
+    }
+    LOG.debug("Invalid value for '{}': '{}', using default {}", key, winner.value(), fallback);
+    return fallback;
+  }
+
+  /**
    * Builds {@link ResolvedConfig.Ai.BackfillPacing} from the {@code justsearch.backfill.*} config
    * surface (tempdoc 710 Wave-1.5 Move 4). Defaults are byte-identical to the pre-Move-4 literals
    * in {@code LoopPacingPolicy} / {@code BackfillScheduler} / {@code
@@ -1174,8 +1211,10 @@ public final class ResolvedConfigBuilder {
         resolveInt("justsearch.backfill.ner_batch_size", 100),
         resolveInt("justsearch.backfill.disambiguation_batch_size", 500),
         resolveInt("justsearch.backfill.splade_batch_size", 200),
-        resolveInt("justsearch.backfill.splade_interleave_batch_size", 10),
-        resolveLong("justsearch.backfill.splade_interleave_interval_ms", 5_000L),
+        // A count cap of at least one document per busy lane turn.
+        (int) resolveEnrichmentInterleave("batch_size", 10, 1, Integer.MAX_VALUE),
+        // Zero admits a busy turn on every primary-indexing iteration.
+        resolveEnrichmentInterleave("interval_ms", 5_000L, 0, Long.MAX_VALUE),
         resolveLong("justsearch.backfill.commit_interval_ms", 10_000L),
         resolveInt("justsearch.backfill.max_docs_before_commit", 1000),
         resolveInt("justsearch.backfill.chunk_slots_per_batch", 50),

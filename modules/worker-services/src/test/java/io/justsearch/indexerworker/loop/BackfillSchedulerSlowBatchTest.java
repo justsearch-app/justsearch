@@ -2,6 +2,7 @@
 package io.justsearch.indexerworker.loop;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -378,8 +379,8 @@ class BackfillSchedulerSlowBatchTest {
                 defaults.nerBackfillBatchSize(),
                 defaults.disambiguationBackfillBatchSize(),
                 defaults.spladeBackfillBatchSize(),
-                defaults.spladeInterleaveBatchSize(),
-                defaults.spladeInterleaveIntervalMs(),
+                defaults.enrichmentInterleaveBatchSize(),
+                defaults.enrichmentInterleaveIntervalMs(),
                 defaults.commitIntervalMs(),
                 defaults.maxDocsBeforeCommit(),
                 0,
@@ -616,13 +617,15 @@ class BackfillSchedulerSlowBatchTest {
   @DisplayName("the budget-trip WARN still fires when a slow cycle advances nothing")
   void budgetTripWithNoProgress_stillLogsTheWarn() {
     embedMsPerDoc = 0;
-    modeledNanosPerEncode = SLICE_MS * 1_000_000L;
-    blankContentDocs = EMBED_SLICE; // write-but-never-advance documents
-    embedReturnsNull = true; // the encoder runs but serves nothing usable
+    // E4b: a lane that returns without advancing is not offered again that cycle, so the budget
+    // is spent here by one non-advancing unit that overruns it. Advancement is now a published,
+    // charged or terminal row or retained progress (D8); a unit whose every row the writer
+    // rejects as stale advances nothing.
+    modeledNanosPerEncode = (CYCLE_BUDGET_MS + SLICE_MS) * 1_000_000L;
 
     lenient().when(indexingCoordinator.updateDocumentsBatch(anyList())).thenAnswer(call -> {
       List<?> updates = call.getArgument(0);
-      return new LuceneRuntimeTypes.BatchUpdateResult(1, updates.size() - 1);
+      return new LuceneRuntimeTypes.BatchUpdateResult(0, updates.size());
     });
     timeIdleCycle(scheduler(monotonicNanos::get));
     assertTrue(monotonicNanos.get() >= CYCLE_BUDGET_MS * 1_000_000L);
@@ -660,7 +663,7 @@ class BackfillSchedulerSlowBatchTest {
 
   @ParameterizedTest
   @ValueSource(longs = {2_999_999_999L, 3_000_000_000L, 3_000_000_001L})
-  void embedShareBeforeAtAndAfter_reservesTimeForPendingNer(long encodeNanos) {
+  void expensiveDenseTurnHandsTheNextTurnToPendingNer(long encodeNanos) {
     embedMsPerDoc = 0;
     modeledNanosPerEncode = encodeNanos;
     nerPending = true;
@@ -680,19 +683,24 @@ class BackfillSchedulerSlowBatchTest {
       return java.util.Collections.nCopies(texts.size(), new float[] {0.1f, 0.2f});
     }).when(embeddingProvider).embedDocumentBatch(anyList());
     timeIdleCycle(scheduler(monotonicNanos::get));
-    assertEquals(encodeNanos < 3_000_000_000L ? 2 : 1, embedCalls.get());
-    assertEquals(1, nerCalls.get(), "the soft reservation must leave the later stage runnable");
+    // E4b replaced the absolute three-second dense reservation with the service ledger: before,
+    // at and after the old boundary, the charged dense turn hands the next turn to NER.
+    assertEquals(1, embedCalls.get());
+    assertEquals(1, nerCalls.get(), "the lane owed service must get the next turn");
     assertTrue(monotonicNanos.get() < 5_000_000_000L,
         "pending ingest, rather than the cycle budget, ends the tight loop");
   }
 
   /**
-   * An individual retry publishes one document against its own one-entry input snapshot
-   * ({@code EnrichmentBatch.update}); combined batches publish against the whole batch's inputs.
+   * No per-document fallback ran. E4b lanes publish one-document NER units and one-document final
+   * pages by design, so the one-row publication shape no longer identifies a fallback; the
+   * per-document encoder calls and the individual conditional update do.
    */
   private void assertNoIndividualPublication() {
-    verify(indexingCoordinator, never()).publishEnrichmentBatch(
-        argThat(updates -> updates.size() == 1), argThat(inputs -> inputs.size() == 1));
+    assertDoesNotThrow(() -> {
+      verify(embeddingProvider, never()).embedDocument(anyString(), any());
+      if (sparseEncoder != null) verify(sparseEncoder, never()).encode(anyString(), any());
+    });
     verify(indexingCoordinator, never()).updateDocumentIf(
         anyString(), any(DocumentFieldOps.EnrichmentInput.class), any());
   }
@@ -957,10 +965,13 @@ class BackfillSchedulerSlowBatchTest {
     BackfillScheduler scheduler = scheduler(monotonicNanos::get);
     if (encoderRetires) sparseEncoder = null;
     else {
-      var failure = BackfillScheduler.class.getDeclaredMethod("recordSpladeBackfillResult", boolean.class);
+      var failure = BackfillScheduler.class.getDeclaredMethod("recordBackfillResult",
+          io.justsearch.indexerworker.loop.ops.EnrichmentAccounting.Stage.class, boolean.class);
       failure.setAccessible(true);
       // Keep the hold beyond this modeled cycle, as the previous infinite deadline did.
-      for (int count = 0; count < 6; count++) failure.invoke(scheduler, false);
+      for (int count = 0; count < 6; count++) {
+        failure.invoke(scheduler, io.justsearch.indexerworker.loop.ops.EnrichmentAccounting.Stage.SPLADE, false);
+      }
     }
     timeIdleCycle(scheduler);
     assertEquals("COMPLETED", state.get("doc").get(SchemaFields.EMBEDDING_STATUS));
@@ -994,7 +1005,7 @@ class BackfillSchedulerSlowBatchTest {
     assertFalse(state.get("doc").containsKey(SchemaFields.SPLADE_RETRY_COUNT));
     int callsBeforeBackoff = calls.get();
     assertTrue(callsBeforeBackoff > 0);
-    scheduler.runInterleavedSplade(System.currentTimeMillis());
+    scheduler.runInterleavedEnrichment(System.currentTimeMillis());
     timeIdleCycle(scheduler);
     assertEquals(callsBeforeBackoff, calls.get(), "combined and interleaved paths share backoff");
     assertFalse(state.get("doc").containsKey(SchemaFields.SPLADE_RETRY_COUNT));

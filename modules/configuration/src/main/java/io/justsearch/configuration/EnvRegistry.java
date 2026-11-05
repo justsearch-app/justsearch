@@ -677,8 +677,28 @@ public enum EnvRegistry {
         "justsearch.backfill.splade_batch_size", "JUSTSEARCH_BACKFILL_SPLADE_BATCH_SIZE", "200", LifecycleStage.PERMANENT),
 
     /**
-     * Doc-count per SPLADE batch interleaved into primary indexing (default 10 — tempdoc 278
-     * Phase 4c; smaller than the idle-branch batch so interleaving stays cheap).
+     * Document count cap of one busy enrichment lane turn during primary indexing (default 10).
+     * A count cap, not a time quantum. Legacy alias: {@link #BACKFILL_SPLADE_INTERLEAVE_BATCH_SIZE};
+     * both names join one source-priority chain and the canonical name wins at equal priority.
+     */
+    BACKFILL_ENRICHMENT_INTERLEAVE_BATCH_SIZE(
+        "justsearch.backfill.enrichment_interleave_batch_size",
+        "JUSTSEARCH_BACKFILL_ENRICHMENT_INTERLEAVE_BATCH_SIZE",
+        "10", LifecycleStage.PERMANENT),
+
+    /**
+     * Minimum time (ms) between busy enrichment turns during primary indexing (default 5000; 0
+     * admits a turn every primary iteration). Legacy alias:
+     * {@link #BACKFILL_SPLADE_INTERLEAVE_INTERVAL_MS}, resolved as for the batch size.
+     */
+    BACKFILL_ENRICHMENT_INTERLEAVE_INTERVAL_MS(
+        "justsearch.backfill.enrichment_interleave_interval_ms",
+        "JUSTSEARCH_BACKFILL_ENRICHMENT_INTERLEAVE_INTERVAL_MS",
+        "5000", LifecycleStage.PERMANENT),
+
+    /**
+     * Legacy alias of {@link #BACKFILL_ENRICHMENT_INTERLEAVE_BATCH_SIZE} (E4b): its value still
+     * applies, now to every busy enrichment lane, not only SPLADE.
      */
     BACKFILL_SPLADE_INTERLEAVE_BATCH_SIZE(
         "justsearch.backfill.splade_interleave_batch_size",
@@ -686,21 +706,15 @@ public enum EnvRegistry {
         "10", LifecycleStage.PERMANENT),
 
     /**
-     * Minimum time (ms) between interleaved SPLADE/BGE-M3 batches during primary indexing
-     * (default 5000 — tempdoc 278 Phase 4a; time-gated to limit primary-indexing overhead to
-     * ~13%).
+     * Legacy alias of {@link #BACKFILL_ENRICHMENT_INTERLEAVE_INTERVAL_MS} (E4b): its value still
+     * applies, now to every busy enrichment turn, not only SPLADE/BGE-M3.
      */
     BACKFILL_SPLADE_INTERLEAVE_INTERVAL_MS(
         "justsearch.backfill.splade_interleave_interval_ms",
         "JUSTSEARCH_BACKFILL_SPLADE_INTERLEAVE_INTERVAL_MS",
         "5000", LifecycleStage.PERMANENT),
 
-    /**
-     * Time-based commit trigger interval in ms (default 10000). Despite the {@code backfill.} key,
-     * this is read by {@code LoopPacingPolicy.isTimeCommitTriggered} for the PRIMARY indexing loop;
-     * no backfill op reads it (tempdoc 912 §E — the mislabelling is what led 885's A3 arm to
-     * believe it had relaxed backfill commits when it had relaxed none).
-     */
+    /** Time-based Lucene commit threshold for primary indexing and enrichment (default 10000 ms). */
     BACKFILL_COMMIT_INTERVAL_MS(
         "justsearch.backfill.commit_interval_ms",
         "JUSTSEARCH_BACKFILL_COMMIT_INTERVAL_MS",

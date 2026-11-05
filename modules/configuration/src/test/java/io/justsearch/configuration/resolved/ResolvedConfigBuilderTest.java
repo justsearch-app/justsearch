@@ -623,12 +623,12 @@ final class ResolvedConfigBuilderTest {
       assertEquals(200, pacing.spladeBackfillBatchSize());
       assertEquals(
           Integer.parseInt(EnvRegistry.BACKFILL_SPLADE_INTERLEAVE_BATCH_SIZE.defaultValue()),
-          pacing.spladeInterleaveBatchSize());
-      assertEquals(10, pacing.spladeInterleaveBatchSize());
+          pacing.enrichmentInterleaveBatchSize());
+      assertEquals(10, pacing.enrichmentInterleaveBatchSize());
       assertEquals(
           Long.parseLong(EnvRegistry.BACKFILL_SPLADE_INTERLEAVE_INTERVAL_MS.defaultValue()),
-          pacing.spladeInterleaveIntervalMs());
-      assertEquals(5_000L, pacing.spladeInterleaveIntervalMs());
+          pacing.enrichmentInterleaveIntervalMs());
+      assertEquals(5_000L, pacing.enrichmentInterleaveIntervalMs());
       assertEquals(
           Long.parseLong(EnvRegistry.BACKFILL_COMMIT_INTERVAL_MS.defaultValue()),
           pacing.commitIntervalMs());

@@ -52,7 +52,7 @@ public final class NerBackfillOps {
   public static StageOutcome processNerUnit(BackfillContext source, EnrichmentSelection selection) {
     return processNerBackfill(new BackfillContext(source.documentFieldOps(), source.indexingCoordinator(),
         source.commitOps(), source.pacing(), source.nerServiceSupplier(), source.runningSupplier(),
-        1, source.log(), source.unitAllowed()), selection);
+        1, source.log(), source.unitAllowed()), selection, false);
   }
 
   /**
@@ -67,6 +67,11 @@ public final class NerBackfillOps {
 
   public static StageOutcome processNerBackfill(
       BackfillContext context, EnrichmentSelection selection) {
+    return processNerBackfill(context, selection, true);
+  }
+
+  private static StageOutcome processNerBackfill(BackfillContext context,
+      EnrichmentSelection selection, boolean commit) {
     if (selection != null) selection.begin();
     var authority = context.indexingCoordinator().enrichmentAuthority();
     NerService selectedService = context.nerServiceSupplier().get();
@@ -188,7 +193,7 @@ public final class NerBackfillOps {
 
       batch.rejectRetiredOutcomes();
       if (processed > 0 || failed > 0) {
-        context
+        if (commit) context
             .commitOps()
             .commitAndTrack(io.justsearch.adapters.lucene.runtime.CommitReason.BACKFILL_NER);
         context
