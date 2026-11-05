@@ -423,12 +423,11 @@ The brief's adopted scenarios are quoted below. Evidence is emitted only by run-
         "modules/app-api/src/test/java/io/justsearch/app/api/operations/BulkRefusalExplanationTest.java",
         "modules/app-services/src/test/java/io/justsearch/app/services/vdu/PictureReadingCoordinatorTest.java",
         "modules/ui/src/test/java/io/justsearch/ui/api/OfflineProcessingOperationLifecycleIntegrationTest.java",
-        "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts",
         "modules/ui-web/src/shell-v0/views/BulkOperationImmediateRefusal.test.ts"
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Repair round 2: picture-Off refuses before dispatch with Picture reading is off, stable PICTURE_READING_OFF and retryable false; a fence arriving during indexing-hold acquisition completes with the same refusal. Exercise real coordinator and handler, loopback HTTP controller, durable runner/store and read-time outcome. Library renders the refusal from its real operation button; both AI Brain picture presentations state the unknown saved choice after settings quarantine. The seven final checks pass on the candidate and fail by assertion on the rebased round-1 head c1918ffb47. This evidence covers these changed checks only; it does not establish full-suite or real-GPU preservation.",
+      "behaviour": "Repair round 2: picture-Off refuses before dispatch with Picture reading is off, stable PICTURE_READING_OFF and retryable false; a fence arriving during indexing-hold acquisition completes with the same refusal. Exercise real coordinator and handler, loopback HTTP controller, durable runner/store and read-time outcome. Library renders the refusal from its real operation button. The six final checks pass on the candidate and fail by assertion on the rebased round-1 head c1918ffb47. This evidence covers these changed checks only; it does not establish full-suite or real-GPU preservation.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -467,7 +466,6 @@ The brief's adopted scenarios are quoted below. Evidence is emitted only by run-
         "modules/app-services/src/test/java/io/justsearch/app/services/vdu/PictureReadingCoordinatorTest.java#offWithdrawsAnExplicitWaitWithoutResumingTheIndexingPolicy",
         "modules/ui/src/test/java/io/justsearch/ui/api/OfflineProcessingOperationLifecycleIntegrationTest.java#pictureOffRefusesHttpAndRecordsTheReasonWithoutStartingWork",
         "modules/ui/src/test/java/io/justsearch/ui/api/OfflineProcessingOperationLifecycleIntegrationTest.java#pictureOffDuringStartCompletesWithTheSameRecordedRefusal",
-        "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts#shows the unknown saved choice in both places after settings quarantine",
         "modules/ui-web/src/shell-v0/views/BulkOperationImmediateRefusal.test.ts#Library shows the picture-off refusal from Process pending work in plain words"
       ]
     },
@@ -551,6 +549,65 @@ The brief's adopted scenarios are quoted below. Evidence is emitted only by run-
       "evidence": "gates/test-intent/evidence/s2-picture-switch-profile-choice-preservation.json",
       "newChecks": [
         "modules/app-services/src/test/java/io/justsearch/app/services/chat/PictureReadingProfileRepairTest.java#profileAndReconfigureBuildersKeepTheNullablePictureChoice"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Bounded page repair: both quarantined-choice switches are unchecked and disabled, the unknown-choice sentence ends with one period, and a saved Off choice omits yet. These three checks fail by assertion before 7732f5cd3e and pass after. Prior interruption checks retain their separate evidence and baseline.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "V1",
+          "quote": "After install, Text in scans and images has a live switch. Off: no new picture work starts (automatic or manual), unfinished pictures return to waiting without using up retries, the managed answer server runs without the picture file; files and already read text are kept; the page says \"Off - files and read text kept\". On: picture reading resumes waiting work only (no rereading of already processed files). Works whether answers are on or off.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "N2",
+          "quote": "Saved settings keep their meaning across the stored settings schema change (stored schema 8 today -> 9; public API v2): existing installs load with no explicit choice (today's behaviour: picture reading on when its file is present), older settings versions migrate, corrupt settings are quarantined as today; declinedAiPackages stays acquisition preference only.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "Repair picture switch presentation when the saved choice is unknown or Off.",
+          "choice": "Render both unknown-choice picture switches unchecked and disabled with the existing reason; end the unknown-choice sentence with one period. Omit yet for the saved Off choice and retain existing wording for missing files and uninstalled AI.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s2-picture-switch-page-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts#shows the unknown saved choice in both places after settings quarantine",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts#ends the unknown picture choice sentence with one period",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts#omits yet from the picture sentence when the saved choice is Off"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts"
+      ],
+      "class": "New",
+      "repaired": false,
+      "behaviour": "Preservation: with no saved Off choice and files not downloaded, the rendered picture sentence retains yet. The same assertion passes at 7732f5cd3e.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "V1",
+          "quote": "After install, Text in scans and images has a live switch. Off: no new picture work starts (automatic or manual), unfinished pictures return to waiting without using up retries, the managed answer server runs without the picture file; files and already read text are kept; the page says \"Off - files and read text kept\". On: picture reading resumes waiting work only (no rereading of already processed files). Works whether answers are on or off.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s2-picture-switch-page-preservation.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts#keeps yet in the picture sentence when files have not been downloaded"
       ]
     }
   ]
@@ -736,3 +793,24 @@ Evidence was generated by the unmodified runner. A temporary Git adapter allocat
   "note": "Acceptance by independent verifier session verifier-s2v-acc2 (Codex): accept, no must-fix. Transcribed by the orchestrator."
 }
 ```
+
+## Bounded page repair after live verification
+
+Only BrainSurface.ts and its picture-switch tests change application behavior: an unknown saved choice renders both switches unchecked and disabled with the existing reason; its sentence has one final period; a saved Off choice omits "yet". Missing-download wording is preserved. The admission/publication and projector-configuration route inventories above are unchanged by this page-only repair.
+
+The shared before clone at 7732f5cd3e executes all 13 final page checks: the three repair assertions fail on the reported rendered values, while the other ten pass. All 13 pass after repair. The new repair evidence uses --before 7732f5cd3e; the existing three interruption checks are regenerated against their original 0466d6521e baseline because their test-file digest changed. Their named assertions still fail before and pass after. Missing-download wording has separate preservation evidence. All assertions in this page test file were reviewed for production-sensitive observations; the new assertions inspect rendered controls and sentence text, with no fixture-only oracle.
+
+Evidence was emitted by the unmodified run-evidence.mjs. Its temporary Git adapter allocates before states as shared clones inside the supplied temporary folder, with copied dependencies and separate build folders; it does not register source-repository worktrees. Shared resources touched: the assigned checkout's frontend dependencies/caches and test-owned loopback servers during the full UI suite. No owner application, dev stack, GPU, Gradle or CI runner was used. No .agents/preflight exists. No fetch, rebase, commit, push or acceptance-record write was performed.
+
+| Check | Observed result |
+| --- | --- |
+| ui-web lint; typecheck | Both passed. |
+| test:unit:run --maxWorkers=4 | 699 files, 8,887 tests passed. |
+| run-ui-web-gates.mjs | 31/31 passed. |
+| knip:report; dead-code gate | Report emitted; gate passed, six findings. |
+| run-evidence.mjs, page repair and prior interruption repair | All six named checks passed after and failed by assertion before their respective baselines. |
+| run-evidence.mjs, missing-download preservation | Passed; also passed in the 7732f5cd3e before clone. |
+| test-intent cli | Only acceptance-stale: the existing acceptance needs the independent acceptor's review of the new digest. |
+| git diff --check | Passed. |
+
+Independent verification and renewed test-intent acceptance remain with the orchestrator.

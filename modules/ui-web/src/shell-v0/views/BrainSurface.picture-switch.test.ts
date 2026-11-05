@@ -95,6 +95,7 @@ describe('picture reading live switch', () => {
     const reason = 'Saved picture reading choice is not known. Refresh settings before changing it.';
     expect(switches(el)).toHaveLength(2);
     expect(switches(el).map(b => b.getAttribute('aria-disabled'))).toEqual(['true', 'true']);
+    expect(switches(el).map(b => b.getAttribute('aria-checked'))).toEqual(['false', 'false']);
     for (const selector of ['.brain-sentence', '[data-feature="pictures"]']) {
       const place = el.shadowRoot!.querySelector(selector)!;
       expect(place.textContent).toContain(reason);
@@ -106,6 +107,31 @@ describe('picture reading live switch', () => {
     }
     switches(el)[0]!.click(); await settle(el);
     expect(posts).toEqual([]);
+  });
+
+  it('ends the unknown picture choice sentence with one period', async () => {
+    settingsQuarantined = true;
+    const el = await mount();
+    const phrase = el.shadowRoot!.querySelector('.brain-sentence .feature-phrase[aria-controls="brain-feature-panel-pictures"]');
+    expect(phrase?.textContent).toBe('Saved picture reading choice is not known. Refresh settings before changing it.');
+  });
+
+  it('omits yet from the picture sentence when the saved choice is Off', async () => {
+    enabled = false; emit(false);
+    const el = await mount();
+    const phrase = el.shadowRoot!.querySelector('.brain-sentence .feature-phrase[aria-controls="brain-feature-panel-pictures"]');
+    expect(phrase?.textContent).toBe("It doesn't read text in scans and images.");
+    expect(switches(el).map(b => b.getAttribute('aria-checked'))).toEqual(['false', 'false']);
+  });
+
+  it('keeps yet in the picture sentence when files have not been downloaded', async () => {
+    emit(false);
+    preview = { totalDownloadBytes: 1024, components: [
+      { id: 'chat', label: 'Answer model', state: 'to-download', totalBytes: 1024, downloadBytes: 1024 },
+    ] };
+    const el = await mount();
+    const phrase = el.shadowRoot!.querySelector('.brain-sentence .feature-phrase[aria-controls="brain-feature-panel-pictures"]');
+    expect(phrase?.textContent).toBe("It doesn't read text in scans and images yet.");
   });
 
   it('reconciles an interrupted delivery with an unchanged witness using the original attempt', async () => {

@@ -1487,7 +1487,7 @@ export class BrainSurface extends JfElement {
       ?? this.planPreview?.components?.find(c => c.id === 'chat')?.state === 'installed';
     const pictureMismatch = mmproj === true && pictureChoice === false && this.pictureApplied === null;
     features.pictures = {
-      id: 'pictures', label: 'Text in scans and images', selected: pictureMismatch || pictureChoice,
+      id: 'pictures', label: 'Text in scans and images', selected: this.settingsRead && !!this.rerankerSettings?.witness && (pictureMismatch || pictureChoice),
       installed: features.chat.installed, active: this.pictureApplied ?? mmproj,
       availability: features.chat.availability,
       state: !live ? 'Unknown — checking AI status' : !installed ? features.chat.availability === 'unavailable'
@@ -1516,9 +1516,12 @@ export class BrainSurface extends JfElement {
 
   private renderBrainSentence(verdict: AiEngineVerdict, installed: boolean, features: Record<BrainFeatureId, BrainFeature>, readingPictures: boolean | null): TemplateResult {
     const parts = composeBrainSentence(verdict, installed, features, readingPictures, this.aiKnown());
-    if (features.pictures.state === PICTURE_CHOICE_UNKNOWN) {
-      const picturePart = parts.find(part => part.feature === 'pictures');
-      if (picturePart) picturePart.text = `. ${PICTURE_CHOICE_UNKNOWN}`;
+    const picturePart = parts.find(part => part.feature === 'pictures');
+    if (picturePart && features.pictures.state === PICTURE_CHOICE_UNKNOWN) {
+      picturePart.text = `. ${PICTURE_CHOICE_UNKNOWN.slice(0, -1)}`;
+    } else if (picturePart && installed && this.rerankerSettings?.pictureReadingEnabled === false
+        && features.pictures.state === 'Off - files and read text kept') {
+      picturePart.text = ". It doesn't read text in scans and images";
     }
     for (let i = 1; i < parts.length; ++i) {
       const punctuation = parts[i]!.text.match(/^[.,]/)?.[0];
