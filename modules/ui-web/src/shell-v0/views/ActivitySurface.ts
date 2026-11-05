@@ -33,11 +33,12 @@ import '../components/ResourceView.js';
 import '../components/ActionLedgerView.js';
 import '../components/Button.js';
 import '../components/EffectLine.js';
-import { listJournalByOriginator, previewUndoAllByOriginator, undoAllByOriginator, subscribeJournal,
+import { listJournalByOriginator, previewUndoAllByOriginator, undoEntries, subscribeJournal,
   type JournalEntry } from '../substrates/effects/index.js';
 import { applyEffect } from '../substrates/actions/index.js';
 import { defineMacroFromEffects } from '../substrates/macros/index.js';
 import { getSeenCursor } from '../substrates/recall/recallCursor.js';
+import { listOpenReversals, subscribeReversals } from '../state/ownReversals.js';
 
 export class ActivitySurface extends JfElement {
   static properties = {
@@ -48,6 +49,7 @@ export class ActivitySurface extends JfElement {
   declare apiBase: string;
   declare undoPreview: readonly JournalEntry[];
   private stopJournal: (() => void) | undefined;
+  private stopReversals: (() => void) | undefined;
 
   constructor() {
     super();
@@ -58,17 +60,35 @@ export class ActivitySurface extends JfElement {
   override connectedCallback(): void {
     super.connectedCallback();
     this.stopJournal = subscribeJournal(() => this.requestUpdate());
+    this.stopReversals = subscribeReversals(() => this.requestUpdate());
   }
   override disconnectedCallback(): void {
     this.stopJournal?.(); this.stopJournal = undefined;
+    this.stopReversals?.(); this.stopReversals = undefined;
     super.disconnectedCallback();
   }
 
+  /** DE6 — runs exactly the previewed set (nothing that arrived since), once, and says what was not undone. */
   private confirmUndo(): void {
+    const previewed = this.undoPreview;
     this.undoPreview = [];
-    const count = undoAllByOriginator('agent', applyEffect);
-    applyEffect({ kind: 'toast', message: count ? `Undid ${count} AI action${count === 1 ? '' : 's'}` : 'Nothing to undo', severity: 'info' });
+    if (!previewed.length) return;
+    const { reversed, skipped } = undoEntries(previewed, applyEffect);
+    applyEffect({ kind: 'toast', severity: skipped.length ? 'warning' : 'info',
+      message: `${reversed ? `Undid ${reversed} AI action${reversed === 1 ? '' : 's'}` : 'Nothing was undone'}${skipped.length
+        ? `; ${skipped.length} could no longer be undone` : ''}` });
   }
+  /** DE6 — your own recent actions that can still be reversed in this window, with their reversal. */
+  private renderOwnReversals(): TemplateResult | typeof nothing {
+    const open = listOpenReversals();
+    if (!open.length) return nothing;
+    return html`<section class="own-reversals" aria-label="You can still undo" data-testid="activity-own-reversals">
+      <div class="section-label">You can still undo</div>
+      <ul>${open.map(offer => html`<li><span>${offer.message}</span>
+        <jf-button size="sm" .onActivate=${offer.run}>${offer.actionLabel}</jf-button></li>`)}</ul>
+    </section>`;
+  }
+
   private async saveMacro(): Promise<void> {
     const effects = listJournalByOriginator('agent')
       .filter(e => e.invokedAt > getSeenCursor() && e.pendingOutcome !== 'rejected').map(e => e.effect);
@@ -104,6 +124,8 @@ export class ActivitySurface extends JfElement {
     }
     .agent-actions { display: flex; flex-wrap: wrap; gap: var(--jf-space-2); margin-block: var(--jf-space-3); }
     .undo-preview { padding: var(--jf-space-3); border: var(--frame-hairline) solid var(--border-default); }
+    .own-reversals ul { margin: 0; padding: 0; list-style: none; }
+    .own-reversals li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--jf-space-2); padding-block: var(--jf-space-1); }
   `,
   ];
 
@@ -121,11 +143,12 @@ export class ActivitySurface extends JfElement {
         </div>
       </div>
       <div class="body">
+        ${this.renderOwnReversals()}
         ${listJournalByOriginator('agent').some(e => e.pendingOutcome !== 'rejected') ? html`
           <div class="agent-actions">
-            <jf-button size="sm" label="Undo all AI actions" data-testid="activity-undo-all"
+            ${previewUndoAllByOriginator('agent').length ? html`<jf-button size="sm" label="Undo all AI actions" data-testid="activity-undo-all"
               .onActivate=${() => { this.undoPreview = previewUndoAllByOriginator('agent');
-                if (!this.undoPreview.length) applyEffect({ kind: 'toast', message: 'Nothing to undo', severity: 'info' }); }}>Undo all AI actions</jf-button>
+                if (!this.undoPreview.length) applyEffect({ kind: 'toast', message: 'Nothing to undo', severity: 'info' }); }}>Undo all AI actions</jf-button>` : nothing}
             <jf-button size="sm" label="Save as macro" data-testid="activity-save-macro"
               .onActivate=${() => void this.saveMacro()}>Save as macro</jf-button>
           </div>` : nothing}

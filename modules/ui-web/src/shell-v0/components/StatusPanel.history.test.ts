@@ -38,14 +38,17 @@ describe('Earlier (moved from the inbox drawer)', () => {
     expect(panel().shadowRoot!.querySelector('.empty')!.textContent).toBe('Search is up to date. Nothing needs you.');
     expect(button('All activity')).toBeDefined(); expect(button('Health')).toBeDefined();
   });
-  it('unread comes first, then newest within read state; history does not reactivate a resolved condition', async () => {
+  it('newest comes first regardless of read state; unread keeps its marker and history does not reactivate a resolved condition', async () => {
     const newest = record('newest', { acknowledged: true });
     const older = record('older', { event: { ...newest.event, id: 'older', occurredAt: '2026-11-02T10:00:00Z' } });
     await publish([newest, older]);
-    expect([...panel().shadowRoot!.querySelectorAll('article')].map(n => n.getAttribute('data-fact'))).toEqual(['advisory:older', 'advisory:newest']);
+    const rows = [...panel().shadowRoot!.querySelectorAll('article')];
+    expect(rows.map(n => n.getAttribute('data-fact'))).toEqual(['advisory:newest', 'advisory:older']);
     expect(panel().shadowRoot!.querySelectorAll('.unread')).toHaveLength(1);
+    expect(rows[0]!.querySelector('.unread')).toBeNull();
+    expect(rows[1]!.querySelector('.unread')).not.toBeNull();
     expect(panel().model!.sections.problems).toEqual([]);
-    button('Details').click(); await flush(); expect(acknowledge).toHaveBeenCalledExactlyOnceWith('older');
+    rows[1]!.querySelector<HTMLButtonElement>('button')!.click(); await flush(); expect(acknowledge).toHaveBeenCalledExactlyOnceWith('older');
     await publish([{ ...older, acknowledged: true }, newest]);
     button('Details').click(); await flush(); expect(acknowledge).toHaveBeenCalledTimes(1);
   });

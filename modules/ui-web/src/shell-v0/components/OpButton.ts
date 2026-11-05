@@ -33,6 +33,7 @@ import type {
   Risk,
 } from './ActionButton.js';
 import './ActionButton.js';
+import { emitEphemeralToast } from './advisory/ephemeralToast.js';
 
 /**
  * Detail shape for the `op-success` CustomEvent OpButton dispatches
@@ -168,6 +169,14 @@ export class OpButton extends JfElement {
         { args: this.args },
         { consented: detail.risk === 'HIGH' },
       );
+      // These own-action bands can disappear with their affected data. Keep a receipt in the
+      // window's pill even when the owning surface refreshes or closes immediately afterwards.
+      const receipt = {
+        'core.clear-failed-jobs': 'Failed jobs cleared',
+        'core.rebuild-index': 'Rebuild accepted. Completion has not yet been confirmed.',
+        'core.reset-settings': 'Settings reset',
+      }[detail.operationId];
+      if (receipt) emitEphemeralToast({ classId: 'core.own-action', message: receipt, severity: 'success' });
       this.dispatchEvent(
         new CustomEvent<OpSuccessEventDetail>('op-success', {
           detail: {

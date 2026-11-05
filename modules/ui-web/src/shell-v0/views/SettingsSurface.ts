@@ -26,6 +26,7 @@ import { captureSettingsPatch, saveAbsoluteSettings, type SettingsPatch } from '
 // DOM property, which is the only comparison that can notice.
 import { live } from 'lit/directives/live.js';
 import { ifDefined } from 'lit/directives/if-defined.js';
+import { keyed } from 'lit/directives/keyed.js';
 import { JfElement } from '../primitives/JfElement.js';
 import { authorizedFetch } from '../api/authorizedFetch.js';
 // Tempdoc 511 §511-followup-B: reset-settings now routes through
@@ -147,6 +148,10 @@ import type { Audience } from '../../api/types/registry.js';
 // confirm modal + manual `client.invoke` here are replaced.
 import '../aggregate-substrate/components/JfOperation.js';
 import type { OpErrorEventDetail } from '../components/OpButton.js';
+import '../components/ConfirmBand.js';
+import { emitEphemeralToast } from '../components/advisory/ephemeralToast.js';
+import { ModalController } from '../primitives/modalController.js';
+import type { ConfirmBand } from '../components/ConfirmBand.js';
 import {
   checkForAppUpdate as checkForAppUpdateFromHost,
   installAppUpdate as installAppUpdateFromHost,
@@ -259,6 +264,9 @@ export class SettingsSurface extends JfElement {
     themeImporting: { state: true },
     themeImportDraft: { state: true },
     renamingThemeId: { state: true },
+    themeDeleteConfirm: { state: true },
+    themeDeleteError: { state: true },
+    pluginRevokeConfirm: { state: true },
     renameDraft: { state: true },
     // Tempdoc 567 §9.4 — the glass/solid surface-mode toggle (FE-only pref, mirrors high-contrast).
     surfaceMode: { state: true },
@@ -296,6 +304,11 @@ export class SettingsSurface extends JfElement {
   declare themeImporting: boolean;
   declare themeImportDraft: string;
   declare renamingThemeId: string | null;
+  /** DE1 — the custom theme whose deletion waits in its in-place band. */
+  declare themeDeleteConfirm: string | null;
+  declare themeDeleteError: string | null;
+  /** DE1 — the plugin whose revocation waits in its in-place band. */
+  declare pluginRevokeConfirm: string | null;
   declare renameDraft: string;
   declare surfaceMode: 'glass' | 'solid';
   declare chatWidth: ChatWidth;
@@ -397,6 +410,9 @@ export class SettingsSurface extends JfElement {
     this.themeImporting = false;
     this.themeImportDraft = '';
     this.renamingThemeId = null;
+    this.themeDeleteConfirm = null;
+    this.themeDeleteError = null;
+    this.pluginRevokeConfirm = null;
     this.renameDraft = '';
     this.surfaceMode = getSurfaceMode();
     this.chatWidth = getChatWidth();
@@ -425,6 +441,38 @@ export class SettingsSurface extends JfElement {
        pass-through (layout-purity) so the hosting <jf-settings-window> frame controls sizing. */
     :host {
       display: contents;
+    }
+    /* DE2 (ref-16) — the typed delete-all-data dialog: centred, frame dialog width, danger title. */
+    dialog.delete-dialog {
+      box-sizing: border-box;
+      width: min(var(--frame-dialog-width), calc(100vw - 2 * var(--jf-space-4)));
+      max-height: calc(100vh - 2 * var(--jf-space-4));
+      overflow: auto;
+      padding: var(--jf-space-6);
+      border: var(--frame-hairline) solid var(--accent-danger-30);
+      border-radius: var(--frame-panel-radius);
+      background: var(--surface-1);
+      color: var(--text-primary);
+    }
+    dialog.delete-dialog::backdrop { background: var(--frame-dialog-dim); }
+    .delete-dialog .who { display: flex; align-items: center; gap: var(--jf-space-2); margin: 0; color: var(--text-secondary);
+      font-size: var(--font-size-sm); }
+    .delete-dialog .title { margin: var(--jf-space-3) 0; color: var(--text-danger); font-size: var(--font-size-lg);
+      font-weight: var(--jf-weight-medium); }
+    .delete-dialog .consequences { margin: 0; padding: 0; list-style: none; }
+    .delete-dialog .consequences li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--jf-space-3);
+      padding-block: var(--jf-space-2); border-block-end: var(--frame-hairline) solid var(--border-subtle); }
+    .delete-dialog .typed-label { display: block; margin-block: var(--jf-space-4) var(--jf-space-2); color: var(--text-secondary); }
+    .delete-dialog .typed-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--jf-space-2); }
+    .delete-dialog .typed-input { flex: 1 1 calc(6 * var(--jf-space-8)); min-inline-size: 0; padding: var(--jf-space-2) var(--jf-space-3);
+      border: var(--frame-hairline) solid var(--border-subtle); border-radius: var(--frame-control-radius);
+      background: var(--surface-2); color: var(--text-primary); font: inherit; font-family: var(--font-mono); }
+    .delete-dialog .remaining { color: var(--text-secondary); font-size: var(--font-size-sm); }
+    .delete-dialog .dialog-actions { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--jf-space-2);
+      margin-block-start: var(--jf-space-4); }
+    @media (forced-colors: active) {
+      dialog.delete-dialog { border-color: CanvasText; }
+      .delete-dialog .title { color: CanvasText; }
     }
     /* Tempdoc 855 §9.3/§9.5 — the Discord-2025 IA: a fixed (non-scrolling) header, then a
        nav | content two-pane shell. Only .settings-content-pane scrolls; the nav scrolls its own
@@ -834,6 +882,9 @@ export class SettingsSurface extends JfElement {
       align-items: flex-start;
       justify-content: space-between;
     }
+    /* DE1 — the revoke band sits under the plugin's row, across its full width. */
+    .plugin-row:has(> jf-confirm-band) { flex-wrap: wrap; }
+    .plugin-row > jf-confirm-band, .theme-delete-confirm { flex: 1 0 100%; margin-block-start: var(--jf-space-2); }
     .plugin-meta {
       flex: 1;
       min-width: 0;
@@ -1037,6 +1088,7 @@ export class SettingsSurface extends JfElement {
     this.deleteState = 'idle';
     this.confirmText = '';
     this.searchShortcutError = null;
+    this.themeDeleteError = null;
   }
 
   override disconnectedCallback(): void {
@@ -1350,15 +1402,24 @@ export class SettingsSurface extends JfElement {
       activeInteractionFor(CONFIRM_CEREMONY.id) ?? CONFIRM_CEREMONY,
     );
     this.deleteUnsub = this.deleteMachine.subscribe((state) => {
+      // DE2 — the confirming state is a modal dialog; leaving it releases the modal (focus is
+      // returned by cancelDelete, or the app restarts).
+      if (state !== 'confirming') this.deleteModal.close({ skipFocusRestore: true });
       this.deleteState = state;
       if (state === 'done') void this.runDelete();
       if (state === 'confirming') {
         void this.updateComplete.then(() => {
+          this.deleteModal.open();
           this.shadowRoot?.querySelector<HTMLInputElement>('input[aria-label="Type DELETE to confirm"]')?.focus();
         });
       }
     });
   }
+
+  /** DE2 — the typed delete-all-data dialog's full modal contract (native dialog + scroll lock). */
+  private readonly deleteModal = new ModalController(this, {
+    dialog: () => this.shadowRoot?.querySelector<HTMLDialogElement>('dialog.delete-dialog'),
+  });
 
   private cancelDelete(): void {
     this.confirmText = '';
@@ -2089,7 +2150,8 @@ export class SettingsSurface extends JfElement {
                     size="icon"
                     label=${`Delete custom theme ${entry.displayName}`}
                     title=${`Delete "${entry.displayName}"`}
-                    .onActivate=${() => void this.deleteCustomTheme(entry)}
+                    aria-expanded=${this.themeDeleteConfirm === entry.id ? 'true' : 'false'}
+                    .onActivate=${() => this.requestDeleteCustomTheme(entry)}
                   >
                     ${icon({ name: 'trash-2', size: 12 })}
                   </jf-button>
@@ -2119,6 +2181,9 @@ export class SettingsSurface extends JfElement {
           </div>
           ${themes.map(renderEntry)}
         </div>
+        ${this.renderThemeDeleteBand(themes)}
+        ${this.themeDeleteError ? html`<jf-error-alert class="theme-delete-error" tone="error"
+          .onDismiss=${() => { this.themeDeleteError = null; }}>${this.themeDeleteError}</jf-error-alert>` : nothing}
         ${this.renderThemeImport()}
       </div>
     `;
@@ -2537,10 +2602,17 @@ export class SettingsSurface extends JfElement {
           variant="danger"
           label="Revoke"
           title="Uninstall plugin"
-          .onActivate=${() => void this.revokePlugin(p.manifest.id)}
+          aria-expanded=${this.pluginRevokeConfirm === p.manifest.id ? 'true' : 'false'}
+          .onActivate=${() => this.requestRevokePlugin(p.manifest.id)}
         >
           ${icon({ name: 'trash-2', size: 14 })} Revoke
         </jf-button>
+        ${this.pluginRevokeConfirm === p.manifest.id ? html`<jf-confirm-band class="plugin-revoke-confirm"
+          heading=${`Revoke the plugin ${p.manifest.id}?`}
+          consequence="It is uninstalled for this session and its views, overrides and texts are removed. Your files and settings stay; it comes back only when it is loaded again."
+          action-label=${`Revoke ${p.manifest.id}`}
+          @confirm-band-confirm=${() => this.revokePlugin(p.manifest.id)}
+          @confirm-band-cancel=${() => { this.pluginRevokeConfirm = null; }}></jf-confirm-band>` : nothing}
         ${p.manifest.settingsSchema
           ? html`
               <div class="plugin-settings">
@@ -2583,13 +2655,37 @@ export class SettingsSurface extends JfElement {
    * clearActiveTheme (the subscribeActiveTheme listener re-renders); for a non-active theme the catalog
    * changed but no reactive prop did, so request an explicit re-render.
    */
-  private async deleteCustomTheme(entry: ThemeCatalogEntry): Promise<void> {
-    const confirmed = await this.host_.ui.showConfirmDialog(
-      `Delete the custom theme "${entry.displayName}"? This cannot be undone.`,
-    );
-    if (!confirmed) return;
-    this.host_.theme.deleteTheme?.(entry.id);
-    this.requestUpdate();
+  private requestDeleteCustomTheme(entry: ThemeCatalogEntry): void {
+    this.themeDeleteError = null;
+    if (this.themeDeleteConfirm === entry.id) {
+      void this.updateComplete.then(() => this.shadowRoot?.querySelector<ConfirmBand>('.theme-delete-confirm')?.focusKeep());
+      return;
+    }
+    this.themeDeleteConfirm = entry.id;
+  }
+
+  /** DE1 — the band under the theme grid asks before a custom theme is deleted. */
+  private renderThemeDeleteBand(themes: readonly ThemeCatalogEntry[]): TemplateResult | typeof nothing {
+    const entry = themes.find(theme => theme.id === this.themeDeleteConfirm);
+    if (!entry) return nothing;
+    return html`${keyed(entry.id, html`<jf-confirm-band class="theme-delete-confirm" heading=${`Delete the theme ${entry.displayName}?`}
+      consequence=${`${entry.displayName} is deleted from this computer${this.activeThemeId === entry.id ? ' and the default theme is used instead' : ''}. Other themes stay. This can't be undone.`}
+      action-label=${`Delete ${entry.displayName}`}
+      @confirm-band-confirm=${() => this.deleteCustomTheme(entry)}
+      @confirm-band-cancel=${() => { this.themeDeleteConfirm = null; }}></jf-confirm-band>`)}`;
+  }
+
+  private deleteCustomTheme(entry: ThemeCatalogEntry): void {
+    if (this.themeDeleteConfirm !== entry.id) return;
+    this.themeDeleteConfirm = null;
+    try {
+      this.themeDeleteError = null;
+      this.host_.theme.deleteTheme?.(entry.id);
+      emitEphemeralToast({ classId: 'core.own-action', message: `${entry.displayName} deleted`, severity: 'success' });
+      this.requestUpdate();
+    } catch {
+      this.themeDeleteError = `Couldn't delete ${entry.displayName}. It has been kept. Try again.`;
+    }
   }
 
   /**
@@ -2673,13 +2769,18 @@ export class SettingsSurface extends JfElement {
     this.host_.layout.setSurfaceOrder(next.map((s) => s.id));
   }
 
-  private async revokePlugin(id: string): Promise<void> {
-    const ok = await this.host_.ui.showConfirmDialog(
-      `This uninstalls plugin "${id}" and removes its surface contributions, ` +
-      'overrides, and i18n keys. The plugin must be re-loaded to come back.', {
-      confirmLabel: 'Revoke',
-    });
-    if (!ok) return;
+  private requestRevokePlugin(id: string): void {
+    if (this.pluginRevokeConfirm === id) {
+      void this.updateComplete.then(() => this.shadowRoot?.querySelector<ConfirmBand>('.plugin-revoke-confirm')?.focusKeep());
+      return;
+    }
+    this.pluginRevokeConfirm = id;
+  }
+
+  /** DE1 — the band's verb: uninstall the plugin it named. */
+  private revokePlugin(id: string): void {
+    if (this.pluginRevokeConfirm !== id) return;
+    this.pluginRevokeConfirm = null;
     try {
       this.error = null;
       const registry = getSessionPluginRegistry();
@@ -2689,6 +2790,7 @@ export class SettingsSurface extends JfElement {
       // will also fire from `removePluginSurfaceContributions`, but
       // updating now makes the UI feel instantaneous.
       this.plugins = registry.list();
+      emitEphemeralToast({ classId: 'core.own-action', message: `Plugin ${id} revoked`, severity: 'success' });
     } catch (err) {
       this.error = err instanceof Error ? err.message : String(err);
     }
@@ -2704,20 +2806,20 @@ export class SettingsSurface extends JfElement {
           This does not remove JustSearch itself.
         </p>
         <div style="margin-top: 0.75rem">
-          ${this.deleteState === 'confirming'
-            ? this.renderDeleteConfirm()
-            : html`<jf-button
-                variant="danger"
-                label="Delete all local data"
-                ?disabled=${!tauri || this.deleting}
-                title=${tauri
-                  ? 'Restarts automatically and deletes local data before starting again'
-                  : 'Available only in the desktop app (Tauri).'}
-                .onActivate=${() => this.deleteMachine?.send('REQUEST')}
-              >
-                ${icon({ name: 'trash-2', size: 14 })}
-                ${this.deleting ? 'Restarting…' : 'Delete all local data'}
-              </jf-button>`}
+          <jf-button
+            variant="danger"
+            label="Delete all local data"
+            aria-haspopup="dialog"
+            ?disabled=${!tauri || this.deleting}
+            title=${tauri
+              ? 'Restarts automatically and deletes local data before starting again'
+              : 'Available only in the desktop app (Tauri).'}
+            .onActivate=${() => this.deleteMachine?.send('REQUEST')}
+          >
+            ${icon({ name: 'trash-2', size: 14 })}
+            ${this.deleting ? 'Restarting…' : 'Delete all local data'}
+          </jf-button>
+          ${this.deleteState === 'confirming' ? this.renderDeleteConfirm() : nothing}
         </div>
         ${!tauri ? html`<p class="help">Available only in the desktop app. A browser cannot delete the app's local data.</p>` : nothing}
       </div>
@@ -2774,63 +2876,80 @@ export class SettingsSurface extends JfElement {
   }
 
   /**
-   * 569 §15 (Move 8) — the declared `confirming` state of the delete ceremony, rendered inline. The
-   * typed input feeds the statechart's `typed == true` GUARD: `CONFIRM` only advances to `done`
-   * (which runs the bespoke delete) when "DELETE" is typed — otherwise the guard blocks the
-   * transition. This is the first BRANCHING, GUARDED statechart driving a real destructive surface
-   * flow (the appearance flow was single-state). Replaces the imperative `showConfirmDialog`.
+   * 569 §15 (Move 8) — the declared `confirming` state of the delete ceremony. DE2 (ref-16): a wide,
+   * irreversible act, so it is a must-stop dialog with typed confirmation — who asked, the question,
+   * what is deleted, what stays, that it cannot be undone, the exact phrase, Cancel left and the verb
+   * right. The typed input still feeds the statechart's `typed == true` GUARD: `CONFIRM` only advances
+   * to `done` (which runs the bespoke delete) when "DELETE" is typed. The presentation seam is the
+   * statechart (`CONFIRM_CEREMONY`), unchanged; only where its `confirming` state renders moved.
    */
   private renderDeleteConfirm(): TemplateResult {
-    const typed = this.confirmText.trim().toUpperCase() === 'DELETE';
+    const phrase = 'DELETE';
+    const typed = this.confirmText.trim().toUpperCase() === phrase;
+    const missing = Math.max(0, phrase.length - this.confirmText.trim().length);
     return html`
-      <div role="group" aria-label="Confirm delete all local data"
+      <dialog class="delete-dialog" aria-labelledby="delete-data-title" aria-describedby="delete-data-description"
+        @cancel=${(e: Event) => { e.preventDefault(); this.cancelDelete(); }}
         @keydown=${(e: KeyboardEvent) => {
           if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); this.cancelDelete(); }
         }}>
-        <p id="delete-data-description" class="help" style="margin-top: 0">
-          JustSearch will restart automatically and delete conversations, memories, agent history,
-          the index, watched folders, settings, logs, and saved window data (including recent
-          searches, composer drafts, and conversation titles) before starting again.
-          Your original files and folders are untouched. Downloaded AI models and the AI runtime are kept.
-          These deleted items <strong>cannot be recovered</strong>, whether or not encryption is enabled.
-          Type <strong>DELETE</strong> to confirm.
-        </p>
-        <p class="help">
-          To keep a copy of any conversations before resetting, open each in Search and choose Export conversation beside its other actions. There is no automatic
-          conversation backup for an unencrypted store. If encryption is enabled, you can also
-          export an encrypted backup in Security &amp; Privacy first. Earlier backups and exports
-          are not deleted.
-          <jf-button variant="secondary"
-            .onActivate=${() => this.host_.navigation.navigate('core.security-surface')}
-          >Open Security &amp; Privacy</jf-button>
-        </p>
-        <input
-          type="text"
-          aria-label="Type DELETE to confirm"
-          aria-describedby="delete-data-description"
-          placeholder="DELETE"
-          style="padding:0.4rem 0.6rem; border-radius:0.375rem; border:1px solid var(--border-subtle); background:var(--surface-1); color:var(--text-primary); font:inherit; box-sizing:border-box; min-inline-size:0; inline-size:min(18rem, 100%)"
-          .value=${this.confirmText}
-          @input=${(e: Event) => (this.confirmText = (e.target as HTMLInputElement).value)}
-        />
-        <div style="display:flex; flex-wrap:wrap; gap:0.5rem; margin-top:0.5rem">
-          <jf-button
-            variant="danger"
-            label="Delete & Restart"
-            ?disabled=${!typed}
-            .onActivate=${() => this.deleteMachine?.send('CONFIRM', { typed })}
-          >
-            ${icon({ name: 'trash-2', size: 14 })} Delete &amp; Restart
-          </jf-button>
-          <jf-button
-            variant="ghost"
-            label="Cancel"
-            .onActivate=${() => this.cancelDelete()}
-          >
-            Cancel
-          </jf-button>
+        <div role="group" aria-label="Confirm delete all local data">
+          <p class="who">You asked for this · Settings › Data</p>
+          <h3 id="delete-data-title" class="title">Delete all JustSearch data?</h3>
+          <ul class="consequences" id="delete-data-description">
+            <li>${icon({ name: 'trash-2', size: 14 })}<span>JustSearch will restart automatically and delete conversations, memories,
+              agent history, the index, watched folders, settings, logs, and saved window data (including recent
+              searches, composer drafts, and conversation titles) before starting again.</span></li>
+            <li>${icon({ name: 'check-circle-2', size: 14 })}<span>Your original files and folders are untouched. Downloaded AI models
+              and the AI runtime are kept.</span></li>
+            <li>${icon({ name: 'alert-circle', size: 14 })}<span>These deleted items <strong>cannot be recovered</strong>, whether or not
+              encryption is enabled.</span></li>
+          </ul>
+          <p class="help">
+            To keep a copy of any conversations before resetting, open each in Search and choose Export conversation beside its other actions. There is no automatic
+            conversation backup for an unencrypted store. If encryption is enabled, you can also
+            export an encrypted backup in Security &amp; Privacy first. Earlier backups and exports
+            are not deleted.
+            <jf-button variant="secondary"
+              .onActivate=${() => this.host_.navigation.navigate('core.security-surface')}
+            >Open Security &amp; Privacy</jf-button>
+          </p>
+          <label class="typed-label" for="delete-data-typed">Type <code>${phrase}</code> to confirm</label>
+          <div class="typed-row">
+            <input
+              class="typed-input"
+              id="delete-data-typed"
+              type="text"
+              aria-label="Type DELETE to confirm"
+              aria-describedby="delete-data-description"
+              placeholder=${phrase}
+              autocomplete="off"
+              spellcheck="false"
+              .value=${this.confirmText}
+              @input=${(e: Event) => (this.confirmText = (e.target as HTMLInputElement).value)}
+            />
+            <span id="delete-data-remaining" class="remaining" aria-live="polite">${typed ? 'Ready'
+              : missing > 0 ? `${missing} more letter${missing === 1 ? '' : 's'}` : `Type exactly ${phrase}`}</span>
+          </div>
+          <div class="dialog-actions">
+            <jf-button
+              variant="ghost"
+              label="Cancel"
+              .onActivate=${() => this.cancelDelete()}
+            >
+              Cancel
+            </jf-button>
+            <jf-button
+              variant="danger"
+              label="Delete & Restart"
+              ?disabled=${!typed}
+              .onActivate=${() => this.deleteMachine?.send('CONFIRM', { typed })}
+            >
+              ${icon({ name: 'trash-2', size: 14 })} Delete &amp; Restart
+            </jf-button>
+          </div>
         </div>
-      </div>
+      </dialog>
     `;
   }
 

@@ -74,6 +74,8 @@ export class XUiRendererControl extends JsonFormsRendererBase {
     }
   `;
 
+  // Keep the actual renderer mounted when only its projected data changes.
+  private childRenderer: HTMLElement | null = null;
   // 569 Phase 0 — re-render when the hint registry changes (a lazy renderer just registered),
   // so a miss that triggered `ensureXUiRenderer` resolves on the next paint.
   private _registryUnsub: (() => void) | null = null;
@@ -117,7 +119,7 @@ export class XUiRendererControl extends JsonFormsRendererBase {
     }
     return html`
       <div data-x-ui-renderer-hint=${hint}>
-        ${createElementWithProps(tag, {
+        ${this.childRenderer = createElementWithProps(tag, {
           schema: this.schema,
           uischema: this.uischema,
           path: this.path,
@@ -127,7 +129,7 @@ export class XUiRendererControl extends JsonFormsRendererBase {
           visible: this.visible,
           onChange: this.onChange,
           userConfig: this.userConfig,
-        })}
+        }, this.childRenderer)}
       </div>
     `;
   }
@@ -145,8 +147,9 @@ export class XUiRendererControl extends JsonFormsRendererBase {
 function createElementWithProps(
   tag: string,
   props: Record<string, unknown>,
+  previous: HTMLElement | null,
 ): HTMLElement {
-  const el = document.createElement(tag) as HTMLElement &
+  const el = (previous?.localName === tag ? previous : document.createElement(tag)) as HTMLElement &
     Record<string, unknown>;
   for (const [k, v] of Object.entries(props)) {
     el[k] = v;

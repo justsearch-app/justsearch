@@ -25,6 +25,7 @@ const json = (body: unknown) => new Response(JSON.stringify(body));
 let run: InstallStatus;
 let operations: string[];
 let confirmations: string[];
+let dialogs: { destructive?: boolean; title?: string }[] = [];
 let repairReply: (() => Promise<InstallStatus>) | null;
 
 async function settle(el: Brain) { await new Promise(resolve => setTimeout(resolve, 0)); await el.updateComplete; }
@@ -38,7 +39,7 @@ async function mount() {
   const el = document.createElement('jf-brain-surface') as Brain;
   el.apiBase = '';
   el.host_ = createMockHostApi({
-    ui: { showConfirmDialog: async (_message, options) => { confirmations.push(options?.confirmLabel ?? ''); return true; } },
+    ui: { showConfirmDialog: async (_message, options) => { confirmations.push(options?.confirmLabel ?? ''); dialogs.push(options ?? {}); return true; } },
     data: { invokeOperation: async id => {
       operations.push(id);
       if (id === 'core.repair-ai-install' && repairReply) return { success: true, structuredData: await repairReply() };
@@ -66,7 +67,7 @@ function notify(patch: Partial<AiState> = {}) {
 function emit(installStatus: InstallStatus) { notify({ installStatus }); }
 
 beforeEach(() => {
-  operations = []; confirmations = []; repairReply = null; refreshInstall.mockClear();
+  operations = []; confirmations = []; dialogs = []; repairReply = null; refreshInstall.mockClear();
   run = {
     state: 'running', phase: 'download', installedFully: true, repairNeeded: true,
     startedAtEpochMs: 200, updatedAtEpochMs: Date.now(), downloadedBytes: 256, totalBytes: 1024,
@@ -128,7 +129,10 @@ describe('Brain running repair controls (B2/B8)', () => {
     expect(el.shadowRoot!.querySelector('[data-testid="brain-simple-action"][label="Cancel"]')).not.toBeNull();
     emit(run); await settle(el);
     expect(operations).toEqual(['core.repair-ai-install', 'core.cancel-ai-install']);
-    expect(confirmations).toEqual(['Repair', 'Pause download']);
+    // DE2 — Repair keeps its dialog (download size and licences) but is not a danger dialog; pausing
+    // keeps everything downloaded and resumes later, so Cancel no longer asks at all.
+    expect(confirmations).toEqual(['Repair']);
+    expect(dialogs).toEqual([expect.objectContaining({ title: 'Repair AI installation?', destructive: false })]);
     expect(run.resumableBytes).toBe(256);
     expect(el.shadowRoot!.querySelector('[data-testid="brain-simple-action"][label="Cancel"]')).toBeNull();
     expect(el.shadowRoot!.textContent).not.toContain('Downloading 25%');

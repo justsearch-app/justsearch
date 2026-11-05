@@ -13,6 +13,7 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import './LibrarySurface.js';
 import type { LibrarySurface } from './LibrarySurface.js';
+import { EPHEMERAL_TOAST_EVENT, type EphemeralToastSpec } from '../components/advisory/ephemeralToast.js';
 import type { PluginHostApi } from '../plugin-api/plugin-types.js';
 import {
   __resetAiStateForTest,
@@ -133,6 +134,16 @@ function removeButton(
   return el.shadowRoot?.querySelector(
     `jf-button[label="Remove ${collection}"]`,
   ) as (HTMLElement & { onActivate: () => void }) | null;
+}
+
+type OtherSourceBand = HTMLElement & { heading: string; consequence: string; actionLabel: string; updateComplete: Promise<unknown> };
+/** DE1 — the in-place band under an other-app source (null when none is open). */
+function otherSourceBand(el: HTMLElement): OtherSourceBand | null {
+  return el.shadowRoot!.querySelector<OtherSourceBand>('.other-source-confirm jf-confirm-band');
+}
+async function answerBand(band: OtherSourceBand, which: 'confirm' | 'keep'): Promise<void> {
+  await band.updateComplete;
+  band.shadowRoot!.querySelector<HTMLElement & { onActivate(): void }>(`jf-button.${which}`)!.onActivate();
 }
 
 describe('LibrarySurface — "Other sources" section (811 C-2a)', () => {
@@ -260,24 +271,35 @@ describe('LibrarySurface — "Other sources" section (811 C-2a)', () => {
   });
 
   it('confirms first, then issues the DELETE for that collection', async () => {
+    const receipts: EphemeralToastSpec[] = [];
+    const receive = (event: Event) => receipts.push((event as CustomEvent<EphemeralToastSpec>).detail);
+    document.addEventListener(EPHEMERAL_TOAST_EVENT, receive);
     const { el, host, calls } = await setup({ collectionFacet: { 'mcp-ingest': 12 } });
     try {
       const remove = removeButton(el, 'mcp-ingest');
       expect(remove).not.toBeNull();
       remove?.onActivate();
       await new Promise((resolve) => setTimeout(resolve, 0));
+      await el.updateComplete;
 
-      const confirm = host.ui.showConfirmDialog as unknown as ReturnType<typeof vi.fn>;
-      expect(confirm).toHaveBeenCalledTimes(1);
-      const message = confirm.mock.calls[0]?.[0] as string;
-      expect(message).toContain('12 documents');
-      expect(message).toContain("'mcp-ingest'");
-      expect(confirm.mock.calls[0]?.[1]).toMatchObject({ destructive: true });
+      // DE1 — the band under this source names how much leaves search and that nothing adds it back.
+      const band = otherSourceBand(el)!;
+      expect(band).not.toBeNull();
+      expect(band.heading).toContain('12 documents');
+      expect(band.heading).toContain('mcp-ingest');
+      expect(band.consequence).toContain('nothing adds them back');
+      expect(band.actionLabel).toBe('Remove mcp-ingest');
+      expect(calls.some((c) => c.path === '/api/indexing/collections')).toBe(false);
+      await answerBand(band, 'confirm');
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(host.ui.showConfirmDialog).not.toHaveBeenCalled();
 
       const del = calls.find((c) => c.path === '/api/indexing/collections');
       expect(del?.method).toBe('DELETE');
       expect(del?.body).toEqual({ collection: 'mcp-ingest' });
+      expect(receipts).toEqual([expect.objectContaining({ classId: 'core.own-action', severity: 'success', message: 'Removed collection mcp-ingest' })]);
     } finally {
+      document.removeEventListener(EPHEMERAL_TOAST_EVENT, receive);
       el.remove();
     }
   });
@@ -287,8 +309,12 @@ describe('LibrarySurface — "Other sources" section (811 C-2a)', () => {
     try {
       removeButton(el, 'mcp-ingest')?.onActivate();
       await new Promise((resolve) => setTimeout(resolve, 0));
+      await el.updateComplete;
+      await answerBand(otherSourceBand(el)!, 'keep');
+      await el.updateComplete;
 
-      expect(host.ui.showConfirmDialog).toHaveBeenCalledTimes(1);
+      expect(otherSourceBand(el)).toBeNull();
+      expect(host.ui.showConfirmDialog).not.toHaveBeenCalled();
       expect(calls.some((c) => c.path === '/api/indexing/collections')).toBe(false);
     } finally {
       el.remove();

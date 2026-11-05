@@ -219,6 +219,31 @@ describe('<jf-effect-audit-log> causation chip (§32 R-E3)', () => {
     }
   });
 
+  it('DE6 — "restore to here" says what cannot be undone and reverses exactly the previewed actions', async () => {
+    const a = recordEffect({ kind: 'open-pane', paneId: 'a' }, CORE_PROVENANCE);
+    recordEffect({ kind: 'open-modal', modalId: 'm' }, CORE_PROVENANCE);
+    recordEffect({ kind: 'toast', message: 'noted' }, CORE_PROVENANCE); // irreversible
+    host.open = true;
+    await flush();
+    const closes: string[] = [];
+    const onClose = ((e: Event) => closes.push((e as CustomEvent).detail.modalId)) as EventListener;
+    document.addEventListener('jf-close-modal', onClose);
+    try {
+      await activateJfButton(host.shadowRoot?.querySelector(`[data-testid="restore-to-${a.id}"]`));
+      await flush();
+      expect(host.shadowRoot?.querySelector('[data-testid="undo-irreversible"]')?.textContent?.replace(/\s+/g, ' '))
+        .toContain("1 other action can't be undone and will remain.");
+      // Something new happens while the preview is open: it was not previewed, so it stays.
+      recordEffect({ kind: 'open-modal', modalId: 'late' }, CORE_PROVENANCE);
+      await flush();
+      await activateJfButton(host.shadowRoot?.querySelector('[data-testid="restore-confirm-yes"]'));
+      await flush();
+      expect(closes).toEqual(['m']);
+    } finally {
+      document.removeEventListener('jf-close-modal', onClose);
+    }
+  });
+
   it('§32 U2 — renders an Undo button for an undoable entry; click dispatches undo-operation', async () => {
     const entry = recordEffect(
       { kind: 'invoke-operation', operationId: 'core.file-operations' },

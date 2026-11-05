@@ -4,6 +4,7 @@ import { icon } from './Icon.js';
 import { failedChipCopy } from '../state/folderStatus.js';
 import { unavailableBecause } from '../state/availability.js';
 import './Button.js';
+import './ConfirmBand.js';
 
 /** Additive projection: existing theme fields and intents remain supported. */
 export interface FolderRow {
@@ -29,9 +30,12 @@ export interface FolderRow {
   readonly canReveal?: boolean;
   readonly revealUnavailable?: string;
   readonly needsVerification?: boolean;
+  /** DE1 — the in-place confirmation of Remove, shown under the row while it waits for an answer. */
+  readonly removeConfirm?: { readonly heading: string; readonly consequence: string; readonly actionLabel: string };
 }
 
-export type FolderRowIntent = 'remove' | 'show-failed' | 'reveal' | 'reindex';
+/** `confirm-remove` / `keep` answer the row's removal band. */
+export type FolderRowIntent = 'remove' | 'show-failed' | 'reveal' | 'reindex' | 'confirm-remove' | 'keep';
 interface RowActions {
   readonly expanded: boolean;
   readonly enabled: boolean;
@@ -136,5 +140,8 @@ export function renderFolderRow(f: FolderRow, actions: RowActions): TemplateResu
           >${icon({ name: 'trash-2', size: 14 })} ${f.removalBusy ? 'Removing…' : 'Remove from library'}</jf-button>
       </div>
     </div>` : nothing}
+    ${f.removeConfirm ? html`<jf-confirm-band heading=${f.removeConfirm.heading} consequence=${f.removeConfirm.consequence}
+      action-label=${f.removeConfirm.actionLabel} ?busy=${disabled}
+      @confirm-band-confirm=${() => actions.invoke('confirm-remove')} @confirm-band-cancel=${() => actions.invoke('keep')}></jf-confirm-band>` : nothing}
   </div>`;
 }

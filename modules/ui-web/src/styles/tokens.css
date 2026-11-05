@@ -47,6 +47,9 @@
   --frame-control-size: 2.25rem;
   --frame-control-radius: 0.5rem;
   --frame-menu-width: 18rem;
+  /* Frame dialog (design system §2/§7): must-stop decisions, centred, 480-560 px, over a 55 % dim. */
+  --frame-dialog-width: 32rem;
+  --frame-dialog-dim: rgba(var(--p-shadow), 0.55);
   /* === Primitive Palette ===
      Base colors and hue angles shared across semantic tokens.
      Override these to create new themes — semantic tokens derive from them. */

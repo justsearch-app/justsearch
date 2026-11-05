@@ -10,6 +10,7 @@ import { StatusPill } from './StatusPill.js';
 import type { StatusPanel } from './StatusPanel.js';
 import { AdvisoryStore } from './advisory/AdvisoryStore.js';
 import { emitEphemeralToast } from './advisory/ephemeralToast.js';
+import { offerReversal, __resetOwnReversalsForTest } from '../state/ownReversals.js';
 import { __resetAiStateForTest, type AiState } from '../state/aiStateStore.js';
 import { proposeEffect, __resetPendingForTest } from '../substrates/pending-effects/index.js';
 import { CORE_PROVENANCE } from '../primitives/provenance.js';
@@ -40,7 +41,7 @@ beforeEach(async () => {
   pill = new StatusPill(); pill.store = store; document.body.append(pill);
   pill.status.ai = ai(); await flush();
 });
-afterEach(() => { pill.remove(); store.stop(); __resetAiStateForTest(); __resetPendingForTest(); vi.unstubAllGlobals(); viewport(1024); });
+afterEach(() => { pill.remove(); store.stop(); __resetAiStateForTest(); __resetPendingForTest(); __resetOwnReversalsForTest(); vi.unstubAllGlobals(); viewport(1024); });
 
 describe('status pill drawing', () => {
   it('ref-09 needs you shows its count in a badge followed by the words, and names both', async () => {
@@ -93,12 +94,18 @@ describe('status pill drawing', () => {
   });
 
   it('ref-07 the undo notice names Ctrl+Z, and the shell undo command reverses that notice once', async () => {
-    const undo = vi.fn();
-    emitEphemeralToast({ message: 'Skip rule added', actionLabel: 'Undo', onAction: undo }); await flush();
+    const undo = vi.fn(async () => {});
+    // DE6 — an undo notice is a real reversal offered by the person's own action (ownReversals).
+    offerReversal({ message: 'Skip rule added', reverse: undo, reversed: 'Skip rules are back as they were' }); await flush();
     const action = pill.shadowRoot!.querySelector<HTMLButtonElement>('.transient-action')!;
+    expect(action.textContent).toContain('Undo');
     expect(action.querySelector('kbd')!.textContent).toBe('Ctrl+Z');
     expect(action.getAttribute('aria-keyshortcuts')).toBe('Control+Z');
     expect(pill.undoNotice()).toBe(true);
+    await flush();
+    expect(undo).toHaveBeenCalledTimes(1);
+    // Once reversed it is no longer offered, and the undo command does not run it again.
+    expect(pill.undoNotice()).toBe(false);
     await flush();
     expect(undo).toHaveBeenCalledTimes(1);
   });

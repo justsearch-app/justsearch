@@ -1,0 +1,180 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-05T10:15:30.118Z",
+  "revision": "b1b5ae0f3c400c3ca672fafddd43869412891d41",
+  "tree": "265f764709799adf932d5610c3b21a615e840df2",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/SettingsSurface.ownActions-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/gkokugqn/tmp/test-intent-vitest-4-1793873713078.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 4810
+    },
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/frameStatus.test.ts\" \"src/shell-v0/components/StatusPanel.history.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/gkokugqn/tmp/test-intent-vitest-4-1793873717888.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1043
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions-lockdown.test.ts#DE1 switching from Delete Alpha to Delete Beta leaves one band, focuses Keep it, and Escape restores Delete Beta",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8d3baa57f4675c3b0183457fa1696a21a90c2e4b674a25ed6508378e7afec930",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE1 switching from Delete Alpha to Delete Beta leaves one band, focuses Keep it, and Escape restores Delete Beta",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions-lockdown.test.ts#C1 a real quota failure keeps the custom theme and its active state, reports it by the grid, and permits retry (active=false)",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8d3baa57f4675c3b0183457fa1696a21a90c2e4b674a25ed6508378e7afec930",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C1 a real quota failure keeps the custom theme and its active state, reports it by the grid, and permits retry (active=false)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions-lockdown.test.ts#C1 a real quota failure keeps the custom theme and its active state, reports it by the grid, and permits retry (active=true)",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8d3baa57f4675c3b0183457fa1696a21a90c2e4b674a25ed6508378e7afec930",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C1 a real quota failure keeps the custom theme and its active state, reports it by the grid, and permits retry (active=true)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions-lockdown.test.ts#X1 the typed delete input uses the spacing token through its class",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8d3baa57f4675c3b0183457fa1696a21a90c2e4b674a25ed6508378e7afec930",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "X1 the typed delete input uses the spacing token through its class",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#ST7 Earlier orders advisories and completed operations newest first regardless of read state",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7fd88ce5c33be2394e8d2c83295548a0c0333704fa094b7efde05dfb381d1b63",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "concurrent source facts ST7 Earlier orders advisories and completed operations newest first regardless of read state",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts#newest comes first regardless of read state; unread keeps its marker and history does not reactivate a resolved condition",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b18369c180e18eae078fa7c3002b683fd7a59188df4f3252f81bdfec655e7675",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Earlier (moved from the inbox drawer) newest comes first regardless of read state; unread keeps its marker and history does not reactivate a resolved condition",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "b1b5ae0f3c400c3ca672fafddd43869412891d41",
+    "revision": "b1b5ae0f3c400c3ca672fafddd43869412891d41",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/SettingsSurface.ownActions-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/gkokugqn/tmp/test-intent-vitest-4-1793873720998.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 7336,
+        "output": "JSON report written to /home/elias/.cache/am/gkokugqn/tmp/test-intent-vitest-4-1793873720998.json\n\nEvidence worker limit: --maxWorkers=4\n"
+      },
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/frameStatus.test.ts\" \"src/shell-v0/components/StatusPanel.history.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/gkokugqn/tmp/test-intent-vitest-4-1793873728335.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1221,
+        "output": "JSON report written to /home/elias/.cache/am/gkokugqn/tmp/test-intent-vitest-4-1793873728335.json\n\nEvidence worker limit: --maxWorkers=4\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions-lockdown.test.ts#DE1 switching from Delete Alpha to Delete Beta leaves one band, focuses Keep it, and Escape restores Delete Beta",
+        "classification": "assertion",
+        "detail": "DE1 switching from Delete Alpha to Delete Beta leaves one band, focuses Keep it, and Escape restores Delete Beta:  Error: expected false to be true // Object.is equality\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/.cache/am/gkokugqn/tmp/test-intent-before-MzyvZd/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3748:47)\n    at /home/elias/.cache/am/gkokugqn/tmp/test-intent-before-MzyvZd/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions-lockdown.test.ts#C1 a real quota failure keeps the custom theme and its active state, reports it by the grid, and permits retry (active=false)",
+        "classification": "assertion",
+        "detail": "C1 a real quota failure keeps the custom theme and its active state, reports it by the grid, and permits retry (active=false):  Error: expected { …(4) } to deeply equal { …(4) }\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/.cache/am/gkokugqn/tmp/test-intent-before-MzyvZd/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3748:47)\n    at /home/elias/.cache/am/gkokugqn/tmp/test-intent-before-MzyvZd/modul"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions-lockdown.test.ts#C1 a real quota failure keeps the custom theme and its active state, reports it by the grid, and permits retry (active=true)",
+        "classification": "assertion",
+        "detail": "C1 a real quota failure keeps the custom theme and its active state, reports it by the grid, and permits retry (active=true):  Error: expected { …(4) } to deeply equal { …(4) }\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/.cache/am/gkokugqn/tmp/test-intent-before-MzyvZd/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3748:47)\n    at /home/elias/.cache/am/gkokugqn/tmp/test-intent-before-MzyvZd/modul"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions-lockdown.test.ts#X1 the typed delete input uses the spacing token through its class",
+        "classification": "assertion",
+        "detail": "X1 the typed delete input uses the spacing token through its class:  AssertionError: expected '192px' to be '240px' // Object.is equality\n    at /home/elias/.cache/am/gkokugqn/tmp/test-intent-before-MzyvZd/modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions-lockdown.test.ts:174:70\n    at file:///home/elias/.cache/am/gkokugqn/tmp/test-intent-before-MzyvZd/mod"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#ST7 Earlier orders advisories and completed operations newest first regardless of read state",
+        "classification": "assertion",
+        "detail": "concurrent source facts ST7 Earlier orders advisories and completed operations newest first regardless of read state:  AssertionError: expected [ 'advisory:older', …(2) ] to deeply equal [ Array(3) ]\n    at /home/elias/.cache/am/gkokugqn/tmp/test-intent-before-MzyvZd/modules/ui-web/src/shell-v0/state/frameStatus.test.ts:277:52\n    at file:///home/elias/.cache/am/gkokugqn/tmp/test-intent-before-MzyvZd/modules/ui-web/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts#newest comes first regardless of read state; unread keeps its marker and history does not reactivate a resolved condition",
+        "classification": "assertion",
+        "detail": "Earlier (moved from the inbox drawer) newest comes first regardless of read state; unread keeps its marker and history does not reactivate a resolved condition:  AssertionError: expected [ 'advisory:older', 'advisory:newest' ] to deeply equal [ 'advisory:newest', 'advisory:older' ]\n    at /home/elias/.cache/am/gkokugqn/tmp/test-intent-before-MzyvZd/modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts:46:56\n    at file:///home/elias/.cache/am/gk"
+      }
+    ]
+  },
+  "digest": "sha256:4a069a0ac2c1af5b2395534743e420f177cf01c26b9bf73422da2a0b1a56e8f4"
+}

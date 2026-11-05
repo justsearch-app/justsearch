@@ -6,6 +6,7 @@ import io.justsearch.core.context.EngineContext;
 import io.justsearch.agent.api.registry.OperationHandler;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.IndexingService;
+import io.justsearch.app.api.operations.OperationReceipt;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Map;
@@ -76,12 +77,16 @@ public final class RemoveWatchedRootHandler implements OperationHandler {
       if (deletedJobs < 0) {
         return OperationResult.failure("Remove watched root incomplete: " + p + "; retry removal");
       }
+      String removedPath = p.toAbsolutePath().toString();
+      Map<String, Object> data = new java.util.LinkedHashMap<>();
+      data.put("path", removedPath);
+      data.put("collection", collection);
+      data.put("deletedJobs", deletedJobs);
+      // L1 — the durable receipt keeps which folder this removed, so every window can add it back.
+      OperationReceipt.RemovedFolder.of(removedPath, collection)
+          .ifPresent(folder -> data.put(OperationReceipt.REMOVED_FOLDER_KEY, folder));
       return OperationResult.success(
-          "Removed watched root " + p + " (" + deletedJobs + " jobs deleted)",
-          Map.of(
-              "path", p.toAbsolutePath().toString(),
-              "collection", collection,
-              "deletedJobs", deletedJobs));
+          "Removed watched root " + p + " (" + deletedJobs + " jobs deleted)", data);
     } catch (io.justsearch.app.api.EngineAdmissionException
         | io.justsearch.core.execution.EngineExecutorRejectedException e) {
       throw e;

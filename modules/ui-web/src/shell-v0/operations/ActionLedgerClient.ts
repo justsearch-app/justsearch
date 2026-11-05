@@ -38,6 +38,15 @@ import { JOB_STATE_RETRY_EXHAUSTED } from '../state/indexingJobStates.js';
 // `present()` already joins for labels in this module).
 import { getOperation } from '../../api/registry/OperationCatalogClient.js';
 
+/** L1 — the folder a successful removal row recorded; nothing for older rows without one. */
+function removedFolderOf(e: BackendLedgerEntry): { removedFolder?: { path: string; collection?: string } } {
+  const folder = e.removedFolder;
+  if (e.kind !== 'operation' || e.operationId !== 'core.remove-watched-root' || e.outcome !== 'SUCCESS'
+      || !folder || typeof folder.path !== 'string' || !folder.path) return {};
+  return { removedFolder: { path: folder.path,
+    ...(typeof folder.collection === 'string' && folder.collection ? { collection: folder.collection } : {}) } };
+}
+
 /** A backend action-ledger entry (operation or navigation). Mirrors ActionLedgerController. */
 export interface BackendLedgerEntry {
   // Tempdoc 550 thesis I: explicit, deterministic event id (kind:occurredAt:subject) — stable
@@ -87,6 +96,9 @@ export interface BackendLedgerEntry {
   // here). Present on agent-originated operation rows; lets the agent History view project itself
   // from this one ledger filtered to a single session (P-B1).
   readonly correlationId?: string;
+  // L1 — present on a successful core.remove-watched-root row: the folder it removed, so every
+  // window (and a reload) can offer to add it back. Older records have none and offer no re-add.
+  readonly removedFolder?: { readonly path?: unknown; readonly collection?: unknown };
 }
 
 /** A single row in the unified activity stream — backend record OR FE-local effect. */
@@ -119,6 +131,8 @@ export interface UnifiedActionEntry {
   readonly gate?: { readonly disposition: string; readonly operation: string; readonly pendingId?: string };
   /** Present on grant-lifecycle rows: the structured action (ISSUED | CONSUMED | REVOKED) and the humanized subject. */
   readonly grant?: { readonly action: string; readonly subject: string };
+  /** L1 — a successful folder removal's folder (path, and collection when recorded): the way back. */
+  readonly removedFolder?: { readonly path: string; readonly collection?: string };
   /**
    * Optional grouping key for bounded-projection collapse (tempdoc 550 thesis III(b)). Present on
    * kind='index' rows (the job collection), so the Activity timeline can collapse an indexing burst
@@ -315,6 +329,7 @@ export function projectBackend(e: BackendLedgerEntry): UnifiedActionEntry {
     ...(e.outcome ? { outcome: e.outcome } : {}),
     ...(e.kind === 'gate' && e.disposition ? { gate: { disposition: e.disposition, operation: opLabel(e.operationId), ...(e.pendingId ? { pendingId: e.pendingId } : {}) } } : {}),
     ...(e.kind === 'grant' && e.action ? { grant: { action: e.action, subject: e.subject ? opLabel(e.subject) : '' } } : {}),
+    ...removedFolderOf(e),
     ...(e.kind === 'operation'
       && ['core.bulk-reindex', 'core.rebuild-index', 'core.activate-installed-models'].includes(e.operationId ?? '')
       && /^operation:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(e.id)

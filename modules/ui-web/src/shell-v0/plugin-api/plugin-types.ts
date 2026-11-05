@@ -712,6 +712,9 @@ export interface NotificationOptions {
 
 /** Options for host.showConfirmDialog(). */
 export interface ConfirmDialogOptions {
+  /** The question the dialog asks, naming the object ("Repair AI installation?"). */
+  title?: string;
+  /** The verb that answers it (default "Continue"). */
   confirmLabel?: string;
   cancelLabel?: string;
   destructive?: boolean;

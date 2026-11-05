@@ -1,0 +1,167 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-05T09:32:12.363Z",
+  "revision": "a279e9812fd4e6d9e923effc528929d7d117fa8c",
+  "tree": "3d01ae459860bb1f6f4902cdde16d4f2d0fb6377",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.folderUndo.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/xdm2xvul/tmp/test-intent-vitest-71-1793871123616.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2974
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.folderUndo.test.ts#a user removal followed by Ctrl+Z re-adds the folder from the successful receipt",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.folderUndo.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3c4732be82fcd0ed0c03065cbf12bec025f0dc3fa857b5aead303f682c82c1f7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a user removal followed by Ctrl+Z re-adds the folder from the successful receipt",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.folderUndo.test.ts#a agent removal followed by Ctrl+Z re-adds the folder from the successful receipt",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.folderUndo.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3c4732be82fcd0ed0c03065cbf12bec025f0dc3fa857b5aead303f682c82c1f7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a agent removal followed by Ctrl+Z re-adds the folder from the successful receipt",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.folderUndo.test.ts#a successful removal without a recorded path offers no Undo or Ctrl+Z target",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.folderUndo.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3c4732be82fcd0ed0c03065cbf12bec025f0dc3fa857b5aead303f682c82c1f7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a successful removal without a recorded path offers no Undo or Ctrl+Z target",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.folderUndo.test.ts#an older persisted removal with an argument-less inverse offers no Undo after restore",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.folderUndo.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3c4732be82fcd0ed0c03065cbf12bec025f0dc3fa857b5aead303f682c82c1f7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "an older persisted removal with an argument-less inverse offers no Undo after restore",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.folderUndo.test.ts#a removal receipt keeps its working re-add inverse across a journal restore",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.folderUndo.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3c4732be82fcd0ed0c03065cbf12bec025f0dc3fa857b5aead303f682c82c1f7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a removal receipt keeps its working re-add inverse across a journal restore",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.folderUndo.test.ts#Activity offers no Undo when the agent only removed a folder without a recorded path",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.folderUndo.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3c4732be82fcd0ed0c03065cbf12bec025f0dc3fa857b5aead303f682c82c1f7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Activity offers no Undo when the agent only removed a folder without a recorded path",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "a279e9812fd4e6d9e923effc528929d7d117fa8c",
+    "revision": "a279e9812fd4e6d9e923effc528929d7d117fa8c",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.folderUndo.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/xdm2xvul/tmp/test-intent-vitest-71-1793871128944.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 2878,
+        "output": "JSON report written to /home/elias/.cache/am/xdm2xvul/tmp/test-intent-vitest-71-1793871128944.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.folderUndo.test.ts#a user removal followed by Ctrl+Z re-adds the folder from the successful receipt",
+        "classification": "assertion",
+        "detail": "a user removal followed by Ctrl+Z re-adds the folder from the successful receipt:  AssertionError: Ctrl+Z must really restore the removed folder: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/xdm2xvul/tmp/test-intent-before-YtUerr/modules/ui-web/src/shell-v0/chrome/Shell.folderUndo.test.ts:68:85\n    at file:///home/elias/.cache/am/xdm2xvul/tmp/test-i"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.folderUndo.test.ts#a agent removal followed by Ctrl+Z re-adds the folder from the successful receipt",
+        "classification": "assertion",
+        "detail": "a agent removal followed by Ctrl+Z re-adds the folder from the successful receipt:  AssertionError: Ctrl+Z must really restore the removed folder: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/xdm2xvul/tmp/test-intent-before-YtUerr/modules/ui-web/src/shell-v0/chrome/Shell.folderUndo.test.ts:68:85\n    at file:///home/elias/.cache/am/xdm2xvul/tmp/test-i"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.folderUndo.test.ts#a successful removal without a recorded path offers no Undo or Ctrl+Z target",
+        "classification": "assertion",
+        "detail": "a successful removal without a recorded path offers no Undo or Ctrl+Z target:  AssertionError: expected { kind: 'invoke-operation', …(1) } to be null\n    at /home/elias/.cache/am/xdm2xvul/tmp/test-intent-before-YtUerr/modules/ui-web/src/shell-v0/chrome/Shell.folderUndo.test.ts:76:90\n    at file:///home/elias/.cache/am/xdm2xvul/tmp/test-intent-before-YtUerr/modules/ui-web/node_"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.folderUndo.test.ts#an older persisted removal with an argument-less inverse offers no Undo after restore",
+        "classification": "assertion",
+        "detail": "an older persisted removal with an argument-less inverse offers no Undo after restore:  AssertionError: expected { kind: 'invoke-operation', …(1) } to be null\n    at /home/elias/.cache/am/xdm2xvul/tmp/test-intent-before-YtUerr/modules/ui-web/src/shell-v0/chrome/Shell.folderUndo.test.ts:101:37\n    at file:///home/elias/.cache/am/xdm2xvul/tmp/test-intent-before-YtUerr/modules/ui-web/node"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.folderUndo.test.ts#a removal receipt keeps its working re-add inverse across a journal restore",
+        "classification": "assertion",
+        "detail": "a removal receipt keeps its working re-add inverse across a journal restore:  AssertionError: expected { kind: 'invoke-operation', …(1) } to deeply equal { kind: 'invoke-operation', …(2) }\n    at /home/elias/.cache/am/xdm2xvul/tmp/test-intent-before-YtUerr/modules/ui-web/src/shell-v0/chrome/Shell.folderUndo.test.ts:112:41\n    at file:///home/elias/.cache/am/xdm2xvul/tmp/test-"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.folderUndo.test.ts#Activity offers no Undo when the agent only removed a folder without a recorded path",
+        "classification": "assertion",
+        "detail": "Activity offers no Undo when the agent only removed a folder without a recorded path:  AssertionError: expected <jf-button size=\"sm\" …(3)></jf-button> to be null\n    at /home/elias/.cache/am/xdm2xvul/tmp/test-intent-before-YtUerr/modules/ui-web/src/shell-v0/chrome/Shell.folderUndo.test.ts:89:83\n    at file:///home/elias/.cache/am/xdm2xvul/tmp/test-intent-before-YtUerr/modules/ui-web/n"
+      }
+    ]
+  },
+  "digest": "sha256:9294c617271b65c5d8877c7f3757d0de68ad6420fd6a7dd13f7798d13dc15ed1"
+}
