@@ -143,6 +143,14 @@ public class InferenceLifecycleManager
     generation.fenceForRecovery();
   }
 
+  /**
+   * Binds the managed answer server launch fence: a plain reason refuses every managed launch while
+   * the answer model's files are being removed (design D4).
+   */
+  public void setManagedLaunchFence(java.util.function.Supplier<Optional<String>> fence) {
+    serverOps.setLaunchFence(fence);
+  }
+
   /** Binds the saved policy and the live Engine backlog observation. */
   public void setAnswersPaused(BooleanSupplier paused) {
     generation.setAnswersPaused(paused);

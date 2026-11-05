@@ -24,7 +24,9 @@ import org.slf4j.LoggerFactory;
  * Delegates to {@link BrainInstallService#startInstall(boolean)} via lazy
  * supplier.
  *
- * <p>Args shape: {@code {"acceptTerms"?: boolean, "enableRerankerOnCompletion"?: boolean}}.
+ * <p>Args shape: {@code {"acceptTerms"?: boolean, "enableRerankerOnCompletion"?: boolean,
+ * "enablePictureReadingOnCompletion"?: boolean, "includePackages"?: string[]}}; the last names parts
+ * downloaded again whose saved declines the accepted start withdraws.
  * Returns the post-start
  * install status snapshot in {@code structuredData}.
  */
@@ -64,7 +66,10 @@ public final class StartAiInstallHandler implements OperationHandler {
           argumentsJson, "enableRerankerOnCompletion");
       boolean enablePictures = BrainInstallHandlerSupport.parseBoolean(
           argumentsJson, "enablePictureReadingOnCompletion");
-      return BrainInstallHandlerSupport.execution("AI install started", enablePictures
+      java.util.Set<String> include = BrainInstallHandlerSupport.parseStrings(
+          argumentsJson, "includePackages");
+      return BrainInstallHandlerSupport.execution("AI install started", !include.isEmpty()
+          ? svc.startInstall(acceptTerms, enableReranker, enablePictures, include) : enablePictures
           ? svc.startInstall(acceptTerms, enableReranker, true) : enableReranker
               ? svc.startInstall(acceptTerms, true) : svc.startInstall(acceptTerms));
     } catch (Exception e) {

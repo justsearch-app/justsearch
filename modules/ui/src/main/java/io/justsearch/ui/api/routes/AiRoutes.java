@@ -116,6 +116,7 @@ public final class AiRoutes {
     app.get("/api/ai/install/manifest", aiInstallController::handleGetManifest, ActivityRole.OBSERVATION);
     app.get("/api/ai/install/status", aiInstallController::handleGetStatus, ActivityRole.OBSERVATION);
     app.get("/api/ai/install/plan-preview", aiInstallController::handleGetPlanPreview, ActivityRole.OBSERVATION);
+    app.get("/api/ai/install/downloaded-files", aiInstallController::handleGetDownloadedFiles, ActivityRole.OBSERVATION);
     app.post("/api/ai/install/start", aiInstallController::handleStart, ActivityRole.USER_ACTION);
     app.post("/api/ai/install/cancel", aiInstallController::handleCancel, ActivityRole.USER_ACTION);
     app.post("/api/ai/install/repair", aiInstallController::handleRepair, ActivityRole.USER_ACTION);

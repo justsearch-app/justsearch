@@ -68,6 +68,11 @@ public final class ActivateInstalledModelsHandler implements OperationHandler {
       String argumentsJson, InvocationProvenance provenance, EngineContext context) {
     requireSourceArguments(argumentsJson);
     BrainInstallService service = service();
+    try {
+      service.refuseWhileRemovingFiles();
+    } catch (IllegalStateException removing) {
+      throw refused(removing.getMessage(), "MODEL_FILES_REMOVING");
+    }
     final io.justsearch.app.api.AiInstallService.InstalledGenerationCandidate candidate;
     try {
       candidate = service.prepareInstalledGenerationCandidate().orElseThrow(

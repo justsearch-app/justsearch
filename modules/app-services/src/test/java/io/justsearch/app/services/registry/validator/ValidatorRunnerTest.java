@@ -195,6 +195,10 @@ final class ValidatorRunnerTest {
         CoreOperationCatalog.REPAIR_AI_INSTALL,
         new io.justsearch.app.services.registry.operations.handlers.RepairAiInstallHandler(
             () -> null));
+    handlers.register(
+        CoreOperationCatalog.REMOVE_AI_FILES,
+        new io.justsearch.app.services.registry.operations.handlers.RemoveAiFilesHandler(
+            () -> null));
     // Mirror the three production Forget bindings; all validator assertions remain unchanged.
     handlers.register(CoreOperationCatalog.FORGET_INDEXED_PATH,
         new io.justsearch.app.services.registry.operations.handlers.ForgetIndexedPathHandler(

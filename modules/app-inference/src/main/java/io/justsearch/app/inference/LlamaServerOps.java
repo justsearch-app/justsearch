@@ -207,6 +207,17 @@ final class LlamaServerOps {
   private final AtomicLong launchAttempts = new AtomicLong();
 
   /**
+   * Refuses a managed launch with a plain reason while the answer model's files are being removed
+   * (design D4). Empty means launch; bound by composition, empty by default.
+   */
+  private volatile Supplier<Optional<String>> launchFence = Optional::empty;
+
+  /** Binds the managed-launch fence (design D4). */
+  void setLaunchFence(Supplier<Optional<String>> fence) {
+    this.launchFence = fence == null ? Optional::empty : fence;
+  }
+
+  /**
    * T6/T27: the rung a RESOURCE step-down reached, for the configuration it was reached under. A
    * later automatic launch of the same declared configuration starts there for the rest of this
    * Engine's life instead of failing at the top rung again.
@@ -1782,6 +1793,11 @@ final class LlamaServerOps {
     // pre-launch check mirrors the existing MISSING_DLL pattern (detect a specific missing-artifact
     // condition, throw a typed reason) but at an earlier failure point — before a process exists,
     // rather than by inspecting an already-launched process's exit code.
+    Optional<String> fenced = launchFence.get();
+    if (fenced.isPresent()) {
+      throw new ModeTransitionException(ModeTransitionException.Reason.ONLINE_START_FAILED,
+          fenced.get());
+    }
     LlamaServerConfigContext context = result.context();
     Path exe = context.inference().serverExecutable();
     if (exe == null || !Files.isRegularFile(exe)) {

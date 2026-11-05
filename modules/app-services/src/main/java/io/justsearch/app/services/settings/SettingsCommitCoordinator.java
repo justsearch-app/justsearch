@@ -958,6 +958,38 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
         Objects.requireNonNull(candidateContext, "candidateContext"));
   }
 
+  /**
+   * The settings owner's half of the removal lock (design D4): while a part's files are being
+   * removed, a candidate that would switch that part on, point it at other files, change the chat
+   * profile or withdraw its decline is refused. Checked under the commit mutex, so a removal's
+   * decline committed against an older witness and a switch-on cannot both win.
+   */
+  private void refuseWhileRemovingFiles(UiSettings prior, UiSettings next,
+      io.justsearch.app.api.settings.SettingsCandidateContext candidateContext) {
+    var removalFence = store.modelFileRemovalFence();
+    String part = removalFence == null ? null : removalFence.removingPart().orElse(null);
+    if (part == null) return;
+    boolean undeclined = prior.getDeclinedAiPackages().contains(part)
+        && !next.getDeclinedAiPackages().contains(part);
+    boolean turnsOn = switch (part) {
+      case "reranker" -> !Objects.equals(prior.getRerankerEnabled(), next.getRerankerEnabled())
+              && !Boolean.FALSE.equals(next.getRerankerEnabled())
+          || !Objects.equals(prior.getRerankerModelPath(), next.getRerankerModelPath());
+      case "chat" -> !Objects.equals(prior.getChatEnabled(), next.getChatEnabled())
+              && Boolean.TRUE.equals(next.getChatEnabled())
+          || !Objects.equals(prior.getPictureReadingEnabled(), next.getPictureReadingEnabled())
+              && !Boolean.FALSE.equals(next.getPictureReadingEnabled())
+          || !Objects.equals(prior.getLlmModelPath(), next.getLlmModelPath())
+          || candidateContext != null && candidateContext.hasChatProfile();
+      default -> false;
+    };
+    if (undeclined || turnsOn) {
+      throw refused("MODEL_FILES_REMOVING",
+          io.justsearch.app.services.ai.install.ModelFileRemovalFence.REMOVING,
+          Map.of("component", part));
+    }
+  }
+
   private void applyOwned(Reservation reservation, UiSettings candidate, AttemptControl control,
       boolean reset, io.justsearch.app.api.settings.SettingsCandidateContext candidateContext) {
     Objects.requireNonNull(control, "control");
@@ -993,6 +1025,9 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       }
       var next = new SettingsWitness(Math.addExact(active.prior.acceptedRevision(), 1), active.key);
       UiSettings preparedCandidate = store.prepareCandidate(candidate);
+      if (!active.recoveryReset()) {
+        refuseWhileRemovingFiles(active.priorSettings, preparedCandidate, candidateContext);
+      }
       // A recovery reset starts from quarantined bytes with no readable prior settings.
       // Its committed defaults are applied by the already-required successor boot.
       boolean pictureComponentChanged = !active.recoveryReset() && !Objects.equals(

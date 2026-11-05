@@ -157,6 +157,53 @@ public interface AiInstallService {
     return startInstall(acceptTerms, enableRerankerOnCompletion);
   }
 
+  /**
+   * Starts an accepted install that also downloads {@code includePackages}, parts the user had
+   * chosen not to download ("Download again"). Their saved declines are withdrawn only here, when
+   * the consented install starts, against the settings witness read at that moment; a closed or
+   * cancelled consent therefore changes nothing.
+   */
+  default Attempt startInstall(boolean acceptTerms, boolean enableRerankerOnCompletion,
+      boolean enablePictureReadingOnCompletion, Set<String> includePackages) {
+    if (includePackages != null && !includePackages.isEmpty()) {
+      throw new UnsupportedOperationException("Download again is unavailable");
+    }
+    return startInstall(acceptTerms, enableRerankerOnCompletion, enablePictureReadingOnCompletion);
+  }
+
+  /**
+   * The download plan as it would be with {@code includePackages} downloaded again, without
+   * changing any saved choice (the consent preview for "Download again").
+   */
+  default InstallPlanPreview previewInstallPlan(Set<String> includePackages) {
+    if (includePackages != null && !includePackages.isEmpty()) {
+      throw new UnsupportedOperationException("Download again is unavailable");
+    }
+    return previewInstallPlan();
+  }
+
+  /** Advanced settings - Downloaded files: measured sizes and whether each part can be removed. */
+  default DownloadedFiles downloadedFiles() {
+    throw new UnsupportedOperationException("Downloaded files are unavailable");
+  }
+
+  /** A started removal: its first report and its final report after the owner finished. */
+  record RemovalAttempt(DownloadedFiles.Removal started,
+      java.util.concurrent.CompletionStage<DownloadedFiles.Removal> completion) {}
+
+  /**
+   * Removes the downloaded files of one part when nothing uses them. Takes a part id, never a
+   * path; {@code previewDigest} names the list the confirmation showed.
+   *
+   * @throws AiInstallException with the plain reason when it refuses; nothing is deleted then
+   */
+  default RemovalAttempt removeFiles(String packageId, String previewDigest) {
+    throw new UnsupportedOperationException("Removing files is unavailable");
+  }
+
+  /** Refuses ({@link IllegalStateException}) while a part's files are being removed. */
+  default void refuseWhileRemovingFiles() {}
+
   /** Request cancellation of an in-flight install. */
   void cancel();
 

@@ -128,6 +128,44 @@ interface ModelPresence {
   packages?: Array<{ id: string; complete: boolean; presentVariantFiles?: string[] }>;
 }
 
+/** One file of `GET /api/ai/install/downloaded-files`, relative to the models folder (design D4). */
+interface DownloadedFileEntry { path?: string; sizeBytes?: number | null; reason?: string | null }
+
+/** One part as Advanced settings - Downloaded files shows it; sizes are measured on disk. */
+interface DownloadedPart {
+  id?: string;
+  label?: string;
+  state?: string;
+  sizeOnDiskBytes?: number | null;
+  declined?: boolean;
+  removable?: boolean;
+  reason?: string | null;
+  previewDigest?: string | null;
+  unavailableAfter?: string;
+  delete?: DownloadedFileEntry[];
+  kept?: DownloadedFileEntry[];
+}
+
+/** The latest removal, reported from what is actually on disk. */
+interface FileRemoval {
+  packageId?: string;
+  label?: string;
+  state?: string;
+  message?: string;
+  deleted?: DownloadedFileEntry[];
+  kept?: DownloadedFileEntry[];
+}
+
+interface DownloadedFilesView { parts?: DownloadedPart[]; removal?: FileRemoval | null }
+
+/** Parts whose files "Remove files" can delete in this step; the others show why not. */
+const REMOVABLE_PARTS = new Set(['reranker', 'chat']);
+const REMOVING_FILES = 'Removing files - try again when it finishes';
+
+function measuredSize(bytes: number | null | undefined): string {
+  return bytes == null ? 'size unknown' : formatBytes(bytes);
+}
+
 const NUM = new Intl.NumberFormat();
 const PICTURE_CHOICE_UNKNOWN = 'Saved picture reading choice is not known. Refresh settings before changing it.';
 
@@ -551,6 +589,9 @@ export class BrainSurface extends JfElement {
     featureInfo: { state: true },
     planLoading: { state: true },
     planError: { state: true },
+    downloadedFiles: { state: true },
+    removalConfirm: { state: true },
+    removalError: { state: true },
   };
 
   declare apiBase: string;
@@ -617,6 +658,13 @@ export class BrainSurface extends JfElement {
   private readonly pendingActions = new Set<string>();
   private featureOpener: HTMLElement | null = null;
   private consentFeature: string | null = null;
+  /** Parts a "Download again" consent previews and, if accepted, downloads (design D4). */
+  private consentInclude: string[] = [];
+  declare downloadedFiles: DownloadedFilesView | null;
+  /** The part whose "Remove files" confirmation is open. */
+  declare removalConfirm: string | null;
+  declare removalError: { id: string; message: string } | null;
+  private removalPoll: number | null = null;
   private pictureUncertain = false;
   private pictureAttempt: SettingsAttempt | null = null;
   private pictureApplied: boolean | null = null;
@@ -659,6 +707,9 @@ export class BrainSurface extends JfElement {
     this.activeTab = 'runtime';
     this.featureInfo = null;
     this.planLoading = false;
+    this.downloadedFiles = null;
+    this.removalConfirm = null;
+    this.removalError = null;
     this.planError = null;
   }
 
@@ -1276,6 +1327,9 @@ export class BrainSurface extends JfElement {
     // An un-answered consent prompt is transient too: a surface hidden mid-question must not come
     // back holding a modal (nor leak its scroll-lock).
     this.installConsentOpen = false;
+    // An open "Remove files" confirmation and its refusal are answers to this visit only.
+    this.removalConfirm = null;
+    this.removalError = null;
     this.closeFeatureInfo();
   }
 
@@ -1284,7 +1338,14 @@ export class BrainSurface extends JfElement {
     super.updated(changed);
     if (!changed.has('installConsentOpen')) return;
     if (this.installConsentOpen) this.consentModal.open();
-    else this.consentModal.close();
+    else {
+      this.consentModal.close();
+      if (this.consentInclude.length > 0) {
+        // Closed without accepting: nothing was saved, so the page shows the saved plan again.
+        this.consentInclude = [];
+        void this.refreshInstallPlanPreview();
+      }
+    }
   }
 
   override disconnectedCallback(): void {
@@ -1371,7 +1432,7 @@ export class BrainSurface extends JfElement {
     this.refreshing = true;
     try {
       await Promise.all([
-        this.refreshSettings(), this.refreshInstallPlanPreview(),
+        this.refreshSettings(), this.refreshInstallPlanPreview(), this.refreshDownloadedFiles(),
         this.fetchJson<EffectivePolicy>('/api/policy/effective').then(policy => {
           if (policy) this.policy = policy;
         }),
@@ -1571,17 +1632,15 @@ export class BrainSurface extends JfElement {
       const complete = this.modelPresence?.packages?.find(p => p.id === 'chat')?.complete
         ?? this.planPreview?.components?.find(c => c.id === 'chat')?.state === 'installed';
       if (!feature.selected && !complete) {
-        const component = this.planPreview?.components?.find(c => c.id === 'chat');
-        if (component?.declined || component?.state === 'declined') await this.setComponentDeclined('chat', false);
-        if (!this.runtimeError) await this.startInstall('pictures');
+        // The saved decline is withdrawn only by the accepted install (design D4): a cancelled
+        // consent leaves it, so Repair cannot restore files the user removed.
+        await this.startInstall('pictures', this.declinedIds(['chat']));
       } else await this.setPictureReadingEnabled(!feature.selected);
       return;
     }
     if (feature.id === 'reranker' && this.hasInstalledAi()) {
       if (!feature.selected && !feature.installed) {
-        const component = this.planPreview?.components?.find(c => c.id === 'reranker');
-        if (component?.declined || component?.state === 'declined') await this.setComponentDeclined('reranker', false);
-        if (!this.runtimeError) await this.startInstall('reranker');
+        await this.startInstall('reranker', this.declinedIds(['reranker']));
       } else await this.setRerankerEnabled(!feature.selected);
       return;
     }
@@ -1593,8 +1652,21 @@ export class BrainSurface extends JfElement {
   }
 
   private async changeAcquisition(id: string, selected: boolean, installed: boolean): Promise<void> {
+    if (this.hasInstalledAi() && !installed && !selected) {
+      // Switching on a missing part after install asks first; its decline is withdrawn only when
+      // the consented install starts (design D4).
+      await this.startInstall(id, this.declinedIds([id]));
+      return;
+    }
     await this.setComponentDeclined(id, selected);
-    if (this.hasInstalledAi() && !installed && !selected && !this.runtimeError) await this.startInstall(id);
+  }
+
+  /** The subset of {@code ids} the user has declined, per the current plan preview. */
+  private declinedIds(ids: string[]): string[] {
+    return ids.filter(id => {
+      const component = this.planPreview?.components?.find(c => c.id === id);
+      return component?.declined === true || component?.state === 'declined';
+    });
   }
 
   private openFeatureInfo(id: BrainFeatureId, event: Event): void {
@@ -1715,7 +1787,8 @@ export class BrainSurface extends JfElement {
       // Passive reads never invalidate an unfinished batch or take the choice lock.
       // Start the next delay only after both reads finish, so slow windows converge.
       if (!this.planReads && !this.planLockReason() && !this.busy['inference-switch']) {
-        await Promise.all([this.refreshSettings(), this.refreshInstallPlanPreview()]);
+        await Promise.all([this.refreshSettings(), this.refreshInstallPlanPreview(),
+          this.refreshDownloadedFiles()]);
       }
       if (this.pollSettings === timer && this.isConnected) {
         this.pollSettings = null;
@@ -1728,6 +1801,153 @@ export class BrainSurface extends JfElement {
   private stopAllPolling(): void {
     if (this.pollSettings !== null) window.clearTimeout(this.pollSettings);
     this.pollSettings = null;
+    if (this.removalPoll !== null) window.clearTimeout(this.removalPoll);
+    this.removalPoll = null;
+  }
+
+  // ---------- Downloaded files: Remove files and Download again (design D4) ----------
+
+  /** A removal runs here or in another window: every page route that adds or uses files waits. */
+  private removalRunning(): boolean {
+    return this.pendingActions.has('remove-files') || this.downloadedFiles?.removal?.state === 'running';
+  }
+
+  private async refreshDownloadedFiles(): Promise<void> {
+    if (!this.apiBase && this.apiBase !== '') return;
+    const view = await this.fetchJson<DownloadedFilesView>('/api/ai/install/downloaded-files');
+    if (!this.isConnected) return;
+    if (view) this.downloadedFiles = view;
+    if (view?.removal?.state === 'running') this.scheduleRemovalPoll();
+  }
+
+  /** Follows a running removal (this window's or another's) until it reports what is left. */
+  private scheduleRemovalPoll(): void {
+    if (this.removalPoll !== null) return;
+    this.removalPoll = window.setTimeout(async () => {
+      this.removalPoll = null;
+      await this.refreshDownloadedFiles();
+      if (this.downloadedFiles?.removal?.state !== 'running') {
+        await this.refreshInstallPlanPreview();
+        void refreshAiInstallNow();
+      }
+    }, 1000);
+  }
+
+  private openRemoval(id: string): void {
+    this.removalError = null;
+    this.removalConfirm = id;
+    void this.updateComplete.then(() => this.shadowRoot
+      ?.querySelector<HTMLElement>(`#remove-files-title-${id}`)?.focus({ preventScroll: true }));
+  }
+
+  private closeRemoval(id: string): void {
+    this.removalConfirm = null;
+    void this.updateComplete.then(() => this.focusPartAction(id));
+  }
+
+  /** Focus returns to the row's own action, or to the outcome when the row changed. */
+  private focusPartAction(id: string): void {
+    const target = this.shadowRoot?.querySelector<HTMLElement>(`[data-remove="${id}"]`)
+      ?? this.shadowRoot?.querySelector<HTMLElement>(`[data-download-again="${id}"]`)
+      ?? this.shadowRoot?.querySelector<HTMLElement>('[data-testid="removal-outcome"]');
+    target?.focus({ preventScroll: true });
+  }
+
+  private async confirmRemoval(part: DownloadedPart): Promise<void> {
+    const id = part.id ?? '';
+    if (this.removalRunning() || !part.previewDigest) return;
+    this.removalConfirm = null;
+    await this.withBusy('remove-files', async () => {
+      this.removalError = null;
+      try {
+        await this.invokeOp('core.remove-ai-files', { packageId: id, previewDigest: part.previewDigest });
+      } catch (error) {
+        this.removalError = { id, message: error instanceof Error ? error.message : String(error) };
+      }
+      await this.refreshDownloadedFiles();
+    });
+    await this.refreshInstallPlanPreview();
+    void refreshAiInstallNow();
+    await this.updateComplete;
+    this.focusPartAction(id);
+  }
+
+  /** Asks first, with the download size and licence; only the accepted install withdraws the decline. */
+  private async downloadAgain(id: string): Promise<void> {
+    if (this.planLockReason()) return;
+    await this.startInstall(null, [id]);
+  }
+
+  private renderDownloadedFiles(): TemplateResult {
+    const view = this.downloadedFiles;
+    if (!view) return html`<p class="advanced-note">Checking the files on this computer…</p>`;
+    const running = this.removalRunning();
+    const rows = (view.parts ?? []).filter(p => p.state === 'downloaded'
+      || (REMOVABLE_PARTS.has(p.id ?? '') && p.declined === true));
+    const removal = view.removal;
+    return html`<div class="downloaded-files" data-testid="downloaded-files">
+      ${rows.length === 0 ? html`<p class="advanced-note">No downloaded model files.</p>`
+        : rows.map(part => this.renderDownloadedPart(part, running))}
+      ${running ? html`<p role="status">Removing files…</p>` : nothing}
+      ${removal && removal.state !== 'running' ? this.renderRemovalOutcome(removal) : nothing}
+    </div>`;
+  }
+
+  private renderDownloadedPart(part: DownloadedPart, running: boolean): TemplateResult {
+    const id = part.id ?? '';
+    const downloaded = part.state === 'downloaded';
+    const error = this.removalError?.id === id ? this.removalError.message : null;
+    return html`<div class="advanced-row" data-part=${id}>
+        <div>${part.label ?? id}<p>${downloaded ? `${measuredSize(part.sizeOnDiskBytes)} on disk` : 'Not downloaded'}</p></div>
+        <div>
+          ${downloaded && part.removable ? html`<button type="button" data-remove=${id}
+            aria-expanded=${this.removalConfirm === id ? 'true' : 'false'} ?disabled=${running}
+            @click=${() => this.openRemoval(id)}>${icon({ name: 'trash-2', size: 14 })} Remove files</button>` : nothing}
+          ${downloaded && !part.removable && part.reason ? html`<span class="removal-reason">${part.reason}</span>` : nothing}
+          ${!downloaded && REMOVABLE_PARTS.has(id) && part.declined === true ? html`<button type="button"
+            data-download-again=${id} ?disabled=${running} @click=${() => void this.downloadAgain(id)}>
+            ${icon({ name: 'download', size: 14 })} Download again</button>` : nothing}
+          ${error ? html`<p role="alert">${error}</p>` : nothing}
+        </div>
+      </div>
+      ${this.removalConfirm === id ? this.renderRemovalConfirm(part) : nothing}`;
+  }
+
+  private renderRemovalConfirm(part: DownloadedPart): TemplateResult {
+    const id = part.id ?? '';
+    const deleted = part.delete ?? [];
+    const kept = part.kept ?? [];
+    const known = deleted.every(f => f.sizeBytes != null);
+    const total = known ? formatBytes(deleted.reduce((sum, f) => sum + (f.sizeBytes ?? 0), 0)) : 'size unknown';
+    return html`<div class="removal-confirm" role="group" aria-labelledby=${`remove-files-title-${id}`}
+        data-testid="removal-confirm">
+      <strong id=${`remove-files-title-${id}`} tabindex="-1">Remove ${part.label ?? id} files?</strong>
+      <p>This deletes ${deleted.length} ${deleted.length === 1 ? 'file' : 'files'} (${total}) from this computer.
+        ${part.unavailableAfter ? `${part.unavailableAfter} won't work until you download it again. ` : ''}Each
+        file is checked first; a file JustSearch can't confirm it downloaded is kept. Your documents, the
+        index and conversations are not touched.</p>
+      <p>Deleted:</p>
+      <ul class="removal-files">${deleted.map(f => html`<li><code>${f.path}</code> · ${measuredSize(f.sizeBytes)}</li>`)}</ul>
+      ${kept.length > 0 ? html`<p>Kept:</p>
+        <ul class="removal-files">${kept.map(f => html`<li><code>${f.path}</code> · ${measuredSize(f.sizeBytes)} · ${f.reason}</li>`)}</ul>` : nothing}
+      <div class="row">
+        <button type="button" class="confirm-remove" @click=${() => void this.confirmRemoval(part)}>Remove files</button>
+        <button type="button" @click=${() => this.closeRemoval(id)}>Cancel</button>
+      </div>
+    </div>`;
+  }
+
+  private renderRemovalOutcome(removal: FileRemoval): TemplateResult {
+    const headline = removal.state === 'removed' ? 'Files removed'
+      : removal.state === 'interrupted' ? 'The removal was interrupted'
+        : removal.state === 'refused' || removal.state === 'not-removed' ? 'Nothing was removed'
+          : 'Some files were not removed';
+    const kept = removal.kept ?? [];
+    return html`<div role=${removal.state === 'removed' ? 'status' : 'alert'} tabindex="-1"
+        data-testid="removal-outcome">
+      <p>${removal.label ?? removal.packageId}: ${headline}. ${removal.message ?? ''}</p>
+      ${kept.length > 0 ? html`<ul class="removal-files">${kept.map(f => html`<li><code>${f.path}</code> · ${f.reason ?? ''}</li>`)}</ul>` : nothing}
+    </div>`;
   }
 
   private async withBusy<T>(key: string, fn: () => Promise<T>): Promise<T | null> {
@@ -1841,6 +2061,7 @@ export class BrainSurface extends JfElement {
    */
   private planLockReason(): string | null {
     if (!this.aiKnown()) return 'Checking AI status before changing features.';
+    if (this.removalRunning()) return REMOVING_FILES;
     if (this.installStatus?.state === 'running' || this.installStatus?.paused === true
       || this.installConsentOpen || this.pendingActions.has('install-start') || this.pendingActions.has('install-repair')) {
       return 'Changes apply after this download';
@@ -1854,12 +2075,13 @@ export class BrainSurface extends JfElement {
     return null;
   }
 
-  private async startInstall(feature: string | null = null): Promise<void> {
+  private async startInstall(feature: string | null = null, include: string[] = []): Promise<void> {
     // An unresolved preview can open a consent dialog, but cannot authorize a download.
     // Only mutations / an existing consent or download prevent opening it.
     if (this.installConsentOpen || this.installStatus?.state === 'running' || this.installStatus?.paused
-      || this.pendingActions.size > 0) return;
+      || this.pendingActions.size > 0 || this.removalRunning()) return;
     this.consentFeature = feature;
+    this.consentInclude = include;
     // Lock before fetching: concurrent clicks cannot change the plan being consented to.
     this.installConsentOpen = true;
     await this.refreshInstallPlanPreview();
@@ -1873,8 +2095,11 @@ export class BrainSurface extends JfElement {
       const choice = this.choiceRevision;
       this.planLoading = true;
       this.planError = null;
+      const include = this.installConsentOpen ? this.consentInclude : [];
       const [preview, manifest, presence] = await Promise.all([
-        this.fetchJson<InstallPlanPreview>('/api/ai/install/plan-preview'),
+        this.fetchJson<InstallPlanPreview>(include.length > 0
+          ? `/api/ai/install/plan-preview?include=${include.map(encodeURIComponent).join(',')}`
+          : '/api/ai/install/plan-preview'),
         getAiInstallManifest(this.base()).catch(() => null),
         this.fetchJson<ModelPresence>('/api/ai/models/status'),
       ]);
@@ -1927,12 +2152,15 @@ export class BrainSurface extends JfElement {
   private async confirmInstall(): Promise<void> {
     if (this.planLoading || !this.consentReady()) return;
     const feature = this.consentFeature;
+    const include = this.consentInclude;
+    this.consentInclude = [];
     this.installConsentOpen = false;
     await this.withBusy('install-start', async () => {
       this.runtimeError = null;
       const data = (await this.invokeOp('core.start-ai-install', { acceptTerms: true,
         ...(feature === 'reranker' ? { enableRerankerOnCompletion: true } : {}),
         ...(feature === 'pictures' ? { enablePictureReadingOnCompletion: true } : {}),
+        ...(include.length > 0 ? { includePackages: include } : {}),
       })) as InstallStatus;
       if (data) {
         void refreshAiInstallNow();
@@ -3347,7 +3575,9 @@ export class BrainSurface extends JfElement {
       </section>
       ${this.renderRuntimeSection()}
       <section aria-label="Downloaded files"><h3 class="advanced-heading">Downloaded files</h3>
-        <p class="advanced-note">Registry footprints, not measured disk use. Include or skip optional parts for acquisition; existing files are kept.</p>
+        <p class="advanced-note">Files on this computer, measured on disk. Remove files deletes a switched-off part's downloaded files; Download again asks first.</p>
+        ${this.renderDownloadedFiles()}
+        <p class="advanced-note">Download choices use registry sizes. Skipping a part keeps its existing files.</p>
         ${this.renderComponentList()}${this.renderTierBreakdown()}${this.renderPackageHistory()}${this.renderSearchQualityFeatures()}
         ${this.renderPackImport()}
       </section>

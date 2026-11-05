@@ -1,0 +1,87 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-05T06:21:25.571Z",
+  "revision": "b21749f0e07917daceb0df14e57bd2e9163cb91b",
+  "tree": "05dcb9b8aad4c3b49246865afba13f83b567d8c3",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.remove-files.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/7u_pptlp/tmp/test-intent-vitest-23497-1793859677732.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2490
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.remove-files.test.ts#Best match first: Cancel leaves the decline, Accept carries it to the install start",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.remove-files.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ab6825975eb9380fe54391f6e17a3a04fb7294e2c110680edee01b0b681edbff",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "switching on a removed part saves nothing until the consented install starts Best match first: Cancel leaves the decline, Accept carries it to the install start",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.remove-files.test.ts#Answers and picture reading: a declined answer model is undeclined only by the accepted start",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.remove-files.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ab6825975eb9380fe54391f6e17a3a04fb7294e2c110680edee01b0b681edbff",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "switching on a removed part saves nothing until the consented install starts Answers and picture reading: a declined answer model is undeclined only by the accepted start",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "b21749f0e0",
+    "revision": "b21749f0e07917daceb0df14e57bd2e9163cb91b",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.remove-files.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/7u_pptlp/tmp/test-intent-vitest-23497-1793859683312.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1769,
+        "output": "JSON report written to /home/elias/.cache/am/7u_pptlp/tmp/test-intent-vitest-23497-1793859683312.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.remove-files.test.ts#Best match first: Cancel leaves the decline, Accept carries it to the install start",
+        "classification": "assertion",
+        "detail": "switching on a removed part saves nothing until the consented install starts Best match first: Cancel leaves the decline, Accept carries it to the install start:  AssertionError: expected [ Array(1) ] to deeply equal []\n    at /home/elias/.cache/am/7u_pptlp/tmp/test-intent-before-ncNb0b/modules/ui-web/src/shell-v0/views/BrainSurface.remove-files.test.ts:212:22\n    at file:///home/elias/.cache/am/7u_pptlp/tmp/test-intent-before-ncNb0b/modules/ui-web/node_modul"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.remove-files.test.ts#Answers and picture reading: a declined answer model is undeclined only by the accepted start",
+        "classification": "assertion",
+        "detail": "switching on a removed part saves nothing until the consented install starts Answers and picture reading: a declined answer model is undeclined only by the accepted start:  AssertionError: Answer questions: expected [ Array(1) ] to deeply equal []\n    at /home/elias/.cache/am/7u_pptlp/tmp/test-intent-before-ncNb0b/modules/ui-web/src/shell-v0/views/BrainSurface.remove-files.test.ts:236:31\n    at file:///home/elias/.cache/am/7u_pptlp/tmp/test-intent-before-ncNb0b/modules"
+      }
+    ]
+  },
+  "digest": "sha256:9dc7a0f3e6333dcb0863fef22c7eec64df8fd1b658b2688dd3ac5c2c8e833b10"
+}

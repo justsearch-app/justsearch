@@ -28,6 +28,23 @@ final class BrainInstallHandlerSupport {
         io.justsearch.agent.api.registry.OperationResult.success(message, snapshot), completion);
   }
 
+  /** The string items of array {@code key}; empty when absent or malformed. */
+  static java.util.Set<String> parseStrings(String argumentsJson, String key) {
+    try {
+      JsonNode v = HandlerJson.MAPPER.readTree(
+          argumentsJson == null || argumentsJson.isBlank() ? "{}" : argumentsJson).get(key);
+      if (v == null || !v.isArray()) return java.util.Set.of();
+      var items = new java.util.LinkedHashSet<String>();
+      for (JsonNode item : v) {
+        if (!item.isString() || item.asString().isBlank()) return java.util.Set.of();
+        items.add(item.asString());
+      }
+      return java.util.Set.copyOf(items);
+    } catch (RuntimeException malformed) {
+      return java.util.Set.of();
+    }
+  }
+
   static boolean parseAcceptTerms(String argumentsJson) {
     return parseBoolean(argumentsJson, "acceptTerms");
   }

@@ -317,6 +317,9 @@ public final class ServicePhase {
             in.knowledgeServer(),
             enterprisePolicy,
             chatHolds, settings);
+    // Design D4: the settings owner, pack import and runtime activation read the install owner's
+    // removal lock from the shared settings store; bound before any of them can run.
+    in.settingsStore().bindModelFileRemovalFence(aiInstallHelper.removalFence());
     PackAllowlistService packAllowlistService = new PackAllowlistService();
     AiPackImportService aiPackImportHelper =
         new AiPackImportService(
@@ -363,6 +366,20 @@ public final class ServicePhase {
     // dependency can only run in this direction. A method reference, not a captured value: the
     // observation changes with every activation and must be read at status time.
     aiInstallHelper.setFunctionalStatusSource(runtimeActivationHelper::functionalStatusByPackage);
+    // Design D4: "Remove files" asks each runtime owner whether the part's files are in use, and
+    // the managed answer server refuses to launch while the answer model's files are removed.
+    var removalFence = aiInstallHelper.removalFence();
+    var answerRuntime = in.inferenceManager();
+    if (answerRuntime != null) {
+      answerRuntime.setManagedLaunchFence(() -> removalFence.removingPart()
+          .filter("chat"::equals)
+          .map(part -> io.justsearch.app.services.ai.install.ModelFileRemovalFence.REMOVING));
+    }
+    aiInstallHelper.setRemovalUsageProbe(io.justsearch.app.services.ai.install.ModelFileUsage.probe(
+        workerFeatureCache,
+        answerRuntime == null ? null : answerRuntime::chatActuator,
+        () -> answerRuntime != null && answerRuntime.isUsingExternalLlamaServer(),
+        chatHolds));
 
 
     // DiagnosticsService: SPI suppliers read from the late-bindings holder.

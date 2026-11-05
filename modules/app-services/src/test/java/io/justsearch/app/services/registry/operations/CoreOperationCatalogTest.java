@@ -81,6 +81,7 @@ final class CoreOperationCatalogTest {
             "core.accept-gaps",
             "core.cancel-ai-install",
             "core.repair-ai-install",
+            "core.remove-ai-files",
             "core.create-user-policy",
             "core.allowlist-add-digest",
             "core.reset-settings",
@@ -416,6 +417,22 @@ final class CoreOperationCatalogTest {
     Operation op = catalog.findById(CoreOperationCatalog.REPAIR_AI_INSTALL).orElseThrow();
     assertEquals(RiskTier.MEDIUM, op.policy().risk());
     assertInstanceOf(ConfirmStrategy.Inline.class, op.policy().confirm());
+  }
+
+  @Test
+  void removeAiFilesIsHighRiskInlineConfirmTakingOnlyAPartIdAndItsPreview() {
+    Operation op = catalog.findById(CoreOperationCatalog.REMOVE_AI_FILES).orElseThrow();
+    assertEquals(RiskTier.HIGH, op.policy().risk());
+    assertInstanceOf(ConfirmStrategy.Inline.class, op.policy().confirm());
+    assertEquals(Set.of(ExecutorTag.UI), op.executors());
+    var inputs = tools.jackson.databind.json.JsonMapper.builder().build()
+        .readTree(op.intf().inputs());
+    assertEquals(Set.of("packageId", "previewDigest"),
+        Set.copyOf(inputs.path("properties").propertyNames()));
+    var parts = new java.util.ArrayList<String>();
+    for (var part : inputs.path("properties").path("packageId").path("enum")) parts.add(part.asString());
+    assertEquals(java.util.List.of("reranker", "chat"), parts);
+    assertFalse(inputs.path("additionalProperties").asBoolean(true), "no path can be supplied");
   }
 
   @Test

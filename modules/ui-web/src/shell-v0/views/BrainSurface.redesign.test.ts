@@ -68,6 +68,12 @@ beforeEach(() => {
     const path = String(input);
     if (path.endsWith('/api/settings/v2')) return settingsGet ? settingsGet() : json({ ui: { chatEnabled }, llm: {} });
     if (path.endsWith('/plan-preview')) return previewGet ? previewGet() : json(preview);
+    // "Download again" previews a declined part as included, without saving the choice first.
+    if (path.includes('/plan-preview?include=')) {
+      const included = new URL(path, 'http://x').searchParams.get('include')!.split(',');
+      return json({ ...preview, totalDownloadBytes: 1024, components: preview.components!.map(c =>
+        included.includes(c.id ?? '') ? { ...c, declined: false, state: 'to-download' } : c) });
+    }
     if (path.endsWith('/manifest')) return json(manifest, manifestFails ? 503 : 200);
     if (path.includes('/decline')) {
       declines.push(path); await declineWait;
