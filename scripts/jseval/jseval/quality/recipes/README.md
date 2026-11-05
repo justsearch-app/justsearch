@@ -358,6 +358,11 @@ python -m jseval.quality.topical_labels freeze
   like the primary's, stamped with revision and dispatch time, and keep only a
   digest of each reply; it pauses and stops with the same reasons
   (`quota: ChatGPT usage limit reached`).
+  SIGTERM and SIGINT cleanup covers setup as well as calls. Each home holds
+  an exclusive file lock for its lifetime; every labelling command first
+  removes abandoned `codex-home-*` folders, leaving locked, active homes alone.
+  SIGKILL cannot run cleanup: the login copy remains until the next run of
+  any labelling step (including `second-judge`, `spot`, `accept` or `freeze`).
 - **Decision**, fixed before any second grade: the judges agree when both give
   the same binary label (grade >= 2). Below 80% of the 150 pairs, unrounded
   (119 of 150), FAIL, and the owner is not asked. At or above it, the owner's

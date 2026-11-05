@@ -45,6 +45,7 @@ from collections import Counter, defaultdict
 import concurrent.futures
 import contextlib
 from dataclasses import replace
+import fcntl
 import json
 import math
 import os
@@ -699,11 +700,39 @@ def _verify_codex_home(home: Path, model: str) -> None:
 
 
 @contextlib.contextmanager
+def _codex_homes_lock():
+    """Serialize home creation and sweeping, including the gap before a new home is locked."""
+    fd = os.open(WORK, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        yield
+    finally:
+        os.close(fd)
+
+
+def _cleanup_codex_homes() -> None:
+    """Remove only abandoned credential homes; a live run holds its home's lock throughout."""
+    if not WORK.is_dir():
+        return
+    with _codex_homes_lock():
+        for home in WORK.glob("codex-home-*"):
+            if home.is_symlink() or not home.is_dir():
+                continue
+            with (home / "lock").open("a+b") as lock:
+                try:
+                    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except BlockingIOError:
+                    continue
+                shutil.rmtree(home)
+
+
+@contextlib.contextmanager
 def codex_home(model: str = SECOND_MODEL):
     """A fresh CODEX_HOME for one second-judge run: the tool's own config and a copy of the stored
     ChatGPT login (never an API key) with a placeholder refresh token, verified tool-free before any call,
     deleted afterwards. The copy cannot refresh, so the run can never rotate or overwrite the
     owner's stored login; a run whose access token expires stops with codex's error."""
+    _cleanup_codex_homes()
     if any(n.startswith(CODEX_OVERRIDE_PREFIXES) or n in CODEX_OVERRIDES for n in os.environ):
         raise ruq.SubscriptionRequired("ChatGPT subscription required; remove API/provider overrides")
     source = _codex_auth_path()
@@ -715,8 +744,24 @@ def codex_home(model: str = SECOND_MODEL):
         raise ruq.SubscriptionRequired("ChatGPT subscription required; the stored codex login is not a "
                                        "ChatGPT login without an API key")
     WORK.mkdir(parents=True, exist_ok=True)
-    home = Path(tempfile.mkdtemp(prefix="codex-home-", dir=WORK))
+    home, lock = None, None
+    previous = {}
+
+    def terminate(signum, frame):
+        raise SystemExit(128 + signum)
+
     try:
+        for signum in (signal.SIGTERM, signal.SIGINT):
+            previous[signum] = signal.signal(signum, terminate)
+        with _codex_homes_lock():
+            # Defer termination until the home is owned and its lifetime lock is held.
+            mask = signal.pthread_sigmask(signal.SIG_BLOCK, previous)
+            try:
+                home = Path(tempfile.mkdtemp(prefix="codex-home-", dir=WORK))
+                lock = (home / "lock").open("a+b")
+                fcntl.flock(lock, fcntl.LOCK_EX)
+            finally:
+                signal.pthread_sigmask(signal.SIG_SETMASK, mask)
         fd = os.open(home / "auth.json", os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(fd, "wb") as f:
             f.write(_without_refresh_token(copied))
@@ -724,7 +769,17 @@ def codex_home(model: str = SECOND_MODEL):
         _verify_codex_home(home, model)
         yield home
     finally:
-        shutil.rmtree(home)
+        mask = signal.pthread_sigmask(signal.SIG_BLOCK, previous)
+        try:
+            if home is not None:
+                with _codex_homes_lock():
+                    shutil.rmtree(home)
+        finally:
+            if lock is not None:
+                lock.close()
+            for signum, handler in previous.items():
+                signal.signal(signum, handler)
+            signal.pthread_sigmask(signal.SIG_SETMASK, mask)
 
 
 REFRESH_PLACEHOLDER = "disabled-in-isolated-home"
@@ -920,6 +975,7 @@ def judge(*, max_calls: int, concurrency: int = 1, phase: str = "labels", revisi
 def second_judge(*, max_calls: int, concurrency: int = 1, phase: str = "labels", revision: int = 0,
                  max_seconds: float = 6 * 3600, call_timeout: float = CALL_TIMEOUT) -> dict:
     """The second judge over exactly the drawn sample's pairs; stops as ``_judge_loop`` says."""
+    _cleanup_codex_homes()
     after = _revision_after(revision)
     c, _ = _collection()
     pools = load_pools(c)
@@ -1246,6 +1302,7 @@ def _state(revision: int):
 
 def spot(revision: int = 0) -> int:
     """Draws the owner's spot check once the second judge has graded every sample pair."""
+    _cleanup_codex_homes()
     c, _, ex, done, record, second, rows = _state(revision)
     path = _sample_path(revision, "spot")
     if path.exists():
@@ -1324,6 +1381,7 @@ def _record_decision(revision: int, result: dict) -> None:
 
 
 def accept(revision: int = 0, sheet: Path | None = None) -> dict:
+    _cleanup_codex_homes()
     _check_revision(revision)
     if _acceptance_path(revision).exists():
         raise LabelError(f"revision {revision} is decided ({_acceptance_path(revision).name}); "
@@ -1381,6 +1439,7 @@ def frozen_collection(c: Collection, pools: dict, done: dict) -> tuple[Collectio
 
 
 def freeze(revision: int = 0) -> int:
+    _cleanup_codex_homes()
     _check_revision(revision)
     decided = [r for r in range(MAX_REVISION + 1) if _acceptance_path(r).exists()]
     if not decided or decided[-1] != revision:
@@ -1441,6 +1500,7 @@ def main(argv=None) -> int:
         steps.add_parser(name).add_argument("--revision", type=int, default=0)
     args = parser.parse_args(argv)
     try:
+        _cleanup_codex_homes()
         if args.step == "extract":
             return extract(args.timeout_sec)
         if args.step == "pool":
