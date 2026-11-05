@@ -599,7 +599,7 @@ def test_sensitivity_history_isolated_and_effective_profile_checked(tmp_path, mo
 
 
 def write_timed_history(c, folder, *, sample=30, seed=0, seconds=(.1, .5),
-                        startup=20, started='2026-11-02T10:00:00Z', **profile):
+                        startup=20, scoring=None, started='2026-11-02T10:00:00Z', **profile):
     record = labelled(c, sample=sample, seed=seed, started=started)
     record = replace(record, header=replace(record.header,
         sensitivity={**record.header.sensitivity,
@@ -608,10 +608,78 @@ def write_timed_history(c, folder, *, sample=30, seed=0, seconds=(.1, .5),
         results=tuple(replace(q, timings={'elapsed_seconds': seconds[i % len(seconds)]})
                       for i, q in enumerate(record.results)))
     record.write(folder/'run.jsonl')
-    # Scoring includes confirmation/readback, so it must never supply query time.
+    # Legacy history may lack a scoring phase; query work always comes from JSONL.
+    phases = {'startup': startup, 'waiting': 100}
+    if scoring is not None:
+        phases['scoring'] = scoring
     (folder/'done.json').write_text(json.dumps({'error': None,
-        'phase_seconds': {'startup': startup, 'waiting': 100, 'scoring': 70000}}))
+        'phase_seconds': phases}))
     return record
+
+
+@pytest.mark.parametrize('seconds, scoring, total, fits', [
+    ((.1,), 12, 431.375, True), ((2,), 69, 1155.75, False)])
+def test_measured_confirmation_scales_sample_to_full_window(
+        tmp_path, monkeypatch, seconds, scoring, total, fits):
+    c = make_collection({'en/vague': 305})
+    record = write_timed_history(c, tmp_path/'sample', seconds=seconds,
+                                startup=301.6, scoring=scoring)
+    monkeypatch.setattr(os, 'sched_getaffinity', lambda _: {2, 3, 4, 5})
+    estimate, startup, _ = sensitivity.estimate(c, record.header.request_config,
+        record.header.model_hashes, tmp_path, sensitivity.declaration(c, {}, None, None, 42))
+    assert estimate == pytest.approx(total)
+    assert startup == pytest.approx(377)
+    window = run.estimate_window([estimate], [startup], False)
+    if fits:
+        run.require_budget(window, 600)
+    else:
+        with pytest.raises(run.RunRefused, match='exceeds budget 600s'):
+            run.require_budget(window, 600)
+
+
+def test_confirmation_uses_largest_of_last_five_matching_runs(tmp_path, monkeypatch):
+    c = make_collection({'en/vague': 300})
+    for i, confirmation in enumerate((1000, 1, 7, 2, 3, 4)):
+        record = write_timed_history(c, tmp_path/str(i), seconds=(.1,),
+            scoring=3+confirmation, started=f'2026-11-02T10:0{i}:00Z')
+    monkeypatch.setattr(os, 'sched_getaffinity', lambda _: {2, 3, 4, 5})
+    args = (c, record.header.request_config, record.header.model_hashes, tmp_path,
+            sensitivity.declaration(c, {}, None, None, 42))
+    # The oldest 1000s observation is outside the last five; use 7s, not their mean.
+    assert sensitivity.estimate(*args)[:2] == pytest.approx((76.25, 25))
+    write_timed_history(c, tmp_path/'new-profile', seconds=(.2,), scoring=7,
+        effective_settings={'provider': 'other'}, started='2026-11-02T10:06:00Z')
+    assert sensitivity.estimate(*args)[:2] == pytest.approx((106.25, 25))
+
+
+@pytest.mark.parametrize('missing', ['phases', 'scoring', 'timing'])
+def test_confirmation_falls_back_to_startup_without_measurements(tmp_path, monkeypatch, missing):
+    c = make_collection({'en/vague': 300})
+    folder = tmp_path/'sample'
+    record = write_timed_history(c, folder, seconds=(.1,), scoring=12)
+    done = json.loads((folder/'done.json').read_text())
+    if missing == 'phases':
+        del done['phase_seconds']
+    elif missing == 'scoring':
+        del done['phase_seconds']['scoring']
+    else:
+        replace(record, results=(replace(record.results[0], timings={}),
+                                 *record.results[1:])).write(folder/'run.jsonl')
+    (folder/'done.json').write_text(json.dumps(done))
+    monkeypatch.setattr(os, 'sched_getaffinity', lambda _: {2, 3, 4, 5})
+    total, startup, _ = sensitivity.estimate(c, record.header.request_config,
+        record.header.model_hashes, tmp_path, sensitivity.declaration(c, {}, None, None, 42))
+    assert startup == (56.25 if missing == 'phases' else 25)
+    assert total == pytest.approx(2*startup + 300*(15 if missing == 'timing' else .125) + 5)
+
+
+def test_confirmation_clamps_negative_residual_to_zero(tmp_path, monkeypatch):
+    c = make_collection({'en/vague': 300})
+    record = write_timed_history(c, tmp_path/'sample', seconds=(.1,), scoring=2.9)
+    monkeypatch.setattr(os, 'sched_getaffinity', lambda _: {2, 3, 4, 5})
+    total, _, _ = sensitivity.estimate(c, record.header.request_config,
+        record.header.model_hashes, tmp_path, sensitivity.declaration(c, {}, None, None, 42))
+    assert total == pytest.approx(67.5)
 
 
 @pytest.mark.parametrize('seconds, total, fits', [((.1, .5), 167.5, True), ((2,), 805, False)])

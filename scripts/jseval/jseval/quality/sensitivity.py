@@ -368,8 +368,13 @@ def estimate(c, request, models, runs, declaration):
                          if times and all(isinstance(v, (int, float)) and not isinstance(v, bool)
                                           and math.isfinite(v) and v >= 0 for v in times)
                          else None)
+            scoring = phases.get('scoring')
+            confirmation = (max(0, scoring - sum(times))
+                            if per_query is not None and isinstance(scoring, (int, float))
+                            and not isinstance(scoring, bool) and math.isfinite(scoring) and scoring >= 0
+                            else None)
             expected = {k: arm[k] for k in ('effective_settings', 'effective_cpus')}
-            observed.append((h.started, per_query, startup, expected))
+            observed.append((h.started, per_query, startup, expected, confirmation))
         except (ValueError, OSError, KeyError, TypeError):
             continue
     if observed:
@@ -379,11 +384,12 @@ def estimate(c, request, models, runs, declaration):
         times = [row[1] for row in matching if row[1] is not None][-5:]
         per_query = max(times)*1.25 if times else 15
         startup = max(row[2] for row in matching[-5:])*1.25
-        # Startup includes adoption's content/identity confirmation. Allow the
-        # same again for post-score confirmation: the scoring phase includes it
-        # and readback, so only per-query elapsed_seconds can measure query work.
+        confirmations = [row[4] for row in matching[-5:] if row[4] is not None]
+        # Scoring includes confirmation/readback as well as query work. Use its
+        # measured remainder, or another startup allowance for legacy history.
+        confirmation = max(confirmations)*1.25 if confirmations else startup
         # The window adds its existing cleanup reserve in run.estimate_window.
-        return 2*startup + declaration['sample_size']*per_query + 5, startup, expected
+        return startup + confirmation + declaration['sample_size']*per_query + 5, startup, expected
     return cold_estimate(declaration['sample_size']), 45, None
 
 
