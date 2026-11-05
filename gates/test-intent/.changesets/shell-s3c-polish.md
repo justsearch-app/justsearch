@@ -638,8 +638,29 @@ the person's own action, so it waits in Needs you. The own-transport cases of th
       ],
       "evidence": "gates/test-intent/evidence/shell-s3c-purpose-preserved.json",
       "newChecks": [
-        "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts#renders risk, args summary, and an irreversibility warning when provided; never the Engine's gate text",
         "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts#a plain-language purpose stays visible in the protected dialog"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "The protected dialog states risk in plain words ('High risk' rather than 'Risk: HIGH'), with its arguments and irreversibility warning, and never the Engine's diagnostic text.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "design decisions of the frame build, within the canonical design",
+          "choice": "the protected dialog shows a request's purpose only when the whole line is plain words and hides it otherwise",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s3c-risk-wording.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts#renders risk, args summary, and an irreversibility warning when provided; never the Engine's gate text"
       ]
     },
     {
@@ -739,5 +760,16 @@ the person's own action, so it waits in Needs you. The own-transport cases of th
   "verdict": "accept",
   "digest": "sha256:e73a805573acef8f39d3f6a9bfd24772d38de82258c817d5dd8294643d2163df",
   "note": "Independent audit (PR audit-selected): all 45 listed checks covered, 43 repaired checks with assertion fail-before; mixed keyed and legacy history across 120 orders fails before and passes after; existing assertion changes accounted for. Transcribed by the orchestrator from the auditor's answer (Codex sandbox)."
+}
+```
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "01a1ad4d-0fcf-79d1-aa68-57c101daf301",
+  "verdict": "reject",
+  "digest": "sha256:2b378f72ebb0974b2078c293a7d437616ae8ec2572dc3388a0d8c2a4511d3171",
+  "note": "Audit: the enriched-prompt check in entry 24 also pins the repaired risk wording, so it is a repair, not preservation; all other entries and 324 frontend checks held. Repaired since: that check has its own repaired entry with assertion fail-before evidence. The acceptance on this digest (01a1ad4c-f06a-7432-99f2-ef530ef9f03f) accepted the product changes. Transcribed by the orchestrator (Codex sandbox)."
 }
 ```
