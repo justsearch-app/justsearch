@@ -804,17 +804,11 @@ export class AuthorizationHost extends JfElement {
     return prompt.arrival === 'needs-you' ? { who: 'an agent on this computer', detail: '' } : null;
   }
 
-  /** Keep authored plain words, excluding the Engine's gate diagnostics and raw payloads. */
+  /** Show the whole purpose only when it contains no Engine syntax or names. */
   private static plainPurpose(prompt: AuthorizationPrompt): string | undefined {
     const purpose = prompt.purpose?.trim();
-    if (!purpose || purpose.includes(prompt.operationId) ||
-        /\b(?:AUTO|INLINE_CONFIRM|TYPED_CONFIRM|DENY|CORE|TRUSTED_PLUGIN|UNTRUSTED_PLUGIN|TRUSTED|UNTRUSTED|LOW|MEDIUM|HIGH)\b|\b(?:gate|sourceTier|riskTier)\s*=|\b(?:core|vop)\.[\w.-]+/.test(purpose)) return undefined;
-    try {
-      JSON.parse(purpose.match(/\{.*\}|\[.*\]/s)?.[0] ?? purpose);
-      return undefined;
-    } catch {
-      return purpose;
-    }
+    if (!purpose || /[{}[\]=]|\b[\w-]+\.[\w.-]+|\b(?:AUTO|INLINE_CONFIRM|TYPED_CONFIRM|DENY|CORE|TRUSTED_PLUGIN|UNTRUSTED_PLUGIN|TRUSTED|UNTRUSTED|LOW|MEDIUM|HIGH)\b/.test(purpose)) return undefined;
+    return purpose;
   }
 
   /**

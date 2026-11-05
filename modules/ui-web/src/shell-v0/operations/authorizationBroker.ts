@@ -52,7 +52,7 @@ export interface AuthorizationPrompt {
   readonly argsSummary?: string;
   /**
    * Why the gate fired (the 428 message or the pending's rationale). The security dialog shows it
-   * when it is plain words; Engine diagnostics, internal names and raw JSON are hidden (L17).
+   * only when the whole line is plain words; any Engine syntax or name hides the whole line (L17).
    */
   readonly purpose?: string;
   /** Words the requester wrote (an agent suggestion's rationale): shown as written by it, not checked by JustSearch. */

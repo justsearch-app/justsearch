@@ -81,10 +81,12 @@ both edited Chromium files. The unchanged producer uses a temporary Git adapter 
 and a Node adapter limiting Vitest to four workers. All checkouts use copied dependencies, private
 Vite ports and owned headless Chromium processes; no shared service is touched.
 
-L17 follow-up: `shell-s3c-purpose-repaired.json` records the plain-purpose regression against
-`c0fbb88825e7f1024fe77a7649c6337f9f08f44a`; `shell-s3c-purpose-l17-repaired.json` refreshes the
-original engine-text/requester checks against 7ed8454d85; `shell-s3c-purpose-preserved.json` reruns
-every check in the edited AuthorizationHost test file. The unchanged producer again uses temporary
+L17 follow-up: `shell-s3c-purpose-repaired.json` records whole-line engine-text hiding, including
+mixed purposes, with assertion fail-before against baseline 911102bd9f9b9363aac09af520633c150c671ff4.
+Plain-purpose visibility is preservation, not a repair. `shell-s3c-purpose-l17-repaired.json` refreshes
+the original engine-text/requester checks against 7ed8454d85; `shell-s3c-purpose-preserved.json`
+reruns the two plain-purpose checks and every check in the edited AuthorizationHost test file,
+without a fail-before claim. The unchanged producer again uses temporary
 shared clones and copied dependencies. The placement retirement below cites the orchestrator
 decision; its replacement checks keep their existing font-metrics evidence.
 
@@ -104,9 +106,12 @@ the person's own action, so it waits in Needs you. The own-transport cases of th
       "behaviour": "A broadcast request that names no source waits in Needs you as an outside request (arrival needs-you, live, its asking time and requester kept), with one live announcement and no dialog on arrival.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "L12: an agent request that names no source opens its dialog at once instead of waiting in Needs you. Expected: it waits in Needs you like every other outside request (one live announcement); only plugin consent the person's own action triggered opens at once. An existing check pins the old behaviour: change it with a recorded reason (orchestrator decision).",
-          "location": "task t-20261103-shell request (S3c builder brief, 2026-11-05)"
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "design decisions of the frame build, within the canonical design",
+          "choice": "a broadcast request naming no source waits in Needs you like other outside requests, with one live announcement and no dialog on arrival; only the person’s own window gestures and plugin consent they trigger open immediately",
+          "label": "agent choice"
         }
       ],
       "repaired": true,
@@ -123,9 +128,12 @@ the person's own action, so it waits in Needs you. The own-transport cases of th
       "class": "Obsolete",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "L12: an agent request that names no source opens its dialog at once instead of waiting in Needs you. Expected: it waits in Needs you like every other outside request (one live announcement); only plugin consent the person's own action triggered opens at once. An existing check pins the old behaviour: change it with a recorded reason (orchestrator decision).",
-          "location": "task t-20261103-shell request (S3c builder brief, 2026-11-05)"
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "design decisions of the frame build, within the canonical design",
+          "choice": "a broadcast request naming no source waits in Needs you like other outside requests, with one live announcement and no dialog on arrival; only the person’s own window gestures and plugin consent they trigger open immediately",
+          "label": "agent choice"
         }
       ],
       "conflictSearch": "decision records searched for a conflict (docs/decisions, \"transport\", \"authorization\", \"needs you\"): none names a dialog for a request without a source.",
@@ -484,9 +492,12 @@ the person's own action, so it waits in Needs you. The own-transport cases of th
       "behaviour": "Redirect notices name windows plainly (Opened System instead of Health), retaining an id only when no plain name is available. Placement follows the orchestrator decision recorded below: beside the pill within two lines, otherwise under the top bar.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "Also: the notice names windows by their plain names (\"Opened System instead of Health\"), never internal ids; when a window has no plain name, use its id as today.",
-          "location": "task t-20261103-shell request (S3c bounded top-bar notice repair brief, 2026-11-05)"
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "design decisions of the frame build, within the canonical design",
+          "choice": "redirect notices name windows by their plain names and use the id only when no plain name is available",
+          "label": "agent choice"
         }
       ],
       "repaired": true,
@@ -598,12 +609,15 @@ the person's own action, so it waits in Needs you. The own-transport cases of th
       "class": "Obsolete",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "Expected: show the purpose when it contains no engine text; hide only engine text (gate and tier names like TYPED_CONFIRM / UNTRUSTED, internal operation ids, raw JSON). The typed phrase, top layer and every other plain-words change stay.",
-          "location": "task t-20261103-shell request (S3c exact L17 and changeset repairs builder brief, 2026-11-05)"
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "design decisions of the frame build, within the canonical design",
+          "choice": "the protected dialog shows a request's purpose only when the whole line is plain words and hides it otherwise",
+          "label": "agent choice"
         }
       ],
-      "removedChecks": "In 'renders risk, args summary, and an irreversibility warning when provided; never the Engine's gate text', the assertion that the plain purpose 'Rebuild the entire index' is absent. Only that erroneous expectation is retired; risk, arguments, irreversibility, decision, engine-text hiding and typed-phrase checks remain.",
+      "removedChecks": "In 'renders risk, args summary, and an irreversibility warning when provided; never the Engine's gate text', the assertion that the plain purpose 'Rebuild the entire index' is absent. Only that erroneous expectation is retired; risk, arguments, irreversibility, decision, engine-text hiding and typed-phrase checks remain. The expectation that bracketed plain words stay visible is also retired: brackets hide the whole purpose under the same rule.",
       "conflictSearch": "decision records searched for a conflict (docs/decisions/*.md; purpose, ceremony, typed, authorization): none requires hiding a purpose already in plain words. Typed confirmation and top-layer protection remain unchanged."
     },
     {
@@ -611,20 +625,21 @@ the person's own action, so it waits in Needs you. The own-transport cases of th
         "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts"
       ],
       "class": "New",
-      "behaviour": "The protected dialog retains the plain purpose Rebuild the entire index, together with its typed phrase and security header. The enriched-prompt check also retains its risk, arguments, irreversibility and Deny assertions. Plain bracketed descriptions and lower-case trust words are retained too.",
+      "behaviour": "Preservation: the protected dialog retains the plain purpose Rebuild the entire index, together with its typed phrase and security header. The enriched-prompt check also retains its risk, arguments, irreversibility and Deny assertions. Plain-purpose visibility is not a repair against the baseline.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "Expected: show the purpose when it contains no engine text; hide only engine text (gate and tier names like TYPED_CONFIRM / UNTRUSTED, internal operation ids, raw JSON). The typed phrase, top layer and every other plain-words change stay.",
-          "location": "task t-20261103-shell request (S3c exact L17 and changeset repairs builder brief, 2026-11-05)"
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "design decisions of the frame build, within the canonical design",
+          "choice": "the protected dialog shows a request's purpose only when the whole line is plain words and hides it otherwise",
+          "label": "agent choice"
         }
       ],
-      "repaired": true,
-      "evidence": "gates/test-intent/evidence/shell-s3c-purpose-repaired.json",
+      "evidence": "gates/test-intent/evidence/shell-s3c-purpose-preserved.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts#renders risk, args summary, and an irreversibility warning when provided; never the Engine's gate text",
-        "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts#a plain-language purpose stays visible in the protected dialog",
-        "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts#keeps plain words with brackets and lower-case trust words"
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts#a plain-language purpose stays visible in the protected dialog"
       ]
     },
     {
@@ -632,18 +647,38 @@ the person's own action, so it waits in Needs you. The own-transport cases of th
         "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts"
       ],
       "class": "New",
-      "behaviour": "Preservation: hide purposes containing gate/tier diagnostics, internal operation ids or raw JSON while retaining the exact typed phrase. Every check in the edited AuthorizationHost test file is rerun.",
+      "behaviour": "Repair: hide the whole purpose if any braces, brackets, equals sign, dotted id token or gate/tier name occurs anywhere in it, while retaining the exact typed phrase. This includes mixed plain and engine text; no partial filtering.",
       "sources": [
         {
-          "kind": "owner-words",
-          "quote": "Expected: show the purpose when it contains no engine text; hide only engine text (gate and tier names like TYPED_CONFIRM / UNTRUSTED, internal operation ids, raw JSON). The typed phrase, top layer and every other plain-words change stay.",
-          "location": "task t-20261103-shell request (S3c exact L17 and changeset repairs builder brief, 2026-11-05)"
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "design decisions of the frame build, within the canonical design",
+          "choice": "the protected dialog shows a request's purpose only when the whole line is plain words and hides it otherwise",
+          "label": "agent choice"
         }
       ],
-      "repaired": false,
-      "evidence": "gates/test-intent/evidence/shell-s3c-purpose-preserved.json",
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s3c-purpose-repaired.json",
       "newChecks": [
-        "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts"
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts#hides an engine purpose: TYPED_CONFIRM",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts#hides an engine purpose: INLINE_CONFIRM",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts#hides an engine purpose: UNTRUSTED",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts#hides an engine purpose: TRUSTED",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts#hides an engine purpose: HIGH",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts#hides an engine purpose: gate=typed",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts#hides an engine purpose: sourceTier=untrusted",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts#hides an engine purpose: Run core.bulk-reindex",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts#hides an engine purpose: Run vendor.rebuild-index",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts#hides an engine purpose: Then run core.recover-component",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts#hides an engine purpose: {\"scope\":\"all\"}",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts#hides an engine purpose: [\"all\"]",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts#hides an engine purpose: Rebuild {\"scope\":\"all\"}",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts#hides an engine purpose: Rebuild [\"all\"]",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts#hides an engine purpose: Rebuild [the index] {\"scope\":\"all\"}",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts#hides an engine purpose: Rebuild {\"scope\":\"all\"} then {\"mode\":\"replace\"}",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts#hides an engine purpose: Rebuild, then run vendor.rebuild-index",
+        "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts#hides the whole purpose when plain words contain brackets"
       ]
     }
   ]

@@ -116,6 +116,9 @@ describe('<jf-authorization-host> L17 plain words in the protected dialog', () =
     'gate=typed', 'sourceTier=untrusted',
     'Run core.bulk-reindex', 'Run vendor.rebuild-index', 'Then run core.recover-component',
     '{"scope":"all"}', '["all"]', 'Rebuild {"scope":"all"}', 'Rebuild ["all"]',
+    'Rebuild [the index] {"scope":"all"}',
+    'Rebuild {"scope":"all"} then {"mode":"replace"}',
+    'Rebuild, then run vendor.rebuild-index',
   ])('hides an engine purpose: %s', async (purpose) => {
     const decision = requestAuthorization({ pendingId: 'pa-engine-purpose', operationId: 'vendor.rebuild-index',
       gateBehavior: 'TYPED_CONFIRM', purpose });
@@ -127,13 +130,13 @@ describe('<jf-authorization-host> L17 plain words in the protected dialog', () =
     await expect(decision).resolves.toEqual({ approved: false, allowAlways: false });
   });
 
-  it('keeps plain words with brackets and lower-case trust words', async () => {
+  it('hides the whole purpose when plain words contain brackets', async () => {
     const purpose = 'Rebuild [the untrusted documents]';
     const decision = requestAuthorization({ pendingId: 'pa-plain-brackets', operationId: 'core.bulk-reindex',
       gateBehavior: 'TYPED_CONFIRM', purpose });
     await settle();
     const dialog = host.shadowRoot!.querySelector('dialog')!;
-    expect(dialog.querySelector('[data-testid="authorization-purpose"]')?.textContent).toBe(purpose);
+    expect(dialog.querySelector('[data-testid="authorization-purpose"]')).toBeNull();
     await activateJfButton(dialog.querySelector('[data-testid="authorization-deny"]'));
     await expect(decision).resolves.toEqual({ approved: false, allowAlways: false });
   });

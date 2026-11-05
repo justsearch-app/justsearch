@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-05T19:33:23.391Z",
-  "revision": "c0fbb88825e7f1024fe77a7649c6337f9f08f44a",
-  "tree": "91b2e20f1838f53807d0261c4ca8d54d2fca3512",
+  "createdAt": "2026-11-05T19:54:53.954Z",
+  "revision": "14a8781e1fadde5a9e41f391689093f7075ba519",
+  "tree": "55890330d559ff8457b0b234a55915eca619ee4f",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,18 +18,48 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/AuthorizationHost.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/z5a08b_a/tmp/test-intent-vitest-340-1793907201593.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/AuthorizationHost.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/zww5mxmz/tmp/test-intent-vitest-165-1793908491109.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 1796
+      "durationMs": 2842
     }
   ],
   "checks": [
     {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts#renders risk, args summary, and an irreversibility warning when provided; never the Engine's gate text",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e87c0c6955e4e2439198002ea5c82c4af7925e6cdee691408b6dc5ea4b119119",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "<jf-authorization-host> enriched prompt (tempdoc 550 P1) renders risk, args summary, and an irreversibility warning when provided; never the Engine's gate text",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts#a plain-language purpose stays visible in the protected dialog",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e87c0c6955e4e2439198002ea5c82c4af7925e6cdee691408b6dc5ea4b119119",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "<jf-authorization-host> L17 plain words in the protected dialog a plain-language purpose stays visible in the protected dialog",
+          "status": "passed"
+        }
+      ]
+    },
+    {
       "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts",
       "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:94a6ac8fa06de1aeb121b4367bb96c6abb2a713dd5d1b0b8bbcfdb8f66cd16d6",
+      "contentDigest": "sha256:e87c0c6955e4e2439198002ea5c82c4af7925e6cdee691408b6dc5ea4b119119",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -107,7 +137,19 @@
           "status": "passed"
         },
         {
-          "name": "<jf-authorization-host> L17 plain words in the protected dialog keeps plain words with brackets and lower-case trust words",
+          "name": "<jf-authorization-host> L17 plain words in the protected dialog hides an engine purpose: Rebuild [the index] {\"scope\":\"all\"}",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> L17 plain words in the protected dialog hides an engine purpose: Rebuild {\"scope\":\"all\"} then {\"mode\":\"replace\"}",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> L17 plain words in the protected dialog hides an engine purpose: Rebuild, then run vendor.rebuild-index",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> L17 plain words in the protected dialog hides the whole purpose when plain words contain brackets",
           "status": "passed"
         },
         {
@@ -178,5 +220,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:48eb583228084b5470e080b91f6e493daffdb19a2333c639499a8f128a59e799"
+  "digest": "sha256:a13f7fef41e4074ec7be97c2a7346a269fffa7aa7b2cc5c55c438e490af7d602"
 }
