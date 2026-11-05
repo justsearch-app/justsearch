@@ -4,6 +4,7 @@ package io.justsearch.app.inference.chat;
 import io.justsearch.app.api.runtime.child.ChildControl;
 import io.justsearch.app.api.runtime.child.ChildHandle;
 import io.justsearch.app.api.runtime.child.ChildKind;
+import io.justsearch.app.api.runtime.child.ChildRegistrationRefusedException;
 import io.justsearch.app.api.runtime.child.ChildSpec;
 import io.justsearch.app.api.runtime.child.ExitOutcome;
 import io.justsearch.app.api.runtime.child.StopMode;
@@ -104,6 +105,16 @@ public final class ChildSelfTestLauncher implements SelfTestLauncher {
     ChildHandle candidate;
     try {
       candidate = start(spec);
+    } catch (ChildRegistrationRefusedException refused) {
+      // A candidate whose registration was refused and whose rollback stop did not confirm its
+      // exit still runs: it is retained, as the managed-server launch owner retains its survivor,
+      // with the processes it was seen to start, until it is confirmed gone (repair round 3).
+      refused.survivor().ifPresent(survivor -> {
+        LOG.error("Self-test llama-server PID {} survived registration rollback; retaining its"
+            + " handle", survivor.pid());
+        unreleased.add(new Unreleased(survivor, startedSoFar(survivor)));
+      });
+      return SelfTestRun.failed("llama-server could not start: " + message(refused));
     } catch (IOException | RuntimeException failure) {
       return SelfTestRun.failed("llama-server could not start: " + message(failure));
     }
@@ -122,6 +133,15 @@ public final class ChildSelfTestLauncher implements SelfTestLauncher {
     // A candidate that may still run (and hold the GPU) is not a passed self-test (S19).
     if (survived == null) return outcome;
     return SelfTestRun.failed(outcome.exercised() ? survived : outcome.failure() + "; " + survived);
+  }
+
+  /** The processes a survivor was seen to start; its scope is read again until it is released. */
+  private static Set<ProcessHandle> startedSoFar(ChildHandle survivor) {
+    try {
+      return Set.copyOf(StartedProcesses.of(survivor));
+    } catch (RuntimeException unreadable) {
+      return Set.of();
+    }
   }
 
   private SelfTestRun exercise(ChildHandle candidate, SelfTestSpec spec, Set<ProcessHandle> started) {

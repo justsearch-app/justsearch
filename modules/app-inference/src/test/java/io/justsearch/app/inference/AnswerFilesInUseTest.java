@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.justsearch.app.api.runtime.ManagedChild;
 import io.justsearch.app.api.runtime.ManagedChildRegistry;
 import io.justsearch.app.api.runtime.child.DefaultChildControl;
 import io.justsearch.app.inference.chat.SelfTestRun;
@@ -12,6 +13,7 @@ import io.justsearch.app.inference.chat.SelfTestSpec;
 import io.justsearch.app.inference.telemetry.NoopInferenceTelemetryEvents;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
+import java.io.IOException;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.nio.file.Files;
@@ -22,6 +24,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -30,8 +33,10 @@ import org.junit.jupiter.api.io.TempDir;
  * use is read from the processes this Engine started, never from the answer server's mode. A stop
  * that failed leaves the mode offline while the server lives, and a self-test candidate that
  * outlived its stop outlives the controller's hold; both keep the files in use until the process
- * is gone. The terminator kills nothing while it is told to survive, so each stop really fails.
+ * is gone. The terminator kills nothing while it is told to survive, so each stop really fails
+ * (also a rollback stop after a refused registration, repair round 3).
  */
+@Tag("cross-platform")
 final class AnswerFilesInUseTest {
   private static final String SERVER_LOADED = "The answer model is still loaded - try again in a moment";
   private static final String BEING_TESTED = "The answer model is being tested - try again when it finishes";
@@ -111,6 +116,50 @@ final class AnswerFilesInUseTest {
         "once the candidate is gone the files are released");
   }
 
+  @Test
+  void aSelfTestCandidateWhoseRegistrationWasRefusedAndWhoseRollbackFailedKeepsTheFilesInUse()
+      throws Exception {
+    manager = manager(tmp.resolve("unused-llama-server"), new ManagedChildRegistry() {
+      @Override
+      public List<ManagedChild> snapshot() {
+        return List.of();
+      }
+
+      @Override
+      public void register(ManagedChild child) throws IOException {
+        throw new IOException("disk full");
+      }
+
+      @Override
+      public void remove(String childId) {}
+    });
+    assertEquals(Optional.empty(), manager.answerFilesInUse(), "precondition: nothing runs");
+    terminator.survive = true; // the rollback stop after the refused registration fails
+
+    SelfTestRun run = manager.selfTestLauncher().run(new SelfTestSpec(sleepingChild(), null,
+        List.of(), tmp.resolve("self-test.log"), freePort(), Duration.ofSeconds(10),
+        new SelfTestSpec.Probe() {
+          @Override
+          public boolean healthy(int port) {
+            return true;
+          }
+
+          @Override
+          public void exercise(int port) {}
+        }));
+
+    assertFalse(run.exercised(), "precondition: the candidate never started: " + run.failure());
+    assertTrue(run.failure().contains("disk full"), "precondition: its registration was refused: "
+        + run.failure());
+    assertFalse(terminator.alive().isEmpty(), "precondition: the rolled-back candidate lives");
+    assertEquals(Optional.of(BEING_TESTED), manager.answerFilesInUse(),
+        "a candidate that survived its rollback keeps the answer model in use");
+
+    terminator.killAll();
+    assertEquals(Optional.empty(), eventually(manager::answerFilesInUse),
+        "once the candidate is confirmed gone the files are released");
+  }
+
   private static Optional<String> eventually(Supplier<Optional<String>> read) throws InterruptedException {
     long deadline = System.nanoTime() + Duration.ofSeconds(15).toNanos();
     Optional<String> last = read.get();
@@ -122,7 +171,12 @@ final class AnswerFilesInUseTest {
   }
 
   private InferenceLifecycleManager manager(Path executable) throws Exception {
-    control = DefaultChildControl.of((type, fields) -> true, terminator, ManagedChildRegistry.noop());
+    return manager(executable, ManagedChildRegistry.noop());
+  }
+
+  private InferenceLifecycleManager manager(Path executable, ManagedChildRegistry registry)
+      throws Exception {
+    control = DefaultChildControl.of((type, fields) -> true, terminator, registry);
     Path model = tmp.resolve("model.gguf");
     if (!Files.exists(model)) Files.createFile(model);
     ResolvedConfig captured = TestResolvedConfigHelper.fromEntries(Map.of(
@@ -143,7 +197,7 @@ final class AnswerFilesInUseTest {
     return List.of(java, "-cp", classes, ManagedLlamaAdoptionTest.SleepingChild.class.getName());
   }
 
-  private static int freePort() throws java.io.IOException {
+  private static int freePort() throws IOException {
     try (ServerSocket socket = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
       return socket.getLocalPort();
     }

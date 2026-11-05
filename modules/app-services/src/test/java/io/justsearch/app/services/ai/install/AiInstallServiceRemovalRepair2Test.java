@@ -35,6 +35,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -44,6 +45,7 @@ import org.junit.jupiter.api.io.TempDir;
  * the answer model's usage comes from the processes the answer runtime started, never from its
  * mode; and a removal holds upgrade admission.
  */
+@Tag("cross-platform")
 final class AiInstallServiceRemovalRepair2Test {
   /** AiInstallService.DOWNLOAD_CHANGED, as the page shows it. */
   private static final String DOWNLOAD_CHANGED = "The download changed - review it again";

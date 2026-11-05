@@ -88,8 +88,12 @@ import tools.jackson.databind.json.JsonMapper;
  * <p>The removal folder is private (repair round 2): it is created owner-only (0700 on POSIX, a
  * protected owner-and-SYSTEM DACL on Windows), and before each capture, put-back and deletion it
  * must still be the same plain folder, owned by the Engine's user and writable by no one else;
- * otherwise the whole removal refuses or stops and nothing in that folder is touched. Where the
- * platform offers directory handles the deletion happens through the checked folder's own handle.
+ * otherwise the whole removal refuses or stops and nothing in that folder is touched. A captured
+ * file is deleted only through a handle checked to be it, never by name (repair round 3): on POSIX
+ * relative to the checked folder's own handle, on Windows through the one file handle its identity,
+ * links and hash were read through; where neither exists it is kept. Afterwards each canonical place
+ * whose file was captured is looked at again: a file that appeared there is kept and reported, and
+ * the removal is not reported complete.
  * The removal record is replaced only atomically (a disk without atomic replacement refuses the
  * removal before anything is moved), and a removal holds an upgrade-admission lease, so an
  * application upgrade waits for it or it refuses while one is being prepared.
@@ -118,6 +122,8 @@ final class ModelFileRemoval {
   static final String KEPT_UNREADABLE = "kept - could not be read";
   static final String KEPT_NOT_DELETED = "kept - could not be deleted";
   static final String KEPT_IN_REMOVAL_FOLDER = "kept in the removal folder - its original place is taken";
+  /** A file appeared at a canonical place after its own file was captured (repair round 3). */
+  static final String KEPT_NEW_FILE = "kept - a new file appeared here";
   static final String KEPT_INTERRUPTED = "kept - the removal was interrupted";
   static final String KEPT_PUT_BACK = "kept - the removal was interrupted; the file was put back";
   static final String KEPT_UNCERTAIN = "kept - not touched: its place could not be checked";
@@ -605,6 +611,7 @@ final class ModelFileRemoval {
       boolean finished = false;
       try {
         for (Target t : targets) removeOne(journal, t, folder);
+        recheckCanonical(journal);
         journal.state = outcome(journal, targets);
         journal.finishedAtEpochMs = System.currentTimeMillis();
         journal.message = summary(journal);
@@ -622,6 +629,7 @@ final class ModelFileRemoval {
             if ("kept".equals(f.state) && KEPT_INTERRUPTED.equals(f.reason)) f.reason = KEPT_STOPPED;
           }
         }
+        recheckCanonical(journal);
         journal.state = outcome(journal, targets);
         journal.finishedAtEpochMs = System.currentTimeMillis();
         journal.message = "Removal stopped: " + failure.getMessage() + ". " + summary(journal);
@@ -642,9 +650,54 @@ final class ModelFileRemoval {
   }
 
   /**
+   * Repair round 3: once every file was handled, each canonical place whose own file was captured
+   * (deleted, or still in the removal folder) is looked at again. Anything there now arrived after
+   * the capture, possibly while the captured file was being hashed: it was not checked and is not
+   * JustSearch's verified download, so it is kept, never deleted, and reported as a new file, and
+   * the removal is not reported as complete while it is there.
+   */
+  private void recheckCanonical(Journal journal) {
+    Set<String> reported = new HashSet<>();
+    for (JournalFile f : journal.files) {
+      if (KEPT_NEW_FILE.equals(f.reason)) reported.add(f.path);
+    }
+    List<JournalFile> appeared = new ArrayList<>();
+    for (JournalFile f : journal.files) {
+      boolean captured = "deleted".equals(f.state) || f.staged != null;
+      if (!captured || reported.contains(f.path)) continue;
+      Path canonical = canonicalOf(f.path);
+      if (canonical == null || !Files.exists(canonical, LinkOption.NOFOLLOW_LINKS)) continue;
+      if (f.staged != null && putBackByLink(root.resolve(f.staged).normalize(), canonical)) continue;
+      JournalFile arrived = new JournalFile();
+      arrived.path = f.path;
+      arrived.state = "kept";
+      arrived.reason = KEPT_NEW_FILE;
+      try {
+        arrived.sizeBytes = Files.readAttributes(canonical, BasicFileAttributes.class,
+            LinkOption.NOFOLLOW_LINKS).size();
+      } catch (IOException unreadable) {
+        arrived.sizeBytes = null; // unknown stays unknown
+      }
+      appeared.add(arrived);
+      reported.add(f.path);
+    }
+    journal.files.addAll(appeared);
+  }
+
+  /**
+   * A put-back that linked the captured file to its place but could not drop its captured name:
+   * both names are the same file, which is not a new one.
+   */
+  private static boolean putBackByLink(Path staged, Path canonical) {
+    Object captured = identity(staged);
+    return captured != null && captured.equals(identity(canonical));
+  }
+
+  /**
    * {@code removed} when every target was deleted or failed an ownership check at deletion (it
    * did not pass, so it is not JustSearch's to delete); {@code not-removed} when nothing was
-   * deleted; otherwise {@code partly-removed}. Never "removed" while a file that passed remains.
+   * deleted; otherwise {@code partly-removed}. Never "removed" while a file that passed remains,
+   * nor while a new file sits at a canonical place ({@link #KEPT_NEW_FILE}: it is unresolved).
    */
   private static String outcome(Journal journal, List<Target> targets) {
     Set<String> rels = new HashSet<>();
@@ -810,10 +863,15 @@ final class ModelFileRemoval {
       putBack(journal, entry, staged, t.path(), KEPT_NOT_DELETED, folder);
       return;
     }
-    if (kept != null) {
+    if (KEPT_CHANGED.equals(kept)) {
       // What the captured name holds now is not the verified file: it is neither deleted nor put
       // back, and stays reported in the removal folder.
       keep(journal, entry, kept);
+      return;
+    }
+    if (kept != null) {
+      // Still the captured file, not deleted: it goes back to its place if that is free.
+      putBack(journal, entry, staged, t.path(), kept, folder);
       return;
     }
     entry.state = "deleted";
@@ -832,6 +890,8 @@ final class ModelFileRemoval {
       if (!singleLink(staged)) return KEPT_LINKED;
       if (t.expected().partial()) return null;
       if (t.expected().size() > 0 && attrs.size() != t.expected().size()) return KEPT_NOT_VERIFIED;
+      // On Windows the hash is computed through the one handle that also deletes the file.
+      if (isWindows()) return t.expected().sha256() == null ? KEPT_NOT_VERIFIED : null;
       String sha = sha256(staged);
       return t.expected().sha256() != null && t.expected().sha256().equalsIgnoreCase(sha)
           ? null : KEPT_NOT_VERIFIED;
@@ -842,37 +902,60 @@ final class ModelFileRemoval {
 
   /**
    * Deletes the verified captured file, immediately after checking again that the removal folder is
-   * the private folder checked for this run and that its captured name still holds the verified
-   * file. Where the platform has directory handles the folder is opened without following links,
-   * its handle is checked to be that folder, and the file is deleted through that handle, so a
-   * folder or file swapped in by path meanwhile is never what gets deleted.
+   * the private folder checked for this run, and only through a handle that was itself checked to be
+   * the verified file, so a file swapped in under the captured name meanwhile is never what gets
+   * deleted (repair round 3). POSIX: the models folder is opened without following links, its
+   * removal folder's handle is checked to be that folder, and the entry is checked and unlinked
+   * relative to that handle. Windows: the captured file is opened once for reading and deletion
+   * with no write, rename or delete sharing, its identity, link count, size and registry hash are
+   * read through that handle, and that handle deletes it. Where neither is available nothing is
+   * deleted by name: the file is kept.
    *
-   * @return {@code null} when deleted; otherwise why the captured name was kept
+   * @return {@code null} when deleted; {@link #KEPT_CHANGED} when the captured name no longer holds
+   *     the verified file (it stays in the removal folder); otherwise why the still-captured file was
+   *     not deleted (it is put back)
+   * @throws IOException when it could not be deleted (it is put back)
    * @throws FolderNotPrivate when the removal folder is no longer the checked private folder
    */
   private String deleteCaptured(PrivateFolder folder, Path staged, Target t) throws IOException {
     requireStillPrivate(folder);
+    if (isWindows()) return deleteThroughHandle(staged, t);
     if (!t.identity().equals(identity(staged))) return KEPT_CHANGED;
     try (DirectoryStream<Path> models = Files.newDirectoryStream(root)) {
-      if (models instanceof SecureDirectoryStream<Path> modelsHandle) {
-        try (SecureDirectoryStream<Path> handle = modelsHandle.newDirectoryStream(
-            Path.of(REMOVAL_FOLDER), LinkOption.NOFOLLOW_LINKS)) {
-          Object opened = handle.getFileAttributeView(BasicFileAttributeView.class)
-              .readAttributes().fileKey();
-          if (opened == null || !opened.equals(folder.identity())) {
-            throw new FolderNotPrivate();
-          }
-          Path name = staged.getFileName();
-          BasicFileAttributes entry = handle.getFileAttributeView(name,
-              BasicFileAttributeView.class, LinkOption.NOFOLLOW_LINKS).readAttributes();
-          if (!entry.isRegularFile() || !t.identity().equals(entry.fileKey())) return KEPT_CHANGED;
-          handle.deleteFile(name);
-          return null;
+      if (!(models instanceof SecureDirectoryStream<Path> modelsHandle)) {
+        // No directory handle: a delete by name could unlink a file swapped in meanwhile.
+        return t.identity().equals(identity(staged)) ? KEPT_NOT_DELETED : KEPT_CHANGED;
+      }
+      try (SecureDirectoryStream<Path> handle = modelsHandle.newDirectoryStream(
+          Path.of(REMOVAL_FOLDER), LinkOption.NOFOLLOW_LINKS)) {
+        Object opened = handle.getFileAttributeView(BasicFileAttributeView.class)
+            .readAttributes().fileKey();
+        if (opened == null || !opened.equals(folder.identity())) {
+          throw new FolderNotPrivate();
         }
+        Path name = staged.getFileName();
+        BasicFileAttributes entry = handle.getFileAttributeView(name,
+            BasicFileAttributeView.class, LinkOption.NOFOLLOW_LINKS).readAttributes();
+        if (!entry.isRegularFile() || !t.identity().equals(entry.fileKey())) return KEPT_CHANGED;
+        handle.deleteFile(name);
+        return null;
       }
     }
-    Files.delete(staged);
-    return null;
+  }
+
+  /** Windows: identity, links, size and hash read through the one handle that deletes the file. */
+  private String deleteThroughHandle(Path staged, Target t) throws IOException {
+    if (!(t.identity() instanceof String identity)) return KEPT_NOT_DELETED;
+    WindowsOwnerOnlyDirectory.HandleCheck check = WindowsOwnerOnlyDirectory.deleteVerified(staged,
+        identity, t.expected().size() > 0 ? t.expected().size() : -1,
+        t.expected().partial() ? null : t.expected().sha256(),
+        () -> checkpointHook.accept("deleting:" + t.expected().rel()));
+    return switch (check) {
+      case DELETED -> null;
+      case CHANGED -> KEPT_CHANGED;
+      case LINKED -> KEPT_LINKED;
+      case NOT_VERIFIED -> KEPT_NOT_VERIFIED;
+    };
   }
 
   /**
@@ -1310,6 +1393,7 @@ final class ModelFileRemoval {
       if (journal != null && "running".equals(journal.state)) {
         boolean folderPrivate = removalFolderPrivate();
         for (JournalFile f : journal.files) settleOne(f, folderPrivate);
+        recheckCanonical(journal);
         journal.state = "interrupted";
         journal.finishedAtEpochMs = System.currentTimeMillis();
         journal.message = "The removal was interrupted: " + summary(journal)

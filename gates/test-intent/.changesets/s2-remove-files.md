@@ -585,6 +585,72 @@ The brief's adopted scenarios are quoted below; choices the scenarios leave open
     },
     {
       "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalRepair3Test.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/NoDirectoryHandlesFileSystem.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalWindowsTest.java",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/AnswerFilesInUseTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Repair round 3 of the reviewed candidate (ba932039fe). A captured file is deleted only through a handle checked to be the verified file, never by name after the last check: on a platform without directory handles (a file system whose directory streams are not secure, as on Windows) a file swapped in under the captured name after the last check by name is kept in the removal folder ('kept - it changed while being removed'), and a still-captured verified file is put back ('kept - could not be deleted') instead of being deleted by name; before the change both were deleted by name. A new file written at a canonical place after its own file was captured (while that file is checked) is kept, measured and reported 'kept - a new file appeared here', and the removal says 'partly-removed', in the finished report, the page's report and after a crash; before the change the place was reported deleted and the removal 'removed'. A self-test candidate whose registration was refused and whose rollback stop failed keeps the answer model in use (the removal refuses with 'The answer model is being tested - try again when it finishes') until it is confirmed gone; before the change it was forgotten and the files were reported free. Each check failed by assertion on ba932039fe with only NoDirectoryHandlesFileSystem.java overlaid (a test file system over the real one whose directory streams are plain). AnswerFilesInUseTest and AiInstallServiceRemovalRepair2Test are now tagged cross-platform. The Windows handle path is covered by three Windows-only cases in ModelFileRemovalWindowsTest (a file swapped in before the deleting handle opens is not deleted; the captured name cannot be renamed while the verified handle is held, and that file is the one deleted; a captured file another program opened for writing cannot get the deleting handle and is kept); they did not run on this Linux host and run in the Windows CI lane.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "X3",
+          "quote": "Removal is safe under failure: permission or sharing errors, a path replaced by a link, process death between steps, restart midway: the page reports the files actually left, never \"removed\" while files remain, and never re-enables the part; a second window or a repeated click cannot start a second removal. Source documents, the index and conversations are untouched.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "X4",
+          "quote": "Removal cannot race new users: Remove versus switching the part on, Repair, import, activation or index generation preparation, in both orders and through the page, agents and HTTP; once removal starts, no new user takes the files until it ends. On Windows removal waits for or refuses until native sessions and child processes have released the files. After partial deletion or a crash, removal intent and the files left are reported; recovery does not turn it into a deferred deletion. Linked or junctioned parent folders are refused. (challenger-4 #9, #10)",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
+          "choice": "Repair round 3, Windows deletion: the captured file is opened once (CreateFileW, read and delete access, read sharing only, not following a link or reparse point, no backup semantics so a folder cannot be opened); its NTFS identity, link count and size are read from that handle and its SHA-256 by reading the same handle; only then is the handle's delete disposition set (SetFileInformationByHandle, FileDispositionInfo) and the handle closed. The decision named StandardOpenOption.DELETE_ON_CLOSE; a delete-on-close open cannot be withdrawn after a failed check and would delete a mismatched file, so the disposition is set only after the checks pass, which deletes exactly the opened file. When the handle cannot be opened or marked (in use for writing, a sharing violation, the calls unavailable) the file is kept and put back ('kept - could not be deleted'). On POSIX the directory-relative unlink with identity checks stays. No path deletes a captured file by name: a platform with neither is refused for that file. A file another program had already opened with delete sharing is deleted once that program closes it, as on Linux.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
+          "choice": "Repair round 3, new files at a canonical place: after every file was handled, and also when a removal stops and when recovery reports an interrupted removal, each canonical place whose own file was captured (deleted or still in the removal folder) is looked at again; anything there is kept, never deleted, listed with its measured size (unknown stays unknown) and 'kept - a new file appeared here', and counts as a file left, so the removal is reported 'partly-removed' (or 'not-removed' when nothing was deleted), never 'removed'. A put-back that linked the captured file to its place but could not drop its captured name is the same file and is not reported as new. The page shows these entries in its existing Kept list.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
+          "choice": "Repair round 3, self-test survivors: a self-test candidate whose manifest registration was refused and whose rollback stop did not confirm its exit is retained with the processes it was seen to start, as the managed-server launch owner retains its survivor (ChildControl keeps it held and retries its stop before the next chat-server start); the answer model stays in use until it has exited and nothing it started still runs.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
+          "choice": "Repair round 3, Windows evidence: AnswerFilesInUseTest and AiInstallServiceRemovalRepair2Test are tagged cross-platform without guards: their cases use the portable fake llama-server launcher and the terminator wrapper the stop goes through on both platforms, temporary folders and the settings owner. The case without directory handles assumes a non-Windows host, because Windows deletes through the verified file handle instead (ModelFileRemovalWindowsTest).",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s2-remove-files-repair3.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalRepair3Test.java#whereThereAreNoDirectoryHandlesACapturedFileSwappedAfterItsLastCheckIsNeverDeletedByName",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalRepair3Test.java#aNewFileWrittenAtTheCanonicalPlaceWhileTheCapturedFileIsCheckedIsKeptAndReported",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalRepair3Test.java#aNewFileAtTheCanonicalPlaceOfADeletedFileIsReportedAfterACrash",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/AnswerFilesInUseTest.java#aSelfTestCandidateWhoseRegistrationWasRefusedAndWhoseRollbackFailedKeepsTheFilesInUse"
+      ]
+    },
+    {
+      "items": [
         "modules/app-services/src/test/resources/registry/emitter/ui-operation-wire.golden.json"
       ],
       "class": "New",
