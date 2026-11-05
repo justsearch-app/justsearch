@@ -269,7 +269,8 @@ final class AiInstallServiceFileRemovalTest {
   void anAcceptedDownloadAgainWithdrawsTheDeclineAtStart() throws Exception {
     compose(s -> s.setDeclinedAiPackages(List.of("reranker")));
 
-    var attempt = owner.startInstall(true, false, false, Set.of("reranker"));
+    InstallPlanPreview consent = owner.previewInstallPlan(Set.of("reranker"));
+    var attempt = owner.startInstall(true, false, false, Set.of("reranker"), consent.planDigest);
     try {
       assertTrue(savedDeclines().isEmpty(), "withdrawn inside the accepted start");
     } finally {

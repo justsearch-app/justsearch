@@ -25,8 +25,9 @@ import org.slf4j.LoggerFactory;
  * supplier.
  *
  * <p>Args shape: {@code {"acceptTerms"?: boolean, "enableRerankerOnCompletion"?: boolean,
- * "enablePictureReadingOnCompletion"?: boolean, "includePackages"?: string[]}}; the last names parts
- * downloaded again whose saved declines the accepted start withdraws.
+ * "enablePictureReadingOnCompletion"?: boolean, "includePackages"?: string[], "planDigest"?: string}};
+ * {@code includePackages} names parts downloaded again whose saved declines the accepted start
+ * withdraws, and {@code planDigest} the previewed plan it accepted (a changed plan refuses).
  * Returns the post-start
  * install status snapshot in {@code structuredData}.
  */
@@ -68,8 +69,10 @@ public final class StartAiInstallHandler implements OperationHandler {
           argumentsJson, "enablePictureReadingOnCompletion");
       java.util.Set<String> include = BrainInstallHandlerSupport.parseStrings(
           argumentsJson, "includePackages");
+      String planDigest = BrainInstallHandlerSupport.parseString(argumentsJson, "planDigest");
       return BrainInstallHandlerSupport.execution("AI install started", !include.isEmpty()
-          ? svc.startInstall(acceptTerms, enableReranker, enablePictures, include) : enablePictures
+          ? svc.startInstall(acceptTerms, enableReranker, enablePictures, include, planDigest)
+          : enablePictures
           ? svc.startInstall(acceptTerms, enableReranker, true) : enableReranker
               ? svc.startInstall(acceptTerms, true) : svc.startInstall(acceptTerms));
     } catch (Exception e) {

@@ -75,7 +75,26 @@ public final class WindowsOwnerOnlyDirectory {
     inspectEntry(path, true);
   }
 
+  /**
+   * The entry's own NTFS identity (volume serial number and file index), opened without following a
+   * link or reparse point: it stays the same across renames on one volume and differs for any other
+   * file, which Java's file key does not offer on Windows.
+   */
+  public static String fileIdentity(Path path) throws IOException {
+    String[] identity = new String[1];
+    inspectEntry(path, false, information -> identity[0] =
+        Integer.toUnsignedString(information.get(ValueLayout.JAVA_INT, 28), 16) + ":"
+            + Integer.toUnsignedString(information.get(ValueLayout.JAVA_INT, 44), 16) + ":"
+            + Integer.toUnsignedString(information.get(ValueLayout.JAVA_INT, 48), 16));
+    return identity[0];
+  }
+
   private static void inspectEntry(Path path, boolean singleLink) throws IOException {
+    inspectEntry(path, singleLink, information -> {});
+  }
+
+  private static void inspectEntry(Path path, boolean singleLink,
+      java.util.function.Consumer<MemorySegment> read) throws IOException {
     try (Arena arena = Arena.ofConfined()) {
       MemorySegment captured = arena.allocate(Win32.STATE);
       MemorySegment handle = (MemorySegment) Win32.OPEN.invokeExact(captured,
@@ -93,6 +112,8 @@ public final class WindowsOwnerOnlyDirectory {
         if (singleLink && Integer.toUnsignedLong(information.get(ValueLayout.JAVA_INT, 40)) != 1) {
           throw new IOException("Entry must have exactly one link: " + path);
         }
+        // BY_HANDLE_FILE_INFORMATION: dwVolumeSerialNumber at 28, nFileIndexHigh/Low at 44/48.
+        read.accept(information);
       } finally {
         int _ = (int) Win32.CLOSE.invokeExact(handle);
       }

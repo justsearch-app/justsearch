@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.ai.install;
 
-import io.justsearch.app.inference.chat.ChatActuator;
+import io.justsearch.app.inference.InferenceLifecycleManager;
 import io.justsearch.app.inference.chat.ChatHolds;
 import io.justsearch.app.services.worker.OnnxModelStatus;
 import io.justsearch.app.services.worker.WorkerFeatureCache;
@@ -13,28 +13,43 @@ import java.util.function.Supplier;
 
 /**
  * What the runtime owners report about a removable part's files, read at each owner's own state
- * (design D4, fourth decision 2a): Best match first is unloaded only when the Worker reports no
- * live query-role reranker session; the answer model is unloaded only when no managed or user-run
- * answer server runs, and no self-test, picture-reading or install hold is open. Anything that
- * cannot be confirmed refuses.
+ * (design D4, fourth decision 2a; repair round 2): Best match first is unloaded only when the
+ * Worker reports no live query-role reranker session; the answer model is unloaded only when no
+ * process this Engine started may still hold it (a managed llama-server not seen to exit, also
+ * after a failed stop, or whose descendants are not confirmed ended; a self-test candidate running
+ * or outliving its test), no picture-reading, self-test or install hold is open, and no answer
+ * server the user runs is configured or in use. The answer server's mode is never trusted for
+ * this: a failed stop leaves it offline while the process lives. Anything that cannot be confirmed
+ * refuses.
  */
 public final class ModelFileUsage {
   private ModelFileUsage() {}
 
   /**
-   * Builds the probe over the live owners.
+   * The probe as the service composition binds it over the answer runtime.
    *
    * @param worker the Worker's last reported ONNX sessions; empty until it has answered
-   * @param answerServer the answer runtime, or {@code null} when this build has none
-   * @param externalServer whether a user-run answer server is configured or in use
+   * @param answerRuntime the answer runtime, or {@code null} when this build has none
    * @param holds the chat controller's holds, or {@code null} when it has none
    */
   public static Function<String, Optional<String>> probe(WorkerFeatureCache worker,
-      Supplier<ChatActuator> answerServer, BooleanSupplier externalServer,
-      ChatHolds holds) {
+      InferenceLifecycleManager answerRuntime, ChatHolds holds) {
+    return probe(worker,
+        answerRuntime == null ? Optional::empty : answerRuntime::answerFilesInUse,
+        () -> answerRuntime != null && answerRuntime.isUsingExternalLlamaServer(), holds);
+  }
+
+  /**
+   * Builds the probe over the live owners.
+   *
+   * @param answerProcesses why a process this Engine started may still hold the answer model
+   * @param externalServer whether a user-run answer server is configured or in use
+   */
+  static Function<String, Optional<String>> probe(WorkerFeatureCache worker,
+      Supplier<Optional<String>> answerProcesses, BooleanSupplier externalServer, ChatHolds holds) {
     return packageId -> switch (packageId) {
       case "reranker" -> reranker(worker == null ? List.of() : worker.getOnnxModels());
-      case "chat" -> answers(answerServer == null ? null : answerServer.get(), externalServer, holds);
+      case "chat" -> answers(answerProcesses, externalServer, holds);
       default -> Optional.of("These files can't be removed here");
     };
   }
@@ -53,8 +68,8 @@ public final class ModelFileUsage {
     return Optional.of("Search hasn't reported Best match first yet - try again in a moment");
   }
 
-  static Optional<String> answers(ChatActuator server, BooleanSupplier externalServer,
-      ChatHolds holds) {
+  static Optional<String> answers(Supplier<Optional<String>> answerProcesses,
+      BooleanSupplier externalServer, ChatHolds holds) {
     if (externalServer != null && externalServer.getAsBoolean()) {
       return Optional.of("An answer server you run yourself is configured");
     }
@@ -67,9 +82,11 @@ public final class ModelFileUsage {
         });
       }
     }
-    if (server != null && server.serverRunning()) {
-      return Optional.of("The answer model is still loaded - try again in a moment");
+    try {
+      Optional<String> processes = answerProcesses == null ? Optional.empty() : answerProcesses.get();
+      return processes == null ? Optional.empty() : processes;
+    } catch (RuntimeException unknown) {
+      return Optional.of("JustSearch can't confirm nothing uses these files yet - try again in a moment");
     }
-    return Optional.empty();
   }
 }

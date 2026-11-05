@@ -24,6 +24,7 @@ import java.nio.file.Path;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -32,6 +33,7 @@ import org.junit.jupiter.api.io.TempDir;
  * removal lock (design D4): a pack import and a runtime activation or deactivation are refused
  * while files are being removed, and a removal is refused while one of them runs.
  */
+@Tag("cross-platform")
 final class ModelFileRemovalRoutesTest {
 
   @TempDir Path tmp;

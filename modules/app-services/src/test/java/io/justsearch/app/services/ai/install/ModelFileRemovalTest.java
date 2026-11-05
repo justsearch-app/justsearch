@@ -19,17 +19,27 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
  * "Remove files" against a temporary models folder (design D4). Each ownership rule and each
  * capture-before-verify case is driven through the real engine on real files; nothing outside the
- * temporary folder is touched.
+ * temporary folder is touched. Folder links are junctions on Windows, and the case that needs POSIX
+ * permissions runs only where they exist (repair round 2: these run in the Windows lane too).
  */
+@Tag("cross-platform")
 final class ModelFileRemovalTest {
 
   @TempDir Path tmp;
+  private final RemovalLinks links = new RemovalLinks();
+
+  @AfterEach
+  void unlink() throws Exception {
+    links.close();
+  }
 
   /** A process death between two checkpoints: an Error is never caught by the engine. */
   static final class SimulatedDeath extends Error {
@@ -170,7 +180,7 @@ final class ModelFileRemovalTest {
     Files.createDirectories(outside);
     Path dir = fixture.rerankerDir(0);
     Files.createDirectories(dir.getParent());
-    Files.createSymbolicLink(dir, outside);
+    links.folder(dir, outside);
     Files.write(outside.resolve("model.onnx"), RemovalModelsFixture.RERANK_FP32);
 
     DownloadedFiles.Part preview = part(engine, "reranker");
@@ -188,12 +198,13 @@ final class ModelFileRemovalTest {
     Path model = fixture.models.resolve("answer.gguf");
     Path elsewhere = tmp.resolve("user-copy.gguf");
     Files.write(elsewhere, RemovalModelsFixture.CHAT);
+    links.file(tmp.resolve("link-probe"), elsewhere); // skips here where file links are refused
     String digest = part(engine, "chat").previewDigest;
     engine.setCheckpointHookForTest(name -> {
       if (name.equals("declined")) {
         try {
           Files.delete(model);
-          Files.createSymbolicLink(model, elsewhere);
+          links.file(model, elsewhere);
         } catch (Exception e) {
           throw new AssertionError(e);
         }
@@ -213,8 +224,9 @@ final class ModelFileRemovalTest {
     fixture.writeChat();
     Path model = fixture.models.resolve("answer.gguf");
     Path other = tmp.resolve("hardlink.gguf");
+    // A second name for the same file (NTFS supports hard links too; the engine reads the link
+    // count through the platform on Windows).
     Files.createLink(other, model);
-    assumeTrue(model.getFileSystem().supportedFileAttributeViews().contains("unix"));
 
     DownloadedFiles.Removal removal = remove(engine, "chat");
 
@@ -383,8 +395,10 @@ final class ModelFileRemovalTest {
   void aRenameFailureKeepsTheFileAndReportsNotRemoved() throws Exception {
     ModelFileRemoval engine = engine();
     fixture.writeChat();
-    // The removal folder exists; only the rename out of the models folder can fail.
-    Files.createDirectories(fixture.models.resolve(ModelFileRemoval.REMOVAL_FOLDER));
+    assumeTrue(RemovalLinks.posix(fixture.models), "the rename is made to fail through POSIX permissions");
+    // The private removal folder exists; only the rename out of the models folder can fail.
+    Files.createDirectories(fixture.models.resolve(ModelFileRemoval.REMOVAL_FOLDER),
+        PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")));
     Files.setPosixFilePermissions(fixture.models, PosixFilePermissions.fromString("r-xr-xr-x"));
     try {
       assumeTrue(!Files.isWritable(fixture.models), "running as a user that ignores permissions");

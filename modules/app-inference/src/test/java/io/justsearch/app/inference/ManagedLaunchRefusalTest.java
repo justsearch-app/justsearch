@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -29,6 +30,7 @@ import org.junit.jupiter.api.io.TempDir;
  * a refusal with its plain reason. It latches no chat failure, and once the removal has ended the
  * same start launches normally.
  */
+@Tag("cross-platform")
 final class ManagedLaunchRefusalTest {
   private static final String REMOVING = "Removing files - try again when it finishes";
 

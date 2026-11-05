@@ -20,6 +20,8 @@ import './BrainSurface.js';
 interface Brain extends HTMLElement { apiBase: string; host_: unknown; installConsentOpen: boolean; updateComplete: Promise<boolean> }
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
 const DIGEST = 'b'.repeat(64);
+/** The plan identity a Download again preview carries; the accepted start sends it back. */
+const PLAN = 'd'.repeat(64);
 let view: Record<string, unknown>;
 let preview: InstallPlanPreview;
 let operations: Array<{ id: string; args: unknown }>;
@@ -100,7 +102,7 @@ beforeEach(() => {
     if (path.includes('/plan-preview')) {
       if (!path.includes('include=')) return json(preview);
       // Download again: the included part is planned; nothing about the saved choice changed.
-      return json({ ...preview, totalDownloadBytes: 1024, components: preview.components!.map(c =>
+      return json({ ...preview, totalDownloadBytes: 1024, planDigest: PLAN, components: preview.components!.map(c =>
         path.includes(`include=${c.id}`) ? { ...c, declined: false, state: 'to-download', downloadBytes: 1024 } : c) });
     }
     if (path.endsWith('/manifest')) return json({ schemaVersion: 2, packages: [
@@ -195,7 +197,7 @@ describe('Advanced settings - Downloaded files', () => {
     row(el, 'chat').querySelector<HTMLButtonElement>('[data-download-again="chat"]')!.click(); await settle(el);
     (el.shadowRoot!.querySelector('[data-testid="install-consent-dialog"] [label="Accept and download"]') as unknown as { onActivate(): void }).onActivate();
     await settle(el);
-    expect(operations).toEqual([{ id: 'core.start-ai-install', args: { acceptTerms: true, includePackages: ['chat'] } }]);
+    expect(operations).toEqual([{ id: 'core.start-ai-install', args: { acceptTerms: true, includePackages: ['chat'], planDigest: PLAN } }]);
     expect(declines).toEqual([]);
   });
 });
@@ -221,7 +223,7 @@ describe('switching on a removed part saves nothing until the consented install 
     await settle(el);
     expect(declines).toEqual([]);
     expect(operations).toEqual([{ id: 'core.start-ai-install',
-      args: { acceptTerms: true, enableRerankerOnCompletion: true, includePackages: ['reranker'] } }]);
+      args: { acceptTerms: true, enableRerankerOnCompletion: true, includePackages: ['reranker'], planDigest: PLAN } }]);
   });
 
   it('Answers and picture reading: a declined answer model is undeclined only by the accepted start', async () => {
@@ -245,8 +247,26 @@ describe('switching on a removed part saves nothing until the consented install 
     (el.shadowRoot!.querySelector('[data-testid="install-consent-dialog"] [label="Accept and download"]') as unknown as { onActivate(): void }).onActivate();
     await settle(el);
     expect(operations).toEqual([{ id: 'core.start-ai-install',
-      args: { acceptTerms: true, enablePictureReadingOnCompletion: true, includePackages: ['chat'] } }]);
+      args: { acceptTerms: true, enablePictureReadingOnCompletion: true, includePackages: ['chat'], planDigest: PLAN } }]);
     expect(declines).toEqual([]);
+  });
+});
+
+describe('Download again is bound to the plan its consent showed (repair round 2)', () => {
+  it('accepting sends the identity of the plan the consent showed, not a fresh one', async () => {
+    view = { parts: [{ ...chatRow(), state: 'not-downloaded', declined: true, removable: false, delete: [], kept: [] }], removal: null };
+    preview.components = preview.components!.map(c => c.id === 'chat' ? { ...c, state: 'declined', declined: true, downloadBytes: 0 } : c);
+    const el = await mount();
+
+    row(el, 'chat').querySelector<HTMLButtonElement>('[data-download-again="chat"]')!.click(); await settle(el);
+    const shown = paths.filter(p => p.includes('/plan-preview?include=chat')).length;
+    (el.shadowRoot!.querySelector('[data-testid="install-consent-dialog"] [label="Accept and download"]') as unknown as { onActivate(): void }).onActivate();
+    await settle(el);
+
+    expect(shown).toBeGreaterThan(0);
+    expect(operations).toHaveLength(1);
+    expect((operations[0]!.args as { planDigest?: string }).planDigest).toBe(PLAN);
+    expect(paths.filter(p => p.includes('/plan-preview?include=chat')).length, 'no other plan was fetched to accept').toBe(shown);
   });
 });
 

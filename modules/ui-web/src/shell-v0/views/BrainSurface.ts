@@ -2166,6 +2166,8 @@ export class BrainSurface extends JfElement {
     if (this.planLoading || !this.consentReady()) return;
     const feature = this.consentFeature;
     const include = this.consentInclude;
+    // Download again accepts exactly the plan this consent showed; the Engine refuses a changed one.
+    const planDigest = include.length > 0 ? this.planPreview?.planDigest ?? '' : '';
     this.consentInclude = [];
     this.installConsentOpen = false;
     await this.withBusy('install-start', async () => {
@@ -2173,7 +2175,7 @@ export class BrainSurface extends JfElement {
       const data = (await this.invokeOp('core.start-ai-install', { acceptTerms: true,
         ...(feature === 'reranker' ? { enableRerankerOnCompletion: true } : {}),
         ...(feature === 'pictures' ? { enablePictureReadingOnCompletion: true } : {}),
-        ...(include.length > 0 ? { includePackages: include } : {}),
+        ...(include.length > 0 ? { includePackages: include, planDigest } : {}),
       })) as InstallStatus;
       if (data) {
         void refreshAiInstallNow();

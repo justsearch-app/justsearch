@@ -7,15 +7,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import io.justsearch.app.inference.chat.ChatActuator;
 import io.justsearch.app.inference.chat.ChatHolds;
 import io.justsearch.app.services.worker.OnnxModelStatus;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /** The one removal lock in both orders, and the runtime owners' "in use" answers (design D4). */
+@Tag("cross-platform")
 final class ModelFileRemovalFenceTest {
 
   @Test
@@ -142,28 +143,33 @@ final class ModelFileRemovalFenceTest {
   }
 
   @Test
-  void theAnswerModelIsInUseWhileAServerRunsOrAHoldIsOpen() {
-    ChatActuator server = mock(ChatActuator.class);
+  void theAnswerModelIsInUseWhileAProcessMayHoldItOrAHoldIsOpen() {
+    // What the answer runtime's physical owners report (repair round 2): never the server's mode.
+    var processes = new java.util.concurrent.atomic.AtomicReference<Optional<String>>(Optional.empty());
     ChatHolds holds = mock(ChatHolds.class);
     when(holds.openHolds()).thenReturn(List.of());
-    assertTrue(ModelFileUsage.answers(server, () -> false, holds).isEmpty(), "stopped and unheld");
+    assertTrue(ModelFileUsage.answers(processes::get, () -> false, holds).isEmpty(),
+        "released and unheld");
 
-    when(server.serverRunning()).thenReturn(true);
+    processes.set(Optional.of("The answer model is still loaded - try again in a moment"));
     assertEquals("The answer model is still loaded - try again in a moment",
-        ModelFileUsage.answers(server, () -> false, holds).orElseThrow());
+        ModelFileUsage.answers(processes::get, () -> false, holds).orElseThrow());
 
-    when(server.serverRunning()).thenReturn(false);
+    processes.set(Optional.empty());
     when(holds.openHolds()).thenReturn(List.of(
         new ChatHolds.OpenHold(ChatHolds.Kind.VDU, "vdu", Instant.EPOCH)));
     assertEquals("Picture reading is still using the answer model - try again in a moment",
-        ModelFileUsage.answers(server, () -> false, holds).orElseThrow());
+        ModelFileUsage.answers(processes::get, () -> false, holds).orElseThrow());
     when(holds.openHolds()).thenReturn(List.of(
         new ChatHolds.OpenHold(ChatHolds.Kind.SELF_TEST, "activation", Instant.EPOCH)));
     assertEquals("The answer model is being tested - try again when it finishes",
-        ModelFileUsage.answers(server, () -> false, holds).orElseThrow());
+        ModelFileUsage.answers(processes::get, () -> false, holds).orElseThrow());
 
     assertEquals("An answer server you run yourself is configured",
         ModelFileUsage.answers(null, () -> true, null).orElseThrow());
+    assertEquals("JustSearch can't confirm nothing uses these files yet - try again in a moment",
+        ModelFileUsage.answers(() -> { throw new IllegalStateException("unreadable"); },
+            () -> false, null).orElseThrow(), "an owner that cannot answer refuses");
   }
 
   @Test

@@ -100,6 +100,16 @@ final class LlamaServerProcessOwnership {
     }
   }
 
+  /**
+   * Whether a launch is still inside the OS or a launched server has not been seen to exit (also one
+   * whose stop failed): design D4 reads this, not the mode, before the answer model's files go.
+   */
+  boolean anyOwned() {
+    synchronized (gate) {
+      return !owned.isEmpty();
+    }
+  }
+
   /** Owns {@code child} through {@code reservation} until the child exits. */
   private void own(CompletableFuture<ChildHandle> reservation, ChildHandle child) {
     reservation.complete(child);

@@ -45,6 +45,17 @@ final class BrainInstallHandlerSupport {
     }
   }
 
+  /** The string value of {@code key}; {@code null} when absent or not a string. */
+  static String parseString(String argumentsJson, String key) {
+    try {
+      JsonNode v = HandlerJson.MAPPER.readTree(
+          argumentsJson == null || argumentsJson.isBlank() ? "{}" : argumentsJson).get(key);
+      return v != null && v.isString() ? v.asString() : null;
+    } catch (RuntimeException malformed) {
+      return null;
+    }
+  }
+
   static boolean parseAcceptTerms(String argumentsJson) {
     return parseBoolean(argumentsJson, "acceptTerms");
   }

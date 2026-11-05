@@ -377,11 +377,10 @@ public final class ServicePhase {
     if (recordedIngestion != null) {
       aiInstallHelper.setInstallerActivationOpen(recordedIngestion::installerActivationOpen);
     }
+    // The answer model's usage is read from the processes the answer runtime started (a failed stop
+    // or a surviving self-test keeps it in use), never from the server's mode (repair round 2).
     aiInstallHelper.setRemovalUsageProbe(io.justsearch.app.services.ai.install.ModelFileUsage.probe(
-        workerFeatureCache,
-        answerRuntime == null ? null : answerRuntime::chatActuator,
-        () -> answerRuntime != null && answerRuntime.isUsingExternalLlamaServer(),
-        chatHolds));
+        workerFeatureCache, answerRuntime, chatHolds));
 
 
     // DiagnosticsService: SPI suppliers read from the late-bindings holder.

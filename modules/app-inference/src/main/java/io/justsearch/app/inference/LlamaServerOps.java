@@ -156,6 +156,8 @@ final class LlamaServerOps {
   private volatile ChildHandle child;
   /** A launched server whose exit was confirmed while its descendants could not be listed. */
   private volatile ChildHandle unverifiedExit;
+  /** What an exited server started that could not be confirmed ended (design D4 reads it). */
+  private volatile List<ProcessHandle> leftRunning = List.of();
   private volatile CompletableFuture<?> crashMonitor;
   /** The owner a planned stop is ending; its exit, whatever its class, is not a crash. */
   private volatile ActiveServer stoppingOwner;
@@ -1034,6 +1036,7 @@ final class LlamaServerOps {
     }
     if (!io.justsearch.app.inference.chat.StartedProcesses.awaitExit(started, STOP_WAIT)) {
       LOG.warn("A process llama-server PID {} started is still running", exited.pid());
+      leftRunning = List.copyOf(started);
     }
   }
 
@@ -2247,6 +2250,32 @@ final class LlamaServerOps {
 
   boolean hasLiveManagedProcess() {
     return alive(child);
+  }
+
+  /**
+   * Design D4: whether a llama-server process this Engine launched may still hold the answer
+   * model's files, read from the physical owner and never from the mode (a failed stop leaves the
+   * mode offline while the child lives). True while a launch is inside the OS or a launched server
+   * has not been seen to exit, while a retained server (one whose stop failed) is not confirmed
+   * gone, while an exit's descendants are unverified, and while anything a server started that
+   * could not be ended still runs. An unreadable descendant list counts as in use.
+   */
+  boolean managedProcessesMayHoldFiles() {
+    if (processOwnership.anyOwned() || unverifiedExit != null) return true;
+    ChildHandle held = child;
+    if (held != null) {
+      if (held.state() != ChildHandle.State.EXITED) return true;
+      try {
+        if (io.justsearch.app.inference.chat.StartedProcesses.of(held).stream()
+            .anyMatch(io.justsearch.app.api.runtime.child.ProcessTerminator::isRunning)) {
+          return true;
+        }
+      } catch (RuntimeException unreadable) {
+        return true;
+      }
+    }
+    return leftRunning.stream()
+        .anyMatch(io.justsearch.app.api.runtime.child.ProcessTerminator::isRunning);
   }
 
   void handlePeriodicHealthFailure(String reason, boolean external) {

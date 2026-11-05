@@ -2,6 +2,11 @@
 package io.justsearch.app.services.ai.install;
 
 import io.justsearch.app.api.DownloadedFiles;
+import io.justsearch.app.api.OpCriticality;
+import io.justsearch.app.api.OpLeaseOutcome;
+import io.justsearch.app.api.OperationAdmissionClosedException;
+import io.justsearch.app.api.OperationLeaseHandle;
+import io.justsearch.app.api.OperationLeaseService;
 import io.justsearch.app.api.UiSettings;
 import io.justsearch.configuration.model.CapabilityTier;
 import io.justsearch.configuration.model.InstallContract;
@@ -11,20 +16,34 @@ import io.justsearch.configuration.model.ModelRegistry;
 import io.justsearch.configuration.model.ModelVariant;
 import io.justsearch.configuration.model.SupportingFile;
 import io.justsearch.configuration.persistence.AtomicFileWrites;
+import io.justsearch.configuration.persistence.OwnerOnlyDirectory;
 import io.justsearch.configuration.persistence.WindowsOwnerOnlyDirectory;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.nio.file.SecureDirectoryStream;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.AclEntry;
+import java.nio.file.attribute.AclEntryPermission;
+import java.nio.file.attribute.AclEntryType;
+import java.nio.file.attribute.AclFileAttributeView;
+import java.nio.file.attribute.BasicFileAttributeView;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.PosixFileAttributeView;
+import java.nio.file.attribute.PosixFileAttributes;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.UserPrincipal;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -65,6 +84,15 @@ import tools.jackson.databind.json.JsonMapper;
  * move). Recovery after a crash acts only on a well-formed record whose paths lie inside the models
  * folder and whose folders are all plain; it reports the interrupted removal, puts captured files
  * back where it can, keeps everything else untouched and reported, and never deletes.
+ *
+ * <p>The removal folder is private (repair round 2): it is created owner-only (0700 on POSIX, a
+ * protected owner-and-SYSTEM DACL on Windows), and before each capture, put-back and deletion it
+ * must still be the same plain folder, owned by the Engine's user and writable by no one else;
+ * otherwise the whole removal refuses or stops and nothing in that folder is touched. Where the
+ * platform offers directory handles the deletion happens through the checked folder's own handle.
+ * The removal record is replaced only atomically (a disk without atomic replacement refuses the
+ * removal before anything is moved), and a removal holds an upgrade-admission lease, so an
+ * application upgrade waits for it or it refuses while one is being prepared.
  */
 final class ModelFileRemoval {
   private static final Logger log = LoggerFactory.getLogger(ModelFileRemoval.class);
@@ -94,6 +122,17 @@ final class ModelFileRemoval {
   static final String KEPT_PUT_BACK = "kept - the removal was interrupted; the file was put back";
   static final String KEPT_UNCERTAIN = "kept - not touched: its place could not be checked";
   static final String KEPT_STOPPED = "kept - the removal stopped before this file";
+
+  /** The removal folder is not private to the Engine's user: the whole removal refuses or stops. */
+  static final String FOLDER_NOT_PRIVATE =
+      "The removal folder can be changed by another account, so nothing can be removed";
+  /** The removal record cannot be replaced atomically on this disk: nothing is moved. */
+  static final String RECORD_NOT_ATOMIC =
+      "Nothing was removed: this disk can't save the removal record safely";
+  /** Upgrade admission is closed: an application update is being prepared. */
+  static final String UPDATE_PREPARING = "An update is being prepared - try again after it";
+  /** The op-lease class a removal registers under (upgrade admission). */
+  static final String LEASE_OP_CLASS = "ai.model-file-removal";
 
   /** The whole removal refuses when the models folder itself is a link or sits in a linked folder. */
   static final String ROOT_LINKED =
@@ -150,20 +189,40 @@ final class ModelFileRemoval {
   private final Supplier<ModelRegistry> registry;
   private final Supplier<InstallContract> contract;
   private final ModelFileRemovalFence fence;
+  private final Supplier<OperationLeaseService> leases;
   private final Object journalLock = new Object();
   private volatile boolean recovered;
 
+  /** How the removal record is replaced: only atomically (test seam for unsupported disks). */
+  @FunctionalInterface
+  interface RecordReplace {
+    void replace(Path target, byte[] content) throws IOException;
+  }
+
+  private volatile RecordReplace recordReplace = AtomicFileWrites::replaceStrict;
+
   ModelFileRemoval(Path homeDir, Path modelsRoot, Supplier<ModelRegistry> registry,
       Supplier<InstallContract> contract, ModelFileRemovalFence fence) {
+    this(homeDir, modelsRoot, registry, contract, fence, OperationLeaseService::noOp);
+  }
+
+  ModelFileRemoval(Path homeDir, Path modelsRoot, Supplier<ModelRegistry> registry,
+      Supplier<InstallContract> contract, ModelFileRemovalFence fence,
+      Supplier<OperationLeaseService> leases) {
     this.homeDir = Objects.requireNonNull(homeDir, "homeDir");
     this.root = Objects.requireNonNull(modelsRoot, "modelsRoot").toAbsolutePath().normalize();
     this.registry = Objects.requireNonNull(registry, "registry");
     this.contract = Objects.requireNonNull(contract, "contract");
     this.fence = Objects.requireNonNull(fence, "fence");
+    this.leases = Objects.requireNonNull(leases, "leases");
   }
 
   void setCheckpointHookForTest(Consumer<String> hook) {
     this.checkpointHook = hook == null ? name -> {} : hook;
+  }
+
+  void setRecordReplaceForTest(RecordReplace replace) {
+    this.recordReplace = replace == null ? AtomicFileWrites::replaceStrict : replace;
   }
 
   // ---------------------------------------------------------------------------
@@ -302,7 +361,9 @@ final class ModelFileRemoval {
       if (f.reason() == null) part.delete.add(entry);
       else part.kept.add(entry);
     }
-    part.state = presence(usable, found.stream().anyMatch(f -> !f.expected().partial()));
+    // Any file left, a partial download's staging file too, makes the part incomplete: a download
+    // cancelled before its first file completed is listed and its staging files can be removed.
+    part.state = presence(usable, !found.isEmpty());
     part.sizeOnDiskBytes = measured(!found.isEmpty(), unknown, total);
   }
 
@@ -509,14 +570,22 @@ final class ModelFileRemoval {
   // Execute
   // ---------------------------------------------------------------------------
 
-  /** A prepared removal: the fence is held, the decline committed, the journal written. */
+  /**
+   * A prepared removal: the fence and the upgrade-admission lease are held, the removal folder is
+   * checked, the decline committed, the journal written.
+   */
   final class Run {
     private final ModelFileRemovalFence.Removal held;
+    private final OperationLeaseHandle lease;
+    private final PrivateFolder folder;
     private final Journal journal;
     private final List<Target> targets;
 
-    private Run(ModelFileRemovalFence.Removal held, Journal journal, List<Target> targets) {
+    private Run(ModelFileRemovalFence.Removal held, OperationLeaseHandle lease, PrivateFolder folder,
+        Journal journal, List<Target> targets) {
       this.held = held;
+      this.lease = lease;
+      this.folder = folder;
       this.journal = journal;
       this.targets = targets;
     }
@@ -533,19 +602,23 @@ final class ModelFileRemoval {
      */
     DownloadedFiles.Removal finish() {
       boolean settled = false;
+      boolean finished = false;
       try {
-        for (Target t : targets) removeOne(journal, t);
+        for (Target t : targets) removeOne(journal, t, folder);
         journal.state = outcome(journal, targets);
         journal.finishedAtEpochMs = System.currentTimeMillis();
         journal.message = summary(journal);
         write(journal);
         settled = true;
+        finished = true;
         return journal.report();
       } catch (RuntimeException failure) {
-        // Settle every unfinished file in memory first: no checkpoint write may stop this.
+        // Settle every unfinished file in memory first: no checkpoint write may stop this. Nothing
+        // in a removal folder that is no longer the checked private folder is touched.
+        boolean folderPrivate = !(failure instanceof FolderNotPrivate) && stillPrivate(folder);
         for (JournalFile f : journal.files) {
           if (!"deleted".equals(f.state) && !"kept".equals(f.state) && !"missing".equals(f.state)) {
-            settleOne(f);
+            settleOne(f, folderPrivate);
             if ("kept".equals(f.state) && KEPT_INTERRUPTED.equals(f.reason)) f.reason = KEPT_STOPPED;
           }
         }
@@ -557,7 +630,13 @@ final class ModelFileRemoval {
         return journal.report();
       } finally {
         if (!settled) recovered = false; // the saved record may still say running
-        held.close();
+        try {
+          lease.release(finished ? OpLeaseOutcome.SUCCESS : OpLeaseOutcome.FAILURE);
+        } catch (RuntimeException notReleased) {
+          log.warn("Removal lease could not be released", notReleased);
+        } finally {
+          held.close();
+        }
       }
     }
   }
@@ -568,7 +647,7 @@ final class ModelFileRemoval {
    * deleted; otherwise {@code partly-removed}. Never "removed" while a file that passed remains.
    */
   private static String outcome(Journal journal, List<Target> targets) {
-    Set<String> rels = new java.util.HashSet<>();
+    Set<String> rels = new HashSet<>();
     for (Target t : targets) rels.add(t.expected().rel());
     long deleted = 0;
     boolean passingLeft = false;
@@ -588,8 +667,9 @@ final class ModelFileRemoval {
 
   /**
    * Prepares a removal of {@code packageId}. The order is the decided one: resolve file identities,
-   * take the lock, re-check eligibility under it, record the decline through the settings owner
-   * (so Repair does not restore the part), write the journal.
+   * take the lock and the upgrade-admission lease, re-check eligibility under them, check the
+   * private removal folder, write the journal (only atomically), record the decline through the
+   * settings owner (so Repair does not restore the part).
    *
    * @throws Refusal with a plain reason; nothing is deleted
    */
@@ -621,12 +701,22 @@ final class ModelFileRemoval {
     if (targets.isEmpty()) throw new Refusal("No downloaded files to remove");
 
     ModelFileRemovalFence.Removal held = fence.begin(packageId);
+    OperationLeaseHandle lease = null;
     try {
+      // Upgrade admission: an update being prepared refuses the removal; a running removal is a
+      // must-complete operation an update waits for (it is never interrupted mid-capture).
+      try {
+        lease = leases.get().register(LEASE_OP_CLASS, OpCriticality.MUST_COMPLETE, 1800,
+            Map.of("source", LEASE_OP_CLASS, "packageId", packageId));
+      } catch (OperationAdmissionClosedException closed) {
+        throw new Refusal(UPDATE_PREPARING);
+      }
       checkpointHook.accept("fenced");
       UiSettingsStoreView read = settings.inspect();
       Optional<String> refused = eligibility.reason(packageId, read.settings());
       if (refused.isEmpty()) refused = probe.inUse(packageId);
       if (refused.isPresent()) throw new Refusal(refused.get());
+      PrivateFolder folder = privateRemovalFolder();
       Journal journal = new Journal();
       journal.version = JOURNAL_VERSION;
       journal.packageId = packageId;
@@ -642,7 +732,14 @@ final class ModelFileRemoval {
         journal.files.add(file);
       }
       journal.message = "Removing files";
-      write(journal);
+      try {
+        write(journal);
+      } catch (java.io.UncheckedIOException notAtomic) {
+        // Nothing was saved, captured or declined: a record that could be torn is never written.
+        log.warn("Removal record could not be saved", notAtomic);
+        throw new Refusal(notAtomic.getCause() instanceof java.nio.file.AtomicMoveNotSupportedException
+            ? RECORD_NOT_ATOMIC : "Nothing was removed: the removal record could not be saved");
+      }
       try {
         settings.decline(read, packageId);
       } catch (RuntimeException notSaved) {
@@ -660,32 +757,32 @@ final class ModelFileRemoval {
             + notSaved.getMessage() + ")");
       }
       checkpointHook.accept("declined");
-      return new Run(held, journal, targets);
+      return new Run(held, lease, folder, journal, targets);
     } catch (RuntimeException | Error failure) {
       // A record may have been saved as running: the next read reconciles it, never this lock.
       recovered = false;
-      held.close();
+      try {
+        if (lease != null) lease.release(OpLeaseOutcome.CANCELLED);
+      } catch (RuntimeException notReleased) {
+        failure.addSuppressed(notReleased);
+      } finally {
+        held.close();
+      }
       throw failure;
     }
   }
 
-  private void removeOne(Journal journal, Target t) {
+  private void removeOne(Journal journal, Target t, PrivateFolder folder) {
     JournalFile entry = journal.files.stream().filter(f -> f.path.equals(t.expected().rel()))
         .findFirst().orElseThrow();
-    Path folder = root.resolve(REMOVAL_FOLDER);
     String stagedName = UUID.randomUUID() + STAGED_SUFFIX;
-    Path staged = folder.resolve(stagedName);
+    Path staged = folder.path().resolve(stagedName);
     // Rule 2 is applied to the file before capture.
     if (linkedOnTheWay(t.path())) {
       keep(journal, entry, KEPT_LINKED_FOLDER);
       return;
     }
-    try {
-      ensureRemovalFolder(folder);
-    } catch (IOException unavailable) {
-      keep(journal, entry, KEPT_IN_USE);
-      return;
-    }
+    requireStillPrivate(folder);
     entry.state = "capturing";
     entry.staged = REMOVAL_FOLDER + "/" + stagedName;
     write(journal);
@@ -702,14 +799,21 @@ final class ModelFileRemoval {
     checkpointHook.accept("captured:" + entry.path);
     String failed = verify(t, staged);
     if (failed != null) {
-      putBack(journal, entry, staged, t.path(), failed);
+      putBack(journal, entry, staged, t.path(), failed, folder);
       return;
     }
     checkpointHook.accept("verified:" + entry.path);
+    final String kept;
     try {
-      Files.delete(staged);
+      kept = deleteCaptured(folder, staged, t);
     } catch (IOException notDeleted) {
-      putBack(journal, entry, staged, t.path(), KEPT_NOT_DELETED);
+      putBack(journal, entry, staged, t.path(), KEPT_NOT_DELETED, folder);
+      return;
+    }
+    if (kept != null) {
+      // What the captured name holds now is not the verified file: it is neither deleted nor put
+      // back, and stays reported in the removal folder.
+      keep(journal, entry, kept);
       return;
     }
     entry.state = "deleted";
@@ -736,8 +840,49 @@ final class ModelFileRemoval {
     }
   }
 
-  /** Puts a captured file back only if its place is free; never overwrites. */
-  private void putBack(Journal journal, JournalFile entry, Path staged, Path canonical, String why) {
+  /**
+   * Deletes the verified captured file, immediately after checking again that the removal folder is
+   * the private folder checked for this run and that its captured name still holds the verified
+   * file. Where the platform has directory handles the folder is opened without following links,
+   * its handle is checked to be that folder, and the file is deleted through that handle, so a
+   * folder or file swapped in by path meanwhile is never what gets deleted.
+   *
+   * @return {@code null} when deleted; otherwise why the captured name was kept
+   * @throws FolderNotPrivate when the removal folder is no longer the checked private folder
+   */
+  private String deleteCaptured(PrivateFolder folder, Path staged, Target t) throws IOException {
+    requireStillPrivate(folder);
+    if (!t.identity().equals(identity(staged))) return KEPT_CHANGED;
+    try (DirectoryStream<Path> models = Files.newDirectoryStream(root)) {
+      if (models instanceof SecureDirectoryStream<Path> modelsHandle) {
+        try (SecureDirectoryStream<Path> handle = modelsHandle.newDirectoryStream(
+            Path.of(REMOVAL_FOLDER), LinkOption.NOFOLLOW_LINKS)) {
+          Object opened = handle.getFileAttributeView(BasicFileAttributeView.class)
+              .readAttributes().fileKey();
+          if (opened == null || !opened.equals(folder.identity())) {
+            throw new FolderNotPrivate();
+          }
+          Path name = staged.getFileName();
+          BasicFileAttributes entry = handle.getFileAttributeView(name,
+              BasicFileAttributeView.class, LinkOption.NOFOLLOW_LINKS).readAttributes();
+          if (!entry.isRegularFile() || !t.identity().equals(entry.fileKey())) return KEPT_CHANGED;
+          handle.deleteFile(name);
+          return null;
+        }
+      }
+    }
+    Files.delete(staged);
+    return null;
+  }
+
+  /**
+   * Puts a captured file back only if its place is free; never overwrites. A removal folder that is
+   * no longer the checked private folder stops the whole removal instead: what its captured name
+   * holds may not be the file that was captured.
+   */
+  private void putBack(Journal journal, JournalFile entry, Path staged, Path canonical, String why,
+      PrivateFolder folder) {
+    requireStillPrivate(folder);
     if (linkedParents(staged) || linkedParents(canonical)) {
       keep(journal, entry, KEPT_UNCERTAIN);
     } else if (restoreWithoutOverwrite(staged, canonical)) {
@@ -777,29 +922,165 @@ final class ModelFileRemoval {
     write(journal);
   }
 
-  private void ensureRemovalFolder(Path folder) throws IOException {
-    try {
-      Files.createDirectory(folder);
-    } catch (FileAlreadyExistsException exists) {
-      // verified below
+  // ---------------------------------------------------------------------------
+  // The private removal folder (repair round 2)
+  // ---------------------------------------------------------------------------
+
+  /** The removal folder as checked for one run; its identity notices a replacement. */
+  record PrivateFolder(Path path, Object identity) {}
+
+  /** The removal folder is not, or no longer, the checked private folder: the removal stops. */
+  static final class FolderNotPrivate extends RuntimeException {
+    private static final long serialVersionUID = 1L;
+
+    FolderNotPrivate() {
+      super(FOLDER_NOT_PRIVATE);
     }
+  }
+
+  /** Rights that let an account add, rename, replace or delete entries, or take the folder over. */
+  private static final Set<AclEntryPermission> WRITE_RIGHTS = Collections.unmodifiableSet(EnumSet.of(
+      AclEntryPermission.WRITE_DATA, AclEntryPermission.APPEND_DATA,
+      AclEntryPermission.DELETE_CHILD, AclEntryPermission.DELETE, AclEntryPermission.WRITE_ACL,
+      AclEntryPermission.WRITE_OWNER, AclEntryPermission.WRITE_NAMED_ATTRS));
+
+  /** The Engine's own account, and (Windows) the principals an owner-only folder grants. */
+  private record EngineAccount(UserPrincipal owner, Set<UserPrincipal> ownerOnly) {}
+
+  private volatile EngineAccount engineAccount;
+
+  /**
+   * Creates the removal folder owner-only when it is absent (an existing folder is never
+   * loosened or repaired), then checks it.
+   *
+   * @throws Refusal unless it is a private folder of the Engine's user
+   */
+  PrivateFolder privateRemovalFolder() {
+    Path folder = root.resolve(REMOVAL_FOLDER);
+    try {
+      if (!Files.exists(folder, LinkOption.NOFOLLOW_LINKS)) {
+        OwnerOnlyDirectory.ensureOwnerOnlyDirectory(folder);
+      }
+      return new PrivateFolder(folder, checkPrivate(folder, null));
+    } catch (IOException | RuntimeException notPrivate) {
+      log.warn("Removal folder {} is not private: {}", folder, notPrivate.toString());
+      throw new Refusal(FOLDER_NOT_PRIVATE);
+    }
+  }
+
+  private void requireStillPrivate(PrivateFolder folder) {
+    if (!stillPrivate(folder)) throw new FolderNotPrivate();
+  }
+
+  private boolean stillPrivate(PrivateFolder folder) {
+    try {
+      checkPrivate(folder.path(), folder.identity());
+      return true;
+    } catch (IOException | RuntimeException notPrivate) {
+      return false;
+    }
+  }
+
+  /** Recovery's check (no identity is known after a restart). */
+  private boolean removalFolderPrivate() {
+    Path folder = root.resolve(REMOVAL_FOLDER);
+    try {
+      checkPrivate(folder, null);
+      return true;
+    } catch (IOException | RuntimeException notPrivate) {
+      return false;
+    }
+  }
+
+  /**
+   * A plain folder (no link, junction or reparse point) inside a plain models folder, owned by the
+   * Engine's user and writable by no other account (POSIX: no group or other write; Windows: no
+   * allow entry granting write rights to anyone an owner-only folder does not grant), and, when
+   * {@code expected} is given, the same folder. Returns its identity.
+   */
+  private Object checkPrivate(Path folder, Object expected) throws IOException {
+    if (rootLinked()) throw new IOException("models folder is linked");
     BasicFileAttributes attrs =
         Files.readAttributes(folder, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
     if (!attrs.isDirectory() || attrs.isSymbolicLink() || attrs.isOther()) {
-      throw new IOException("Removal folder is not a plain folder");
+      throw new IOException("not a plain folder");
     }
     if (isWindows()) WindowsOwnerOnlyDirectory.requireNonReparsePoint(folder);
+    // A folder's change times move with every entry: its identity is its file key, on Windows its
+    // NTFS file index, elsewhere its creation time.
+    Object identity = attrs.fileKey() != null ? attrs.fileKey()
+        : isWindows() ? WindowsOwnerOnlyDirectory.fileIdentity(folder)
+        : attrs.creationTime().toMillis();
+    if (expected != null && !expected.equals(identity)) throw new IOException("replaced");
+    EngineAccount engine = engineAccount();
+    PosixFileAttributeView posix =
+        Files.getFileAttributeView(folder, PosixFileAttributeView.class, LinkOption.NOFOLLOW_LINKS);
+    if (posix != null) {
+      PosixFileAttributes perms = posix.readAttributes();
+      if (!perms.owner().equals(engine.owner())) throw new IOException("owned by another account");
+      if (perms.permissions().contains(PosixFilePermission.GROUP_WRITE)
+          || perms.permissions().contains(PosixFilePermission.OTHERS_WRITE)) {
+        throw new IOException("writable by other accounts");
+      }
+      return identity;
+    }
+    AclFileAttributeView acl =
+        Files.getFileAttributeView(folder, AclFileAttributeView.class, LinkOption.NOFOLLOW_LINKS);
+    if (acl == null) throw new IOException("its permissions cannot be read");
+    if (!acl.getOwner().equals(engine.owner())) throw new IOException("owned by another account");
+    for (AclEntry entry : acl.getAcl()) {
+      if (entry.type() == AclEntryType.ALLOW && !Collections.disjoint(entry.permissions(), WRITE_RIGHTS)
+          && !engine.ownerOnly().contains(entry.principal())) {
+        throw new IOException("writable by " + entry.principal().getName());
+      }
+    }
+    return identity;
   }
 
-  /** File key where the platform has one; otherwise size plus creation and change times. */
+  /**
+   * The account files created by this Engine belong to, read from a fresh owner-only probe folder
+   * (on Windows also the principals that folder's protected DACL names), so the check needs no
+   * platform account lookups.
+   */
+  private EngineAccount engineAccount() throws IOException {
+    EngineAccount known = engineAccount;
+    if (known != null) return known;
+    Files.createDirectories(homeDir);
+    Path probe = homeDir.resolve(".removal-owner-" + UUID.randomUUID());
+    OwnerOnlyDirectory.ensureOwnerOnlyDirectory(probe);
+    try {
+      UserPrincipal owner = Files.getOwner(probe, LinkOption.NOFOLLOW_LINKS);
+      Set<UserPrincipal> ownerOnly = new HashSet<>();
+      ownerOnly.add(owner);
+      AclFileAttributeView acl =
+          Files.getFileAttributeView(probe, AclFileAttributeView.class, LinkOption.NOFOLLOW_LINKS);
+      if (acl != null) {
+        for (AclEntry entry : acl.getAcl()) {
+          if (entry.type() == AclEntryType.ALLOW) ownerOnly.add(entry.principal());
+        }
+      }
+      known = new EngineAccount(owner, Set.copyOf(ownerOnly));
+    } finally {
+      Files.deleteIfExists(probe);
+    }
+    engineAccount = known;
+    return known;
+  }
+
+  /**
+   * The file's identity: its file key where Java has one (device and inode on POSIX); on Windows the
+   * NTFS volume serial and file index, which survive a rename on one volume and differ for any
+   * other file. Elsewhere size plus creation and change times. {@code null} when unreadable.
+   */
   static Object identity(Path p) {
     try {
       BasicFileAttributes attrs =
           Files.readAttributes(p, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
       Object key = attrs.fileKey();
-      return key != null ? key
-          : List.of(attrs.size(), attrs.creationTime().toMillis(), attrs.lastModifiedTime().toMillis());
-    } catch (IOException unreadable) {
+      if (key != null) return key;
+      if (isWindows()) return WindowsOwnerOnlyDirectory.fileIdentity(p);
+      return List.of(attrs.size(), attrs.creationTime().toMillis(), attrs.lastModifiedTime().toMillis());
+    } catch (IOException | RuntimeException unreadable) {
       return null;
     }
   }
@@ -891,7 +1172,8 @@ final class ModelFileRemoval {
     synchronized (journalLock) {
       try {
         Files.createDirectories(homeDir);
-        AtomicFileWrites.replace(journalPath(), JSON.writeValueAsBytes(journal));
+        // Only an atomic replacement: a torn record could misreport what is left (repair round 2).
+        recordReplace.replace(journalPath(), JSON.writeValueAsBytes(journal));
         unsaved = null;
       } catch (IOException failure) {
         throw new java.io.UncheckedIOException("Removal record could not be saved", failure);
@@ -997,7 +1279,7 @@ final class ModelFileRemoval {
   private void addStrays(DownloadedFiles.Removal report, Journal journal) {
     Path folder = root.resolve(REMOVAL_FOLDER);
     if (!Files.isDirectory(folder, LinkOption.NOFOLLOW_LINKS)) return;
-    Set<String> named = new java.util.HashSet<>();
+    Set<String> named = new HashSet<>();
     for (JournalFile f : journal.files) if (f.staged != null) named.add(f.staged);
     try (var listing = Files.list(folder)) {
       listing.map(p -> REMOVAL_FOLDER + "/" + p.getFileName()).filter(rel -> !named.contains(rel))
@@ -1026,7 +1308,8 @@ final class ModelFileRemoval {
       }
       Journal journal = readJournal();
       if (journal != null && "running".equals(journal.state)) {
-        for (JournalFile f : journal.files) settleOne(f);
+        boolean folderPrivate = removalFolderPrivate();
+        for (JournalFile f : journal.files) settleOne(f, folderPrivate);
         journal.state = "interrupted";
         journal.finishedAtEpochMs = System.currentTimeMillis();
         journal.message = "The removal was interrupted: " + summary(journal)
@@ -1040,11 +1323,11 @@ final class ModelFileRemoval {
 
   /**
    * Settles one unfinished entry without deleting anything: a captured file goes back to its
-   * canonical place when that place is free and every folder on both paths is a plain folder;
-   * otherwise it stays where it is and is reported. An entry whose paths cannot be checked is
-   * reported as kept and not touched.
+   * canonical place when that place is free, every folder on both paths is a plain folder and the
+   * removal folder is still private ({@code folderPrivate}); otherwise it stays where it is and is
+   * reported. An entry whose paths cannot be checked is reported as kept and not touched.
    */
-  private void settleOne(JournalFile f) {
+  private void settleOne(JournalFile f, boolean folderPrivate) {
     if ("deleted".equals(f.state) || "kept".equals(f.state) || "missing".equals(f.state)) return;
     Path canonical = canonicalOf(f.path);
     if (canonical == null || linkedParents(canonical)) {
@@ -1064,7 +1347,7 @@ final class ModelFileRemoval {
       return;
     }
     if (staged != null && Files.exists(staged, LinkOption.NOFOLLOW_LINKS)) {
-      if (!plainSingleFile(staged)) {
+      if (!folderPrivate || !plainSingleFile(staged)) {
         uncertain(f);
       } else if (restoreWithoutOverwrite(staged, canonical)) {
         f.staged = null;

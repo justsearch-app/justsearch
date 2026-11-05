@@ -65,9 +65,13 @@ public interface BrainInstallService {
    * @return current install status as a serializable map
    * @throws Exception on cancel failure
    */
-  /** "Download again": the accepted install also downloads these previously declined parts. */
+  /**
+   * "Download again": the accepted install also downloads these previously declined parts, only
+   * while the plan is still the one the consent showed ({@code planDigest}).
+   */
   default AiInstallService.Attempt startInstall(boolean acceptTerms, boolean enableRerankerOnCompletion,
-      boolean enablePictureReadingOnCompletion, java.util.Set<String> includePackages) throws Exception {
+      boolean enablePictureReadingOnCompletion, java.util.Set<String> includePackages,
+      String planDigest) throws Exception {
     if (includePackages != null && !includePackages.isEmpty()) {
       throw new UnsupportedOperationException("Download again is unavailable");
     }

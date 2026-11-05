@@ -436,6 +436,7 @@ public class InferenceLifecycleManager
       java.util.function.Function<EngineWorkHandle, Runnable> generationLifetime,
       java.util.function.Supplier<Optional<String>> pinnedCudaUuid) {
     this.childControl = Objects.requireNonNull(childControl, "childControl");
+    this.selfTests = new io.justsearch.app.inference.chat.ChildSelfTestLauncher(childControl);
     Objects.requireNonNull(generationLifetime, "generationLifetime");
     Objects.requireNonNull(pinnedCudaUuid, "pinnedCudaUuid");
     // The tracker owns the indexing-pacing lifetime (ER beginGeneration) for every GENERATE lease.
@@ -1682,7 +1683,27 @@ public class InferenceLifecycleManager
    * child of this manager's control, stopped with {@code SELF_TEST} before the main server starts.
    */
   public io.justsearch.app.inference.chat.SelfTestLauncher selfTestLauncher() {
-    return new io.justsearch.app.inference.chat.ChildSelfTestLauncher(childControl);
+    return selfTests;
+  }
+
+  /** The one self-test launcher of this manager: it also answers whether a candidate outlived it. */
+  private final io.justsearch.app.inference.chat.ChildSelfTestLauncher selfTests;
+
+  /**
+   * Design D4: why the answer model's files may still be in use by a process this Engine started,
+   * read from the physical owners rather than from the mode: a managed llama-server that has not
+   * been seen to exit (also after a failed stop) or whose descendants are not confirmed ended, and a
+   * self-test candidate that is running or outlived its test. Empty only when all are confirmed
+   * released.
+   */
+  public Optional<String> answerFilesInUse() {
+    if (serverOps.managedProcessesMayHoldFiles()) {
+      return Optional.of("The answer model is still loaded - try again in a moment");
+    }
+    if (selfTests.candidatesMayHoldFiles()) {
+      return Optional.of("The answer model is being tested - try again when it finishes");
+    }
+    return Optional.empty();
   }
 
   /** Sends one step to the router and maps the router's verdicts onto the legacy exception. */

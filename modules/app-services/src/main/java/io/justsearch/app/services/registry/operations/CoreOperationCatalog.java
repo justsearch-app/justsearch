@@ -1152,7 +1152,8 @@ public final class CoreOperationCatalog implements OperationCatalog {
             + "\"enableRerankerOnCompletion\":{\"type\":\"boolean\"},"
             + "\"enablePictureReadingOnCompletion\":{\"type\":\"boolean\"},"
             + "\"includePackages\":{\"type\":\"array\",\"maxItems\":8,\"uniqueItems\":true,"
-            + "\"items\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":64}}}}",
+            + "\"items\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":64}},"
+            + "\"planDigest\":{\"type\":\"string\",\"pattern\":\"^[0-9a-f]{64}$\"}}}",
             "{\"type\":\"object\"}"),
         new OperationPolicy(
             RiskTier.MEDIUM,

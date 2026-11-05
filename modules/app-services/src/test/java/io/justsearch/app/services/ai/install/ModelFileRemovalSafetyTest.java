@@ -18,6 +18,8 @@ import java.nio.file.attribute.PosixFilePermissions;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -27,7 +29,9 @@ import org.junit.jupiter.api.io.TempDir;
  * on a well-formed record and on plain folders inside the models folder; restoring never falls
  * back to an overwriting move; a checkpoint that cannot be saved still puts the captured file back
  * and leaves no running record without an owner; a part missing a required file is not usable.
+ * Folder links are junctions on Windows (repair round 2: these run in the Windows lane too).
  */
+@Tag("cross-platform")
 final class ModelFileRemovalSafetyTest {
   /** The engine's whole-removal refusal for a linked models folder (ModelFileRemoval.ROOT_LINKED). */
   private static final String ROOT_LINKED =
@@ -36,6 +40,12 @@ final class ModelFileRemovalSafetyTest {
   private static final String UNCERTAIN = "kept - not touched: its place could not be checked";
 
   @TempDir Path tmp;
+  private final RemovalLinks links = new RemovalLinks();
+
+  @AfterEach
+  void unlink() throws Exception {
+    links.close();
+  }
 
   private final ModelFileRemovalTest.FakeSettings settings = new ModelFileRemovalTest.FakeSettings();
   private static final ModelFileRemoval.Eligibility ELIGIBLE = (id, s) -> Optional.empty();
@@ -56,7 +66,7 @@ final class ModelFileRemovalSafetyTest {
     var fixture = new RemovalModelsFixture(tmp.resolve("real-home"));
     fixture.writeChat();
     Path linkedModels = tmp.resolve("linked-models");
-    Files.createSymbolicLink(linkedModels, fixture.models);
+    links.folder(linkedModels, fixture.models);
     ModelFileRemoval engine = engine(fixture.home, linkedModels, fixture);
 
     DownloadedFiles.Part chat = part(engine, "chat");
@@ -78,7 +88,7 @@ final class ModelFileRemovalSafetyTest {
     var fixture = new RemovalModelsFixture(tmp.resolve("real-home"));
     fixture.writeReranker();
     Path linkedHome = tmp.resolve("linked-home");
-    Files.createSymbolicLink(linkedHome, fixture.home);
+    links.folder(linkedHome, fixture.home);
     ModelFileRemoval engine = engine(linkedHome, linkedHome.resolve("models"), fixture);
 
     DownloadedFiles.Part reranker = part(engine, "reranker");
@@ -113,7 +123,7 @@ final class ModelFileRemovalSafetyTest {
     Path external = Files.createDirectories(tmp.resolve("external"));
     byte[] unrelated = RemovalModelsFixture.bytes("someone else's file");
     Files.write(external.resolve(stagedName), unrelated);
-    Files.createSymbolicLink(removalFolder, external);
+    links.folder(removalFolder, external);
 
     ModelFileRemoval restarted = engine(fixture.home, fixture.models, fixture);
     DownloadedFiles.Removal report = assertDoesNotThrow(

@@ -21,6 +21,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mockito;
@@ -31,6 +32,7 @@ import tools.jackson.databind.ObjectMapper;
  * is refused before any process is launched, as a refusal rather than a failed start; an admitted
  * launch stays registered with the removal lock until its process exists.
  */
+@Tag("cross-platform")
 final class LlamaServerLaunchFenceTest {
   private static final String REMOVING = "Removing files - try again when it finishes";
 

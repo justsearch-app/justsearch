@@ -41,8 +41,8 @@ final class RemoveAiFilesHandlerTest {
 
     @Override
     public AiInstallService.Attempt startInstall(boolean acceptTerms, boolean enableReranker,
-        boolean enablePictureReading, Set<String> includePackages) {
-      calls.add("start include " + new java.util.TreeSet<>(includePackages));
+        boolean enablePictureReading, Set<String> includePackages, String planDigest) {
+      calls.add("start include " + new java.util.TreeSet<>(includePackages) + " plan " + planDigest);
       return attempt();
     }
 
@@ -149,15 +149,15 @@ final class RemoveAiFilesHandlerTest {
   }
 
   @Test
-  void downloadAgainCarriesItsPartsToTheAcceptedStart() {
+  void downloadAgainCarriesItsPartsAndThePreviewedPlanToTheAcceptedStart() {
     var owner = new Owner();
 
     new StartAiInstallHandler(() -> owner).executeRecorded(
-        "{\"acceptTerms\":true,\"includePackages\":[\"reranker\"]}", null,
-        TestEngineContexts.internal(), null);
+        "{\"acceptTerms\":true,\"includePackages\":[\"reranker\"],\"planDigest\":\"" + DIGEST + "\"}",
+        null, TestEngineContexts.internal(), null);
     new StartAiInstallHandler(() -> owner).executeRecorded(
         "{\"acceptTerms\":true}", null, TestEngineContexts.internal(), null);
 
-    assertEquals(List.of("start include [reranker]", "start"), owner.calls);
+    assertEquals(List.of("start include [reranker] plan " + DIGEST, "start"), owner.calls);
   }
 }

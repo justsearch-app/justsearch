@@ -1,0 +1,106 @@
+diff --git a/modules/app-api/src/main/java/io/justsearch/app/api/InstallPlanPreview.java b/modules/app-api/src/main/java/io/justsearch/app/api/InstallPlanPreview.java
+index aa7b72fb82..74d4d67fda 100644
+--- a/modules/app-api/src/main/java/io/justsearch/app/api/InstallPlanPreview.java
++++ b/modules/app-api/src/main/java/io/justsearch/app/api/InstallPlanPreview.java
+@@ -38,6 +38,9 @@ public final class InstallPlanPreview {
+    */
+   public long resumableBytes;
+ 
++  /** Compatibility shape: this revision's preview names no plan identity. */
++  public String planDigest = "";
++
+   /** Per-tier estimates, in canonical tier order. */
+   public final List<TierEstimate> tiers = new ArrayList<>();
+ 
+diff --git a/modules/app-inference/src/main/java/io/justsearch/app/inference/InferenceLifecycleManager.java b/modules/app-inference/src/main/java/io/justsearch/app/inference/InferenceLifecycleManager.java
+index ae5ba96216..eb7fd3afc6 100644
+--- a/modules/app-inference/src/main/java/io/justsearch/app/inference/InferenceLifecycleManager.java
++++ b/modules/app-inference/src/main/java/io/justsearch/app/inference/InferenceLifecycleManager.java
+@@ -1681,6 +1681,15 @@ public class InferenceLifecycleManager
+    * The self-test seam's launcher (Spec B step 6): each candidate is a {@code LLAMA_SELF_TEST}
+    * child of this manager's control, stopped with {@code SELF_TEST} before the main server starts.
+    */
++  /**
++   * Compatibility shape for the repaired check: the rule this revision's removal applied to the
++   * answer runtime, the server's mode as its actuator reports it.
++   */
++  public Optional<String> answerFilesInUse() {
++    return chatActuator().serverRunning()
++        ? Optional.of("The answer model is still loaded - try again in a moment") : Optional.empty();
++  }
++
+   public io.justsearch.app.inference.chat.SelfTestLauncher selfTestLauncher() {
+     return new io.justsearch.app.inference.chat.ChildSelfTestLauncher(childControl);
+   }
+diff --git a/modules/app-services/src/main/java/io/justsearch/app/services/ai/install/AiInstallService.java b/modules/app-services/src/main/java/io/justsearch/app/services/ai/install/AiInstallService.java
+index 34702ce40c..de8d6bd3e1 100644
+--- a/modules/app-services/src/main/java/io/justsearch/app/services/ai/install/AiInstallService.java
++++ b/modules/app-services/src/main/java/io/justsearch/app/services/ai/install/AiInstallService.java
+@@ -1107,6 +1107,13 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
+         Set.of());
+   }
+ 
++  /** Compatibility shape: this revision's accepted start carries no plan identity. */
++  public Attempt startInstall(boolean acceptTerms, boolean enableRerankerOnCompletion,
++      boolean enablePictureReadingOnCompletion, Set<String> includePackages, String planDigest) {
++    return startInstall(acceptTerms, enableRerankerOnCompletion, enablePictureReadingOnCompletion,
++        includePackages);
++  }
++
+   @Override
+   public Attempt startInstall(boolean acceptTerms, boolean enableRerankerOnCompletion,
+       boolean enablePictureReadingOnCompletion, Set<String> includePackages) {
+diff --git a/modules/app-services/src/main/java/io/justsearch/app/services/ai/install/ModelFileRemoval.java b/modules/app-services/src/main/java/io/justsearch/app/services/ai/install/ModelFileRemoval.java
+index cd8aca9ec5..50b97c3fa1 100644
+--- a/modules/app-services/src/main/java/io/justsearch/app/services/ai/install/ModelFileRemoval.java
++++ b/modules/app-services/src/main/java/io/justsearch/app/services/ai/install/ModelFileRemoval.java
+@@ -162,6 +162,28 @@ final class ModelFileRemoval {
+     this.fence = Objects.requireNonNull(fence, "fence");
+   }
+ 
++  /**
++   * Compatibility shape for the repaired checks: this revision takes no lease service (a removal
++   * holds no upgrade admission).
++   */
++  ModelFileRemoval(Path homeDir, Path modelsRoot, Supplier<ModelRegistry> registry,
++      Supplier<InstallContract> contract, ModelFileRemovalFence fence,
++      Supplier<io.justsearch.app.api.OperationLeaseService> leases) {
++    this(homeDir, modelsRoot, registry, contract, fence);
++  }
++
++  /** Compatibility shape: how this revision would replace its record (it never asks). */
++  @FunctionalInterface
++  interface RecordReplace {
++    void replace(Path target, byte[] content) throws IOException;
++  }
++
++  /**
++   * Compatibility shape: this revision always saves its record through the non-strict
++   * replacement, which falls back to a plain move where atomic replacement is unavailable.
++   */
++  void setRecordReplaceForTest(RecordReplace replace) {}
++
+   void setCheckpointHookForTest(Consumer<String> hook) {
+     this.checkpointHook = hook == null ? name -> {} : hook;
+   }
+diff --git a/modules/app-services/src/main/java/io/justsearch/app/services/ai/install/ModelFileUsage.java b/modules/app-services/src/main/java/io/justsearch/app/services/ai/install/ModelFileUsage.java
+index ed2f37a8c4..bb58103e64 100644
+--- a/modules/app-services/src/main/java/io/justsearch/app/services/ai/install/ModelFileUsage.java
++++ b/modules/app-services/src/main/java/io/justsearch/app/services/ai/install/ModelFileUsage.java
+@@ -21,6 +21,16 @@ import java.util.function.Supplier;
+ public final class ModelFileUsage {
+   private ModelFileUsage() {}
+ 
++  /**
++   * Compatibility shape for the repaired check: this revision's composition over the answer
++   * runtime, which reads the server's mode through its actuator.
++   */
++  public static Function<String, Optional<String>> probe(WorkerFeatureCache worker,
++      io.justsearch.app.inference.InferenceLifecycleManager answerRuntime, ChatHolds holds) {
++    return probe(worker, answerRuntime == null ? null : answerRuntime::chatActuator,
++        () -> answerRuntime != null && answerRuntime.isUsingExternalLlamaServer(), holds);
++  }
++
+   /**
+    * Builds the probe over the live owners.
+    *

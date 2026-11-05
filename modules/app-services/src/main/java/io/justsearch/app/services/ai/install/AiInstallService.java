@@ -319,8 +319,9 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     } else {
       this.modelsDir = homeDir.resolve("models");
     }
+    // The removal reads the lease service late: composition binds it after construction.
     this.removal = new ModelFileRemoval(homeDir, modelsDir, this::getManifest,
-        this::readInstallContractBestEffort, removalFence);
+        this::readInstallContractBestEffort, removalFence, () -> operationLeases);
   }
 
   /** Production constructor — resolves AI Home from ConfigStore / platform defaults. */
@@ -488,8 +489,13 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
    */
   @Override
   public InstallPlanPreview previewInstallPlan(Set<String> includePackages) {
-    Set<String> declinedNow = new HashSet<>(declinedPackages());
-    declinedNow.removeAll(includePackages == null ? Set.of() : includePackages);
+    Set<String> include = includePackages == null ? Set.of() : Set.copyOf(includePackages);
+    // Download again: the declines and the settings witness come from one read, so the plan the
+    // consent shows can be named exactly by the accepted start (repair round 2).
+    UiSettingsStore.Snapshot read = include.isEmpty() ? null : settingsSnapshotOrNull();
+    Set<String> declinedNow = new HashSet<>(read != null
+        ? read.settings().getDeclinedAiPackages() : declinedPackages());
+    declinedNow.removeAll(include);
     InstallPlanPreview preview = new InstallPlanPreview();
     ModelRegistry registry = getManifest();
     InstallHardware installHardware = buildInstallHardware();
@@ -503,6 +509,9 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     InstallPlan plan =
         InstallPlanner.plan(registry, hardware, intent, declinedNow, modelsDir, homeDir,
             installHardware.policyExcluded());
+    if (read != null) {
+      preview.planDigest = downloadAgainDigest(include, declinedNow, plan, read.witness());
+    }
     // What the download will actually COST: complete files are already excluded by the planner, and
     // `remainingBytes()` also drops the bytes an interrupted run left staged. Stating `totalBytes()`
     // here charged the user for bytes already on their disk (Sandbox round 8).
@@ -1104,12 +1113,12 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
   public Attempt startInstall(boolean acceptTerms, boolean enableRerankerOnCompletion,
       boolean enablePictureReadingOnCompletion) {
     return startInstall(acceptTerms, enableRerankerOnCompletion, enablePictureReadingOnCompletion,
-        Set.of());
+        Set.of(), null);
   }
 
   @Override
   public Attempt startInstall(boolean acceptTerms, boolean enableRerankerOnCompletion,
-      boolean enablePictureReadingOnCompletion, Set<String> includePackages) {
+      boolean enablePictureReadingOnCompletion, Set<String> includePackages, String planDigest) {
     if (!acceptTerms) {
       throw new AiInstallException(
           400, ApiErrorCode.TERMS_REQUIRED, "You must accept the model terms before downloading.");
@@ -1128,7 +1137,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
       // An interrupted removal puts its captured files back before anything plans downloads.
       removal.recoverIfNeeded();
       return startInstallRun(enableRerankerOnCompletion, enablePictureReadingOnCompletion, include,
-          filesUser);
+          planDigest, filesUser);
     } catch (RuntimeException | Error failure) {
       filesUser.close();
       throw failure;
@@ -1136,16 +1145,45 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
   }
 
   private Attempt startInstallRun(boolean enableRerankerOnCompletion,
-      boolean enablePictureReadingOnCompletion, Set<String> include,
+      boolean enablePictureReadingOnCompletion, Set<String> include, String planDigest,
       ModelFileRemovalFence.Ticket filesUser) {
-    var preferenceAtStart = (enableRerankerOnCompletion || enablePictureReadingOnCompletion) && settingsStore != null
-        ? settingsStore.inspect() : null;
+    Set<String> acceptedDeclines = null;
+    if (!include.isEmpty()) {
+      // "Download again": the guard is taken first so no other start can interleave, then the
+      // presented plan is checked against one settings read and the declines are withdrawn against
+      // that read's witness. A changed plan refuses before anything is saved or downloaded, and
+      // leaves the install status as it was; a cancelled consent never reaches this point.
+      synchronized (lock) {
+        if (!running.compareAndSet(false, true)) {
+          throw new AiInstallException(
+              409, ApiErrorCode.INSTALL_ALREADY_RUNNING, "AI install is already running.");
+        }
+      }
+      try {
+        acceptedDeclines = acceptDownloadAgain(include, planDigest);
+      } catch (RuntimeException | Error refused) {
+        running.set(false);
+        throw refused instanceof AiInstallException typed ? typed : new AiInstallException(409,
+            ApiErrorCode.AI_INSTALL_ERROR, "Download again could not be saved: " + refused.getMessage());
+      }
+    }
+    // Read after any withdrawal, so a completion enable commits against the current witness.
+    final UiSettingsStore.Snapshot preferenceAtStart;
+    try {
+      preferenceAtStart = (enableRerankerOnCompletion || enablePictureReadingOnCompletion)
+          && settingsStore != null ? settingsStore.inspect() : null;
+    } catch (RuntimeException | Error unreadable) {
+      if (acceptedDeclines != null) installStartFailed(unreadable);
+      throw unreadable;
+    }
     AiInstallStatus started;
     synchronized (lock) {
-      if (!running.compareAndSet(false, true)) {
+      if (acceptedDeclines == null && !running.compareAndSet(false, true)) {
         throw new AiInstallException(
             409, ApiErrorCode.INSTALL_ALREADY_RUNNING, "AI install is already running.");
       }
+      // The accepted plan's declines drive this run's acquisition planning (null: read live).
+      this.runDeclines = acceptedDeclines == null ? null : Set.copyOf(acceptedDeclines);
       this.enableRerankerOnCompletion = enableRerankerOnCompletion;
       this.rerankerPreferenceAtInstallStart = enableRerankerOnCompletion ? preferenceAtStart : null;
       this.enablePictureReadingOnCompletion = enablePictureReadingOnCompletion;
@@ -1156,18 +1194,6 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
       status.startedAtEpochMs = System.currentTimeMillis();
       updateState("running", "preflight", "Starting AI install...");
       started = status.snapshot();
-    }
-    if (!include.isEmpty()) {
-      // "Download again": the consent covered these parts, so their saved declines are withdrawn
-      // now, inside the accepted start and against the witness read here. A cancelled consent never
-      // reaches this point and leaves the declines (and therefore Repair) unchanged.
-      try {
-        withdrawDeclines(include);
-      } catch (RuntimeException | Error failure) {
-        installStartFailed(failure);
-        throw failure instanceof AiInstallException typed ? typed : new AiInstallException(409,
-            ApiErrorCode.AI_INSTALL_ERROR, "Download again could not be saved: " + failure.getMessage());
-      }
     }
     // The first stage's lease is acquired before starting the owner. Later stages keep their
     // existing byte-sized leases and cancellation callback; no parallel lifetime registry.
@@ -1213,6 +1239,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
             status.resumableBytes = resumableBytesOnDisk;
             outcome = status.snapshot();
           } finally {
+            runDeclines = null;
             running.set(false);
             filesUser.close();
           }
@@ -1236,6 +1263,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
   private void installStartFailed(Throwable failure) {
     synchronized (lock) {
       try {
+        runDeclines = null;
         pause.clear();
         fail("INSTALL_START_FAILED", "AI install could not start: " + failure.getMessage());
       } finally { running.set(false); }
@@ -1385,11 +1413,55 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     }
   }
 
+  /** The refusal when the accepted Download again no longer matches the plan its consent showed. */
+  static final String DOWNLOAD_CHANGED = "The download changed - review it again";
+
+  /** The accepted plan's declines for the running install's acquisition planning; null: live. */
+  private volatile Set<String> runDeclines;
+
+  private UiSettingsStore.Snapshot settingsSnapshotOrNull() {
+    if (settingsStore == null) return null;
+    try {
+      return settingsStore.inspect();
+    } catch (RuntimeException unreadable) {
+      log.debug("Download again preview: settings unreadable: {}", unreadable.toString());
+      return null;
+    }
+  }
+
   /**
-   * Withdraws the declines of {@code include} through the settings owner, against the witness read
-   * here. Declinability is not consulted: withdrawing a decline is always a valid request.
+   * The identity of a Download again plan: the parts included, the declines it was planned with,
+   * every file it downloads, and the settings witness those declines were read against. The
+   * consent preview carries it, and the accepted start presents it back.
    */
-  private void withdrawDeclines(Set<String> include) {
+  static String downloadAgainDigest(Set<String> include, Set<String> declines, InstallPlan plan,
+      io.justsearch.app.api.settings.SettingsWitness witness) {
+    StringBuilder identity = new StringBuilder("download-again.v1\n");
+    identity.append(witness.acceptedRevision()).append('\n')
+        .append(String.valueOf(witness.lastCommittedOperationKey())).append('\n');
+    include.stream().sorted().forEach(id -> identity.append("include ").append(id).append('\n'));
+    declines.stream().sorted().forEach(id -> identity.append("declined ").append(id).append('\n'));
+    plan.downloads().stream()
+        .map(d -> d.packageId() + "\u0000" + d.targetPath() + "\u0000" + d.sha256())
+        .sorted().forEach(line -> identity.append("file ").append(line).append('\n'));
+    try {
+      return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+          .digest(identity.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+    } catch (NoSuchAlgorithmException impossible) {
+      throw new AssertionError(impossible);
+    }
+  }
+
+  /**
+   * The accepted Download again: from one settings read, re-plans with {@code include} no longer
+   * declined, refuses with {@link #DOWNLOAD_CHANGED} unless that is exactly the plan the consent
+   * showed ({@code planDigest}), and withdraws the declines through the settings owner against
+   * that read's witness (a change committed meanwhile refuses the same way). Nothing is saved when
+   * it refuses.
+   *
+   * @return the declines the accepted plan was made with
+   */
+  private Set<String> acceptDownloadAgain(Set<String> include, String planDigest) {
     if (settingsStore == null || !settingsStore.mode().isWritable()) {
       throw new AiInstallException(409, ApiErrorCode.SETTINGS_READ_ONLY,
           "Settings are read-only in this session, so Download again cannot be remembered.");
@@ -1403,10 +1475,30 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     }
     var snapshot = settingsStore.inspect();
     UiSettings settings = snapshot.settings();
+    Set<String> declines = new HashSet<>(settings.getDeclinedAiPackages());
+    declines.removeAll(include);
+    InstallHardware hardware = buildInstallHardware();
+    InstallPlan plan = InstallPlanner.plan(registry, hardware.effective(), installIntent(), declines,
+        modelsDir, homeDir, hardware.policyExcluded());
+    if (planDigest == null
+        || !planDigest.equals(downloadAgainDigest(include, declines, plan, snapshot.witness()))) {
+      throw new AiInstallException(409, ApiErrorCode.AI_INSTALL_ERROR, DOWNLOAD_CHANGED);
+    }
     List<String> next = new ArrayList<>(settings.getDeclinedAiPackages());
-    if (!next.removeAll(include)) return;
-    settings.setDeclinedAiPackages(next);
-    commitSettings(settings, snapshot.witness(), "ai-download-again");
+    if (next.removeAll(include)) {
+      settings.setDeclinedAiPackages(next);
+      try {
+        commitSettings(settings, snapshot.witness(), "ai-download-again");
+      } catch (io.justsearch.app.api.settings.SettingsCommitOwner.Refused refused) {
+        // A save that landed after the read refuses the commit: the plan changed. Anything else is
+        // reported as what it is.
+        UiSettingsStore.Snapshot now = settingsSnapshotOrNull();
+        boolean changed = now == null || !snapshot.witness().equals(now.witness());
+        throw new AiInstallException(409, ApiErrorCode.AI_INSTALL_ERROR, changed ? DOWNLOAD_CHANGED
+            : "Download again could not be saved: " + refused.getMessage());
+      }
+    }
+    return Set.copyOf(declines);
   }
 
   // ---------------------------------------------------------------------------
@@ -2454,8 +2546,11 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
   }
 
   private InstallPlan planInstallRun(ModelRegistry registry, InstallHardware hardware) {
+    // An accepted Download again plans with exactly the declines its consent was shown.
+    Set<String> accepted = runDeclines;
     return InstallPlanner.planInstallRun(registry, hardware.effective(), installIntent(),
-        declinedPackages(), modelsDir, homeDir, hardware.policyExcluded());
+        accepted != null ? accepted : declinedPackages(), modelsDir, homeDir,
+        hardware.policyExcluded());
   }
 
   HardwareProfile detectHardwareProfile() {

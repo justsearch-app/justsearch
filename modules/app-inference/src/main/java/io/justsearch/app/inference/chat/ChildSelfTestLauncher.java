@@ -20,9 +20,11 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,13 +53,54 @@ public final class ChildSelfTestLauncher implements SelfTestLauncher {
 
   private final ChildControl control;
 
+  /** Runs inside {@link #run} (a candidate may be starting, serving or stopping). */
+  private final AtomicInteger running = new AtomicInteger();
+  /** Candidates whose stop did not confirm them and everything they started gone. */
+  private final Set<Unreleased> unreleased = ConcurrentHashMap.newKeySet();
+
+  /** A candidate that outlived its self-test, with the processes it was seen to start. */
+  private record Unreleased(ChildHandle candidate, Set<ProcessHandle> started) {
+    /** Confirmed gone: exited, nothing it started still runs, and its scope reads empty. */
+    boolean released() {
+      if (!candidate.exit().toCompletableFuture().isDone()) return false;
+      if (started.stream().anyMatch(io.justsearch.app.api.runtime.child.ProcessTerminator::isRunning)) {
+        return false;
+      }
+      try {
+        return StartedProcesses.of(candidate).stream()
+            .noneMatch(io.justsearch.app.api.runtime.child.ProcessTerminator::isRunning);
+      } catch (RuntimeException unreadable) {
+        return false;
+      }
+    }
+  }
+
   public ChildSelfTestLauncher(ChildControl control) {
     this.control = Objects.requireNonNull(control, "control");
+  }
+
+  /**
+   * Design D4: whether a self-test candidate may still hold the answer model's files: a run is in
+   * progress, or a candidate outlived its run (its stop was not confirmed, or something it started
+   * still runs) and is not yet seen gone. This outlives the controller's self-test hold.
+   */
+  public boolean candidatesMayHoldFiles() {
+    unreleased.removeIf(Unreleased::released);
+    return running.get() > 0 || !unreleased.isEmpty();
   }
 
   @Override
   public SelfTestRun run(SelfTestSpec spec) {
     Objects.requireNonNull(spec, "spec");
+    running.incrementAndGet();
+    try {
+      return runCandidate(spec);
+    } finally {
+      running.decrementAndGet();
+    }
+  }
+
+  private SelfTestRun runCandidate(SelfTestSpec spec) {
     ChildHandle candidate;
     try {
       candidate = start(spec);
@@ -66,11 +109,15 @@ public final class ChildSelfTestLauncher implements SelfTestLauncher {
     }
     Set<ProcessHandle> started = new LinkedHashSet<>();
     SelfTestRun outcome;
-    String survived;
+    String survived = "Self-test cleanup unverified";
     try {
       outcome = exercise(candidate, spec, started);
     } finally {
-      survived = stopAndRelease(candidate, started);
+      try {
+        survived = stopAndRelease(candidate, started);
+      } finally {
+        if (survived != null) unreleased.add(new Unreleased(candidate, Set.copyOf(started)));
+      }
     }
     // A candidate that may still run (and hold the GPU) is not a passed self-test (S19).
     if (survived == null) return outcome;

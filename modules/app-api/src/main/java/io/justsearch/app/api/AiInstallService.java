@@ -159,12 +159,14 @@ public interface AiInstallService {
 
   /**
    * Starts an accepted install that also downloads {@code includePackages}, parts the user had
-   * chosen not to download ("Download again"). Their saved declines are withdrawn only here, when
-   * the consented install starts, against the settings witness read at that moment; a closed or
-   * cancelled consent therefore changes nothing.
+   * chosen not to download ("Download again"). {@code planDigest} is the {@link
+   * InstallPlanPreview#planDigest} of the plan the consent showed: the start refuses ("The download
+   * changed - review it again") unless the plan is still exactly that one, read against the same
+   * settings witness. Only then are the saved declines withdrawn, against that witness, and the
+   * download planned with exactly those declines; a closed or cancelled consent changes nothing.
    */
   default Attempt startInstall(boolean acceptTerms, boolean enableRerankerOnCompletion,
-      boolean enablePictureReadingOnCompletion, Set<String> includePackages) {
+      boolean enablePictureReadingOnCompletion, Set<String> includePackages, String planDigest) {
     if (includePackages != null && !includePackages.isEmpty()) {
       throw new UnsupportedOperationException("Download again is unavailable");
     }
