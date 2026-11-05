@@ -56,6 +56,7 @@ whether bytes belong here (tempdoc 930 chunk C; enforced mechanically by the
 Run from the checkout whose engine is being measured, with jseval installed:
 
 ```sh
+export JUSTSEARCH_GPU_ENABLED=false   # or source the documented gpu.env for GPU runs
 python -m jseval quality prepare scifact
 python -m jseval quality baseline scifact
 python -m jseval quality check scifact
@@ -98,8 +99,9 @@ where it lives:
 - in GPU mode (`JUSTSEARCH_GPU_ENABLED=true`, or any per-model
   `JUSTSEARCH_*_GPU_ENABLED` switch that is not false), the NVIDIA driver
   version `nvidia-smi` reports and the bytes of the `libcuda.so.1` the system
-  loader resolves (`LD_LIBRARY_PATH`, then `ldconfig -p`). GPU mode is refused
-  when either cannot be read;
+  loader actually maps (a short child process with the launch environment loads
+  it and reports the mapped file). GPU mode is refused when either cannot be
+  read;
 - the whole models root (`--models-dir`): every package model discovery can
   select, BGE-M3 included. Only files whose readers cannot change index
   contents are left out: ORT's legacy optimized siblings (only ever deleted),
@@ -111,9 +113,9 @@ where it lives:
   fingerprints come from it. Every file a `model_manifest.json` names (model
   files, tokenizer, pooling and label configuration) is resolved as the
   engine resolves it, following links before `..` and also lexically
-  normalized; it must be hashed bytes or lie inside the models root, so an
-  absolute name, a `../` climbing out or a link leading out of the root
-  refuses;
+  normalized; it must resolve to bytes the key hashes (inside the models root
+  or another hashed root), so a reference to untracked bytes refuses, whether
+  it is an absolute name, a `../` climbing out or a link;
 - every other `JUSTSEARCH_*` setting by its literal value, except the listed
   resource locators (`JUSTSEARCH_FIELD_CATALOG`, `JUSTSEARCH_MCP_HOST_CONFIG`,
   `JUSTSEARCH_ONNXRUNTIME_NATIVE_PATH`, `JUSTSEARCH_NATIVE_PATH`,

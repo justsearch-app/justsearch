@@ -599,7 +599,7 @@ def test_kr9_headers_record_identity_digests_without_machine_paths(checkout, mod
     for path in (str(tmp_path), str(Path.home()), env["JAVA_HOME"], env["JUSTSEARCH_MODELS_DIR"]):
         assert path not in text
     with pytest.raises(ValueError, match="identity must map"):
-        header(c, identity={"models": "/home/someone/models"})
+        header(c, identity={"models": str(tmp_path / "models")})
     # Records written before the identity field still load.
     old = h.to_dict()
     del old["identity"]
@@ -612,7 +612,8 @@ def test_kr9_run_records_keep_path_like_settings_only_as_digests(tmp_path, monke
     from .helpers import make_run
     c = make_collection()
     fixture = make_run(c)
-    runtime = {"JUSTSEARCH_ORT_PROFILING_DIR": "/home/reviewer/profiles", "JUSTSEARCH_TRACE_DIR": "traces/run-1",
+    profiles = str(tmp_path / "profiles")
+    runtime = {"JUSTSEARCH_ORT_PROFILING_DIR": profiles, "JUSTSEARCH_TRACE_DIR": "traces/run-1",
                "JUSTSEARCH_CHUNK_SIZE": "512", "JUSTSEARCH_FIELD_CATALOG": {"file": "f" * 64}}
     handle = Mock(index_key="prepared-key", index_population=c.index_population(), index_build="cached",
                   index_cache_key="prepared-key", model_hashes=dict(fixture.header.model_hashes), env={},
@@ -632,9 +633,9 @@ def test_kr9_run_records_keep_path_like_settings_only_as_digests(tmp_path, monke
                            item, time.monotonic() + 30)
     assert json.loads(Path(item["done"]).read_text())["error"] is None
     text = Path(item["run"]).read_text()
-    for literal in ("/home/reviewer/profiles", "traces/run-1"):
+    for literal in (profiles, "traces/run-1"):
         assert literal not in text
     recorded = RunRecord.read(item["run"]).header.index_state["runtime"]
-    assert recorded == {"JUSTSEARCH_ORT_PROFILING_DIR": {"sha256": sha256_text("/home/reviewer/profiles")},
+    assert recorded == {"JUSTSEARCH_ORT_PROFILING_DIR": {"sha256": sha256_text(profiles)},
                         "JUSTSEARCH_TRACE_DIR": {"sha256": sha256_text("traces/run-1")},
                         "JUSTSEARCH_CHUNK_SIZE": "512", "JUSTSEARCH_FIELD_CATALOG": {"file": "f" * 64}}
