@@ -28,6 +28,7 @@ import { live } from 'lit/directives/live.js';
 import { ifDefined } from 'lit/directives/if-defined.js';
 import { keyed } from 'lit/directives/keyed.js';
 import { JfElement } from '../primitives/JfElement.js';
+import { FocusKeeper } from '../primitives/focusKeeper.js';
 import { authorizedFetch } from '../api/authorizedFetch.js';
 // Tempdoc 511 §511-followup-B: reset-settings now routes through
 // `<jf-operation>` → ActionButton → OperationClient internally; the
@@ -384,6 +385,8 @@ export class SettingsSurface extends JfElement {
 
   constructor() {
     super();
+    // L21 — a deleted theme or revoked plugin hands focus to its neighbour, never the page.
+    new FocusKeeper(this);
     this.apiBase = '';
     this.host_ = undefined as unknown as PluginHostApi;
     this.ui = {};
@@ -2087,7 +2090,7 @@ export class SettingsSurface extends JfElement {
       // is replaced by an inline input.
       if (isCustom && this.renamingThemeId === entry.id) {
         return html`
-          <div class="theme-tile-wrap custom-theme-renaming">
+          <div class="theme-tile-wrap custom-theme-renaming" data-focus-row=${entry.id}>
             <input
               class="theme-rename-input"
               .value=${this.renameDraft}
@@ -2122,7 +2125,7 @@ export class SettingsSurface extends JfElement {
         `;
       }
       return html`
-        <div class="theme-tile-wrap">
+        <div class="theme-tile-wrap" data-focus-row=${entry.id}>
           ${this.renderThemeTile({
             id: entry.id,
             displayName: entry.displayName,
@@ -2169,7 +2172,7 @@ export class SettingsSurface extends JfElement {
           Appearance above.
         </p>
         <div class="theme-grid" role="group" aria-label="Theme">
-          <div class="theme-tile-wrap">
+          <div class="theme-tile-wrap" data-focus-row="default">
             ${this.renderThemeTile({
               id: null,
               displayName: 'Default',

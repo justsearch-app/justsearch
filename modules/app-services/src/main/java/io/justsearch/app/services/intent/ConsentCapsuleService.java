@@ -194,7 +194,7 @@ public final class ConsentCapsuleService
     liveGrants.put(grantId, new GrantMeta(expiry, operationId, sourceTier, pendingId));
     String payload = encode(capsule);
     String mac = base64(hmac(payload.getBytes(StandardCharsets.UTF_8)));
-    emitGrant(grantId, "ISSUED", operationId, now);
+    emitGrant(grantId, "ISSUED", operationId, now, pendingId);
     return base64(payload.getBytes(StandardCharsets.UTF_8)) + "." + mac;
   }
 
@@ -209,7 +209,7 @@ public final class ConsentCapsuleService
     }
     revoked.add(grantId);
     GrantMeta meta = liveGrants.remove(grantId);
-    emitGrant(grantId, "REVOKED", meta != null ? meta.subject() : grantId, clock.instant());
+    emitGrant(grantId, "REVOKED", meta != null ? meta.subject() : grantId, clock.instant(), null);
   }
 
   /**
@@ -228,7 +228,8 @@ public final class ConsentCapsuleService
     }
   }
 
-  private void emitGrant(String grantId, String action, String subject, Instant when) {
+  /** L16: the ISSUED and CONSUMED rows of a capsule an Allow minted name its pending request. */
+  private void emitGrant(String grantId, String action, String subject, Instant when, String pendingId) {
     var sink = this.grantEventSink;
     if (sink == null) {
       return;
@@ -242,7 +243,8 @@ public final class ConsentCapsuleService
               "APPROVAL",
               grantId,
               action,
-              subject));
+              subject,
+              Optional.ofNullable(pendingId)));
     } catch (RuntimeException ignored) {
       // Audit emission is best-effort and must NEVER alter mint/verify/revoke semantics
       // (fail-closed discipline, same as the gate-outcome emit).
@@ -332,7 +334,7 @@ public final class ConsentCapsuleService
       @Override public String pendingId() { return meta.pendingId(); }
       @Override public void publish() {
         if (published.compareAndSet(false, true)) {
-          emitGrant(capsule.grantId(), "CONSUMED", operationId, consumedAt);
+          emitGrant(capsule.grantId(), "CONSUMED", operationId, consumedAt, meta.pendingId());
         }
       }
     });

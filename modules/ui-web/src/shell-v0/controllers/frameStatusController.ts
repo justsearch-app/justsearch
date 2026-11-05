@@ -19,7 +19,7 @@ import { emitEphemeralToast } from '../components/advisory/ephemeralToast.js';
 import { sendDesktopNotification } from '../../utils/notify.js';
 import type { PresenceRun } from './AgentSessionController.js';
 import { getOperationClient } from '../operations/OperationClient.js';
-import { withdrawAuthorization } from '../operations/authorizationBroker.js';
+import { withdrawAuthorization, withdrawnAuthorizations } from '../operations/authorizationBroker.js';
 import type { PluginErrorEventDetail } from '../state/pluginLoadEvents.js';
 import { presentationForSeverity } from '../state/messageClasses.js';
 import { isWindowFocused } from '../../utils/windowFocus.js';
@@ -303,7 +303,7 @@ export class FrameStatusController implements ReactiveController {
       consents: listPendingConsentRequests().map(c => ({ id: String(c.id), pluginId: c.contributorId, capability: c.capability })),
       update: getAppUpdateStatus(), conditions: this.conditions, finished: this.finished,
       roots: this.roots, rootPaths: this.rootPaths, rootsLive: this.rootsLive && !!this.ai?.indexingStatusLive,
-      activity: this.activity, presence: { runs: this.presence, live: this.presenceLive && !!this.ai?.snapshotLive }, operations: [...this.operations.values()] });
+      activity: this.activity, withdrawn: withdrawnAuthorizations(), presence: { runs: this.presence, live: this.presenceLive && !!this.ai?.snapshotLive }, operations: [...this.operations.values()] });
     let next = derive();
     const finishedBefore = this.finished;
     const p = next.progress;

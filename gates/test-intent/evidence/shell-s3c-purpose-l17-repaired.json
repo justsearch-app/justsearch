@@ -1,0 +1,127 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-05T19:55:21.602Z",
+  "revision": "14a8781e1fadde5a9e41f391689093f7075ba519",
+  "tree": "2e1afda15617de182cf1e2fa275d0dde1774ce65",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/AuthorizationHost.test.ts\" \"src/shell-v0/components/AuthorizationArrival.scope.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/zww5mxmz/tmp/test-intent-vitest-258-1793908505082.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2739
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts#a typed agent request says who asks, what happens and what to type, with no internal names",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e87c0c6955e4e2439198002ea5c82c4af7925e6cdee691408b6dc5ea4b119119",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "<jf-authorization-host> L17 plain words in the protected dialog a typed agent request says who asks, what happens and what to type, with no internal names",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts#the agent in Search is named as such",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e87c0c6955e4e2439198002ea5c82c4af7925e6cdee691408b6dc5ea4b119119",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "<jf-authorization-host> L17 plain words in the protected dialog the agent in Search is named as such",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationArrival.scope.test.ts#C protected dialog consent names operation and access scope for requester undefined",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationArrival.scope.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a6b08f6866dba89b90fd2ac3ca00149eb94bfd70de6173339e2e083758f4629b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C protected dialog consent names operation and access scope for requester undefined",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationArrival.scope.test.ts#C protected dialog consent names operation and access scope for requester Claude Desktop",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationArrival.scope.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a6b08f6866dba89b90fd2ac3ca00149eb94bfd70de6173339e2e083758f4629b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C protected dialog consent names operation and access scope for requester Claude Desktop",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "7ed8454d85",
+    "revision": "7ed8454d853098e7a1d4ebad081676d335f13440",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/AuthorizationHost.test.ts\" \"src/shell-v0/components/AuthorizationArrival.scope.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/zww5mxmz/tmp/test-intent-vitest-258-1793908516814.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 4028,
+        "output": "JSON report written to /home/elias/.cache/am/zww5mxmz/tmp/test-intent-vitest-258-1793908516814.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts#a typed agent request says who asks, what happens and what to type, with no internal names",
+        "classification": "assertion",
+        "detail": "<jf-authorization-host> L17 plain words in the protected dialog a typed agent request says who asks, what happens and what to type, with no internal names:  AssertionError: expected 'Authorize action' to be 'Let Claude Desktop run “Bulk Reindex”?' // Object.is equality\n    at /home/elias/.cache/am/zww5mxmz/tmp/test-intent-before-Nh2JOw/modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts:155:53\n    at file:///home/elias/.cache/am/zww5mxmz/tm"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts#the agent in Search is named as such",
+        "classification": "assertion",
+        "detail": "<jf-authorization-host> L17 plain words in the protected dialog the agent in Search is named as such:  AssertionError: expected 'Authorize action' to be 'Let the agent in Search run “Reindex”?' // Object.is equality\n    at /home/elias/.cache/am/zww5mxmz/tmp/test-intent-before-Nh2JOw/modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts:176:53\n    at file:///home/elias/.cache/am/zww5mxmz/tm"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/AuthorizationArrival.scope.test.ts#C protected dialog consent names operation and access scope for requester undefined",
+        "classification": "assertion",
+        "detail": "C protected dialog consent names operation and access scope for requester undefined:  AssertionError: expected 'Always allow “core.ingest-files” with…' to be 'Always allow “Ingest Files” without a…' // Object.is equality\n    at /home/elias/.cache/am/zww5mxmz/tmp/test-intent-before-Nh2JOw/modules/ui-web/src/shell-v0/components/AuthorizationArrival.scope.test.ts:151:37\n    at file:///h"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/AuthorizationArrival.scope.test.ts#C protected dialog consent names operation and access scope for requester Claude Desktop",
+        "classification": "assertion",
+        "detail": "C protected dialog consent names operation and access scope for requester Claude Desktop:  AssertionError: expected 'Always allow “core.ingest-files” with…' to be 'Always allow “Ingest Files” without a…' // Object.is equality\n    at /home/elias/.cache/am/zww5mxmz/tmp/test-intent-before-Nh2JOw/modules/ui-web/src/shell-v0/components/AuthorizationArrival.scope.test.ts:151:37\n    at file:///h"
+      }
+    ]
+  },
+  "digest": "sha256:032cb30d5aa1ba6103b3812fb61902381d7b38227a98244a149d937b5a3e9c1c"
+}

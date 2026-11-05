@@ -18,6 +18,7 @@ import { folderAttention, folderStatus, rootCoverage } from './folderStatus.js';
 import type { IndexedRootView } from '../../api/generated/schema-types/indexed-root-view.js';
 import type { PresenceRun } from '../controllers/AgentSessionController.js';
 import type { UnifiedActionEntry } from '../operations/ActionLedgerClient.js';
+import { isOutsideTransport } from '../operations/authorizationBroker.js';
 import type { OperationOutcomeView } from '../../api/generated/schema-types/index.js';
 
 const RECONNECT_GRACE_MS = 10_000; // One complete status-poll interval.
@@ -122,6 +123,8 @@ interface FrameStatusInput {
   readonly rootPaths?: ReadonlyMap<string, string>;
   readonly rootsLive?: boolean;
   readonly activity?: readonly UnifiedActionEntry[];
+  /** L15 — requests the Engine said no longer wait; any other open request row may still wait. */
+  readonly withdrawn?: ReadonlySet<string>;
   readonly presence?: { readonly runs: readonly PresenceRun[]; readonly live: boolean };
   readonly finished?: { readonly title: string; readonly at: number } | null;
 }
@@ -130,7 +133,7 @@ interface StatusPillState {
   readonly label: string;
   readonly stale: boolean;
   readonly percent?: number | null;
-  /** Needs-you count, shown as the pill's badge. */
+  /** Needs-you or problems count, shown as the pill's badge. */
   readonly count?: number;
 }
 export interface FrameStatus {
@@ -174,7 +177,7 @@ function asked(askedAt: string | undefined, now: number): string {
   return ` · asked ${minutes < 1 ? 'just now' : minutes < 60 ? `${minutes} min ago` : `about ${Math.round(minutes / 60)} h ago`}`;
 }
 
-const RISK_WORDS: Readonly<Record<string, string>> = {
+export const RISK_WORDS: Readonly<Record<string, string>> = {
   HIGH: 'High risk', MEDIUM: 'Medium risk', LOW: 'Low risk',
 };
 
@@ -276,6 +279,46 @@ function activityWords(entry: UnifiedActionEntry): { title: string; detail?: str
     tone: outcome?.[1] ?? (/^Index (failed|gave up)/.test(entry.label) ? 'failure' : 'neutral') };
 }
 
+const OUTCOME_STATE: Readonly<Record<string, readonly [string, NonNullable<StatusFact['tone']>]>> = {
+  SUCCESS: ['completed', 'success'], FAILURE: ['failed', 'failure'], FAILED: ['failed', 'failure'],
+  UNDONE: ['undone', 'neutral'], PARTIAL: ['finished incomplete', 'warning'], STARTED: ['started', 'neutral'],
+};
+
+/**
+ * L16 — one Earlier row per decision. An Allow mints a one-time permission (ISSUED), the run uses it
+ * (CONSUMED) and the operation then ends: those rows are the decision's latest state ("Allowed ·
+ * completed"), never rows of their own. A row joins a decision only by the request id the Engine wrote
+ * on it (`allowedBy`); rows without one (older rows, paths that cannot know it) are never joined and
+ * keep their own words, and the decision shows just "Allowed". Every row stays listed in Activity.
+ */
+function foldDecisions(activity: readonly UnifiedActionEntry[]): { folded: Set<string>; state: Map<string, { detail: string; tone?: NonNullable<StatusFact['tone']> }> } {
+  const decisions = new Map<string, { id: string; used: boolean; outcome?: string }>();
+  for (const entry of activity) {
+    if (entry.gate?.pendingId && entry.gate.disposition === 'APPROVED') {
+      decisions.set(entry.gate.pendingId, { id: entry.id, used: false });
+    }
+  }
+  const folded = new Set<string>();
+  for (const entry of [...activity].sort((a, b) => a.occurredAt.localeCompare(b.occurredAt))) {
+    const decision = entry.allowedBy ? decisions.get(entry.allowedBy) : undefined;
+    if (!decision) continue;
+    const grant = entry.grant;
+    if (grant && ['ISSUED', 'CONSUMED'].includes(grant.action.toUpperCase())) {
+      if (grant.action.toUpperCase() === 'CONSUMED') decision.used = true;
+      folded.add(entry.id);
+    } else if (entry.kind === 'operation' && entry.outcome && OUTCOME_STATE[entry.outcome] && !entry.isRoutine && !entry.operationOutcomeKey) {
+      decision.outcome = entry.outcome;
+      folded.add(entry.id);
+    }
+  }
+  const state = new Map<string, { detail: string; tone?: NonNullable<StatusFact['tone']> }>();
+  for (const d of decisions.values()) {
+    const outcome = d.outcome ? OUTCOME_STATE[d.outcome] : d.used ? OUTCOME_STATE.STARTED : undefined;
+    if (outcome) state.set(d.id, { detail: `Allowed · ${outcome[0]}`, ...(d.outcome ? { tone: outcome[1] } : {}) });
+  }
+  return { folded, state };
+}
+
 export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
   const { ai, now } = input;
   const progress = selectIndexingProgress(ai?.status, ai?.indexingStatusLive ?? false,
@@ -329,15 +372,21 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
   // L4b/L5 — only an exact request id can hold a gate out of Earlier. Operation-id/recency
   // guesses can hide a newer answered request while an older request still waits. Legacy rows
   // have no request identity and remain history.
+  const decisions = foldDecisions(input.activity ?? []);
   for (const entry of input.activity ?? []) {
-    if (entry.isRoutine || entry.operationOutcomeKey) continue;
+    if (entry.isRoutine || entry.operationOutcomeKey || decisions.folded.has(entry.id)) continue;
     const pendingId = entry.gate?.pendingId;
     if (pendingId && (waiting.has(pendingId) || entry.gate?.disposition === 'GATED' && terminal.has(pendingId))) continue;
     // L9 — a same-key copy withdrawn by another request's answer is not a decision: one row per decision.
     if (entry.gate?.disposition === 'WITHDRAWN') continue;
-    const expiry = pendingId && input.advisories?.some(record => record.event.classId === 'authorization.pending'
+    const expiry = pendingId && (input.advisories?.some(record => record.event.classId === 'authorization.pending'
       && record.event.classExtras.pendingId === pendingId && typeof record.event.classExtras.expiresAt === 'string'
-      && Date.parse(record.event.classExtras.expiresAt) <= now);
+      && Date.parse(record.event.classExtras.expiresAt) <= now)
+      || (input.authorizations ?? []).some(request => request.pendingId === pendingId && !!request.expiresAt && Date.parse(request.expiresAt) <= now));
+    // L15 — an outside request with no outcome recorded may still wait (a reload re-reads it into Needs
+    // you): it moves to Earlier on its outcome, its expiry, or once the Engine says it no longer waits.
+    if (pendingId && entry.gate?.disposition === 'GATED' && !expiry && !input.withdrawn?.has(pendingId)
+      && isOutsideTransport(entry.gate.transport)) continue;
     const removed = entry.removedFolder;
     // L1 — this window's own removal notice already offers the way back; one row per removal.
     if (removed && offeredRestores.has(folderKey(removed.path))) continue;
@@ -345,7 +394,7 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
       ? { title: `${expiry ? 'Denied automatically' : 'Approval no longer pending'}: ${entry.gate.operation}`, tone: 'neutral' as const }
       : removed ? { title: `Removed ${folderName(removed.path)} from your library`, tone: 'neutral' as const,
         detail: `${removed.path}. Adding it again reads its files again.` }
-        : activityWords(entry);
+        : { ...activityWords(entry), ...decisions.state.get(entry.id) };
     // L1 — every window offers the way back from the removal record, while the folder is not watched.
     const addAgain: StatusAction[] = removed && !watched.has(folderKey(removed.path))
       ? [{ kind: 'add-folder-again', target: removed.path, label: `Add ${folderName(removed.path)} again`,
@@ -521,7 +570,7 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
   if (ai && !ai.connection.reachable && pastGrace) pill = { kind: 'unreachable', label: "Can't reach the engine", stale: false };
   else if (limited) pill = { kind: 'limited', label: 'Search limited', stale };
   else if (sections.needs.length) pill = { kind: 'needs', label: `${sections.needs.length} ${sections.needs.length === 1 ? 'needs' : 'need'} you`, count: sections.needs.length, stale: sections.needs.every(row => row.stale === true) };
-  else if (sections.problems.length) pill = { kind: 'problems', label: `Problems right now (${sections.problems.length})`, stale };
+  else if (sections.problems.length) pill = { kind: 'problems', label: `Problems right now (${sections.problems.length})`, count: sections.problems.length, stale };
   else if (sections.running.some(row => row.id !== FILE_ACTIVITY_ID)) {
     const row = sections.running.find(r => r.id !== FILE_ACTIVITY_ID)!;
     pill = { kind: 'working', label: row.title, stale: row.stale ?? stale, ...(row.percent != null ? { percent: row.percent } : {}) };

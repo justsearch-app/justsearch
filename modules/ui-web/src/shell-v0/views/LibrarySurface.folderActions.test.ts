@@ -11,6 +11,7 @@ import type { PluginHostApi } from '../plugin-api/plugin-types.js';
 import { __feedForTest, __resetAiStateForTest, type StatusSnapshot } from '../state/aiStateStore.js';
 import type { IndexedRootView } from '../../api/generated/schema-types/indexed-root-view.js';
 import { EPHEMERAL_TOAST_EVENT, type EphemeralToastSpec } from '../components/advisory/ephemeralToast.js';
+import { __resetOwnReversalsForTest, latestReversalAt, undoLatestReversal } from '../state/ownReversals.js';
 
 const key = '0194f72c-0000-7000-8000-000000000001';
 const root = (pathHash: string): IndexedRootView => ({ pathHash, collection: 'default', fileCount: 0, walkCompleted: true });
@@ -212,6 +213,34 @@ it('R3 a completed removal offers to add the same folder again, once, with its p
     offer.onAction!(); offer.onAction!(); await pump(el);
     expect(invoke.mock.calls.filter(call => call[0] === 'core.add-watched-root')).toEqual([['core.add-watched-root', { path: '/docs' }]]);
     expect(notices.map(n => n.message)).toContain('Added docs again. Reading its files.');
+  } finally { document.removeEventListener(EPHEMERAL_TOAST_EVENT, listen); }
+});
+
+it('L20 Ctrl+Z after another window already added the folder back says so and sends no add', async () => {
+  __resetOwnReversalsForTest();
+  const notices: EphemeralToastSpec[] = [];
+  const listen = (event: Event) => notices.push((event as CustomEvent<EphemeralToastSpec>).detail);
+  document.addEventListener(EPHEMERAL_TOAST_EVENT, listen);
+  try {
+    const { el, invoke, fetch, setRows } = await mount();
+    setRows([root('b')]);
+    await removeFolder(el);
+    expect(notices.map(n => n.actionLabel)).toContain('Add docs again');
+    // Another window adds /docs again: the Engine now watches it.
+    const watching = fetch.getMockImplementation()!;
+    fetch.mockImplementation(async (path: string, init?: { body?: string }) => path === '/api/indexing-roots/preview'
+      && JSON.parse(init?.body ?? '{}').path === '/docs' ? new Response(JSON.stringify({ exists: true, isDir: true, alreadyWatched: true }))
+      : watching(path));
+    const adds = () => invoke.mock.calls.filter(call => call[0] === 'core.add-watched-root').length;
+    expect(undoLatestReversal(), 'Ctrl+Z finds the removal').toBe(true);
+    await pump(el);
+    expect(adds(), 'no add is sent for a folder that is already back').toBe(0);
+    expect(notices.map(n => n.message)).not.toContain('Added docs again. Reading its files.');
+    expect(notices.at(-1)?.message).toBe("Can't add docs again: docs is already back in your library.");
+    // The offer no longer applies: a second Ctrl+Z finds nothing to add back.
+    expect(latestReversalAt()).toBeNull();
+    expect(undoLatestReversal()).toBe(false);
+    expect(adds()).toBe(0);
   } finally { document.removeEventListener(EPHEMERAL_TOAST_EVENT, listen); }
 });
 

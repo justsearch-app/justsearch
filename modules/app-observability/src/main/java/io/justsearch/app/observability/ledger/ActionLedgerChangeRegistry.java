@@ -39,6 +39,19 @@ public final class ActionLedgerChangeRegistry {
   // Operations split immediate live publication from forced journal acceptance in their drainer.
   // Other producers retain their existing synchronous publish path.
   private final ActionEventJournal journal;
+  // L16 — operation key -> the pending request whose Allow admitted that invocation. Written by the
+  // executor when it consumes the request's one-time permission; read when the invocation's
+  // completion row is projected (live and journaled alike), so the outcome names its decision by id.
+  // Process-local and bounded: a completion projected after a restart, or after this many later
+  // Allows, carries no id and is never joined to a decision.
+  private static final int APPROVAL_LINK_LIMIT = 1024;
+  private final java.util.Map<String, String> approvalLinks = java.util.Collections.synchronizedMap(
+      new java.util.LinkedHashMap<>(16, 0.75f, false) {
+        @Override
+        protected boolean removeEldestEntry(java.util.Map.Entry<String, String> eldest) {
+          return size() > APPROVAL_LINK_LIMIT;
+        }
+      });
 
   public ActionLedgerChangeRegistry() {
     this(ActionEventJournal.disabled());
@@ -77,6 +90,22 @@ public final class ActionLedgerChangeRegistry {
     return channel.subscribe(listener);
   }
 
+  /**
+   * L16 — the invocation with this operation key was admitted by the Allow of {@code pendingId}: its
+   * completion row carries that id. Blank values are ignored.
+   */
+  public void linkApproval(String operationKey, String pendingId) {
+    if (operationKey == null || operationKey.isBlank() || pendingId == null || pendingId.isBlank()) return;
+    approvalLinks.put(operationKey, pendingId);
+  }
+
+  private ActionEvent projectOperation(OperationHistoryEntry entry,
+      Optional<io.justsearch.app.api.operations.OperationReceipt.RemovedFolder> removedFolder) {
+    Objects.requireNonNull(entry, "entry");
+    return ActionLedgerProjection.projectOperation(entry, removedFolder,
+        entry.operationKey().map(approvalLinks::get));
+  }
+
   /** Relay a completed operation as a unified UPDATE row. */
   public void broadcastOperation(OperationHistoryEntry entry) {
     Objects.requireNonNull(entry, "entry");
@@ -91,7 +120,7 @@ public final class ActionLedgerChangeRegistry {
   /** As {@link #persistOperation(OperationHistoryEntry)}, with the row's removal record (L1). */
   public boolean persistOperation(OperationHistoryEntry entry,
       Optional<io.justsearch.app.api.operations.OperationReceipt.RemovedFolder> removedFolder) {
-    return journal.append(ActionLedgerProjection.projectOperation(Objects.requireNonNull(entry, "entry"), removedFolder));
+    return journal.append(projectOperation(entry, removedFolder));
   }
 
   /** Immediate committed-row visibility without moving journal I/O onto the producer thread. */
@@ -102,7 +131,7 @@ public final class ActionLedgerChangeRegistry {
   /** As {@link #publishLiveOperation(OperationHistoryEntry)}, with the row's removal record (L1). */
   public void publishLiveOperation(OperationHistoryEntry entry,
       Optional<io.justsearch.app.api.operations.OperationReceipt.RemovedFolder> removedFolder) {
-    publishLive(ActionLedgerProjection.projectOperation(Objects.requireNonNull(entry, "entry"), removedFolder));
+    publishLive(projectOperation(entry, removedFolder));
   }
 
   /** Relay a navigation as a unified UPDATE row. */

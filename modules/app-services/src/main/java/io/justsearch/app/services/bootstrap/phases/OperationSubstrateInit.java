@@ -270,6 +270,8 @@ public final class OperationSubstrateInit {
             // F5: append fans the gate firing into the one log via the store's listener.
             authorizationOutcomeStore::append, preparationCipher);
     operationExecutorImpl.setGlobalHardStop(globalHardStop);
+    // L16: an Allowed request's run names that request on its completion row.
+    operationExecutorImpl.setApprovalLinkSink(actionLedgerChangeRegistry::linkApproval);
     io.justsearch.app.services.intent.IndexedRootGrantScope durableGrantScope = authority.scope();
     operationExecutorImpl.setDurableGrantStore(durableGrantStore, durableGrantScope);
     // Tempdoc 550 thesis III: expose the executor's ONE intent-gate evaluator (built from the same

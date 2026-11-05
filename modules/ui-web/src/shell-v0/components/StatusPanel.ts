@@ -46,6 +46,15 @@ const LINE_ICONS: Record<StatusReviewLine['icon'], string> = { target: '▸', ri
 const DECISIONS: ReadonlySet<StatusAction['kind']> = new Set(['authorization-allow', 'authorization-deny', 'proposal', 'reject-proposal']);
 const decisionId = (action: StatusAction): string => `${action.kind}:${action.target}`;
 
+/** The words a node shows: its text, through open shadow roots and the nodes assigned to its slots. */
+function shownText(node: Node): string {
+  if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? '';
+  if (!(node instanceof Element) || ['style', 'script', 'template'].includes(node.localName)) return '';
+  const children = node instanceof HTMLSlotElement ? node.assignedNodes({ flatten: true })
+    : [...(node.shadowRoot ?? node).childNodes];
+  return children.map(shownText).join(' ');
+}
+
 /** Keyed rows preserve disclosures, focus and scroll through live source updates. */
 export class StatusPanel extends JfElement {
   static override properties = {
@@ -191,6 +200,7 @@ export class StatusPanel extends JfElement {
   }
   protected override updated(): void {
     this.placeControls();
+    for (const body of this.renderRoot.querySelectorAll<HTMLElement>('.plugin-body')) this.titlePlugin(body);
     if (this.focusSummary) {
       this.focusSummary = false;
       this.shadowRoot?.querySelector<HTMLElement>('[role="dialog"]')?.focus({ preventScroll: true });
@@ -247,6 +257,18 @@ export class StatusPanel extends JfElement {
       if (!e.repeat && this.controlArmed(control)) this.keyPress = { key: e.key, control };
     } else if (pending?.key === e.key && pending.control === control && this.controlArmed(control)) control.click();
   };
+  /**
+   * L6 — a clipped plugin item keeps its full words as its tooltip: what it shows, read through its own
+   * shadow root and slots (rendered later than this panel, so read again when pointed at), or else its
+   * declared label.
+   */
+  private titlePlugin(body: HTMLElement): void {
+    const item = this.plugins.find(row => row.id === body.parentElement?.dataset.pluginItem);
+    const output = item && this.pluginOutputs.get(item);
+    if (!item || output === undefined) return;
+    const words = (typeof output === 'string' ? output : shownText(output)).replace(/\s+/g, ' ').trim();
+    body.title = words || item.accessibleLabel || '';
+  }
   private pluginOutput(item: StatusBarItem): HTMLElement | string {
     if (!this.pluginOutputs.has(item)) this.pluginOutputs.set(item, item.render());
     return this.pluginOutputs.get(item)!;
@@ -344,7 +366,7 @@ export class StatusPanel extends JfElement {
     const hidden = this.plugins.length - shown.length;
     return html`<div class="plugins ${this.pluginsOpen ? 'open' : ''}" role="group" aria-label="Plugin status">${repeat(shown, item => item.id,
       item => { const output = this.pluginOutput(item); return html`<span class="plugin" data-plugin-item=${item.id}><span class="plugin-body"
-        title=${(typeof output === 'string' ? output : output.textContent ?? '').trim()}>${output}</span><jf-provenance-chip .provenance=${item.provenance}></jf-provenance-chip></span>`; })}
+        @pointerenter=${(e: Event) => this.titlePlugin(e.currentTarget as HTMLElement)}>${output}</span><jf-provenance-chip .provenance=${item.provenance}></jf-provenance-chip></span>`; })}
       ${hidden > 0 || this.pluginsOpen && this.overflow.visibleCount < this.plugins.length ? html`<button type="button" aria-expanded=${this.pluginsOpen}
         @click=${() => { this.pluginsOpen = !this.pluginsOpen; }}>${this.pluginsOpen ? 'Fewer' : `… ${hidden} more`}</button>` : nothing}</div>`;
   }

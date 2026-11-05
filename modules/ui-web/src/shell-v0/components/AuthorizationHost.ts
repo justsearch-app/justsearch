@@ -47,6 +47,8 @@ import {
   type AuthorizationPrompt,
   type AuthorizationDecision,
 } from '../operations/authorizationBroker.js';
+import { present } from '../display/present.js';
+import { RISK_WORDS } from '../state/frameStatus.js';
 import {
   listPendingConsentRequests,
   resolveConsentRequest,
@@ -792,30 +794,57 @@ export class AuthorizationHost extends JfElement {
     `;
   }
 
+  /**
+   * L17 — who asks, in plain words: the agent in Search (its run), the outside agent's own name, or an
+   * agent with no name. A prompt from the person's own action names nobody.
+   */
+  private static asker(prompt: AuthorizationPrompt): { who: string; detail: string } | null {
+    if (prompt.owningRunId) return { who: 'the agent in Search', detail: ', in this window' };
+    if (prompt.requestedBy) return { who: prompt.requestedBy, detail: prompt.arrival === 'needs-you' ? ', an agent on this computer' : '' };
+    return prompt.arrival === 'needs-you' ? { who: 'an agent on this computer', detail: '' } : null;
+  }
+
+  /** Show the whole purpose only when it contains no Engine syntax or names. */
+  private static plainPurpose(prompt: AuthorizationPrompt): string | undefined {
+    const purpose = prompt.purpose?.trim();
+    if (!purpose || /[{}[\]=]|\b[\w-]+\.[\w.-]+|\b(?:AUTO|INLINE_CONFIRM|TYPED_CONFIRM|DENY|CORE|TRUSTED_PLUGIN|UNTRUSTED_PLUGIN|TRUSTED|UNTRUSTED|LOW|MEDIUM|HIGH)\b/.test(purpose)) return undefined;
+    return purpose;
+  }
+
+  /**
+   * L17 — the protected dialog in plain words (ref-12): the question names who asks and the action by
+   * its name, then its plain-language purpose, what it acts on, its risk and whether it can be undone.
+   * Engine diagnostics and internal names stay out; the typed phrase is still the exact operation id.
+   */
   private renderAuthorizeBody(prompt: AuthorizationPrompt): TemplateResult {
     const { operationId, gateBehavior } = prompt;
     const typedGate = gateBehavior === 'TYPED_CONFIRM';
     const matches = !typedGate || this.typed === operationId;
+    const label = present({ kind: 'operation', id: operationId }).label;
+    const asker = AuthorizationHost.asker(prompt);
+    const purpose = AuthorizationHost.plainPurpose(prompt);
     return html`
-      <h3>Authorize action</h3>
-      <p>An action requires your approval: <code>${operationId}</code></p>
-      ${prompt.requestedBy
-        ? html`<p class="rationale" data-testid="authorization-requested-by">Requested by: ${prompt.requestedBy}</p>`
+      <h3>${asker ? `Let ${asker.who} run “${label}”?` : `Run “${label}”?`}</h3>
+      ${asker
+        ? html`<p class="rationale" data-testid="authorization-requested-by">Asked by ${asker.who}${asker.detail}</p>`
         : ''}
-      ${prompt.purpose
-        ? html`<p class="rationale" data-testid="authorization-purpose">${prompt.purpose}</p>`
-        : ''}
-      ${prompt.riskTier
-        ? html`<p class="rationale" data-testid="authorization-risk">Risk: ${prompt.riskTier}</p>`
+      ${purpose
+        ? html`<p class="rationale" data-testid="authorization-purpose">${purpose}</p>`
         : ''}
       ${prompt.argsSummary
-        ? html`<p class="description" data-testid="authorization-args"><code>${prompt.argsSummary}</code></p>`
+        ? html`<p class="description" data-testid="authorization-args">It acts on <code>${prompt.argsSummary}</code></p>`
+        : ''}
+      ${prompt.riskTier && RISK_WORDS[prompt.riskTier]
+        ? html`<p class="rationale" data-testid="authorization-risk">${RISK_WORDS[prompt.riskTier]}</p>`
         : ''}
       ${prompt.undoSupported === false
-        ? html`<p class="rationale" data-testid="authorization-irreversible">⚠ This action cannot be undone.</p>`
+        ? html`<p class="rationale" data-testid="authorization-irreversible">No undo: it cannot be reversed.</p>`
+        : ''}
+      ${prompt.reason
+        ? html`<p class="rationale" data-testid="authorization-reason">“${prompt.reason}” Written by ${asker?.who ?? 'the requester'}, not checked by JustSearch.</p>`
         : ''}
       ${typedGate
-        ? html`<p id="authorization-typed-label">Type <code>${operationId}</code> to confirm:</p>
+        ? html`<p id="authorization-typed-label">To allow it, type <code>${operationId}</code>:</p>
             <input
               type="text"
               data-testid="authorization-typed-input"
@@ -835,7 +864,7 @@ export class AuthorizationHost extends JfElement {
                 this.allowAlways = (e.target as HTMLInputElement).checked;
               }}
             />
-            Always allow “${operationId}” without asking, for any agent with this access
+            Always allow “${label}” without asking, for any agent with this access
           </label>`
         : ''}
       ${this.active && this.answerErrors.get(this.active) ? html`<p role="alert">${this.answerErrors.get(this.active)}</p>` : ''}

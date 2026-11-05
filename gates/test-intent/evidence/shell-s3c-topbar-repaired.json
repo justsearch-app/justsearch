@@ -1,0 +1,87 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-05T17:12:50.305Z",
+  "revision": "c8b58b5e25cf509dac9313d6085054a70508c46f",
+  "tree": "c76fafd184b17e5f34ef8f306c41321c351e3e9d",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.s3c-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/r4iw673b/tmp/test-intent-vitest-4-1793898715166.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 27735
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts#redirect notices stay inside the bar in at most two lines with a centred switcher at every size",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:93d66b78cbea0f644f73b53b5aeadb80550188b59186218bbb761de2b0fb32b1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "redirect notices stay inside the bar in at most two lines with a centred switcher at every size",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts#redirect notices use window names and retain an id only when no name is available",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:93d66b78cbea0f644f73b53b5aeadb80550188b59186218bbb761de2b0fb32b1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "redirect notices use window names and retain an id only when no name is available",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "c8b58b5e25cf509dac9313d6085054a70508c46f",
+    "revision": "c8b58b5e25cf509dac9313d6085054a70508c46f",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.s3c-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/r4iw673b/tmp/test-intent-vitest-4-1793898747851.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 21861,
+        "output": "JSON report written to /home/elias/.cache/am/r4iw673b/tmp/test-intent-vitest-4-1793898747851.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts#redirect notices stay inside the bar in at most two lines with a centred switcher at every size",
+        "classification": "assertion",
+        "detail": "redirect notices stay inside the bar in at most two lines with a centred switcher at every size:  AssertionError: {\"width\":1280,\"target\":\"Opened core.system-surface instead of core.health-surface\",\"centre\":635.984375,\"half\":640,\"top\":0,\"bottom\":56,\"barTop\":0,\"barBottom\":56,\"height\":56,\"lineHeight\":13.2,\"visible\":true,\"paintedInside\":false,\"clipped\":true,\"title\":\"Opened core.system-surface instea"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts#redirect notices use window names and retain an id only when no name is available",
+        "classification": "assertion",
+        "detail": "redirect notices use window names and retain an id only when no name is available:  AssertionError: expected 'Opened core.system-surface instead of…' to be 'Opened System instead of Health' // Object.is equality\n    at /home/elias/.cache/am/r4iw673b/tmp/test-intent-before-ue8OAi/modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts:336:77\n    at file:///home/elias/.cache/am"
+      }
+    ]
+  },
+  "digest": "sha256:89532caa3ac062b2a37df9630494a467ff4d7cebe312a18d7e3cfac521d9ca4d"
+}

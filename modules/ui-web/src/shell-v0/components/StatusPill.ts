@@ -53,6 +53,7 @@ export class StatusPill extends JfElement {
   /** Window narrower than 1000 px: the state reads from the icon (badge, ring or dot); the name stays on the button. */
   declare narrow: boolean;
   private narrowQuery: MediaQueryList | null = null;
+  private noticeResize: ResizeObserver | null = null;
   private readonly narrowChange = (): void => { this.narrow = this.narrowQuery?.matches ?? false; };
   readonly status = new FrameStatusController(this);
   private readonly transient = new TransientController(this, {
@@ -71,23 +72,35 @@ export class StatusPill extends JfElement {
     jf-status-badge { min-width: 0; max-width: 100%; }
     jf-status-badge::part(badge) { min-width: 0; max-width: 100%; box-sizing: border-box; }
     .transient-action { font: inherit; color: var(--text-tint); background: var(--surface-2); border: 0; border-radius: var(--frame-pill-radius); padding: var(--jf-space-1) var(--jf-space-2); }
-    .beside-notice { align-self: center; min-width: 0; max-width: var(--frame-menu-width); padding-inline: var(--jf-space-2); color: var(--text-secondary);
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    /* Measure the full words; notices that need more than two lines move below the bar. */
+    .beside-notice { align-self: center; flex: 0 1 auto; min-width: 0; max-width: var(--frame-menu-width); padding-inline: var(--jf-space-2);
+      color: var(--text-secondary); font-size: var(--font-size-xs); line-height: 1.2; white-space: normal; overflow-wrap: normal;
+    }
+    .beside-notice, .notice-below, .trigger.notice .label { white-space: normal; overflow-wrap: anywhere; }
+    .trigger.notice { flex: 0 1 auto; }
+    .trigger.notice .label { min-width: 0; flex: 0 1 auto; text-align: start; }
+    .trigger { flex: none; }
     .transient-action { white-space: nowrap; flex: none; }
     .content { display: inline-flex; align-items: center; gap: var(--jf-space-2); min-width: 0; }
     .trigger.stale { outline: var(--frame-hairline) dashed var(--border-emphasized); }
-    /* L3 — the pill's words never truncate: the top bar makes room for them (it is a grid whose
-       brand side gives way), and below 720 px the pill is its icon alone. A notice cannot fit
-       beside it there, so it moves under the top bar, where it wraps instead of being cut. */
+    /* The status words stay whole. In the minimal bar the action has its own row. */
     .label { white-space: nowrap; flex: none; }
     .notice-below { display: none; }
     @media (max-width: 719px) {
-      .label, .beside-notice { display: none; }
-      .notice-below { display: block; position: fixed; top: var(--frame-topbar-height); inset-inline-end: var(--jf-space-2);
-        max-width: calc(100vw - 2 * var(--jf-space-2)); box-sizing: border-box; z-index: var(--z-overlay-top);
-        padding: var(--jf-space-1) var(--jf-space-2); border: var(--frame-hairline) solid var(--border-subtle);
-        border-radius: var(--frame-control-radius); background: var(--surface-1); color: var(--text-primary);
-        white-space: normal; overflow-wrap: anywhere; }
+      :host { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; }
+      .label, .trigger.notice .label { display: none; }
+      .trigger { grid-column: 1; grid-row: 1; }
+      .beside-notice, .notice-below { grid-column: 2; grid-row: 1; display: block;
+        min-width: 0; padding-inline: var(--jf-space-1); font-size: var(--font-size-xs); line-height: 1.2;
+        color: var(--text-secondary); }
+      .transient-action { grid-column: 1 / -1; grid-row: 2; justify-self: end; font-size: var(--font-size-xs); }
+    }
+    :host([notice-under]) .trigger.notice .label { display: none; }
+    :host([notice-under]) .beside-notice, :host([notice-under]) .notice-below {
+      display: block; position: fixed; top: var(--frame-status-notice-top); left: var(--jf-space-2); right: var(--jf-space-2);
+      width: auto; max-width: none; box-sizing: border-box; padding: var(--jf-space-2);
+      background: var(--surface-1); color: var(--text-secondary); font-size: var(--font-size-xs); line-height: 1.2;
+      z-index: var(--z-overlay-top);
     }
     .symbol { color: var(--text-secondary); }
     .calm .symbol { color: var(--text-success); }
@@ -103,6 +116,7 @@ export class StatusPill extends JfElement {
       padding-inline: var(--jf-space-1); box-sizing: border-box; border-radius: var(--frame-pill-radius);
       background: var(--accent-warning); color: var(--accent-on-warning); font-size: var(--font-size-xs);
       font-weight: var(--jf-weight-medium); font-variant-numeric: tabular-nums; }
+    .count.problems { background: var(--accent-danger); color: var(--accent-on-danger); }
     .ring { width: var(--frame-status-ring); height: var(--frame-status-ring); flex-shrink: 0; }
     .ring circle { fill: none; stroke-width: 2.5; }
     .ring .track { stroke: var(--border-emphasized); }
@@ -111,7 +125,7 @@ export class StatusPill extends JfElement {
     @media (forced-colors: active) {
       .trigger { color: ButtonText; background: ButtonFace; border-color: ButtonText; }
       .symbol { color: ButtonText !important; } button:focus-visible { outline-color: Highlight; }
-      .count { background: ButtonText; color: ButtonFace; forced-color-adjust: none; }
+      .count, .count.problems { background: ButtonText; color: ButtonFace; forced-color-adjust: none; }
       .ring .track { stroke: GrayText; } .ring .arc { stroke: ButtonText; }
       .overlay { background: transparent; }
       .notice-below { border-color: CanvasText; }
@@ -128,6 +142,7 @@ export class StatusPill extends JfElement {
     this.narrowQuery = typeof window.matchMedia === 'function' ? window.matchMedia('(max-width: 999px)') : null;
     this.narrowQuery?.addEventListener('change', this.narrowChange);
     this.narrowChange();
+    if (typeof ResizeObserver !== 'undefined') this.noticeResize = new ResizeObserver(this.placeNotice);
   }
   override disconnectedCallback(): void {
     super.disconnectedCallback();
@@ -138,6 +153,8 @@ export class StatusPill extends JfElement {
     document.removeEventListener('visibilitychange', this.visibility);
     this.narrowQuery?.removeEventListener('change', this.narrowChange);
     this.narrowQuery = null;
+    this.noticeResize?.disconnect();
+    this.noticeResize = null;
     this.open = false;
   }
   protected override willUpdate(changed: PropertyValues): void {
@@ -146,6 +163,13 @@ export class StatusPill extends JfElement {
     if (changed.has('authorizationHost')) this.status.refresh();
   }
   protected override updated(changed: PropertyValues): void {
+    this.noticeResize?.disconnect();
+    this.noticeResize?.observe(this);
+    if (this.parentElement) this.noticeResize?.observe(this.parentElement);
+    for (const element of this.shadowRoot!.querySelectorAll('.beside-notice, .notice-below, .trigger, .label, .transient-action')) {
+      this.noticeResize?.observe(element);
+    }
+    this.placeNotice();
     if (changed.has('open')) {
       if (this.open) {
         this.transient.open();
@@ -173,6 +197,21 @@ export class StatusPill extends JfElement {
       } else this.transient.close();
     }
   }
+  /** Recheck the inline slot on text, font or frame-size changes, including a return from below. */
+  private readonly placeNotice = (): void => {
+    this.removeAttribute('notice-under');
+    const notice = this.shadowRoot?.querySelector<HTMLElement>('.beside-notice')
+      ?? this.shadowRoot?.querySelector<HTMLElement>(window.innerWidth < 720 ? '.notice-below' : '.trigger.notice .label');
+    if (!notice || !this.parentElement) return;
+    const box = notice.getBoundingClientRect();
+    const bar = this.parentElement.getBoundingClientRect();
+    const style = getComputedStyle(notice);
+    const lineHeight = parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.2;
+    if (box.width > 0 && box.height <= lineHeight * 2 + 1
+      && notice.scrollWidth <= notice.clientWidth + 1 && box.top >= bar.top && box.bottom <= bar.bottom) return;
+    this.style.setProperty('--frame-status-notice-top', `${bar.bottom}px`);
+    this.setAttribute('notice-under', '');
+  };
   /** A length token in px (rem resolves against the root font size); 0 when the token is not defined. */
   private cssPx(name: string): number {
     const value = getComputedStyle(this).getPropertyValue(name).trim();
@@ -254,7 +293,7 @@ export class StatusPill extends JfElement {
         this.close();
         const id = `proposal:${p.id}`;
         const decision = requestAuthorization({ pendingId: id, operationId: p.effect.operationId,
-          gateBehavior: 'TYPED_CONFIRM', allowAlwaysSupported: false, purpose: p.rationale ?? '' });
+          gateBehavior: 'TYPED_CONFIRM', allowAlwaysSupported: false, ...(p.rationale ? { reason: p.rationale } : {}) });
         this.authorizationHost?.()?.reviewStatusRequest(id);
         const answer = await decision;
         if (answer.approved && listPending().some(row => row.id === p.id)) acceptPendingWithConsent(p.id);
@@ -324,26 +363,28 @@ export class StatusPill extends JfElement {
     const label = transient?.toast?.message ?? `${pill.label}${pill.percent != null ? ` · ${pill.percent}%` : ''}`;
     const symbols = { calm: '●', working: '◌', needs: '!', problems: '!', unreachable: '×', limited: '!', finished: '✓', unknown: '?' };
     // ref-09: the count sits in a badge and the words follow it; a known fraction draws a ring.
-    const icon = !transient && pill.kind === 'needs' && pill.count != null
-      ? html`<span class="count" aria-hidden="true">${pill.count}</span>`
+    // Needs you and problems show their count (ref-22: also when the pill is its icon alone).
+    const icon = !transient && (pill.kind === 'needs' || pill.kind === 'problems') && pill.count != null
+      ? html`<span class="count ${pill.kind}" aria-hidden="true">${pill.count}</span>`
       : !transient && pill.kind === 'working' && pill.percent != null
         ? html`<svg class="ring" viewBox="0 0 20 20" aria-hidden="true" data-percent=${pill.percent}><circle class="track" cx="10" cy="10" r="8"></circle>
           <circle class="arc" cx="10" cy="10" r="8" pathLength="100" stroke-dasharray="${pill.percent} 100" transform="rotate(-90 10 10)"></circle></svg>`
         : html`<span class="symbol" aria-hidden="true">${symbols[pill.kind]}</span>`;
-    const text = transient?.toast?.message ?? (pill.kind === 'needs' && pill.count != null ? (pill.count === 1 ? 'Needs you' : 'Need you') : pill.label);
+    const text = transient?.toast?.message ?? (pill.kind === 'needs' && pill.count != null ? (pill.count === 1 ? 'Needs you' : 'Need you')
+      : pill.kind === 'problems' && pill.count != null ? 'Problems right now' : pill.label);
     const shown = transient ?? beside;
     // DE6 — the notice's action shows while it can still run; a real reversal carries the Ctrl+Z hint.
     const action = shown && toastActionAvailable(shown) ? shown : undefined;
     const undo = action?.toast?.reversal === true;
     return html`<button type="button" class="trigger ${transient ? 'notice' : pill.kind} ${pill.stale ? 'stale' : ''}"
-      aria-label=${label} aria-expanded=${this.open} aria-haspopup="dialog" title="What's going on · Ctrl+Shift+S"
+      aria-label=${label} aria-expanded=${this.open} aria-haspopup="dialog" title=${transient?.toast?.message ?? "What's going on · Ctrl+Shift+S"}
       @click=${() => this.toggle()} @mouseenter=${() => this.status.pauseTransient(true)} @mouseleave=${() => this.status.pauseTransient(false)}
       @focus=${() => this.status.pauseTransient(true)} @blur=${() => this.status.pauseTransient(false)}>
       <jf-status-badge .tone=${pill.kind === 'needs' || pill.kind === 'limited' ? 'warning' : pill.kind === 'unreachable' || pill.kind === 'problems' ? 'error' : 'neutral'}><span class="content">${icon}${this.narrow && !transient ? nothing : html`<span class="label">${text}</span>`}
       ${pill.kind === 'calm' && plugins.length ? html`<span aria-label="Plugin status items">${plugins.length}</span>` : nothing}</span></jf-status-badge></button>
-      ${beside?.toast ? html`<span class="beside-notice" data-testid="status-notice" title=${beside.toast.message} @mouseenter=${() => this.status.pauseTransient(true)}
+      ${beside?.toast ? html`<span class="beside-notice" role="note" aria-label=${beside.toast.message} data-testid="status-notice" title=${beside.toast.message} @mouseenter=${() => this.status.pauseTransient(true)}
         @mouseleave=${() => this.status.pauseTransient(false)}>${beside.toast.message}</span>` : nothing}
-      ${shown?.toast ? html`<span class="notice-below">${shown.toast.message}</span>` : nothing}
+      ${transient?.toast ? html`<span class="notice-below" role="note" title=${transient.toast.message} aria-label=${transient.toast.message}>${transient.toast.message}</span>` : nothing}
       ${action ? html`<button class="transient-action" type="button" @mouseenter=${() => this.status.pauseTransient(true)} @mouseleave=${() => this.status.pauseTransient(false)} @focus=${() => this.status.pauseTransient(true)} @blur=${() => this.status.pauseTransient(false)} @click=${() => this.act({ kind: 'advisory', target: action.key, label: this.transientActionLabel(action) })}
         aria-keyshortcuts=${undo ? 'Control+Z' : nothing}>${this.transientActionLabel(action)}${undo ? html`<kbd aria-hidden="true">Ctrl+Z</kbd>` : nothing}</button>` : nothing}
       <div class="overlay" ?hidden=${!this.open} @click=${() => this.close()}></div>

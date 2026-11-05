@@ -44,6 +44,17 @@ public final class ActionLedgerProjection {
    */
   public static ActionEvent projectOperation(OperationHistoryEntry op,
       Optional<io.justsearch.app.api.operations.OperationReceipt.RemovedFolder> removedFolder) {
+    return projectOperation(op, removedFolder, Optional.empty());
+  }
+
+  /**
+   * As {@link #projectOperation(OperationHistoryEntry, Optional)}, naming the pending request whose
+   * Allow admitted this run (L16), so a reader joins the outcome to that decision by its id alone.
+   * The row's id does not change with it.
+   */
+  public static ActionEvent projectOperation(OperationHistoryEntry op,
+      Optional<io.justsearch.app.api.operations.OperationReceipt.RemovedFolder> removedFolder,
+      Optional<String> pendingId) {
     return new ActionEvent.Operation(
         op.operationKey().map(key -> "operation:" + key).orElseGet(() -> deterministicId(
             "operation", op.endTime(), op.operationId().value(), op.outcome().name(),
@@ -60,7 +71,8 @@ public final class ActionLedgerProjection {
         // History view projects from this one ledger filtered to a single session (P-B1).
         op.provenance().correlationId(),
         // L1: a successful folder removal names the folder, so every window can add it back.
-        removedFolder);
+        removedFolder,
+        pendingId);
   }
 
   /**
@@ -187,6 +199,7 @@ public final class ActionLedgerProjection {
           if (folder.collection() != null) removed.put("collection", folder.collection());
           m.put("removedFolder", removed);
         });
+        op.pendingId().ifPresent(id -> m.put("pendingId", id));
       }
       case ActionEvent.Navigation nav -> {
         m.put("targetSurface", nav.targetSurface());
@@ -205,6 +218,7 @@ public final class ActionLedgerProjection {
         m.put("action", grant.action()); // ISSUED | CONSUMED | REVOKED
         m.put("outcome", grant.action()); // outcome column mirrors the grant action
         m.put("subject", grant.subject());
+        grant.pendingId().ifPresent(id -> m.put("pendingId", id));
       }
       case ActionEvent.Effect effect -> {
         m.put("effectKind", effect.effectKind());
@@ -296,7 +310,8 @@ public final class ActionLedgerProjection {
                         str(row, "outcome"),
                         optional(row, "executionId"),
                         correlationId,
-                        removedFolder(row));
+                        removedFolder(row),
+                        optional(row, "pendingId"));
             case "navigation" ->
                 new ActionEvent.Navigation(
                     id,
@@ -323,7 +338,8 @@ public final class ActionLedgerProjection {
                     transport,
                     str(row, "grantId"),
                     str(row, "action"),
-                    str(row, "subject"));
+                    str(row, "subject"),
+                    optional(row, "pendingId"));
             case "effect" ->
                 new ActionEvent.Effect(
                     id,

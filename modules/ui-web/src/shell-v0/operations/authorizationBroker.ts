@@ -50,8 +50,13 @@ export interface AuthorizationPrompt {
   readonly undoSupported?: boolean;
   /** Display-safe raw-argument summary or complete bounded frozen target/scope metadata. */
   readonly argsSummary?: string;
-  /** Human rationale / message: why this needs approval. */
+  /**
+   * Why the gate fired (the 428 message or the pending's rationale). The security dialog shows it
+   * only when the whole line is plain words; any Engine syntax or name hides the whole line (L17).
+   */
   readonly purpose?: string;
+  /** Words the requester wrote (an agent suggestion's rationale): shown as written by it, not checked by JustSearch. */
+  readonly reason?: string;
   /**
    * Tempdoc 875 — whether this ceremony's approval route can actually record an "allow always"
    * durable grant. Absent = yes (the `/api/authorizations/approve` route, which carries
@@ -159,9 +164,37 @@ export function cancelAuthorizationsForRun(runId: string): number {
   return canceller(runId);
 }
 
+/**
+ * The person's own gesture in an app window (the Engine grants these only with window authority). Every
+ * other source — agents, outside HTTP callers, other apps, schedules, the backend itself, any source
+ * added later, and a request that names no source (L12) — is not the person's action here: it waits in
+ * Needs you (DE3).
+ */
+const OWN_TRANSPORTS = new Set(['BUTTON', 'PALETTE', 'RAIL']);
+export function isOutsideTransport(transport: string | undefined): boolean {
+  return !transport || !OWN_TRANSPORTS.has(transport);
+}
+
+/** Requests the Engine said no longer wait, newest last (bounded): history may call them "no longer pending". */
+const withdrawn = new Set<string>();
+
 /** Withdraw every copy of an Engine request that is no longer pending, including queued copies. */
 export function withdrawAuthorization(pendingId: string): number {
+  if (pendingId) {
+    withdrawn.delete(pendingId);
+    withdrawn.add(pendingId);
+    if (withdrawn.size > 500) withdrawn.delete(withdrawn.values().next().value!);
+  }
   return canceller && pendingId ? canceller(pendingId, 'pending') : 0;
+}
+
+/**
+ * L15 — the requests this window learned are no longer pending (withdrawn above). An open request
+ * row the Engine has not confirmed gone may still wait, e.g. while a reload re-reads it: it never
+ * reads "no longer pending" on a guess.
+ */
+export function withdrawnAuthorizations(): ReadonlySet<string> {
+  return withdrawn;
 }
 
 /**

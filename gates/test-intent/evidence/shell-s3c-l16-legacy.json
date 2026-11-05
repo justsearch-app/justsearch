@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-05T17:49:46.339Z",
+  "revision": "e6d6f637476323047207922edb18d64a8ed29847",
+  "tree": "59f1996b1cd284a60237dbf32f349876bb255c5b",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/frameStatus.decisions.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-3770788-1793900984515.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1822
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.decisions.test.ts#L16 rows without a request id are never joined to a decision; each keeps its own words",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.decisions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:fc706a257b0a0a857bdaed270c630bdb4a84d711338948db0f99a53d03688c72",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L16 rows without a request id are never joined to a decision; each keeps its own words",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:98699687fdccdefa6703a0c631e35682d1e49e772ee302e523453d7a3faf556c"
+}

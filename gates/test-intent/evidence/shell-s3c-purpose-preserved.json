@@ -1,0 +1,224 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-05T19:54:53.954Z",
+  "revision": "14a8781e1fadde5a9e41f391689093f7075ba519",
+  "tree": "55890330d559ff8457b0b234a55915eca619ee4f",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/AuthorizationHost.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/zww5mxmz/tmp/test-intent-vitest-165-1793908491109.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2842
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts#renders risk, args summary, and an irreversibility warning when provided; never the Engine's gate text",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e87c0c6955e4e2439198002ea5c82c4af7925e6cdee691408b6dc5ea4b119119",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "<jf-authorization-host> enriched prompt (tempdoc 550 P1) renders risk, args summary, and an irreversibility warning when provided; never the Engine's gate text",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts#a plain-language purpose stays visible in the protected dialog",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e87c0c6955e4e2439198002ea5c82c4af7925e6cdee691408b6dc5ea4b119119",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "<jf-authorization-host> L17 plain words in the protected dialog a plain-language purpose stays visible in the protected dialog",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/AuthorizationHost.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e87c0c6955e4e2439198002ea5c82c4af7925e6cdee691408b6dc5ea4b119119",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "authorizationBroker fails closed (deny) when no presenter is registered",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> enriched prompt (tempdoc 550 P1) renders risk, args summary, and an irreversibility warning when provided; never the Engine's gate text",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> enriched prompt (tempdoc 550 P1) omits the enriched rows when the prompt carries no context (back-compat)",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> L17 plain words in the protected dialog a plain-language purpose stays visible in the protected dialog",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> L17 plain words in the protected dialog hides an engine purpose: TYPED_CONFIRM",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> L17 plain words in the protected dialog hides an engine purpose: INLINE_CONFIRM",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> L17 plain words in the protected dialog hides an engine purpose: UNTRUSTED",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> L17 plain words in the protected dialog hides an engine purpose: TRUSTED",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> L17 plain words in the protected dialog hides an engine purpose: HIGH",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> L17 plain words in the protected dialog hides an engine purpose: gate=typed",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> L17 plain words in the protected dialog hides an engine purpose: sourceTier=untrusted",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> L17 plain words in the protected dialog hides an engine purpose: Run core.bulk-reindex",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> L17 plain words in the protected dialog hides an engine purpose: Run vendor.rebuild-index",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> L17 plain words in the protected dialog hides an engine purpose: Then run core.recover-component",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> L17 plain words in the protected dialog hides an engine purpose: {\"scope\":\"all\"}",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> L17 plain words in the protected dialog hides an engine purpose: [\"all\"]",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> L17 plain words in the protected dialog hides an engine purpose: Rebuild {\"scope\":\"all\"}",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> L17 plain words in the protected dialog hides an engine purpose: Rebuild [\"all\"]",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> L17 plain words in the protected dialog hides an engine purpose: Rebuild [the index] {\"scope\":\"all\"}",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> L17 plain words in the protected dialog hides an engine purpose: Rebuild {\"scope\":\"all\"} then {\"mode\":\"replace\"}",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> L17 plain words in the protected dialog hides an engine purpose: Rebuild, then run vendor.rebuild-index",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> L17 plain words in the protected dialog hides the whole purpose when plain words contain brackets",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> L17 plain words in the protected dialog a typed agent request says who asks, what happens and what to type, with no internal names",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> L17 plain words in the protected dialog the agent in Search is named as such",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> (tempdoc 550 C3) registers as the broker presenter and resolves true on Approve (INLINE)",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> (tempdoc 550 C3) thesis IV: checking \"always allow\" then Approve resolves allowAlways=true",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> (tempdoc 550 C3) 875: hides the allow-always checkbox for a HIGH-risk prompt (the backend will not honour it)",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> (tempdoc 550 C3) 875: keeps the allow-always checkbox for a MEDIUM-risk prompt (the grant is still honoured)",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> (tempdoc 550 C3) 875: hides the allow-always checkbox when the route cannot carry it (agent tool-call ceremony)",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> (tempdoc 550 C3) resolves false on Deny",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> (tempdoc 550 C3) TYPED gate: Approve is disabled until the op id is typed",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> (tempdoc 550 C3) denies an in-flight prompt when the host is torn down (fail-closed)",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> capability consent (tempdoc 550 G9) presents a jf-consent-request through the one ceremony surface and resolves allow-always",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> capability consent (tempdoc 550 G9) resolves deny on the capability Deny button",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> capability consent (tempdoc 550 G9) leaves a pending capability request UNTOUCHED on teardown (no persisted deny)",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> run-scoped drain (tempdoc 605 Move 2) a concluding run drains its own ceremony fail-closed (superseded) so the NEXT run surfaces — the M1 fix",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> run-scoped drain (tempdoc 605 Move 2) does NOT drain another run's ceremony or a plugin capability request",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-authorization-host> run-scoped drain (tempdoc 605 Move 2) a run-less ceremony (no owningRunId, e.g. a Shell effect dispatch) is never drained by a run conclusion",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:a13f7fef41e4074ec7be97c2a7346a269fffa7aa7b2cc5c55c438e490af7d602"
+}
