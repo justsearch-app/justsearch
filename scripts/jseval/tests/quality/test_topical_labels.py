@@ -438,8 +438,33 @@ def test_working_records_stay_out_of_the_committed_record(world, monkeypatch):
     judged(world, monkeypatch)
     rows = tl.read_checkpoint(tl.WORK / "judgments.jsonl")
     assert set(rows[0]) == {"qid", "doc", "grade", "identity", "call_id", "position", "batch_size",
-                            "phase", "at"}
+                            "phase", "at", "revision", "dispatched_at"}
+    calls = {c["call_id"]: c for c in tl.read_checkpoint(tl.WORK / "calls.jsonl")}
+    for row in rows:
+        call = calls[row["call_id"]]
+        assert row["revision"] == call["revision"] == 0
+        assert row["dispatched_at"] == call["dispatched_at"] == call["at"]
+        assert row["dispatched_at"] <= row["at"]
     assert list(world.record.rglob("*.jsonl")) == []
+
+
+@pytest.mark.parametrize("stamp,eligible", [
+    ({}, False),
+    ({"revision": 0, "dispatched_at": 11}, False),
+    ({"revision": 1}, False),
+    ({"revision": 1, "dispatched_at": 9}, False),
+    ({"revision": 1, "dispatched_at": 10}, False),
+    ({"revision": 1, "dispatched_at": 11}, True),
+])
+def test_revision_one_uses_only_its_own_post_fail_dispatches(world, stamp, eligible):
+    ex = tl.load_excerpts(world.pools)
+    qid = "tp-002"
+    doc = next(iter(ex[qid]))
+    tl.append_rows(tl.WORK / "judgments.jsonl", [
+        {"qid": qid, "doc": doc, "grade": 2, "at": 12,
+         "identity": tl.identity(world.c, world.pools, qid, doc, ex[qid][doc]), **stamp}])
+    done = tl.current_judgments(world.c, world.pools, ex, revision=1, after=10)
+    assert bool(done) == eligible
 
 
 # --------------------------------------------------------------------------- L7 cost and interruption
@@ -470,6 +495,9 @@ def test_quota_timeout_and_stall_exit_with_their_reason_and_keep_finished_pairs(
     stall = FakeJudge(world.c, fail=lambda n: subprocess.CalledProcessError(1, ["claude"]))
     monkeypatch.setattr(ruq, "ask_claude", stall)
     assert tl.judge(max_calls=10_000)["stopped"].startswith("stalled: 3 consecutive calls failed")
+    calls = tl.read_checkpoint(tl.WORK / "calls.jsonl")
+    assert {c["error"] for c in calls if not c["ok"]} == {"quota", "timeout", "CalledProcessError"}
+    assert all(c["revision"] == 0 and c["dispatched_at"] == c["at"] for c in calls)
     rest = FakeJudge(world.c)
     monkeypatch.setattr(ruq, "ask_claude", rest)
     assert tl.judge(max_calls=10_000)["stopped"] == "complete" and rest.calls == 122 - 2
@@ -603,6 +631,34 @@ def test_sampling_waits_for_every_pooled_pair_to_be_graded(world, monkeypatch):
     tl.judge(max_calls=3)
     with pytest.raises(tl.LabelError, match="no model grade yet"):
         tl.sample(1)
+
+
+def test_revision_zero_preserves_the_sample_from_2516_unstamped_judgments(world):
+    docs = sorted(world.c.documents)
+    results = {}
+    for n, qid in enumerate(tl.topical_queries(world.c)):
+        ranked = [docs[(n * 31 + k) % len(docs)] for k in range(20 + (n < 76))]
+        results[qid] = {name: {"status": "ok", "ranked": ranked[start:end],
+                               "stages": {}, "attempts": 1}
+                        for name, start, end in (("keyword", 0, 10), ("dense", 10, 20),
+                                                 ("hybrid", 20, 21))}
+    pools = tl.build_pools(world.c, results, {q: [] for q in results},
+                          index_key="legacy-fixture", index_generation=7)
+    tl._write_json(tl.WORK / "pools.json", pools)
+    extracted = {d: {"text": d, "extracted_sha256": sha256_text(d)} for d in docs}
+    tl._write_json(tl.WORK / "excerpts.json", tl.build_excerpts(world.c, pools, extracted))
+    ex = tl.load_excerpts(pools)
+    rows = [{"qid": q, "doc": d, "grade": grade_of(q, d), "at": 1,
+             "identity": tl.identity(world.c, pools, q, d, ex[q][d])}
+            for q, p in pools["queries"].items() for d in p["pairs"]]
+    assert len(rows) == 2516
+    tl.append_rows(tl.WORK / "judgments.jsonl", rows)
+    done = tl.current_judgments(world.c, pools, ex)
+    assert len(done) == 2516
+    assert tl.sample(1) == 0
+    sample = json.loads((tl.WORK / "samples" / "r0-b1.json").read_text())
+    assert sample["pairs"] == tl.draw_sample(
+        tl.population(world.c, pools, {(r["qid"], r["doc"]): r for r in rows}), batch=1)
 
 
 @pytest.fixture
@@ -796,6 +852,43 @@ def test_revision_one_does_not_reuse_judgments_from_before_the_failure(sampled, 
         tl.sample(1, 1)
     fake = judged(sampled, monkeypatch, revision=1)
     assert fake.calls == 122
+
+
+@pytest.mark.parametrize("fail_during_call", [True, False])
+def test_revision_one_relabels_calls_dispatched_under_revision_zero(sampled, monkeypatch,
+                                                                  fail_during_call):
+    path = tl.RECORD / "prompts" / "topical-judge.txt"
+    original = path.read_text()
+    revised = original + "\nRevised rubric.\n"
+    fake = FakeJudge(sampled.c)
+
+    def record_fail():
+        path.write_text(original)
+        assert _accept_with(sampled, 0.5)["outcome"] == "FAIL"
+        path.write_text(revised)
+
+    def finish_after_fail(prompt, **kw):
+        if fail_during_call:
+            record_fail()
+        return fake(prompt, **kw)
+
+    if not fail_during_call:
+        record_fail()
+    path.write_text(revised)
+    monkeypatch.setattr(ruq, "ask_claude", finish_after_fail)
+    assert tl.judge(max_calls=1, revision=0)["judged_pairs"] == 5
+    old_call = tl.read_checkpoint(tl.WORK / "calls.jsonl")[-1]
+    fresh = judged(sampled, monkeypatch, revision=1)
+    assert fresh.calls == 122  # every pair, including the call that finished after FAIL
+    calls = tl.read_checkpoint(tl.WORK / "calls.jsonl")
+    failed_at = json.loads((tl.WORK / "acceptance-r0.json").read_text())["at"]
+    rows = tl.read_checkpoint(tl.WORK / "judgments.jsonl")
+    old_rows = [r for r in rows if r["call_id"] == old_call["call_id"]]
+    if fail_during_call:
+        assert all(r["dispatched_at"] < failed_at < r["at"] for r in old_rows)
+    else:
+        assert all(failed_at < r["dispatched_at"] <= r["at"] for r in old_rows)
+    assert all(c["revision"] == 1 and c["dispatched_at"] > failed_at for c in calls[123:])
 
 
 def test_accept_refuses_an_old_undersized_sample(sampled):

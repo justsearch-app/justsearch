@@ -507,12 +507,16 @@ def append_rows(path: Path, rows: list[dict]) -> None:
 
 
 def current_judgments(c: Collection, pools: dict, ex: dict,
-                      *, after: float | None = None) -> dict[tuple[str, str], dict]:
-    """The latest checkpointed judgment per pooled pair whose identity equals the current one."""
+                      *, revision: int = 0, after: float | None = None) -> dict[tuple[str, str], dict]:
+    """Latest judgments matching this revision and identity, dispatched after its opening decision.
+    Unstamped legacy judgments belong to revision 0 only.
+    """
     out = {}
     rubric = template()
     for row in read_checkpoint(WORK / "judgments.jsonl"):
-        if after is not None and row.get("at", 0) <= after:
+        if row.get("revision", 0) != revision:
+            continue
+        if after is not None and row.get("dispatched_at", 0) <= after:
             continue
         qid, doc = row.get("qid"), row.get("doc")
         if qid in pools["queries"] and doc in pools["queries"][qid]["pairs"] and doc in ex.get(qid, {}):
@@ -535,7 +539,7 @@ def batches(pools: dict, done, revision: int) -> list[tuple[str, list[str]]]:
 
 
 def _call(c: Collection, pools: dict, ex: dict, qid: str, docs: list[str], phase: str,
-          call_timeout: float) -> tuple[list[dict], dict]:
+          call_timeout: float, *, revision: int = 0) -> tuple[list[dict], dict]:
     fids = [f"F{n}" for n in range(1, len(docs) + 1)]
     rubric = template()
     identities = {d: identity(c, pools, qid, d, ex[qid][d], template_text=rubric) for d in docs}
@@ -543,8 +547,10 @@ def _call(c: Collection, pools: dict, ex: dict, qid: str, docs: list[str], phase
                           template_text=rubric)
     call_id = sha256_text(f"{time.time_ns()}:{qid}:{','.join(docs)}")[:16]
     started = time.monotonic()
+    dispatched_at = time.time()
     call = {"call_id": call_id, "qid": qid, "docs": docs, "phase": phase, "model": MODEL,
-            "prompt_sha256": sha256_text(prompt), "at": time.time()}
+            "prompt_sha256": sha256_text(prompt), "at": dispatched_at,
+            "revision": revision, "dispatched_at": dispatched_at}
     try:
         reply, raw = ruq.ask_claude(prompt, model=call["model"], timeout=call_timeout)
         grades = parse_grades(reply, fids)
@@ -560,6 +566,7 @@ def _call(c: Collection, pools: dict, ex: dict, qid: str, docs: list[str], phase
     seconds = time.monotonic() - started
     rows = [{"qid": qid, "doc": d, "grade": grades[f], "identity": identities[d],
              "call_id": call_id, "position": n, "batch_size": len(docs), "phase": phase,
+             "revision": revision, "dispatched_at": dispatched_at,
              "at": time.time()} for n, (f, d) in enumerate(zip(fids, docs), 1)]
     return rows, {**call, "ok": True, "seconds": seconds, "raw": raw}
 
@@ -576,7 +583,7 @@ def judge(*, max_calls: int, concurrency: int = 1, phase: str = "labels", revisi
     lock = threading.Lock()
     for name in ("judgments.jsonl", "calls.jsonl"):
         read_checkpoint(WORK / name, repair=True)
-    done = current_judgments(c, pools, ex, after=after)
+    done = current_judgments(c, pools, ex, revision=revision, after=after)
     todo = batches(pools, done, revision)
     stop: list[str] = []
     previous = signal.signal(signal.SIGTERM, lambda *_: stop.append("paused (terminated)")) \
@@ -600,7 +607,8 @@ def judge(*, max_calls: int, concurrency: int = 1, phase: str = "labels", revisi
                         break
                     qid, docs = todo.pop(0)
                     calls += 1
-                    inflight[pool_.submit(_call, c, pools, ex, qid, docs, phase, call_timeout)] = qid
+                    inflight[pool_.submit(_call, c, pools, ex, qid, docs, phase, call_timeout,
+                                          revision=revision)] = qid
                 if not inflight:
                     break
                 finished, _ = concurrent.futures.wait(inflight, return_when=concurrent.futures.FIRST_COMPLETED)
@@ -622,7 +630,7 @@ def judge(*, max_calls: int, concurrency: int = 1, phase: str = "labels", revisi
     finally:
         if previous is not None:
             signal.signal(signal.SIGTERM, previous)
-    remaining = len(batches(pools, current_judgments(c, pools, ex, after=after), revision))
+    remaining = len(batches(pools, current_judgments(c, pools, ex, revision=revision, after=after), revision))
     status = {"stopped": stop[0] if stop else "complete" if not remaining else "call limit reached",
               "calls": calls, "judged_pairs": judged, "remaining_calls": remaining,
               "seconds": round(time.monotonic() - started, 1), "phase": phase}
@@ -823,7 +831,7 @@ def sample(batch: int, revision: int = 0) -> int:
     c, _ = _collection()
     pools = load_pools(c)
     ex = load_excerpts(pools)
-    done = current_judgments(c, pools, ex, after=after)
+    done = current_judgments(c, pools, ex, revision=revision, after=after)
     rows = population(c, pools, done)
     if batch == 2 and decision["labels_sha256"] != labels_sha256(done):
         raise LabelError("the model labels changed since the first batch's decision")
@@ -911,7 +919,7 @@ def accept(revision: int = 0, sheets: dict[int, Path] | None = None) -> dict:
     c, _ = _collection()
     pools = load_pools(c)
     ex = load_excerpts(pools)
-    done = current_judgments(c, pools, ex, after=after)
+    done = current_judgments(c, pools, ex, revision=revision, after=after)
     batches_ = {}
     for batch in (1, 2):
         record_path, sheet_path = _sample_paths(revision, batch)
@@ -972,7 +980,7 @@ def freeze(revision: int = 0) -> int:
     c, _ = _collection()
     pools = load_pools(c)
     ex = load_excerpts(pools)
-    done = current_judgments(c, pools, ex, after=after)
+    done = current_judgments(c, pools, ex, revision=revision, after=after)
     decision = _json(WORK / f"acceptance-r{revision}.json")
     if decision["outcome"] != "PASS" or decision["labels_sha256"] != labels_sha256(done):
         raise LabelError("labels freeze only after a PASS decision on exactly the current model labels")
