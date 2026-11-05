@@ -1,0 +1,286 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-05T10:16:24.049Z",
+  "revision": "b1b5ae0f3c400c3ca672fafddd43869412891d41",
+  "tree": "3c1210107d1409f36bb52117ec82cd3fc90b6fef",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/frameStatus.test.ts\" \"src/shell-v0/components/StatusPanel.history.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/gkokugqn/tmp/test-intent-vitest-4-1793873782264.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1784
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7fd88ce5c33be2394e8d2c83295548a0c0333704fa094b7efde05dfb381d1b63",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "frame status projection ST1 keeps concurrent facts discoverable while the pill chooses one urgency",
+          "status": "passed"
+        },
+        {
+          "name": "frame status projection ST2 separates contact from poll freshness and waits a full poll before unreachable",
+          "status": "passed"
+        },
+        {
+          "name": "frame status projection ST6 durable acceptance and gaps suppress an invocation-return completion",
+          "status": "passed"
+        },
+        {
+          "name": "frame status projection ST7 read state never decides active/resolved and Earlier stays newest first",
+          "status": "passed"
+        },
+        {
+          "name": "frame status projection ST8 C6 terminal replay is silent; only an observed active-to-ready edge completes",
+          "status": "passed"
+        },
+        {
+          "name": "frame status projection ST6 AI downloads preserve measured progress and the existing pause/resume route",
+          "status": "passed"
+        },
+        {
+          "name": "frame status projection ref-09 agent request deadlines read as their consequence relative to now, never as a raw time",
+          "status": "passed"
+        },
+        {
+          "name": "frame status projection ref-09 the needs-you pill carries its count for the badge",
+          "status": "passed"
+        },
+        {
+          "name": "frame status projection C12 the broadcast advisory and the request-scoped prompt for one authorization give one decision route",
+          "status": "passed"
+        },
+        {
+          "name": "frame status projection L4b a waiting approval is in Needs you only; it enters Earlier once answered, expired or withdrawn",
+          "status": "passed"
+        },
+        {
+          "name": "frame status projection L4b an MCP request also recorded as a GATED ledger row waits in Needs you only; the row joins Earlier once it is answered or expires",
+          "status": "passed"
+        },
+        {
+          "name": "frame status projection ST1 working shows the most important running item with its measured progress only",
+          "status": "passed"
+        },
+        {
+          "name": "frame status projection ST2 a reachable engine with a stale poll says checking, never reconnecting, and never claims calm",
+          "status": "passed"
+        },
+        {
+          "name": "frame status projection C12 deduplicates the same backend authorization by pending id",
+          "status": "passed"
+        },
+        {
+          "name": "indexing detail moved from the task tray (813 §5/§20) stage rows mark only finished stages, extraction has no fraction, and file rows come after stages",
+          "status": "passed"
+        },
+        {
+          "name": "indexing detail moved from the task tray (813 §5/§20) a terminal indexing failure is a current problem, never a completion",
+          "status": "passed"
+        },
+        {
+          "name": "concurrent source facts ST1 search restriction index.failed precedes decisions and remains actionable",
+          "status": "passed"
+        },
+        {
+          "name": "concurrent source facts ST1 search restriction index.blocked_legacy precedes decisions and remains actionable",
+          "status": "passed"
+        },
+        {
+          "name": "concurrent source facts ST1 search restriction index.schema_open_refused precedes decisions and remains actionable",
+          "status": "passed"
+        },
+        {
+          "name": "concurrent source facts ST4 keeps all decisions, holds and running work visible together, including all overlapping holds",
+          "status": "passed"
+        },
+        {
+          "name": "concurrent source facts ST5 active folder failures and AI failure leave Problems on recovery without turning acknowledgement into recovery",
+          "status": "passed"
+        },
+        {
+          "name": "concurrent source facts B1 a folder whose scan errored is a problem right now, as the Library headline counts it, and the pill never claims calm",
+          "status": "passed"
+        },
+        {
+          "name": "concurrent source facts ST6 answering, per-folder work, rebuild and background runs retain separate freshness and real fractions",
+          "status": "passed"
+        },
+        {
+          "name": "concurrent source facts ST7 Earlier orders advisories and completed operations newest first regardless of read state",
+          "status": "passed"
+        },
+        {
+          "name": "concurrent source facts ST4 update available retains its existing Settings action",
+          "status": "passed"
+        },
+        {
+          "name": "concurrent source facts ST4 update repair_required retains its existing Settings action",
+          "status": "passed"
+        },
+        {
+          "name": "round 7 repairs R1 a passing notice never takes the pill from a more urgent state; engine waits say nothing while unreachable",
+          "status": "passed"
+        },
+        {
+          "name": "round 7 repairs R3 permission rows read in plain words, never the raw grant action",
+          "status": "passed"
+        },
+        {
+          "name": "round 7 repairs R3 a removal notice keeps its add-again action and plain consequence in Earlier",
+          "status": "passed"
+        },
+        {
+          "name": "round 7 repairs R4 folder rows are named by folder with the path as detail, never by collection",
+          "status": "passed"
+        },
+        {
+          "name": "L1/ST7 the way back after a folder removal, in every window a window that did not remove the folder (or a reload) offers \"Add <folder> again\" from the removal record",
+          "status": "passed"
+        },
+        {
+          "name": "L1/ST7 the way back after a folder removal, in every window an older removal record without a path, a failed removal and other operations offer no re-add",
+          "status": "passed"
+        },
+        {
+          "name": "L1/ST7 the way back after a folder removal, in every window the re-add is not offered while the folder is watched again (added back here or elsewhere)",
+          "status": "passed"
+        },
+        {
+          "name": "L1/ST7 the way back after a folder removal, in every window the window that removed it shows one row: its own notice, whose action goes once it can no longer run",
+          "status": "passed"
+        },
+        {
+          "name": "DE6 no Undo where no reversal exists a completed operation without a backend undo offers no Undo; a forget offers \"Add back to search\"",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.history.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b18369c180e18eae078fa7c3002b683fd7a59188df4f3252f81bdfec655e7675",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Earlier (moved from the inbox drawer) omits empty sections; calm has one line and the two history destinations",
+          "status": "passed"
+        },
+        {
+          "name": "Earlier (moved from the inbox drawer) newest comes first regardless of read state; unread keeps its marker and history does not reactivate a resolved condition",
+          "status": "passed"
+        },
+        {
+          "name": "Earlier (moved from the inbox drawer) Mark all read uses the existing acknowledgement and stays focusable with a reason when already read",
+          "status": "passed"
+        },
+        {
+          "name": "Earlier (moved from the inbox drawer) diagnostics preserve safe navigation or plain text for https://example.test/diagnostics",
+          "status": "passed"
+        },
+        {
+          "name": "Earlier (moved from the inbox drawer) diagnostics preserve safe navigation or plain text for diagnostics.i18n.key",
+          "status": "passed"
+        },
+        {
+          "name": "Earlier (moved from the inbox drawer) diagnostics preserve safe navigation or plain text for javascript:alert(1)",
+          "status": "passed"
+        },
+        {
+          "name": "Earlier (moved from the inbox drawer) retains local receipts in Earlier without making them unread",
+          "status": "passed"
+        },
+        {
+          "name": "Earlier (moved from the inbox drawer) unknown advisory classes use default chrome, without exposing their raw class id as the title",
+          "status": "passed"
+        },
+        {
+          "name": "Earlier (moved from the inbox drawer) humanizes recoverable conditions, authored reasons and operation actions",
+          "status": "passed"
+        },
+        {
+          "name": "Earlier (moved from the inbox drawer) forget offers reindexing while backend supported reversal alone is called Undo",
+          "status": "passed"
+        },
+        {
+          "name": "Earlier (moved from the inbox drawer) a failed operation reads as a failure in Earlier, and ledger codes read as plain words",
+          "status": "passed"
+        },
+        {
+          "name": "Earlier (moved from the inbox drawer) row titles share one icon column that never stretches with the title",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#an older removal record without a path, a failed removal and other operations offer no re-add",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7fd88ce5c33be2394e8d2c83295548a0c0333704fa094b7efde05dfb381d1b63",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L1/ST7 the way back after a folder removal, in every window an older removal record without a path, a failed removal and other operations offer no re-add",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#the re-add is not offered while the folder is watched again (added back here or elsewhere)",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7fd88ce5c33be2394e8d2c83295548a0c0333704fa094b7efde05dfb381d1b63",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L1/ST7 the way back after a folder removal, in every window the re-add is not offered while the folder is watched again (added back here or elsewhere)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#a completed operation without a backend undo offers no Undo; a forget offers \"Add back to search\"",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7fd88ce5c33be2394e8d2c83295548a0c0333704fa094b7efde05dfb381d1b63",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE6 no Undo where no reversal exists a completed operation without a backend undo offers no Undo; a forget offers \"Add back to search\"",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:70721b4c6c9ff2a4179190c0921ea1099afb04e7fab1daa5d6fc6245e56096ab"
+}

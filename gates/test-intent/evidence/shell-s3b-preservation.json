@@ -1,0 +1,204 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-05T09:05:08.604Z",
+  "revision": "a42d2cbed2cc46990f7872bef8715cd07e26eb80",
+  "tree": "7a94f850e362eb96d9d5f9a2fe6c48e08828c7a9",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-observability:test --tests \"io.justsearch.app.observability.operations.RemovedFolderRecordTest.aFailedRemovalRecordsNoFolderToAddBack\" --tests \"io.justsearch.app.observability.operations.RemovedFolderRecordTest.aReceiptWrittenBeforeTheFieldExistedStillReadsAndOffersNoReAdd\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2550
+    },
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/frameStatus.test.ts\" \"src/shell-v0/commands/KeybindingRegistry.undoGuard.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/o40bh6xh/tmp/test-intent-vitest-61331-1793869501268.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1373
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#an older removal record without a path, a failed removal and other operations offer no re-add",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:463d9e9274016cb8d73f516d5faba2dbee907e06287cb7d1e865d95923aaad1f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L1/ST7 the way back after a folder removal, in every window an older removal record without a path, a failed removal and other operations offer no re-add",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#the re-add is not offered while the folder is watched again (added back here or elsewhere)",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:463d9e9274016cb8d73f516d5faba2dbee907e06287cb7d1e865d95923aaad1f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L1/ST7 the way back after a folder removal, in every window the re-add is not offered while the folder is watched again (added back here or elsewhere)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/RemovedFolderRecordTest.java#aFailedRemovalRecordsNoFolderToAddBack",
+      "file": "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/RemovedFolderRecordTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3de6661d10fd24db043d19b54828d45739cdd21fa5e0da2ddc4dd3a100a4f377",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aFailedRemovalRecordsNoFolderToAddBack()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/RemovedFolderRecordTest.java#aReceiptWrittenBeforeTheFieldExistedStillReadsAndOffersNoReAdd",
+      "file": "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/RemovedFolderRecordTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3de6661d10fd24db043d19b54828d45739cdd21fa5e0da2ddc4dd3a100a4f377",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aReceiptWrittenBeforeTheFieldExistedStillReadsAndOffersNoReAdd()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/commands/KeybindingRegistry.undoGuard.test.ts#outside a text field Ctrl+Z runs the shell Undo and Ctrl+Shift+Z its Redo",
+      "file": "modules/ui-web/src/shell-v0/commands/KeybindingRegistry.undoGuard.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c64a2f75afa0802d6a03a46e12979f523024c3729d23f91728d989083e09b891",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C8 Ctrl+Z keyboard ownership outside a text field Ctrl+Z runs the shell Undo and Ctrl+Shift+Z its Redo",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/commands/KeybindingRegistry.undoGuard.test.ts#during IME composition and on key repeat nothing runs",
+      "file": "modules/ui-web/src/shell-v0/commands/KeybindingRegistry.undoGuard.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c64a2f75afa0802d6a03a46e12979f523024c3729d23f91728d989083e09b891",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C8 Ctrl+Z keyboard ownership during IME composition and on key repeat nothing runs",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#a completed operation without a backend undo offers no Undo; a forget offers \"Add back to search\"",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:463d9e9274016cb8d73f516d5faba2dbee907e06287cb7d1e865d95923aaad1f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE6 no Undo where no reversal exists a completed operation without a backend undo offers no Undo; a forget offers \"Add back to search\"",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "a42d2cbed2",
+    "revision": "a42d2cbed2cc46990f7872bef8715cd07e26eb80",
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/compat/shell-s3b-removed-folder-api.patch",
+        "contentDigest": "sha256:9742992bb90e70a5bf3c89229a987d7a60b52416dff1bde392fc577d5e32c0c5"
+      }
+    ],
+    "runs": [
+      {
+        "command": "./gradlew :modules:app-observability:test --tests \"io.justsearch.app.observability.operations.RemovedFolderRecordTest.aFailedRemovalRecordsNoFolderToAddBack\" --tests \"io.justsearch.app.observability.operations.RemovedFolderRecordTest.aReceiptWrittenBeforeTheFieldExistedStillReadsAndOffersNoReAdd\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 3349
+      },
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/frameStatus.test.ts\" \"src/shell-v0/commands/KeybindingRegistry.undoGuard.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/o40bh6xh/tmp/test-intent-vitest-61331-1793869507312.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 994,
+        "output": "JSON report written to /home/elias/.cache/am/o40bh6xh/tmp/test-intent-vitest-61331-1793869507312.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#an older removal record without a path, a failed removal and other operations offer no re-add",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#the re-add is not offered while the folder is watched again (added back here or elsewhere)",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/RemovedFolderRecordTest.java#aFailedRemovalRecordsNoFolderToAddBack",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/RemovedFolderRecordTest.java#aReceiptWrittenBeforeTheFieldExistedStillReadsAndOffersNoReAdd",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/commands/KeybindingRegistry.undoGuard.test.ts#outside a text field Ctrl+Z runs the shell Undo and Ctrl+Shift+Z its Redo",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/commands/KeybindingRegistry.undoGuard.test.ts#during IME composition and on key repeat nothing runs",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#a completed operation without a backend undo offers no Undo; a forget offers \"Add back to search\"",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:09dfa5eb92b6d0f21c946e57464ebf8f316e0fc06302ba90259fb0c0a24d6b50"
+}

@@ -37,6 +37,15 @@ export interface EphemeralToastSpec {
   readonly durationMs?: number;
   readonly actionLabel?: string;
   readonly onAction?: () => void;
+  /**
+   * The action is the real reversal of the person's own action (`state/ownReversals.ts`): the pill
+   * shows the Ctrl+Z hint and the shell's Undo command runs it while the notice shows.
+   */
+  readonly reversal?: boolean;
+  /** False once the action can no longer run (done, or its reversal window closed): it is no longer offered. */
+  readonly actionAvailable?: () => boolean;
+  /** A removed folder this notice's action adds back; other records of the same removal defer to it. */
+  readonly restoresFolder?: string;
   /** Recovery choices for an unresolved destination, rendered in Earlier. */
   readonly destinations?: readonly { readonly id: string; readonly label: string }[];
   /**

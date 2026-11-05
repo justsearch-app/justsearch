@@ -1116,7 +1116,10 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
         ? result.structuredData().get("composition")
         : result.errorDetails().get("composition");
     CompositionV2 composition = candidate instanceof CompositionV2 typed ? typed : null;
-    return new OperationReceipt(code, execution, composition);
+    OperationReceipt.RemovedFolder removed = result.success()
+        && result.structuredData().get(OperationReceipt.REMOVED_FOLDER_KEY) instanceof OperationReceipt.RemovedFolder folder
+        ? folder : null;
+    return new OperationReceipt(code, execution, composition, removed);
   }
 
   private static String failureCode(Throwable failure) {

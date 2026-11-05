@@ -57,7 +57,7 @@ export class ConfirmDialog extends JfElement {
     this.open = false;
     this.title = '';
     this.message = '';
-    this.confirmLabel = 'Confirm';
+    this.confirmLabel = 'Continue';
     this.cancelLabel = 'Cancel';
     this.variant = 'danger';
     this.typedInput = '';

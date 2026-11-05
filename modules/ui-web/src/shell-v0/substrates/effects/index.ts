@@ -35,7 +35,8 @@ import type { Effect } from '../effect.js';
 import type { Provenance } from '../../primitives/provenance.js';
 
 /**
- * The journal entry record. Append-only; entries are never mutated.
+ * The journal entry record. Effects are append-only; a successful removal receipt may
+ * complete its inverse after dispatch, replacing the entry without changing the effect.
  *
  *   `id`         — monotonic unique id (cursor + chained-action refs).
  *   `effect`     — the closed-union Effect that was dispatched.
@@ -194,7 +195,14 @@ export function restoreJournalFromStorage(): void {
     const parsed = JSON.parse(raw) as PersistedJournal;
     if (parsed?.version !== 1) return;
     if (!Array.isArray(parsed.entries)) return;
-    _entries.push(...parsed.entries);
+    // Older removals persisted an argument-less add operation as their inverse. It cannot
+    // restore a folder; retain only a re-add carrying the path captured on success.
+    _entries.push(...parsed.entries.map(entry => entry.effect.kind === 'invoke-operation'
+      && entry.effect.operationId === 'core.remove-watched-root'
+      && !(entry.inverse?.kind === 'invoke-operation'
+        && entry.inverse.operationId === 'core.add-watched-root'
+        && typeof entry.inverse.args?.path === 'string' && entry.inverse.args.path.trim())
+      ? { ...entry, inverse: null } : entry));
     if (typeof parsed.nextId === 'number') {
       _nextId = Math.max(_nextId, parsed.nextId);
     }
@@ -296,6 +304,9 @@ function deriveInverse(effect: Effect): Effect | null {
     case 'toast':
       return null;
     case 'invoke-operation': {
+      // Removal is reversible only after its successful receipt supplies the removed path.
+      // The invocation arguments alone do not prove a folder was actually removed.
+      if (effect.operationId === 'core.remove-watched-root') return null;
       // §25.γ5 — consult manifest-declared inverses first. Plugins
       // (and first-party manifests) can ship per-operation declarative
       // inverses via `contributes.effectInverses` without waiting for
@@ -619,6 +630,26 @@ export function getJournalEntry(id: number): JournalEntry | undefined {
   return _entries.find((e) => e.id === id);
 }
 
+/** Complete a removal's inverse from its successful receipt, using the existing inverse wire shape. */
+export function markRemovedFolderOperation(journalEntryId: number, removedFolder: unknown): void {
+  const index = _entries.findIndex(entry => entry.id === journalEntryId);
+  const entry = _entries[index];
+  if (!entry || entry.effect.kind !== 'invoke-operation'
+      || entry.effect.operationId !== 'core.remove-watched-root'
+      || !removedFolder || typeof removedFolder !== 'object') return;
+  const folder = removedFolder as { path?: unknown; collection?: unknown };
+  if (typeof folder.path !== 'string' || !folder.path.trim()) return;
+  const completed: JournalEntry = { ...entry, inverse: {
+    kind: 'invoke-operation', operationId: 'core.add-watched-root',
+    args: { path: folder.path,
+      ...(typeof folder.collection === 'string' && folder.collection.trim()
+        ? { collection: folder.collection } : {}) },
+  } };
+  _entries[index] = completed;
+  writePersisted();
+  notifyAllWith(_listeners, completed);
+}
+
 /**
  * §32 R-E3 — walk the causation chain from an entry up to its root.
  * Returns the ancestor entries oldest-first (root … direct parent),
@@ -747,6 +778,19 @@ export function undoLastEffect(
       applyFn(entry.inverse);
     }
     return entry.inverse;
+  }
+  return null;
+}
+
+/**
+ * The entry {@link undoLastEffect} would reverse next, without moving the cursor (same walk). Lets
+ * the shell's Undo command choose between this journal and a newer own-action reversal by time.
+ */
+export function peekLastEffectUndo(): JournalEntry | null {
+  for (let i = _undoCursor - 1; i >= 0; i--) {
+    const entry = _entries[i];
+    if (!entry || entry.pendingOutcome !== undefined || entry.inverse === null) continue;
+    return entry;
   }
   return null;
 }
@@ -891,6 +935,34 @@ export function undoAllByOriginator(
     }
   }
   return count;
+}
+
+/**
+ * DE6 — reverse EXACTLY a confirmed preview: the entries the person saw, in the order shown
+ * (newest-first), and nothing that arrived after the preview was drawn. An entry that is no longer
+ * reversible by the time of the confirmation (vetoed, gone) is skipped and returned, so the caller
+ * can say what was not undone. A failing reversal stops the run; it and the rest are returned too.
+ */
+export function undoEntries(
+  previewed: readonly JournalEntry[],
+  applyFn: (effect: Effect) => void,
+): { readonly reversed: number; readonly skipped: readonly JournalEntry[] } {
+  let reversed = 0;
+  const skipped: JournalEntry[] = [];
+  for (let i = 0; i < previewed.length; i++) {
+    const shown = previewed[i]!;
+    const entry = getJournalEntry(shown.id);
+    const undo = entry && entry.pendingOutcome !== 'rejected' ? undoEffectFor(entry) : null;
+    if (undo === null) { skipped.push(shown); continue; }
+    try {
+      applyFn(undo);
+      reversed++;
+    } catch {
+      skipped.push(...previewed.slice(i));
+      break;
+    }
+  }
+  return { reversed, skipped };
 }
 
 /**

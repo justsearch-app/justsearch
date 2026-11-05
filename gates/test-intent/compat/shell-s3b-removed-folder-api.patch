@@ -1,0 +1,116 @@
+diff --git a/modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationReceipt.java b/modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationReceipt.java
+index 7ace0cc44a..01bbb19265 100644
+--- a/modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationReceipt.java
++++ b/modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationReceipt.java
+@@ -12,7 +12,18 @@ import java.util.Set;
+  * here. Unit counts come from the committed checkpoint, not the immediate response.
+  */
+ @JsonInclude(JsonInclude.Include.NON_NULL)
+-public record OperationReceipt(String code, String executionId, CompositionV2 composition) {
++public record OperationReceipt(String code, String executionId, CompositionV2 composition,
++    RemovedFolder removedFolder) {
++  /** Compatibility surface only: the key exists; nothing writes or reads it here. */
++  public static final String REMOVED_FOLDER_KEY = "removedFolder";
++
++  /** Compatibility surface only: no validation and no recording. */
++  public record RemovedFolder(String path, String collection) {
++    public static java.util.Optional<RemovedFolder> of(String path, String collection) {
++      return java.util.Optional.empty();
++    }
++  }
++
+   private static final Set<String> COMPOSITION_REASONS = Set.of(
+       "candidate_fits_free_device_memory",
+       "source_holds_no_device_memory",
+@@ -22,7 +33,11 @@ public record OperationReceipt(String code, String executionId, CompositionV2 co
+       "candidate_fits_after_source_release");
+ 
+   public OperationReceipt(String code, String executionId) {
+-    this(code, executionId, null);
++    this(code, executionId, null, null);
++  }
++
++  public OperationReceipt(String code, String executionId, CompositionV2 composition) {
++    this(code, executionId, composition, null);
+   }
+ 
+   public OperationReceipt {
+diff --git a/modules/app-observability/src/main/java/io/justsearch/app/observability/ledger/ActionEvent.java b/modules/app-observability/src/main/java/io/justsearch/app/observability/ledger/ActionEvent.java
+index ce7398b9c2..c542e79867 100644
+--- a/modules/app-observability/src/main/java/io/justsearch/app/observability/ledger/ActionEvent.java
++++ b/modules/app-observability/src/main/java/io/justsearch/app/observability/ledger/ActionEvent.java
+@@ -75,8 +75,16 @@ public sealed interface ActionEvent
+       String operationId,
+       String outcome,
+       Optional<String> executionId,
+-      Optional<String> correlationId)
++      Optional<String> correlationId,
++      Optional<io.justsearch.app.api.operations.OperationReceipt.RemovedFolder> removedFolder)
+       implements ActionEvent {
++    /** Compatibility surface only. */
++    public Operation(String id, Instant occurredAt, String originator, String transport,
++        String operationId, String outcome, Optional<String> executionId, Optional<String> correlationId) {
++      this(id, occurredAt, originator, transport, operationId, outcome, executionId, correlationId,
++          Optional.empty());
++    }
++
+     @Override
+     public ActionEventKind kind() {
+       return ActionEventKind.OPERATION;
+diff --git a/modules/app-observability/src/main/java/io/justsearch/app/observability/ledger/ActionLedgerChangeRegistry.java b/modules/app-observability/src/main/java/io/justsearch/app/observability/ledger/ActionLedgerChangeRegistry.java
+index b0645eede5..db38787bad 100644
+--- a/modules/app-observability/src/main/java/io/justsearch/app/observability/ledger/ActionLedgerChangeRegistry.java
++++ b/modules/app-observability/src/main/java/io/justsearch/app/observability/ledger/ActionLedgerChangeRegistry.java
+@@ -87,6 +87,18 @@ public final class ActionLedgerChangeRegistry {
+     return journal.append(ActionLedgerProjection.projectOperation(Objects.requireNonNull(entry, "entry")));
+   }
+ 
++  /** Compatibility surface only: the removal record is ignored. */
++  public boolean persistOperation(OperationHistoryEntry entry,
++      java.util.Optional<io.justsearch.app.api.operations.OperationReceipt.RemovedFolder> removedFolder) {
++    return persistOperation(entry);
++  }
++
++  /** Compatibility surface only: the removal record is ignored. */
++  public void publishLiveOperation(OperationHistoryEntry entry,
++      java.util.Optional<io.justsearch.app.api.operations.OperationReceipt.RemovedFolder> removedFolder) {
++    publishLiveOperation(entry);
++  }
++
+   /** Immediate committed-row visibility without moving journal I/O onto the producer thread. */
+   public void publishLiveOperation(OperationHistoryEntry entry) {
+     publishLive(ActionLedgerProjection.projectOperation(Objects.requireNonNull(entry, "entry")));
+diff --git a/modules/app-observability/src/main/java/io/justsearch/app/observability/ledger/ActionLedgerProjection.java b/modules/app-observability/src/main/java/io/justsearch/app/observability/ledger/ActionLedgerProjection.java
+index 398ac8500d..ec8dbd0556 100644
+--- a/modules/app-observability/src/main/java/io/justsearch/app/observability/ledger/ActionLedgerProjection.java
++++ b/modules/app-observability/src/main/java/io/justsearch/app/observability/ledger/ActionLedgerProjection.java
+@@ -33,6 +33,12 @@ public final class ActionLedgerProjection {
+ 
+   private ActionLedgerProjection() {}
+ 
++  /** Compatibility surface only: the removal record is ignored. */
++  public static ActionEvent projectOperation(OperationHistoryEntry op,
++      Optional<io.justsearch.app.api.operations.OperationReceipt.RemovedFolder> removedFolder) {
++    return projectOperation(op);
++  }
++
+   /** A completed operation invocation (tempdoc 550 thesis I — typed {@link ActionEvent}). */
+   public static ActionEvent projectOperation(OperationHistoryEntry op) {
+     return new ActionEvent.Operation(
+diff --git a/modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationHistoryProjection.java b/modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationHistoryProjection.java
+index a67d1dcd61..941c27557c 100644
+--- a/modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationHistoryProjection.java
++++ b/modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationHistoryProjection.java
+@@ -16,6 +16,12 @@ import java.util.Optional;
+ public final class OperationHistoryProjection {
+   private OperationHistoryProjection() {}
+ 
++  /** Compatibility surface only: no removal record is read. */
++  public static Optional<io.justsearch.app.api.operations.OperationReceipt.RemovedFolder> removedFolder(
++      OperationHistoryRow row) {
++    return Optional.empty();
++  }
++
+   public static OperationHistoryEntry entry(OperationHistoryRow row) {
+     boolean success = row.state() == OperationState.COMPLETE;
+     OperationOutcome outcome = success

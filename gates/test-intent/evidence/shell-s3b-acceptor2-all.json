@@ -1,0 +1,452 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-05T10:53:58.116Z",
+  "revision": "2ba5a3ebf37f0c2684e22444af65ed08798a4bba",
+  "tree": "510aea86d9791160f4d2cf5d8f694846e88fb8f1",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/ActionButton.render.test.ts\" \"src/shell-v0/views/SettingsSurface.ownActions.test.ts\" \"src/shell-v0/views/LibrarySurface.otherSources.test.ts\" \"src/shell-v0/components/OpButton.ownReceipts.test.ts\" \"src/shell-v0/views/LibrarySurface.folderActions.test.ts\" \"src/shell-v0/views/LibrarySurface.gapDecision.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/jl7zspct/tmp/test-intent-vitest-5-1793876021593.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 4700
+    },
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/SettingsSurface.ownActions-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/jl7zspct/tmp/test-intent-vitest-5-1793876026295.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 11820
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ActionButton.render.test.ts#an operation without its own sentence still says it runs now with no undo",
+      "file": "modules/ui-web/src/shell-v0/components/ActionButton.render.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:32a8728f28b72eaa5549967a74f6226deb6fbab96440a9b6c06080a42509f6f8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ActionButton — MEDIUM risk (DE1 in-place band) an operation without its own sentence still says it runs now with no undo",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ActionButton.render.test.ts#Escape in the band cancels it without firing",
+      "file": "modules/ui-web/src/shell-v0/components/ActionButton.render.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:32a8728f28b72eaa5549967a74f6226deb6fbab96440a9b6c06080a42509f6f8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ActionButton — MEDIUM risk (DE1 in-place band) Escape in the band cancels it without firing",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions.test.ts#deleting a custom theme asks in a band naming the theme; Keep it deletes nothing, the verb deletes once",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:881ad784350e9dd08242823651b4ce13e21a4606f0b1d69e9594098fb1a93fa7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Settings own risky actions ask in place (DE1) deleting a custom theme asks in a band naming the theme; Keep it deletes nothing, the verb deletes once",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions.test.ts#revoking a plugin asks in a band under its row; the verb revokes it",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:881ad784350e9dd08242823651b4ce13e21a4606f0b1d69e9594098fb1a93fa7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Settings own risky actions ask in place (DE1) revoking a plugin asks in a band under its row; the verb revokes it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions.test.ts#opens a modal dialog that names who asked, what is deleted, what stays, that it cannot be undone, and the phrase",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:881ad784350e9dd08242823651b4ce13e21a4606f0b1d69e9594098fb1a93fa7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Delete all local data stays a typed dialog (DE2) opens a modal dialog that names who asked, what is deleted, what stays, that it cannot be undone, and the phrase",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.otherSources.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.otherSources.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0d2977843cd02e3fc8ad47307a5a8ded348361470dfbe9ca4a155b0f109b76b1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "LibrarySurface — \"Other sources\" section (811 C-2a) renders a row per non-root collection with its document count",
+          "status": "passed"
+        },
+        {
+          "name": "LibrarySurface — \"Other sources\" section (811 C-2a) never lists the reserved app-internal collections",
+          "status": "passed"
+        },
+        {
+          "name": "LibrarySurface — \"Other sources\" section (811 C-2a) never lists a collection a watched folder already owns",
+          "status": "passed"
+        },
+        {
+          "name": "LibrarySurface — \"Other sources\" section (811 C-2a) renders NO section at all when there are no non-root collections",
+          "status": "passed"
+        },
+        {
+          "name": "LibrarySurface — \"Other sources\" section (811 C-2a) says the list may be incomplete when the facet scan truncated",
+          "status": "passed"
+        },
+        {
+          "name": "LibrarySurface — \"Other sources\" section (811 C-2a) re-probes with a bigger scan once a poll reveals a larger index",
+          "status": "passed"
+        },
+        {
+          "name": "LibrarySurface — \"Other sources\" section (811 C-2a) confirms first, then issues the DELETE for that collection",
+          "status": "passed"
+        },
+        {
+          "name": "LibrarySurface — \"Other sources\" section (811 C-2a) issues nothing when the confirm is declined",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ActionButton.render.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/ActionButton.render.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:32a8728f28b72eaa5549967a74f6226deb6fbab96440a9b6c06080a42509f6f8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ActionButton — LOW risk fires action-invoke immediately on click",
+          "status": "passed"
+        },
+        {
+          "name": "ActionButton — MEDIUM risk (DE1 in-place band) asks in place with the consequence and the verb, never \"Are you sure?\", and fires once on the verb",
+          "status": "passed"
+        },
+        {
+          "name": "ActionButton — MEDIUM risk (DE1 in-place band) an operation without its own sentence still says it runs now with no undo",
+          "status": "passed"
+        },
+        {
+          "name": "ActionButton — MEDIUM risk (DE1 in-place band) Keep it returns to idle without firing and returns focus to the button that asked",
+          "status": "passed"
+        },
+        {
+          "name": "ActionButton — MEDIUM risk (DE1 in-place band) Escape in the band cancels it without firing",
+          "status": "passed"
+        },
+        {
+          "name": "ActionButton — HIGH risk requires typing the operationId to enable confirm",
+          "status": "passed"
+        },
+        {
+          "name": "ActionButton — HIGH risk respects requireConfirmText override over operationId",
+          "status": "passed"
+        },
+        {
+          "name": "ActionButton — disabled / pending does not fire when disabled",
+          "status": "passed"
+        },
+        {
+          "name": "ActionButton — disabled / pending does not fire when pending",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ActionButton.render.test.ts#asks in place with the consequence and the verb, never \"Are you sure?\", and fires once on the verb",
+      "file": "modules/ui-web/src/shell-v0/components/ActionButton.render.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:32a8728f28b72eaa5549967a74f6226deb6fbab96440a9b6c06080a42509f6f8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ActionButton — MEDIUM risk (DE1 in-place band) asks in place with the consequence and the verb, never \"Are you sure?\", and fires once on the verb",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:881ad784350e9dd08242823651b4ce13e21a4606f0b1d69e9594098fb1a93fa7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Settings own risky actions ask in place (DE1) deleting a custom theme asks in a band naming the theme; Keep it deletes nothing, the verb deletes once",
+          "status": "passed"
+        },
+        {
+          "name": "Settings own risky actions ask in place (DE1) revoking a plugin asks in a band under its row; the verb revokes it",
+          "status": "passed"
+        },
+        {
+          "name": "Delete all local data stays a typed dialog (DE2) opens a modal dialog that names who asked, what is deleted, what stays, that it cannot be undone, and the phrase",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions-lockdown.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:cf10b8fc4087e99861458d097454278ddfc2452e3ea90b2d6db57a9d26958022",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE1 switching from Delete Alpha to Delete Beta leaves one band, focuses Keep it, and Escape restores Delete Beta",
+          "status": "passed"
+        },
+        {
+          "name": "C1 a real quota failure keeps the custom theme and its active state, reports it by the grid, and permits retry (active=false)",
+          "status": "passed"
+        },
+        {
+          "name": "C1 a real quota failure keeps the custom theme and its active state, reports it by the grid, and permits retry (active=true)",
+          "status": "passed"
+        },
+        {
+          "name": "X1 the typed delete input uses the spacing token through its class",
+          "status": "passed"
+        },
+        {
+          "name": "DE1 folder, collection and theme bands share one window slot and Escape restores the latest opener",
+          "status": "passed"
+        },
+        {
+          "name": "C1 deleting Alpha shows a success receipt in the pill and announces it politely",
+          "status": "passed"
+        },
+        {
+          "name": "X2 a 200-character theme name keeps the band and both answers within 600×400",
+          "status": "passed"
+        },
+        {
+          "name": "X2 a 200-character theme name keeps the band and both answers within 900×800",
+          "status": "passed"
+        },
+        {
+          "name": "X2 a 200-character theme name keeps the band and both answers within 1280×800",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/OpButton.ownReceipts.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/OpButton.ownReceipts.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:94181a6958cb9a85e37771124cbd953ae2dcb7f7c16f643ab9a42f974d315f8e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C1 core.clear-failed-jobs acknowledges success in the pill only after the band is answered and the response succeeds",
+          "status": "passed"
+        },
+        {
+          "name": "C1 core.rebuild-index acknowledges success in the pill only after the band is answered and the response succeeds",
+          "status": "passed"
+        },
+        {
+          "name": "C1 core.reset-settings acknowledges success in the pill only after the band is answered and the response succeeds",
+          "status": "passed"
+        },
+        {
+          "name": "C1 core.clear-failed-jobs never emits a success receipt for a refused operation",
+          "status": "passed"
+        },
+        {
+          "name": "C1 core.rebuild-index never emits a success receipt for a refused operation",
+          "status": "passed"
+        },
+        {
+          "name": "C1 core.reset-settings never emits a success receipt for a refused operation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:af47670d264fe0543a7f96624637237cea7c88310095f69d9abaae494401b832",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "keeps a refused Add draft reachable and allows correction and retry",
+          "status": "passed"
+        },
+        {
+          "name": "explains a preview overlap (inside) and blocks click and Enter before Add",
+          "status": "passed"
+        },
+        {
+          "name": "explains a preview overlap (containing) and blocks click and Enter before Add",
+          "status": "passed"
+        },
+        {
+          "name": "submits Add once while waiting and announces its outcome",
+          "status": "passed"
+        },
+        {
+          "name": "switching member tabs during Add retains the pending outcome and draft until acceptance",
+          "status": "passed"
+        },
+        {
+          "name": "a cancelled native picker leaves a closed form and an existing draft unchanged",
+          "status": "passed"
+        },
+        {
+          "name": "exposes row removal progress, suppresses repeats and keeps the other row usable",
+          "status": "passed"
+        },
+        {
+          "name": "R3 a completed removal offers to add the same folder again, once, with its plain consequence",
+          "status": "passed"
+        },
+        {
+          "name": "R3 a failed add-again says so and can be tried again",
+          "status": "passed"
+        },
+        {
+          "name": "a refused removal retains the row, explains retry without a live-watch claim, and retries",
+          "status": "passed"
+        },
+        {
+          "name": "reconciles an uncertain removal response with current roots (NETWORK_ERROR)",
+          "status": "passed"
+        },
+        {
+          "name": "reconciles an uncertain removal response with current roots (SERIALIZATION_ERROR)",
+          "status": "passed"
+        },
+        {
+          "name": "reconciles an uncertain removal response with current roots (HANDLER_FAILURE)",
+          "status": "passed"
+        },
+        {
+          "name": "ignores an old removal response after returning and reads the current roots",
+          "status": "passed"
+        },
+        {
+          "name": "names legacy inner folders and ancestor coverage in Remove confirmations",
+          "status": "passed"
+        },
+        {
+          "name": "distinguishes accepted reindex from the recorded completion and failure",
+          "status": "passed"
+        },
+        {
+          "name": "explains an empty reindex scope and offline folders without claiming a full reindex",
+          "status": "passed"
+        },
+        {
+          "name": "R1 browser Add reveals and focuses Folders from folders and Cancel restores focus",
+          "status": "passed"
+        },
+        {
+          "name": "R1 browser Add reveals and focuses Folders from core.browse-surface and Cancel restores focus",
+          "status": "passed"
+        },
+        {
+          "name": "R1 desktop Add reveals and focuses Folders from folders and Cancel restores focus",
+          "status": "passed"
+        },
+        {
+          "name": "R1 desktop Add reveals and focuses Folders from core.browse-surface and Cancel restores focus",
+          "status": "passed"
+        },
+        {
+          "name": "R1 a late picker selects Folders, but a response from before reconnect cannot open a form",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.gapDecision.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.gapDecision.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d45de5aee0b886dac5ccbb509bcfd5c59819042f62813c235c2497efbad3818e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Library recorded migration gap decision offers exact-key cancellation during a rebuild only after destructive confirmation",
+          "status": "passed"
+        },
+        {
+          "name": "Library recorded migration gap decision shows the exact operation gap list and invokes one approved keyed decision",
+          "status": "passed"
+        },
+        {
+          "name": "Library recorded migration gap decision releases an invalidated gap read that finishes before the next migration read",
+          "status": "passed"
+        },
+        {
+          "name": "Library recorded migration gap decision releases an invalidated gap read that finishes during the next migration read",
+          "status": "passed"
+        },
+        {
+          "name": "Library recorded migration gap decision does not retain an operation error that completes after navigation",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:6690e93138ca3a440eaeefc48fc65b3d885f6edb4f9330955a5689408637f2aa"
+}

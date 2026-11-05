@@ -81,6 +81,16 @@ public final class WatchedRootsState {
     if (interrupted) Thread.currentThread().interrupt();
   }
 
+  // Evidence belongs to one registration and one observation, never to a path alone.
+  private record CoverageRevision(long registration, long observation) {}
+  private final Map<Path, CoverageRevision> coverageRevisions = new java.util.HashMap<>();
+  private long coverageRevision;
+
+  private void newRegistration(Path root) {
+    long revision = ++coverageRevision;
+    coverageRevisions.put(root, new CoverageRevision(revision, revision));
+  }
+
   private long retirementRevision;
   private final Map<Path, Long> retiredRoots = new java.util.HashMap<>();
   private final Map<Path, Object> initializations = new java.util.HashMap<>();
@@ -109,11 +119,34 @@ public final class WatchedRootsState {
     private final Path root;
     private final boolean watchedOnly;
     private final long revision;
+    private final CoverageRevision coverage;
+    private final java.util.List<io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding> bindings;
 
     private RootProducerFence(Path root, boolean watchedOnly, long revision) {
       this.root = root;
       this.watchedOnly = watchedOnly;
       this.revision = revision;
+      this.coverage = coverageRevisions.get(root);
+      this.bindings = coverageBindings(root);
+    }
+
+    /** Also checked at result application, after the producer has relinquished its removal hold. */
+    public boolean sameRegistration() {
+      synchronized (WatchedRootsState.this) {
+        var current = coverageRevisions.get(root);
+        return watchedRoots.containsKey(root) && !isRemovalIncomplete(root)
+            && Objects.equals(coverage == null ? null : coverage.registration(),
+                current == null ? null : current.registration())
+            && retiredRoots.entrySet().stream().noneMatch(entry ->
+                entry.getValue() > revision && affectedBy(entry.getKey()));
+      }
+    }
+
+    public boolean currentCoverage() {
+      synchronized (WatchedRootsState.this) {
+        return sameRegistration() && Objects.equals(coverage, coverageRevisions.get(root))
+            && bindings.equals(coverageBindings(root));
+      }
     }
 
     /** Hold removal off until every admission in the synchronous worker body has exited. */
@@ -212,6 +245,7 @@ public final class WatchedRootsState {
     var result = rootsStore.loadPersistedRootsWithErrors();
     for (var entry : result.roots().entrySet()) {
       watchedRoots.put(entry.getKey(), normalizeTimestamp(entry.getValue()));
+      newRegistration(entry.getKey());
     }
     walkErrors.putAll(result.walkErrors());
     walkCompleted.addAll(result.walkCompleted());
@@ -259,6 +293,7 @@ public final class WatchedRootsState {
   synchronized void markNeverIndexed(Path root) {
     var statusBefore = statusContent();
     watchedRoots.put(root, WatchedRootsStore.NEVER_INDEXED);
+    newRegistration(root);
     walkCompleted.remove(root);
       io.justsearch.core.status.StatusChangeCounter.process().changed(statusBefore, statusContent());
   }
@@ -278,6 +313,12 @@ public final class WatchedRootsState {
     var statusBefore = statusContent();
     watchedRoots.put(root, WatchedRootsStore.NEVER_INDEXED);
     walkErrors.put(root, error != null ? error : "unknown");
+    if ("INCOMPLETE_COVERAGE".equals(error)) {
+      var previous = coverageRevisions.get(root);
+      long revision = ++coverageRevision;
+      coverageRevisions.put(root, new CoverageRevision(
+          previous == null ? revision : previous.registration(), revision));
+    }
     walkCompleted.add(root);
       io.justsearch.core.status.StatusChangeCounter.process().changed(statusBefore, statusContent());
   }
@@ -345,6 +386,43 @@ public final class WatchedRootsState {
       }
       persist();
     }
+  }
+
+  private java.util.List<io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding> coverageBindings(Path root) {
+    return snapshotBindings().stream()
+        .filter(binding -> binding.path().startsWith(root) || root.startsWith(binding.path())).toList();
+  }
+
+  /** Complete enumeration repairs only incomplete coverage; other walk errors retain their owners. */
+  synchronized boolean completeCoverage(Path root, RootProducerFence fence, long eligibleFiles) {
+    if (fence == null || !fence.root.equals(root) || !fence.currentCoverage()
+        || !"INCOMPLETE_COVERAGE".equals(walkErrors.get(root))) return false;
+    if (eligibleFiles > 0) markIndexed(root);
+    else markWalkedEmpty(root);
+    return true;
+  }
+
+  /** Frozen request scope must still equal the registration's entire current eligible scope. */
+  public synchronized void recordRecordedWalk(io.justsearch.app.api.operations.RecordedRootPlan.Root scope,
+      RootProducerFence fence, boolean complete, String terminalReasonCode, long eligibleFiles,
+      java.util.List<String> currentExclusions) {
+    Path root = scope.path();
+    if (fence == null || !fence.sameRegistration()) return;
+    if (RootLifecycleOps.isRootUnavailableReason(terminalReasonCode)) {
+      recordRecordedWalk(root, false, terminalReasonCode);
+      return;
+    }
+    if (!complete || terminalReasonCode == null || !terminalReasonCode.isEmpty()
+        || scope.singleFile() || currentExclusions == null
+        || !scope.excludePatterns().equals(currentExclusions) || !fence.currentCoverage()) return;
+    var requested = snapshotBindings().stream().map(binding ->
+        new io.justsearch.app.api.operations.RecordedRootPlan.Root(binding.path(), binding.collection(),
+            scope.force(), false, currentExclusions, java.util.List.of())).toList();
+    var current = io.justsearch.app.api.operations.RecordedRootPlan.partition("coverage", requested);
+    if (!current.roots().contains(scope)) return;
+    boolean changed = completeCoverage(root, fence, eligibleFiles);
+    changed |= markRootReturned(root);
+    if (changed) persist();
   }
 
   synchronized void markInitializationPending(Path root) {
@@ -447,6 +525,7 @@ public final class WatchedRootsState {
     var statusBefore = statusContent();
     retiredRoots.put(root, ++retirementRevision);
     initializations.remove(root);
+    coverageRevisions.remove(root);
     watchedRoots.remove(root);
     walkErrors.remove(root);
     walkCompleted.remove(root);
@@ -466,6 +545,7 @@ public final class WatchedRootsState {
     var statusBefore = statusContent();
     watchedRoots.clear();
     initializations.clear();
+    coverageRevisions.clear();
     walkErrors.clear();
     walkCompleted.clear();
     deleteDetectionUnverified.clear();

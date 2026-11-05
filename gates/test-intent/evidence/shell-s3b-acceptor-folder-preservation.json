@@ -1,0 +1,87 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-05T10:11:48.139Z",
+  "revision": "b1b5ae0f3c400c3ca672fafddd43869412891d41",
+  "tree": "17821aca288087799c1c51efabdf1b0838cfe50d",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/frameStatus.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/gkokugqn/tmp/test-intent-vitest-64-1793873502114.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1586
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#a window that did not remove the folder (or a reload) offers \"Add <folder> again\" from the removal record",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7fd88ce5c33be2394e8d2c83295548a0c0333704fa094b7efde05dfb381d1b63",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L1/ST7 the way back after a folder removal, in every window a window that did not remove the folder (or a reload) offers \"Add <folder> again\" from the removal record",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#the window that removed it shows one row: its own notice, whose action goes once it can no longer run",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7fd88ce5c33be2394e8d2c83295548a0c0333704fa094b7efde05dfb381d1b63",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L1/ST7 the way back after a folder removal, in every window the window that removed it shows one row: its own notice, whose action goes once it can no longer run",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "a42d2cbed2",
+    "revision": "a42d2cbed2cc46990f7872bef8715cd07e26eb80",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/frameStatus.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/gkokugqn/tmp/test-intent-vitest-64-1793873506516.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1052,
+        "output": "JSON report written to /home/elias/.cache/am/gkokugqn/tmp/test-intent-vitest-64-1793873506516.json\n\nEvidence worker limit: --maxWorkers=4\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#a window that did not remove the folder (or a reload) offers \"Add <folder> again\" from the removal record",
+        "classification": "assertion",
+        "detail": "L1/ST7 the way back after a folder removal, in every window a window that did not remove the folder (or a reload) offers \"Add <folder> again\" from the removal record:  AssertionError: expected 'Remove Watched Root' to be 'Removed Notes from your library' // Object.is equality\n    at /home/elias/.cache/am/gkokugqn/tmp/test-intent-before-TuhkMG/modules/ui-web/src/shell-v0/state/frameStatus.test.ts:351:23\n    at file:///home/elias/.cache/am/gkokugqn/tmp/test-intent-b"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/frameStatus.test.ts#the window that removed it shows one row: its own notice, whose action goes once it can no longer run",
+        "classification": "assertion",
+        "detail": "L1/ST7 the way back after a folder removal, in every window the window that removed it shows one row: its own notice, whose action goes once it can no longer run:  AssertionError: expected [ …(2) ] to deeply equal [ 'Removed Notes from your library' ]\n    at /home/elias/.cache/am/gkokugqn/tmp/test-intent-before-TuhkMG/modules/ui-web/src/shell-v0/state/frameStatus.test.ts:374:41\n    at file:///home/elias/.cache/am/gkokugqn/tmp/test-intent-before-TuhkMG/modules/"
+      }
+    ]
+  },
+  "digest": "sha256:5ee048e4482926c6b7cea81b3c01abe59ed69cb1f7e0e3ed5b225e9da01db910"
+}

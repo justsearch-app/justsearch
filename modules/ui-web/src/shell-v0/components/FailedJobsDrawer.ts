@@ -11,6 +11,7 @@
  * Resource). After a retry the list refetches; the folder row's count then drops on its own live tick.
  */
 import { html, css, nothing, type TemplateResult } from 'lit';
+import { repeat } from 'lit/directives/repeat.js';
 import { JfElement } from '../primitives/JfElement.js';
 import './Button.js';
 import './RowActions.js';
@@ -423,15 +424,13 @@ export class FailedJobsDrawer extends JfElement {
 
   private renderBody(): TemplateResult {
     if (this.loading && (!this.inline || !this.rows.length)) return html`<div class="loading">Loading…</div>`;
-    // An inline list keeps its last-known rows when a refresh fails: the error is shown beside them.
-    if (this.error && this.inline && this.rows.length) {
-      return html`<div class="empty" role="status">Couldn't refresh failed files: ${this.error}. Showing the last known list.</div>
-        ${this.rows.map((r) => this.renderRow(r))}`;
-    }
-    if (this.error) return html`<div class="empty">Couldn't load failed files: ${this.error}</div>`;
+    // Keep one keyed row part through both successful and failed refreshes: an open band
+    // and its opener belong to the file, even when another file disappears or changes order.
+    if (this.error && (!this.inline || !this.rows.length)) return html`<div class="empty">Couldn't load failed files: ${this.error}</div>`;
     if (this.rows.length === 0)
       return html`<div class="empty">No failed files in this folder.</div>`;
-    return html`${this.rows.map((r) => this.renderRow(r))}`;
+    return html`${this.error ? html`<div class="empty" role="status">Couldn't refresh failed files: ${this.error}. Showing the last known list.</div>` : nothing}
+      ${repeat(this.rows, row => row.pathHash, row => this.renderRow(row))}`;
   }
 
   private renderRow(r: FailedRow): TemplateResult {

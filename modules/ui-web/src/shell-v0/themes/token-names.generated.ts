@@ -134,6 +134,8 @@ export type TokenName =
   | '--frame-brand-halo'
   | '--frame-control-radius'
   | '--frame-control-size'
+  | '--frame-dialog-dim'
+  | '--frame-dialog-width'
   | '--frame-focus-width'
   | '--frame-hairline'
   | '--frame-menu-width'
@@ -374,6 +376,8 @@ export const TOKEN_NAMES: readonly TokenName[] = [
   '--frame-brand-halo',
   '--frame-control-radius',
   '--frame-control-size',
+  '--frame-dialog-dim',
+  '--frame-dialog-width',
   '--frame-focus-width',
   '--frame-hairline',
   '--frame-menu-width',

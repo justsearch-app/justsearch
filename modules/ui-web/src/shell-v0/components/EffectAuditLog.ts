@@ -23,18 +23,17 @@ import {
   listJournal,
   subscribeJournal,
   undoLastEffectByOriginator,
-  undoAllByOriginator,
+  undoEntries,
+  listJournalByOriginator,
   peekLastUndoableByOriginator,
   previewUndoAllByOriginator,
   getUndoableOperation,
   getCausationChain,
   previewUndoToEntry,
-  undoToEntry,
   exportJournalArchive,
   importJournalArchive,
   getGroupRoot,
   previewUndoGroup,
-  undoGroup,
   type JournalEntry,
   type EffectOriginator,
 } from '../substrates/effects/index.js';
@@ -137,16 +136,29 @@ export class EffectAuditLog extends JfElement {
   }
 
   private confirmUndoTurn(): void {
-    const root = this.groupRootId;
+    const previewed = this.groupPreview;
     this.groupRootId = null;
     this.groupPreview = [];
-    if (root === null) return;
-    const count = undoGroup(root, (effect) => applyEffect(effect));
+    if (!previewed.length) return;
+    // DE6 — exactly the previewed turn members, nothing that joined the turn since.
+    const { reversed, skipped } = undoEntries(previewed, (effect) => applyEffect(effect));
+    this.reportUndone(reversed, skipped.length, ' in this turn');
+  }
+
+  /** The outcome of a confirmed undo preview, including what could no longer be undone. */
+  private reportUndone(reversed: number, skipped: number, scope = ''): void {
     applyEffect({
       kind: 'toast',
-      message: count === 0 ? 'Nothing to undo' : `Reverted ${count} action${count === 1 ? '' : 's'} in this turn`,
-      severity: 'info',
+      message: `${reversed === 0 ? 'Nothing was undone' : `Reverted ${reversed} action${reversed === 1 ? '' : 's'}${scope}`}${skipped
+        ? `; ${skipped} could no longer be undone` : ''}`,
+      severity: skipped ? 'warning' : 'info',
     });
+  }
+
+  /** DE6 — the entries in a preview's scope that will NOT be reversed, said before the person commits. */
+  private irreversibleNote(count: number): TemplateResult | typeof nothing {
+    return count > 0 ? html`<p class="confirm-note" data-testid="undo-irreversible">${count} other
+      action${count === 1 ? '' : 's'} can't be undone and will remain.</p>` : nothing;
   }
 
   // 543-fwd #6 — toggle the bottom-up "why did this happen" causation trace.
@@ -172,16 +184,13 @@ export class EffectAuditLog extends JfElement {
   }
 
   private confirmRestore(): void {
-    const id = this.restoreTargetId;
+    const previewed = this.restorePreview;
     this.restoreTargetId = null;
     this.restorePreview = [];
-    if (id === null) return;
-    const count = undoToEntry(id, (effect) => applyEffect(effect));
-    applyEffect({
-      kind: 'toast',
-      message: count === 0 ? 'Nothing to undo' : `Reverted ${count} action${count === 1 ? '' : 's'}`,
-      severity: 'info',
-    });
+    if (!previewed.length) return;
+    // DE6 — exactly the previewed entries, nothing recorded after the preview was drawn.
+    const { reversed, skipped } = undoEntries(previewed, (effect) => applyEffect(effect));
+    this.reportUndone(reversed, skipped.length);
   }
 
   // §28.W4 — undo the last reversible effect from a given originator.
@@ -219,17 +228,16 @@ export class EffectAuditLog extends JfElement {
 
   // 543-fwd #4 + #8 — commit the confirmed mass-undo + count toast.
   private confirmUndoAll(): void {
+    const previewed = this.undoAllPreview;
     this.undoAllPreview = [];
-    const count = undoAllByOriginator('agent', (effect) => {
-      applyEffect(effect);
-    });
+    if (!previewed.length) return;
+    // DE6 — exactly the previewed AI actions; a repeated click finds the preview gone and does nothing.
+    const { reversed, skipped } = undoEntries(previewed, (effect) => applyEffect(effect));
     applyEffect({
       kind: 'toast',
-      message:
-        count === 0
-          ? 'Nothing to undo'
-          : `Undid ${count} AI action${count === 1 ? '' : 's'}`,
-      severity: 'info',
+      message: `${reversed === 0 ? 'Nothing was undone' : `Undid ${reversed} AI action${reversed === 1 ? '' : 's'}`}${skipped.length
+        ? `; ${skipped.length} could no longer be undone` : ''}`,
+      severity: skipped.length ? 'warning' : 'info',
     });
   }
 
@@ -818,6 +826,8 @@ export class EffectAuditLog extends JfElement {
             (e) => html`<li data-testid="undo-all-row">${present({ kind: 'effect', effect: e.effect }).label}</li>`,
           )}
         </ul>
+        ${this.irreversibleNote(listJournalByOriginator('agent').filter((e) => e.pendingOutcome !== 'rejected'
+          && !this.undoAllPreview.some((p) => p.id === e.id)).length)}
         <div class="confirm-actions">
           <jf-button
             variant="danger"
@@ -851,6 +861,8 @@ export class EffectAuditLog extends JfElement {
             (e) => html`<li data-testid="restore-row">${present({ kind: 'effect', effect: e.effect }).label}</li>`,
           )}
         </ul>
+        ${this.irreversibleNote(this.entries.filter((e) => this.restoreTargetId !== null && e.id > this.restoreTargetId
+          && e.pendingOutcome !== 'rejected' && !this.restorePreview.some((p) => p.id === e.id)).length)}
         <div class="confirm-actions">
           <jf-button
             variant="danger"
@@ -883,6 +895,8 @@ export class EffectAuditLog extends JfElement {
             (e) => html`<li data-testid="undo-turn-row">${present({ kind: 'effect', effect: e.effect }).label}</li>`,
           )}
         </ul>
+        ${this.irreversibleNote(this.entries.filter((e) => this.groupRootId !== null && getGroupRoot(e.id) === this.groupRootId
+          && e.pendingOutcome !== 'rejected' && !this.groupPreview.some((p) => p.id === e.id)).length)}
         <div class="confirm-actions">
           <jf-button variant="danger" size="sm" data-testid="undo-turn-confirm-yes" label="Undo turn" .onActivate=${() => this.confirmUndoTurn()}>Undo turn</jf-button>
           <jf-button size="sm" data-testid="undo-turn-confirm-cancel" label="Cancel" .onActivate=${() => this.cancelUndoTurn()}>Cancel</jf-button>

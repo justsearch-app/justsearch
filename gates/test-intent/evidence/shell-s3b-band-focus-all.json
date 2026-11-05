@@ -1,0 +1,58 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-05T12:48:18.951Z",
+  "revision": "978c06a6aae55f4c7cfef0e791f8a033fb8bf467",
+  "tree": "db86cf63c6e3019f959fd7f5bbc6d8e2e37adc8f",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/LibrarySurface.bandFocus-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/tmp/test-intent-vitest-4014112-1793882889538.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 9410
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.bandFocus-lockdown.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.bandFocus-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b8bcaeb4076c3456d28e21d4e27b42d13acb034843722145ce19dded561a21e6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "folder band keeps its identity, keyboard answer and opener through status updates (themed=false)",
+          "status": "passed"
+        },
+        {
+          "name": "folder band keeps its identity, keyboard answer and opener through status updates (themed=true)",
+          "status": "passed"
+        },
+        {
+          "name": "collection band keeps its identity and answer when another source arrives and restores its opener on every close",
+          "status": "passed"
+        },
+        {
+          "name": "failed-file band stays with its file across refreshes and errors and restores its opener",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:75c7748454419ce914338494f1eed9cca36fc1d788004cd70bff0d7e6a610953"
+}
