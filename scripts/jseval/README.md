@@ -142,7 +142,10 @@ runtime, and every driver component other than `libcuda.so.1` (NVML, for
 example). After an operating-system or driver update, build fresh indexes:
 run `quality prepare` (and the scoring commands after it) with `--cache-root`
 pointing at a new folder under `~/.cache/justsearch-quality/`. Nothing is
-reused from a cache root that holds no entries.
+reused from a cache root that holds no entries. In CPU mode the engine's boot
+still probes the GPU driver for hardware detection (it may load
+`libcuda.so.1`); no model runs on the GPU then, so the driver is not part of a
+CPU-mode key.
 
 Quality engines never use ORT's optimized-graph cache
 (`JUSTSEARCH_ORT_OPTIMIZED_CACHE_MAX_MB=0`, its folder inside the entry's data

@@ -282,3 +282,14 @@ def test_cpu_mode_never_reads_the_driver(models, driver):
     assert components["runtime"].get("JUSTSEARCH_RERANK_GPU_ENABLED") == "false"
     assert components["runtime"].get("JUSTSEARCH_RERANK_CHUNKS_GPU_ENABLED") == "false"
     assert components["gpu"] is None and not driver["calls"]
+
+
+@pytest.mark.parametrize("blank", ["", "   "])
+@pytest.mark.parametrize("name", ["JUSTSEARCH_RERANK_GPU_ENABLED", "JUSTSEARCH_RERANK_CHUNKS_GPU_ENABLED"])
+def test_blank_reranker_gpu_override_follows_the_master(models, driver, monkeypatch, name, blank):
+    # ResolvedConfigBuilder ignores blank values, which would expose the reranker's own
+    # GPU default; the core must treat blank as unset and apply the master switch.
+    monkeypatch.setenv(name, blank)
+    cfg = ix.IndexConfig(models_dir=models)
+    env = cfg.environment()
+    assert env[name] == env["JUSTSEARCH_GPU_ENABLED"] == "false"

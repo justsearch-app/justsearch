@@ -110,8 +110,10 @@ class IndexConfig:
         # GPU selection is the caller's (inherited above), explicit, and part of the index key.
         # ResolvedConfigBuilder:1345,1375 gives reranker/chunk reranker independent GPU
         # defaults; make them follow the master unless the caller explicitly chose otherwise.
+        # A blank value counts as unset: ResolvedConfigBuilder:728 ignores blank values.
         for name in ("JUSTSEARCH_RERANK_GPU_ENABLED", "JUSTSEARCH_RERANK_CHUNKS_GPU_ENABLED"):
-            env.setdefault(name, env.get("JUSTSEARCH_GPU_ENABLED", ""))
+            if not env.get(name, "").strip():
+                env[name] = env.get("JUSTSEARCH_GPU_ENABLED", "")
         env[ORT_CACHE_CAP] = "0"
         env.update({"JUSTSEARCH_SPLADE_ENABLED": "false",
                     "JUSTSEARCH_RAG_CHUNK_SPLADE_ENABLED": "false", "JUSTSEARCH_LLM_ENABLED": "false"})
