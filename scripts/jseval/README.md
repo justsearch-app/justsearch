@@ -64,8 +64,9 @@ python -m jseval quality ablate scifact --mode vector
 ```
 
 Omit the collection arguments to baseline/check to use SciFact, MIRACL de
-and Enron. Each needs its prepared index; run `quality prepare ALIAS`
-for each beforehand. Stored collection directories with `quality.config.json`
+and Enron, plus real-use once none of its query kinds awaits labels (once its
+topical labels are frozen). Each needs its prepared index; run
+`quality prepare ALIAS` for each beforehand. Stored collection directories with `quality.config.json`
 also work, with `--documents-dir` for local source texts. Preparation builds
 through pausable background admission and may wait for the Gradle slot. Scoring
 never builds or repairs an index and refuses missing, corrupt or stale inputs

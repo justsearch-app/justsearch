@@ -86,7 +86,7 @@ def check(c: Collection, cfg: QualityConfig, *, require_scored: bool = True) -> 
     preparation; baseline, check and score keep the default and refuse it."""
     reasons: list[str] = []
     pending = pending_queries(c, cfg)
-    counts = {**c.counts(), "pending": len(pending)}
+    counts = {**c.counts(), "pending": len(pending), "excluded": len(cfg.excluded)}
     for key, want in cfg.expected.items():
         if counts.get(key) != want:
             reasons.append(f"expected {key} {want}, found {counts.get(key)}")
@@ -96,6 +96,13 @@ def check(c: Collection, cfg: QualityConfig, *, require_scored: bool = True) -> 
     if judged_pending:
         reasons.append(f"{len(judged_pending)} queries of a pending kind already have judgments "
                        f"(e.g. {judged_pending[0]}); remove the kind from pending_kinds")
+    unknown = sorted(set(cfg.excluded) - set(c.queries))
+    if unknown:
+        reasons.append(f"{len(unknown)} excluded queries are not in the collection (e.g. {unknown[0]})")
+    # An exclusion records why a query has no relevant judgment; it never hides a scorable one.
+    relevant = sorted(q for q in cfg.excluded if any(g > 0 for g in c.judgments.get(q, {}).values()))
+    if relevant:
+        reasons.append(f"{len(relevant)} excluded queries have a relevant judgment (e.g. {relevant[0]})")
     c = scored_collection(c, cfg)
     if require_scored and not c.queries:
         reasons.append("no scored queries" + (f" ({len(pending)} pending labels)" if pending else ""))

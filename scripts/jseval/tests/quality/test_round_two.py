@@ -76,9 +76,10 @@ def test_quick_and_explicit_full_suite_surfaces(monkeypatch):
     monkeypatch.setattr(run, 'execute', execute)
     cli = CliRunner()
     assert cli.invoke(main, ['quality', 'full-suite']).exit_code == 2
-    result = cli.invoke(main, ['quality', 'full-suite', '--window-seconds', '720'])
+    result = cli.invoke(main, ['quality', 'full-suite', '--window-seconds', '600'])
     assert result.exit_code == 0, result.output
-    assert calls[-1][2]['full_suite'] is True and calls[-1][2]['window_seconds'] == 720
+    assert calls[-1][2]['full_suite'] is True and calls[-1][2]['window_seconds'] == 600
+    assert cli.invoke(main, ['quality', 'full-suite', '--window-seconds', '601']).exit_code == 2
 
 
 def test_estimate_models_startup_overlap_once():

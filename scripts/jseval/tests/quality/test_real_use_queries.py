@@ -714,3 +714,31 @@ def test_gate_records_explain_every_planned_query_the_collection_lacks():
     assert record["ranking"]["pipeline"] == ruq.KEYWORD_PIPELINE
     assert not any(k.split(":")[0] in ruq.KEYWORD_OFF and k.endswith(":executed")
                    for k in record["ranking"]["trace_stages"])
+
+
+# P5c: deferred P5b items.
+RECIPES = Path(ruq.__file__).with_name("recipes")
+
+
+def test_a_refused_generation_run_appends_nothing_to_the_committed_record(monkeypatch, tmp_path):
+    monkeypatch.setattr(ruq, "RECORD", tmp_path / "record")
+    monkeypatch.setattr(ruq, "WORK", tmp_path / "work")
+    monkeypatch.setattr(ruq, "_template", lambda _: "template")
+    monkeypatch.setattr(ruq, "known_item_prompt", lambda *a: "prompt")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "x")
+    q = {"qid": "ki-1", "kind": "known-item", "level": "partial", "target": "t"}
+    with pytest.raises(ruq.SubscriptionRequired):
+        ruq.generate_one(q, {"t": {}}, {"t": "text"}, max_attempts=1)
+    assert not (ruq.RECORD / "generation.jsonl").exists()
+    assert ruq._jsonl(ruq.WORK / "generation.jsonl")[0]["error"]["type"] == "SubscriptionRequired"
+
+
+def test_the_second_build_note_names_its_files_excluded():
+    from jseval.quality import collections
+    record = json.loads((RECIPES / "real-use-queries" / "excluded.json").read_text(encoding="utf-8"))
+    second = record["second_build"]
+    excluded = set(record["ocr_page_cap"]["excluded"])
+    c = collections.load_collection(RECIPES / "real-use")
+    assert all(t["doc"] in excluded and t["doc"] not in c.documents for t in second["truncated"])
+    assert "still in the collection" not in second["note"].lower()
+    assert "excluded" in second["note"].lower()

@@ -200,7 +200,7 @@ def _run_options(command=None, *, full_suite=False):
                      default=Path('scripts/jseval/runs/quality/baselines'), show_default=True),
         click.option('--runs-dir', type=click.Path(file_okay=False, path_type=Path),
                      default=Path('scripts/jseval/runs/quality'), show_default=True),
-        click.option('--window-seconds', type=click.FloatRange(min=45, max=720 if full_suite else 600, min_open=True),
+        click.option('--window-seconds', type=click.FloatRange(min=45, max=600, min_open=True),
                      **({'required': True} if full_suite else {'default': 600}),
                      help='Exclusive window including startup and cleanup; estimate must fit.'),
         click.option('--models-dir', type=click.Path(file_okay=False, path_type=Path)),
