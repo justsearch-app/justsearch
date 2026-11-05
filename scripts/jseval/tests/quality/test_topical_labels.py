@@ -1017,7 +1017,9 @@ def test_every_call_runs_in_one_isolated_home_without_the_users_config_or_mcp_se
     assert home.parent == tl.WORK and home != fake_codex.user_config.parent
     for r in records:
         assert "mcp_servers" not in r["config"] and r["config"]["cli_auth_credentials_store"] == "file"
-        assert json.loads(r["auth"]) == SUBSCRIPTION_AUTH  # the copied ChatGPT login
+        copied = {**SUBSCRIPTION_AUTH, "tokens": {k: v for k, v in SUBSCRIPTION_AUTH["tokens"].items()
+                                                  if k != "refresh_token"}}
+        assert json.loads(r["auth"]) == copied  # the copied ChatGPT login, without refresh token
     assert not home.exists()  # deleted afterwards
     calls = tl.read_checkpoint(tl.WORK / "second" / "calls.jsonl")
     assert all(c["ok"] and c["phase"] == "calibration" and c["model"] == "gpt-6.1-sol" for c in calls)
@@ -1038,22 +1040,23 @@ def test_a_tool_or_mcp_server_left_in_the_effective_set_refuses_before_any_exec(
     assert [p.name for p in tl.WORK.iterdir() if p.name.startswith("codex-")] == []
 
 
-@pytest.mark.parametrize("stored_changed", [False, True])
-def test_a_token_refresh_in_the_home_keeps_the_stored_login_usable(sampled, fake_codex, monkeypatch,
-                                                                   stored_changed):
+def test_the_isolated_home_never_holds_or_writes_back_a_refresh_token(sampled, fake_codex, monkeypatch):
+    # A refresh inside the temporary home could rotate the owner's login; the copy has no refresh
+    # token, and the stored login is never written by the run.
     monkeypatch.setenv("FAKE_CODEX_REFRESH", "1")
-    other = {**SUBSCRIPTION_AUTH, "tokens": {**SUBSCRIPTION_AUTH["tokens"], "refresh_token": "theirs"}}
-    if stored_changed:  # the owner's own codex refreshed meanwhile: theirs stays
-        real_run = subprocess.run
+    before = fake_codex.auth.read_bytes()
+    seen = []
+    real_run = subprocess.run
 
-        def run(command, **kw):
-            if command[:2] == ["codex", "exec"]:
-                fake_codex.auth.write_text(json.dumps(other))
-            return real_run(command, **kw)
-        monkeypatch.setattr(tl.subprocess, "run", run)
-    assert tl.second_judge(max_calls=1)["calls"] == 1
-    stored = json.loads(fake_codex.auth.read_text())
-    assert stored["tokens"]["refresh_token"] == ("theirs" if stored_changed else "rotated")
+    def run(command, **kw):
+        if command[:2] == ["codex", "exec"]:
+            home = Path(kw.get("env", os.environ)["CODEX_HOME"])
+            seen.append(json.loads((home / "auth.json").read_text())["tokens"])
+        return real_run(command, **kw)
+    monkeypatch.setattr(tl.subprocess, "run", run)
+    tl.second_judge(max_calls=1)
+    assert seen and all("refresh_token" not in t for t in seen)
+    assert fake_codex.auth.read_bytes() == before
 
 
 @pytest.mark.parametrize("extra,error", [
