@@ -296,7 +296,6 @@ public final class BackfillScheduler {
     if (!hardStopBackfillWork() && monotonicNanos.getAsLong() < deadline) {
       boolean disambiguated = runDisambiguationIfReady(activity);
       activity |= disambiguated;
-      admitted |= disambiguated;
     }
     OperationalMetrics.getInstance().recordBackfillMode(admitted ? "active" : "idle");
     return activity;

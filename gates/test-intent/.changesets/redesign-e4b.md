@@ -317,6 +317,25 @@ orchestrator's on a committed candidate.
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/FairEnrichmentSchedulerTest.java#D11_notDueBusyCallReportsIdle"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/FairEnrichmentSchedulerTest.java"
+      ],
+      "class": "New",
+      "behaviour": "An idle cycle that reconciles disambiguation without admitting a fair-lane turn reports idle in the backfill-mode gauge, while returning true so the caller still selects active pacing (E3c-a).",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "location": "task redesign-e4b request",
+          "quote": "the gauge reports lane admission only (\"active\" if the call admitted at least one fair-lane turn, else \"idle\"); the activity/pacing result returned to the caller stays as it is (disambiguation still counts as useful work for pacing, per E3c-a)."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/redesign-e4b-d11-disambiguation-repair.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/FairEnrichmentSchedulerTest.java#D11_disambiguationWithoutLaneAdmissionReportsIdle"
+      ],
+      "repaired": true
     }
   ]
 }
@@ -414,6 +433,24 @@ env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot node scripts/governance/gates/t
   --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/FairEnrichmentSchedulerTest.java#D5b_bgeHoldDoesNotBlockIndependentDenseChunk \
   --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/FairEnrichmentSchedulerTest.java#D5b_denseChunkAcquisitionHoldUnderBge \
   --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/FairEnrichmentSchedulerTest.java#D11_notDueBusyCallReportsIdle
+```
+
+The D11 disambiguation-only case is `New` with `repaired: true` under
+`docs/reference/testing/test-intent.md`: it adds an expectation for a repair to the in-flight
+E4b candidate, rather than changing an existing oracle. Its returned-activity assertion preserves
+E3c-a pacing. Run the evidence command below on the final candidate in a disposable shared clone;
+the builder does not write evidence JSON. Use pre-repair HEAD for fail-before, since the defect
+is in E4b. Manual runs in separate shared clones confirmed that the selector fails by assertion
+on `121d48e580721678af99f74a90cffcafb9edeb1d` (expected idle, actual active) and passes on
+main `51bfa7756ce7f6313350eaaaf70d6a5cec4dc8b5`. Both runs passed the preceding assertions
+that reconciliation ran, no fair lane was admitted, and the same cycle returned true.
+
+```bash
+env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot node scripts/governance/gates/test-intent/run-evidence.mjs \
+  --out gates/test-intent/evidence/redesign-e4b-d11-disambiguation-repair.json \
+  --before 121d48e580721678af99f74a90cffcafb9edeb1d \
+  --before-root "$TMPDIR" \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/FairEnrichmentSchedulerTest.java#D11_disambiguationWithoutLaneAdmissionReportsIdle
 ```
 
 Parameterized checks include their method signature in each invocation name, and the stall

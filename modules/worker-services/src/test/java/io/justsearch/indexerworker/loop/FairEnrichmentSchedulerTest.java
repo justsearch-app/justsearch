@@ -15,6 +15,7 @@ import io.justsearch.configuration.FieldCatalogDef.FieldDef;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.indexerworker.bgem3.*;
 import io.justsearch.indexerworker.coordination.WorkerSignalBus;
+import io.justsearch.indexerworker.disambiguation.DisambiguationService;
 import io.justsearch.indexerworker.embed.*;
 import io.justsearch.indexerworker.inference.LocalSessionAcquisition;
 import io.justsearch.indexerworker.loop.ops.*;
@@ -524,6 +525,26 @@ class FairEnrichmentSchedulerTest extends LuceneExecutorTestBase {
   }
 
   // ==================== D11 ====================
+
+  @Test
+  void D11_disambiguationWithoutLaneAdmissionReportsIdle() throws Exception {
+    try (var h = new Harness();
+        var service = spy(new DisambiguationService(directory.resolve("entity-state")))) {
+      h.seed("settled", "body", Map.of(SchemaFields.NER_STATUS, "COMPLETED_EMPTY"));
+      h.refresh();
+      service.open();
+      var field = BackfillScheduler.class.getDeclaredField("disambiguationServiceSupplier");
+      field.setAccessible(true);
+      field.set(h.scheduler, (java.util.function.Supplier<DisambiguationService>) () -> service);
+      var turns = h.observe();
+      assertTrue(h.scheduler.runIdleCycle(),
+          "disambiguation reconciliation still counts as useful work for active pacing");
+      verify(service).acknowledgeReconciliation(anyInt(), anyBoolean());
+      assertTrue(turns.isEmpty(), "none of the fair enrichment lanes was admitted");
+      assertEquals("idle", OperationalMetrics.getInstance().getBackfillMode(),
+          "the gauge reports lane admission even when separate disambiguation work ran");
+    }
+  }
 
   @Test
   void D11_activityGaugeAndPerTurnRecordsDistinguishWindowAdvancementFromCompletion() throws Exception {
