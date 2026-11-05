@@ -53,3 +53,38 @@ def test_per_hit_trace_stays_aligned_after_chunk_collapse(tmp_path):
     assert QueryResult.from_dict(result.to_dict()) == result
 
 
+@pytest.mark.parametrize('failure', [False, True])
+def test_elapsed_measures_only_search_request(tmp_path, monkeypatch, failure):
+    from jseval.quality import index
+    c = make_collection({'en/vague': 1})
+    (tmp_path/'materialized.json').write_text(json.dumps(c.documents))
+    h = index.IndexHandle(c, index.IndexConfig(), 'key', tmp_path, tmp_path,
+                          'cached', {}, {}, None)
+    now = [100.0]
+    monkeypatch.setattr(run.time, 'monotonic', lambda: now[0])
+    def reply(_):
+        now[0] += 2.5
+        if failure:
+            raise httpx.ReadTimeout('request timeout')
+        return httpx.Response(200, json={
+            'results': [{'fields': {'path': c.documents['d002']},
+                         'trace': [{'id': 'sparse-retrieval', 'rank': 1}]}],
+            'searchTrace': {'stages': [{'id': stage, 'status': 'executed'} for stage in
+                ('sparse-retrieval', 'dense-retrieval', 'cross-encoder')]}})
+    reads = []
+    read_text = type(tmp_path).read_text
+    def read_manifest(path, *a, **kw):
+        if path.name == 'materialized.json':
+            reads.append(path)
+            now[0] += 20  # Manifest validation is harness work, not search latency.
+        return read_text(path, *a, **kw)
+    monkeypatch.setattr(type(tmp_path), 'read_text', read_manifest)
+    with httpx.Client(base_url='http://engine', transport=httpx.MockTransport(reply)) as client:
+        result = run.search_query(client, h, 'q000', c.queries['q000'], run.refined_request(), 5)
+    assert bool(result.error) is failure
+    assert result.timings['elapsed_seconds'] == 2.5
+    if not failure:
+        assert reads == [tmp_path/'materialized.json']
+        assert result.ranked == ('d002',) and result.hit_signals[0]['keyword_rank'] == 1
+
+

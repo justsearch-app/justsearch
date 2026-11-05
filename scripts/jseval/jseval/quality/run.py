@@ -71,17 +71,22 @@ def expected_legs(mode: str | None) -> tuple[str, ...]:
 
 def search_query(client: httpx.Client, handle: index.IndexHandle, qid, query,
                  request: dict, timeout: float) -> QueryResult:
-    start = time.monotonic()
     served = Served()
     ranked = ()
     error = None
     signals = ()
+    elapsed = None
     try:
-        resp = client.post('/api/knowledge/search', json={**request, 'query': query.text},
-                           timeout=max(.001, timeout))
+        payload = {**request, 'query': query.text}
+        start = time.monotonic()
+        try:
+            resp = client.post('/api/knowledge/search', json=payload,
+                               timeout=max(.001, timeout))
+        finally:
+            elapsed = time.monotonic() - start
         if resp.status_code == 400 and resp.json().get('errorCode') == compare.SYNTAX_REFUSAL:
             return QueryResult(qid, query.sha256, (), Served((), 'skipped', compare.SYNTAX_REFUSAL),
-                               timings={'elapsed_seconds': time.monotonic()-start, 'http_status': 400})
+                               timings={'elapsed_seconds': elapsed, 'http_status': 400})
         resp.raise_for_status()
         body = resp.json()
         if body.get('error'):
@@ -103,27 +108,25 @@ def search_query(client: httpx.Client, handle: index.IndexHandle, qid, query,
         locations = [(h.get('fields') or {}).get('path') or h.get('id') for h in hits]
         if any(not isinstance(loc, str) or not loc for loc in locations):
             raise ValueError('delivered hit has no full document identity')
-        ranked = tuple(handle.ranked_doc_ids(locations))
-        signals = delivered_signals(handle, hits, locations, ranked)
+        materialized = replace(handle.collection, version='',
+            documents=json.loads((handle.root/'materialized.json').read_text()))
+        delivered = [materialized.doc_id_for_location(loc, handle.documents_dir) for loc in locations]
+        ranked = tuple(dict.fromkeys(delivered))
+        signals = delivered_signals(hits, delivered, ranked)
     except Exception as e:
         # All other HTTP errors, transport failures and malformed traces stay errors.
         error = f'{type(e).__name__}: {e}'
     return QueryResult(qid, query.sha256, ranked, served, error,
-                       {'elapsed_seconds': time.monotonic() - start}, signals)
+                       {'elapsed_seconds': elapsed}, signals)
 
 
-def delivered_signals(handle, hits, locations, ranked):
+def delivered_signals(hits, delivered, ranked):
     """Keep the first delivered chunk's trace, exactly like ranked_doc_ids collapse."""
     empty = dict.fromkeys(('keyword_rank', 'meaning_rank', 'splade_rank', 'fusion_score', 'cross_encoder_score'))
     if not any(hit.get('trace') for hit in hits):
         return tuple(dict(empty) for _ in ranked)
-    # Resolve the salted manifest once. Calling ranked_doc_ids per hit would
-    # reconstruct and validate the whole collection up to 50 times per query.
-    materialized = replace(handle.collection, version='',
-        documents=json.loads((handle.root/'materialized.json').read_text()))
     by_doc = {}
-    for hit, location in zip(hits, locations):
-        doc = materialized.doc_id_for_location(location, handle.documents_dir)
+    for hit, doc in zip(hits, delivered):
         if doc in by_doc:
             continue
         stages = {stage['id']: stage for stage in hit.get('trace') or []}

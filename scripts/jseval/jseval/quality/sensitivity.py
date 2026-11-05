@@ -42,8 +42,10 @@ from .types import canonical_json, sha256_text
 # 438,1032 read it only on an explicit settings operation, which scoring never calls;
 # config/ConfigStoreRebuilder.java:295 imports the saved preference into resolution.
 # Query reranking has no index writer. Encoder switches/threads also drive ingestion:
-# admit ONLY a settled prepared index, never a build, and refuse pending work at adoption.
-# GenerationModelSelection.java:43-46,73-97,111-122,161-162 retains/verifies exact saved
+# admit ONLY a settled prepared index, never a build. KnowledgeServer.java:1965-1966,2012
+# recovers jobs and starts ingestion at boot: require idle with prepared settings and stop
+# that Engine under the data lock before starting an Engine with scoring overrides.
+# GenerationModelSelection.java:43-46,69-84,99-122,125-139 retains/verifies exact saved
 # model files and fingerprints; it has no persistence API. KnowledgeServer.java:1419
 # loads it at boot; EncoderConfigurationProjection.java:148-187 keeps selected files.
 # KnowledgeServer.java:1401,9615 binds model selections only for recorded build/promotion,

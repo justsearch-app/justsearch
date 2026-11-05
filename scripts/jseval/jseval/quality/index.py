@@ -764,6 +764,21 @@ class IndexHandle:
             if self._sensitivity is not None:
                 from .sensitivity import launch_environment
                 launch_env = launch_environment(self.env, self._sensitivity)
+                # Retained attestations do not prove that the job store is idle now.
+                # Recover/check it with prepared settings before any override can
+                # reach startup ingestion. The data lock spans both writer lifetimes.
+                from .sensitivity import SensitivityRefused, require_idle
+                self._backend = _start_serving(self.config, self.data_dir, self.env, port, deadline,
+                    prepared_only=True, startup_admission=False)
+                try:
+                    with httpx.Client(base_url=f"http://127.0.0.1:{port}", timeout=30) as client:
+                        require_idle(_get(client, "/api/status"))
+                except SensitivityRefused as e:
+                    raise IndexRefused(f"not ready: {e}") from e
+                finally:
+                    backend.stop_backend(self._backend.proc, data_dir=self.data_dir)
+                    self._backend = None
+                port = _free_port()
             self._backend = _start_serving(self.config, self.data_dir, launch_env, port, deadline,
                 prepared_only=prepared_only, startup_admission=not prepared_only)
             self.base_url = f"http://127.0.0.1:{port}"
@@ -876,6 +891,10 @@ def prepare_index(collection: Collection, config: IndexConfig, *, prepared_only:
             raise IndexRefused("nonempty data folder has no collection owner")
         entry_path = root / "entry.json"
         adopted = entry_path.exists()
+        # The preflight can race a previous lock holder retiring this entry.
+        # Prepared-only callers must never enter the replacement/build branch.
+        if prepared_only and not adopted:
+            raise IndexRefused("not ready: no complete prepared index; run quality prepare outside the scoring window")
         if adopted:
             _check_owner(_json(entry_path)["owner"], collection, key)
             if not owner_path.exists():

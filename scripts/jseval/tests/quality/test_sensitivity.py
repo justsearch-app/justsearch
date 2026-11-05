@@ -207,8 +207,7 @@ def test_prepared_key_adoption_postscore_and_residue(tmp_path, monkeypatch, over
             assert h.index_key == index.compute_index_key(c, cfg, h.env)[0] == key
     assert confirmations == [key, key]
     assert normal.call_count == 4  # labelled wait and post-score never use the CE canary
-    assert launches[0] == launches[2] == env
-    assert launches[1] == {**env, **overrides}
+    assert launches == [env, env, {**env, **overrides}, env]
     assert all((root/p).read_bytes() == value for p, value in original.items())
     assert (data/'quality-owner.json').read_bytes() == original[Path('data/quality-owner.json')]
     assert not (root/'quarantine').exists()
@@ -255,6 +254,76 @@ def test_every_pending_stage_refuses(field):
     sensitivity.require_idle(status)
     with pytest.raises(sensitivity.SensitivityRefused, match='pending'):
         sensitivity.require_idle({**status, field: 1})
+
+
+@pytest.mark.parametrize('arm', [None, {'JUSTSEARCH_RERANK_ENABLED': 'false'}])
+@pytest.mark.parametrize('remove_data', [False, True])
+def test_prepared_entry_lost_before_lock_never_mutates_or_builds(tmp_path, monkeypatch, arm, remove_data):
+    c = make_collection()
+    cfg = index.IndexConfig(cache_root=tmp_path/'cache')
+    monkeypatch.setattr(index.IndexConfig, 'environment', lambda _: {})
+    monkeypatch.setattr(index, 'compute_index_key', lambda *a: ('key', {}))
+    monkeypatch.setattr(index, '_under_cache', lambda path: path)
+    root = cfg.cache_root/sha256_text(c.name)/'key'
+    data = root/'data'; data.mkdir(parents=True)
+    owner = index._population_owner(c, 'key')
+    index._write(root/'entry.json', {'owner': owner})
+    index._write(data/'quality-owner.json', owner)
+    (data/'retained-index').write_bytes(b'prepared bytes')
+    flock = index.fcntl.flock
+    def acquire(lock, flags):
+        # The entry passed preflight, but another holder retired it before this lock.
+        if Path(lock.name) == root/'data.quality.lock':
+            (root/'entry.json').unlink()
+            if remove_data:
+                index.shutil.rmtree(data)
+        flock(lock, flags)
+    monkeypatch.setattr(index.fcntl, 'flock', acquire)
+    spawn = Mock(side_effect=AssertionError('prepared-only must never start preparation'))
+    monkeypatch.setattr(index.subprocess, 'Popen', spawn)
+    with pytest.raises(index.IndexRefused, match='not ready'):
+        index.prepare_index(c, cfg, prepared_only=True, sensitivity=arm)
+    spawn.assert_not_called()
+    assert not (root/'build.json').exists()
+    assert not (root/'collection').exists()
+    assert data.exists() is (not remove_data)
+    if not remove_data:
+        assert (data/'retained-index').read_bytes() == b'prepared bytes'
+        assert index._json(data/'quality-owner.json') == owner
+
+
+@pytest.mark.parametrize('status', [
+    {'indexState': 'IDLE', 'pendingJobs': 1, 'processingJobsCount': 0,
+     'embeddingPendingCount': 0, 'pendingNerCount': 0},
+    {'indexState': 'IDLE', 'pendingJobs': 0, 'processingJobsCount': 0,
+     'embeddingPendingCount': 1, 'pendingNerCount': 0},
+    {},
+])
+def test_pending_or_unknown_work_refuses_before_override_launch(tmp_path, monkeypatch, status):
+    from .test_redesign import cached_handle
+    h = cached_handle(tmp_path, monkeypatch)
+    h.env['JUSTSEARCH_GPU_ENABLED'] = 'false'
+    h._sensitivity = {'JUSTSEARCH_RERANK_ENABLED': 'false'}
+    launches = []
+    def start(config, data, env, *a, **kw):
+        launches.append(dict(env))
+        assert not h._lock.closed
+        return backend.BackendInfo(Mock(), data)
+    monkeypatch.setattr(index, '_start_serving', start)
+    monkeypatch.setattr(index, '_get', lambda *a: status)
+    monkeypatch.setattr(index, '_confirm_ready', lambda *a, **kw: index_identity.ConfirmResult(True, [], {}))
+    quarantine = Mock(side_effect=AssertionError('sensitivity must never quarantine'))
+    monkeypatch.setattr(index, '_quarantine', quarantine)
+    try:
+        with pytest.raises(index.IndexRefused, match='pending'):
+            h.wait(prepared_only=True, deadline=time.monotonic()+5)
+        assert launches == [h.env]
+        backend.stop_backend.assert_called_once()
+        assert h._lock.closed
+        assert (h.root/'entry.json').exists()
+        quarantine.assert_not_called()
+    finally:
+        h.close()
 
 
 def test_sensitivity_identity_confirmation_keeps_every_non_ce_check(monkeypatch, tmp_path):
