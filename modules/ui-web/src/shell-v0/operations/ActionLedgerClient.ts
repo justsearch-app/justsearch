@@ -60,7 +60,8 @@ export interface BackendLedgerEntry {
   readonly outcome?: string;
   readonly targetSurface?: string;
   readonly sourceId?: string;
-  // Tempdoc 550 Outcome face — present on kind='gate' rows (trust-gate firings).
+  // Tempdoc 550 Outcome face — present on kind='gate' rows (trust-gate firings). L16: also on the
+  // grant ISSUED/CONSUMED and operation rows an Allowed request produced, when the Engine knew it.
   readonly pendingId?: string;
   readonly disposition?: string; // GATED | DENIED | APPROVED | EXPIRED | WITHDRAWN
   readonly gateBehavior?: string;
@@ -136,6 +137,12 @@ export interface UnifiedActionEntry {
    * subject and the grant's source (`APPROVAL`: a one-time permission minted by an Allow; `ALLOW_ALWAYS`).
    */
   readonly grant?: { readonly action: string; readonly subject: string; readonly transport?: string };
+  /**
+   * L16 — on grant and operation rows: the request whose Allow minted this permission or admitted this
+   * run, as the Engine recorded it. Absent on older rows and on paths that cannot know it; such rows
+   * are never joined to a decision.
+   */
+  readonly allowedBy?: string;
   /** L1 — a successful folder removal's folder (path, and collection when recorded): the way back. */
   readonly removedFolder?: { readonly path: string; readonly collection?: string };
   /**
@@ -337,6 +344,7 @@ export function projectBackend(e: BackendLedgerEntry): UnifiedActionEntry {
       ...(e.transport ? { transport: e.transport } : {}) } } : {}),
     ...(e.kind === 'grant' && e.action ? { grant: { action: e.action, subject: e.subject ? opLabel(e.subject) : '',
       ...(e.transport ? { transport: e.transport } : {}) } } : {}),
+    ...((e.kind === 'grant' || e.kind === 'operation') && e.pendingId ? { allowedBy: e.pendingId } : {}),
     ...removedFolderOf(e),
     ...(e.kind === 'operation'
       && ['core.bulk-reindex', 'core.rebuild-index', 'core.activate-installed-models'].includes(e.operationId ?? '')

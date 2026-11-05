@@ -113,6 +113,23 @@ final class ConsentCapsuleServiceTest {
     assertTrue(actions.contains("CONSUMED"), "verify records CONSUMED");
   }
 
+  /** L16 — the permission an Allow mints, and its use, name that request; other capsules name none. */
+  @Test
+  void anAllowsPermissionRowsNameItsRequestAndOtherCapsulesNameNone() {
+    List<ActionEvent> events = new java.util.ArrayList<>();
+    ConsentCapsuleService svc = svc();
+    svc.setGrantEventSink(events::add);
+    String allowed = svc.mint(OP, ARGS, io.justsearch.agent.api.registry.SourceTier.UNTRUSTED, "pa-allowed");
+    assertTrue(svc.verifyAndConsume(allowed, OP, ARGS));
+    String direct = svc.mint(OP, ARGS);
+    assertTrue(svc.verifyAndConsume(direct, OP, ARGS));
+    List<String> rows = events.stream()
+        .map(io.justsearch.app.observability.ledger.ActionLedgerProjection::toWireRow)
+        .map(row -> row.get("action") + " " + row.getOrDefault("pendingId", "none"))
+        .toList();
+    assertEquals(List.of("ISSUED pa-allowed", "CONSUMED pa-allowed", "ISSUED none", "CONSUMED none"), rows);
+  }
+
   @Test
   void deferredConsumptionSpendsBeforePublishingAndPublishesOnceAtConsumptionTime() {
     Instant t0 = Instant.parse("2026-09-20T00:00:00Z");

@@ -4,30 +4,42 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-05T14:27:07.116Z",
-  "revision": "7ed8454d853098e7a1d4ebad081676d335f13440",
-  "tree": "397d89ec35eb8eb96b564865bf5ee0f5e441691b",
+  "createdAt": "2026-11-05T15:51:06.522Z",
+  "revision": "511b14e88d00011217da3396d77ec4bcdbc85069",
+  "tree": "5dd2cfc6d705f8b46ee5bdad76785821e3e6df36",
   "environment": {
     "platform": "linux",
     "arch": "x64",
     "osRelease": "7.0.0-38-generic",
     "node": "v24.22.0",
-    "java": null,
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
     "cargo": null,
     "ci": false
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/AuthorizationArrival.restore.test.ts\" \"src/shell-v0/components/AuthorizationArrival.scope.test.ts\" \"src/shell-v0/components/AuthorizationHost.test.ts\" \"src/shell-v0/operations/OperationClient.test.ts\" \"src/shell-v0/operations/authorizationReject.test.ts\" \"src/shell-v0/operations/pendingAuthorizationBridge.test.ts\" \"src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts\" \"src/shell-v0/state/frameStatus.test.ts\" \"src/shell-v0/views/LibrarySurface.folderActions.test.ts\" \"src/api/statusCompletion.test.ts\" \"src/shell-v0/controllers/AgentSessionController.denyFailure.test.ts\" \"src/shell-v0/state/frameStatus.decisions.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/oi_xj252/tmp/test-intent-vitest-57737-1793888756613.json\"",
-      "cwd": "modules/ui-web",
+      "command": "./gradlew :modules:app-observability:test --tests \"io.justsearch.app.observability.ledger.ApprovalLinkedRowsTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2870
+      "durationMs": 6123
     },
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts\" \"src/shell-v0/chrome/Shell.s3c-lockdown.test.ts\" \"src/shell-v0/views/LibrarySurface.focusKeeper-lockdown.test.ts\" \"src/shell-v0/views/SettingsSurface.focusKeeper-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/oi_xj252/tmp/test-intent-vitest-57737-1793888759483.json\"",
+      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.intent.ConsentCapsuleServiceTest\" --tests \"io.justsearch.app.services.registry.executor.OperationExecutorImplTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 13740
+    },
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/AuthorizationArrival.restore.test.ts\" \"src/shell-v0/components/AuthorizationArrival.scope.test.ts\" \"src/shell-v0/components/AuthorizationHost.test.ts\" \"src/shell-v0/operations/OperationClient.test.ts\" \"src/shell-v0/operations/authorizationReject.test.ts\" \"src/shell-v0/operations/pendingAuthorizationBridge.test.ts\" \"src/shell-v0/operations/pendingAuthorizationWithdrawal.test.ts\" \"src/shell-v0/state/frameStatus.test.ts\" \"src/shell-v0/views/LibrarySurface.folderActions.test.ts\" \"src/api/statusCompletion.test.ts\" \"src/shell-v0/controllers/AgentSessionController.denyFailure.test.ts\" \"src/shell-v0/state/frameStatus.decisions.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/pv87dt4j/tmp/test-intent-vitest-57436-1793893789611.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 67630
+      "durationMs": 3467
+    },
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/AuthorizationHost.activation-lockdown.test.ts\" \"src/shell-v0/chrome/Shell.s3c-lockdown.test.ts\" \"src/shell-v0/views/LibrarySurface.focusKeeper-lockdown.test.ts\" \"src/shell-v0/views/SettingsSurface.focusKeeper-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/pv87dt4j/tmp/test-intent-vitest-57436-1793893793081.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 73434
     }
   ],
   "checks": [
@@ -1217,7 +1229,7 @@
       "id": "modules/ui-web/src/shell-v0/state/frameStatus.decisions.test.ts",
       "file": "modules/ui-web/src/shell-v0/state/frameStatus.decisions.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:b43c4529d3b5fbcd6b89072c5f98c04d4035ab48e37c1891714d30da35123484",
+      "contentDigest": "sha256:fc706a257b0a0a857bdaed270c630bdb4a84d711338948db0f99a53d03688c72",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -1233,6 +1245,18 @@
         {
           "name": "L16 rows that are not this decision's steps stay their own rows",
           "status": "passed"
+        },
+        {
+          "name": "L16 two Allows of one operation 1.5 s apart keep their own outcomes when the first run succeeds and the second fails",
+          "status": "passed"
+        },
+        {
+          "name": "L16 a long first run that fails after a later Allow was used keeps its failure on its own decision",
+          "status": "passed"
+        },
+        {
+          "name": "L16 rows without a request id are never joined to a decision; each keeps its own words",
+          "status": "passed"
         }
       ]
     },
@@ -1240,7 +1264,7 @@
       "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.focusKeeper-lockdown.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.focusKeeper-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6044ae89268244691353876bf61310781ed92ddcb8cf1b3bf2f3aa743d47b7e2",
+      "contentDigest": "sha256:53f930596e52b8ad7ad147795045e6e2f1a05e930875cce3870aa9c850aa4b6f",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -1280,6 +1304,26 @@
         {
           "name": "L21 a failed-files refresh keeps an open band for a file still listed, with focus; a file that leaves hands focus on",
           "status": "passed"
+        },
+        {
+          "name": "L21 focus on folder a's \"Remove from library\" stays there through all 24 orders of four rows",
+          "status": "passed"
+        },
+        {
+          "name": "L21 focus on folder b's \"Remove from library\" stays there through all 24 orders of four rows",
+          "status": "passed"
+        },
+        {
+          "name": "L21 focus on folder c's \"Remove from library\" stays there through all 24 orders of four rows",
+          "status": "passed"
+        },
+        {
+          "name": "L21 focus on folder d's \"Remove from library\" stays there through all 24 orders of four rows",
+          "status": "passed"
+        },
+        {
+          "name": "L21 when a focused row leaves, focus moves to the next row's same control, else to \"Add folder\"",
+          "status": "passed"
         }
       ]
     },
@@ -1297,8 +1341,529 @@
           "status": "passed"
         }
       ]
+    },
+    {
+      "id": "modules/app-observability/src/test/java/io/justsearch/app/observability/ledger/ApprovalLinkedRowsTest.java",
+      "file": "modules/app-observability/src/test/java/io/justsearch/app/observability/ledger/ApprovalLinkedRowsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:114a2ae6e82c7bfd838b8df383f9c65b730c83915ce126c52c26c37b3509e9e6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "eachRunsCompletionRowNamesTheRequestThatAllowedIt(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "grantAndOperationRowsKeepTheirRequestIdentityAcrossTheJournalAndLegacyRowsHaveNone()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/intent/ConsentCapsuleServiceTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/intent/ConsentCapsuleServiceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a98cf439fe7803a7deb5b15f409828691f10ee0764ecebe4a487d8a138a2c419",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "deferredConsumptionRefusesNullAndMalformedInputsAndUnsupportedAuthoritiesFailClosed()",
+          "status": "passed"
+        },
+        {
+          "name": "capsuleIsBoundToOperationId()",
+          "status": "passed"
+        },
+        {
+          "name": "deferredConsumptionAllowsOnlyOneConcurrentSpend()",
+          "status": "passed"
+        },
+        {
+          "name": "capsuleFromAnotherSessionKeyIsRejected()",
+          "status": "passed"
+        },
+        {
+          "name": "expiredCapsuleIsRejected()",
+          "status": "passed"
+        },
+        {
+          "name": "grantLifecycleIssuedAndConsumedAreRecorded()",
+          "status": "passed"
+        },
+        {
+          "name": "capsuleIsSingleUse()",
+          "status": "passed"
+        },
+        {
+          "name": "revokeNonUserLeavesUserGrantsIntactButRevokesUntrusted()",
+          "status": "passed"
+        },
+        {
+          "name": "revokeNonUserFailsClosedAndIsRecorded()",
+          "status": "passed"
+        },
+        {
+          "name": "capsuleIsBoundToArguments()",
+          "status": "passed"
+        },
+        {
+          "name": "mintEvictsExpiredGrants()",
+          "status": "passed"
+        },
+        {
+          "name": "tamperedSignatureIsRejected()",
+          "status": "passed"
+        },
+        {
+          "name": "argsBindingIsKeyOrderIndependent()",
+          "status": "passed"
+        },
+        {
+          "name": "anAllowsPermissionRowsNameItsRequestAndOtherCapsulesNameNone()",
+          "status": "passed"
+        },
+        {
+          "name": "deferredConsumptionSpendsBeforePublishingAndPublishesOnceAtConsumptionTime()",
+          "status": "passed"
+        },
+        {
+          "name": "distinctMintsAreDistinctTokens()",
+          "status": "passed"
+        },
+        {
+          "name": "malformedTokensAreRejectedNotThrown()",
+          "status": "passed"
+        },
+        {
+          "name": "preparedAndPublicDeferredConsentRemainSeparateBindings()",
+          "status": "passed"
+        },
+        {
+          "name": "validCapsuleVerifiesForBoundActionAndArgs()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/registry/executor/OperationExecutorImplTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/registry/executor/OperationExecutorImplTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:32b3eaf54cb583becf0d0327ada6e82436bf81ae1fce007ab922d47280603faa",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "schemaValidationFailureEmitsFailureHistoryEntry()",
+          "status": "passed"
+        },
+        {
+          "name": "capabilityUnavailableReturnsFailureWithoutInvokingHandler()",
+          "status": "passed"
+        },
+        {
+          "name": "keyedUndoReturnsItsReceiptAndRejectsAnotherTarget()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] false",
+          "status": "passed"
+        },
+        {
+          "name": "[2] true",
+          "status": "passed"
+        },
+        {
+          "name": "durablePerOperationGrantDoesNotSatisfyHighRiskGate()",
+          "status": "passed"
+        },
+        {
+          "name": "keyedReceiptStillRefusesHardStopAndInvalidProvenance()",
+          "status": "passed"
+        },
+        {
+          "name": "trustedPluginCannotSpoofUserFacingButtonTransport()",
+          "status": "passed"
+        },
+        {
+          "name": "durableFamilyGrantSatisfiesMediumButNeverHigh()",
+          "status": "passed"
+        },
+        {
+          "name": "schemaValidationSkippedForEmptySchema()",
+          "status": "passed"
+        },
+        {
+          "name": "acceptedReconfigureRefreshIsBoundToThePersistedMetadataPreparation()",
+          "status": "passed"
+        },
+        {
+          "name": "thrownDispatchStillCarriesProvenanceOnFailureEntry()",
+          "status": "passed"
+        },
+        {
+          "name": "asynchronousTerminalWriteFailureEmitsFailureHistoryAndHealth()",
+          "status": "passed"
+        },
+        {
+          "name": "capabilityAvailableAllowsDispatch()",
+          "status": "passed"
+        },
+        {
+          "name": "unauditedAsyncFailureStillEmitsFailureAdvisory()",
+          "status": "passed"
+        },
+        {
+          "name": "gateFireEmitsGatedOutcomeAndStillThrows()",
+          "status": "passed"
+        },
+        {
+          "name": "threeArgDispatchThreadsProvenanceOntoHistoryEntry()",
+          "status": "passed"
+        },
+        {
+          "name": "untrustedNonCapsuleTokenIsRejected()",
+          "status": "passed"
+        },
+        {
+          "name": "trustedHighNonCapsuleTokenIsRejected()",
+          "status": "passed"
+        },
+        {
+          "name": "coreTierDispatchAcceptsUserFacingTransports()",
+          "status": "passed"
+        },
+        {
+          "name": "noneAuditSuppressesHistoryEntry()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] false",
+          "status": "passed"
+        },
+        {
+          "name": "[2] true",
+          "status": "passed"
+        },
+        {
+          "name": "legacyTwoArgDispatchDefaultsToSystemInternalProvenance()",
+          "status": "passed"
+        },
+        {
+          "name": "schemaValidationPassesValidArgsThrough()",
+          "status": "passed"
+        },
+        {
+          "name": "trustedPluginProvenanceDispatchesToHandlerSameAsCore()",
+          "status": "passed"
+        },
+        {
+          "name": "trustedPluginMayDispatchWithPluginEmittedTransport()",
+          "status": "passed"
+        },
+        {
+          "name": "noAdvisoryEmittedWhenPolicyDoesNotDeclareAdvisoryClass()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] changed-arguments",
+          "status": "passed"
+        },
+        {
+          "name": "[2] malformed-payload",
+          "status": "passed"
+        },
+        {
+          "name": "[3] null-preparation",
+          "status": "passed"
+        },
+        {
+          "name": "[4] content-payload",
+          "status": "passed"
+        },
+        {
+          "name": "undoBlockedWhenCapabilityUnavailable()",
+          "status": "passed"
+        },
+        {
+          "name": "undoOfAGatedOperationIsRefusedExactlyAsItsForwardFormIs()",
+          "status": "passed"
+        },
+        {
+          "name": "noneAuditSuppressesHistoryOnThrownDispatch()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] REINDEX",
+          "status": "passed"
+        },
+        {
+          "name": "[2] INGEST",
+          "status": "passed"
+        },
+        {
+          "name": "[1] auto",
+          "status": "passed"
+        },
+        {
+          "name": "[2] capsule",
+          "status": "passed"
+        },
+        {
+          "name": "[3] operation",
+          "status": "passed"
+        },
+        {
+          "name": "[4] family",
+          "status": "passed"
+        },
+        {
+          "name": "trustedHighValidCapsuleSatisfiesGate()",
+          "status": "passed"
+        },
+        {
+          "name": "failedAcceptanceCannotReachDispatchHandler()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] false",
+          "status": "passed"
+        },
+        {
+          "name": "[2] true",
+          "status": "passed"
+        },
+        {
+          "name": "anEngagedHardStopDeniesTheReversalToo()",
+          "status": "passed"
+        },
+        {
+          "name": "historyEmitterFailureDoesNotBreakDispatch()",
+          "status": "passed"
+        },
+        {
+          "name": "advisoryEmittedWhenPolicyDeclaresAdvisoryClass()",
+          "status": "passed"
+        },
+        {
+          "name": "noneAuditSuppressesHistoryButStillFiresAdvisory()",
+          "status": "passed"
+        },
+        {
+          "name": "untrustedPluginThrowsUnsupportedOperation()",
+          "status": "passed"
+        },
+        {
+          "name": "schemaValidationRejectsWrongType()",
+          "status": "passed"
+        },
+        {
+          "name": "schemaValidationRejectsMissingRequiredArg()",
+          "status": "passed"
+        },
+        {
+          "name": "undoArgumentsAreEscapedJson()",
+          "status": "passed"
+        },
+        {
+          "name": "aForwardCapsuleDoesNotAuthorizeTheReversal()",
+          "status": "passed"
+        },
+        {
+          "name": "durableGrantCoversInRootIngestButNotOutOfRoot(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "ungatedWiringCannotPersistAForgedServerBasis()",
+          "status": "passed"
+        },
+        {
+          "name": "anAutoGateLeavesUndoUnchanged()",
+          "status": "passed"
+        },
+        {
+          "name": "unactivatedReplayPlanCannotEnterTheCurrentRowIdentity()",
+          "status": "passed"
+        },
+        {
+          "name": "recordedAsyncDispatchPublishesOnlyAfterActualDurableCompletion()",
+          "status": "passed"
+        },
+        {
+          "name": "aDurableGrantDoesNotSilentlyAuthorizeTheReversalOfAGovernedOperation(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "undoFailsFastWhenPolicyDoesNotSupportIt()",
+          "status": "passed"
+        },
+        {
+          "name": "trustedPluginCannotSpoofUrlBarOrLlmEmission()",
+          "status": "passed"
+        },
+        {
+          "name": "aPermittedUndoStillRuns()",
+          "status": "passed"
+        },
+        {
+          "name": "noneAuditSuppressesHistoryOnValidationFailure()",
+          "status": "passed"
+        },
+        {
+          "name": "undoUnsupportedStillFailsFastAheadOfTheGate()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] CONTEXT_LIMIT",
+          "status": "passed"
+        },
+        {
+          "name": "[2] ENGINE_LIMIT",
+          "status": "passed"
+        },
+        {
+          "name": "[3] INFERENCE_BUSY",
+          "status": "passed"
+        },
+        {
+          "name": "[4] FROZEN",
+          "status": "passed"
+        },
+        {
+          "name": "[5] WORK_FINISHED",
+          "status": "passed"
+        },
+        {
+          "name": "advisoryEmittedOnFailureOutcomeWhenAdvisoryClassDeclared()",
+          "status": "passed"
+        },
+        {
+          "name": "gateIdentityExistsBeforePublicationAndSurvivesTheConfirmation()",
+          "status": "passed"
+        },
+        {
+          "name": "undoReceivesItsOwnAcceptedIdentity()",
+          "status": "passed"
+        },
+        {
+          "name": "noCapabilityResolverSkipsCheck()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] false",
+          "status": "passed"
+        },
+        {
+          "name": "[2] true",
+          "status": "passed"
+        },
+        {
+          "name": "successfulDispatchEmitsHistoryEntryWithSuccessOutcome()",
+          "status": "passed"
+        },
+        {
+          "name": "emptyCapabilitySetAlwaysPasses()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] NONE",
+          "status": "passed"
+        },
+        {
+          "name": "[2] STANDARD",
+          "status": "passed"
+        },
+        {
+          "name": "[3] UNDOABLE",
+          "status": "passed"
+        },
+        {
+          "name": "[4] UNDO",
+          "status": "passed"
+        },
+        {
+          "name": "[1] []",
+          "status": "passed"
+        },
+        {
+          "name": "[2] not-json",
+          "status": "passed"
+        },
+        {
+          "name": "capsuleApprovalEmitsApprovedOutcome()",
+          "status": "passed"
+        },
+        {
+          "name": "untrustedMediumWithoutTokenIsGated()",
+          "status": "passed"
+        },
+        {
+          "name": "mediumRiskUnauditedMutationStillAcceptsBeforeEffect()",
+          "status": "passed"
+        },
+        {
+          "name": "synchronousCompletionWriteFailureCannotReturnSuccess()",
+          "status": "passed"
+        },
+        {
+          "name": "keyedReceiptCannotBypassTheUntrustedPluginBoundary()",
+          "status": "passed"
+        },
+        {
+          "name": "durableGrantFailsClosedWhenRootsAreUnavailable(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "globalHardStop_deniesUntrusted_leavesUserActionsAlone()",
+          "status": "passed"
+        },
+        {
+          "name": "anAllowedRunsCompletionRowNamesTheRequestThatAllowedIt()",
+          "status": "passed"
+        },
+        {
+          "name": "metadataOnlyAuditEmitsHistoryEntry()",
+          "status": "passed"
+        },
+        {
+          "name": "gateStillFailsClosedWhenOutcomeEmitterThrows()",
+          "status": "passed"
+        },
+        {
+          "name": "keyedReceiptDoesNotConsumeApprovalAgainButFreshMutationStillRequiresIt()",
+          "status": "passed"
+        },
+        {
+          "name": "coreProvenanceDispatchesToHandler()",
+          "status": "passed"
+        },
+        {
+          "name": "validCapsuleSatisfiesTheGate()",
+          "status": "passed"
+        },
+        {
+          "name": "unmappedAdvisoryClassDoesNotBreakDispatch()",
+          "status": "passed"
+        },
+        {
+          "name": "thrownDispatchStillEmitsFailureHistoryEntry()",
+          "status": "passed"
+        },
+        {
+          "name": "failedDispatchEmitsHistoryEntryWithFailureOutcome()",
+          "status": "passed"
+        },
+        {
+          "name": "undoDelegatesToHandlerWhenPolicySupportsIt()",
+          "status": "passed"
+        }
+      ]
     }
   ],
   "failBefore": null,
-  "digest": "sha256:cbbf5265103beaaf505029fd996d458948d229640ed3f4c613818c3cab4ac2ed"
+  "digest": "sha256:bcac8ac56f6ab673fa914201750d318ab5e88327157c0de36f2eb9aac35ab803"
 }

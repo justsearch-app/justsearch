@@ -460,7 +460,7 @@ export class FailedJobsDrawer extends JfElement {
     // reads the failed-jobs Resource's itemOperations and dispatches the user-invocable Operation with
     // {pathHash: rowKey} — no hand-rolled button or direct OperationClient call.
     return html`
-      <div class="row" data-state=${r.state || 'FAILED'}>
+      <div class="row" data-focus-row=${r.pathHash} data-state=${r.state || 'FAILED'}>
         <div class="row-info">
           <div class="row-path" title=${display}>${display}</div>
           ${exhausted

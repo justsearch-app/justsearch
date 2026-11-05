@@ -45,7 +45,7 @@ beforeAll(async () => {
           import { __seedForTest as seedOperations } from '/src/api/registry/OperationCatalogClient.ts';
           import { __seedForTest as seedResources } from '/src/api/registry/ResourceCatalogClient.ts';
           const settle = async () => { for (let i = 0; i < 4; i++) await new Promise(requestAnimationFrame); };
-          const names = { a: '/home/sam/Notes', b: '/home/sam/Docs', c: '/home/sam/Music' };
+          const names = { a: '/home/sam/Notes', b: '/home/sam/Docs', c: '/home/sam/Music', d: '/home/sam/Photos' };
           let library, drawer, rows = ['a', 'b', 'c'], failed = [];
           __feedForTest({ status: { worker: { core: { indexState: 'IDLE', indexedDocuments: 12, indexHealthy: true },
             migration: { migrationState: 'IDLE' } }, readiness: { composites: { retrieval: { state: 'READY', reasonCodes: [] } } } } });
@@ -245,4 +245,52 @@ it('L21 a failed-files refresh keeps an open band for a file still listed, with 
   await page.evaluate(() => window.refreshFailedDrawer(['first', 'last']));
   await expect.poll(() => band.count()).toBe(0);
   await expect.poll(() => focusNow(page)).toMatchObject({ page: false, row: 'file:last' });
+}, 30_000);
+
+/** Every order of `items`, in lexicographic order of their positions. */
+function orders<T>(items: readonly T[]): T[][] {
+  if (items.length <= 1) return [[...items]];
+  return items.flatMap((item, i) => orders([...items.slice(0, i), ...items.slice(i + 1)]).map(rest => [item, ...rest]));
+}
+/** Four expanded folder rows a, b, c, d. */
+async function openFour(): Promise<Page> {
+  const page = await open();
+  await page.evaluate(() => window.setRoots(['a', 'b', 'c', 'd']));
+  const toggle = page.locator('.folder-toggle[aria-controls="folder-details-d"]');
+  if (await toggle.getAttribute('aria-expanded') === 'false') { await toggle.focus(); await page.keyboard.press('Enter'); }
+  await expect.poll(() => toggle.getAttribute('aria-expanded')).toBe('true');
+  return page;
+}
+
+it.each(['a', 'b', 'c', 'd'])('L21 focus on folder %s\'s "Remove from library" stays there through all 24 orders of four rows', async row => {
+  const page = await openFour();
+  await focusControl(page, 'Remove from library', `folder-details-${row}`);
+  const lost: string[] = [];
+  // The reported sequence first, then every order of the four rows.
+  for (const order of [['b', 'c', 'd', 'a'], ['b', 'd', 'a', 'c'], ['b', 'd', 'c', 'a'], ...orders(['a', 'b', 'c', 'd'])]) {
+    await page.evaluate(order => window.setRoots(order), order);
+    const expected = { page: false, control: 'Remove from library', row: `folder-details-${row}` };
+    // Focus is put right after the render settles; a wrong or lost focus stays wrong.
+    for (let i = 0; i < 10 && JSON.stringify(await focusNow(page)) !== JSON.stringify(expected); i++) {
+      await page.evaluate(() => new Promise(requestAnimationFrame));
+    }
+    const now = await focusNow(page);
+    if (JSON.stringify(now) !== JSON.stringify(expected)) {
+      lost.push(`${order.join(',')}: ${JSON.stringify(now)}`);
+      await focusControl(page, 'Remove from library', `folder-details-${row}`);
+    }
+  }
+  expect(lost, `focus left ${row}'s control after these orders`).toEqual([]);
+}, 60_000);
+
+it('L21 when a focused row leaves, focus moves to the next row\'s same control, else to "Add folder"', async () => {
+  const page = await openFour();
+  await focusControl(page, 'Remove from library', 'folder-details-b');
+  // Another update removes b: the next row's same control takes focus.
+  await page.evaluate(() => window.setRoots(['a', 'c', 'd']));
+  await expect.poll(() => focusNow(page)).toEqual({ page: false, control: 'Remove from library', row: 'folder-details-c' });
+  // The last row leaves: there is no next row, so "Add folder" takes it.
+  await focusControl(page, 'Remove from library', 'folder-details-d');
+  await page.evaluate(() => window.setRoots(['a', 'c']));
+  await expect.poll(() => focusNow(page)).toEqual({ page: false, control: 'Add folder', row: null });
 }, 30_000);

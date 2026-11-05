@@ -287,38 +287,32 @@ const OUTCOME_STATE: Readonly<Record<string, readonly [string, NonNullable<Statu
 /**
  * L16 — one Earlier row per decision. An Allow mints a one-time permission (ISSUED), the run uses it
  * (CONSUMED) and the operation then ends: those rows are the decision's latest state ("Allowed ·
- * completed"), never rows of their own. The ledger does not link them by id, so a row joins the latest
- * Allow of the same operation that came before it (2 s of clock slack) and lacks that step; the
- * operation's outcome joins only after its permission was used. Every row stays listed in Activity.
+ * completed"), never rows of their own. A row joins a decision only by the request id the Engine wrote
+ * on it (`allowedBy`); rows without one (older rows, paths that cannot know it) are never joined and
+ * keep their own words, and the decision shows just "Allowed". Every row stays listed in Activity.
  */
 function foldDecisions(activity: readonly UnifiedActionEntry[]): { folded: Set<string>; state: Map<string, { detail: string; tone?: NonNullable<StatusFact['tone']> }> } {
-  const decisions: { id: string; operation: string; at: number; issued: boolean; used: boolean; outcome?: string }[] = [];
+  const decisions = new Map<string, { id: string; used: boolean; outcome?: string }>();
   for (const entry of activity) {
     if (entry.gate?.pendingId && entry.gate.disposition === 'APPROVED') {
-      decisions.push({ id: entry.id, operation: entry.gate.operation, at: Date.parse(entry.occurredAt), issued: false, used: false });
+      decisions.set(entry.gate.pendingId, { id: entry.id, used: false });
     }
   }
   const folded = new Set<string>();
-  const latest = (operation: string, at: number, open: (d: typeof decisions[number]) => boolean) =>
-    decisions.filter(d => d.operation === operation && d.at - 2_000 <= at && open(d)).sort((a, b) => b.at - a.at)[0];
   for (const entry of [...activity].sort((a, b) => a.occurredAt.localeCompare(b.occurredAt))) {
-    const at = Date.parse(entry.occurredAt);
+    const decision = entry.allowedBy ? decisions.get(entry.allowedBy) : undefined;
+    if (!decision) continue;
     const grant = entry.grant;
-    if (grant && grant.transport !== 'ALLOW_ALWAYS' && ['ISSUED', 'CONSUMED'].includes(grant.action.toUpperCase())) {
-      const issued = grant.action.toUpperCase() === 'ISSUED';
-      const decision = latest(grant.subject, at, d => issued ? !d.issued : !d.used);
-      if (!decision) continue;
-      if (issued) decision.issued = true; else decision.used = true;
+    if (grant && ['ISSUED', 'CONSUMED'].includes(grant.action.toUpperCase())) {
+      if (grant.action.toUpperCase() === 'CONSUMED') decision.used = true;
       folded.add(entry.id);
     } else if (entry.kind === 'operation' && entry.outcome && OUTCOME_STATE[entry.outcome] && !entry.isRoutine && !entry.operationOutcomeKey) {
-      const decision = latest(entry.label, at, d => d.used && (!d.outcome || d.outcome === 'STARTED'));
-      if (!decision) continue;
       decision.outcome = entry.outcome;
       folded.add(entry.id);
     }
   }
   const state = new Map<string, { detail: string; tone?: NonNullable<StatusFact['tone']> }>();
-  for (const d of decisions) {
+  for (const d of decisions.values()) {
     const outcome = d.outcome ? OUTCOME_STATE[d.outcome] : d.used ? OUTCOME_STATE.STARTED : undefined;
     if (outcome) state.set(d.id, { detail: `Allowed · ${outcome[0]}`, ...(d.outcome ? { tone: outcome[1] } : {}) });
   }

@@ -2144,7 +2144,7 @@ export class LibrarySurface extends JfElement {
   private renderOtherSourceCard(source: OtherSource): TemplateResult {
     const noun = source.docCount === 1 ? 'document' : 'documents';
     return html`
-      <div class="other-source-card">
+      <div class="other-source-card" data-focus-row=${`source:${source.collection}`}>
         <span class="card-icon">${icon({ name: 'hard-drive', size: 24 })}</span>
         <div class="card-info">
           <div class="card-path">
@@ -2222,7 +2222,7 @@ export class LibrarySurface extends JfElement {
   private renderAttention(): TemplateResult {
     return html`<div class="attention">
       ${repeat(this.attentionItems().filter(item => item.key !== 'rebuild' && !item.key.startsWith('forget:')), item => item.key, item => html`
-        <section class="attention-item" aria-label=${item.title}>
+        <section class="attention-item" data-focus-row=${`attention:${item.key}`} aria-label=${item.title}>
           <div class="attention-title"><span>${icon({ name: 'alert-triangle', size: 16 })}</span>${item.title}</div>
           ${item.detail ? html`<p role=${item.key === 'bulk' ? 'alert' : nothing}>${item.detail}</p>` : nothing}
           <div class="attention-actions">${item.actions ?? nothing}</div>

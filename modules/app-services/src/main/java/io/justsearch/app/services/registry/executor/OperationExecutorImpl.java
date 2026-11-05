@@ -128,6 +128,15 @@ public final class OperationExecutorImpl implements OperationDispatcher {
     }
   }
 
+  // L16: optional sink told which pending request's Allow admitted an invocation (operation key,
+  // pending id), so the invocation's completion row can name its decision. Null in legacy/test wiring.
+  private volatile java.util.function.BiConsumer<String, String> approvalLinkSink;
+
+  /** L16: wire the sink that links an invocation's operation key to the request that allowed it. */
+  public void setApprovalLinkSink(java.util.function.BiConsumer<String, String> sink) {
+    this.approvalLinkSink = sink;
+  }
+
   /** The shared intent-gate computation (tempdoc 550 thesis III); null when the lattice is absent. */
   public IntentGateEvaluator intentGateEvaluator() {
     return intentGateEvaluator;
@@ -962,6 +971,7 @@ public final class OperationExecutorImpl implements OperationDispatcher {
             : preparationNonce == null ? capsuleService.consumeDeferred(token, op.id().value(), argumentsJson)
                 : capsuleService.consumePreparedDeferred(token, op.id().value(), argumentsJson, operationKey, preparationNonce);
         if (consumed.isPresent()) {
+          linkApproval(operationKey, consumed.orElseThrow().pendingId());
           publications.add(consumed.orElseThrow()::publish);
           // Pending approval already published its keyed decision; direct capsules still need one.
           if (consumed.orElseThrow().pendingId() == null) {
@@ -987,6 +997,18 @@ public final class OperationExecutorImpl implements OperationDispatcher {
       }
     }
     throw new IllegalStateException("Unhandled trust gate");
+  }
+
+  /** L16: best-effort, like every audit emit here; never alters the gate's decision. */
+  private void linkApproval(String operationKey, String pendingId) {
+    var sink = this.approvalLinkSink;
+    if (sink == null || operationKey == null || pendingId == null) return;
+    try {
+      sink.accept(operationKey, pendingId);
+    } catch (RuntimeException e) {
+      LOG.warn("Approval link emit failed for operationKey={} ({}); the outcome row will not name its request",
+          operationKey, e.toString());
+    }
   }
 
   private static boolean continuationPreparation(Operation operation,

@@ -1,0 +1,28 @@
+diff --git a/modules/app-observability/src/main/java/io/justsearch/app/observability/ledger/ActionLedgerChangeRegistry.java b/modules/app-observability/src/main/java/io/justsearch/app/observability/ledger/ActionLedgerChangeRegistry.java
+index 3cfe6f84e4..1ca20307ac 100644
+--- a/modules/app-observability/src/main/java/io/justsearch/app/observability/ledger/ActionLedgerChangeRegistry.java
++++ b/modules/app-observability/src/main/java/io/justsearch/app/observability/ledger/ActionLedgerChangeRegistry.java
+@@ -77,6 +77,9 @@ public final class ActionLedgerChangeRegistry {
+     return channel.subscribe(listener);
+   }
+ 
++  /** Compatibility scaffolding for the L16 checks: accepts the link and records nothing. */
++  public void linkApproval(String operationKey, String pendingId) {}
++
+   /** Relay a completed operation as a unified UPDATE row. */
+   public void broadcastOperation(OperationHistoryEntry entry) {
+     Objects.requireNonNull(entry, "entry");
+diff --git a/modules/app-services/src/main/java/io/justsearch/app/services/registry/executor/OperationExecutorImpl.java b/modules/app-services/src/main/java/io/justsearch/app/services/registry/executor/OperationExecutorImpl.java
+index 1a389b3e54..2f5edd6ed1 100644
+--- a/modules/app-services/src/main/java/io/justsearch/app/services/registry/executor/OperationExecutorImpl.java
++++ b/modules/app-services/src/main/java/io/justsearch/app/services/registry/executor/OperationExecutorImpl.java
+@@ -128,6 +128,9 @@ public final class OperationExecutorImpl implements OperationDispatcher {
+     }
+   }
+ 
++  /** Compatibility scaffolding for the L16 checks: accepts the sink and never calls it. */
++  public void setApprovalLinkSink(java.util.function.BiConsumer<String, String> sink) {}
++
+   /** The shared intent-gate computation (tempdoc 550 thesis III); null when the lattice is absent. */
+   public IntentGateEvaluator intentGateEvaluator() {
+     return intentGateEvaluator;

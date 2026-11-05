@@ -19,6 +19,16 @@ Eleven rough edges left by the status, review, own-action and frame slices, each
   shows such a row only on an outcome, its expiry, or once the Engine says it no longer waits.
 - L16: one Earlier row per decision: an Allow's one-time permission (ISSUED, CONSUMED) and the
   operation it allowed become its latest state ("Allowed · completed"); Activity keeps every row.
+  The rows are linked by the request's own id, never by operation and timing: the Engine writes the
+  request's `pendingId` (an optional, additive field) on the grant ISSUED and CONSUMED rows of a
+  permission an Allow minted (`ConsentCapsuleService`) and on the completion row of the run that
+  permission admitted (`OperationExecutorImpl` links the run's operation key to the request when it
+  uses the permission; `ActionLedgerChangeRegistry` writes it on that key's live and journaled
+  completion row). Rows without it (older rows; durable "always allow" grants; capsules minted outside
+  a pending request, such as the agent in Search's own approvals; completions projected after a
+  restart, agent-loop tool rows and uncommitted storage-failure rows) are never joined: the decision
+  then reads just "Allowed" and those rows keep their own words. The first three L16 checks' grant and
+  operation fixtures now carry that id, as the Engine writes it; their assertions are unchanged.
 - L17: the protected dialog says who asks, what it acts on, its risk, whether it can be undone and the
   exact phrase to type, never the Engine's gate text or internal names other than that phrase.
 - L19: a failed own action whose engine part is not running says so in plain words
@@ -27,20 +37,31 @@ Eleven rough edges left by the status, review, own-action and frame slices, each
   says so instead of sending another add.
 - L18/L21: a collection band closes for good when its source leaves; `primitives/focusKeeper.ts` keeps
   keyboard focus on its control across reorders, and hands it to a neighbour when its row leaves
-  (Library, Settings, failed files); a failed-files refresh keeps listed rows and their bands.
+  (Library, Settings, failed files); a failed-files refresh keeps listed rows and their bands. The
+  keeper knows a control by its row's key (`data-focus-row` on folder, source, attention, failed-file
+  and theme rows) and its role in that row (its name, else its place), never by its position: after
+  any reorder focus is on the same row's same control (a move is what the DOM says: an ancestor of the
+  control was taken out), and only when that row leaves does focus go to the next row's same control,
+  else the list's fallback ("Add folder", the drawer's Close), else the nearest control left.
 - L6 and the top bar: plugin tooltips read the item's rendered text through its shadow root (or its
   declared label); the provenance chip keeps whole words; the narrow area menu closes once its button
   is gone; a notice beside the pill wraps instead of pushing the switcher off centre; the pill shows
   the number of problems as it does for needs-you.
 
-No engine or persisted-format change. Evidence runs used a temporary Git command adapter (a
+Engine change (L16 only): one optional field, `pendingId`, on the action ledger's grant and operation
+rows (wire, live ring and audit journal); readers tolerate its absence, row ids are unchanged, no
+migration. Evidence runs used a temporary Git command adapter (a
 before-state is a shared clone in the session's temporary folder; nothing is registered in the
 source repository) and a Node command adapter that adds `--maxWorkers=4` to Vitest. The evidence
 producer is unchanged. Focus, layout and size checks run in isolated headless Chromium over private
 Vite servers; no shared dev stack or another session's service is used.
 
-`shell-s3c-repaired.json` holds every repaired check with its fail-before against 7ed8454d85.
-`shell-s3c-all.json` re-runs every check in every edited or added test file on the candidate.
+`shell-s3c-repaired.json` holds every repaired check with its fail-before against 7ed8454d85 (re-run
+after the L16/L21 repair edited two of its files). `shell-s3c-l16-l21-repaired.json` holds the checks
+of the L16/L21 repair with their fail-before against 511b14e88d; its before-state patch
+(`shell-s3c-l16-compat.patch`) adds only the two new entry points as no-ops (`linkApproval`,
+`setApprovalLinkSink`) so the Java checks compile there. `shell-s3c-all.json` re-runs every check in
+every edited or added test file on the candidate.
 
 Recorded reason (L12, orchestrator decision): `pendingAuthorizationBridge.test.ts` pinned that a
 broadcast with no source keeps its dialog on arrival. The brief retires that: such a request is not
@@ -184,7 +205,7 @@ the person's own action, so it waits in Needs you. The own-transport cases of th
         "modules/ui-web/src/shell-v0/state/frameStatus.decisions.test.ts"
       ],
       "class": "New",
-      "behaviour": "From the ledger rows one Allow writes (gate APPROVED with its request id, the one-time permission ISSUED and CONSUMED, the operation's outcome), Earlier shows one row: 'Allowed: <operation>' with its latest state (none, 'Allowed · started', 'Allowed · completed', 'Allowed · failed' with a failure tone). Two Allows keep their own rows and outcomes. A lasting 'always allow' permission and a later run of the same operation without a used permission stay rows of their own.",
+      "behaviour": "From the ledger rows one Allow writes (gate APPROVED with its request id, the one-time permission ISSUED and CONSUMED and the operation's outcome, each naming that request id), Earlier shows one row: 'Allowed: <operation>' with its latest state (none, 'Allowed · started', 'Allowed · completed', 'Allowed · failed' with a failure tone). Two Allows keep their own rows and outcomes. A lasting 'always allow' permission and a later run of the same operation without a used permission stay rows of their own.",
       "sources": [
         {
           "kind": "owner-words",
@@ -329,6 +350,57 @@ the person's own action, so it waits in Needs you. The own-transport cases of th
         "modules/ui-web/src/shell-v0/views/LibrarySurface.focusKeeper-lockdown.test.ts#L21 a confirmed collection removal hands focus to the next source",
         "modules/ui-web/src/shell-v0/views/LibrarySurface.focusKeeper-lockdown.test.ts#L21 a failed-files refresh keeps an open band for a file still listed, with focus; a file that leaves hands focus on",
         "modules/ui-web/src/shell-v0/views/SettingsSurface.focusKeeper-lockdown.test.ts#L21 a confirmed delete of the last custom theme by keyboard hands focus to a neighbour, never the page"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/frameStatus.decisions.test.ts",
+        "modules/app-observability/src/test/java/io/justsearch/app/observability/ledger/ApprovalLinkedRowsTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/intent/ConsentCapsuleServiceTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/registry/executor/OperationExecutorImplTest.java"
+      ],
+      "class": "New",
+      "behaviour": "History is true: Earlier joins an Allow's permission and outcome rows only by the request id the Engine wrote on them. Two Allows of one operation 1.5 s apart (first run succeeds, second fails) read 'Allowed · completed' and 'Allowed · failed' on their own rows; a long first run that fails after a later Allow was used keeps its failure on its own decision; rows without the id (older rows) are never joined, the decision reads 'Allowed' and they keep their own words. The Engine writes the id on the ISSUED and CONSUMED rows of a capsule an Allow minted (none for other capsules) and on the live and journaled completion row of each run that capsule admitted; a run no request allowed carries none, and legacy rows read back unchanged.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "L16, history must be true. Today Earlier joins an Allow's later ledger rows (Permission Allowed, Permission Used, Completed) to the Allow by operation and a 2 s timing window. [...] Orchestrator decision (binding): link the rows by the request's own identity. Carry the request's pendingId [...] as an optional, additive field on the permission-allowed, permission-used and completion rows wherever the engine knows which pending/capsule it is executing [...] readers tolerate its absence; no migration, no other field changes. Earlier joins only on that id. Rows without it (older rows, paths that cannot know it) are never joined to a decision: the decision row shows just \"Allowed\" and the other rows keep their own truthful labels.",
+          "location": "task t-20261103-shell request (S3c repair brief, 2026-11-05)"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s3c-l16-l21-repaired.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/state/frameStatus.decisions.test.ts#L16 two Allows of one operation 1.5 s apart keep their own outcomes when the first run succeeds and the second fails",
+        "modules/ui-web/src/shell-v0/state/frameStatus.decisions.test.ts#L16 a long first run that fails after a later Allow was used keeps its failure on its own decision",
+        "modules/ui-web/src/shell-v0/state/frameStatus.decisions.test.ts#L16 rows without a request id are never joined to a decision; each keeps its own words",
+        "modules/app-observability/src/test/java/io/justsearch/app/observability/ledger/ApprovalLinkedRowsTest.java#grantAndOperationRowsKeepTheirRequestIdentityAcrossTheJournalAndLegacyRowsHaveNone",
+        "modules/app-observability/src/test/java/io/justsearch/app/observability/ledger/ApprovalLinkedRowsTest.java#eachRunsCompletionRowNamesTheRequestThatAllowedIt",
+        "modules/app-services/src/test/java/io/justsearch/app/services/intent/ConsentCapsuleServiceTest.java#anAllowsPermissionRowsNameItsRequestAndOtherCapsulesNameNone",
+        "modules/app-services/src/test/java/io/justsearch/app/services/registry/executor/OperationExecutorImplTest.java#anAllowedRunsCompletionRowNamesTheRequestThatAllowedIt"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.focusKeeper-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Real keyboard focus in Chromium over four expanded folder rows a, b, c, d. With focus on any row's 'Remove from library', the reported orders (b,c,d,a then b,d,a,c then b,d,c,a) and then all 24 orders of the four rows leave focus on that row's same control every time, never the page. When the focused row leaves, focus moves to the next row's same control; when the last row leaves, to 'Add folder'.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "L21, focus. The focus keeper (primitives/focusKeeper.ts) compares a control's position with one recorded at an older focus event; with folders a, b, c, d and focus on a's \"Remove from library\", reordering to b,c,d,a then b,d,a,c then b,d,c,a loses focus to the page body (across all 24 orders: a lost 4 times, b/c/d once each). Expected: track the focused control by its row's identity (key) and the control's role within the row; after any reorder focus is on the same row's same control; only when that row leaves does focus move to a neighbour (next row's same control, else the list heading or \"Add folder\").",
+          "location": "task t-20261103-shell request (S3c repair brief, 2026-11-05)"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s3c-l16-l21-repaired.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.focusKeeper-lockdown.test.ts#L21 focus on folder a's \"Remove from library\" stays there through all 24 orders of four rows",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.focusKeeper-lockdown.test.ts#L21 focus on folder b's \"Remove from library\" stays there through all 24 orders of four rows",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.focusKeeper-lockdown.test.ts#L21 focus on folder c's \"Remove from library\" stays there through all 24 orders of four rows",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.focusKeeper-lockdown.test.ts#L21 focus on folder d's \"Remove from library\" stays there through all 24 orders of four rows",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.focusKeeper-lockdown.test.ts#L21 when a focused row leaves, focus moves to the next row's same control, else to \"Add folder\""
       ]
     },
     {

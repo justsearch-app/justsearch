@@ -98,7 +98,7 @@ export function renderFolderRow(f: FolderRow, actions: RowActions): TemplateResu
   const failed = (f.failed ?? 0) > 0 ? failedChipCopy(f.failed ?? 0, f.failedLastKnown === true) : null;
   const glyph = f.status === 'indexed' ? 'check-circle-2' : f.status === 'error' ? 'alert-circle'
     : f.status === 'unavailable' ? 'x-circle' : f.status === 'unverified' ? 'alert-triangle' : 'clock';
-  return html`<div class="card" role="listitem" aria-busy=${f.removalBusy ? 'true' : 'false'}>
+  return html`<div class="card" role="listitem" data-focus-row=${f.pathHash ?? nothing} aria-busy=${f.removalBusy ? 'true' : 'false'}>
     <div class="folder-summary">
       <button type="button" class="folder-toggle" aria-expanded=${String(actions.expanded)}
         aria-controls=${`folder-details-${f.pathHash ?? ''}`} @click=${actions.toggle}>
