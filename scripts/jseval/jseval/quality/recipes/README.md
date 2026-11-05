@@ -333,16 +333,26 @@ python -m jseval.quality.topical_labels freeze
   on the ChatGPT subscription only. Any `OPENAI_*` variable (API key, base URL
   and other endpoint overrides), the CLI's own `CODEX_API_KEY`,
   `CODEX_ACCESS_TOKEN`, `CODEX_HOME`, login-issuer and token-refresh overrides,
-  or a Bedrock token refuses before any call, even when empty, and
-  `codex login status` must report `Logged in using ChatGPT`. The call
-  (reviewed against codex-cli 0.166.0, `codex exec --help`):
-  `codex exec --ignore-user-config --ignore-rules --ephemeral
-  --skip-git-repo-check --sandbox read-only --model gpt-6.1-sol --json
-  --output-schema <grades schema> -c model_provider="openai"
-  -c approval_policy="never" -c web_search="disabled" -c project_doc_max_bytes=0
-  --disable <each tool feature> -`, with the prompt on stdin, in an empty
-  temporary folder. A reply whose event stream shows any tool item, or an
-  error event, is refused. It grades exactly the sample's 150 pairs with the
+  or a Bedrock token refuses before any call, even when empty. Each run uses a
+  fresh `CODEX_HOME` in the work folder, deleted afterwards, holding only the
+  tool's own `config.toml` (file credential store, `forced_login_method =
+  "chatgpt"`, approval never, read-only sandbox, web search and every tool
+  feature off, `request_user_input` off, no MCP server) and a copy of
+  `~/.codex/auth.json`, copied only when it says `auth_mode` `chatgpt` and holds
+  no API key; a token refresh during the run is written back unless the stored
+  login changed meanwhile. The model's catalog entry, not a feature, turns on
+  code mode, sub-agents, `apply_patch` and tool search, so the home pins its own
+  catalog (`model_catalog_json`, from `codex debug models`) with those off.
+  Before the first call, in that same home: `codex login status` must report
+  `Logged in using ChatGPT`, `codex mcp list --json` must be empty, and
+  `codex debug prompt-input` must render no tool item (the catalog entry must
+  be responses-lite, the only request form whose tools that rendering shows);
+  any doubt refuses. The call (reviewed against codex-cli 0.166.0):
+  `codex exec --ignore-rules --ephemeral --skip-git-repo-check --sandbox
+  read-only --model gpt-6.1-sol --json --output-schema <grades schema> -`, with
+  the prompt on stdin, in an empty temporary folder. A reply whose event
+  stream shows any tool item, or an error event, is refused. It grades
+  exactly the sample's 150 pairs with the
   same rubric, excerpts and batching (one query per call, up to five files in
   seeded random order). Its records (`second/` in the work folder) are bound
   like the primary's, stamped with revision and dispatch time, and keep only a
@@ -363,9 +373,12 @@ python -m jseval.quality.topical_labels freeze
   label) on 4 or 5 of the 5 makes it FAIL; otherwise the spot result is
   recorded as information and the decision is PASS. A FAIL allows one rubric
   or prompt revision, a full re-label, a new sample of new pairs and the second
-  judge again; a second FAIL stops. The decision record adds the judges'
-  confusion matrix and disagreements by language and grade (information only).
-- **Freeze**, only after a PASS on exactly the current grades of both judges:
+  judge again; a second FAIL stops. A revision's decision is recorded once
+  (`acceptance-r<revision>.json`): `accept` on a decided revision refuses. The
+  decision record adds the judges' confusion matrix and disagreements by
+  language and grade (information only).
+- **Freeze**, only after a PASS of the latest decided revision on exactly the
+  current grades of both judges:
   binary qrels for every topical pair through the collection writer, counts and
   grade histogram in the config, `topical` removed from `pending_kinds`. The
   record's provenance names the primary and second judge, their measured

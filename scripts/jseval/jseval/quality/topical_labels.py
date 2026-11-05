@@ -23,13 +23,16 @@ the fixed cutoff grade >= 2, judged zeros kept, raw grades kept as audit data.
 ``sample``        the fixed, seeded 150-pair agreement sample (no sheet: no owner grades it).
 ``second-judge``  an independent judge of another model family, ``gpt-6.1-sol`` through
                   ``codex exec`` on the ChatGPT subscription, grades exactly the sample's pairs
-                  with the same rubric, excerpts and batching.
+                  with the same rubric, excerpts and batching. Each run uses a fresh CODEX_HOME
+                  holding only the tool's config and a copy of the ChatGPT login, verified to
+                  expose no tool and no MCP server before the first call.
 ``spot``          the owner's 5-pair spot check, drawn from the judges' disagreements by a
                   recorded seed, as a plain-text sheet without grades.
 ``accept``        the decision (rule fixed below, before any grade): the judges agree on the binary
                   label for >= 80% of the 150 pairs, and the owner does not side against the
-                  primary judge on 4 or 5 of the 5 spot pairs.
-``freeze``        canonical binary qrels through the collection writer, after a passing decision.
+                  primary judge on 4 or 5 of the 5 spot pairs. Recorded once per revision.
+``freeze``        canonical binary qrels through the collection writer, after a passing decision
+                  of the latest decided revision.
 
 Limit (named): labels are agreement on the excerpt; an answer outside it can be missed. No
 German compound-splitting rule exists in this codebase, so query terms match whole tokens of the
@@ -40,6 +43,7 @@ from __future__ import annotations
 import argparse
 from collections import Counter, defaultdict
 import concurrent.futures
+import contextlib
 from dataclasses import replace
 import json
 import math
@@ -47,6 +51,7 @@ import os
 from pathlib import Path, PurePosixPath
 import random
 import re
+import shutil
 import signal
 import statistics
 import subprocess
@@ -584,23 +589,30 @@ def second_batches(pairs: list[dict], done, revision: int) -> list[tuple[str, li
     return _batches(by_query, done, f"{SEED}:{revision}:second")
 
 
-# The second judge: ``codex exec`` (reviewed against codex-cli 0.166.0, ``codex exec --help``) on
-# the ChatGPT subscription. Presence of any of these, even empty, refuses before any call:
-# OPENAI_* covers OPENAI_API_KEY, OPENAI_BASE_URL and the other endpoint/organisation overrides;
-# the CODEX_* names are the CLI's own API key, access token, credential home, login issuer and
-# token refresh endpoint, and a remote executor; Bedrock is another provider.
+# The second judge: ``codex exec`` (reviewed against codex-cli 0.166.0) on the ChatGPT subscription,
+# in a fresh CODEX_HOME per run (``codex_home``). Presence of any of these, even empty, refuses
+# before any call: OPENAI_* covers OPENAI_API_KEY, OPENAI_BASE_URL and the other
+# endpoint/organisation overrides; the CODEX_* names are the CLI's own API key, access token,
+# credential home, login issuer and token refresh endpoint, and a remote executor; Bedrock is
+# another provider.
 CODEX_OVERRIDE_PREFIXES = ("OPENAI_", "AZURE_OPENAI_")
 CODEX_OVERRIDES = frozenset({"CODEX_API_KEY", "CODEX_ACCESS_TOKEN", "CODEX_HOME",
                              "CODEX_REFRESH_TOKEN_URL_OVERRIDE", "CODEX_APP_SERVER_LOGIN_ISSUER",
                              "CODEX_APP_SERVER_LOGIN_CLIENT_ID", "CODEX_EXEC_SERVER_URL",
                              "AWS_BEARER_TOKEN_BEDROCK"})
 CODEX_SUBSCRIPTION = "Logged in using ChatGPT"
-# Every feature that gives the agent a tool or extra context is off; ``codex exec`` keeps no
-# session (--ephemeral), loads no user config or rules, runs in a read-only sandbox with no
-# approvals, and must reply with the grades object (--output-schema).
-CODEX_FEATURES_OFF = ("shell_tool", "unified_exec", "apps", "plugins", "multi_agent", "image_generation",
-                      "view_image", "browser_use", "computer_use", "in_app_browser", "goals", "hooks",
-                      "memories", "skill_search", "sleep_tool", "tool_suggest", "shell_snapshot")
+# Every feature that gives the agent a tool or extra context is off in the home's config.
+CODEX_FEATURES_OFF = ("shell_tool", "unified_exec", "apps", "plugins", "multi_agent", "multi_agent_v2",
+                      "image_generation", "view_image", "browser_use", "computer_use", "in_app_browser",
+                      "goals", "hooks", "memories", "skill_search", "sleep_tool", "tool_suggest",
+                      "shell_snapshot", "code_mode_host")
+# The model's catalog entry, not a feature, turns on code mode, sub-agents, apply_patch and tool
+# search (``codex debug models``); the home pins its own catalog with these off.
+CODEX_CATALOG_TOOLS_OFF = {"tool_mode": "direct", "multi_agent_version": None,
+                           "experimental_supported_tools": [], "apply_patch_tool_type": None,
+                           "supports_search_tool": False}
+CODEX_PROBE = "tool-set probe"
+CODEX_SETUP_TIMEOUT = 60
 # Items a tool-less reply may hold; an ``error`` item is a non-fatal CLI warning (a fatal error
 # arrives as an ``error``/``turn.failed`` event). Any other item is a tool the agent used.
 CODEX_REPLY_ITEMS = {"agent_message", "reasoning", "error"}
@@ -610,15 +622,138 @@ class CodexError(RuntimeError):
     """An error event of ``codex exec`` itself (never text of the model's reply)."""
 
 
+def _codex_auth_path() -> Path:
+    return Path.home() / ".codex" / "auth.json"
+
+
+def _subscription_auth(raw: bytes) -> bool:
+    """A stored ChatGPT login holding no API key."""
+    try:
+        auth = json.loads(raw)
+    except ValueError:
+        return False
+    if not isinstance(auth, dict) or auth.get("auth_mode") != "chatgpt":
+        return False
+    if any("api_key" in str(k).lower() and v for k, v in auth.items()):
+        return False
+    tokens = auth.get("tokens")
+    return isinstance(tokens, dict) and bool(tokens.get("access_token")) and bool(tokens.get("refresh_token"))
+
+
+def _codex_config(model: str, catalog: Path | None) -> str:
+    q = json.dumps  # a TOML basic string
+    lines = [f"model = {q(model)}", 'model_provider = "openai"', 'cli_auth_credentials_store = "file"',
+             'forced_login_method = "chatgpt"', 'approval_policy = "never"', 'sandbox_mode = "read-only"',
+             'web_search = "disabled"', "project_doc_max_bytes = 0"]
+    if catalog is not None:
+        lines.append(f"model_catalog_json = {q(str(catalog))}")
+    lines += ["", "[history]", 'persistence = "none"', "", "[tools.experimental_request_user_input]",
+              "enabled = false", "", "[features]"] + [f"{f} = false" for f in CODEX_FEATURES_OFF]
+    return "\n".join(lines) + "\n"
+
+
+def _codex_run(home: Path, args: list[str], cwd: Path) -> subprocess.CompletedProcess:
+    return subprocess.run(["codex", *args], capture_output=True, text=True, timeout=CODEX_SETUP_TIMEOUT,
+                          cwd=cwd, env={**os.environ, "CODEX_HOME": str(home)}, stdin=subprocess.DEVNULL)
+
+
+def _verify_codex_home(home: Path, model: str) -> None:
+    """Before any call: the home's login is the ChatGPT subscription, its catalog switches the
+    model's tools off, it has no MCP server, and the model would see no tool at all."""
+    probe = home / "probe"
+    probe.mkdir()
+    try:
+        status = _codex_run(home, ["login", "status"], probe)
+        lines = (status.stdout + status.stderr).strip().splitlines()
+        subscribed = status.returncode == 0 and lines[-1:] == [CODEX_SUBSCRIPTION]
+    except (OSError, subprocess.SubprocessError):
+        subscribed = False
+    if not subscribed:
+        raise ruq.SubscriptionRequired("ChatGPT subscription authentication could not be verified")
+    try:
+        r = _codex_run(home, ["debug", "models"], probe)
+        entry = [m for m in json.loads(r.stdout)["models"] if m.get("slug") == model] if r.returncode == 0 else []
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError, AttributeError):
+        entry = []
+    # Tools reach ``debug prompt-input`` only as an input item, which the responses-lite request has.
+    if len(entry) != 1 or entry[0].get("use_responses_lite") is not True:
+        raise LabelError(f"codex: no single responses-lite catalog entry for {model}; tool set unverifiable")
+    catalog = home / "catalog.json"
+    catalog.write_text(json.dumps({"models": [{**entry[0], **CODEX_CATALOG_TOOLS_OFF}]}), encoding="utf-8")
+    (home / "config.toml").write_text(_codex_config(model, catalog), encoding="utf-8")
+    try:
+        servers = _codex_run(home, ["mcp", "list", "--json"], probe)
+        no_servers = servers.returncode == 0 and json.loads(servers.stdout) == []
+        rendered = _codex_run(home, ["debug", "prompt-input", CODEX_PROBE], probe)
+        items = json.loads(rendered.stdout) if rendered.returncode == 0 else None
+    except (OSError, subprocess.SubprocessError, ValueError):
+        no_servers, items = False, None
+    if not no_servers:
+        raise LabelError("codex: the isolated home lists MCP servers (or could not list them)")
+    tool_free = (isinstance(items, list) and items
+                 and all(isinstance(i, dict) and i.get("type") == "message" and "tools" not in i for i in items)
+                 and items[-1].get("role") == "user"
+                 and [c.get("text") for c in items[-1].get("content", [])] == [CODEX_PROBE])
+    if not tool_free:
+        raise LabelError("codex: the model-visible prompt holds tools (or could not be rendered); refused")
+
+
+@contextlib.contextmanager
+def codex_home(model: str = SECOND_MODEL):
+    """A fresh CODEX_HOME for one second-judge run: the tool's own config and a copy of the stored
+    ChatGPT login (never an API key), verified tool-free before any call, deleted afterwards. A
+    token refresh during the run is written back so the stored login stays usable."""
+    if any(n.startswith(CODEX_OVERRIDE_PREFIXES) or n in CODEX_OVERRIDES for n in os.environ):
+        raise ruq.SubscriptionRequired("ChatGPT subscription required; remove API/provider overrides")
+    source = _codex_auth_path()
+    try:
+        copied = source.read_bytes()
+    except OSError:
+        copied = b""
+    if not _subscription_auth(copied):
+        raise ruq.SubscriptionRequired("ChatGPT subscription required; the stored codex login is not a "
+                                       "ChatGPT login without an API key")
+    WORK.mkdir(parents=True, exist_ok=True)
+    home = Path(tempfile.mkdtemp(prefix="codex-home-", dir=WORK))
+    try:
+        fd = os.open(home / "auth.json", os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "wb") as f:
+            f.write(copied)
+        (home / "config.toml").write_text(_codex_config(model, None), encoding="utf-8")
+        _verify_codex_home(home, model)
+        yield home
+    finally:
+        try:
+            _write_back_refresh(home / "auth.json", source, copied)
+        finally:
+            shutil.rmtree(home)
+
+
+def _write_back_refresh(used: Path, source: Path, copied: bytes) -> None:
+    """A login the run refreshed replaces the stored one, unless that changed meanwhile."""
+    try:
+        now = used.read_bytes()
+        unchanged = source.read_bytes() == copied
+    except OSError:
+        return
+    if now == copied or not unchanged or not _subscription_auth(now):
+        return
+    fd, tmp = tempfile.mkstemp(dir=source.parent, prefix=".auth.json.")  # mode 0600
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(now)
+        os.replace(tmp, source)
+    except BaseException:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+        raise
+
+
 def codex_command(model: str, cwd: str, schema: str) -> list[str]:
-    command = ["codex", "exec", "--ignore-user-config", "--ignore-rules", "--ephemeral",
-               "--skip-git-repo-check", "--sandbox", "read-only", "--model", model, "--cd", cwd,
-               "--color", "never", "--json", "--output-schema", schema,
-               "-c", 'model_provider="openai"', "-c", 'approval_policy="never"',
-               "-c", 'web_search="disabled"', "-c", "project_doc_max_bytes=0"]
-    for feature in CODEX_FEATURES_OFF:
-        command += ["--disable", feature]
-    return command + ["-"]  # the prompt on stdin, never in the process list
+    # The home's config (verified by ``codex_home``) is the only configuration; nothing overrides it.
+    return ["codex", "exec", "--ignore-rules", "--ephemeral", "--skip-git-repo-check", "--sandbox",
+            "read-only", "--model", model, "--cd", cwd, "--color", "never", "--json", "--output-schema",
+            schema, "-"]  # the prompt on stdin, never in the process list
 
 
 def grade_schema(ids: list[str]) -> dict:
@@ -657,38 +792,25 @@ def parse_codex_events(stdout: str) -> dict:
     return value
 
 
-def ask_codex(prompt: str, ids: list[str], *, model: str = SECOND_MODEL,
+def ask_codex(prompt: str, ids: list[str], *, home: Path, model: str = SECOND_MODEL,
               timeout: float = CALL_TIMEOUT) -> tuple[dict, str]:
-    """One tool-less, session-less ``codex exec`` call on the ChatGPT subscription."""
-    if any(n.startswith(CODEX_OVERRIDE_PREFIXES) or n in CODEX_OVERRIDES for n in os.environ):
-        raise ruq.SubscriptionRequired("ChatGPT subscription required; remove API/provider overrides")
-    env = dict(os.environ)
-    WORK.mkdir(parents=True, exist_ok=True)
+    """One tool-less, session-less ``codex exec`` call in the verified ``home``."""
     with tempfile.TemporaryDirectory(prefix="codex-", dir=WORK) as cwd:
-        # Reads the stored credentials only; anything but a ChatGPT login fails closed.
-        try:
-            status = subprocess.run(["codex", "login", "status"], capture_output=True, text=True,
-                                    timeout=30, cwd=cwd, env=env, stdin=subprocess.DEVNULL)
-            lines = (status.stdout + status.stderr).strip().splitlines()
-            subscribed = status.returncode == 0 and lines[-1:] == [CODEX_SUBSCRIPTION]
-        except (OSError, subprocess.SubprocessError):
-            subscribed = False
-        if not subscribed:
-            raise ruq.SubscriptionRequired("ChatGPT subscription authentication could not be verified")
         schema = Path(cwd) / "grades.schema.json"
         schema.write_text(json.dumps(grade_schema(ids)), encoding="utf-8")
         work = Path(cwd) / "work"
         work.mkdir()
         command = codex_command(model, str(work), str(schema))
         r = subprocess.run(command, input=prompt, capture_output=True, text=True, timeout=timeout,
-                           cwd=cwd, env=env)
+                           cwd=cwd, env={**os.environ, "CODEX_HOME": str(home)})
     if r.returncode != 0 and not r.stdout:
         raise subprocess.CalledProcessError(r.returncode, command[:2])
     return parse_codex_events(r.stdout), r.stdout
 
 
 def _call(c: Collection, pools: dict, ex: dict, qid: str, docs: list[str], phase: str,
-          call_timeout: float, *, revision: int = 0, second: bool = False) -> tuple[list[dict], dict]:
+          call_timeout: float, *, revision: int = 0, second: bool = False,
+          home: Path | None = None) -> tuple[list[dict], dict]:
     fids = [f"F{n}" for n in range(1, len(docs) + 1)]
     rubric = template()
     model = SECOND_MODEL if second else MODEL
@@ -703,7 +825,7 @@ def _call(c: Collection, pools: dict, ex: dict, qid: str, docs: list[str], phase
             "revision": revision, "dispatched_at": dispatched_at}
     try:
         if second:
-            reply, raw = ask_codex(prompt, fids, model=model, timeout=call_timeout)
+            reply, raw = ask_codex(prompt, fids, home=home, model=model, timeout=call_timeout)
         else:
             reply, raw = ruq.ask_claude(prompt, model=model, timeout=call_timeout)
         grades = parse_grades(reply, fids)
@@ -814,10 +936,16 @@ def second_judge(*, max_calls: int, concurrency: int = 1, phase: str = "labels",
     path = _second_path("judgments.jsonl")
     todo = second_batches(pairs, second_judgments(c, pools, ex, pairs, revision=revision, after=after),
                           revision)
-    run = _judge_loop(todo, lambda qid, docs: _call(c, pools, ex, qid, docs, phase, call_timeout,
-                                                     revision=revision, second=True),
-                      path, _second_path("calls.jsonl"), max_calls=max_calls, concurrency=concurrency,
-                      max_seconds=max_seconds, quota="ChatGPT")
+    run = {"stop": None, "calls": 0, "judged_pairs": 0, "seconds": 0.0}
+    if todo and max_calls > 0:
+        try:
+            with codex_home(SECOND_MODEL) as home:  # one verified home for every call of this run
+                run = _judge_loop(todo, lambda qid, docs: _call(c, pools, ex, qid, docs, phase, call_timeout,
+                                                                 revision=revision, second=True, home=home),
+                                  path, _second_path("calls.jsonl"), max_calls=max_calls,
+                                  concurrency=concurrency, max_seconds=max_seconds, quota="ChatGPT")
+        except ruq.SubscriptionRequired as e:
+            run["stop"] = f"subscription required: {e}"
     remaining = len(second_batches(pairs, second_judgments(c, pools, ex, pairs, revision=revision,
                                                            after=after), revision))
     status = {"stopped": run["stop"] or ("complete" if not remaining else "call limit reached"),
@@ -1185,7 +1313,29 @@ def agreement_report(rows: list[dict]) -> dict:
             "note": "information only; the decision is the judges' agreement and the owner's spot check"}
 
 
+def _acceptance_path(revision: int) -> Path:
+    return WORK / f"acceptance-r{revision}.json"
+
+
+def _record_decision(revision: int, result: dict) -> None:
+    """A revision's decision is written once: an existing PASS or FAIL is never replaced."""
+    path = _acceptance_path(revision)
+    fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as f:
+            f.write(json.dumps(result, ensure_ascii=False, indent=1, sort_keys=True) + "\n")
+        os.link(tmp, path)  # fails if a decision exists, even one recorded concurrently
+    except FileExistsError:
+        raise LabelError(f"revision {revision} is decided ({path.name}); a recorded decision is final") from None
+    finally:
+        os.unlink(tmp)
+
+
 def accept(revision: int = 0, sheet: Path | None = None) -> dict:
+    _check_revision(revision)
+    if _acceptance_path(revision).exists():
+        raise LabelError(f"revision {revision} is decided ({_acceptance_path(revision).name}); "
+                         "a recorded decision is final")
     c, _, ex, done, record, second, rows = _state(revision)
     agreement = judge_agreement(rows)
     path = _sample_path(revision, "spot")
@@ -1207,7 +1357,7 @@ def accept(revision: int = 0, sheet: Path | None = None) -> dict:
     result.update(revision=revision, labels_sha256=labels_sha256(done), second_sha256=labels_sha256(second),
                   template_sha256=sha256_text(template()), at=time.time(), sample=record["name"],
                   agreement=agreement, spot_check=spot_check, report=agreement_report(rows))
-    _write_json(WORK / f"acceptance-r{revision}.json", result)
+    _record_decision(revision, result)
     return result
 
 
@@ -1239,9 +1389,15 @@ def frozen_collection(c: Collection, pools: dict, done: dict) -> tuple[Collectio
 
 
 def freeze(revision: int = 0) -> int:
-    c, pools, _, done, _, second, _ = _state(revision)
-    decision = _json(WORK / f"acceptance-r{revision}.json")
-    if (decision["outcome"] != "PASS" or decision["labels_sha256"] != labels_sha256(done)
+    _check_revision(revision)
+    decided = [r for r in range(MAX_REVISION + 1) if _acceptance_path(r).exists()]
+    if not decided or decided[-1] != revision:
+        raise LabelError(f"labels freeze only after a PASS decision of the latest decided revision "
+                         f"({decided[-1] if decided else 'none decided'})")
+    c, pools, _, done, _, second, _ = _state(revision)  # revision 1 only after a recorded r0 FAIL
+    decision = _json(_acceptance_path(revision))
+    if (decision["outcome"] != "PASS" or decision.get("revision") != revision
+            or decision["labels_sha256"] != labels_sha256(done)
             or decision.get("second_sha256") != labels_sha256(second)):
         raise LabelError("labels freeze only after a PASS decision on exactly the current judges' grades")
     new, excluded, audit = frozen_collection(c, pools, done)

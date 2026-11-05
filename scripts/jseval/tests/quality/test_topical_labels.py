@@ -1,6 +1,7 @@
 """Topical labels for real-use (P5c, L1-L8): pools, excerpts, judging, sample, acceptance, freeze."""
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import random
@@ -696,7 +697,7 @@ class FakeCodex:
         self.by_text = {t.text: q for q, t in c.queries.items()}
         self.flip, self.fail, self.calls, self.models, self.batches = set(flip), fail, 0, [], []
 
-    def __call__(self, prompt, ids, *, model, timeout):
+    def __call__(self, prompt, ids, *, model, timeout, home=None):
         self.calls += 1
         self.models.append(model)
         if self.fail and (error := self.fail(self.calls)):
@@ -815,17 +816,62 @@ def test_the_second_judge_needs_the_drawn_sample_on_the_current_labels(world, mo
 
 
 FAKE_CODEX = """#!{python}
-import json, os, sys
+# A codex CLI that behaves like codex-cli 0.166.0 where the tool relies on it: the login, tools and
+# MCP servers come from CODEX_HOME (default ~/.codex); a keyring store reads FAKE_CODEX_KEYRING;
+# FAKE_CODEX_SYSTEM_MCP and FAKE_CODEX_SYSTEM_TOOLS stand for a system-wide config.
+import json, os, sys, tomllib
+from pathlib import Path
+argv = sys.argv[1:]
+home = Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex")
+config = tomllib.loads((home / "config.toml").read_text()) if (home / "config.toml").exists() else {{}}
 log = os.environ["FAKE_CODEX_LOG"]
 with open(log, "a") as f:
-    f.write(json.dumps(sys.argv[1:]) + "\\n")
-if sys.argv[1:3] == ["login", "status"]:
-    print(os.environ.get("FAKE_CODEX_LOGIN", "Logged in using ChatGPT"), file=sys.stderr)
+    f.write(json.dumps({{"argv": argv, "codex_home": os.environ.get("CODEX_HOME"), "config": config,
+                        "auth": (home / "auth.json").read_text() if (home / "auth.json").exists() else None}})
+            + "\\n")
+if config.get("cli_auth_credentials_store") == "keyring":
+    auth = json.loads(os.environ.get("FAKE_CODEX_KEYRING", "{{}}"))
+else:
+    auth = json.loads((home / "auth.json").read_text()) if (home / "auth.json").exists() else {{}}
+if argv[:2] == ["login", "status"]:
+    if auth.get("OPENAI_API_KEY"):
+        print("Logged in using an API key - sk-***", file=sys.stderr)
+    elif auth.get("auth_mode") == "chatgpt":
+        print("Logged in using ChatGPT", file=sys.stderr)
+    else:
+        print("Not logged in", file=sys.stderr)
+        sys.exit(1)
+    sys.exit(0)
+if argv[:2] == ["debug", "models"]:
+    print(json.dumps({{"models": [{{"slug": "gpt-6.1-sol", "tool_mode": "code_mode_only",
+                                    "multi_agent_version": "v2", "experimental_supported_tools": ["clock"],
+                                    "apply_patch_tool_type": "freeform", "supports_search_tool": True,
+                                    "use_responses_lite": os.environ.get("FAKE_CODEX_LITE", "1") == "1"}}]}}))
+    sys.exit(0)
+if argv[:3] == ["mcp", "list", "--json"]:
+    servers = sorted(config.get("mcp_servers", {{}})) + json.loads(os.environ.get("FAKE_CODEX_SYSTEM_MCP", "[]"))
+    print(json.dumps([{{"name": n}} for n in servers]))
+    sys.exit(0)
+if argv[:2] == ["debug", "prompt-input"]:
+    catalog = (json.loads(Path(config["model_catalog_json"]).read_text())["models"][0]
+               if "model_catalog_json" in config else {{"tool_mode": "code_mode_only"}})
+    tools = []
+    if catalog.get("tool_mode") != "direct" or catalog.get("multi_agent_version"):
+        tools += ["exec", "spawn_agent"]
+    if config.get("tools", {{}}).get("experimental_request_user_input", {{}}).get("enabled") is not False:
+        tools.append("request_user_input")
+    tools += json.loads(os.environ.get("FAKE_CODEX_SYSTEM_TOOLS", "[]"))
+    items = [{{"type": "additional_tools", "role": "developer", "tools": tools}}] if tools else []
+    items += [{{"type": "message", "role": "developer", "content": [{{"type": "input_text", "text": "x"}}]}},
+              {{"type": "message", "role": "user", "content": [{{"type": "input_text", "text": argv[-1]}}]}}]
+    print(json.dumps(items))
     sys.exit(0)
 prompt = sys.stdin.read()
 with open(log + ".prompt", "w") as f:
     f.write(prompt)
-schema = json.load(open(sys.argv[sys.argv.index("--output-schema") + 1]))
+if os.environ.get("FAKE_CODEX_REFRESH"):
+    (home / "auth.json").write_text(json.dumps({{**auth, "tokens": {{**auth["tokens"], "refresh_token": "rotated"}}}}))
+schema = json.load(open(argv[argv.index("--output-schema") + 1]))
 ids = schema["properties"]["grades"]["items"]["properties"]["id"]["enum"]
 events = [{{"type": "thread.started", "thread_id": "t"}}, {{"type": "turn.started"}}]
 events += json.loads(os.environ.get("FAKE_CODEX_EXTRA", "[]"))
@@ -836,45 +882,84 @@ events += [{{"type": "item.completed", "item": {{"id": "i0", "type": "reasoning"
 for e in events:
     print(json.dumps(e))
 """
+SUBSCRIPTION_AUTH = {"auth_mode": "chatgpt", "OPENAI_API_KEY": None, "last_refresh": "2026-11-01T00:00:00Z",
+                     "tokens": {"id_token": "i", "access_token": "a", "refresh_token": "r", "account_id": "x"}}
+API_KEY_AUTH = {"auth_mode": "apikey", "OPENAI_API_KEY": "sk-test"}
+REAL_CODEX_HOME = getattr(tl, "codex_home", None)
+
+
+@pytest.fixture(autouse=True)
+def _fake_codex_home(monkeypatch, tmp_path):
+    """Tests that replace ``ask_codex`` need no codex CLI for the home; ``fake_codex`` restores
+    the real one."""
+    @contextlib.contextmanager
+    def home(model=tl.SECOND_MODEL):
+        yield tmp_path / "no-codex-home"
+    monkeypatch.setattr(tl, "codex_home", home, raising=False)
 
 
 @pytest.fixture
 def fake_codex(tmp_path, monkeypatch):
-    """A ``codex`` executable first on PATH that logs every invocation and its prompt."""
+    """A ``codex`` executable first on PATH that logs every invocation, its CODEX_HOME, that
+    home's config and login, and its prompt; HOME holds a stored ChatGPT login."""
+    if REAL_CODEX_HOME is not None:
+        monkeypatch.setattr(tl, "codex_home", REAL_CODEX_HOME)
     bindir = tmp_path / "bin"
     bindir.mkdir()
     exe = bindir / "codex"
     exe.write_text(FAKE_CODEX.format(python=sys.executable))
     exe.chmod(0o755)
     log = tmp_path / "codex.log"
+    user = tmp_path / "home"
+    (user / ".codex").mkdir(parents=True)
+    auth = user / ".codex" / "auth.json"
+    auth.write_text(json.dumps(SUBSCRIPTION_AUTH))
+    monkeypatch.setenv("HOME", str(user))
     monkeypatch.setenv("PATH", f"{bindir}{os.pathsep}{os.environ['PATH']}")
     monkeypatch.setenv("FAKE_CODEX_LOG", str(log))
     for name in list(os.environ):
         if name.startswith(tl.CODEX_OVERRIDE_PREFIXES) or name in tl.CODEX_OVERRIDES:
             monkeypatch.delenv(name)
 
-    def invocations():
+    def records():
         return [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
-    return SimpleNamespace(log=log, invocations=invocations)
+
+    def invocations():
+        return [r["argv"] for r in records()]
+    return SimpleNamespace(log=log, invocations=invocations, records=records, auth=auth,
+                           user_config=user / ".codex" / "config.toml")
+
+
+SETUP = [["login", "status"], ["debug", "models"], ["mcp", "list", "--json"], ["debug", "prompt-input"]]
+
+
+def _setup_and_execs(argvs):
+    return [a[:len(s)] for a, s in zip(argvs, SETUP)], [a for a in argvs[len(SETUP):]]
 
 
 def test_codex_exec_is_tool_less_session_less_read_only_with_the_prompt_on_stdin(fake_codex, tmp_path,
                                                                                 monkeypatch):
     monkeypatch.setattr(tl, "WORK", tmp_path / "work")
-    reply, raw = tl.ask_codex("PRIVATE_PROMPT rubric", ["F1", "F2"])
+    with tl.codex_home() as home:
+        reply, raw = tl.ask_codex("PRIVATE_PROMPT rubric", ["F1", "F2"], home=home)
     assert reply == {"grades": [{"id": "F1", "grade": 2}, {"id": "F2", "grade": 2}]}
-    login, call = fake_codex.invocations()
-    assert login == ["login", "status"]
-    assert call[:2] == ["exec", "--ignore-user-config"] and call[-1] == "-"
-    for flag in ("--ignore-rules", "--ephemeral", "--skip-git-repo-check", "--json"):
+    setup, (call,) = _setup_and_execs(fake_codex.invocations())
+    assert setup == SETUP
+    assert call[:2] == ["exec", "--ignore-rules"] and call[-1] == "-"
+    assert "--ignore-user-config" not in call and "-c" not in call  # the home's config is the only one
+    for flag in ("--ephemeral", "--skip-git-repo-check", "--json"):
         assert flag in call
     assert call[call.index("--sandbox") + 1] == "read-only" and call[call.index("--model") + 1] == "gpt-6.1-sol"
-    assert {'approval_policy="never"', 'web_search="disabled"', 'model_provider="openai"'} <= set(call)
-    assert {"shell_tool", "unified_exec", "apps", "plugins", "multi_agent"} <= {
-        call[i + 1] for i, a in enumerate(call) if a == "--disable"}
+    config = fake_codex.records()[-1]["config"]
+    assert {k: config[k] for k in ("approval_policy", "sandbox_mode", "web_search", "cli_auth_credentials_store",
+                                   "forced_login_method", "model_provider")} == {
+        "approval_policy": "never", "sandbox_mode": "read-only", "web_search": "disabled",
+        "cli_auth_credentials_store": "file", "forced_login_method": "chatgpt", "model_provider": "openai"}
+    assert config["tools"]["experimental_request_user_input"] == {"enabled": False}
+    assert set(tl.CODEX_FEATURES_OFF) <= set(config["features"]) and not any(config["features"].values())
     assert not any("PRIVATE_PROMPT" in a for a in call)
     assert fake_codex.log.with_name("codex.log.prompt").read_text() == "PRIVATE_PROMPT rubric"
-    assert list(tl.WORK.iterdir()) == []  # the temporary working folder is gone
+    assert list(tl.WORK.iterdir()) == []  # the temporary home and working folder are gone
 
 
 @pytest.mark.parametrize("name", ["OPENAI_API_KEY", "OPENAI_BASE_URL", "OPENAI_ORGANIZATION", "CODEX_API_KEY",
@@ -889,19 +974,86 @@ def test_an_api_or_provider_override_refuses_the_second_judge_with_zero_calls(sa
     assert not (tl.WORK / "second" / "judgments.jsonl").exists()
 
 
-def test_a_login_other_than_chatgpt_refuses_before_any_exec(sampled, fake_codex, monkeypatch):
-    monkeypatch.setenv("FAKE_CODEX_LOGIN", "Logged in using an API key - sk-***")
+@pytest.mark.parametrize("stored,user_config", [
+    (API_KEY_AUTH, None),  # the stored login is an API key
+    ({**SUBSCRIPTION_AUTH, "OPENAI_API_KEY": "sk-test"}, None),  # a subscription file holding an API key
+    (API_KEY_AUTH, 'cli_auth_credentials_store = "keyring"\n'),  # the keyring says ChatGPT, the file does not
+    (None, 'cli_auth_credentials_store = "keyring"\n'),
+])
+def test_a_stored_login_other_than_a_chatgpt_file_refuses_before_any_codex_call(sampled, fake_codex,
+                                                                              monkeypatch, stored, user_config):
+    if stored is None:
+        fake_codex.auth.unlink()
+    else:
+        fake_codex.auth.write_text(json.dumps(stored))
+    if user_config:
+        fake_codex.user_config.write_text(user_config)
+        monkeypatch.setenv("FAKE_CODEX_KEYRING", json.dumps(SUBSCRIPTION_AUTH))
+    status = tl.second_judge(max_calls=5)
+    assert status["stopped"].startswith("subscription required: ChatGPT subscription required")
+    assert fake_codex.invocations() == []
+    assert not (tl.WORK / "second" / "judgments.jsonl").exists()
+
+
+def test_a_login_other_than_chatgpt_in_the_home_refuses_before_any_exec(sampled, fake_codex, monkeypatch):
+    monkeypatch.setattr(tl, "_subscription_auth", lambda raw: True)  # the CLI disagrees with the file
+    fake_codex.auth.write_text(json.dumps(API_KEY_AUTH))
     status = tl.second_judge(max_calls=5)
     assert status["stopped"] == "subscription required: ChatGPT subscription authentication could not be verified"
-    assert [i[:2] for i in fake_codex.invocations()] == [["login", "status"]]
+    assert fake_codex.invocations() == [["login", "status"]]
 
 
-def test_the_real_second_judge_path_runs_on_the_fake_cli(sampled, fake_codex):
+def test_every_call_runs_in_one_isolated_home_without_the_users_config_or_mcp_servers(sampled, fake_codex):
+    fake_codex.user_config.write_text('[mcp_servers.leak]\ncommand = "leak"\n'
+                                      'cli_auth_credentials_store = "keyring"\n')
     status = tl.second_judge(max_calls=2, phase="calibration")
     assert status["stopped"] == "call limit reached" and status["calls"] == 2
-    assert [i[0] for i in fake_codex.invocations()] == ["login", "exec", "login", "exec"]
+    records = fake_codex.records()
+    setup, execs = _setup_and_execs([r["argv"] for r in records])
+    assert setup == SETUP and [a[0] for a in execs] == ["exec", "exec"]
+    homes = {r["codex_home"] for r in records}
+    assert len(homes) == 1 and None not in homes  # the login check and every call: one home
+    home = Path(homes.pop())
+    assert home.parent == tl.WORK and home != fake_codex.user_config.parent
+    for r in records:
+        assert "mcp_servers" not in r["config"] and r["config"]["cli_auth_credentials_store"] == "file"
+        assert json.loads(r["auth"]) == SUBSCRIPTION_AUTH  # the copied ChatGPT login
+    assert not home.exists()  # deleted afterwards
     calls = tl.read_checkpoint(tl.WORK / "second" / "calls.jsonl")
     assert all(c["ok"] and c["phase"] == "calibration" and c["model"] == "gpt-6.1-sol" for c in calls)
+
+
+@pytest.mark.parametrize("env,error", [
+    ({"FAKE_CODEX_SYSTEM_MCP": '["system-server"]'}, "MCP servers"),
+    ({"FAKE_CODEX_SYSTEM_TOOLS": '["shell"]'}, "holds tools"),
+    ({"FAKE_CODEX_LITE": "0"}, "unverifiable"),
+])
+def test_a_tool_or_mcp_server_left_in_the_effective_set_refuses_before_any_exec(sampled, fake_codex,
+                                                                                monkeypatch, env, error):
+    for name, value in env.items():
+        monkeypatch.setenv(name, value)
+    with pytest.raises(tl.LabelError, match=error):
+        tl.second_judge(max_calls=5)
+    assert not any(a[0] == "exec" for a in fake_codex.invocations())
+    assert [p.name for p in tl.WORK.iterdir() if p.name.startswith("codex-")] == []
+
+
+@pytest.mark.parametrize("stored_changed", [False, True])
+def test_a_token_refresh_in_the_home_keeps_the_stored_login_usable(sampled, fake_codex, monkeypatch,
+                                                                   stored_changed):
+    monkeypatch.setenv("FAKE_CODEX_REFRESH", "1")
+    other = {**SUBSCRIPTION_AUTH, "tokens": {**SUBSCRIPTION_AUTH["tokens"], "refresh_token": "theirs"}}
+    if stored_changed:  # the owner's own codex refreshed meanwhile: theirs stays
+        real_run = subprocess.run
+
+        def run(command, **kw):
+            if command[:2] == ["codex", "exec"]:
+                fake_codex.auth.write_text(json.dumps(other))
+            return real_run(command, **kw)
+        monkeypatch.setattr(tl.subprocess, "run", run)
+    assert tl.second_judge(max_calls=1)["calls"] == 1
+    stored = json.loads(fake_codex.auth.read_text())
+    assert stored["tokens"]["refresh_token"] == ("theirs" if stored_changed else "rotated")
 
 
 @pytest.mark.parametrize("extra,error", [
@@ -914,7 +1066,8 @@ def test_tool_use_and_cli_errors_are_refused(fake_codex, tmp_path, monkeypatch, 
     monkeypatch.setattr(tl, "WORK", tmp_path / "work")
     monkeypatch.setenv("FAKE_CODEX_EXTRA", json.dumps(extra))
     with pytest.raises((ValueError, tl.CodexError), match=error):
-        tl.ask_codex("prompt", ["F1"])
+        with tl.codex_home() as home:
+            tl.ask_codex("prompt", ["F1"], home=home)
 
 
 # --------------------------------------------------------------------------- L4 decision and spot check
@@ -972,6 +1125,33 @@ def test_the_owner_against_the_primary_on_4_or_5_of_5_takes_the_failure_path(sam
         assert result["next"].startswith("revise the rubric") and "second judge" in result["next"]
     else:
         assert "next" not in result
+
+
+def test_a_recorded_failure_is_final_and_freeze_stays_blocked(sampled, monkeypatch):
+    drawn_path = tl.WORK / "samples" / "r0-spot.json"
+    assert _accept_with(sampled, monkeypatch, 140 / 150, against=4)["outcome"] == "FAIL"
+    recorded = (tl.WORK / "acceptance-r0.json").read_text()
+    # The owner turns one opposing answer into "unsure": 3 of 5 against would now PASS.
+    first = json.loads(drawn_path.read_text())["pairs"][0]["id"]
+    sheet = tl.WORK / "samples" / "r0-spot.sheet.txt"
+    sheet.write_text(re.sub(rf"(=== {first} ===\n(?:.*\n)*?)Answer: \w+\n", r"\1Answer: unsure\n",
+                            sheet.read_text(), count=1))
+    with pytest.raises(tl.LabelError, match="decided"):
+        tl.accept(0)
+    assert tl.main(["accept"]) == 2
+    assert (tl.WORK / "acceptance-r0.json").read_text() == recorded
+    with pytest.raises(tl.LabelError, match="PASS"):
+        tl.freeze(0)
+    assert not (tl.RECORD / "topical-labels.json").exists()
+
+
+def test_a_recorded_pass_is_final_too(sampled, monkeypatch):
+    assert _accept_with(sampled, monkeypatch, 140 / 150, against=0)["outcome"] == "PASS"
+    recorded = (tl.WORK / "acceptance-r0.json").read_text()
+    with pytest.raises(tl.LabelError, match="decided"):
+        tl.accept(0)
+    assert (tl.WORK / "acceptance-r0.json").read_text() == recorded
+    assert tl.freeze(0) == 0
 
 
 def test_unsure_is_not_against_the_primary_and_the_sheet_must_be_answered(sampled, monkeypatch):
@@ -1172,6 +1352,9 @@ def test_revision_one_relabels_draws_new_pairs_judges_them_again_and_a_second_fa
     assert result["outcome"] == "FAIL" and result["next"] == "stop and report to the user"
     with pytest.raises(tl.LabelError, match="revision"):
         tl.sample(2)
+    for revision in (0, 1):
+        with pytest.raises(tl.LabelError, match="PASS|decided"):
+            tl.freeze(revision)
 
 
 def test_revision_one_does_not_reuse_judgments_from_before_the_failure(sampled, monkeypatch):
