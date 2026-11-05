@@ -164,117 +164,36 @@ folders, test profiles, filesystem fixtures, SQLite queues and watched-roots sto
 resources touched are Gradle caches, reusable daemons and js-gradle-slot/admission locks.
 Nothing is committed and acceptance records are reserved for the independent acceptor.
 
-Create separate shared clones in `$TMPDIR` (already done in this session), copy only the two
-test sources, and run one background Gradle command at a time:
+Evidence (orchestrator; produced by run-evidence.mjs, nothing hand-written):
 
 ```bash
-git clone --quiet --shared --no-checkout . "$TMPDIR/before"
-git -C "$TMPDIR/before" checkout --quiet --detach bbcb4090fc9ae41e520b7e7bd3fb7142b6275285
-git clone --quiet --shared --no-checkout . "$TMPDIR/fu1-base"
-git -C "$TMPDIR/fu1-base" checkout --quiet --detach b21749f0e07917daceb0df14e57bd2e9163cb91b
-for tree in "$TMPDIR/before" "$TMPDIR/fu1-base"; do
-  for file in modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIncompleteCoverageTest.java modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SyncCoverageEvidenceTest.java; do
-    cp "$file" "$tree/$file"
-  done
-done
+env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot node scripts/governance/gates/test-intent/run-evidence.mjs \
+  --out gates/test-intent/evidence/fu-1.json \
+  --before b21749f0e07917daceb0df14e57bd2e9163cb91b \
+  --check modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIncompleteCoverageTest.java#D1PeriodicCoverageClearsPersistedWarning \
+  --check modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIncompleteCoverageTest.java#D2VerifyFolderClearsPersistedWarning \
+  --check modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIncompleteCoverageTest.java#D3RecordedReindexClearsPersistedWarning \
+  --check modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIncompleteCoverageTest.java#D4OneRepairedFileCannotClearButWholeRootCan \
+  --check modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIncompleteCoverageTest.java#D5LegacyReindexRejectsUnverifiedResponseIndependentlyOfSkipped \
+  --check modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIncompleteCoverageTest.java#R3RepeatedIncompleteObservationInvalidatesOlderCleanCompletion \
+  --check modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIncompleteCoverageTest.java#R6EmptyRepairedRootCompletesWithoutTimestamp \
+  --check modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIncompleteCoverageTest.java#R2LegitimatePolicyAndOwnershipExclusionsPermitWholeEligibleCoverage \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SyncCoverageEvidenceTest.java#R1EmptyMessageExceptionIsAnExplicitSyncFailure \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SyncCoverageEvidenceTest.java#R1CancelledAndInterruptedWalksNeverCompleteCoverage \
+  --check modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIncompleteCoverageTest.java#R6UnchangedEligibleFilesRemainCoverageEvidenceWithoutAdmission \
+  --check modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIncompleteCoverageTest.java#R6AbsentCoverageCannotClearOrCompleteNonemptyRootAsEmpty \
+  --check modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIncompleteCoverageTest.java#R2LiteralPolicyExpansionCannotClearPartialWalk
 ```
 
-From `$TMPDIR/before` (expected assertion failures), save the log as
-`tmp/fu1-repair/pre-repair-2.log` in the candidate and the engine JUnit XML under
-`tmp/fu1-repair/pre-repair/`:
-
 ```bash
-env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:app-engine:test --tests '*EngineIncompleteCoverageTest.R6AbsentCoverageCannotClearOrCompleteNonemptyRootAsEmpty' --tests '*EngineIncompleteCoverageTest.R2LiteralPolicyExpansionCannotClearPartialWalk' --tests '*EngineIncompleteCoverageTest.R6UnchangedEligibleFilesRemainCoverageEvidenceWithoutAdmission' -PskipWebBuild=true --continue
-```
-
-Run this command from `$TMPDIR/fu1-base` (expected assertion failures), then from the
-candidate. Save the respective logs as `tmp/fu1-repair/base-focused.log` and
-`tmp/fu1-repair/candidate-evidence.log`. Copy both classes' JUnit XML files to
-`tmp/fu1-repair/base-focused/` and `tmp/fu1-repair/after-focused/` immediately after each run.
-The class selectors execute every method named by the entries above; parameterized names
-include their method names and resolve with the repository's unchanged XML selector.
-
-```bash
-env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:app-engine:test --tests '*EngineIncompleteCoverageTest' --rerun :modules:worker-services:test --tests '*SyncCoverageEvidenceTest' --rerun -PskipWebBuild=true --continue
-```
-
-The request explicitly permits writing the evidence JSON. The following collector regenerates
-both files from those saved commands and XML using the existing schema, selector, summary,
-classification and digest helpers. Its extra `producer.writer` states how it was produced;
-`producer.script` and its digest identify the gate's required evidence format implementation.
-No run or outcome is inferred from API availability. Execute from the candidate:
-
-```bash
-node --input-type=module <<'JS'
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
-import { spawnSync } from 'node:child_process';
-import { pathToFileURL } from 'node:url';
-const load = rel => import(pathToFileURL(path.resolve(rel)));
-const { EVIDENCE_SCHEMA, EVIDENCE_PRODUCER, contentDigest, evidenceSelfDigest, checkFile } =
-  await load('scripts/governance/gates/test-intent/evidence.mjs');
-const { gradleTarget, parseJUnitXml, selectJUnitCases, summarize, classifyFailBefore } =
-  await load('scripts/governance/gates/test-intent/evidence-runners.mjs');
-const git = (args, env = process.env) => {
-  const r = spawnSync('git', ['-c', 'core.splitIndex=false', '-c', 'core.fsmonitor=false', ...args], { env, encoding: 'utf8' });
-  if (r.status !== 0) throw Error(r.stderr);
-  return r.stdout.trim();
-};
-const changeset = fs.readFileSync('gates/test-intent/.changesets/fu-1.md', 'utf8');
-const { entries } = JSON.parse(/```json\n([\s\S]*?)\n```/.exec(changeset)[1]);
-const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'fu1-evidence-tree-'));
-let tree;
-try {
-  const objects = path.resolve(git(['rev-parse', '--git-path', 'objects']));
-  fs.mkdirSync(path.join(scratch, 'objects'));
-  const env = { ...process.env, GIT_INDEX_FILE: path.join(scratch, 'index'),
-    GIT_OBJECT_DIRECTORY: path.join(scratch, 'objects'), GIT_ALTERNATE_OBJECT_DIRECTORIES: JSON.stringify(objects) };
-  git(['read-tree', 'HEAD'], env);
-  const changed = git(['diff', '--name-only', 'HEAD']).split('\n').filter(Boolean);
-  if (changed.length) git(['add', '--', ...changed], env);
-  tree = git(['write-tree'], env);
-} finally { fs.rmSync(scratch, { recursive: true, force: true }); }
-const directory = 'tmp/fu1-repair';
-const command = "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:app-engine:test --tests '*EngineIncompleteCoverageTest' --rerun :modules:worker-services:test --tests '*SyncCoverageEvidenceTest' --rerun -PskipWebBuild=true --continue";
-const run = (kind, exitCode) => ({ command, cwd: kind === 'after-focused' ? '.' : '$TMPDIR/fu1-base', exitCode,
-  output: fs.readFileSync(`${directory}/${kind === 'after-focused' ? 'candidate-evidence' : 'base-focused'}.log`, 'utf8') });
-const cases = (kind, id) => {
-  const target = gradleTarget(id);
-  return selectJUnitCases(parseJUnitXml(fs.readFileSync(
-    `${directory}/${kind}/TEST-${target.fqcn}.xml`, 'utf8')), target);
-};
-for (const entry of entries) {
-  const evidence = {
-    schema: EVIDENCE_SCHEMA,
-    producer: { script: EVIDENCE_PRODUCER, scriptDigest: contentDigest(fs.readFileSync(EVIDENCE_PRODUCER, 'utf8')),
-      writer: 'Builder-authorized inline collector in fu-1.md, using the evidence schema/parsers; Gradle commands run separately with js-gradle-slot.' },
-    createdAt: new Date().toISOString(), revision: git(['rev-parse', 'HEAD']), tree,
-    environment: { platform: process.platform, arch: process.arch, osRelease: os.release(), node: process.version,
-      java: spawnSync('java', ['-version'], { encoding: 'utf8' }).stderr.trim().split('\n')[0], ci: false },
-    runs: [run('after-focused', 0)],
-    checks: entry.newChecks.map(id => ({ id, file: checkFile(id), runner: 'gradle',
-      contentDigest: contentDigest(fs.readFileSync(checkFile(id), 'utf8')),
-      ...summarize(cases('after-focused', id)), cases: cases('after-focused', id).map(({name, status}) => ({name, status})) })),
-    failBefore: entry.repaired ? { ref: 'b21749f0e07917daceb0df14e57bd2e9163cb91b',
-      revision: 'b21749f0e07917daceb0df14e57bd2e9163cb91b', overlays: [], patches: [],
-      runs: [run('base-focused', 1)], checks: entry.newChecks.map(id => ({ id,
-        ...classifyFailBefore({ runner: 'gradle', cases: cases('base-focused', id), buildOutput: fs.readFileSync(`${directory}/base-focused.log`, 'utf8') }) })) } : null,
-  };
-  if (entry.repaired) evidence.preRepairCounterexamples = {
-    revision: 'bbcb4090fc9ae41e520b7e7bd3fb7142b6275285',
-    command: "env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew :modules:app-engine:test --tests '*EngineIncompleteCoverageTest.R6AbsentCoverageCannotClearOrCompleteNonemptyRootAsEmpty' --tests '*EngineIncompleteCoverageTest.R2LiteralPolicyExpansionCannotClearPartialWalk' --tests '*EngineIncompleteCoverageTest.R6UnchangedEligibleFilesRemainCoverageEvidenceWithoutAdmission' -PskipWebBuild=true --continue",
-    exitCode: 1, output: fs.readFileSync(`${directory}/pre-repair-2.log`, 'utf8'),
-    checks: entry.newChecks.filter(id => /#(R6AbsentCoverage|R2LiteralPolicyExpansion)/.test(id)).map(id => ({ id,
-      ...classifyFailBefore({ runner: 'gradle', cases: cases('pre-repair', id), buildOutput: '' }) })),
-  };
-  evidence.digest = evidenceSelfDigest(evidence);
-  fs.writeFileSync(entry.evidence, JSON.stringify(evidence, null, 2) + '\n');
-  for (const c of evidence.checks) if (c.outcome !== 'passed') throw Error(`${c.id}: ${c.outcome}`);
-  for (const c of evidence.failBefore?.checks ?? []) if (c.classification !== 'assertion') throw Error(`${c.id}: ${c.classification}`);
-  console.log(`${entry.evidence}: ${evidence.checks.length} passing selectors`);
-}
-JS
+env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot node scripts/governance/gates/test-intent/run-evidence.mjs \
+  --out gates/test-intent/evidence/fu-1-preservation.json \
+  --check modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIncompleteCoverageTest.java#R1NonqualifyingSyncCannotClear \
+  --check modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIncompleteCoverageTest.java#R2RestrictedRecordedScopeCannotClear \
+  --check modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIncompleteCoverageTest.java#R2LiteralPolicyChangedDuringEnumerationCannotClear \
+  --check modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIncompleteCoverageTest.java#R4RemovedRegistrationRejectsAResultAwaitingApplication \
+  --check modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIncompleteCoverageTest.java#R5ReloadWhileUnreadableRetainsWarningAndBootAfterRepairClears \
+  --check modules/app-engine/src/test/java/io/justsearch/app/engine/EngineIncompleteCoverageTest.java#R8SuccessfulSyncLeavesOtherWalkErrorsAndUnrelatedRootsAlone
 ```
 
 Required final checks (Gradle runs in the background, one at a time):
@@ -302,10 +221,10 @@ env -u DISPLAY -u WAYLAND_DISPLAY node scripts/dev/java-prepush.mjs --unreferenc
   durable warning remains, after the success and zero-admission assertions have passed.
 - Final focused candidate: engine 40/40 and worker 2/2 passed, none skipped; command exit 0.
   Both test tasks were freshly executed with `--rerun`.
-- Evidence regenerated: 13 repair selectors (27 cases), six preservation selectors (15 cases).
-  The request-authorized collector records actual command logs, selected XML and source
-  digests; its writer is identified explicitly. No compatibility patch or new production API
-  is used to make the base compile.
+- Evidence: produced by run-evidence.mjs with the commands above (orchestrator, after an
+  acceptor rejected an earlier hand-collected version): 13 repair selectors failing before by
+  assertion and passing after, six preservation selectors passing. No compatibility patch or
+  new production API is used to make the base compile.
 - Test-intent gate: exit 1, only `acceptance-missing`; no source or evidence errors remain.
 - Module suites: exit 1 after 16m01s, exactly the six listed environment failures; no other
   failures. App-services: 5,106 tests, zero failures, 11 skipped. App-engine: 930 tests, two
