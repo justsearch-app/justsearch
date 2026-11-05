@@ -208,7 +208,7 @@ final class RecordedIngestionCoordinatorTest {
     }
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(booleans = {false, true})
   void dispatchesAcceptedWatchedReindexThroughMembershipFencedProducer(boolean reindex) throws Exception {
     try (Fixture f = new Fixture(temp, 1)) {
@@ -556,6 +556,103 @@ final class RecordedIngestionCoordinatorTest {
       f.coordinator.maintain();
       assertEquals(OperationState.COMPLETE, result.completion().toCompletableFuture().get(2, java.util.concurrent.TimeUnit.SECONDS).state());
       assertEquals(0, f.admission.activeWorkCount());
+    }
+  }
+
+  @Test
+  void openImportKeepsCompletedChildEvidenceThroughRetentionAndRestart() throws Exception {
+    String parentKey;
+    String firstChild;
+    String secondChild;
+    RecordedRootPlan frozen;
+    int prunedJobs;
+    int prunedLedger;
+    JobQueue.SealedWalkReceipt completedReceipt;
+    try (Fixture f = new Fixture(temp, 2)) {
+      frozen = f.plan;
+      bindProducer(f.coordinator, (plan, key, epoch, context, cancellation) -> {
+        Path root = plan.roots().getFirst().path();
+        try {
+          Path file = Files.writeString(root.resolve("member.txt"), "retained import member");
+          f.queue.enqueueRecordedEntries(key, epoch,
+              List.of(JobQueue.EnqueueEntry.ofUnknownSize(file).withinRoot(root)), null);
+        } catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
+        return CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.COMPLETE);
+      });
+      var request = f.request(); parentKey = request.key();
+      var accepted = f.accept(request);
+      try (var work = f.admission.admit(request.context(), false)) {
+        f.runner.start(accepted, handle -> f.coordinator.execute(handle, work.context()));
+      }
+      var first = f.queue.pollPending(1).getFirst(); firstChild = first.scanId();
+      f.queue.markDoneTransitions(List.of(new JobQueue.IngestionLedgerTransition(first, null, "a".repeat(64))),
+          io.justsearch.indexerworker.ingest.IngestionOutcome.of(
+              io.justsearch.indexerworker.ingest.IngestionOutcomeClass.SUCCESS_FULL, "SUCCESS",
+              io.justsearch.indexerworker.ingest.IngestionRetryPolicy.NONE));
+      f.coordinator.maintain();
+      secondChild = f.operations.findIngestChild(parentKey, oneRoot(frozen, 1)).orElseThrow().key();
+      assertEquals(OperationState.COMPLETE, f.operations.find(firstChild).orElseThrow().state());
+      assertFalse(f.operations.find(parentKey).orElseThrow().state().terminal());
+      var receipt = f.queue.sealedRecordedWalkReceipt(firstChild).orElseThrow();
+      completedReceipt = receipt;
+      assertEquals(receipt.revision(), f.queue.recordedWalk(firstChild).orElseThrow().acknowledgedRevision());
+      // Interrupt B before retention runs; cleanup must use the open durable parent, not live work.
+      f.coordinator.stopProducers(1000);
+      f.attachment.close();
+      // Controlled record age also reproduces the defect on the base, before the clock seam exists.
+      try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + temp.resolve("jobs.db"));
+          var update = connection.prepareStatement("UPDATE jobs SET last_updated=1 WHERE scan_id=?")) {
+        update.setString(1, firstChild); assertEquals(1, update.executeUpdate());
+      }
+      try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + temp.resolve("jobs.db"));
+          var update = connection.prepareStatement("UPDATE ingestion_ledger SET observed_at=1 WHERE operation_key=?")) {
+        update.setString(1, firstChild); assertEquals(1, update.executeUpdate());
+      }
+      try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + temp.resolve("jobs.db"));
+          var update = connection.prepareStatement("UPDATE ingestion_walk_progress SET sealed_at=1,enumeration_closed_at=1 WHERE operation_key=?")) {
+        update.setString(1, firstChild); assertEquals(1, update.executeUpdate());
+      }
+      prunedJobs = f.queue.cleanupOldJobs(30);
+      prunedLedger = f.queue.cleanupOldLedgerEvents(30);
+    }
+    try (var operations = new SqliteOperationStore(temp.resolve("operations.db"))) {
+      var runner = new OperationAttemptRunnerImpl(operations, CLOCK,
+          Set.of(OperationKind.INGEST, OperationKind.REINDEX, OperationKind.ACCEPT_GAPS), null,
+          new RecordedIngestPlanResolver());
+      var coordinator = new RecordedIngestionCoordinator(operations, runner,
+          new EngineAdmissionController(2, 2, 1), OperationAuthority.load(temp.resolve("authority")));
+      try (var queue = queueWithAgedRetentionClock(temp.resolve("jobs.db"), coordinator::recordedClaimDecision)) {
+        queue.open();
+        try (var _ = coordinator.attach(queue, () -> Optional.of(GENERATION), () -> true)) {
+          bindProducer(coordinator, (plan, key, epoch, context, cancellation) -> {
+            throw new AssertionError("closed enumeration must drain recorded members without traversal");
+          });
+          coordinator.maintain();
+          var pending = queue.pollPending(10);
+          // Let the base reach its actual unavailable-recovery outcome before judging it.
+          if (!pending.isEmpty()) {
+            assertEquals(1, pending.size()); assertEquals(secondChild, pending.getFirst().scanId());
+            queue.markDoneTransitions(List.of(new JobQueue.IngestionLedgerTransition(pending.getFirst(), null, "b".repeat(64))),
+                io.justsearch.indexerworker.ingest.IngestionOutcome.of(
+                    io.justsearch.indexerworker.ingest.IngestionOutcomeClass.SUCCESS_FULL, "SUCCESS",
+                    io.justsearch.indexerworker.ingest.IngestionRetryPolicy.NONE));
+          }
+          coordinator.maintain();
+          var parent = operations.find(parentKey).orElseThrow();
+          assertEquals(OperationState.COMPLETE, parent.state(),
+              "retention must preserve A's receipt so restart can continue B: " + parent);
+          assertEquals(1, pending.size());
+          assertEquals(0, prunedJobs, "open parent must retain its completed child's job");
+          assertEquals(0, prunedLedger, "open parent must retain its child's ledger");
+          assertEquals(completedReceipt, queue.sealedRecordedWalkReceipt(firstChild).orElseThrow(), "exact sealed evidence survives");
+          assertEquals(2, parent.unitsCompleted());
+          assertEquals(2, queue.cleanupOldJobs(30), "terminal parent releases job retention");
+          assertEquals(2, queue.cleanupOldLedgerEvents(30), "terminal parent releases ledger retention");
+          assertTrue(queue.recordedWalk(firstChild).isEmpty(), "released receipt can expire");
+          assertTrue(queue.recordedWalk(secondChild).isEmpty());
+          coordinator.stopProducers(1000);
+        }
+      }
     }
   }
 
@@ -2307,6 +2404,17 @@ final class RecordedIngestionCoordinatorTest {
     }
   }
 
+  private static SqliteJobQueue queueWithAgedRetentionClock(Path db,
+      java.util.function.Function<String, JobQueue.RecordedClaimDecision> policy) throws Exception {
+    try {
+      // The base has no clock constructor. Its assertion uses explicitly aged job/ledger rows.
+      return SqliteJobQueue.class.getConstructor(Path.class, java.util.function.Function.class, Clock.class)
+          .newInstance(db, policy, Clock.fixed(Instant.parse("2100-01-01T00:00:00Z"), java.time.ZoneOffset.UTC));
+    } catch (NoSuchMethodException baseWithoutClockSeam) {
+      return new SqliteJobQueue(db, policy);
+    }
+  }
+
   private static final class Fixture implements AutoCloseable {
     final SqliteOperationStore operations;
     final SqliteJobQueue queue;
@@ -2339,7 +2447,7 @@ final class RecordedIngestionCoordinatorTest {
       runner = new OperationAttemptRunnerImpl(operations, CLOCK, Set.of(OperationKind.INGEST, OperationKind.REINDEX, OperationKind.ACCEPT_GAPS),
           null, new RecordedIngestPlanResolver());
       coordinator = new RecordedIngestionCoordinator(operations, runner, admission, authority);
-      queue = new SqliteJobQueue(directory.resolve("jobs.db"), key -> fixtureClaimOwner.get() ? JobQueue.RecordedClaimDecision.ALLOW : coordinator.recordedClaimDecision(key));
+      queue = queueWithAgedRetentionClock(directory.resolve("jobs.db"), key -> fixtureClaimOwner.get() ? JobQueue.RecordedClaimDecision.ALLOW : coordinator.recordedClaimDecision(key));
       queue.open();
       attachment = coordinator.attach(queue, () -> Optional.of(generation), () -> true);
     }
