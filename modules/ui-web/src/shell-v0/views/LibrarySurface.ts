@@ -2135,6 +2135,7 @@ export class LibrarySurface extends JfElement {
             context="button"
             operation-id="core.trigger-offline-processing"
             api-base=${this.apiBase}
+            @op-error=${(e: CustomEvent<OpErrorEventDetail>) => { this.error = e.detail.message; }}
           ></jf-operation>
           </div></details>
           <jf-button

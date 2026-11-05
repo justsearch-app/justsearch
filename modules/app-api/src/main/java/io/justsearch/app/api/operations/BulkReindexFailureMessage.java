@@ -11,6 +11,10 @@ public final class BulkReindexFailureMessage {
    */
   public static String forOperation(String operationRef, String code) {
     if (operationRef == null || code == null) return null;
+    // This read-time seam also projects offline-processing receipts in history and replay.
+    if (operationRef.equals("core.trigger-offline-processing") && code.equals("PICTURE_READING_OFF")) {
+      return "Picture reading is off. Turn it on to process pending work.";
+    }
     if (!operationRef.equals("core.bulk-reindex") && !operationRef.equals("core.rebuild-index")
         && !operationRef.equals("core.activate-installed-models")) return null;
     String sentence = switch (code) {

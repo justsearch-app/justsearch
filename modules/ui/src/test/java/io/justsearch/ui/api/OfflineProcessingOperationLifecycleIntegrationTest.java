@@ -173,6 +173,70 @@ final class OfflineProcessingOperationLifecycleIntegrationTest {
     }
   }
 
+  @Test
+  void pictureOffRefusesHttpAndRecordsTheReasonWithoutStartingWork() throws Exception {
+    try (var fixture = new Fixture(directory.resolve("picture-off.db"))) {
+      fixture.coordinator.pictureReadingEnabled(() -> false);
+      var dispatcher = mock(io.justsearch.agent.api.registry.OperationDispatcher.class);
+      when(dispatcher.dispatch(any(), any(), any(), any(), any(EngineContext.class)))
+          .thenAnswer(call -> fixture.startRecorded().response());
+      var controller = new OperationsController(List.of(new CoreOperationCatalog()), dispatcher);
+      var app = io.javalin.Javalin.create();
+      try {
+        app.before(ctx -> ctx.attribute(RequestEngineContext.ATTRIBUTE, fixture.caller));
+        app.post(OperationsController.INVOKE_PATH, controller::handleInvoke);
+        app.start("127.0.0.1", 0);
+        var response = java.net.http.HttpClient.newHttpClient().send(
+            java.net.http.HttpRequest.newBuilder(java.net.URI.create("http://127.0.0.1:"
+                + app.port() + "/api/operations/core.trigger-offline-processing/invoke"))
+                .header("Content-Type", "application/json")
+                .POST(java.net.http.HttpRequest.BodyPublishers.ofString("{\"args\":{}}"))
+                .build(), java.net.http.HttpResponse.BodyHandlers.ofString());
+        var body = tools.jackson.databind.json.JsonMapper.builder().build().readTree(response.body());
+        assertTrue(body.path("message").asString().contains("Picture reading is off"), response.body());
+        assertFalse(body.path("success").asBoolean(true), response.body());
+        assertEquals("PICTURE_READING_OFF", body.path("errorCode").asString());
+        assertFalse(body.path("retryable").asBoolean(true));
+      } finally { app.stop(); }
+      var row = fixture.store.find(fixture.operationKey).orElseThrow();
+      assertEquals(OperationState.FAILED, row.state());
+      assertEquals("PICTURE_READING_OFF", row.receipt().code());
+      var outcome = fixture.store.outcome(fixture.operationKey);
+      assertEquals("PICTURE_READING_OFF", outcome.reason());
+      assertTrue(outcome.message().contains("Picture reading is off"));
+      verify(fixture.client, never()).recoverVduProcessing(any());
+      fixture.verifyNoDocumentEffects();
+      assertEquals(0, fixture.admission.activeWorkCount());
+    }
+  }
+
+  @Test
+  void pictureOffDuringStartCompletesWithTheSameRecordedRefusal() throws Exception {
+    try (var fixture = new Fixture(directory.resolve("picture-off-during-start.db"))) {
+      var enabled = new java.util.concurrent.atomic.AtomicBoolean(true);
+      fixture.coordinator.pictureReadingEnabled(enabled::get);
+      var hold = new io.justsearch.core.scheduling.IndexingHold();
+      hold.pause(null, "USER_PAUSED");
+      when(fixture.client.indexingHold()).thenReturn(hold);
+      try {
+        var running = fixture.start();
+        assertEquals("Enrichment pass started", running.response().message());
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (hold.snapshot().waiting() == 0 && System.nanoTime() < deadline) Thread.sleep(5);
+        assertEquals(1, hold.snapshot().waiting());
+        enabled.set(false);
+        var terminal = fixture.await(running);
+        assertEquals(OperationState.FAILED, terminal.state());
+        assertEquals("PICTURE_READING_OFF", terminal.receipt().code());
+        var outcome = fixture.store.outcome(fixture.operationKey);
+        assertEquals("PICTURE_READING_OFF", outcome.reason());
+        assertTrue(outcome.message().contains("Picture reading is off"));
+        fixture.verifyNoDocumentEffects();
+        assertEquals(0, fixture.admission.activeWorkCount());
+      } finally { hold.resume(); }
+    }
+  }
+
   private static final class Fixture implements AutoCloseable {
     final SqliteOperationStore store;
     final OperationAttemptRunnerImpl runner;
@@ -211,7 +275,7 @@ final class OfflineProcessingOperationLifecycleIntegrationTest {
           executors, admission, batch, () -> client, new VduCapabilityState());
       var brain = new BrainRuntimeServiceImpl(mock(OnlineAiService.class),
           (context, progress) -> {
-            var completion = coordinator.startOfflineProcessing(context, progress);
+            var completion = coordinator.startExplicitProcessing(context, progress);
             coordinatorCompletion.set(completion);
             return completion;
           });
@@ -219,6 +283,12 @@ final class OfflineProcessingOperationLifecycleIntegrationTest {
     }
 
     OperationAttemptRunner.Result start() {
+      var result = startRecorded();
+      assertTrue(result.response().success(), result.response().message());
+      return result;
+    }
+
+    OperationAttemptRunner.Result startRecorded() {
       var descriptor = OperationDescriptor.invocation(OperationKind.OPERATION,
           CoreOperationCatalog.TRIGGER_OFFLINE_PROCESSING.value(), "{}", false);
       try (var dispatch = admission.admit(caller, false)) {
@@ -226,10 +296,8 @@ final class OfflineProcessingOperationLifecycleIntegrationTest {
         var prepared = runner.accept(
             new OperationAttemptRunner.Request(null, descriptor, dispatchContext, null));
         operationKey = prepared.accepted().key();
-        OperationAttemptRunner.Result result = runner.start(prepared, record ->
+        return runner.start(prepared, record ->
             handler.executeRecorded("{}", null, dispatchContext, record));
-        assertTrue(result.response().success());
-        return result;
       }
     }
 

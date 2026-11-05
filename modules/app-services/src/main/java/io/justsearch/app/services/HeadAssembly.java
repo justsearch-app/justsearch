@@ -2268,7 +2268,8 @@ public final class HeadAssembly implements AutoCloseable {
         inferenceManager,
         generativeComponent,
         inferenceBaseDir,
-        inferenceLiteMode);
+        inferenceLiteMode,
+        offlineCoordinator);
   }
 
   public io.justsearch.app.services.bootstrap.CapabilityGraph capabilities() {

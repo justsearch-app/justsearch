@@ -56,8 +56,16 @@ public final class SettingsServiceImpl implements SettingsService {
         "servingRefreshProfileId");
   }
 
-  private static void requireRerankerChoiceAuthority(io.justsearch.app.api.settings.SettingsV2 input,
+  private static void requireFeatureChoiceAuthority(io.justsearch.app.api.settings.SettingsV2 input,
       io.justsearch.app.api.UiSettings saved) {
+    if (input.pictureReadingEnabled() != null
+        && (Boolean.TRUE.equals(input.pictureReadingSwitchIntent())
+            || !Objects.equals(input.pictureReadingEnabled(), saved.getPictureReadingEnabled()))
+        && io.justsearch.configuration.EnvRegistry.MMPROJ_MODEL.get()
+            .filter(value -> !value.isBlank()).isPresent()) {
+      throw refused("PICTURE_READING_OVERRIDDEN",
+          "Text in scans and images is controlled by an operator override; change that override first");
+    }
     if (input.rerankerEnabled() == null
         || (!Boolean.TRUE.equals(input.rerankerSwitchIntent())
             && Objects.equals(input.rerankerEnabled(), saved.getRerankerEnabled()))) return;
@@ -117,7 +125,7 @@ public final class SettingsServiceImpl implements SettingsService {
       }
       Long latest = modeIntent == null ? null : latestUiModeIntentByClient.get(modeIntent.clientId());
       boolean applyMode = modeIntent == null || latest == null || modeIntent.sequence() > latest;
-      requireRerankerChoiceAuthority(patch, snapshot.settings());
+      requireFeatureChoiceAuthority(patch, snapshot.settings());
       var candidate = SettingsPatch.merge(snapshot.settings(), patch, applyMode);
       String invalidPath = SettingsPatch.validateIndexPath(candidate.getIndexBasePath());
       if (invalidPath != null) throw refused("INVALID_PATH", invalidPath);
@@ -265,7 +273,7 @@ public final class SettingsServiceImpl implements SettingsService {
       Long latest = modeIntent == null ? null : latestUiModeIntentByClient.entrySet().stream()
           .filter(entry -> entry.getKey().equals(modeIntent.clientId())).map(Map.Entry::getValue).findFirst().orElse(null);
       boolean applyMode = modeIntent == null || latest == null || modeIntent.sequence() > latest;
-      requireRerankerChoiceAuthority(patch, snapshot.settings());
+      requireFeatureChoiceAuthority(patch, snapshot.settings());
       var candidate = SettingsPatch.merge(snapshot.settings(), patch, applyMode);
       String invalidPath = SettingsPatch.validateIndexPath(candidate.getIndexBasePath());
       if (invalidPath != null) throw refused("INVALID_PATH", invalidPath);

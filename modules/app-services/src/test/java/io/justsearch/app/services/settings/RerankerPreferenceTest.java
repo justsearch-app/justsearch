@@ -62,7 +62,7 @@ final class RerankerPreferenceTest {
     assertEquals(Boolean.FALSE, after.settings().getRerankerEnabled());
     assertEquals(candidate.getRerankerRestoreSelection(), after.settings().getRerankerRestoreSelection());
     assertEquals(disabled, after.queryRoles());
-    assertEquals(8, json.readTree(Files.readString(store.settingsPath())).get("schemaVersion").intValue());
+    assertEquals(9, json.readTree(Files.readString(store.settingsPath())).get("schemaVersion").intValue());
   }
 
   @Test

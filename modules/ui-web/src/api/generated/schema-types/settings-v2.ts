@@ -29,6 +29,9 @@ export interface SettingsV2 {
     modelPath?: string | null;
     serverExecutable?: string | null;
   } | null;
+  pictureReadingSwitchIntent?: boolean;
+  pictureReadingEnabled?: boolean | null;
+  pictureReadingOverrideEnabled?: boolean | null;
   pauseAnswersWhileIndexing?: boolean | null;
   operationKey?: string | null;
   rerankerEnabled?: boolean | null;
@@ -93,6 +96,9 @@ export const settingsV2Schema = z.strictObject({
     "modelPath": z.string().nullable().optional(),
     "serverExecutable": z.string().nullable().optional(),
   }).nullable().optional(),
+  "pictureReadingSwitchIntent": z.boolean().optional(),
+  "pictureReadingEnabled": z.boolean().nullable().optional(),
+  "pictureReadingOverrideEnabled": z.boolean().nullable().optional(),
   "pauseAnswersWhileIndexing": z.boolean().nullable().optional(),
   "operationKey": z.string().nullable().optional(),
   "rerankerEnabled": z.boolean().nullable().optional(),

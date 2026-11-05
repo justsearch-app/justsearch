@@ -148,6 +148,15 @@ public interface AiInstallService {
     return startInstall(acceptTerms);
   }
 
+  /** Carries the consented picture-reader enable intent through acquisition completion. */
+  default Attempt startInstall(boolean acceptTerms, boolean enableRerankerOnCompletion,
+      boolean enablePictureReadingOnCompletion) {
+    if (enablePictureReadingOnCompletion) {
+      throw new UnsupportedOperationException("Picture reading install intent unavailable");
+    }
+    return startInstall(acceptTerms, enableRerankerOnCompletion);
+  }
+
   /** Request cancellation of an in-flight install. */
   void cancel();
 

@@ -105,8 +105,13 @@ public final class ConfigStoreRebuilder {
           "chatProfile", chatProfile.id());
       builder.put(EnvRegistry.VLM_MODEL.configKey(), ACTIVATION_ORDINAL, ACTIVATION_SOURCE,
           "chatProfile", chatProfile.modelFile());
-      builder.put(EnvRegistry.MMPROJ_MODEL.configKey(), ACTIVATION_ORDINAL, ACTIVATION_SOURCE,
-          "chatProfile", chatProfile.mmprojFile());
+      // A profile supplies a companion only when no per-file choice was resolved. In
+      // particular, the saved Off and genuine operator paths must survive activation.
+      var projector = selected.resolution(EnvRegistry.MMPROJ_MODEL.configKey());
+      if (projector == null || !projector.isResolved() || "default".equals(projector.sourceName())) {
+        builder.put(EnvRegistry.MMPROJ_MODEL.configKey(), ACTIVATION_ORDINAL, ACTIVATION_SOURCE,
+            "chatProfile", chatProfile.mmprojFile());
+      }
       selected = builder.build();
     }
     Map<String, String> derived = new LinkedHashMap<>();
@@ -266,6 +271,9 @@ public final class ConfigStoreRebuilder {
   public static void contributeUiSettings(ResolvedConfigBuilder builder, UiSettings settings) {
     builder.putSettings("justsearch.index.base_path", settings.getIndexBasePath());
     builder.putSettings("justsearch.llm.model_path", settings.getLlmModelPath());
+    if (Boolean.FALSE.equals(settings.getPictureReadingEnabled())) {
+      builder.putSettings(EnvRegistry.MMPROJ_MODEL.configKey(), "none");
+    }
     // ${user.home} expansion used to happen only in SettingsController's server.exe promotion, so a
     // placeholder resolved differently before and after a settings PUT. Tempdoc 883 decision 4
     // slice 2 deleted that promotion; the expansion moves here, where the value actually enters the

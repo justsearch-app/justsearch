@@ -39,5 +39,7 @@
     "footprintBytes" : 20
   },
   "rerankerEnabled" : null,
-  "pauseAnswersWhileIndexing" : null
+  "pauseAnswersWhileIndexing" : null,
+  "pictureReadingEnabled" : null,
+  "pictureReadingOverrideEnabled" : null
 }

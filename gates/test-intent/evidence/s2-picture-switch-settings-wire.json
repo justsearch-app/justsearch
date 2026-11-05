@@ -1,0 +1,96 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-04T22:06:18.964Z",
+  "revision": "bcc5ece3c64961dbd224dffbae599675e265ac85",
+  "tree": "00f00b0414325c136bb5bd60dfc76bb323095057",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-api:test --tests \"io.justsearch.app.api.settings.PictureReadingSettingsWireTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 14882
+    },
+    {
+      "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.PictureReadingSettingsHttpTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 15767
+    },
+    {
+      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.settings.PictureReadingPreferenceTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 6570
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/settings/PictureReadingSettingsWireTest.java",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/settings/PictureReadingSettingsWireTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ee1a2a2b28d7962e82e387ad2be47afbfff834cc9651f0f6d080c80bb5954751",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ordinarySettingsHaveNoExplicitPictureChoiceOrSwitchIntent()",
+          "status": "passed"
+        },
+        {
+          "name": "explicitSwitchIntentRequiresItsChoiceAndSurvivesRoundTrip()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/PictureReadingSettingsHttpTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/PictureReadingSettingsHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8a90c6cb09dedc1d8b45abe15fa546de8ff6c4f87bb523a017a7467d7b5eac2e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "witnessedHttpSwitchCommitsLiveAndAStaleWindowCannotReplaceIt(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/settings/PictureReadingPreferenceTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/settings/PictureReadingPreferenceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f9256c0a08f99de3b83e2e91482fc0abc499e8840ac77acfa11656bd1ca89fea",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "offPatchSurvivesReopenAndDoesNotChangeAnswersOrAcquisition(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "everyLegacyVersionKeepsAutomaticPictureReadingAndItsOtherChoices(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:c04fb86f364ecb7dc7b567b5ae64b87bb678f18fff71bbe84905526eec10c116"
+}
