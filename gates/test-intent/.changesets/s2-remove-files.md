@@ -707,6 +707,56 @@ The brief's adopted scenarios are quoted below; choices the scenarios leave open
     },
     {
       "items": [
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/RolledBackChildOwnershipTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalRepair5Test.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Repair round 5 of the reviewed candidate (da0b41ef2f). A launch whose manifest registration was refused is rolled back, and that rollback can end the root while ending what the root started fails; the refusal then reports no survivor. Both owners that read the answer model's files as in use, the managed-server launch owner and the self-test launcher, now keep that rolled-back child until its root has exited and its retained scope lists no running process (an unreadable scope counts as in use), so the removal of the answer model refuses meanwhile; before the change a rolled-back child whose root had exited was forgotten by both owners and the files read as free while its descendant still ran. A place of a part whose presence cannot be determined (an access or I/O failure rather than 'no such file', here a retained Best match first variant folder the account cannot search) is no longer treated as absent: when the files are listed it is shown kept as 'kept - could not be checked', a target that becomes impossible to check during the removal is kept with that reason, the final look at every canonical place and recovery after a crash report it the same way, it is never reported deleted, and the removal is 'partly-removed' (or 'not-removed'), never 'removed'; before the change the inaccessible variant was omitted (or, during the removal, kept as 'in a linked folder', which counted as an ownership failure), the accessible one was deleted and the result said 'removed', and recovery listed nothing for it. Each check failed by assertion on da0b41ef2f with no overlay or patch. The permission cases need POSIX permissions and an account that folder permissions restrict (they skip as root and on Windows); the ownership cases use a real descendant process and run on both platforms.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "X3",
+          "quote": "Removal is safe under failure: permission or sharing errors, a path replaced by a link, process death between steps, restart midway: the page reports the files actually left, never \"removed\" while files remain, and never re-enables the part; a second window or a repeated click cannot start a second removal. Source documents, the index and conversations are untouched.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "X4",
+          "quote": "Removal cannot race new users: Remove versus switching the part on, Repair, import, activation or index generation preparation, in both orders and through the page, agents and HTTP; once removal starts, no new user takes the files until it ends. On Windows removal waits for or refuses until native sessions and child processes have released the files. After partial deletion or a crash, removal intent and the files left are reported; recovery does not turn it into a deferred deletion. Linked or junctioned parent folders are refused. (challenger-4 #9, #10)",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
+          "choice": "Repair round 5, rolled-back launches: ChildRegistrationRefusedException hands over the rolled-back child also when its root exited (rolledBack()); the managed-server launch owner (LlamaServerProcessOwnership) and the self-test launcher (ChildSelfTestLauncher) retain it, with the processes the self-test saw it start, until its exit is recorded and its retained scope (Windows job members, or the birth-checked descendant handles elsewhere) is readable and lists no running process; while retained, the answer model's removal refuses with the owners' existing reasons ('The answer model is still loaded - try again in a moment', 'The answer model is being tested - try again when it finishes'). ChildControl still ends what such a child left before the next chat-server start, as before.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
+          "choice": "Repair round 5, places that could not be checked: only 'no such file' (NoSuchFileException) counts as absent wherever the removal decides whether a file is there (listing and measuring the part, each target before capture, the final look at every canonical place, settling an unfinished entry in a stopped removal or in recovery, the removal folder and the removal record itself). Any other failure is undetermined: the place is kept and listed 'kept - could not be checked' with an unknown size, it is never reported deleted, and it keeps the removal from being reported complete; a measured size that includes such a place is unknown. A removal record whose presence cannot be determined is reported as an unreadable record.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s2-remove-files-repair5.json",
+      "newChecks": [
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/RolledBackChildOwnershipTest.java#theLaunchOwnerKeepsARolledBackServerUntilItsSurvivingDescendantIsGone",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/RolledBackChildOwnershipTest.java#theSelfTestLauncherKeepsARolledBackCandidateUntilItsSurvivingDescendantIsGone",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/RolledBackChildOwnershipTest.java#aRolledBackChildWhoseScopeCannotBeReadIsNotConfirmedGone",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalRepair5Test.java#anInaccessibleRetainedVariantIsReportedAndTheRemovalIsOnlyPartly",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalRepair5Test.java#aVariantFolderThatBecomesInaccessibleDuringTheRemovalIsReportedAndKept",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalRepair5Test.java#recoveryReportsAPlaceThatCouldNotBeCheckedAndNeverCallsItDeleted"
+      ]
+    },
+    {
+      "items": [
         "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java",
         "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalQueryOwnersTest.java"
       ],

@@ -22,6 +22,19 @@ public final class StartedProcesses {
   }
 
   /**
+   * Design D4: whether {@code child} is confirmed gone: its exit was recorded and its retained scope
+   * is readable and lists no running process. An unreadable scope is not confirmed.
+   */
+  public static boolean released(ChildHandle child) {
+    if (!child.exit().toCompletableFuture().isDone()) return false;
+    try {
+      return of(child).stream().noneMatch(ProcessTerminator::isRunning);
+    } catch (RuntimeException unreadable) {
+      return false;
+    }
+  }
+
+  /**
    * Waits, at most {@code max} in total, for every process to exit. An interrupt does not end the
    * wait (the next launch must not overlap them); it is restored for the caller.
    *

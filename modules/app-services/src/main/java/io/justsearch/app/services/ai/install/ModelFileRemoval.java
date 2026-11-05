@@ -95,7 +95,10 @@ import tools.jackson.databind.json.JsonMapper;
  * checked removal folder's own handle; where neither exists it is kept. Afterwards every canonical
  * place of the part is looked at again (repair round 4: also places that were empty when the
  * removal was prepared): a file that appeared there is kept and reported, and the removal is not
- * reported complete.
+ * reported complete. Only "no such file" counts as absent (repair round 5): a place whose presence
+ * cannot be determined (an inaccessible folder, say), when the files are listed, before the outcome
+ * is reported and in recovery, is kept and reported "could not be checked", is never reported
+ * deleted, and keeps the removal from being reported complete.
  *
  * <p>Threat model (decided by the user): programs running under the user's own account are
  * trusted; other accounts are kept out by the owner-only removal folder. Two steps still act on a
@@ -137,6 +140,11 @@ final class ModelFileRemoval {
   static final String KEPT_PUT_BACK = "kept - the removal was interrupted; the file was put back";
   static final String KEPT_UNCERTAIN = "kept - not touched: its place could not be checked";
   static final String KEPT_STOPPED = "kept - the removal stopped before this file";
+  /**
+   * Whether a file is at one of the part's places could not be determined (an inaccessible folder,
+   * say): it is not known to be gone, so it is reported and keeps the removal from being complete.
+   */
+  static final String KEPT_UNCHECKED = "kept - could not be checked";
 
   /** The removal folder is not private to the Engine's user: the whole removal refuses or stops. */
   static final String FOLDER_NOT_PRIVATE =
@@ -244,6 +252,24 @@ final class ModelFileRemoval {
   // Inventory and preview
   // ---------------------------------------------------------------------------
 
+  /** What looking at a path found: a file, confirmed absence, or neither could be determined. */
+  enum Seen { PRESENT, ABSENT, UNKNOWN }
+
+  /**
+   * Looks at {@code p} without following links. Only "no such file" is absence: an access or I/O
+   * failure (an inaccessible folder, say) leaves it undetermined, never absent.
+   */
+  static Seen lookAt(Path p) {
+    try {
+      Files.readAttributes(p, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+      return Seen.PRESENT;
+    } catch (java.nio.file.NoSuchFileException absent) {
+      return Seen.ABSENT;
+    } catch (IOException | SecurityException undetermined) {
+      return Seen.UNKNOWN;
+    }
+  }
+
   /** One file the registry places for a part. */
   record Expected(String rel, String sha256, long size, boolean partial) {}
 
@@ -301,8 +327,13 @@ final class ModelFileRemoval {
     boolean unknown = false;
     for (Expected e : expected(pkg, recorded)) {
       Path p = root.resolve(e.rel()).normalize();
-      if (!Files.exists(p, LinkOption.NOFOLLOW_LINKS)) continue;
+      Seen seen = lookAt(p);
+      if (seen == Seen.ABSENT) continue;
       any = true;
+      if (seen == Seen.UNKNOWN) {
+        unknown = true;
+        continue;
+      }
       try {
         total = Math.addExact(total, Files.size(p));
       } catch (IOException | ArithmeticException unreadable) {
@@ -438,7 +469,10 @@ final class ModelFileRemoval {
     return dir == null || dir.isEmpty() ? name : dir + "/" + name;
   }
 
-  /** Present files for {@code pkg}, each classified by rules 1-3 and 5 (4 is checked at deletion). */
+  /**
+   * Present files for {@code pkg}, each classified by rules 1-3 and 5 (4 is checked at deletion). A
+   * place whose presence could not be determined is listed, kept, as {@link #KEPT_UNCHECKED}.
+   */
   List<Found> classify(ModelRegistry reg, ModelPackage pkg, InstallContract recorded,
       Set<String> declined) {
     Map<Path, String> others = new LinkedHashMap<>();
@@ -455,8 +489,10 @@ final class ModelFileRemoval {
     List<Found> found = new ArrayList<>();
     for (Expected e : expected(pkg, recorded)) {
       Path p = root.resolve(e.rel()).normalize();
-      if (!Files.exists(p, LinkOption.NOFOLLOW_LINKS)) continue;
-      found.add(classifyOne(e, p, others.get(p)));
+      Seen seen = lookAt(p);
+      if (seen == Seen.ABSENT) continue;
+      found.add(seen == Seen.UNKNOWN ? new Found(e, p, null, KEPT_UNCHECKED)
+          : classifyOne(e, p, others.get(p)));
     }
     return found;
   }
@@ -675,10 +711,17 @@ final class ModelFileRemoval {
     for (String rel : places) {
       if (accountedAtPlace(journal, rel)) continue;
       Path canonical = canonicalOf(rel);
-      if (canonical == null || !Files.exists(canonical, LinkOption.NOFOLLOW_LINKS)) continue;
+      Seen seen = canonical == null ? Seen.ABSENT : lookAt(canonical);
+      if (seen == Seen.ABSENT) continue;
       JournalFile arrived = new JournalFile();
       arrived.path = rel;
       arrived.state = "kept";
+      if (seen == Seen.UNKNOWN) {
+        // Not known to be gone: reported, and the removal is not complete.
+        arrived.reason = KEPT_UNCHECKED;
+        appeared.add(arrived);
+        continue;
+      }
       arrived.reason = KEPT_NEW_FILE;
       try {
         arrived.sizeBytes = Files.readAttributes(canonical, BasicFileAttributes.class,
@@ -699,7 +742,7 @@ final class ModelFileRemoval {
   private boolean accountedAtPlace(Journal journal, String rel) {
     for (JournalFile f : journal.files) {
       if (!f.path.equals(rel)) continue;
-      if (KEPT_NEW_FILE.equals(f.reason)) return true;
+      if (KEPT_NEW_FILE.equals(f.reason) || KEPT_UNCHECKED.equals(f.reason)) return true;
       if ("kept".equals(f.state) && f.staged == null) return true;
       Path canonical = canonicalOf(rel);
       if (f.staged != null && canonical != null
@@ -723,7 +766,8 @@ final class ModelFileRemoval {
    * {@code removed} when every target was deleted or failed an ownership check at deletion (it
    * did not pass, so it is not JustSearch's to delete); {@code not-removed} when nothing was
    * deleted; otherwise {@code partly-removed}. Never "removed" while a file that passed remains,
-   * nor while a new file sits at a canonical place ({@link #KEPT_NEW_FILE}: it is unresolved).
+   * nor while a new file sits at a canonical place ({@link #KEPT_NEW_FILE}) or a place could not be
+   * checked ({@link #KEPT_UNCHECKED}): both are unresolved.
    */
   private static String outcome(Journal journal, List<Target> targets) {
     Set<String> rels = new HashSet<>();
@@ -731,8 +775,9 @@ final class ModelFileRemoval {
     long deleted = 0;
     boolean passingLeft = false;
     for (JournalFile f : journal.files) {
-      // A new file at any of the part's places is unresolved, also where nothing was a target.
-      if (KEPT_NEW_FILE.equals(f.reason)) {
+      // A new file, or a place that could not be checked, at any of the part's places is
+      // unresolved, also where nothing was a target.
+      if (KEPT_NEW_FILE.equals(f.reason) || KEPT_UNCHECKED.equals(f.reason)) {
         passingLeft = true;
         continue;
       }
@@ -864,6 +909,11 @@ final class ModelFileRemoval {
         .findFirst().orElseThrow();
     String stagedName = UUID.randomUUID() + STAGED_SUFFIX;
     Path staged = folder.path().resolve(stagedName);
+    // A target that can no longer be looked at is not known to be gone or plain: kept, unresolved.
+    if (lookAt(t.path()) == Seen.UNKNOWN) {
+      keep(journal, entry, KEPT_UNCHECKED);
+      return;
+    }
     // Rule 2 is applied to the file before capture.
     if (linkedOnTheWay(t.path())) {
       keep(journal, entry, KEPT_LINKED_FOLDER);
@@ -1077,7 +1127,7 @@ final class ModelFileRemoval {
   PrivateFolder privateRemovalFolder() {
     Path folder = root.resolve(REMOVAL_FOLDER);
     try {
-      if (!Files.exists(folder, LinkOption.NOFOLLOW_LINKS)) {
+      if (lookAt(folder) == Seen.ABSENT) {
         OwnerOnlyDirectory.ensureOwnerOnlyDirectory(folder);
       }
       return new PrivateFolder(folder, checkPrivate(folder, null));
@@ -1321,7 +1371,9 @@ final class ModelFileRemoval {
 
   private Journal readJournal() {
     Path path = journalPath();
-    if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) return null;
+    Seen seen = lookAt(path);
+    if (seen == Seen.UNKNOWN) return unreadable();
+    if (seen == Seen.ABSENT || !Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) return null;
     try {
       Journal journal = JSON.readValue(path.toFile(), Journal.class);
       return wellFormed(journal) ? journal : unreadable();
@@ -1466,9 +1518,10 @@ final class ModelFileRemoval {
     }
     if ("planned".equals(f.state)) {
       // Never captured: the file is left where it was (or something else moved it).
-      boolean there = Files.exists(canonical, LinkOption.NOFOLLOW_LINKS);
-      f.state = there ? "kept" : "missing";
-      f.reason = there ? KEPT_INTERRUPTED : null;
+      Seen seen = lookAt(canonical);
+      f.state = seen == Seen.ABSENT ? "missing" : "kept";
+      f.reason = seen == Seen.ABSENT ? null
+          : seen == Seen.UNKNOWN ? KEPT_UNCHECKED : KEPT_INTERRUPTED;
       return;
     }
     Path staged = f.staged == null ? null : root.resolve(f.staged).normalize();
@@ -1476,7 +1529,13 @@ final class ModelFileRemoval {
       uncertain(f);
       return;
     }
-    if (staged != null && Files.exists(staged, LinkOption.NOFOLLOW_LINKS)) {
+    Seen stagedSeen = staged == null ? Seen.ABSENT : lookAt(staged);
+    if (stagedSeen == Seen.UNKNOWN) {
+      uncertain(f);
+      return;
+    }
+    Seen canonicalSeen = stagedSeen == Seen.PRESENT ? Seen.PRESENT : lookAt(canonical);
+    if (stagedSeen == Seen.PRESENT) {
       if (!folderPrivate || !plainSingleFile(staged)) {
         uncertain(f);
       } else if (restoreWithoutOverwrite(staged, canonical)) {
@@ -1487,10 +1546,15 @@ final class ModelFileRemoval {
         f.state = "kept";
         f.reason = KEPT_IN_REMOVAL_FOLDER;
       }
-    } else if (Files.exists(canonical, LinkOption.NOFOLLOW_LINKS)) {
+    } else if (canonicalSeen == Seen.PRESENT) {
       f.staged = null;
       f.state = "kept";
       f.reason = KEPT_INTERRUPTED;
+    } else if (canonicalSeen == Seen.UNKNOWN) {
+      // Neither captured nor known to be gone: never reported as deleted.
+      f.staged = null;
+      f.state = "kept";
+      f.reason = KEPT_UNCHECKED;
     } else {
       f.staged = null;
       f.state = "deleted";

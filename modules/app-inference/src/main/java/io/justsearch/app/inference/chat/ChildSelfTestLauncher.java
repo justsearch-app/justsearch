@@ -63,16 +63,10 @@ public final class ChildSelfTestLauncher implements SelfTestLauncher {
   private record Unreleased(ChildHandle candidate, Set<ProcessHandle> started) {
     /** Confirmed gone: exited, nothing it started still runs, and its scope reads empty. */
     boolean released() {
-      if (!candidate.exit().toCompletableFuture().isDone()) return false;
       if (started.stream().anyMatch(io.justsearch.app.api.runtime.child.ProcessTerminator::isRunning)) {
         return false;
       }
-      try {
-        return StartedProcesses.of(candidate).stream()
-            .noneMatch(io.justsearch.app.api.runtime.child.ProcessTerminator::isRunning);
-      } catch (RuntimeException unreadable) {
-        return false;
-      }
+      return StartedProcesses.released(candidate);
     }
   }
 
@@ -106,14 +100,14 @@ public final class ChildSelfTestLauncher implements SelfTestLauncher {
     try {
       candidate = start(spec);
     } catch (ChildRegistrationRefusedException refused) {
-      // A candidate whose registration was refused and whose rollback stop did not confirm its
-      // exit still runs: it is retained, as the managed-server launch owner retains its survivor,
-      // with the processes it was seen to start, until it is confirmed gone (repair round 3).
-      refused.survivor().ifPresent(survivor -> {
-        LOG.error("Self-test llama-server PID {} survived registration rollback; retaining its"
-            + " handle", survivor.pid());
-        unreleased.add(new Unreleased(survivor, startedSoFar(survivor)));
-      });
+      // A candidate whose registration was refused is retained with the processes it was seen to
+      // start until it and they are confirmed gone: one whose rollback stop did not confirm its
+      // exit still runs (repair round 3), and one whose root exited may have left a descendant its
+      // rollback could not end, which may still hold the answer model's files.
+      ChildHandle rolledBack = refused.rolledBack();
+      refused.survivor().ifPresent(survivor -> LOG.error("Self-test llama-server PID {} survived"
+          + " registration rollback; retaining its handle", survivor.pid()));
+      unreleased.add(new Unreleased(rolledBack, startedSoFar(rolledBack)));
       return SelfTestRun.failed("llama-server could not start: " + message(refused));
     } catch (IOException | RuntimeException failure) {
       return SelfTestRun.failed("llama-server could not start: " + message(failure));
