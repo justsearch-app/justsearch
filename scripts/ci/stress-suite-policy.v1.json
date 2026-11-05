@@ -28,6 +28,15 @@
       "expectedStressTests": [
         "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineExtractionSandboxChaosTest.java"
       ]
+    },
+    {
+      "modulePath": "modules/indexer-worker",
+      "gradleTask": ":modules:indexer-worker:test",
+      "owner": "Indexer worker retirement maintenance",
+      "reason": "RetirementMaintenanceProcessTest boots a real upgrade, delays extraction in a real child process, and drives two real 60-second maintenance sync intervals. Its wall-clock workload belongs in the explicit stress tier.",
+      "expectedStressTests": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RetirementMaintenanceProcessTest.java"
+      ]
     }
   ]
 }
