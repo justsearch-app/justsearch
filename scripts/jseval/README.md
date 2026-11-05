@@ -91,11 +91,14 @@ be detected.
 
 Sensitivity exits **3**, labelled **SENSITIVITY**, and cannot be stored as a
 baseline or used by compare/check. Sampling excludes pending labels and is
-deterministic regardless of input order. Without matching sensitivity history,
-the window estimate allows 15 seconds per query plus startup, confirmation and
-cleanup; a run exceeding the 600-second window refuses before admission. Sensitivity history is matched on the
-explicit overrides, CPU set and sample, not on the index key or inherited
-settings, so an estimate can be low; the window deadline still stops the run.
+deterministic regardless of input order. The window estimate scales this run's
+query count by 1.25 times the largest mean per-query elapsed time among the last
+five sensitivity runs with the same collection version, request, models, explicit
+settings, effective settings and CPU set (any sample size or seed), or 15 seconds
+per query without timed history, plus startup, confirmation and cleanup allowances;
+a run exceeding the 600-second window refuses before admission.
+History is not matched on the index key or inherited settings, so an estimate
+can be low; the window deadline still stops the run.
 Use `--sample` to fit a cold run. The report counts executed rerankers and skips by
 reason and fixed query group, including consecutive deadline skips. Disabled
 and deadline skips do not invalidate sensitivity; default skip rules are

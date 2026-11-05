@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from collections import Counter
-from datetime import datetime
 import json
 import math
 import os
@@ -318,7 +317,7 @@ def estimate(c, request, models, runs, declaration):
             h, arm = record.header, record.header.sensitivity
             if (h.run_kind != 'sensitivity' or h.collection_version != c.version
                     or h.request_config != request or h.model_hashes != models
-                    or any(arm.get(k) != v for k, v in declaration.items())
+                    or any(arm.get(k) != declaration[k] for k in ('settings', 'requested_cpus'))
                     or arm.get('effective_cpus') != allowed
                     or not arm.get('effective_settings')
                     or validate_run(c, record, {c.version}, 'history', sensitivity=True)):
@@ -326,21 +325,31 @@ def estimate(c, request, models, runs, declaration):
             done = json.loads((path.parent/'done.json').read_text())
             if done.get('error') is not None:
                 continue
-            elapsed = (datetime.fromisoformat(h.ended) - datetime.fromisoformat(h.started)).total_seconds()
             phases = done.get('phase_seconds', {})
-            total = elapsed - phases.get('waiting', 0)
             startup = phases.get('startup', 45)
-            if not all(math.isfinite(v) and v > 0 for v in (total, startup)):
-                continue
+            if not isinstance(startup, (int, float)) or not math.isfinite(startup) or startup <= 0:
+                startup = 45
+            times = [q.timings.get('elapsed_seconds') for q in record.results]
+            per_query = (sum(times) / len(times)
+                         if times and all(isinstance(v, (int, float)) and not isinstance(v, bool)
+                                          and math.isfinite(v) and v >= 0 for v in times)
+                         else None)
             expected = {k: arm[k] for k in ('effective_settings', 'effective_cpus')}
-            observed.append((h.started, total, startup, expected))
+            observed.append((h.started, per_query, startup, expected))
         except (ValueError, OSError, KeyError, TypeError):
             continue
     if observed:
         observed.sort(key=lambda row: row[0])
         expected = observed[-1][3]
-        matching = [row for row in observed if row[3] == expected][-5:]
-        return max(row[1] for row in matching)*1.25+5, max(row[2] for row in matching)*1.25, expected
+        matching = [row for row in observed if row[3] == expected]
+        times = [row[1] for row in matching if row[1] is not None][-5:]
+        per_query = max(times)*1.25 if times else 15
+        startup = max(row[2] for row in matching[-5:])*1.25
+        # Startup includes adoption's content/identity confirmation. Allow the
+        # same again for post-score confirmation: the scoring phase includes it
+        # and readback, so only per-query elapsed_seconds can measure query work.
+        # The window adds its existing cleanup reserve in run.estimate_window.
+        return 2*startup + declaration['sample_size']*per_query + 5, startup, expected
     return cold_estimate(declaration['sample_size']), 45, None
 
 

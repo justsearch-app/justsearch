@@ -440,19 +440,112 @@ def test_sensitivity_history_isolated_and_effective_profile_checked(tmp_path, mo
     record = labelled(c)
     profile = {'effective_settings': {'provider': 'cpu'}, 'effective_cpus': [2, 3, 4, 5]}
     record = replace(record, header=replace(record.header, sensitivity={**arm, **profile}))
+    record = replace(record, results=tuple(replace(q, timings={'elapsed_seconds': i})
+                                          for i, q in enumerate(record.results, 1)))
     monkeypatch.setattr(os, 'sched_getaffinity', lambda _: {2, 3, 4, 5})
     args = (c, dict(record.header.request_config), dict(record.header.model_hashes), tmp_path, arm)
     assert sensitivity.estimate(*args) == (150, 45, None)
     record.write(tmp_path/'old'/'run.jsonl')
     (tmp_path/'old'/'done.json').write_text(json.dumps({'error': None, 'phase_seconds': {'startup': 20, 'waiting': 100}}))
-    assert sensitivity.estimate(*args) == (255, 25, profile)
+    assert sensitivity.estimate(*args) == (67.5, 25, profile)
     assert run.estimate_seconds(c, args[1], args[2], tmp_path) == 45+.35*4
-    for change in ({'seed': 1}, {'settings': {'JUSTSEARCH_RERANK_ENABLED': 'false'}},
+    assert sensitivity.estimate(*args[:-1], sensitivity.declaration(c, {}, None, 2, 1)) == (61.25, 25, profile)
+    for change in ({'settings': {'JUSTSEARCH_RERANK_ENABLED': 'false'}},
                    {'requested_cpus': [2, 3, 4, 5]}):
         assert sensitivity.estimate(*args[:-1], {**arm, **change}) == (150, 45, None)
     sensitivity.check_profile({**arm, **profile}, profile)
     with pytest.raises(sensitivity.SensitivityRefused, match='history'):
         sensitivity.check_profile({**arm, **profile, 'effective_cpus': [2]}, profile)
+
+
+def write_timed_history(c, folder, *, sample=30, seed=0, seconds=(.1, .5),
+                        startup=20, started='2026-11-02T10:00:00Z', **profile):
+    record = labelled(c, sample=sample, seed=seed, started=started)
+    record = replace(record, header=replace(record.header,
+        sensitivity={**record.header.sensitivity,
+                     'effective_settings': {'provider': 'cpu'}, 'effective_cpus': [2, 3, 4, 5],
+                     **profile}),
+        results=tuple(replace(q, timings={'elapsed_seconds': seconds[i % len(seconds)]})
+                      for i, q in enumerate(record.results)))
+    record.write(folder/'run.jsonl')
+    # Scoring includes confirmation/readback, so it must never supply query time.
+    (folder/'done.json').write_text(json.dumps({'error': None,
+        'phase_seconds': {'startup': startup, 'waiting': 100, 'scoring': 70000}}))
+    return record
+
+
+@pytest.mark.parametrize('seconds, total, fits', [((.1, .5), 167.5, True), ((2,), 805, False)])
+def test_sampled_history_scales_per_query_to_full_collection(tmp_path, monkeypatch, seconds, total, fits):
+    c = make_collection({'en/vague': 300})
+    record = write_timed_history(c, tmp_path/'sample', seconds=seconds)
+    arm = sensitivity.declaration(c, {}, None, None, 42)
+    monkeypatch.setattr(os, 'sched_getaffinity', lambda _: {2, 3, 4, 5})
+    estimate, startup, profile = sensitivity.estimate(c, record.header.request_config,
+        record.header.model_hashes, tmp_path, arm)
+    assert estimate == pytest.approx(total)
+    assert startup == 25
+    assert profile == {k: record.header.sensitivity[k] for k in ('effective_settings', 'effective_cpus')}
+    window = run.estimate_window([estimate], [startup], False)
+    if fits:
+        run.require_budget(window, 600)
+    else:
+        with pytest.raises(run.RunRefused, match='estimate 850.0s exceeds budget 600s'):
+            run.require_budget(window, 600)
+    # Default estimates never consume sensitivity history, including its samples.
+    assert run.estimate_seconds(c, record.header.request_config, record.header.model_hashes,
+                                tmp_path) == 45 + .35 * 300
+
+
+@pytest.mark.parametrize('change', ['settings', 'requested_cpus', 'effective_cpus',
+                                   'collection_version', 'request_config', 'model_hashes', 'run_kind'])
+def test_per_query_history_requires_matching_inputs(tmp_path, monkeypatch, change):
+    c = make_collection({'en/vague': 300})
+    record = write_timed_history(c, tmp_path/'sample')
+    header = record.header
+    if change in ('settings', 'requested_cpus', 'effective_cpus'):
+        value = {'JUSTSEARCH_RERANK_ENABLED': 'false'} if change == 'settings' else [2, 3]
+        header = replace(header, sensitivity={**header.sensitivity, change: value})
+    else:
+        header = replace(header, request_config_sha256='', **{change: {
+            'collection_version': 'other', 'request_config': {'mode': 'other'},
+            'model_hashes': {'embed': 'other'}, 'run_kind': 'standard'}[change]})
+    replace(record, header=header).write(tmp_path/'sample'/'run.jsonl')
+    monkeypatch.setattr(os, 'sched_getaffinity', lambda _: {2, 3, 4, 5})
+    assert sensitivity.estimate(c, record.header.request_config, record.header.model_hashes,
+        tmp_path, sensitivity.declaration(c, {}, None, None, 42)) == (4590, 45, None)
+
+
+def test_per_query_history_uses_last_five_of_the_latest_effective_profile(tmp_path, monkeypatch):
+    c = make_collection({'en/vague': 300})
+    for i, seconds in enumerate((100, .1, .2, .3, .4, .5)):
+        record = write_timed_history(c, tmp_path/str(i), seconds=(seconds,),
+                                    started=f'2026-11-02T10:0{i}:00Z')
+    monkeypatch.setattr(os, 'sched_getaffinity', lambda _: {2, 3, 4, 5})
+    args = (c, record.header.request_config, record.header.model_hashes, tmp_path,
+            sensitivity.declaration(c, {}, None, None, 42))
+    assert sensitivity.estimate(*args)[:2] == (242.5, 25)
+    newer = write_timed_history(c, tmp_path/'new-profile', seconds=(.2,),
+        effective_settings={'provider': 'other'}, started='2026-11-02T10:06:00Z')
+    total, startup, expected = sensitivity.estimate(*args)
+    assert total == 130 and startup == 25
+    assert expected['effective_settings'] == newer.header.sensitivity['effective_settings']
+    with pytest.raises(sensitivity.SensitivityRefused, match='history'):
+        sensitivity.check_profile(record.header.sensitivity, expected)
+
+
+@pytest.mark.parametrize('seconds', [None, -1, float('nan'), float('inf'), '0.3'])
+def test_missing_or_invalid_query_timing_keeps_cold_per_query_allowance(tmp_path, monkeypatch, seconds):
+    c = make_collection({'en/vague': 300})
+    record = write_timed_history(c, tmp_path/'sample')
+    # Malformed external JSONL must also fail closed at RunRecord's read boundary.
+    lines = [json.loads(line) for line in record.dumps().splitlines()]
+    lines[1]['timings'] = {} if seconds is None else {'elapsed_seconds': seconds}
+    (tmp_path/'sample'/'run.jsonl').write_text(''.join(json.dumps(line)+'\n' for line in lines))
+    monkeypatch.setattr(os, 'sched_getaffinity', lambda _: {2, 3, 4, 5})
+    total, startup, _ = sensitivity.estimate(c, record.header.request_config,
+        record.header.model_hashes, tmp_path, sensitivity.declaration(c, {}, None, None, 42))
+    assert total >= 15 * 300
+    assert startup == (25 if seconds is None or seconds == -1 else 45)
 
 
 def test_cold_sensitivity_window_refuses_before_reserving(tmp_path, monkeypatch):
