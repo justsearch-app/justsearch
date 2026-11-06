@@ -41,8 +41,16 @@ export class ProvenanceChip extends JfElement {
     :host {
       display: inline-flex;
       vertical-align: middle;
+      max-inline-size: 100%;
     }
+    /* Whole words only: a parent's overflow-wrap (the status panel's) never splits a word here; a row
+       narrower than the chip shortens the contributor's name with an ellipsis, and the title keeps it all. */
     .chip {
+      white-space: nowrap;
+      overflow-wrap: normal;
+      min-inline-size: 0;
+      max-inline-size: 100%;
+      box-sizing: border-box;
       display: inline-flex;
       align-items: center;
       gap: 0.25rem;
@@ -67,6 +75,15 @@ export class ProvenanceChip extends JfElement {
     }
     .chip-verify-mark {
       font-weight: 700;
+    }
+    .chip > span {
+      flex: none;
+    }
+    .chip > .contributor {
+      flex: 0 1 auto;
+      min-inline-size: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .chip-label {
       opacity: 0.85;
@@ -104,7 +121,7 @@ export class ProvenanceChip extends JfElement {
         ? html`<span class="chip-verify-mark" title="identity-verified" aria-label="verified">✓</span>`
         : nothing}
       <span>·</span>
-      <span>${p.contributorId}</span>
+      <span class="contributor">${p.contributorId}</span>
       ${p.version && p.version !== '0'
         ? html`<span class="chip-version">v${p.version}</span>`
         : nothing}

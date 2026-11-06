@@ -460,22 +460,23 @@ describe('pendingAuthorizationBridge (tempdoc 655)', () => {
     stop();
   });
 
-  it.each(OUTSIDE_TRANSPORTS)('DE3 a %s request waits in Needs you, announced as a live arrival', async (transport) => {
+  // L12 — a request that names no source is not the person's own action either: it waits like the others.
+  it.each([...OUTSIDE_TRANSPORTS, undefined])('DE3 a %s request waits in Needs you, announced as a live arrival', async (transport) => {
     peekPendingMock.mockResolvedValue(detailFor('agent', { requestedBy: 'Claude Desktop' }));
     requestAuthorizationMock.mockReturnValue(new Promise(() => {}));
     const stop = startPendingAuthorizationBridge('http://test', { multiplex: multiplexOn(fakeEs) });
-    fakeEs.emitFrame(pendingFrame(1, 'agent', { transport, createdAt: '2026-07-02T09:59:00Z' }));
+    fakeEs.emitFrame(pendingFrame(1, 'agent', { ...(transport ? { transport } : {}), createdAt: '2026-07-02T09:59:00Z' }));
     await flush();
     expect(requestAuthorizationMock.mock.calls[0]?.[0]).toMatchObject({ pendingId: 'agent', arrival: 'needs-you', live: true,
       askedAt: '2026-07-02T09:59:00Z', requestedBy: 'Claude Desktop' });
     stop();
   });
 
-  it.each([...OWN_TRANSPORTS, undefined])('DE3 the person\'s own %s request keeps its dialog on arrival', async (transport) => {
+  it.each(OWN_TRANSPORTS)('DE3 the person\'s own %s request keeps its dialog on arrival', async (transport) => {
     peekPendingMock.mockResolvedValue(detailFor('own'));
     requestAuthorizationMock.mockReturnValue(new Promise(() => {}));
     const stop = startPendingAuthorizationBridge('http://test', { multiplex: multiplexOn(fakeEs) });
-    fakeEs.emitFrame(pendingFrame(1, 'own', transport ? { transport } : {}));
+    fakeEs.emitFrame(pendingFrame(1, 'own', { transport }));
     await flush();
     const prompt = requestAuthorizationMock.mock.calls[0]?.[0];
     expect(prompt).toMatchObject({ pendingId: 'own' });

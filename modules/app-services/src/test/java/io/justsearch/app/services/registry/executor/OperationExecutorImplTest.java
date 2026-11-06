@@ -1937,6 +1937,51 @@ final class OperationExecutorImplTest {
   }
 
   /**
+   * L16 — a run admitted by an Allowed request's one-time permission names that request on its
+   * completion row; two Allows of the same operation keep their own outcomes, and a capsule minted
+   * outside a pending request names none.
+   */
+  @Test
+  void anAllowedRunsCompletionRowNamesTheRequestThatAllowedIt() {
+    HandlerRegistry handlers = new HandlerRegistry();
+    OperationRef id = new OperationRef("core.test-medium");
+    var calls = new java.util.concurrent.atomic.AtomicInteger();
+    handlers.register(id, (args, engineContext) -> calls.incrementAndGet() != 2
+        ? OperationResult.success("ran") : OperationResult.failure("broke"));
+    ConsentCapsuleService capsule = new ConsentCapsuleService();
+    var executor = new OperationExecutorImpl(attempts, admission, handlers, null, Map.of(), Clock.systemUTC(),
+        new CoreTrustEvaluator(), CoreIntentSourceCatalog.catalog(), null, capsule);
+    var ledger = new io.justsearch.app.observability.ledger.ActionLedgerChangeRegistry();
+    executor.setApprovalLinkSink(ledger::linkApproval);
+    Operation medium = makeMediumOp(id);
+    // A recorded (METADATA_ONLY) MEDIUM operation: its completion is a visible history row.
+    Operation op = new Operation(medium.id(), medium.presentation(), medium.intf(),
+        new OperationPolicy(RiskTier.MEDIUM, new ConfirmStrategy.Typed(new I18nKey("test.confirm")),
+            AuditPolicy.METADATA_ONLY, RetryPolicy.noRetry(), Set.of(), false),
+        medium.availability(), medium.lineage(), medium.binding(), medium.provenance(), medium.executors());
+    InvocationProvenance untrusted = InvocationProvenance.fromEngineContext(
+        io.justsearch.app.services.TestEngineContexts.forTransport(TransportTag.LLM_EMISSION),
+        ExecutorTag.UI, Instant.now(), Optional.empty());
+    var context = io.justsearch.app.services.TestEngineContexts.forProvenance(untrusted);
+    var outcomes = new java.util.LinkedHashMap<String, String>();
+    for (String pendingId : new String[] {"pa-first", "pa-second", null}) {
+      String key = io.justsearch.app.api.operations.OperationKeys.generate(Clock.systemUTC());
+      String token = pendingId == null ? capsule.mint(id.value(), "{}")
+          : capsule.mint(id.value(), "{}", io.justsearch.agent.api.registry.SourceTier.UNTRUSTED, pendingId);
+      executor.dispatch(op, "{}", untrusted, Optional.of(token), context, key);
+      var record = operationStore.find(key).orElseThrow();
+      var entry = io.justsearch.app.observability.operations.OperationHistoryProjection.entry(
+          io.justsearch.app.api.operations.OperationHistoryRow.from(record));
+      ledger.publishLiveOperation(entry);
+      var row = io.justsearch.app.observability.ledger.ActionLedgerProjection.toWireRow(
+          ledger.store().recent().getLast());
+      outcomes.put(String.valueOf(pendingId), row.get("outcome") + " " + row.getOrDefault("pendingId", "none"));
+    }
+    assertEquals(Map.of("pa-first", "SUCCESS pa-first", "pa-second", "FAILURE pa-second", "null", "SUCCESS none"),
+        outcomes);
+  }
+
+  /**
    * Tempdoc 550 critical-analysis: the gate-firing emit is ADDITIVE and security-gate-adjacent.
    * The production emitter fans into the unified ledger SSE (publish + subscriber callbacks). A
    * throwing emitter MUST NOT change the gate's fail-closed semantics — the gated dispatch still

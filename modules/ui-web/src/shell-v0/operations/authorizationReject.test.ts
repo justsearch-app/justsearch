@@ -15,8 +15,9 @@ vi.mock('../utils/statusPoll.js', () => ({
   },
 }));
 
+// The person's own window gesture: its dialog opens at once (an unnamed source waits in Needs you, L12).
 const detail = { pendingId: 'pa-shared', operationId: 'core.apply-excludes',
-  gateBehavior: 'TYPED_CONFIRM', riskTier: 'HIGH', sourceTier: 'UNTRUSTED' };
+  gateBehavior: 'TYPED_CONFIRM', riskTier: 'HIGH', sourceTier: 'UNTRUSTED', transport: 'BUTTON' };
 let host: AuthorizationHost;
 let es: EventTarget;
 let mux: MultiplexedStream;

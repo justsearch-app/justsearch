@@ -71,6 +71,8 @@ public sealed interface ActionEvent
    * A completed operation invocation. {@code outcome} ∈ SUCCESS / FAILURE / UNDONE. A successful
    * folder removal carries the folder it removed ({@code removedFolder}), so every window can offer
    * to add it back; every other row, and rows recorded before the field existed, carry none.
+   * {@code pendingId} names the pending request whose Allow admitted this run (L16), when the
+   * Engine knew it; rows recorded before the field existed, and runs no request allowed, carry none.
    */
   record Operation(
       String id,
@@ -81,10 +83,20 @@ public sealed interface ActionEvent
       String outcome,
       Optional<String> executionId,
       Optional<String> correlationId,
-      Optional<OperationReceipt.RemovedFolder> removedFolder)
+      Optional<OperationReceipt.RemovedFolder> removedFolder,
+      Optional<String> pendingId)
       implements ActionEvent {
     public Operation {
       java.util.Objects.requireNonNull(removedFolder, "removedFolder");
+      java.util.Objects.requireNonNull(pendingId, "pendingId");
+    }
+
+    /** An operation row no pending request is known to have allowed. */
+    public Operation(String id, Instant occurredAt, String originator, String transport,
+        String operationId, String outcome, Optional<String> executionId, Optional<String> correlationId,
+        Optional<OperationReceipt.RemovedFolder> removedFolder) {
+      this(id, occurredAt, originator, transport, operationId, outcome, executionId, correlationId,
+          removedFolder, Optional.empty());
     }
 
     /** An operation row without a removal record. */
@@ -118,7 +130,9 @@ public sealed interface ActionEvent
   /**
    * A grant lifecycle event (tempdoc 550 thesis IV): the consent capsule (and future durable
    * grants) recorded in the one log, giving one audit + one revocation trail. {@code action} ∈
-   * ISSUED / CONSUMED / REVOKED; {@code subject} summarizes the grant's scope.
+   * ISSUED / CONSUMED / REVOKED; {@code subject} summarizes the grant's scope. {@code pendingId}
+   * names the pending request whose Allow minted this one-time permission (L16), when there was one;
+   * durable grants, capsules minted outside a pending request and older rows carry none.
    */
   record Grant(
       String id,
@@ -127,8 +141,19 @@ public sealed interface ActionEvent
       String transport,
       String grantId,
       String action,
-      String subject)
+      String subject,
+      Optional<String> pendingId)
       implements ActionEvent {
+    public Grant {
+      java.util.Objects.requireNonNull(pendingId, "pendingId");
+    }
+
+    /** A grant row no pending request is known to have minted. */
+    public Grant(String id, Instant occurredAt, String originator, String transport,
+        String grantId, String action, String subject) {
+      this(id, occurredAt, originator, transport, grantId, action, subject, Optional.empty());
+    }
+
     @Override
     public ActionEventKind kind() {
       return ActionEventKind.GRANT;

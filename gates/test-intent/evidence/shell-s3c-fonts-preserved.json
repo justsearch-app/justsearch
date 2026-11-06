@@ -1,0 +1,167 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-05T18:50:01.395Z",
+  "revision": "1fc4f0bcece024cc30624560627ee0e9bd7b7307",
+  "tree": "1e1454291e10025d302df68c6fb369d9755f6af6",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.s3c-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/hj92glr_/tmp/test-intent-vitest-1969-1793904530772.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 38356
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts#11 the narrow area menu closes when the window widens past its button, and focus stays on the switcher",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ec0f504ca489d421abdce57146e810f4e794f4ccc53090e159349884cdcd69f3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "11 the narrow area menu closes when the window widens past its button, and focus stays on the switcher",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts#11 at 1280 px a notice beside a problem leaves the switcher centred; pill and notice stay readable (default font)",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ec0f504ca489d421abdce57146e810f4e794f4ccc53090e159349884cdcd69f3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "11 at 1280 px a notice beside a problem leaves the switcher centred; pill and notice stay readable (default font)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts#11 at 600 px the pill shows the number of problems, as it does for needs-you",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ec0f504ca489d421abdce57146e810f4e794f4ccc53090e159349884cdcd69f3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "11 at 600 px the pill shows the number of problems, as it does for needs-you",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts#L6 a plugin item whose words are in its own shadow root keeps them as its tooltip; an empty one its declared label",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ec0f504ca489d421abdce57146e810f4e794f4ccc53090e159349884cdcd69f3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L6 a plugin item whose words are in its own shadow root keeps them as its tooltip; an empty one its declared label",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts#11 a long plugin item's provenance chip keeps whole words; its full text stays available",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ec0f504ca489d421abdce57146e810f4e794f4ccc53090e159349884cdcd69f3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "11 a long plugin item's provenance chip keeps whole words; its full text stays available",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts#redirect notices use window names and retain an id only when no name is available",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ec0f504ca489d421abdce57146e810f4e794f4ccc53090e159349884cdcd69f3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "redirect notices use window names and retain an id only when no name is available",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "7ed8454d853098e7a1d4ebad081676d335f13440",
+    "revision": "7ed8454d853098e7a1d4ebad081676d335f13440",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.s3c-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/hj92glr_/tmp/test-intent-vitest-1969-1793904573063.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 27614,
+        "output": "JSON report written to /home/elias/.cache/am/hj92glr_/tmp/test-intent-vitest-1969-1793904573063.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts#11 the narrow area menu closes when the window widens past its button, and focus stays on the switcher",
+        "classification": "assertion",
+        "detail": "11 the narrow area menu closes when the window widens past its button, and focus stays on the switcher:  AssertionError: 800 px: no menu apart from its button: expected 1 to be +0 // Object.is equality\n    at /home/elias/.cache/am/hj92glr_/tmp/test-intent-before-Mx012y/modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts:204:78\n    at file:///home/elias/.cache/am/hj92glr_/tmp/test-intent-befor"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts#11 at 1280 px a notice beside a problem leaves the switcher centred; pill and notice stay readable (default font)",
+        "classification": "assertion",
+        "detail": "11 at 1280 px a notice beside a problem leaves the switcher centred; pill and notice stay readable (default font):  AssertionError: {\"centre\":554.859375,\"half\":640,\"kind\":\"trigger problems \",\"beside\":\"Couldn't find that window\"}: expected 85.140625 to be less than or equal to 1\n    at /home/elias/.cache/am/hj92glr_/tmp/test-intent-before-Mx012y/modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts:229:73"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts#11 at 600 px the pill shows the number of problems, as it does for needs-you",
+        "classification": "assertion",
+        "detail": "11 at 600 px the pill shows the number of problems, as it does for needs-you:  AssertionError: a count badge: expected +0 to be 1 // Object.is equality\n    at /home/elias/.cache/am/hj92glr_/tmp/test-intent-before-Mx012y/modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts:240:68\n    at file:///home/elias/.cache/am/hj92glr_/tmp/test-intent-before-Mx012y/modules/ui-web/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts#L6 a plugin item whose words are in its own shadow root keeps them as its tooltip; an empty one its declared label",
+        "classification": "assertion",
+        "detail": "L6 a plugin item whose words are in its own shadow root keeps them as its tooltip; an empty one its declared label:  AssertionError: expected '' to be 'Focus timer: 25 minutes left in this …' // Object.is equality\n    at /home/elias/.cache/am/hj92glr_/tmp/test-intent-before-Mx012y/modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts:261:25\n    at file:///home/elias/.cache/am/hj92glr_/tmp/test-intent-befor"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts#11 a long plugin item's provenance chip keeps whole words; its full text stays available",
+        "classification": "assertion",
+        "detail": "11 a long plugin item's provenance chip keeps whole words; its full text stays available:  AssertionError: plugin on one line: {\"title\":\"Contributed by acme.extraordinarily-long-contributor-name-for-status · tier=TRUSTED_PLUGIN · v1.0.0\",\"lines\":[{\"text\":\"plugin\",\"lines\":2},{\"text\":\"·\",\"lines\":1},{\"text\":\"acme.extraordinarily-long-contributor-name-for-status\",\"lines\":2},{\"text\":\"v1.0.0\",\""
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts#redirect notices use window names and retain an id only when no name is available",
+        "classification": "assertion",
+        "detail": "redirect notices use window names and retain an id only when no name is available:  AssertionError: expected 'Opened core.system-surface instead of…' to be 'Opened System instead of Health' // Object.is equality\n    at /home/elias/.cache/am/hj92glr_/tmp/test-intent-before-Mx012y/modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts:363:77\n    at file:///home/elias/.cache/am"
+      }
+    ]
+  },
+  "digest": "sha256:38c9c4b2df833f2a491a1a588921318ed1ac5eab19e4e6f2bde4b8f6ae94b383"
+}

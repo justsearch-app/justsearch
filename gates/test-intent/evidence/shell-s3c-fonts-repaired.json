@@ -1,0 +1,291 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-05T18:48:40.218Z",
+  "revision": "1fc4f0bcece024cc30624560627ee0e9bd7b7307",
+  "tree": "226cac5b8d2de04f07605e0f7b9221a66c87466d",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.frame-lockdown.test.ts\" \"src/shell-v0/chrome/Shell.s3c-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/hj92glr_/tmp/test-intent-vitest-4-1793904264714.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 128770
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#L3 a notice for a window that does not exist is readable at every size (wide font) 900×700: the notice can be read, the pill is not cut and \"Choose destination\" is offered",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0e84a75581ada17ba1714d6eead811bcbd58af29137987c8be850aa2feffaf2c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L3 a notice for a window that does not exist is readable at every size (wide font) 900×700: the notice can be read, the pill is not cut and \"Choose destination\" is offered",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts#11 at 1280 px a notice beside a problem leaves the switcher centred; pill and notice stay readable (wide font)",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ec0f504ca489d421abdce57146e810f4e794f4ccc53090e159349884cdcd69f3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "11 at 1280 px a notice beside a problem leaves the switcher centred; pill and notice stay readable (wide font)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts#redirect notices stay readable in full beside the pill when they fit, otherwise below the bar; the switcher stays centred (default font)",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ec0f504ca489d421abdce57146e810f4e794f4ccc53090e159349884cdcd69f3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "redirect notices stay readable in full beside the pill when they fit, otherwise below the bar; the switcher stays centred (default font)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts#redirect notices stay readable in full beside the pill when they fit, otherwise below the bar; the switcher stays centred (wide font)",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ec0f504ca489d421abdce57146e810f4e794f4ccc53090e159349884cdcd69f3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "redirect notices stay readable in full beside the pill when they fit, otherwise below the bar; the switcher stays centred (wide font)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0e84a75581ada17ba1714d6eead811bcbd58af29137987c8be850aa2feffaf2c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L3 a notice for a window that does not exist is readable at every size (default font) 1280×800: the notice can be read, the pill is not cut and \"Choose destination\" is offered",
+          "status": "passed"
+        },
+        {
+          "name": "L3 a notice for a window that does not exist is readable at every size (default font) 900×700: the notice can be read, the pill is not cut and \"Choose destination\" is offered",
+          "status": "passed"
+        },
+        {
+          "name": "L3 a notice for a window that does not exist is readable at every size (default font) 900×800: the notice can be read, the pill is not cut and \"Choose destination\" is offered",
+          "status": "passed"
+        },
+        {
+          "name": "L3 a notice for a window that does not exist is readable at every size (default font) 600×400: the notice can be read, the pill is not cut and \"Choose destination\" is offered",
+          "status": "passed"
+        },
+        {
+          "name": "L3 a notice for a window that does not exist is readable at every size (default font) C1 an unknown destination vendor.nope-window shows the same notice",
+          "status": "passed"
+        },
+        {
+          "name": "L3 a notice for a window that does not exist is readable at every size (default font) C1 an unknown destination nope-window shows the same notice",
+          "status": "passed"
+        },
+        {
+          "name": "L3 a notice for a window that does not exist is readable at every size (wide font) 1280×800: the notice can be read, the pill is not cut and \"Choose destination\" is offered",
+          "status": "passed"
+        },
+        {
+          "name": "L3 a notice for a window that does not exist is readable at every size (wide font) 900×700: the notice can be read, the pill is not cut and \"Choose destination\" is offered",
+          "status": "passed"
+        },
+        {
+          "name": "L3 a notice for a window that does not exist is readable at every size (wide font) 900×800: the notice can be read, the pill is not cut and \"Choose destination\" is offered",
+          "status": "passed"
+        },
+        {
+          "name": "L3 a notice for a window that does not exist is readable at every size (wide font) 600×400: the notice can be read, the pill is not cut and \"Choose destination\" is offered",
+          "status": "passed"
+        },
+        {
+          "name": "L3 a notice for a window that does not exist is readable at every size (wide font) C1 an unknown destination vendor.nope-window shows the same notice",
+          "status": "passed"
+        },
+        {
+          "name": "L3 a notice for a window that does not exist is readable at every size (wide font) C1 an unknown destination nope-window shows the same notice",
+          "status": "passed"
+        },
+        {
+          "name": "L2 the status panel never scrolls sideways a plugin item that renders a fixed 1000 px wide element stays inside its row, its words and provenance reachable",
+          "status": "passed"
+        },
+        {
+          "name": "C9 closing Settings once keeps the area and leaves no Settings entry behind it Settings, browser Back, browser Forward, close: the next Back does not reopen Settings",
+          "status": "passed"
+        },
+        {
+          "name": "C9 closing Settings once keeps the area and leaves no Settings entry behind it with Settings open, Alt+Left is browser Back and Alt+Right browser Forward",
+          "status": "passed"
+        },
+        {
+          "name": "C9 closing Settings once keeps the area and leaves no Settings entry behind it reload with Settings open keeps the area underneath; closing returns to it once",
+          "status": "passed"
+        },
+        {
+          "name": "FR3 the window under Settings shows its addressed tab reload with Settings open over Library › Browse shows Browse behind Settings from the start",
+          "status": "passed"
+        },
+        {
+          "name": "FR3 the Settings section in the address wins over the one Settings remembers a link to Settings › Developer opens Developer, and reload keeps it, while the engine is slow to answer",
+          "status": "passed"
+        },
+        {
+          "name": "FR3 Alt+Left and Alt+Right always navigate Back into Search puts focus in its text box; Alt+Right still goes Forward and edits nothing",
+          "status": "passed"
+        },
+        {
+          "name": "FR3 a window tab is a step in history Library › Browse adds an entry; Alt+arrows, mouse buttons and browser buttons all land on the same tabs",
+          "status": "passed"
+        },
+        {
+          "name": "FR3 one history entry per navigation opening an area from the Ctrl+K palette is one step: one Back returns",
+          "status": "passed"
+        },
+        {
+          "name": "X1 forced colours the selected window tab is told apart from the others by a shape in a system colour",
+          "status": "passed"
+        },
+        {
+          "name": "X1 forced colours the dark app theme on a light system palette: every tab label is readable, the selected one too",
+          "status": "passed"
+        },
+        {
+          "name": "X1 forced colours the dark app theme on a dark system palette: every tab label is readable, the selected one too",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ec0f504ca489d421abdce57146e810f4e794f4ccc53090e159349884cdcd69f3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "11 the narrow area menu closes when the window widens past its button, and focus stays on the switcher",
+          "status": "passed"
+        },
+        {
+          "name": "11 at 1280 px a notice beside a problem leaves the switcher centred; pill and notice stay readable (default font)",
+          "status": "passed"
+        },
+        {
+          "name": "11 at 1280 px a notice beside a problem leaves the switcher centred; pill and notice stay readable (wide font)",
+          "status": "passed"
+        },
+        {
+          "name": "11 at 600 px the pill shows the number of problems, as it does for needs-you",
+          "status": "passed"
+        },
+        {
+          "name": "L6 a plugin item whose words are in its own shadow root keeps them as its tooltip; an empty one its declared label",
+          "status": "passed"
+        },
+        {
+          "name": "11 a long plugin item's provenance chip keeps whole words; its full text stays available",
+          "status": "passed"
+        },
+        {
+          "name": "redirect notices stay readable in full beside the pill when they fit, otherwise below the bar; the switcher stays centred (default font)",
+          "status": "passed"
+        },
+        {
+          "name": "redirect notices stay readable in full beside the pill when they fit, otherwise below the bar; the switcher stays centred (wide font)",
+          "status": "passed"
+        },
+        {
+          "name": "redirect notices use window names and retain an id only when no name is available",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "1fc4f0bcece024cc30624560627ee0e9bd7b7307",
+    "revision": "1fc4f0bcece024cc30624560627ee0e9bd7b7307",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.frame-lockdown.test.ts\" \"src/shell-v0/chrome/Shell.s3c-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/hj92glr_/tmp/test-intent-vitest-4-1793904401101.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 118524,
+        "output": "JSON report written to /home/elias/.cache/am/hj92glr_/tmp/test-intent-vitest-4-1793904401101.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#L3 a notice for a window that does not exist is readable at every size (wide font) 900×700: the notice can be read, the pill is not cut and \"Choose destination\" is offered",
+        "classification": "assertion",
+        "detail": "L3 a notice for a window that does not exist is readable at every size (wide font) 900×700: the notice can be read, the pill is not cut and \"Choose destination\" is offered:  AssertionError: 900×700: expected [] to not deeply equal []\n    at /home/elias/.cache/am/hj92glr_/tmp/test-intent-before-5bnL5S/modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts:222:67\n    at file:///home/elias/.cache/am/hj92glr_/tmp/test-intent-before-5bnL5S/modules/ui-web/node_module"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts#11 at 1280 px a notice beside a problem leaves the switcher centred; pill and notice stay readable (wide font)",
+        "classification": "assertion",
+        "detail": "11 at 1280 px a notice beside a problem leaves the switcher centred; pill and notice stay readable (wide font):  AssertionError: expected [] to include 'beside-notice'\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/hj92glr_/tmp/test-intent-before-5bnL5S/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1319:15)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/hj92glr_/tmp/test-intent-befor"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts#redirect notices stay readable in full beside the pill when they fit, otherwise below the bar; the switcher stays centred (default font)",
+        "classification": "assertion",
+        "detail": "redirect notices stay readable in full beside the pill when they fit, otherwise below the bar; the switcher stays centred (default font):  AssertionError: {\"width\":1280,\"target\":\"Opened System instead of Health\",\"centre\":640,\"half\":640,\"top\":14.3125,\"bottom\":40.6875,\"barTop\":0,\"barBottom\":56,\"height\":26.375,\"lineHeight\":13.2,\"visible\":true,\"paintedInside\":true,\"clipped\":true,\"coversPill\":false,\"coversSwitcher\":false,\"fits\":true}: expec"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts#redirect notices stay readable in full beside the pill when they fit, otherwise below the bar; the switcher stays centred (wide font)",
+        "classification": "assertion",
+        "detail": "redirect notices stay readable in full beside the pill when they fit, otherwise below the bar; the switcher stays centred (wide font):  AssertionError: {\"width\":1280,\"target\":\"Opened System instead of Health\",\"centre\":640,\"half\":640,\"top\":14.3125,\"bottom\":40.6875,\"barTop\":0,\"barBottom\":56,\"height\":26.375,\"lineHeight\":13.2,\"visible\":true,\"paintedInside\":true,\"clipped\":true,\"coversPill\":false,\"coversSwitcher\":false,\"fits\":true}: expec"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts",
+        "classification": "assertion",
+        "detail": "L3 a notice for a window that does not exist is readable at every size (wide font) 900×700: the notice can be read, the pill is not cut and \"Choose destination\" is offered:  AssertionError: 900×700: expected [] to not deeply equal []\n    at /home/elias/.cache/am/hj92glr_/tmp/test-intent-before-5bnL5S/modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts:222:67\n    at file:///home/elias/.cache/am/hj92glr_/tmp/test-intent-before-5bnL5S/modules/ui-web/node_module | L3 a notice for a windo"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.s3c-lockdown.test.ts",
+        "classification": "assertion",
+        "detail": "11 at 1280 px a notice beside a problem leaves the switcher centred; pill and notice stay readable (wide font):  AssertionError: expected [] to include 'beside-notice'\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/hj92glr_/tmp/test-intent-before-5bnL5S/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1319:15)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/hj92glr_/tmp/test-intent-befor | redirect notices stay readable in full beside the pill when they fit, otherwise belo"
+      }
+    ]
+  },
+  "digest": "sha256:0123e5eeb74f4fd8cc60e6be820b9dc88130128fcf4bd84c1f9602fad56f4107"
+}

@@ -191,7 +191,8 @@ function renderNotice(models) {
     .join(', ');
   return (
     'JustSearch\n' +
-    'Copyright 2025 JustSearch Contributors\n' +
+    'https://github.com/justsearch-app/justsearch\n' +
+    'Copyright 2025 Elias Justus and the JustSearch contributors\n' +
     '\n' +
     'This product includes software developed by the Apache Software Foundation\n' +
     '(https://www.apache.org/).\n' +

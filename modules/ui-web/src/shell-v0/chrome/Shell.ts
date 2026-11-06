@@ -1576,7 +1576,7 @@ export class Shell extends JfElement {
       if (outcome.status === 'unresolved') {
         this.unknownWindowNotice(outcome.alternatives);
       } else {
-        emitEphemeralToast({ message: `Opened ${outcome.canonicalId} instead of ${outcome.originalId}`, actionLabel: 'Undo auto-correction',
+        emitEphemeralToast({ message: `Opened ${present({ kind: 'surface', id: outcome.canonicalId }).label} instead of ${present({ kind: 'surface', id: outcome.originalId }).label}`, actionLabel: 'Undo auto-correction',
           onAction: () => { void this.intentRouter?.dispatch({ address: { kind: 'navigate', target: outcome.originalId, state: {} }, transport: 'BUTTON' }, { recoveryPolicyOverride: strictPolicy }); },
         });
       }

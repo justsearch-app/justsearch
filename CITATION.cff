@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+message: "If you use JustSearch in your work, please cite it as below."
+type: software
+title: "JustSearch"
+abstract: >-
+  JustSearch finds what is inside your files, as a desktop search app or as a
+  private retrieval backend for AI agents through MCP. It offers keyword,
+  dense-vector and learned-sparse retrieval, and a hybrid mode that fuses
+  keyword and vector results with cross-encoder reranking. It answers questions
+  with cited passages, with indexing, retrieval and built-in AI inference on the
+  user's machine.
+authors:
+  - given-names: Elias
+    family-names: Justus
+  - name: "The JustSearch contributors"
+repository-code: "https://github.com/justsearch-app/justsearch"
+license: Apache-2.0
+keywords:
+  - search
+  - hybrid retrieval
+  - information retrieval
+  - retrieval-augmented generation
+  - Model Context Protocol
+  - local-first

@@ -79,7 +79,8 @@ it('mounted authorization host and real pending bridge refresh after the typed a
   });
   es.dispatchEvent(new MessageEvent('frame', { data: JSON.stringify({ streamId: SHELL_EVENT_STREAM_IDS.PENDING_AUTHORIZATIONS,
     frameKind: 'UPDATE', seq: 1, ts: new Date().toISOString(), resumeToken: 'r1', payload: {
-      pendingId: 'pending', operationId: 'core.switch-inference-mode', gateBehavior: 'TYPED_CONFIRM' } }) }));
+      // The person's own window gesture: its dialog opens at once (an unnamed source waits in Needs you, L12).
+      pendingId: 'pending', operationId: 'core.switch-inference-mode', gateBehavior: 'TYPED_CONFIRM', transport: 'BUTTON' } }) }));
   await vi.advanceTimersByTimeAsync(0); await host.updateComplete;
   const input = host.shadowRoot!.querySelector('[data-testid="authorization-typed-input"]') as HTMLInputElement;
   expect(input).not.toBeNull(); input.value = 'core.switch-inference-mode'; input.dispatchEvent(new Event('input'));

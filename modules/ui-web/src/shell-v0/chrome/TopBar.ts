@@ -96,11 +96,10 @@ export class TopBar extends JfElement {
   }
 
   static override styles = css`
-    /* The switcher stays centred while both sides fit; a wider right side (the pill with a notice
-       beside it) takes room from the brand side rather than truncating the pill (L3). */
+    /* Equal side tracks keep the switcher centred; the status notice gives way inside its track. */
     :host {
       display: grid;
-      grid-template-columns: 1fr auto 1fr;
+      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
       align-items: center;
       gap: var(--jf-space-3);
       box-sizing: border-box;
@@ -112,7 +111,7 @@ export class TopBar extends JfElement {
       color: var(--text-secondary);
       font-size: var(--font-size-sm);
     }
-    .start, .end { display: flex; align-items: center; }
+    .start, .end { display: flex; align-items: center; min-width: 0; }
     .start { gap: var(--jf-space-3); }
     .end { justify-content: flex-end; gap: var(--jf-space-2); }
     .brand { display: inline-flex; align-items: center; gap: var(--jf-space-3); flex: none;
@@ -135,7 +134,8 @@ export class TopBar extends JfElement {
     .icon-button { display: inline-grid; place-items: center; inline-size: var(--frame-control-size);
       block-size: var(--frame-control-size); border-radius: var(--frame-control-radius); flex: none; }
     .icon-button:hover, .icon-button[aria-expanded='true'] { background: var(--surface-2); color: var(--text-primary); }
-    ::slotted([slot='status']) { flex: none; }
+    /* The pill may give way only through the notice beside it (which wraps); its own words never shrink. */
+    ::slotted([slot='status']) { flex: 0 1 auto; min-width: 0; }
     .menu-anchor { position: relative; flex: none; }
     .menu { position: absolute; top: calc(100% + var(--jf-space-2)); z-index: var(--z-overlay-transient);
       min-inline-size: var(--frame-menu-width); max-inline-size: calc(100vw - 2 * var(--jf-space-2));
@@ -189,6 +189,32 @@ export class TopBar extends JfElement {
       [role='menuitem']:focus-visible, [role='menuitemradio']:focus-visible { outline: var(--frame-focus-width) solid Highlight; }
     }
   `;
+
+  /** The minimal bar (below 720 px) is the only one with the area menu's button. */
+  private minimal: MediaQueryList | null = null;
+
+  override connectedCallback(): void {
+    super.connectedCallback();
+    this.minimal = typeof window.matchMedia === 'function' ? window.matchMedia('(max-width: 719px)') : null;
+    this.minimal?.addEventListener('change', this.minimalChange);
+  }
+
+  override disconnectedCallback(): void {
+    this.minimal?.removeEventListener('change', this.minimalChange);
+    this.minimal = null;
+    super.disconnectedCallback();
+  }
+
+  /**
+   * The window widened past the minimal bar: the area menu's button is gone, so its menu closes rather
+   * than staying open apart from it. Focus inside it moves to the active area in the switcher.
+   */
+  private readonly minimalChange = (): void => {
+    if (this.minimal?.matches || this.openMenu !== 'areas') return;
+    const focusInside = this.shadowRoot?.activeElement?.closest('[role="menu"]') != null;
+    this.closeMenu(false);
+    if (focusInside) this.shadowRoot?.querySelector<HTMLButtonElement>('.segment[aria-current="page"]')?.focus();
+  };
 
   protected override updated(changed: PropertyValues): void {
     if (changed.has('openMenu')) {
