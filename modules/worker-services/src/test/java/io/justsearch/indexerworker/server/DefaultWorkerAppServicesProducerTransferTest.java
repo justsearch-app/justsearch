@@ -1001,7 +1001,7 @@ final class DefaultWorkerAppServicesProducerTransferTest {
     }
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @CsvSource({"deferred,false", "deferred,true", "reload,false", "reload,true",
       "native,false", "native,true", "serving,false", "serving,true", "query,false", "query,true"})
   void unfinishedRootInitializationSurvivesSelectedProducerReplacement(
@@ -1054,7 +1054,7 @@ final class DefaultWorkerAppServicesProducerTransferTest {
     }
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(booleans = {false, true})
   void uuidlessCompletionIsNotReenrolledByPreparedOrSelectedReplacement(
       boolean query, @TempDir Path temp) throws Exception {
@@ -1082,7 +1082,7 @@ final class DefaultWorkerAppServicesProducerTransferTest {
     }
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(booleans = {false, true})
   void replacementPreservesBoundEmptyVersusUnboundBootInputs(
       boolean boundEmpty, @TempDir Path temp) throws Exception {
