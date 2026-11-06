@@ -218,7 +218,8 @@ final class RootVolumeLedger {
    * Marks each of {@code configured} that has no volume recorded at or above it, and does not
    * already await it, as awaiting its one-time seeding (round 8b, decision 3): a configured
    * collection is the person's configuration and is seeded like a root after an upgrade. Does
-   * nothing for a ledger that is not file-backed, or before the record exists.
+   * nothing for a ledger that is not file-backed. Before declared-root initialization completes,
+   * enrollment fails so the caller retains the configured roots for retry.
    *
    * @return the roots that await seeding now, including ones that awaited it before
    * @throws IOException when the record or the pending file cannot be read or written
@@ -231,7 +232,7 @@ final class RootVolumeLedger {
     synchronized (lock) {
       if (!Files.exists(file)) {
         // The declared roots' upgrade seeding has not begun; it starts first (beginUpgradeSeeding).
-        return awaiting;
+        throw new IOException("Declared-root volume initialization has not completed");
       }
       Properties pending = loadPending();
       boolean changed = false;
@@ -332,9 +333,15 @@ final class RootVolumeLedger {
         return;
       }
       if (volume != null) {
+        Optional<String> recorded = recordedFor(root);
+        if (recorded.isPresent() && !recorded.get().equals(volume)) {
+          throw new IOException("Root volume conflicts with established authority: " + root);
+        }
         Properties entries = load();
-        entries.setProperty(key, volume);
-        store(entries);
+        if (!volume.equals(entries.getProperty(key))) {
+          entries.setProperty(key, volume);
+          store(entries);
+        }
       }
       dropPending(key);
     }

@@ -2283,6 +2283,7 @@ public final class KnowledgeServer implements Closeable {
       throw new IllegalStateException("Stuck-job recovery has no mutation owner");
     }
     try (var ignoredMutation = selected.mutationAdmission().enter(selected.mutationOwnerToken())) {
+      selected.ingestService().retryRootVolumeSeeding();
       if (olderThanMs == null) queue.recoverStuckJobs();
       else queue.recoverStuckJobs(olderThanMs);
     }

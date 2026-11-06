@@ -43,7 +43,7 @@ export async function exerciseHostileLocks(c) {
   try {
     // Exactly one submission: a lost connection never authorizes replay of an unknown outcome.
     ingested = await post(submittedBinding.port, '/api/knowledge/ingest', {
-      paths, idempotencyKey: operationKey,
+      paths: [corpus], idempotencyKey: operationKey,
     });
   } catch (error) {
     if (!lostConnection(error)) throw error;
@@ -78,6 +78,7 @@ export async function exerciseHostileLocks(c) {
       code: acceptanceConnectionLost.cause?.code ?? acceptanceConnectionLost.code }));
   }
   const expectedPaths = new Set(paths.map(file => path.resolve(file).toLowerCase()));
+  let lastState = null;
   const result = await waitFor('the original operation completes and all 100 documents become searchable',
     Math.max(1, deadline - Date.now()), async () => {
     await releaseAfterCountedExit();
@@ -87,6 +88,19 @@ export async function exerciseHostileLocks(c) {
     let response;
     try {
       outcomeResponse = await request(binding.port, `/api/operation-history/${operationKey}`);
+      if (outcomeResponse.status !== 200) return null;
+      const observed = JSON.parse(outcomeResponse.text);
+      requireThat(!['unknown', 'expired', 'failed'].includes(observed.state),
+        `the original hostile-lock operation must remain recoverable: ${outcomeResponse.text}`);
+      if (observed.state !== lastState) {
+        lastState = observed.state;
+        console.log('LOCK_SURVIVAL_STATE', outcomeResponse.text);
+      }
+      // Searches are foreground work; measured foreground interference warrants polling the
+      // durable operation first, but does not establish the cause of a recovery timeout.
+      if (observed.state !== 'complete') return null;
+      requireThat(observed.result?.code === 'SUCCESS' && observed.unitsFailed === 0,
+        `the complete corpus must have a successful durable outcome: ${outcomeResponse.text}`);
       response = await post(binding.port, '/api/knowledge/search', {
         query: `${name.replaceAll('-', ' ')} probe`, limit: paths.length, mode: 'text',
       });
@@ -94,17 +108,12 @@ export async function exerciseHostileLocks(c) {
       if (lostConnection(error) || ['AbortError', 'TimeoutError'].includes(error.name)) return null;
       throw error;
     }
-    if (outcomeResponse.status !== 200) return null;
     const outcome = JSON.parse(outcomeResponse.text);
-    requireThat(!['unknown', 'expired', 'failed'].includes(outcome.state),
-      `the original hostile-lock operation must remain recoverable: ${outcomeResponse.text}`);
     if (response.status !== 200) return null;
     const matched = new Set((JSON.parse(response.text).results ?? [])
       .map(candidate => String(candidate.fields?.path ?? '').toLowerCase())
       .filter(file => expectedPaths.has(file)));
-    if (outcome.state !== 'complete' || matched.size !== expectedPaths.size) return null;
-    requireThat(outcome.result?.code === 'SUCCESS' && outcome.unitsFailed === 0,
-      `the complete corpus must have a successful durable outcome: ${outcomeResponse.text}`);
+    if (matched.size !== expectedPaths.size) return null;
     return { port: binding.port, incarnation: binding.incarnation, matchedCount: matched.size, outcome };
   });
   requireThat((await request(result.port, '/api/health')).status === 200,

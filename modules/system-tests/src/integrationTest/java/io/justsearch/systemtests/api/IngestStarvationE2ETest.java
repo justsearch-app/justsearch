@@ -19,6 +19,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -76,6 +77,9 @@ class IngestStarvationE2ETest {
 
   /** Comfortably past ChunkDocumentWriter.CHUNK_THRESHOLD_CHARS (2000) so chunk docs get written. */
   private static final int DOC_CHARS = 6000;
+
+  // Keep both batches for the same Engine lifetime; JUnit cleans up after BACKEND.stop().
+  @TempDir static Path contentDir;
 
   @BeforeAll
   static void startBackend() throws Exception {
@@ -241,7 +245,7 @@ class IngestStarvationE2ETest {
   // ------------------------------------------------------------------------------
 
   /**
-   * Creates a small corpus under the fixture data dir so its tempdir cleanup removes it.
+   * Creates a small user-content corpus outside protected application data.
    *
    * <p>Each document is deliberately pushed past {@code ChunkDocumentWriter.CHUNK_THRESHOLD_CHARS}
    * (2000) so the ingest produces CHUNK documents, not just parent documents. Chunk docs are the
@@ -250,7 +254,7 @@ class IngestStarvationE2ETest {
    */
   private static Path createBatch(String label) throws Exception {
     String marker = "starve-" + label + "-" + UUID.randomUUID().toString().substring(0, 8);
-    Path corpus = Files.createDirectory(BACKEND.dataDir().resolve(marker));
+    Path corpus = Files.createDirectory(contentDir.resolve(marker));
     for (int i = 0; i < DOCS_PER_BATCH; i++) {
       StringBuilder text = new StringBuilder(DOC_CHARS + 128);
       text.append("Ingest starvation batch ").append(marker).append(" document ").append(i);

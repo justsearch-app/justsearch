@@ -6,6 +6,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { exerciseMigrationRestart } from './migration-restart-scenario.mjs';
 import { exerciseMigrationJournalLoss } from './migration-journal-loss-scenario.mjs';
 import { exercisePointerPublication, preparePointerRecovery } from './pointer-publication-scenario.mjs';
+import { ROOT_VOLUME_INITIALIZATION_RETRY, prepareRootVolumeInitialization, exerciseRootVolumeInitialization } from './root-volume-initialization-scenario.mjs';
 import { exerciseHostileLocks } from './hostile-lock-scenario.mjs';
 import { exerciseProcessingReplay } from './processing-replay-scenario.mjs';
 import { exerciseOperationResume } from './operation-resume-scenario.mjs';
@@ -298,6 +299,11 @@ if (semanticIndexLockScenario) {
   env.JUSTSEARCH_EMBED_GPU_ENABLED = 'false';
   env.JUSTSEARCH_CHAT_PROFILE = 'standard';
   delete env.AI_OFFLINE;
+}
+if (scenario === ROOT_VOLUME_INITIALIZATION_RETRY) {
+  prepareRootVolumeInitialization({ work, data });
+  env.JUSTSEARCH_BACKFILL_COMMIT_INTERVAL_MS = '1000';
+  env.JUSTSEARCH_INDEX_COMMIT_TIMER_INTERVAL_MS = '1000';
 }
 if (lockScenario) env.JUSTSEARCH_BACKFILL_COMMIT_INTERVAL_MS = '1000';
 if (['writer', 'processing', 'operation'].includes(scenario) || scenario === undefined
@@ -917,6 +923,9 @@ try {
     await exerciseIndexLockRecovery({ scenario, work, data, indexBase, first, manifest, apiPort,
       readJson, waitFor, request, post, requireThat, requireOperationSuccess,
       createOperationKey, matchingHit });
+  } else if (scenario === ROOT_VOLUME_INITIALIZATION_RETRY) {
+    await exerciseRootVolumeInitialization({ work, data, indexBase, first, apiPort, readJson, waitFor,
+      request, post, requireThat, requireOperationSuccess, createOperationKey });
   } else if (lockScenario) {
     await exerciseHostileLocks({ work, data, first, readJson, waitFor, request, post,
       requireThat, requireOperationSuccess, createOperationKey });
