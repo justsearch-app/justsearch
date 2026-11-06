@@ -463,7 +463,7 @@ export function analyzeTestIntent({ repoRoot, env = process.env, explicitBase = 
     const ref = rollingRef(repoRoot);
     const report = reportFor({ repoRoot, ref, days: ROLLING_DAYS });
     rollingReport = { report };
-    reconsider = { ...reconsiderRate(report.totals), ref, days: ROLLING_DAYS };
+    reconsider = { ...reconsiderRate({ audited: report.totals.audited, prs: report.prs }), ref, days: ROLLING_DAYS };
     if (reconsider.above) {
       reconsider.message = reconsiderMessage(reconsider, ROLLING_DAYS, ref);
       findings.push(finding('reconsider-rate', 'warning', reconsider.message));

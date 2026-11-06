@@ -437,19 +437,67 @@ test('weekly report: counts and the one-in-ten tie-break flag', () => {
   assert.equal(rep.totals.audited, 1);
   assert.equal(rep.totals.tieBreaks, 1);
   assert.equal(rep.totals.newChecks, 2);
-  assert.ok(rep.findings.some((f) => /third-reviewer tie-breaks were 1 of 1 audited PRs \(100\.0%\), above one in ten/.test(f)));
+  assert.ok(rep.findings.some((f) => /PRs with a reviewer disagreement or third-reviewer tie-break were 1 of 1 audited PRs \(100\.0%\), above one in ten/.test(f)));
   assert.match(renderMarkdown(rep), /\| Third-reviewer tie-breaks \| 1 \|/);
 });
 
-test('reconsider rate: tie-breaks first, disagreements before any tie-break, strictly above one in ten', () => {
-  assert.equal(reconsiderRate({ audited: 10, tieBreaks: 1, auditDisagreements: 5 }).above, false, 'boundary: 1 in 10 is not above');
-  assert.equal(reconsiderRate({ audited: 10, tieBreaks: 2, auditDisagreements: 2 }).above, true);
-  assert.match(reconsiderRate({ audited: 10, tieBreaks: 2, auditDisagreements: 9 }).basis, /tie-breaks/);
-  assert.equal(reconsiderRate({ audited: 10, tieBreaks: 0, auditDisagreements: 2 }).above, true);
-  assert.match(reconsiderRate({ audited: 10, tieBreaks: 0, auditDisagreements: 2 }).basis, /disagreements/);
-  assert.equal(reconsiderRate({ audited: 10, tieBreaks: 0, auditDisagreements: 1 }).above, false);
-  assert.equal(reconsiderRate({ audited: 0, tieBreaks: 0, auditDisagreements: 0 }).above, false);
-  assert.equal(reconsiderRate({ audited: 0, tieBreaks: 0, auditDisagreements: 1 }).above, true, 'nothing to divide by');
+test('weekly report: disagreement requires different sessions on the same digest within a changeset', () => {
+  const rec = (o = {}) => ({ kind: 'acceptance', session: 'v', verdict: 'accept', digest: 'd', ...o });
+  const report = (recordGroups, pr = 10) => buildReport({
+    commits: [{ sha: 'a'.repeat(40), date: 'd', pr, changesets: recordGroups.map((records, i) => ({
+      path: `gates/test-intent/.changesets/${i}.md`,
+      text: records.reduce((text, r) => appendRecord(text, r), changesetText({ entries: [{ items: ['a'], class: 'Obsolete' }] })),
+    })) }],
+    ref: 'main', sinceIso: 's', untilIso: 'u',
+  });
+  for (const firstKind of ['acceptance', 'audit']) {
+    for (const secondKind of ['acceptance', 'audit']) {
+      const pair = [rec({ kind: firstKind, verdict: 'reject' }), rec({ kind: secondKind, session: 'u' })];
+      for (const records of [pair, [...pair].reverse()]) {
+        const r = report([[...records, rec({ digest: 'repaired' }), rec({ kind: 'audit', session: 'u', digest: 'repaired' })]]);
+        assert.equal(r.prs[0].disagreement, true, `${firstKind}/${secondKind}: preserves a disagreement before repair in either order`);
+        assert.equal(r.totals.auditDisagreements, 1);
+      }
+    }
+  }
+  const cycles = [rec({ verdict: 'reject' }), rec({ session: 'u', digest: 'repair-1' }),
+    rec({ verdict: 'reject', digest: 'repair-2' }), rec({ session: 'u', digest: 'repair-3' })];
+  assert.equal(report([cycles]).prs[0].disagreement, false, 'repair cycles on different digests');
+  assert.equal(report([[rec({ verdict: 'reject' }), rec()]]).prs[0].disagreement, false, 'same session reverses itself');
+  assert.equal(report([[rec({ verdict: 'reject' })], [rec({ session: 'u' })]]).prs[0].disagreement, false, 'different changesets never match');
+  for (const field of ['digest', 'session']) {
+    for (const value of [undefined, null, '', '   ']) {
+      for (const side of [0, 1]) {
+        const pair = [rec({ verdict: 'reject' }), rec({ session: 'u' })];
+        pair[side][field] = value;
+        assert.equal(report([pair]).prs[0].disagreement, false, `missing ${field} on either record never matches`);
+      }
+    }
+  }
+  assert.equal(report([[rec({ verdict: 'unknown' }), rec({ session: 'u' })]]).prs[0].disagreement, false, 'only accept/reject are opposite');
+  assert.equal(report([[rec({ kind: 'tie-break', verdict: 'reject' }), rec({ session: 'u' })]]).prs[0].disagreement, false, 'tie-break is not a reviewer pair');
+  const pair = [rec({ verdict: 'reject' }), rec({ session: 'u' })];
+  assert.equal(report([pair, pair]).totals.auditDisagreements, 1, 'count PRs, not pairs or changesets');
+  const nonAudited = report([pair], 11);
+  assert.equal(nonAudited.prs[0].disagreement, true);
+  assert.equal(nonAudited.totals.auditDisagreements, 0);
+  assert.match(renderMarkdown(nonAudited), /\| #11 \| .* \| no \| yes \| no \|/);
+});
+
+test('reconsider rate: union of audited PRs with disagreements or tie-breaks, strictly above one in ten', () => {
+  const both = { audited: true, disagreement: true, tieBreak: true };
+  const disagreement = { audited: true, disagreement: true, tieBreak: false };
+  const tieBreak = { audited: true, disagreement: false, tieBreak: true };
+  const rate = (prs, audited = 10) => reconsiderRate({ audited, prs });
+  assert.equal(rate([both]).count, 1, 'overlap counts once');
+  assert.equal(rate([both]).above, false, 'exactly one in ten does not warn');
+  assert.equal(rate([both, disagreement]).above, true, 'a tie-break never hides other disagreements');
+  assert.equal(rate([disagreement, tieBreak]).count, 2, 'disjoint PRs both count');
+  assert.equal(rate([disagreement, disagreement]).above, true);
+  assert.equal(rate([{ ...disagreement, audited: false }, { ...tieBreak, audited: false }]).count, 0, 'non-audited PRs do not enter the rate');
+  assert.equal(rate([], 0).above, false);
+  assert.equal(rate([{ ...disagreement, audited: false }], 0).above, true, 'no audited PR: any disagreement warns');
+  assert.equal(rate([{ ...tieBreak, audited: false }], 0).above, true, 'no audited PR: any tie-break warns');
 });
 
 test('weekly report: the gate step writes the rolling four-week counts to the job summary', () => {

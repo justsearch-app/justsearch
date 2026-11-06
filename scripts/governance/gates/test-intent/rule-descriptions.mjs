@@ -32,6 +32,6 @@ export const TEST_INTENT_RULE_DESCRIPTIONS = {
   'test-intent/accepted': 'The entries are accepted by a non-author acceptor, bound to the current content',
   'test-intent/base-unresolved': 'The base commit could not be resolved (shallow clone, missing base); the gate fails closed',
   'test-intent/fork-pr': 'Fork PR: a maintainer agent completes the changeset and the acceptance record',
-  'test-intent/reconsider-rate': 'Advisory, never fails: over the rolling four weeks, third-reviewer tie-breaks (or, before any tie-break, disagreements) exceed one in ten audited PRs; the orchestrator reports it as a finding in its next delivery',
+  'test-intent/reconsider-rate': 'Advisory, never fails: over the rolling four weeks, audited PRs with a reviewer disagreement or third-reviewer tie-break exceed one in ten audited PRs (each PR counts once); with no audited PRs, any disagreement or tie-break warns; the orchestrator reports it as a finding in its next delivery',
   'test-intent/stale-entry-item': 'An entry names an item that is not flagged in this diff',
 };

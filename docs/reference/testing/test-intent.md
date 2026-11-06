@@ -449,18 +449,26 @@ summary. The counts read merged history on main:
 - references to test-efficacy changesets;
 - rejections;
 - audited PRs;
-- disagreements;
+- audited PRs with a reviewer disagreement;
 - third-reviewer tie-breaks;
 - new checks per PR.
 
+Within one changeset, a disagreement means two acceptance or audit records from different sessions
+with opposite verdicts on the same digest, in any order. A later repair and acceptance on a new
+digest do not erase that disagreement. Reject, repair, accept on different digests is not a
+disagreement, however many cycles occur; neither is one session reversing itself on the same digest.
+Records without a digest or session never match. The per-PR table also shows disagreements on
+non-audited PRs.
+
 There is no scheduled workflow, because ADR-0026 forbids `schedule:` triggers.
 
-The reconsider rule is checked on every run. Over the same four weeks, it compares third-reviewer
-tie-breaks per audited PR against one in ten. Before any tie-break has happened, it uses
-two-reviewer disagreements per audited PR instead. When the rate is above one in ten, the gate
+The reconsider rule is checked on every run. Over the same four weeks, the rate is audit-selected
+PRs with a disagreement or a third-reviewer tie-break divided by audited PRs. Each PR counts once,
+even if it has both; non-audited PRs do not enter the rate. With no audited PR in the window, any
+disagreement or tie-break counts as above the threshold. When the rate is above one in ten, the gate
 prints a marked warning in its normal output (`WARNING test-intent/reconsider-rate`) and in the job
-summary. The warning names the rate. The orchestrator must report it as a finding in its next
-delivery. The warning never fails the gate. Locally:
+summary. The warning names the rate and what was counted. The orchestrator must report it as a
+finding in its next delivery. The warning never fails the gate. Locally:
 `node scripts/governance/gates/test-intent/weekly-report.mjs [--days 28] [--out-md <file>] [--out-json <file>]`.
 
 ## Fork PRs
