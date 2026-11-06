@@ -1228,7 +1228,7 @@ final class KnowledgeSearchEngine {
         try (Scope ceScope = ceSpan.makeCurrent()) { // NOPMD - scope used for auto-close
           // The RPC's budget is min(its category budget, rerank deadline - now) (§1.2), so a
           // rerank whose native run stalls releases the search at the rerank deadline.
-          reranked = withinHead(rerankBy, () -> client.rerank(
+          reranked = withinHead(rerankBy, () -> client.rerankSearch(
               req.query(), docTexts, rerankConfig.deadlineBudgetMs(), engineContext));
           // Tempdoc 553 Phase D (head): OpenInference RERANKER projection of the CE-scored
           // output — the reranked docs (id + CE score + content), in the cross-encoder's chosen

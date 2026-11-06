@@ -594,6 +594,11 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
         return searchRpcOps.rerank(query, documentTexts, deadlineMs, engineContext);
     }
 
+    /** Interactive search opts into the active tokenizer's conservative query-length policy. */
+    public RerankResponse rerankSearch(String query, List<String> documentTexts, long deadlineMs, EngineContext engineContext) {
+        return searchRpcOps.rerankSearch(query, documentTexts, deadlineMs, engineContext);
+    }
+
     public ListFoldersResponse listFolders(String parentPath, int maxFolders, EngineContext engineContext) {
         return searchRpcOps.listFolders(parentPath, maxFolders, false, engineContext);
     }

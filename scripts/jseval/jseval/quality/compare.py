@@ -127,7 +127,7 @@ def load_baseline(path: str | os.PathLike) -> tuple[RunRecord, dict]:
 # all its non-NONE causes are budget/loading/inference drops. Unknown stays invalid.
 BY_DESIGN_RERANK_SKIPS = frozenset({
     "NAVIGATIONAL_QUERY", "DISABLED", "BELOW_MIN_THRESHOLD", "DOCS_TOO_LONG",
-    "PIPELINE_NOT_ELIGIBLE", "MODEL_NOT_CONFIGURED", "FUSION_CONFIDENT",
+    "PIPELINE_NOT_ELIGIBLE", "MODEL_NOT_CONFIGURED", "FUSION_CONFIDENT", "QUERY_TOO_LONG",
 })
 # modules/worker-services/src/main/java/io/justsearch/indexerworker/services/
 # respond/SearchTraceProjector.java:157-185 emits these routing selections;

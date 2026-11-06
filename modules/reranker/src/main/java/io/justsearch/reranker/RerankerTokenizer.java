@@ -3,9 +3,16 @@ package io.justsearch.reranker;
 
 import ai.djl.huggingface.tokenizers.Encoding;
 import ai.djl.huggingface.tokenizers.HuggingFaceTokenizer;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonParser;
+import com.google.gson.stream.JsonReader;
+import java.io.ByteArrayInputStream;
 import java.io.Closeable;
 import java.io.IOException;
+import java.io.StringReader;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 
 /**
@@ -16,6 +23,7 @@ import java.nio.file.Path;
 public final class RerankerTokenizer implements Closeable {
   private final HuggingFaceTokenizer tokenizer;
   private final int maxLength;
+  private final boolean queryPolicyTemplateSupported;
 
   /**
    * Creates a tokenizer from a local tokenizer.json file.
@@ -26,11 +34,127 @@ public final class RerankerTokenizer implements Closeable {
    */
   public RerankerTokenizer(Path tokenizerPath, int maxLength) {
     try {
-      this.tokenizer = HuggingFaceTokenizer.newInstance(tokenizerPath);
+      Path file = Files.isDirectory(tokenizerPath) ? tokenizerPath.resolve("tokenizer.json") : tokenizerPath;
+      byte[] definition = Files.readAllBytes(file);
+      // The native owner and policy metadata must come from the same immutable definition.
+      this.queryPolicyTemplateSupported = supportsQueryPolicyTemplate(definition);
+      this.tokenizer = HuggingFaceTokenizer.newInstance(new ByteArrayInputStream(definition), null);
     } catch (IOException e) {
       throw new UncheckedIOException("Failed to load tokenizer from " + tokenizerPath, e);
     }
     this.maxLength = maxLength;
+  }
+
+  /**
+   * Proves the search-only long-query predicate without changing native tokenizer options.
+   *
+   * <p>Only the attended primary window is counted. A clipped window is a lower bound, sufficient
+   * to prove {@code 2*q > B-S}; no exact original length or overflow reconstruction is claimed.
+   * Unsupported metadata leaves ordinary reranking unchanged. Native encoding failures propagate.
+   */
+  public boolean exceedsSearchQueryBudget(String query) {
+    if (!queryPolicyTemplateSupported || maxLength <= 0) {
+      return false;
+    }
+    String truncation = tokenizer.getTruncation();
+    boolean truncated = "LONGEST_FIRST".equals(truncation);
+    if (!truncated && !"DO_NOT_TRUNCATE".equals(truncation)) {
+      return false;
+    }
+    int nativeCap = tokenizer.getMaxLength();
+    if (truncated && nativeCap <= 0) {
+      return false;
+    }
+    int budget = truncated ? Math.min(maxLength, nativeCap) : maxLength;
+    Encoding emptyPair = tokenizer.encode("", "", true, false);
+    int specials = attendedTokens(emptyPair, true);
+    if (specials < 0 || specials >= budget) {
+      return false;
+    }
+    // DJL booleans are addSpecialTokens/includeOverflowArrays, not truncation/padding switches.
+    int primaryQueryTokens = attendedTokens(tokenizer.encode(query, false, false), false);
+    if (primaryQueryTokens < 0 || (truncated && primaryQueryTokens > nativeCap)) {
+      return false;
+    }
+    return 2L * primaryQueryTokens > (long) budget - specials;
+  }
+
+  private static int attendedTokens(Encoding encoding, boolean requireSpecials) {
+    long[] ids = encoding.getIds();
+    long[] attention = encoding.getAttentionMask();
+    long[] special = encoding.getSpecialTokenMask();
+    if (attention == null || attention.length != ids.length
+        || (requireSpecials && (special == null || special.length != ids.length))) {
+      return -1;
+    }
+    int count = 0;
+    for (int i = 0; i < attention.length; i++) {
+      if (attention[i] != 0 && attention[i] != 1) {
+        return -1;
+      }
+      if (attention[i] == 1) {
+        if (requireSpecials && special[i] != 1) {
+          return -1;
+        }
+        count++;
+      }
+    }
+    return count;
+  }
+
+  private static boolean supportsQueryPolicyTemplate(byte[] definition) throws IOException {
+    try (var reader = new JsonReader(new StringReader(new String(definition, StandardCharsets.UTF_8)))) {
+      reader.beginObject();
+      while (reader.hasNext()) {
+        if ("post_processor".equals(reader.nextName())) {
+          return supportsQueryPolicyTemplate(JsonParser.parseReader(reader));
+        }
+        reader.skipValue();
+      }
+      return false;
+    }
+  }
+
+  private static boolean supportsQueryPolicyTemplate(JsonElement element) {
+    if (element == null || !element.isJsonObject()) {
+      return false;
+    }
+    var processor = element.getAsJsonObject();
+    JsonElement type = processor.get("type");
+    if (type == null || !type.isJsonPrimitive() || !type.getAsJsonPrimitive().isString()) {
+      return false;
+    }
+    if ("BertProcessing".equals(type.getAsString()) || "RobertaProcessing".equals(type.getAsString())) {
+      return true;
+    }
+    if (!"TemplateProcessing".equals(type.getAsString())
+        || !processor.has("pair") || !processor.get("pair").isJsonArray()) {
+      return false;
+    }
+    int a = 0;
+    int b = 0;
+    for (JsonElement item : processor.getAsJsonArray("pair")) {
+      if (!item.isJsonObject() || item.getAsJsonObject().size() != 1) {
+        return false;
+      }
+      var part = item.getAsJsonObject();
+      if (part.has("Sequence") && part.get("Sequence").isJsonObject()) {
+        JsonElement id = part.getAsJsonObject("Sequence").get("id");
+        if (id == null || !id.isJsonPrimitive() || !id.getAsJsonPrimitive().isString()) {
+          return false;
+        }
+        if ("A".equals(id.getAsString())) {
+          a++;
+        } else if ("B".equals(id.getAsString())) {
+          b++;
+        } else {
+          return false;
+        }
+      } else if (!part.has("SpecialToken") || !part.get("SpecialToken").isJsonObject()) {
+        return false;
+      }
+    }
+    return a == 1 && b == 1;
   }
 
   /**

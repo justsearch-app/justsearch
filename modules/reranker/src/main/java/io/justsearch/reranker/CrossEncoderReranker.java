@@ -181,6 +181,11 @@ public final class CrossEncoderReranker implements Closeable {
     return sessions.status();
   }
 
+  /** Borrows the selected assembly's tokenizer for the search-only policy; acquires no session. */
+  public boolean exceedsSearchQueryBudget(String query) {
+    return tokenizer.exceedsSearchQueryBudget(query);
+  }
+
   /**
    * Reranks documents based on relevance to query.
    *

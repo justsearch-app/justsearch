@@ -1,0 +1,70 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-06T20:34:09.259Z",
+  "revision": "0c0d8786e406f12e4038e1947f89a4c2b3ccc2af",
+  "tree": "45c55f4c66d25dfcb29c341fa8190cd0dc470ef8",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-api:test --tests \"io.justsearch.app.api.knowledge.CrossEncoderSkipReasonTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2819
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/knowledge/CrossEncoderSkipReasonTest.java",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/knowledge/CrossEncoderSkipReasonTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:53b4ef93d5ab8e8210b625dc254c8fefa21369db9fb4c491aec9dd814f00cb5e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the Worker's declared skip reasons map to their members",
+          "status": "passed"
+        },
+        {
+          "name": "aColdRerankIsWordedAsLoadingRatherThanUnknown()",
+          "status": "passed"
+        },
+        {
+          "name": "wire() is the enum name — the string the trace stage carries",
+          "status": "passed"
+        },
+        {
+          "name": "F-054: an inference failure is a drop, and is not the deadline code",
+          "status": "passed"
+        },
+        {
+          "name": "an empty Worker skip reason is UNKNOWN, not a guessed deadline",
+          "status": "passed"
+        },
+        {
+          "name": "an unrecognised Worker string resolves to UNKNOWN, never a raw pass-through",
+          "status": "passed"
+        },
+        {
+          "name": "the drop class is exactly the reasons the user tier words",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:4ea9c7f3fad7f7bf0021539cb1977fc64c76f827186dca78c123d471f9615289"
+}

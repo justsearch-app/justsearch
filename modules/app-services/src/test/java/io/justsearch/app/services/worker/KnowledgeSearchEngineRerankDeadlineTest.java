@@ -74,7 +74,7 @@ final class KnowledgeSearchEngineRerankDeadlineTest {
     when(client.requestDeadlineMs()).thenReturn(4_000L);
     when(client.search(any(SearchRequest.class), any())).thenReturn(hits("/base.txt"));
     long[] rerankBound = new long[1];
-    when(client.rerank(anyString(), anyList(), anyLong(), any())).thenAnswer(invocation -> {
+    when(client.rerankSearch(anyString(), anyList(), anyLong(), any())).thenAnswer(invocation -> {
       rerankBound[0] = HeadSearchDeadline.current().orElse(0);
       return io.justsearch.ipc.RerankResponse.newBuilder()
           .addSortedIndices(0).addScores(1f).build();
@@ -106,7 +106,7 @@ final class KnowledgeSearchEngineRerankDeadlineTest {
     KnowledgeSearchResponse response =
         engineOver(client).search(rerankingRequest(), TestEngineContexts.internal());
 
-    verify(client, never()).rerank(anyString(), anyList(), anyLong(), any());
+    verify(client, never()).rerankSearch(anyString(), anyList(), anyLong(), any());
     assertEquals(List.of("/base.txt"),
         response.results().stream().map(KnowledgeSearchResponse.Hit::id).toList());
     assertEquals(SearchTrace.StageStatus.SKIPPED, crossEncoder(response).status());
@@ -119,7 +119,7 @@ final class KnowledgeSearchEngineRerankDeadlineTest {
     when(client.requestDeadlineMs()).thenReturn(1_500L);
     when(client.search(any(SearchRequest.class), any())).thenReturn(hits("/base.txt"));
     // The client releases the caller at the rerank deadline, as the in-process budget does.
-    when(client.rerank(anyString(), anyList(), anyLong(), any())).thenAnswer(invocation -> {
+    when(client.rerankSearch(anyString(), anyList(), anyLong(), any())).thenAnswer(invocation -> {
       OptionalLong bound = HeadSearchDeadline.current();
       while (System.nanoTime() - bound.getAsLong() < 0) Thread.sleep(5);
       throw new KnowledgeClientException(
@@ -142,7 +142,7 @@ final class KnowledgeSearchEngineRerankDeadlineTest {
     KnowledgeClient client = mock(KnowledgeClient.class);
     when(client.requestDeadlineMs()).thenReturn(10_000L);
     when(client.search(any(SearchRequest.class), any())).thenReturn(hits("/base.txt"));
-    when(client.rerank(anyString(), anyList(), anyLong(), any())).thenThrow(
+    when(client.rerankSearch(anyString(), anyList(), anyLong(), any())).thenThrow(
         new KnowledgeClientException(
             KnowledgeClientException.Status.UNAVAILABLE, "worker gone", null));
 
