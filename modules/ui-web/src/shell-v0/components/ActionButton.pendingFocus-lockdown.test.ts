@@ -221,3 +221,76 @@ it('Escape and Keep it cancel without HTTP and permit a later confirmation', asy
   }
   await f.begin(); await f.finish(); expect(await f.focus()).toBe(true);
 });
+it('ancestor inline visibility hidden then shown invalidates the pending claim', async () => {
+  const f = await open(true); await f.begin();
+  await f.list.evaluate(el => { (el as HTMLElement).style.visibility = 'hidden'; });
+  await f.frames(); expect(await f.opener.isVisible()).toBe(false);
+  await f.list.evaluate(el => { (el as HTMLElement).style.visibility = 'visible'; });
+  await f.frames(); expect(await f.opener.isVisible()).toBe(true);
+  await f.finish(); expect(await f.focus()).toBe(false);
+});
+it.each(['Enter', 'Space'].flatMap(key => [false, true].map(cancel => ({ key, cancel }))))(
+  'fresh $key transfers ownership to the automatic fallback band (cancel=$cancel)', async ({ key, cancel }) => {
+    const f = await open(); await f.begin();
+    const other = f.list.locator('jf-row-actions[row-key="after"] button.invoke');
+    expect(await other.evaluate(el => el.matches(':focus'))).toBe(true);
+    await f.page.keyboard.press(key);
+    const keep = f.list.locator('jf-row-actions[row-key="after"] jf-confirm-band jf-button.keep button');
+    await expect.poll(() => keep.evaluate(el => el.matches(':focus'))).toBe(true);
+    if (cancel) { await f.page.keyboard.press('Escape'); await expect.poll(() => other.evaluate(el => el.matches(':focus'))).toBe(true); }
+    await f.finish(); expect(await f.focus()).toBe(false);
+    expect(await (cancel ? other : keep).evaluate(el => el.matches(':focus'))).toBe(true);
+  },
+);
+it.each([200, 503])('actual OpButton INLINE returns its surviving opener after HTTP %s', async status => {
+  const f = await open(false, status);
+  const errors: string[] = []; f.page.on('pageerror', error => errors.push(error.message));
+  // Browser-native module loading: page.evaluate dynamic imports are rewritten by the test runner.
+  await f.page.addScriptTag({ type: 'module', url: new URL('/src/shell-v0/components/OpButton.ts', url).href });
+  await f.page.evaluate(() => {
+    const op = document.createElement('jf-op-button');
+    op.setAttribute('operation-id', 'core.cancel-indexing-job');
+    op.setAttribute('api-base', location.origin); document.body.append(op);
+  });
+  const action = f.page.locator('jf-op-button jf-action-button'), opener = action.locator('button.invoke');
+  await opener.waitFor({ state: 'visible' }); const original = await opener.elementHandle();
+  await opener.focus(); await f.page.keyboard.press('Enter');
+  const band = action.locator('jf-confirm-band');
+  await expect.poll(() => band.locator('jf-button.keep button').evaluate(el => el.matches(':focus'))).toBe(true);
+  await f.page.keyboard.press('Shift+Tab'); await f.page.keyboard.press('Enter');
+  await expect.poll(f.requests).toBe(1); await expect.poll(() => opener.isDisabled()).toBe(true);
+  expect(await action.evaluate(el => el.hasAttribute('disabled') && el.hasAttribute('pending'))).toBe(true);
+  await f.frames(); expect(await f.page.evaluate(() => document.activeElement === document.body)).toBe(true);
+  f.release(); await expect.poll(() => opener.isEnabled()).toBe(true); await f.frames();
+  expect(await opener.evaluate((el, old) => el === old, original)).toBe(true);
+  expect(await opener.evaluate(el => el.matches(':focus'))).toBe(true);
+  expect(f.requests()).toBe(1); expect(errors).toEqual([]);
+});
+it('a programmatic activation click transfers ownership before the next band renders', async () => {
+  const f = await open(); await f.begin();
+  const other = f.list.locator('jf-row-actions[row-key="after"] button.invoke');
+  expect(await other.evaluate(el => el.matches(':focus'))).toBe(true);
+  await other.evaluate(el => (el as HTMLButtonElement).click());
+  const keep = f.list.locator('jf-row-actions[row-key="after"] jf-confirm-band jf-button.keep button');
+  await expect.poll(() => keep.evaluate(el => el.matches(':focus'))).toBe(true);
+  await f.finish(); expect(await keep.evaluate(el => el.matches(':focus'))).toBe(true);
+});
+it('a removed file returning as a new row inherits no old completion claim', async () => {
+  const f = await open(); await f.begin(); const old = await f.opener.elementHandle();
+  await f.refresh(['after']); await f.refresh(['target', 'after']);
+  expect(await f.opener.evaluate((el, old) => el === old, old)).toBe(false);
+  const other = f.list.locator('jf-row-actions[row-key="after"] button.invoke');
+  expect(await other.evaluate(el => el.matches(':focus'))).toBe(true);
+  f.release(); await expect.poll(() => old!.evaluate(el => !(el as HTMLButtonElement).disabled)).toBe(true);
+  await f.frames(); expect(await other.evaluate(el => el.matches(':focus'))).toBe(true);
+  expect(await f.focus()).toBe(false); expect(f.requests()).toBe(1);
+});
+it.each(['Enter', ' '])('synthetic composing repeat %j remains uncancelled (narrow IME guard only)', async key => {
+  const f = await open(); await f.begin(true);
+  const uncancelled = await f.page.evaluate(key => document.dispatchEvent(new KeyboardEvent('keydown', {
+    key, repeat: true, isComposing: true, bubbles: true, composed: true, cancelable: true,
+  })), key);
+  expect(uncancelled).toBe(true);
+  await f.page.keyboard.up('Enter'); await f.page.locator('#outside').click();
+  await f.finish(); expect(await f.page.locator('#outside').evaluate(el => el.matches(':focus'))).toBe(true);
+});

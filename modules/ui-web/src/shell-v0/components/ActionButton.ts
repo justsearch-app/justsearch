@@ -72,8 +72,11 @@ export class ActionButton extends JfElement {
   private pendingFocus: {
     opener: HTMLButtonElement;
     operationId: string;
+    heldKey: string | null;
     stop: () => void;
   } | null = null;
+
+  private confirmationKey: string | null = null;
 
   declare operationId: string;
   declare label: string;
@@ -183,6 +186,8 @@ export class ActionButton extends JfElement {
           consequence=${operationConsequence(this.operationId, this.label)}
           action-label=${this.label}
           ?busy=${this.disabled || this.pending}
+          @keydown=${this.trackConfirmationKey}
+          @keyup=${this.trackConfirmationKey}
           @confirm-band-confirm=${this.fireInvoke}
           @confirm-band-cancel=${this.cancelConfirm}
         ></jf-confirm-band>` : nothing}
@@ -222,6 +227,14 @@ export class ActionButton extends JfElement {
     this.fireInvoke();
   };
 
+  private readonly trackConfirmationKey = (event: KeyboardEvent): void => {
+    if (event.type === 'keyup') {
+      if (event.key === this.confirmationKey) this.confirmationKey = null;
+    } else if (!shouldIgnoreKeyEvent(event) && (event.key === 'Enter' || event.key === ' ')) {
+      this.confirmationKey = event.key;
+    }
+  };
+
   private readonly fireInvoke = (): void => {
     if (this.disabled || this.pending) {
       return;
@@ -230,10 +243,11 @@ export class ActionButton extends JfElement {
     if (this.confirmStage === 'awaiting-confirm') {
       const opener = this.shadowRoot?.querySelector<HTMLButtonElement>('button.invoke');
       if (opener) {
-        this.pendingFocus = { opener, operationId: this.operationId, stop: () => {} };
+        this.pendingFocus = { opener, operationId: this.operationId, heldKey: this.confirmationKey, stop: () => {} };
         this.watchPendingFocus();
       }
     }
+    this.confirmationKey = null;
     this.dispatchEvent(
       new CustomEvent<ActionInvokeEventDetail>('action-invoke', {
         detail: { operationId: this.operationId, risk: this.risk },
@@ -252,6 +266,7 @@ export class ActionButton extends JfElement {
   }
 
   override disconnectedCallback(): void {
+    this.confirmationKey = null;
     this.pendingFocus?.stop();
     const claim = this.pendingFocus;
     queueMicrotask(() => {
@@ -268,6 +283,8 @@ export class ActionButton extends JfElement {
   /** Visibility and inertness must also hold through the opener's enclosing shadow hosts. */
   private openerAvailable(opener: HTMLButtonElement): boolean {
     if (!opener.isConnected || !opener.getClientRects().length) return false;
+    const visibility = this.ownerDocument.defaultView?.getComputedStyle(opener).visibility;
+    if (visibility === 'hidden' || visibility === 'collapse') return false;
     for (let node: Node | null = opener; node;
       node = node.parentNode ?? (node instanceof ShadowRoot ? node.host : null)) {
       if (node instanceof HTMLElement && (node.inert || node.hidden)) return false;
@@ -287,13 +304,14 @@ export class ActionButton extends JfElement {
     // relinquishes this invocation's claim; that automatic fallback is not a person's choice.
     doc.addEventListener('pointerdown', release, options);
     doc.addEventListener('keydown', event => {
-      if (event.repeat && (event.key === 'Enter' || event.key === ' ')) {
-        // The confirmation key can still be held when a fallback control receives focus.
-        event.preventDefault();
-        event.stopPropagation();
+      if (shouldIgnoreKeyEvent(event)) {
+        // Composition belongs to the IME. Only the still-held confirmation gesture is suppressed.
+        if (!event.isComposing && event.repeat && event.key === claim.heldKey) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
         return;
       }
-      if (shouldIgnoreKeyEvent(event)) return;
       if (event.key === 'Tab') { release(); return; }
       const before = deepActiveElement(doc);
       queueMicrotask(() => {
@@ -301,9 +319,10 @@ export class ActionButton extends JfElement {
         if (after !== before && after !== doc.body) release();
       });
     }, options);
-    doc.addEventListener('focusin', event => {
-      if (event.composedPath().some(node => node instanceof HTMLElement
-        && node.localName === 'jf-confirm-band' && node.getRootNode() !== this.shadowRoot)) release();
+    // Native keyboard and assistive/programmatic activation clicks precede asynchronous band focus.
+    doc.addEventListener('click', release, options);
+    doc.addEventListener('keyup', event => {
+      if (event.key === claim.heldKey) claim.heldKey = null;
     }, options);
     doc.defaultView?.addEventListener('blur', event => {
       if (event.target === doc.defaultView) release();
@@ -322,17 +341,18 @@ export class ActionButton extends JfElement {
   protected override updated(): void {
     const claim = this.pendingFocus;
     if (!claim) return;
-    if (claim.operationId !== this.operationId || this.disabled || !this.openerAvailable(claim.opener)) {
+    if (claim.operationId !== this.operationId || !this.openerAvailable(claim.opener)) {
       this.releasePendingFocus();
       return;
     }
     if (this.pending) return;
     this.releasePendingFocus();
     // Settlement returns to this same surviving opener even if a list controller filled the gap.
-    if (this.ownerDocument.hasFocus() && !claim.opener.disabled) claim.opener.focus({ preventScroll: true });
+    if (!this.disabled && this.ownerDocument.hasFocus() && !claim.opener.disabled) claim.opener.focus({ preventScroll: true });
   }
 
   private readonly cancelConfirm = (): void => {
+    this.confirmationKey = null;
     this.confirmStage = 'idle';
     this.typedConfirm = '';
     this.shadowRoot?.querySelector<HTMLButtonElement>('button.invoke')?.focus();
