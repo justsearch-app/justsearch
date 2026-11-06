@@ -1,198 +1,140 @@
-name: Build Installer
+name: Native TLS proof packages (temporary)
+
+# Build-only carrier. These public TEST-pinned packages are never release assets.
 on:
-  push:
-    tags: ['v*']
   workflow_dispatch:
     inputs:
-      sandboxTestMode:
-        description: Qualification build with loopback feeds and test trust roots (branch refs only)
-        type: boolean
-        default: false
-      candidateVersion:
-        description: Version override for a qualification build
+      beforeSha:
+        description: Exact predecessor source commit
         type: string
-        default: ''
+        required: true
+        default: '379f5936c8b9c0c23c59765f6d970bd33eeab8a8'
+      candidateSha:
+        description: Exact rustls candidate source commit
+        type: string
+        required: true
+        default: '1f152599a1bd715e34e95c3bbcd48ff03bcb246b'
+
 permissions:
   contents: read
   actions: read
-# Serialize candidate sequence derivation and draft upload with publication.
+
 concurrency:
-  group: ${{ startsWith(github.ref, 'refs/tags/v') && 'release-candidate' || format('manual-windows-{0}', github.ref) }}
+  group: native-tls-proof-packages-${{ github.ref }}
   cancel-in-progress: false
-env:
-  JUSTSEARCH_RELEASE_DESCRIPTOR_URL: https://github.com/justsearch-app/justsearch/releases/latest/download/release.v2.json
-  JUSTSEARCH_RELEASE_METADATA_ROOT_PUBLIC_KEY: ${{ vars.JUSTSEARCH_RELEASE_METADATA_ROOT_PUBLIC_KEY }}
-  JUSTSEARCH_RELEASE_METADATA_ROOT_KEY_ID: ${{ vars.JUSTSEARCH_RELEASE_METADATA_ROOT_KEY_ID }}
-  JUSTSEARCH_UPDATE_ARTIFACT_PUBLIC_KEY: ${{ vars.JUSTSEARCH_UPDATE_ARTIFACT_PUBLIC_KEY }}
-  JUSTSEARCH_UPDATE_ARTIFACT_KEY_ID: ${{ vars.JUSTSEARCH_UPDATE_ARTIFACT_KEY_ID }}
+
 jobs:
-  manual-windows:
+  packages:
     if: github.event_name == 'workflow_dispatch' && !startsWith(github.ref, 'refs/tags/')
-    uses: ./.github/workflows/build-installer-windows.yml
-    with:
-      sandboxTestMode: ${{ inputs.sandboxTestMode }}
-      candidateVersion: ${{ inputs.candidateVersion }}
-  prepare:
-    environment: release-signing
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    name: TEST packages / ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        include:
+          - platform: linux
+            runner: ubuntu-24.04
+          - platform: windows
+            runner: windows-latest
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 180
+    defaults:
+      run:
+        shell: bash
+    env:
+      BEFORE_SHA: ${{ inputs.beforeSha }}
+      CANDIDATE_SHA: ${{ inputs.candidateSha }}
+      PROOF_PLATFORM: ${{ matrix.platform }}
+      RELEASE_BUILD: 'false'
+      ORG_GRADLE_PROJECT_includeCuda: 'false'
+      ORG_GRADLE_PROJECT_skipOnnxModels: 'true'
+      JUSTSEARCH_CODESIGN_LEDGER_PATH: ${{ runner.temp }}/native-tls-unused-signing-ledger.jsonl
     steps:
-      - uses: actions/checkout@v7
+      - name: Checkout carrier, without retained credentials
+        uses: actions/checkout@v7
         with:
-          fetch-depth: 0
+          persist-credentials: false
+      - name: Admit exact sources and retain helpers outside source checkouts
+        run: python scripts/ci/native-tls-proof-build.py stage
+      - name: Checkout exact predecessor
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.beforeSha }}
+          path: proof-before
+          persist-credentials: false
+      - name: Checkout exact candidate (probe and target)
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.candidateSha }}
+          path: proof-candidate
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: '24.14.0'
-      - name: Refuse qualification inputs on release refs
-        env:
-          SANDBOX: ${{ inputs.sandboxTestMode }}
-          CANDIDATE_VERSION: ${{ inputs.candidateVersion }}
-        run: test "$SANDBOX" != true && test -z "$CANDIDATE_VERSION"
-      - name: Stage public metadata key
-        env:
-          METADATA_PUBLIC_KEY_PEM: ${{ vars.JUSTSEARCH_RELEASE_METADATA_PUBLIC_KEY_PEM }}
-        run: |
-          printf '%s' "$METADATA_PUBLIC_KEY_PEM" > "$RUNNER_TEMP/metadata-public.pem"
-          echo "JUSTSEARCH_RELEASE_METADATA_PUBLIC_KEY_PATH=$RUNNER_TEMP/metadata-public.pem" >> "$GITHUB_ENV"
-      - name: Admit release before any signing
-        env:
-          GH_TOKEN: ${{ github.token }}
-          HAS_CODESIGN_COMMAND: ${{ secrets.JUSTSEARCH_CODESIGN_COMMAND != '' }}
-          HAS_TAURI_KEY: ${{ secrets.JUSTSEARCH_TAURI_UPDATER_PRIVATE_KEY != '' }}
-          HAS_METADATA_KEY: ${{ secrets.JUSTSEARCH_RELEASE_METADATA_PRIVATE_KEY_PEM != '' }}
-        run: |
-          node scripts/release/release-candidate.mjs admit
-          node scripts/ci/sync-version.mjs --require-release-semver --check
-          node scripts/ci/check-mcpb-consistency.mjs --release-version "${GITHUB_REF_NAME#v}"
-      - name: Reuse original predecessor context on same-run retry
-        id: context
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: node scripts/ci/packaging-smoke.mjs cached release-context-${{ github.run_id }}
-      - name: Derive published predecessor sequence and compatibility
-        if: steps.context.outputs.exists != 'true'
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          mkdir -p dist/context
-          node scripts/ci/derive-release-sequence.mjs --exclude-tag "$GITHUB_REF_NAME" --compat-baseline-out dist/context/compatibility-baseline.json > dist/context/sequence
-          node scripts/release/app-release-assets.mjs check-compatibility --compatibility governance/store-recoverability.v1.json --compat-baseline dist/context/compatibility-baseline.json
-      - uses: actions/upload-artifact@v7
-        if: steps.context.outputs.exists != 'true'
+          cache: npm
+          cache-dependency-path: |
+            proof-before/modules/shell/package-lock.json
+            proof-before/modules/ui-web/package-lock.json
+            proof-candidate/modules/shell/package-lock.json
+            proof-candidate/modules/ui-web/package-lock.json
+      - uses: actions/setup-java@v6
         with:
-          name: release-context-${{ github.run_id }}
-          path: dist/context/*
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: native-tls-proof-${{ matrix.platform }}
+          workspaces: |
+            proof-before/modules/shell/src-tauri -> target
+            proof-candidate/modules/shell/src-tauri -> target
+      - name: Cache Gradle UI outputs
+        uses: actions/cache@v6
+        with:
+          path: |
+            proof-before/modules/ui/build
+            proof-candidate/modules/ui/build
+          key: native-tls-ui-${{ runner.os }}-${{ hashFiles('proof-candidate/modules/ui/build.gradle.kts', 'proof-candidate/modules/**/build.gradle.kts', 'proof-candidate/gradle.properties', 'proof-candidate/settings.gradle.kts', 'proof-candidate/gradle/verification-metadata.xml', 'proof-candidate/gradle/wrapper/gradle-wrapper.properties', 'proof-candidate/**/*.java') }}
+          restore-keys: native-tls-ui-${{ runner.os }}-
+      - name: Cache pinned llama prebuilt downloads
+        uses: actions/cache@v6
+        with:
+          path: |
+            proof-before/modules/ui/build/llama-server/prebuilt
+            proof-candidate/modules/ui/build/llama-server/prebuilt
+          key: native-tls-llama-${{ runner.os }}-b8571-40D8C4B9
+      - name: Cache Windows Tauri bundler downloads
+        if: matrix.platform == 'windows'
+        uses: actions/cache@v6
+        with:
+          path: ~/AppData/Local/tauri
+          key: tauri-bundler-${{ runner.os }}-v2
+      - name: Linux native build libraries
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
+            librsvg2-dev patchelf build-essential binutils libssl-dev pkg-config
+      - name: Initialize shared deterministic public TEST pins
+        run: python "$RUNNER_TEMP/native-tls-proof/native-tls-proof-build.py" initialize
+      - name: Build predecessor / 0.3.80
+        run: python "$RUNNER_TEMP/native-tls-proof/native-tls-proof-build.py" build before
+      - name: Build candidate probe / 0.3.81
+        run: python "$RUNNER_TEMP/native-tls-proof/native-tls-proof-build.py" build probe
+      - name: Build candidate target / 0.3.82 (warm candidate outputs)
+        run: python "$RUNNER_TEMP/native-tls-proof/native-tls-proof-build.py" build target
+      - name: Seal public build evidence and erase ephemeral private fixture material
+        id: seal
+        if: always()
+        run: python "$RUNNER_TEMP/native-tls-proof/native-tls-proof-build.py" finalize
+      - name: Preserve immutable packages, public fixtures, provenance and failures
+        if: always() && steps.seal.outputs.safe_export == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: native-tls-packages-${{ matrix.platform }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/native-tls-proof/public/
           if-no-files-found: error
-  windows:
-    needs: prepare
-    uses: ./.github/workflows/build-installer-windows.yml
-    secrets: inherit
-    with:
-      release: true
-  linux:
-    needs: prepare
-    uses: ./.github/workflows/build-installer-linux.yml
-    secrets: inherit
-    with:
-      release: true
-  assemble:
-    environment: release-signing
-    needs: [windows, linux]
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    permissions:
-      contents: read
-      actions: read
-      id-token: write
-      attestations: write
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '24.14.0'
-      - name: Reuse an assembled candidate on upload retry
-        id: cached
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: node scripts/ci/packaging-smoke.mjs cached candidate-assets-${{ github.run_id }}
-      - uses: actions/download-artifact@v8
-        if: steps.cached.outputs.exists != 'true'
-        with:
-          name: windows-installer
-          path: dist/inputs/windows
-      - uses: actions/download-artifact@v8
-        if: steps.cached.outputs.exists != 'true'
-        with:
-          name: linux-installer-${{ github.run_id }}
-          path: dist/inputs/linux
-      - uses: actions/download-artifact@v8
-        if: steps.cached.outputs.exists != 'true'
-        with:
-          pattern: windows-check-${{ github.run_id }}-*
-          merge-multiple: true
-          path: dist/inputs/checks
-      - uses: actions/download-artifact@v8
-        if: steps.cached.outputs.exists != 'true'
-        with:
-          name: release-context-${{ github.run_id }}
-          path: dist/inputs/context
-      - name: Stage public metadata key
-        if: steps.cached.outputs.exists != 'true'
-        env:
-          METADATA_PUBLIC_KEY_PEM: ${{ vars.JUSTSEARCH_RELEASE_METADATA_PUBLIC_KEY_PEM }}
-        run: |
-          printf '%s' "$METADATA_PUBLIC_KEY_PEM" > "$RUNNER_TEMP/metadata-public.pem"
-          echo "JUSTSEARCH_RELEASE_METADATA_PUBLIC_KEY_PATH=$RUNNER_TEMP/metadata-public.pem" >> "$GITHUB_ENV"
-      - name: Assemble and verify the closed asset set
-        if: steps.cached.outputs.exists != 'true'
-        env:
-          METADATA_PRIVATE_KEY_PEM: ${{ secrets.JUSTSEARCH_RELEASE_METADATA_PRIVATE_KEY_PEM }}
-        run: |
-          node scripts/ci/packaging-smoke.mjs plan dist/inputs dist/candidate-inputs.json
-          node scripts/release/release-candidate.mjs build dist/candidate-inputs.json
-      - name: Attest the candidate and all payloads
-        if: steps.cached.outputs.exists != 'true'
-        id: provenance
-        uses: actions/attest-build-provenance@v3
-        with:
-          subject-path: dist/candidate/*
-      - name: Preserve provenance and checksum every asset
-        if: steps.cached.outputs.exists != 'true'
-        env:
-          BUNDLE_PATH: ${{ steps.provenance.outputs.bundle-path }}
-        run: |
-          cp "$BUNDLE_PATH" dist/candidate/provenance.sigstore.json
-          node scripts/release/release-candidate.mjs checksums dist/candidate
-      - uses: actions/upload-artifact@v7
-        if: steps.cached.outputs.exists != 'true'
-        with:
-          name: candidate-assets-${{ github.run_id }}
-          path: dist/candidate/*
-          if-no-files-found: error
+          compression-level: 0
           retention-days: 14
-  draft:
-    needs: assemble
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '24.14.0'
-      - uses: actions/download-artifact@v8
-        with:
-          name: candidate-assets-${{ github.run_id }}
-          path: dist/candidate
-      - name: Stage public metadata key
-        env:
-          METADATA_PUBLIC_KEY_PEM: ${{ vars.JUSTSEARCH_RELEASE_METADATA_PUBLIC_KEY_PEM }}
-        run: |
-          printf '%s' "$METADATA_PUBLIC_KEY_PEM" > "$RUNNER_TEMP/metadata-public.pem"
-          echo "JUSTSEARCH_RELEASE_METADATA_PUBLIC_KEY_PATH=$RUNNER_TEMP/metadata-public.pem" >> "$GITHUB_ENV"
-      - name: Upload draft and round-trip verify; never publish or clobber
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: node scripts/release/release-candidate.mjs upload dist/candidate
