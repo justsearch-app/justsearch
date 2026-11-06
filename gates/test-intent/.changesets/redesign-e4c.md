@@ -512,3 +512,14 @@ Git metadata is outside the writable sandbox, so all three changed files remain 
 No evidence JSON was written, and acceptance remains empty for the independent verifier.
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1b026-7cbe-7d71-aad2-2e218ae6d08e",
+  "verdict": "accept",
+  "digest": "sha256:779a926cebd5ac329b686df6a9b20f2cdff9b64508cfb143655f640c69d06002",
+  "note": "Entries 1-10 accept. Transcribed from the verifier's result by the orchestrator."
+}
+```
