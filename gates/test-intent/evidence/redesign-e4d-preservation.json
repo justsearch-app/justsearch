@@ -1,0 +1,904 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-06T01:57:30.575Z",
+  "revision": "d4cdb6eb2953971fa2de257d6f7d21ca158e87c7",
+  "tree": "3395ddfa3825299c6b552e15211b92ea54a6f6b9",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:worker-core:test --tests \"io.justsearch.indexerworker.splade.SpladeOptInTest.explicitParentTrueAndFalseKeepTheirMeaning\" --tests \"io.justsearch.indexerworker.splade.SpladeOptInTest.resolvedSourcePrecedenceKeepsAnExplicitGlobalVeto\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2999
+    },
+    {
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.SpladeOptInCompositionTest.permissionDoesNotChangeSelectedIdentityOrPath\" --tests \"io.justsearch.indexerworker.server.SpladeOptInCompositionTest.permissionChangeKeepsCommittedGenerationParityAfterReopen\" --tests \"io.justsearch.indexerworker.server.SpladeOptInTokenCountTest.corruptTokenizerKeepsTheNonfatalEstimate\" --tests \"io.justsearch.indexerworker.server.SpladeOptInTokenCountTest.missingTokenizerKeepsTheNonfatalEstimate\" --tests \"io.justsearch.indexerworker.server.SpladeOptInTokenCountTest.unavailableTokenizerNativeLibraryKeepsTheNonfatalEstimate\" --tests \"io.justsearch.indexerworker.server.GenerationModelSelectionTest\" --tests \"io.justsearch.indexerworker.server.ActivationPhysicalEncoderCapsTest\" --tests \"io.justsearch.indexerworker.server.InferenceCompositionRootFootprintTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 23021
+    },
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.ops.SpladeOptInResumeTest\" --tests \"io.justsearch.indexerworker.loop.FairEnrichmentSchedulerTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentPreservationTest\" --tests \"io.justsearch.indexerworker.loop.ops.SpladeBackfillOpsTest\" --tests \"io.justsearch.indexerworker.loop.ops.BgeM3BackfillOpsTest\" --tests \"io.justsearch.indexerworker.services.SpladeOptInStatusTest.bgeSparseProviderKeepsExistingChunkApplicabilityOutsideTheGlobalVeto\" --tests \"io.justsearch.indexerworker.services.SpladeOptInStatusTest.permittedButUnavailableSparseWorkKeepsItsExistingChunkBacklog\" --tests \"io.justsearch.indexerworker.services.SpladeOptInStatusTest.unavailableBgeSelectionKeepsItsApplicabilityAcrossServingSuccessors\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 55891
+    },
+    {
+      "command": "./gradlew :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.SparsePayloadPreservationTest\" --tests \"io.justsearch.adapters.lucene.runtime.SparseRmwPreservationTest\" --tests \"io.justsearch.adapters.lucene.runtime.SourceEnvelopeSparsePreservationTest\" --tests \"io.justsearch.adapters.lucene.runtime.SpladePendingSelectionTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 13137
+    },
+    {
+      "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.mcp.SpladeOptInMcpHintsTest.runnableSparseAndDenseBacklogsKeepTheirHints\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 6028
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-core/src/test/java/io/justsearch/indexerworker/splade/SpladeOptInTest.java#explicitParentTrueAndFalseKeepTheirMeaning",
+      "file": "modules/worker-core/src/test/java/io/justsearch/indexerworker/splade/SpladeOptInTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:cc6adf007eed540beb11e7af15d7354a51760f1192bce20fe564373c5594fb91",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "explicitParentTrueAndFalseKeepTheirMeaning()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-core/src/test/java/io/justsearch/indexerworker/splade/SpladeOptInTest.java#resolvedSourcePrecedenceKeepsAnExplicitGlobalVeto",
+      "file": "modules/worker-core/src/test/java/io/justsearch/indexerworker/splade/SpladeOptInTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:cc6adf007eed540beb11e7af15d7354a51760f1192bce20fe564373c5594fb91",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "resolvedSourcePrecedenceKeepsAnExplicitGlobalVeto()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/SpladeOptInCompositionTest.java#permissionDoesNotChangeSelectedIdentityOrPath",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/SpladeOptInCompositionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:769563af2046f25e4b04ca7909894b7b1fc8f9fb7c6c44b2e21cfe5968f7a8c5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "permissionDoesNotChangeSelectedIdentityOrPath()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/SpladeOptInCompositionTest.java#permissionChangeKeepsCommittedGenerationParityAfterReopen",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/SpladeOptInCompositionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:769563af2046f25e4b04ca7909894b7b1fc8f9fb7c6c44b2e21cfe5968f7a8c5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "permissionChangeKeepsCommittedGenerationParityAfterReopen()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/SpladeOptInTokenCountTest.java#corruptTokenizerKeepsTheNonfatalEstimate",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/SpladeOptInTokenCountTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e409f1acb4cb98759396b261e6e82f8e2b76837b16d21eb3f1f325f3d4125863",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "corruptTokenizerKeepsTheNonfatalEstimate()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/SpladeOptInTokenCountTest.java#missingTokenizerKeepsTheNonfatalEstimate",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/SpladeOptInTokenCountTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e409f1acb4cb98759396b261e6e82f8e2b76837b16d21eb3f1f325f3d4125863",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "missingTokenizerKeepsTheNonfatalEstimate()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/SpladeOptInTokenCountTest.java#unavailableTokenizerNativeLibraryKeepsTheNonfatalEstimate",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/SpladeOptInTokenCountTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e409f1acb4cb98759396b261e6e82f8e2b76837b16d21eb3f1f325f3d4125863",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unavailableTokenizerNativeLibraryKeepsTheNonfatalEstimate()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/SpladeOptInResumeTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/SpladeOptInResumeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:eddfd9f50eb4df60e2ad5bc09ad744fbc1b98cef78e3fa44621a6f55026b4f65",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "successfulCorpusReachesFullCoverageAndReusesCompletedEmpty()",
+          "status": "passed"
+        },
+        {
+          "name": "restartResumesPendingParentsAndRetainsTerminalStatesAndRetryBudgets()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/GenerationModelSelectionTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/GenerationModelSelectionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5252560461a7c2c161b4a8c4ff7070ed1dd45a2bc4ac577b29b1cbe017bae098",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "companionChangesRejectCompatibilityWithoutChangingGraphIntegrity(String, String) [1] embedding, tokenizer.json",
+          "status": "passed"
+        },
+        {
+          "name": "companionChangesRejectCompatibilityWithoutChangingGraphIntegrity(String, String) [2] embedding, 1_Pooling/config.json",
+          "status": "passed"
+        },
+        {
+          "name": "companionChangesRejectCompatibilityWithoutChangingGraphIntegrity(String, String) [3] embedding, pooling_config.json",
+          "status": "passed"
+        },
+        {
+          "name": "companionChangesRejectCompatibilityWithoutChangingGraphIntegrity(String, String) [4] embedding, prefix_config.json",
+          "status": "passed"
+        },
+        {
+          "name": "companionChangesRejectCompatibilityWithoutChangingGraphIntegrity(String, String) [5] embedding, sentence_bert_config.json",
+          "status": "passed"
+        },
+        {
+          "name": "companionChangesRejectCompatibilityWithoutChangingGraphIntegrity(String, String) [6] embedding, config_sentence_transformers.json",
+          "status": "passed"
+        },
+        {
+          "name": "companionChangesRejectCompatibilityWithoutChangingGraphIntegrity(String, String) [7] ner, tokenizer.json",
+          "status": "passed"
+        },
+        {
+          "name": "companionChangesRejectCompatibilityWithoutChangingGraphIntegrity(String, String) [8] ner, config.json",
+          "status": "passed"
+        },
+        {
+          "name": "companionChangesRejectCompatibilityWithoutChangingGraphIntegrity(String, String) [9] splade, tokenizer.json",
+          "status": "passed"
+        },
+        {
+          "name": "companionChangesRejectCompatibilityWithoutChangingGraphIntegrity(String, String) [10] splade, vocab.txt",
+          "status": "passed"
+        },
+        {
+          "name": "companionReadFailureIsIndeterminateAndGenerationsKeepIndependentAssets()",
+          "status": "passed"
+        },
+        {
+          "name": "selectsOnlyTheManifestFileAndItsOwnMetadataDirectory()",
+          "status": "passed"
+        },
+        {
+          "name": "legacyManifestDoesNotClaimModelSelection()",
+          "status": "passed"
+        },
+        {
+          "name": "externalReferencesUseExactGenerationGraphRatherThanSiblingVariant()",
+          "status": "passed"
+        },
+        {
+          "name": "externalWeightsChangeRejectsCompatibilityAfterCommitAndReopen(String) [1] embedding",
+          "status": "passed"
+        },
+        {
+          "name": "externalWeightsChangeRejectsCompatibilityAfterCommitAndReopen(String) [2] splade",
+          "status": "passed"
+        },
+        {
+          "name": "externalWeightsChangeRejectsCompatibilityAfterCommitAndReopen(String) [3] ner",
+          "status": "passed"
+        },
+        {
+          "name": "graphOnlyGenerationAdoptsWithoutClaimingCommittedCompanionProof()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/FairEnrichmentSchedulerTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/FairEnrichmentSchedulerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:60c903b3dbf111c632a5f3cab74e9530289118b116626dc59c029277163e75ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "D10_bgeIsOneUnifiedOwnerChargedOnceBesideSeparateNer()",
+          "status": "passed"
+        },
+        {
+          "name": "D3_unequalCostsShareChargedServiceNotTurnCounts()",
+          "status": "passed"
+        },
+        {
+          "name": "D11_disambiguationWithoutLaneAdmissionReportsIdle()",
+          "status": "passed"
+        },
+        {
+          "name": "D3_reentryKeepsDebtAndNeverBurstsAfterAbsenceOrProviderReplacement()",
+          "status": "passed"
+        },
+        {
+          "name": "D8_advancingRetainedWindowsOverManyCyclesAreNotAStall()",
+          "status": "passed"
+        },
+        {
+          "name": "D7_replacedContentInvalidatesRetainedWorkForBothCallers()",
+          "status": "passed"
+        },
+        {
+          "name": "P1095_chunksAdvanceWithinThreeCyclesUnderTheOriginalLongDocumentCosts(long, boolean) [1] 80, false",
+          "status": "passed"
+        },
+        {
+          "name": "P1095_chunksAdvanceWithinThreeCyclesUnderTheOriginalLongDocumentCosts(long, boolean) [2] 4900, false",
+          "status": "passed"
+        },
+        {
+          "name": "P1095_chunksAdvanceWithinThreeCyclesUnderTheOriginalLongDocumentCosts(long, boolean) [3] 4900, true",
+          "status": "passed"
+        },
+        {
+          "name": "D7_retainedClassificationAndWindowsResumeThroughEitherCaller()",
+          "status": "passed"
+        },
+        {
+          "name": "D11_activityGaugeAndPerTurnRecordsDistinguishWindowAdvancementFromCompletion()",
+          "status": "passed"
+        },
+        {
+          "name": "D9_smallTurnsUseTheThresholdsRetryAFailedCommitAndDrainAtIdle()",
+          "status": "passed"
+        },
+        {
+          "name": "D3_anOverrunningEarlyLaneCannotReclaimTheFirstSlotAcrossCyclesAndCallers()",
+          "status": "passed"
+        },
+        {
+          "name": "D5b_bgeHoldDoesNotBlockIndependentDenseChunk()",
+          "status": "passed"
+        },
+        {
+          "name": "D8_holdsAndBackoffAreNotUnsuccessfulService()",
+          "status": "passed"
+        },
+        {
+          "name": "D4b_bothSparseLanesGetOpportunitiesUnderContinuingParentArrivals()",
+          "status": "passed"
+        },
+        {
+          "name": "D5b_denseChunkAcquisitionHoldUnderBge()",
+          "status": "passed"
+        },
+        {
+          "name": "D3_globalEligibilityGapDoesNotReintroduceCatchupBurst()",
+          "status": "passed"
+        },
+        {
+          "name": "D2_ingestionArrivingDuringAMultiCallDocumentKeepsTheUnitsRetainedProgress()",
+          "status": "passed"
+        },
+        {
+          "name": "D1_continuingIngestionServesEveryContinuouslyEligibleLane(String) [1] separate",
+          "status": "passed"
+        },
+        {
+          "name": "D1_continuingIngestionServesEveryContinuouslyEligibleLane(String) [2] dense",
+          "status": "passed"
+        },
+        {
+          "name": "D1_continuingIngestionServesEveryContinuouslyEligibleLane(String) [3] ner",
+          "status": "passed"
+        },
+        {
+          "name": "D1_continuingIngestionServesEveryContinuouslyEligibleLane(String) [4] bge",
+          "status": "passed"
+        },
+        {
+          "name": "D11_notDueBusyCallReportsIdle()",
+          "status": "passed"
+        },
+        {
+          "name": "D2_pendingIngestionLetsOneAdmittedUnitFinishThenStopsFurtherIdleUnits()",
+          "status": "passed"
+        },
+        {
+          "name": "architecturalDeletionLeavesNoModeRoutingProbeOrDrainGates()",
+          "status": "passed"
+        },
+        {
+          "name": "D5b_oneProviderHoldCoversEveryLaneItServesThroughBothCallers(String) [1] dense",
+          "status": "passed"
+        },
+        {
+          "name": "D5b_oneProviderHoldCoversEveryLaneItServesThroughBothCallers(String) [2] bge",
+          "status": "passed"
+        },
+        {
+          "name": "D3_zeroTimeOutcomesAndTiesRotateWithoutMonopolising()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentPreservationTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentPreservationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e59bc3a3bfed2568c68ea625fda90115800f4e75405ff404085331e951cd7dfd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "retainedOwnerIsServedBeforeNewAdmissions(boolean) [1] false",
+          "status": "passed"
+        },
+        {
+          "name": "retainedOwnerIsServedBeforeNewAdmissions(boolean) [2] true",
+          "status": "passed"
+        },
+        {
+          "name": "examinedIneligibleHeadDoesNotRunOrPinTheFollowingPage(boolean) [1] false",
+          "status": "passed"
+        },
+        {
+          "name": "examinedIneligibleHeadDoesNotRunOrPinTheFollowingPage(boolean) [2] true",
+          "status": "passed"
+        },
+        {
+          "name": "oversizedRetainedParentStillAllowsPendingChunkToAdvanceWithinThreeCycles()",
+          "status": "passed"
+        },
+        {
+          "name": "sameParentBatchKeepsDifferentRevisionExpectationsSeparate()",
+          "status": "passed"
+        },
+        {
+          "name": "batchSnapshotHashesEachLegacyParentOnce()",
+          "status": "passed"
+        },
+        {
+          "name": "chunkProofRetentionCountsDistinctParentsOnceAndAllowsOneOversizedOwner()",
+          "status": "passed"
+        },
+        {
+          "name": "nextTurnReleasesDeletedReplacedAndExternallyCompletedOwners(String, boolean) [1] deleted, false",
+          "status": "passed"
+        },
+        {
+          "name": "nextTurnReleasesDeletedReplacedAndExternallyCompletedOwners(String, boolean) [2] replaced, false",
+          "status": "passed"
+        },
+        {
+          "name": "nextTurnReleasesDeletedReplacedAndExternallyCompletedOwners(String, boolean) [3] completed, false",
+          "status": "passed"
+        },
+        {
+          "name": "nextTurnReleasesDeletedReplacedAndExternallyCompletedOwners(String, boolean) [4] deleted, true",
+          "status": "passed"
+        },
+        {
+          "name": "nextTurnReleasesDeletedReplacedAndExternallyCompletedOwners(String, boolean) [5] replaced, true",
+          "status": "passed"
+        },
+        {
+          "name": "nextTurnReleasesDeletedReplacedAndExternallyCompletedOwners(String, boolean) [6] completed, true",
+          "status": "passed"
+        },
+        {
+          "name": "budgetDeferredSuffixIsNextTurnWithoutBlankRetriesOrCharges(Lane) [1] DENSE_CHUNK",
+          "status": "passed"
+        },
+        {
+          "name": "budgetDeferredSuffixIsNextTurnWithoutBlankRetriesOrCharges(Lane) [2] SPARSE_PARENT",
+          "status": "passed"
+        },
+        {
+          "name": "budgetDeferredSuffixIsNextTurnWithoutBlankRetriesOrCharges(Lane) [3] SPARSE_CHUNK",
+          "status": "passed"
+        },
+        {
+          "name": "budgetDeferredSuffixIsNextTurnWithoutBlankRetriesOrCharges(Lane) [4] NER",
+          "status": "passed"
+        },
+        {
+          "name": "budgetDeferredSuffixIsNextTurnWithoutBlankRetriesOrCharges(Lane) [5] BGE",
+          "status": "passed"
+        },
+        {
+          "name": "budgetDeferredSuffixIsNextTurnWithoutBlankRetriesOrCharges(Lane) [6] COMBINED",
+          "status": "passed"
+        },
+        {
+          "name": "budgetDeferredSuffixIsNextTurnWithoutBlankRetriesOrCharges(Lane) [7] COMBINED_CHUNK",
+          "status": "passed"
+        },
+        {
+          "name": "budgetDeferredSuffixIsNextTurnWithoutBlankRetriesOrCharges(Lane) [8] COMBINED_SPARSE_PARENT",
+          "status": "passed"
+        },
+        {
+          "name": "budgetDeferredSuffixIsNextTurnWithoutBlankRetriesOrCharges(Lane) [9] COMBINED_SPARSE_CHUNK",
+          "status": "passed"
+        },
+        {
+          "name": "budgetDeferredSuffixIsNextTurnWithoutBlankRetriesOrCharges(Lane) [10] COMBINED_NER",
+          "status": "passed"
+        },
+        {
+          "name": "budgetDeferredSuffixIsNextTurnWithoutBlankRetriesOrCharges(Lane) [11] COMBINED_ALL",
+          "status": "passed"
+        },
+        {
+          "name": "keysetTurnsPassPoisonSurviveRefreshDeletionAndIdleThenWrap(Lane) [1] DENSE_PARENT",
+          "status": "passed"
+        },
+        {
+          "name": "keysetTurnsPassPoisonSurviveRefreshDeletionAndIdleThenWrap(Lane) [2] DENSE_CHUNK",
+          "status": "passed"
+        },
+        {
+          "name": "keysetTurnsPassPoisonSurviveRefreshDeletionAndIdleThenWrap(Lane) [3] SPARSE_PARENT",
+          "status": "passed"
+        },
+        {
+          "name": "keysetTurnsPassPoisonSurviveRefreshDeletionAndIdleThenWrap(Lane) [4] SPARSE_CHUNK",
+          "status": "passed"
+        },
+        {
+          "name": "keysetTurnsPassPoisonSurviveRefreshDeletionAndIdleThenWrap(Lane) [5] NER",
+          "status": "passed"
+        },
+        {
+          "name": "keysetTurnsPassPoisonSurviveRefreshDeletionAndIdleThenWrap(Lane) [6] BGE",
+          "status": "passed"
+        },
+        {
+          "name": "keysetTurnsPassPoisonSurviveRefreshDeletionAndIdleThenWrap(Lane) [7] COMBINED",
+          "status": "passed"
+        },
+        {
+          "name": "keysetTurnsPassPoisonSurviveRefreshDeletionAndIdleThenWrap(Lane) [8] COMBINED_CHUNK",
+          "status": "passed"
+        },
+        {
+          "name": "keysetTurnsPassPoisonSurviveRefreshDeletionAndIdleThenWrap(Lane) [9] COMBINED_SPARSE_PARENT",
+          "status": "passed"
+        },
+        {
+          "name": "keysetTurnsPassPoisonSurviveRefreshDeletionAndIdleThenWrap(Lane) [10] COMBINED_SPARSE_CHUNK",
+          "status": "passed"
+        },
+        {
+          "name": "keysetTurnsPassPoisonSurviveRefreshDeletionAndIdleThenWrap(Lane) [11] COMBINED_NER",
+          "status": "passed"
+        },
+        {
+          "name": "keysetTurnsPassPoisonSurviveRefreshDeletionAndIdleThenWrap(Lane) [12] COMBINED_ALL",
+          "status": "passed"
+        },
+        {
+          "name": "oneOversizedParentDoesNotPullFollowingParentsIntoTheInferenceBatch()",
+          "status": "passed"
+        },
+        {
+          "name": "explicitExpectationsMatchMismatchAndPreserveUnchangedContent()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/SpladeBackfillOpsTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/SpladeBackfillOpsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0f94503386a766e82b4056cf194520dd121cd0a1ba371ae466c6278a5a9ac639",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "encodes reconstructed chunk text from the parent-aware batch reader",
+          "status": "passed"
+        },
+        {
+          "name": "chunk-SPLADE flag OFF: the lane selects whole documents only — it must not encode sparse data the configuration says not to produce (tempdoc 931)",
+          "status": "passed"
+        },
+        {
+          "name": "interleavedSpladeAfterFinalPrimaryCommitIsPersistedByTimer()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/BgeM3BackfillOpsTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/BgeM3BackfillOpsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b5b33d6b549ea7925159a591194b31d721eae6f7af55743b5fc254bed4fc7ebb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "parent embed failure (batch + per-doc encode both throw) escalates via EMBEDDING_RETRY_COUNT, not CHUNK_EMBEDDING_RETRY_COUNT",
+          "status": "passed"
+        },
+        {
+          "name": "chunk doc in the pending batch: CHUNK_VECTOR/CHUNK_EMBEDDING_STATUS written, VECTOR/EMBEDDING_STATUS NOT written, SPLADE written",
+          "status": "passed"
+        },
+        {
+          "name": "chunk-SPLADE flag OFF: the lane selects whole documents only — it writes sparse and dense together, so selecting a chunk would produce sparse data the flag forbids (931)",
+          "status": "passed"
+        },
+        {
+          "name": "chunk embed failure (batch + per-doc encode both throw) escalates via CHUNK_EMBEDDING_RETRY_COUNT, not EMBEDDING_RETRY_COUNT",
+          "status": "passed"
+        },
+        {
+          "name": "parent doc in the pending batch: VECTOR/EMBEDDING_STATUS written (unchanged behavior), no CHUNK_* fields",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparsePayloadPreservationTest.java",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparsePayloadPreservationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fc059b7ef0341affa077baf98e7abd939da26205f4153918014368822ab24d75",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "malformedPayloadsWithholdOnlyTheirRowsWithoutChangingStoredWork()",
+          "status": "passed"
+        },
+        {
+          "name": "suppliedSparseWinsWithReplacementContentAndStatusOnlyFailureDropsBoth()",
+          "status": "passed"
+        },
+        {
+          "name": "payloadAdditionAcceptedByBothParityPaths()",
+          "status": "passed"
+        },
+        {
+          "name": "legacyScanRunsOnceAndEmptyOrFailedRowsNeverDecodeOldPayload()",
+          "status": "passed"
+        },
+        {
+          "name": "mapperDerivesAllAcceptedFeaturesAndRewritesKeepFrequencies()",
+          "status": "passed"
+        },
+        {
+          "name": "chunkPayloadSurvivesBatchPublicationReopenAndMerge()",
+          "status": "passed"
+        },
+        {
+          "name": "storedPayloadReadFailureIsIsolatedInConditionalPublication()",
+          "status": "passed"
+        },
+        {
+          "name": "payloadIsDerivedAndCannotCertifyAnInvalidStatus()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparseRmwPreservationTest.java",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SparseRmwPreservationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:20151ebb49cb54d6f82a672ae5c72d7964e424014a6891542c65e3afdd9074fb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "embeddingOnlyUpdateKeepsEncodedSparsePostings()",
+          "status": "passed"
+        },
+        {
+          "name": "batchTraversesSparseDictionaryOncePerLeaf()",
+          "status": "passed"
+        },
+        {
+          "name": "suppliedSparseAndContentReplacementKeepTheirOwnSemantics()",
+          "status": "passed"
+        },
+        {
+          "name": "unreadableSparseDocumentIsWithheldWhileOtherDocumentsPublish()",
+          "status": "passed"
+        },
+        {
+          "name": "partialUpdatesRetainPostingsStatusAndRetryAfterReopen()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SourceEnvelopeSparsePreservationTest.java",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SourceEnvelopeSparsePreservationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7d155fb57dc4c9c7641622e250f07e7b42026da4b9ba82496847f21113478102",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "sourceWideBatchRetainsLegacyChunkSparsePostings()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SpladePendingSelectionTest.java",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/SpladePendingSelectionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6a86d11c745684695fab2bb4f0b1826def34d4b7070032c2553bdf20ffdbb33c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the plain selection returns the chunk too — the flag-on population",
+          "status": "passed"
+        },
+        {
+          "name": "pageAndContentReadCountsStayBoundedAsBacklogGrows(int) [1] 1000",
+          "status": "passed"
+        },
+        {
+          "name": "pageAndContentReadCountsStayBoundedAsBacklogGrows(int) [2] 50000",
+          "status": "passed"
+        },
+        {
+          "name": "the chunk-excluding selection returns only the pending PARENT",
+          "status": "passed"
+        },
+        {
+          "name": "countNonChunkByField matches the selection it gates, so parked chunks read as 0",
+          "status": "passed"
+        },
+        {
+          "name": "the exclusion filters on is_chunk, not on the status value",
+          "status": "passed"
+        },
+        {
+          "name": "keysetPagesUseDocumentIdsAcrossInsertionOrderRefreshAndDeletedCursor(String) [1] embedding_status",
+          "status": "passed"
+        },
+        {
+          "name": "keysetPagesUseDocumentIdsAcrossInsertionOrderRefreshAndDeletedCursor(String) [2] chunk_embedding_status",
+          "status": "passed"
+        },
+        {
+          "name": "keysetPagesUseDocumentIdsAcrossInsertionOrderRefreshAndDeletedCursor(String) [3] splade_status",
+          "status": "passed"
+        },
+        {
+          "name": "keysetPagesUseDocumentIdsAcrossInsertionOrderRefreshAndDeletedCursor(String) [4] ner_status",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/SpladeOptInMcpHintsTest.java#runnableSparseAndDenseBacklogsKeepTheirHints",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/SpladeOptInMcpHintsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7a2623cf0e919c40a652d82a13f5edc77c9b2df93250934955c316f8d1aa2be9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "runnableSparseAndDenseBacklogsKeepTheirHints()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SpladeOptInStatusTest.java#bgeSparseProviderKeepsExistingChunkApplicabilityOutsideTheGlobalVeto",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SpladeOptInStatusTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7fb97edaf1e6b5175d6f091e13e6ef60c4fbe767004281e3977c6d6f164a4865",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "bgeSparseProviderKeepsExistingChunkApplicabilityOutsideTheGlobalVeto()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SpladeOptInStatusTest.java#permittedButUnavailableSparseWorkKeepsItsExistingChunkBacklog",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SpladeOptInStatusTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7fb97edaf1e6b5175d6f091e13e6ef60c4fbe767004281e3977c6d6f164a4865",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "permittedButUnavailableSparseWorkKeepsItsExistingChunkBacklog()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SpladeOptInStatusTest.java#unavailableBgeSelectionKeepsItsApplicabilityAcrossServingSuccessors",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SpladeOptInStatusTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7fb97edaf1e6b5175d6f091e13e6ef60c4fbe767004281e3977c6d6f164a4865",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unavailableBgeSelectionKeepsItsApplicabilityAcrossServingSuccessors()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ActivationPhysicalEncoderCapsTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ActivationPhysicalEncoderCapsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a2763389f65065f8c7998ad84d91d170e3ac9e205f3a941921cceaa1c3968fba",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "standardToCompactActivationReplacesPhysicalBulkAndQueryCaps(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "precommitRefusalRestoresSourcePhysicalCapsAndWarmQuery(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "compactToStandardActivationReplacesPhysicalBulkAndQueryCaps(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootFootprintTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootFootprintTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:392044a3d3bb4e87bacb6706b174882024ece8d9001610b3aefb0b2a8b2b6b11",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "explicitCapsEqualToTodaysGiveTodaysEstimateBesideAPlan(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "sums only resolved CUDA role policies and adds exact ten-percent headroom",
+          "status": "passed"
+        },
+        {
+          "name": "generationBoundFp32CannotUseASiblingsMeasuredGpuPlan(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "ordinary embedding plus SPLADE roles are additive",
+          "status": "passed"
+        },
+        {
+          "name": "BGE-M3 reserves the larger mutually-exclusive SPLADE fallback policy",
+          "status": "passed"
+        },
+        {
+          "name": "GPU-live source without its resolved policy has unknown releasable bytes",
+          "status": "passed"
+        },
+        {
+          "name": "exact candidate probing does not mark generation selection unavailable",
+          "status": "passed"
+        },
+        {
+          "name": "query estimate is zero when the selected reranker falls back to CPU",
+          "status": "passed"
+        },
+        {
+          "name": "indexSourceCountsOwnedGpuAssembliesAndRetainedPolicies(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "unknownFreeMemoryNeverAdmitsBesideAResidentGpuSource(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDoesNotCreditAnUnusedArenaCeiling(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "sourceCreditsTheArtifactActuallyLoadedByTheGpuHandle(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "plannedP12ReplacementFromCpuSourceFitsFiveGiBFree(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "query estimate uses exact selected policies and excludes retained index roles",
+          "status": "passed"
+        },
+        {
+          "name": "sourceEstimateUsesRealizedGpuHandleAndPolicy(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:de31bbd8cba40dccd9765b15db5bf3ed064481019f3cadbfb80122e56ea70ee2"
+}

@@ -140,47 +140,21 @@ class SpladeConfigTest {
     }
   }
 
-  // ==================== Auto-enable on explicit path (374 alpha.17 R4) ====================
-
-  /**
-   * Tempdoc 374 alpha.17 R4 regression: setting an explicit splade model path
-   * via the system property must result in {@code isReady()=true} even when
-   * auto-discovery returns {@code autoDiscovered=false} (the case for explicit
-   * paths). Pre-alpha.17 the fallback was {@code discovery.autoDiscovered()}
-   * only, so {@code AiInstallService.applyOnnxSettings} writing
-   * {@code justsearch.splade.model_path} at end of Install AI silently
-   * disabled SPLADE — every install post-Install-AI had
-   * {@code spladeEnabled: false} on {@code /api/status} and SPLADE backfill
-   * never ran. Round-7 sandbox confirmed: 5/5189 SciFact docs SPLADE-encoded
-   * (the 5 built-ins from before Install AI). EmbeddingConfig already had
-   * the "explicit path enables" branch; this test pins SPLADE in alignment.
-   */
+  // E4d supersedes explicit-path auto-enable: installed assets alone are not demand.
   @Test
-  @DisplayName("explicit model path → isReady=true (374 alpha.17 R4 regression guard)")
-  void explicitModelPath_isReadyTrue() {
+  @DisplayName("explicit model path alone leaves inference off")
+  void explicitModelPath_doesNotEnable() {
     String prevPath = System.getProperty("justsearch.splade.model_path");
     String prevEnabled = System.getProperty("justsearch.splade.enabled");
     ConfigStore prevStore = ConfigStore.globalOrNull();
     try {
-      // Point at a nonexistent dir — OnnxModelDiscovery returns it as-is
-      // with autoDiscovered=false (the explicit-path branch). No need to
-      // create real model files; the test asserts only the enable-fallback.
       System.setProperty("justsearch.splade.model_path", "/nonexistent/splade-model");
       System.clearProperty("justsearch.splade.enabled");
       TestResolvedConfigHelper.storeFromEnvironment();
-
       SpladeConfig config = SpladeConfig.fromEnv();
-
-      assertTrue(
-          config.enabled(),
-          "enabled must be true when justsearch.splade.model_path is explicitly set,"
-              + " even when autoDiscovered=false. Pre-alpha.17 this was false and"
-              + " AiInstallService.applyOnnxSettings silently disabled SPLADE on"
-              + " every install (374 alpha.17 R4).");
-      assertTrue(
-          config.isReady(),
-          "isReady must be true when an explicit model path is set, regardless"
-              + " of autoDiscovered.");
+      assertFalse(config.enabled(), "D1: installed files and explicit model paths are not demand");
+      assertFalse(config.isReady());
+      assertEquals(java.nio.file.Path.of("/nonexistent/splade-model"), config.modelPath());
     } finally {
       restoreProperty("justsearch.splade.model_path", prevPath);
       restoreProperty("justsearch.splade.enabled", prevEnabled);

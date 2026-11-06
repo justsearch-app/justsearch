@@ -284,7 +284,7 @@ public final class ReadPathOps {
     }
     return switch (expectedSort) {
       case RELEVANCE -> {
-        if (decoded.score() == null) {
+        if (decoded.score() == null || !Float.isFinite(decoded.score())) {
           throw new IllegalArgumentException("cursor_missing_score");
         }
         yield new FieldDoc(

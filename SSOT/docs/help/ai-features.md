@@ -66,10 +66,27 @@ result directly against your query for more accurate relevance scoring.
 
 ## SPLADE sparse retrieval
 
-The AI install includes a SPLADE (Sparse Lexical and Expansion) model, which
-adds learned term weights to your documents as they are indexed. The search
-bar does not use them by default; they are available to searches that request
-SPLADE explicitly, such as through the API or the built-in agent's search tool.
+Install AI downloads and binds a SPLADE (Sparse Lexical and Expansion) model,
+but its background enrichment is off by default. To run it, set
+`JUSTSEARCH_SPLADE_ENABLED=true` (or the Java system property
+`justsearch.splade.enabled=true`) and restart JustSearch. The system property
+takes precedence over the environment variable. Existing pending parents then
+use the existing backfill; completed results and stored sparse data are retained
+when you turn it off again. Terminal failures keep their existing retry rules.
+
+Enabling `rag.chunk_splade.enabled` also permits parent SPLADE at the next start,
+unless `justsearch.splade.enabled=false` explicitly vetoes it. The chunk setting
+still controls enrollment and querying of chunks while running; changing it live
+does not create an encoder omitted at startup. Previously unenrolled chunks are
+not backfilled by turning it on later.
+
+The search bar does not use SPLADE by default. Explicit SPLADE requests never
+enable background work: while the encoder is off, SPLADE-only requests fall back
+to keyword search with `NO_EMBEDDING_SERVICE`; mixed pipelines keep their runnable
+keyword/dense legs. IDF querying also requires the enabled encoder. Existing
+coverage remains visible and does not prove query availability. The built-in
+agent accepts SPLADE through a custom pipeline, not the `splade` mode string.
+BGE-M3's combined dense and sparse inference is independent of this switch.
 
 ## Ask your documents
 

@@ -49,9 +49,11 @@ final class RagContextOpsFilterCopyTest {
     var copy = RagContextOps.withIncludeChunks(scoped(), false);
     String q = QueryFilterBuilder.buildFilterQueryOnly(copy).toString();
 
-    assertTrue(q.contains("collection:agent-history"), "explicit scope survives to the query: " + q);
+    assertTrue(
+        q.contains("collection:agent-history") || q.contains("collection:(agent-history)"),
+        "explicit scope survives to the query: " + q);
     assertFalse(
-        q.contains("-collection:agent-history"),
+        (q.contains("-collection:agent-history") || q.contains("-collection:(agent-history)")),
         "an explicit agent-history scope must not be turned into the default exclusion: " + q);
     assertTrue(q.contains("d:/agent/session-1.md"), "docIds survive to the query: " + q);
   }

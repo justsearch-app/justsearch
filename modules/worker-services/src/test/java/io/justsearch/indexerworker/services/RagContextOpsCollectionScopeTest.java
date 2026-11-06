@@ -46,9 +46,11 @@ final class RagContextOpsCollectionScopeTest {
       assertEquals(List.of("agent-history"), filters.collection());
 
       String q = QueryFilterBuilder.buildChunkFilterQuery(filters).toString();
-      assertTrue(q.contains("collection:agent-history"), "scope must reach the query: " + q);
+      assertTrue(
+        q.contains("collection:agent-history") || q.contains("collection:(agent-history)"),
+        "scope must reach the query: " + q);
       assertFalse(
-          q.contains("-collection:agent-history"),
+          (q.contains("-collection:agent-history") || q.contains("-collection:(agent-history)")),
           "an explicit agent-history scope must NOT become the default exclusion: " + q);
     }
 
@@ -66,7 +68,8 @@ final class RagContextOpsCollectionScopeTest {
           QueryFilterBuilder.buildFilterQueryOnly(RagContextOps.withIncludeChunks(filters, false))
               .toString();
       assertTrue(
-          parentQuery.contains("collection:agent-history"),
+          parentQuery.contains("collection:agent-history")
+              || parentQuery.contains("collection:(agent-history)"),
           "scope must also bind on the parent pre-filter leg: " + parentQuery);
     }
   }

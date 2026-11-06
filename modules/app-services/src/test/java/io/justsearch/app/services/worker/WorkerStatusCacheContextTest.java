@@ -22,6 +22,24 @@ import org.mockito.ArgumentCaptor;
 final class WorkerStatusCacheContextTest {
 
   @Test
+  void alternateStatusRetainsDisabledApplicabilityAndRealCoverage() {
+    try (var readyCapability = ReadyCapability.create()) {
+      KnowledgeClient client = mock(KnowledgeClient.class);
+      when(client.getStatus(org.mockito.ArgumentMatchers.any())).thenReturn(
+          StatusResponse.newBuilder().setEnrichment(io.justsearch.ipc.EnrichmentCoverage.newBuilder()
+              .setSpladeEnabled(false)
+              .setSplade(io.justsearch.ipc.FeatureCoverage.newBuilder().setCoveragePercent(37.5)))
+              .build());
+      var cache = new WorkerStatusCache(readyBootstrap(client));
+      cache.setWorkerCapability(readyCapability.view());
+      var extras = cache.status(TestEngineContexts.mcp()).extras();
+      org.junit.jupiter.api.Assertions.assertEquals(Boolean.FALSE, extras.get("spladeEnabled"),
+          "S13: applicability must come from the retained serving status");
+      org.junit.jupiter.api.Assertions.assertEquals(37.5, extras.get("spladeCoveragePercent"));
+    }
+  }
+
+  @Test
   void alternateStatusPreservesAnOlderWorkersAbsentSpladeTotal() {
     try (var readyCapability = ReadyCapability.create()) {
       KnowledgeClient client = mock(KnowledgeClient.class);

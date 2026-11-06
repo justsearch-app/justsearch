@@ -745,7 +745,8 @@ final class KnowledgeSearchEngine {
         return new StatusFacts(
             status.getCore().getDocCountUnknown() ? -1L : status.getCore().getDocCount(),
             status.getEnrichment().getEmbedding().getCoveragePercent(),
-            status.getEnrichment().getSplade().getCoveragePercent());
+            status.getEnrichment().getSplade().getCoveragePercent(),
+            status.getEnrichment().getSpladeEnabled());
       });
     }
 

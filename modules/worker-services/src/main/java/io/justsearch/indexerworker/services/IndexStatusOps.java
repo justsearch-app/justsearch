@@ -151,6 +151,8 @@ final class IndexStatusOps {
   // which matches backend defaults and the all-enabled production case.
   private volatile boolean embeddingEnabled = true;
   private volatile boolean spladeEnabled = true;
+  // Captured from the serving service's snapshot, never inferred from a later global setting.
+  private Boolean chunkSparsePermitted;
   private volatile boolean nerEnabled = true;
 
   IndexStatusOps(
@@ -255,12 +257,16 @@ final class IndexStatusOps {
     this.rrdStoreSupplier = supplier;
   }
 
-  /**
-   * Sets per-stage enabled flags for the /api/status enrichment view. Called once at
-   * wire-time from {@code DefaultWorkerAppServices.wireStageEnabled}. Default is all
-   * enabled — if the wiring step is skipped, stages report as enabled (matching the
-   * production case where every stage runs).
-   */
+  /** Captures startup permission separately from model availability and live settings. */
+  void setChunkSparsePermission(boolean permitted) {
+    this.chunkSparsePermitted = permitted;
+  }
+
+  void copyChunkSparsePermissionFrom(IndexStatusOps source) {
+    this.chunkSparsePermitted = source.chunkSparsePermitted;
+  }
+
+  /** Per-stage flags from the serving wrappers; BGE-M3's existing flag semantics are retained. */
   void setStageEnabled(boolean embedding, boolean splade, boolean ner) {
     this.embeddingEnabled = embedding;
     this.spladeEnabled = splade;
@@ -824,7 +830,6 @@ final class IndexStatusOps {
     // chunk-SPLADE retrieval leg has to score against.
     LuceneRuntimeTypes.SpladeFeatureCounts chkSplade =
         countOps != null ? countOps.queryChunkSpladeCounts() : null;
-    boolean chunkSpladeEnabled = chunkSpladeEnabled();
     // Tempdoc 821 §3-C3: the auditor projection. `expected` is the field-carrying denominator
     // (an absent status field means the stage does not apply, post-798), so a stage that lost a
     // sub-population reads `missing > 0` instead of hiding inside a coverage percentage that
@@ -846,6 +851,8 @@ final class IndexStatusOps {
     if (available == null) {
       available = BackfillScheduler.StageAvailability.NONE;
     }
+    // BGE-M3 owns sparse output independently of the separate SPLADE permission.
+    boolean chunkSpladeEnabled = chunkSpladeEnabled(available.sparse());
 
     return EnrichmentCoverage.newBuilder()
         .setEmbedding(
@@ -1031,11 +1038,13 @@ final class IndexStatusOps {
    * a consumer can tell "chunk SPLADE has no coverage because it is off" from "it is on and behind".
    * Absent config reads as the flag's own default (false).
    */
-  private boolean chunkSpladeEnabled() {
+  private boolean chunkSpladeEnabled(boolean sparseProviderPresent) {
     Supplier<io.justsearch.configuration.resolved.ResolvedConfig> supplier = resolvedConfigSupplier;
     io.justsearch.configuration.resolved.ResolvedConfig config =
         supplier == null ? null : supplier.get();
-    return config != null && config.rag() != null && config.rag().chunkSpladeEnabled();
+    return ((chunkSparsePermitted != null ? chunkSparsePermitted : spladeEnabled) || sparseProviderPresent)
+        && config != null && config.rag() != null
+        && config.rag().chunkSpladeEnabled();
   }
 
   io.justsearch.ipc.SearchConfig buildSearchConfig() {
