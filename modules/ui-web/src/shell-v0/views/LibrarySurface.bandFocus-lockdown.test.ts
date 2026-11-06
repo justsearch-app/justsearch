@@ -75,7 +75,7 @@ beforeAll(async () => {
             errorMessage: '', retryAfterMs: 0, collection: 'default', scanId: '' });
           window.updateFailedBands = async failure => {
             if (!drawer) {
-              drawer = document.createElement('jf-failed-jobs-drawer'); drawer.inline = true;
+              drawer = document.createElement('jf-failed-files-list');
               drawer.folderPathHash = 'a'; document.body.append(drawer); await settle();
             }
             drawer.rows = [row('before'), row('target')]; drawer.loading = false;
@@ -174,7 +174,7 @@ it('collection band keeps its identity and answer when another source arrives an
 it('failed-file band stays with its file across refreshes and errors and restores its opener', async () => {
   const page = await open();
   await page.evaluate(() => window.updateFailedBands(false));
-  await page.locator('jf-failed-jobs-drawer').evaluate(el => {
+  await page.locator('jf-failed-files-list').evaluate(el => {
     const drawer = el as HTMLElement & { rows: { pathHash: string }[] };
     drawer.rows = drawer.rows.filter(row => row.pathHash === 'target');
   });

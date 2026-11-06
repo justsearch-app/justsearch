@@ -25,6 +25,7 @@ beforeEach(() => {
 });
 afterEach(() => { globalThis.fetch = originalFetch; });
 import { Sv3Pane, SV3_PANE_CLOSE } from './Sv3Pane.js';
+import { DETAILS_CLOSE } from '../../components/detailsPane/DetailsPane.js';
 import { citationHeader, type CitationHeader } from '../../components/chat/evidenceProjection.js';
 import type { DocumentCitationAnchor } from '../../components/documentPane/DocumentPane.js';
 
@@ -80,11 +81,11 @@ afterEach(() => {
 });
 
 describe('jf-sv3-pane — the region forwards and derives nothing', () => {
-  it('renders nothing at all until a document is set', async () => {
+  it('renders nothing at all while the pane is closed', async () => {
     const el = await mount();
     // Not an empty frame: the pane is a region of the window GRID, so an unoccupied one must
     // contribute no box, no edge and no backdrop.
-    expect(el.shadowRoot?.querySelector('.surface')).toBeNull();
+    expect(el.shadowRoot?.querySelector('jf-details-pane')).toBeNull();
     expect(reader(el)).toBeNull();
   });
 
@@ -92,6 +93,7 @@ describe('jf-sv3-pane — the region forwards and derives nothing', () => {
     const el = await mount();
     const h = header();
     el.docPath = 'f:/docs/note-0.md';
+    el.activeTab = 'source:0';
     el.citation = ANCHOR;
     el.citationHeader = h;
     await el.updateComplete;
@@ -106,6 +108,7 @@ describe('jf-sv3-pane — the region forwards and derives nothing', () => {
   it('forwards an ABSENT header as absent — it invents no default for a pre-849 citation', async () => {
     const el = await mount();
     el.docPath = 'f:/docs/note-0.md';
+    el.activeTab = 'source:0';
     el.citation = ANCHOR;
     await el.updateComplete;
     expect(reader(el)?.citationHeader).toBeNull();
@@ -117,6 +120,7 @@ describe('jf-sv3-pane — the region forwards and derives nothing', () => {
     // header here would put the pane back where slice 2 found it, opening in silence.
     const el = await mount();
     el.docPath = 'f:/docs/note-0.md';
+    el.activeTab = 'source:0';
     el.citation = null;
     el.citationHeader = header(true);
     await el.updateComplete;
@@ -125,20 +129,21 @@ describe('jf-sv3-pane — the region forwards and derives nothing', () => {
     expect(reader(el)?.citationHeader?.spanUnusable).toBe(true);
   });
 
-  it('re-raises the shared reader\u2019s close as the WINDOW\u2019s own event', async () => {
+  it('re-raises the shared frame\u2019s close as the WINDOW\u2019s own event', async () => {
     const el = await mount();
     el.docPath = 'f:/docs/note-0.md';
+    el.activeTab = 'source:0';
     await el.updateComplete;
 
     const escaped: Event[] = [];
     const own: Event[] = [];
-    document.body.addEventListener('pane-close', (e) => escaped.push(e));
+    document.body.addEventListener(DETAILS_CLOSE, (e) => escaped.push(e));
     el.addEventListener(SV3_PANE_CLOSE, (e) => own.push(e));
 
-    reader(el)?.dispatchEvent(new CustomEvent('pane-close', { bubbles: true, composed: true }));
+    el.shadowRoot?.querySelector('jf-details-pane')?.dispatchEvent(new CustomEvent(DETAILS_CLOSE, { bubbles: true, composed: true }));
 
-    // The shared component's `composed` event is stopped here; what leaves is this window's own, so
-    // the Shell's unguarded host listeners never see a v3 region closing.
+    // The shared frame's event is stopped here; what leaves is this window's own, so the Shell's
+    // unguarded host listeners never see a v3 region closing.
     expect(own).toHaveLength(1);
     expect(escaped).toHaveLength(0);
   });

@@ -69,8 +69,9 @@ the top bar (banner), its area switcher (navigation) and the window area (main).
 | More (⋯) menu | System (Health, Activity, Logs), Help & shortcuts (F1) and About; windows contributed by the catalog or plugins under “More”; a Developer group (API explorer, Copy link to this view, Show backend address) only while the developer view tier is on (Settings › Developer › View tier) |
 | Window tab row | A window's own tabs at its top (Library: Folders, Browse; AI Brain: AI Brain, Memory; System: Health, Logs, Activity) and its window actions. Search has none |
 | Stage | The active window; layouts can also compose a second window in a split stage, with a picker for the second pane |
+| Details pane (`jf-details-pane`) | At most one per window, on its right edge: tabs that scroll rather than shrink, 360-560 px and resizable, inline from 980 px of window width, a sheet over the window below. Each window owns its details, so a split stage's two windows never show each other's selection |
 | Status pill and panel (`jf-status-pill`, `jf-status-panel`) | One status in the top bar; the pill opens current conditions, work and earlier activity over the page |
-| Overlay slots (`jf-overlay-host`) | Command palette, Settings, authorization dialogs, reading drawers and other transient surfaces in named slots |
+| Overlay slots (`jf-overlay-host`) | Command palette, Settings, authorization dialogs and other transient surfaces in named slots. The frame has no side drawers |
 
 `layout/LayoutManifest.ts` keeps its `rail`, `stage` and `statusBar` zones for saved
 layouts and plugin layouts. `rail.visible: false` (Focus, Zen and custom layouts) hides the
@@ -108,15 +109,19 @@ Back never reopens Settings from there.
 
 - **Search** is one interaction window for retrieval, cited answers and delegated work.
   It starts in Search (keyword retrieval requires no model); the user can choose Ask or
-  Delegate. A session sidebar keeps past conversations reachable. Legacy mode-specific
+  Delegate. A session sidebar keeps past conversations reachable, and at its end the agent
+  runs that can be resumed, replayed or exported. Legacy mode-specific
   surface IDs remain compatibility addresses rather than extra destinations.
 - **Library** manages indexed sources and folders, their state, exclusions and recovery actions.
+  A folder's failed files list under the folder and open and close with it, scrolling past a set
+  height; its `N failed` chip and its problem both open the folder and go there.
 - **AI Brain** presents AI installation and readiness; engine configuration sits behind
   its own Advanced settings disclosure, independent of the app-wide Detailed mode. It surfaces schema incompatibility and enrichment readiness
   rather than treating a drained job queue as complete semantic coverage.
 - **System** hosts diagnostic surfaces including Health, Logs and Activity, reached from
   More › System. Health shows observed system and indexing facts and the recent inference
-  transition history.
+  transition history. Activity also holds background runs and their launcher, what the agent
+  did in the open run, and the effect journal with its undo.
 - **Settings** is a modal window opened from the top bar's Settings button, the command
   palette or a deep link.
 
@@ -345,11 +350,27 @@ facet controls. In the Search window, opening a result and choosing it for an As
 separate acts: a plain click opens the document; explicit selection controls choose files.
 The results can prepare an Ask about those chosen files.
 
+Space previews the focused result in a floating card; Space again, Escape or leaving the row
+closes it, Enter opens the file and the right arrow opens the result's details. The preview shows what
+the result already carries. It never fires inside a text field, during composition, on key
+repeat or under a dialog.
+
 Answers and their streaming activity appear in the conversation. Citations open the
-source in the document reading pane, with a citation witness when one is available.
-The pane loads extracted text through `/api/preview` and shows extraction provenance and
-available OCR/VDU evidence. Trust and context detail stays with the conversation
-and its context disclosures.
+source in Search's details pane, with a citation witness when one is available. The pane
+has a tab per cited source, numbered as the answer numbers it, then Context (what the
+assistant sees), then any tabs plugins contribute; each source tab offers Open file, Show in
+folder, and hiding that source from the assistant. The pane loads extracted text through
+`/api/preview` and shows extraction provenance and available OCR/VDU evidence. Trust and
+context detail stays with the conversation and its context disclosures.
+
+Escape or the close control returns the keyboard to the citation or result that opened the
+pane. Each conversation remembers its tab and selection, across a switch and a reload; a pane
+the reader closed stays closed, and a remembered source the record no longer holds opens
+nothing. The width is remembered across windows.
+
+A selection made elsewhere (`host.ui.showInspector`, a citation outside Search) opens in the
+details pane of the window the reader is in, beside the work; nothing navigates to Search.
+Escape with the keyboard on the page closes the pane of the window the pointer or focus was last in.
 
 ### Keyboard and implicit actions
 

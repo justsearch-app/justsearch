@@ -5,7 +5,7 @@
   "foundation": {
     "note": "Spacing/sizing/z/motion MUST come from these token scales — a raw literal off-scale is a finding.",
     "fontSizeScale": ["--font-size-xs", "--font-size-sm", "--font-size-md", "--font-size-lg", "--font-size-xl"],
-    "zOverlayScale": ["--z-overlay-chrome", "--z-overlay-drawer", "--z-overlay-float", "--z-overlay-modal", "--z-overlay-top", "--z-overlay-transient"],
+    "zOverlayScale": ["--z-overlay-chrome", "--z-overlay-float", "--z-overlay-modal", "--z-overlay-top", "--z-overlay-transient"],
     "durationScale": ["--duration-instant", "--duration-fast", "--duration-normal", "--duration-slow"],
     "easeScale": ["--ease-accelerate", "--ease-decelerate", "--ease-standard"],
     "spacingGridPx": 4,

@@ -7,8 +7,8 @@
  *
  * Tempdoc 565 §26.D — the ACTIVITY half (the presence inbox + the run-in-background launcher) was
  * FOLDED into the one interaction window: a conversation-linked background run renders as a `background`
- * run-segment in the thread (§26.A), and the cross-conversation inbox is a tab of the retrospective
- * drawer (`RetrospectivePanel`). So this surface no longer reads `/api/presence` — "what it did" lives
+ * run-segment in the thread (§26.A), and the cross-conversation inbox is Activity's Background runs
+ * section (`RunActivity`). So this surface no longer reads `/api/presence` — "what it did" lives
  * with the runs, not beside the durable facts ("what it knows" ≠ "what it did" — §14/§24, the ChatGPT
  * split). The durable-facts surface deliberately STAYS a separate peer (the §26.E fork-deletion keeps
  * one run-activity renderer: the unified projection).

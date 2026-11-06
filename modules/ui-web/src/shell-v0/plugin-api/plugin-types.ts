@@ -447,11 +447,9 @@ export interface PluginContribution {
     readonly render: () => HTMLElement | string;
   }>;
   /**
-   * Tempdoc 508 §4 — inspector tab contributions. Originally: append tabs to the (now-retired)
-   * InspectorPane's Preview/Context/Answer/Ask tab list. Search Thread S6 retired InspectorPane in
-   * favor of the no-tabs `<jf-document-pane>` reading surface — this contribution point (and
-   * `commands/InspectorTabRegistry.ts`, which still registers/lists entries declared here) currently
-   * has no visual consumer; a plugin-declared tab registers but nothing renders it.
+   * Tempdoc 508 §4 — inspector tab contributions: tabs of a window's details pane, after the window's
+   * own (design system §10). `render` receives the document on show as `selectedItem`, or null, and
+   * runs again when that changes. A string renders as text; a throw costs that tab alone.
    */
   inspectorTabs?: ReadonlyArray<{
     readonly id: string;

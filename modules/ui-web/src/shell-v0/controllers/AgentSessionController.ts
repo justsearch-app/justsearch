@@ -41,11 +41,8 @@ import { streamViaHost } from '../plugin-api/pumpHostAiStream.js';
 import { ReasoningController } from './ReasoningController.js';
 // Tempdoc 834 §15.3 — run discovery is the backend's enumeration, not a localStorage pointer.
 import { discoverLiveAgentRunRow, type LiveRunRow } from './liveRuns.js';
-// Tempdoc 561 P-B2 — Timeline is a DISTINCT projection of the one action ledger (the workspace
-// activity stream), via the same ActionLedgerClient authority ActionLedgerView uses — not a copy
-// of the Sessions roster. Single-authority: no re-derivation of the activity projection.
+import { RUN_LIST_UNREAD, runListFailed, runListLoaded, type RunListLoad } from './runListLoad.js';
 import {
-  ActionLedgerClient,
   projectBackend,
   type BackendLedgerEntry,
   type UnifiedActionEntry,
@@ -191,7 +188,7 @@ export const REASONING_BOUNDARY_EXEMPT: ReadonlySet<string> = new Set([
 
 // Tempdoc 565 §3.A / §13.8 — AgentSource + AgentSentenceCite are now the single-authority shared
 // shape-leaf types (the generated `done` event references them by name); imported for local use and
-// re-exported so existing importers (SourcesPane, UnifiedChatView) keep their
+// re-exported so existing importers keep their
 // `from '../controllers/AgentSessionController'` path.
 import type {
   AgentSource,
@@ -247,7 +244,7 @@ export interface SessionListItem {
  * `generated/schema-types/agent-sessions-response.ts`): an ISO-8601 `startedAt` string and a
  * `state` enum string (e.g. `READY_FOR_LLM`). `loadSessions` used to cast the raw JSON straight to
  * `SessionListItem[]`, which expects `startedAtEpochMs`/`status` — those keys are never present on
- * the wire, so every row's timestamp rendered blank (`RetrospectivePanel.ts` gates on
+ * the wire, so every row's timestamp rendered blank (`Sv3AgentRuns.ts` gates on
  * `s.startedAtEpochMs` truthiness). This normalizer derives the FE shape from the real backend
  * field names while still accepting `startedAtEpochMs`/`status` directly, so a payload already in
  * the FE shape (tests, a future/alternate backend) round-trips unchanged.
@@ -343,9 +340,9 @@ export function interruptedRunNotice(s: SessionListItem): string | null {
 }
 
 /**
- * Tempdoc 565 §26.D — one background run as the retrospective INBOX sees it (the `/api/presence`
+ * Tempdoc 565 §26.D — one background run as Activity sees it (the `/api/presence`
  * projection of `AgentRunStore` filtered to background runs). The activity half folded out of the
- * standalone Memory surface into the one window's retrospective drawer.
+ * standalone Memory surface into Activity's Background runs section.
  */
 export interface PresenceRun {
   readonly sessionId: string;
@@ -597,12 +594,13 @@ export class AgentSessionController implements CoreAgentRunHandlers {
   }> = [];
   sessions: SessionListItem[] = [];
   history: UnifiedActionEntry[] = [];
-  // Tempdoc 565 §26.D — the cross-conversation background-run inbox (the retrospective drawer's
-  // Inbox tab projects this; the run-in-background launcher folded here from the Memory surface).
+  // Tempdoc 565 §26.D — the cross-conversation background-run inbox (Activity's Background runs
+  // section projects this; the run-in-background launcher folded here from the Memory surface).
   presence: PresenceRun[] = [];
-  // Tempdoc 561 P-B2 — the workspace activity timeline: a chronological projection of the one
-  // action ledger (all kinds, all originators), DISTINCT from the Sessions run-roster.
-  timeline: UnifiedActionEntry[] = [];
+  /** Whether each run list is what the backend last said (`runListLoad.ts`). */
+  sessionsLoad: RunListLoad = RUN_LIST_UNREAD;
+  historyLoad: RunListLoad = RUN_LIST_UNREAD;
+  presenceLoad: RunListLoad = RUN_LIST_UNREAD;
   available: boolean | null = null;
   // Tempdoc 577 §2.13 #17 / §2.14 Root III — the agent's AUTHORITY SPACE. `/api/chat/agent/tools`
   // has always emitted the rich per-tool shape (risk / supportsUndo / tier / provenance / kind /
@@ -2696,28 +2694,12 @@ export class AgentSessionController implements CoreAgentRunHandlers {
       const res = this.host_
         ? await this.host_.data.fetch(`/api/chat/sessions?limit=${SESSIONS_LIMIT}`)
         : await this.transport.request(`${this.apiBase}/api/chat/sessions?limit=${SESSIONS_LIMIT}`);
-      if (!res.ok) return;
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = (await res.json()) as { sessions?: Array<Record<string, unknown>> };
       this.sessions = (data.sessions ?? []).map(toSessionListItem);
+      this.sessionsLoad = runListLoaded();
     } catch {
-      // ignore
-    }
-    this.notify();
-  }
-
-  /**
-   * Tempdoc 561 P-B2: load the workspace activity Timeline — a DISTINCT projection of the one
-   * action ledger (chronological, all kinds + originators), via the shared ActionLedgerClient
-   * authority. This replaces the V1 Timeline that just re-rendered the Sessions roster (the
-   * live-audit's "Timeline ≈ Sessions"): Sessions answers "which runs exist", Timeline answers
-   * "what happened, in order" — two declared projections of one record, not two copies.
-   */
-  async loadTimeline(): Promise<void> {
-    try {
-      const client = new ActionLedgerClient({ apiBase: this.apiBase });
-      this.timeline = await client.unifiedActivity();
-    } catch {
-      // ignore
+      this.sessionsLoad = runListFailed(this.sessionsLoad);
     }
     this.notify();
   }
@@ -2734,6 +2716,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
   async loadHistory(): Promise<void> {
     if (!this.sessionId) {
       this.history = [];
+      this.historyLoad = runListLoaded();
       this.notify();
       return;
     }
@@ -2743,7 +2726,7 @@ export class AgentSessionController implements CoreAgentRunHandlers {
           this.sessionId,
         )}`,
       );
-      if (!res.ok) return;
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = (await res.json()) as { entries?: BackendLedgerEntry[] };
       const rows = data.entries ?? [];
       // tempdoc 558 §S1 — project through the ONE shared projection (projectBackend), so History and
@@ -2752,27 +2735,29 @@ export class AgentSessionController implements CoreAgentRunHandlers {
         .filter((r) => r.kind === 'operation')
         .slice(-HISTORY_LIMIT)
         .map(projectBackend);
+      this.historyLoad = runListLoaded();
     } catch {
-      // ignore
+      this.historyLoad = runListFailed(this.historyLoad);
     }
     this.notify();
   }
 
   /**
    * Tempdoc 565 §26.D — load the cross-conversation background-run inbox (`/api/presence`, the
-   * projection of `AgentRunStore` filtered to background runs). The retrospective drawer's Inbox tab
+   * projection of `AgentRunStore` filtered to background runs). Activity's Background runs section
    * renders these; a conversation-linked background run ALSO renders inline in the thread as a
    * `background` run-segment (§26.A), so the two are consistent views of the one run entity.
    */
   async loadPresence(): Promise<void> {
     try {
       const res = await this.transport.request(`${this.apiBase}/api/presence`);
-      if (!res.ok) return;
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = (await res.json()) as { runs?: PresenceRun[] };
       this.presence = Array.isArray(data.runs) ? data.runs : [];
+      this.presenceLoad = runListLoaded();
       this.detectBackgroundCompletions();
     } catch {
-      // ignore
+      this.presenceLoad = runListFailed(this.presenceLoad);
     }
     this.notify();
   }

@@ -9,7 +9,7 @@ import './RetiredFrameElements.js';
 import { isComponentTag } from '../renderers/component-vocabulary.generated.js';
 import { isAuthorableComponent } from '../themes/authorableComponents.js';
 afterEach(() => document.body.replaceChildren());
-it.each(['jf-rail', 'jf-recents-menu', 'jf-bookmarks-popover'])('frozen %s is defined, in the vocabulary and inert without listeners', tag => {
+it.each(['jf-rail', 'jf-recents-menu', 'jf-bookmarks-popover', 'jf-sources-pane', 'jf-interaction-retrospective-panel', 'jf-failed-jobs-drawer'])('frozen %s is defined, in the vocabulary and inert without listeners', tag => {
   const element = document.createElement(tag);
   const documentListener = vi.spyOn(document, 'addEventListener');
   const windowListener = vi.spyOn(window, 'addEventListener');

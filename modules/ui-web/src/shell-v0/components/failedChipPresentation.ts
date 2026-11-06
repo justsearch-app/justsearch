@@ -18,7 +18,7 @@
 import { css } from 'lit';
 
 export const failedChipStyles = css`
-  /* Tempdoc 599 §16/B1 — the clickable "N failed" chip (danger tone) opens the failed-files drawer. */
+  /* Tempdoc 599 §16/B1 — the clickable "N failed" chip (danger tone) goes to the folder's failed files. */
   .failed-chip {
     margin-left: 0.4rem;
     --jf-button-color: var(--text-danger);

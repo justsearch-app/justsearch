@@ -37,9 +37,6 @@ export class OverlayHost extends JfElement {
     .slot ::slotted(*) {
       pointer-events: auto;
     }
-    .right-drawer ::slotted(*) {
-      height: 100%;
-    }
     /* corner + edge anchors (content-sized) */
     /* Tempdoc 602 R4, shell slice 2 — dock below the top bar (--frame-topbar-height, the Shell's
        first grid row) so a top-right overlay (badge, plugin-error) never occludes the bar's
@@ -97,14 +94,6 @@ export class OverlayHost extends JfElement {
       align-items: flex-end;
       z-index: var(--z-overlay-float);
     }
-    /* full-height right-edge drawer dock (the drawer owns its own slide). */
-    .right-drawer {
-      top: 0;
-      right: 0;
-      bottom: 0;
-      flex-direction: column;
-      z-index: var(--z-overlay-drawer);
-    }
     /* full-viewport slot for modals/palette (they own their backdrop) */
     .center {
       inset: 0;
@@ -119,7 +108,6 @@ export class OverlayHost extends JfElement {
       <div class="slot bottom-center"><slot name="bottom-center"></slot></div>
       <div class="slot bottom-left"><slot name="bottom-left"></slot></div>
       <div class="slot bottom-right"><slot name="bottom-right"></slot></div>
-      <div class="slot right-drawer"><slot name="right-drawer"></slot></div>
       <div class="slot center"><slot name="center"></slot></div>
     `;
   }

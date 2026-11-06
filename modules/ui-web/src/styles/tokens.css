@@ -50,6 +50,13 @@
   /* Frame dialog (design system §2/§7): must-stop decisions, centred, 480-560 px, over a 55 % dim. */
   --frame-dialog-width: 32rem;
   --frame-dialog-dim: rgba(var(--p-shadow), 0.55);
+  /* Details pane (design system §2): 360-560 px; below 980 px of window width a sheet over the window. */
+  --frame-details-min: 22.5rem;
+  --frame-details-max: 35rem;
+  --frame-details-sheet-share: 49%;
+  --frame-details-tab-max: 8.5rem;
+  /* A folder's failed files scroll past this height (design system §1: the problem sits at the item). */
+  --frame-failed-list-max: 24rem;
   /* === Primitive Palette ===
      Base colors and hue angles shared across semantic tokens.
      Override these to create new themes — semantic tokens derive from them. */
@@ -73,6 +80,8 @@
   --z-glass: 10;
   --z-float: 50;
   --z-modal: 100;
+  /* A details sheet stays inside its window: above the window's own content, below every frame overlay. */
+  --z-details-sheet: 20;
 
   /* === Overlay stacking scale (574 Move 2 ambient — the OverlayHost global overlay-order
      authority, 559). DISTINCT from the local --z-* above (which order layers WITHIN one
@@ -81,7 +90,6 @@
   --z-overlay-float: 900;
   --z-overlay-chrome: 1000;
   --z-overlay-transient: 1100;
-  --z-overlay-drawer: 1500;
   --z-overlay-modal: 2000;
   --z-overlay-top: 3000;
 
@@ -217,6 +225,9 @@
   --text-command: rgb(168, 140, 238);
   --text-chat: rgb(95, 194, 212);
   --text-tint: rgb(95, 194, 212);
+  /* Ink of the reader's quiet highlight: the passage keeps its own colour wherever that reads on the
+     tint; the light block below replaces it. */
+  --text-highlight-weak: currentcolor;
   /* --accent-info aliases --accent-chat (line 147), so the text grade tracks --text-chat. */
   --text-info: var(--text-chat);
   /* 577 Phase 7 — text grades for the new roles (legible on the dark surface). */
@@ -513,6 +524,8 @@
   --text-command: rgb(73, 35, 140);
   --text-chat: rgb(0, 80, 120);
   --text-tint: rgb(0, 80, 120);
+  /* A muted passage falls below AA on the tint over a light surface (4.2:1). */
+  --text-highlight-weak: var(--text-primary);
   /* --accent-info aliases --accent-chat, so the text grade tracks --text-chat (light theme). */
   --text-info: var(--text-chat);
   /* 577 Phase 7 — light theme: pale highlight fill with dark ink; deep link blue. */

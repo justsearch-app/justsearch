@@ -206,7 +206,7 @@
       "path": "modules/ui-web/src/shell-v0/state/indexingJobStates.ts",
       "guard": "gate:operation-surface",
       "consumesProjection": "canonical-record",
-      "note": "Tempdoc 885 item 21b, registered by 910 \u2014 the shell-side spelling of IndexingJobView.STATE_*. It is the ONE vocabulary source for the three surfaces that classify on job state (operations/ActionLedgerClient.ts, substrates/tasks/indexingJobsBridge.ts, components/FailedJobsDrawer.ts), so a state literal is typed once rather than three times independently; three literals is three chances to typo one into a silent default arm. It consumes the canonical record directly rather than another projection: it mirrors the STATE_* constants, it does not derive from the SSE feed. Import-invisible to the scanner in the usual way \u2014 it is detected by naming IndexingJobView in its own header, which is exactly the reference that makes it a surface."
+      "note": "Tempdoc 885 item 21b, registered by 910 \u2014 the shell-side spelling of IndexingJobView.STATE_*. It is the ONE vocabulary source for the three surfaces that classify on job state (operations/ActionLedgerClient.ts, substrates/tasks/indexingJobsBridge.ts, components/FailedFilesList.ts), so a state literal is typed once rather than three times independently; three literals is three chances to typo one into a silent default arm. It consumes the canonical record directly rather than another projection: it mirrors the STATE_* constants, it does not derive from the SSE feed. Import-invisible to the scanner in the usual way \u2014 it is detected by naming IndexingJobView in its own header, which is exactly the reference that makes it a surface."
     },
     {
       "id": "fe-activity-index-projection",
@@ -479,11 +479,11 @@
       "note": "Tempdoc 558 \u00a7S1 \u2014 the ONE ledger-row projection over a UnifiedActionEntry (renderEventRow), single-sourced so the Activity surface and the workspace retrospective render identical rows (they previously forked)."
     },
     {
-      "id": "fe-retrospective-panel",
+      "id": "fe-run-activity",
       "kind": "consumer",
       "lang": "ts",
-      "path": "modules/ui-web/src/shell-v0/components/RetrospectivePanel.ts",
-      "guard": "test:RetrospectivePanel.test.ts",
+      "path": "modules/ui-web/src/shell-v0/components/RunActivity.ts",
+      "guard": "test:RunActivity.test.ts",
       "consumesProjection": "fe-event-row-projection",
       "note": "Tempdoc 558 \u00a7S1 \u2014 composes renderEventRow (the shared row projection) to render workspace activity + history; consumes UnifiedActionEntry via that projection only, no independent model."
     },

@@ -71,6 +71,20 @@ const CURRENT_SCHEMA_VERSION = 2;
 /** How many times an edit starts over because another window saved while it was being made. */
 const SAVE_CONFLICT_RETRIES = 5;
 
+/**
+ * What one conversation's details pane last showed. `sourceIndex` is the cited source's index in the
+ * turn's evidence, -1 when the selection was not a source; the document and passage are read back
+ * from the turn, never from here, so a remembered selection cannot outlive what the record says.
+ */
+export interface DetailsMemory {
+  readonly open: boolean;
+  /** The active tab id: `source:<index>`, `document`, `context` or `plugin:<id>`. */
+  readonly tab: string;
+  readonly docPath: string;
+  readonly turnId: string;
+  readonly sourceIndex: number;
+}
+
 /** Built-in default profile id; cannot be deleted. */
 export const DEFAULT_PROFILE_ID = 'default';
 
@@ -282,6 +296,8 @@ export interface UserStateV2Storage {
   readonly surfaceMode?: 'glass' | 'solid';
   /** Tempdoc 874 — the Search v3 chat-column width preset. Cross-profile, FE-only (no backend setting). */
   readonly chatWidth?: 'narrow' | 'default' | 'wide';
+  /** What each conversation's details pane last showed (cross-profile; bounded by `detailsMemory.ts`). */
+  readonly detailsByConversation?: Readonly<Record<string, DetailsMemory>>;
   /** DE5 — the Notifications choice. Cross-profile, FE-only; absent means On. */
   readonly notifications?: 'off' | 'on' | 'sound';
 }
@@ -322,6 +338,8 @@ export interface UserStateV1 {
   readonly surfaceMode?: 'glass' | 'solid';
   /** Tempdoc 874 — Search v3 chat-column width preset (cross-profile, FE-only). */
   readonly chatWidth?: 'narrow' | 'default' | 'wide';
+  /** What each conversation's details pane last showed (cross-profile; bounded by `detailsMemory.ts`). */
+  readonly detailsByConversation?: Readonly<Record<string, DetailsMemory>>;
   /** DE5 — the Notifications choice. Cross-profile, FE-only; absent means On. */
   readonly notifications?: 'off' | 'on' | 'sound';
 }
@@ -423,6 +441,7 @@ function viewFromStorage(storage: UserStateV2Storage): UserStateV1 {
       : {}),
     ...(storage.surfaceMode !== undefined ? { surfaceMode: storage.surfaceMode } : {}),
     ...(storage.chatWidth !== undefined ? { chatWidth: storage.chatWidth } : {}),
+    ...(storage.detailsByConversation !== undefined ? { detailsByConversation: storage.detailsByConversation } : {}),
     ...(storage.notifications !== undefined ? { notifications: storage.notifications } : {}),
   };
 }
@@ -470,6 +489,7 @@ function storageFromView(view: UserStateV1): UserStateV2Storage {
       : {}),
     ...(view.surfaceMode !== undefined ? { surfaceMode: view.surfaceMode } : {}),
     ...(view.chatWidth !== undefined ? { chatWidth: view.chatWidth } : {}),
+    ...(view.detailsByConversation !== undefined ? { detailsByConversation: view.detailsByConversation } : {}),
     ...(view.notifications !== undefined ? { notifications: view.notifications } : {}),
   };
 }
@@ -1013,6 +1033,9 @@ function validateV2(candidate: unknown): UserStateV2Storage | null {
       ? rawChatWidth
       : undefined;
 
+  // The details pane's per-conversation memory (cross-profile); a malformed entry is dropped alone.
+  const detailsByConversation = parseDetailsByConversation(c['detailsByConversation']);
+
   // DE5 — the Notifications choice (cross-profile); only the three valid literals survive.
   const rawNotifications = c['notifications'];
   const notifications: 'off' | 'on' | 'sound' | undefined =
@@ -1047,8 +1070,23 @@ function validateV2(candidate: unknown): UserStateV2Storage | null {
     ...(walkthroughState !== undefined ? { walkthroughState } : {}),
     ...(surfaceMode !== undefined ? { surfaceMode } : {}),
     ...(chatWidth !== undefined ? { chatWidth } : {}),
+    ...(detailsByConversation !== undefined ? { detailsByConversation } : {}),
     ...(notifications !== undefined ? { notifications } : {}),
   };
+}
+
+function parseDetailsByConversation(raw: unknown): Record<string, DetailsMemory> | undefined {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const out: Record<string, DetailsMemory> = {};
+  for (const [id, value] of Object.entries(raw)) {
+    if (value === null || typeof value !== 'object') continue;
+    const { open, tab, docPath, turnId, sourceIndex } = value as Record<string, unknown>;
+    if (typeof open === 'boolean' && typeof tab === 'string' && typeof docPath === 'string'
+      && typeof turnId === 'string' && typeof sourceIndex === 'number' && Number.isInteger(sourceIndex)) {
+      out[id] = { open, tab, docPath, turnId, sourceIndex };
+    }
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
 }
 
 function parseSinglePin(p: unknown): SearchPin[] {

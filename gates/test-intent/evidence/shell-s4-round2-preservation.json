@@ -1,0 +1,91 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-06T09:22:11.212Z",
+  "revision": "05d31c437ee6495bd2c2c1ed9af6b854469dfc84",
+  "tree": "8681cbb2c34466f24bcfbf6946ef77af49741898",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.details-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/oebe5ixx/tmp/test-intent-vitest-35427-1793956752197.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 179014
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts#X4 every window fills its area in a split at 1600 px each window fills its half",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:802b8976fb9f5c507131daabadf44078608de45c0cf56e0e59de861e31bb3b4a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "X4 every window fills its area in a split at 1600 px each window fills its half",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts#X4 every window fills its area with a document open inline a window takes exactly what its pane leaves, and closing gives it back",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:802b8976fb9f5c507131daabadf44078608de45c0cf56e0e59de861e31bb3b4a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "X4 every window fills its area with a document open inline a window takes exactly what its pane leaves, and closing gives it back",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts#X3 F6 walks the frame in the design’s order Library with its pane open: top bar → window tabs → content → details",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:802b8976fb9f5c507131daabadf44078608de45c0cf56e0e59de861e31bb3b4a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "X3 F6 walks the frame in the design’s order Library with its pane open: top bar → window tabs → content → details",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts#C4 each window’s close is its own Library’s Close leaves Search’s document open",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:802b8976fb9f5c507131daabadf44078608de45c0cf56e0e59de861e31bb3b4a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C4 each window’s close is its own Library’s Close leaves Search’s document open",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:049f7a7fb355ec054f7532bb74fb4fb18e1abdafc5c8c87bf724368139a34875"
+}

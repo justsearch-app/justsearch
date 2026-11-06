@@ -317,7 +317,7 @@ export class SettingsWindow extends JfElement {
   override render(): TemplateResult {
     const label = this.surfaceLabel;
     // Chrome close affordances in this codebase carry a hand-written English "Close"
-    // (ConfirmDialog, ContextInspectorPane, FailedJobsDrawer, …) — there is no close-label resource
+    // (ConfirmDialog, DetailsPane, …) — there is no close-label resource
     // key to resolve. The one part that IS catalog-backed, the surface name, goes through `present`.
     const closeLabel = `Close ${label}`;
     return html`

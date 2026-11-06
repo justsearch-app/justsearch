@@ -141,6 +141,7 @@ export function sv3CitationHeader(
             evidence?.groundingIncomplete,
           ),
     question: turn?.question ?? null,
-    spanUnusable: anchor === null,
+    // Only a citation has a span to lose: a search result opens with no turn and no anchor.
+    spanUnusable: turn !== null && anchor === null,
   });
 }

@@ -28,6 +28,7 @@ import { JfElement } from '../../primitives/JfElement.js';
 import { icon } from '../../components/Icon.js';
 import { sv3Shared } from './sv3-shared-styles.js';
 import './Sv3SessionRow.js';
+import './Sv3AgentRuns.js';
 import type { Sv3SessionRow } from './Sv3SessionRow.js';
 import './Sv3Empty.js';
 import { SIDEBAR_EMPTY } from './fixtures.js';
@@ -219,6 +220,7 @@ export class Sv3Sidebar extends JfElement {
     collapsed: { type: Boolean, reflect: true },
     renamingId: { attribute: false },
     announcement: { state: true },
+    apiBase: { type: String, attribute: 'api-base' },
   };
 
   /** The window's projected session groups; empty means nothing has been searched in this window. */
@@ -227,6 +229,7 @@ export class Sv3Sidebar extends JfElement {
   declare collapsed: boolean;
   /** Which row is being renamed, or null. At most one: an edit is where the reader's attention is. */
   declare renamingId: string | null;
+  declare apiBase: string;
   /**
    * What the polite live region is currently saying (tempdoc 831). A discard removes a row with no
    * visible confirmation and no sound; a reader who cannot see the list disappear is otherwise told
@@ -457,6 +460,7 @@ export class Sv3Sidebar extends JfElement {
               )}
             </div>
           `}
+      ${this.collapsed ? nothing : html`<jf-sv3-agent-runs api-base=${this.apiBase}></jf-sv3-agent-runs>`}
       ${/* The panel's one polite announcement channel (tempdoc 831). A LEAF at the end of the
            panel, holding text and nothing else: a live region wrapped around controls re-announces
            the whole subtree every time any of it re-renders, which turns a screen reader into

@@ -1648,44 +1648,6 @@ describe('AgentSessionController interaction methods', () => {
 
   // Tempdoc 561 P-B2: Timeline is a DISTINCT projection of the one ledger (the workspace activity
   // stream), not a copy of the Sessions roster.
-  it('loadTimeline projects the workspace activity stream from the one ledger', async () => {
-    let requestedUrl = '';
-    globalThis.fetch = (async (url: string) => {
-      requestedUrl = String(url);
-      return {
-        ok: true,
-        json: async () => ({
-          entries: [
-            {
-              id: 'operation:t1:core.search-index:SUCCESS',
-              kind: 'operation',
-              occurredAt: '2026-05-30T00:00:01Z',
-              originator: 'agent',
-              operationId: 'core.search-index',
-              outcome: 'SUCCESS',
-            },
-            {
-              id: 'index:t2:default:DONE',
-              kind: 'index',
-              occurredAt: '2026-05-30T00:00:02Z',
-              originator: 'system',
-              collection: 'default',
-              state: 'DONE',
-            },
-          ],
-        }),
-      } as Response;
-    }) as typeof fetch;
-
-    await ctrl.loadTimeline();
-
-    expect(requestedUrl).toContain('/api/action-ledger');
-    // both ledger kinds appear in the activity stream (distinct from the Sessions roster)
-    expect(ctrl.timeline.length).toBe(2);
-    expect(ctrl.timeline.map(e => e.kind)).toEqual(expect.arrayContaining(['operation', 'index']));
-    expect(ctrl.timeline.every(e => typeof e.label === 'string' && e.label.length > 0)).toBe(true);
-  });
-
   it('loadHistory is empty (no fetch) when there is no active session', async () => {
     ctrl.sessionId = null;
     let fetched = false;

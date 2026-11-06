@@ -13,7 +13,7 @@
  *  - sidebar default 16rem
  *  - sidebar drag floor 13rem
  *  - collapsed icon rail 3rem
- *  - pane default 540px, floor 360px, ceiling share 70%
+ *  - pane default 540px, floor 360px, ceiling 560px (the design system's details pane)
  *  - pane inline/overlay switch 980px
  *  - **neither ceiling is the region's own number.** The sidebar's is derived from the MAIN pane's
  *    40rem minimum: `max(sidebarMin, available - 640)`. A region may
@@ -43,6 +43,18 @@
  * sizing already chose for the same kind of value.
  */
 
+import {
+  DETAILS_PANE_DEFAULT_PX,
+  DETAILS_PANE_INLINE_MIN_PX,
+  DETAILS_PANE_MAX_PX,
+  DETAILS_PANE_MIN_PX,
+  DETAILS_PANE_WIDTH_KEY,
+  detailsPaneIsInline,
+  forgetDetailsPaneWidth,
+  readDetailsPaneWidth,
+  storeDetailsPaneWidth,
+} from '../../components/detailsPane/detailsPaneSizing.js';
+
 /** The spec's default — 16rem. */
 export const SV3_SIDEBAR_DEFAULT_PX = 256;
 
@@ -56,16 +68,13 @@ export const SV3_MAIN_MIN_PX = 640;
 export const SV3_SIDEBAR_COLLAPSED_PX = 48;
 
 /** The spec's right-panel default — 540px. */
-export const SV3_PANE_DEFAULT_PX = 540;
+export const SV3_PANE_DEFAULT_PX = DETAILS_PANE_DEFAULT_PX;
 
-/** The spec's right-panel floor — 360px. */
-export const SV3_PANE_MIN_PX = 360;
+/** The details pane's floor — 360px. */
+export const SV3_PANE_MIN_PX = DETAILS_PANE_MIN_PX;
 
-/**
- * The spec's right-panel ceiling share — `floor(70vw)`, re-expressed
- * against the window host box per deviation 1 above.
- */
-export const SV3_PANE_MAX_SHARE = 0.7;
+/** The details pane's ceiling — 560px, shared with every window's pane (design system §2). */
+export const SV3_PANE_MAX_PX = DETAILS_PANE_MAX_PX;
 
 /**
  * The spec's inline/overlay switch — 980px, asked of the WINDOW box rather
@@ -78,7 +87,7 @@ export const SV3_PANE_MAX_SHARE = 0.7;
  * why (the container would re-anchor F7's fixed-position hover card). One number, one owner:
  * geometry cannot quietly drift apart.
  */
-export const SV3_PANE_INLINE_MIN_PX = 980;
+export const SV3_PANE_INLINE_MIN_PX = DETAILS_PANE_INLINE_MIN_PX;
 
 /**
  * One keyboard nudge, shared by both grips. The spec's rail is `tabIndex={-1}` and its pane handle
@@ -105,9 +114,7 @@ function mainSafeRemainder(hostWidth: number, occupiedByOther: number): number {
  * An unmeasured box (`Infinity`) is inline, consistent with every other rule here: an unknown width
  * is not a narrow width.
  */
-export function sv3PaneIsInline(hostWidth: number): boolean {
-  return hostWidth >= SV3_PANE_INLINE_MIN_PX;
-}
+export const sv3PaneIsInline = detailsPaneIsInline;
 
 /**
  * How much layout width an open pane actually takes from the sidebar's ceiling. A pane in overlay
@@ -157,7 +164,7 @@ export function resolveInitialSv3SidebarWidth(
 }
 
 /**
- * The widest the citation pane may be: the spec's 70% share, and — deviation 2 — never more than the
+ * The widest the citation pane may be: the details pane's 560px, and — deviation 2 — never more than the
  * box has left once the sidebar's current occupancy and the main column's 640 are taken out.
  * `sidebarOccupiedWidth` is the rendered width, so a COLLAPSED sidebar hands the pane the 48px rail's
  * worth of room back rather than the width it will have when it expands again.
@@ -165,10 +172,7 @@ export function resolveInitialSv3SidebarWidth(
 export function sv3PaneMaxWidth(hostWidth: number, sidebarOccupiedWidth: number): number {
   return Math.max(
     SV3_PANE_MIN_PX,
-    Math.min(
-      Math.floor(Math.floor(hostWidth) * SV3_PANE_MAX_SHARE),
-      mainSafeRemainder(hostWidth, sidebarOccupiedWidth),
-    ),
+    Math.min(SV3_PANE_MAX_PX, mainSafeRemainder(hostWidth, sidebarOccupiedWidth)),
   );
 }
 
@@ -195,7 +199,6 @@ export function resolveInitialSv3PaneWidth(
 
 const SIDEBAR_WIDTH_KEY = 'justsearch.searchV3.sidebar.width.v1';
 const COLLAPSED_KEY = 'justsearch.searchV3.sidebar.collapsed.v1';
-const PANE_WIDTH_KEY = 'justsearch.searchV3.pane.width.v1';
 
 /** A remembered width, or null for automatic. A stored non-number is treated as no memory at all. */
 function readStoredWidth(key: string): number | null {
@@ -231,9 +234,9 @@ export const readStoredSv3SidebarWidth = (): number | null => readStoredWidth(SI
 export const storeSv3SidebarWidth = (px: number): void => storeWidth(SIDEBAR_WIDTH_KEY, px);
 export const forgetSv3SidebarWidth = (): void => forgetWidth(SIDEBAR_WIDTH_KEY);
 
-export const readStoredSv3PaneWidth = (): number | null => readStoredWidth(PANE_WIDTH_KEY);
-export const storeSv3PaneWidth = (px: number): void => storeWidth(PANE_WIDTH_KEY, px);
-export const forgetSv3PaneWidth = (): void => forgetWidth(PANE_WIDTH_KEY);
+export const readStoredSv3PaneWidth = readDetailsPaneWidth;
+export const storeSv3PaneWidth = storeDetailsPaneWidth;
+export const forgetSv3PaneWidth = forgetDetailsPaneWidth;
 
 /**
  * Whether the rail was left collapsed. The design spec keeps this in a cookie
@@ -260,5 +263,5 @@ export function storeSv3SidebarCollapsed(collapsed: boolean): void {
 export const sv3BoundaryStorageKeys = {
   sidebarWidth: SIDEBAR_WIDTH_KEY,
   sidebarCollapsed: COLLAPSED_KEY,
-  paneWidth: PANE_WIDTH_KEY,
+  paneWidth: DETAILS_PANE_WIDTH_KEY,
 } as const;

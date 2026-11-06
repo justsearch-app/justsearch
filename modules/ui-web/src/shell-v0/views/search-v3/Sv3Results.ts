@@ -26,6 +26,10 @@ import {
   type Sv3ResultsView,
 } from './sv3-search.js';
 import '../../components/searchResults/ResultsCard.js';
+import type { CardHit } from '../../components/searchResults/ResultsCard.js';
+import { formatLocationBreadcrumb } from '../../components/searchResults/resultRowPresentation.js';
+import { projectResultView, type ResultViewInput } from '../searchResultViewModel.js';
+import { openLocalFile } from '../../plugin-api/capabilities/platform.js';
 import '../../components/Control.js';
 import './Sv3Empty.js';
 
@@ -45,15 +49,114 @@ export class Sv3Results extends JfElement {
   static properties = {
     view: { attribute: false },
     forgetAvailable: { type: Boolean, attribute: false },
+    previewId: { state: true },
   };
 
   declare view: Sv3ResultsView;
   declare forgetAvailable: boolean;
+  /** The result the Space preview is showing; null while none is. */
+  declare private previewId: string | null;
+  private previewRow: HTMLElement | null = null;
 
   constructor() {
     super();
     this.view = SV3_RESULTS_IDLE;
     this.forgetAvailable = false;
+    this.previewId = null;
+  }
+
+  /** Read by the window's Escape order: the preview is more local than the details pane. */
+  get previewOpen(): boolean {
+    return this.previewId !== null;
+  }
+
+  private previewHit(): CardHit | null {
+    return (this.view.snapshot?.results as readonly CardHit[] | undefined)?.find((hit) => hit.id === this.previewId) ?? null;
+  }
+
+  private readonly closePreview = (): void => {
+    this.previewRow?.removeEventListener('focusout', this.closePreview);
+    this.previewId = null;
+    this.previewRow = null;
+  };
+
+  private readonly onCardPreview = (event: Event): void => {
+    const detail = (event as CustomEvent<{ id: string; row: HTMLElement }>).detail;
+    const again = this.previewId === detail.id;
+    this.closePreview();
+    if (again) return;
+    this.previewId = detail.id;
+    this.previewRow = detail.row;
+    // On the row, not around the list: a move inside the card's shadow tree never reaches this one.
+    detail.row.addEventListener('focusout', this.closePreview);
+  };
+
+  /** While the card is open the row keeps the keyboard, so the card's keys arrive here. */
+  private readonly onPreviewKeydown = {
+    capture: true, // Ahead of the row, whose own Enter opens details.
+    handleEvent: (event: KeyboardEvent): void => this.previewKey(event),
+  };
+
+  private previewKey(event: KeyboardEvent): void {
+    const hit = this.previewHit();
+    if (hit === null) return;
+    if (event.key === 'Escape') {
+      event.stopPropagation();
+      this.closePreview();
+    } else if (event.key === 'Enter') {
+      event.stopPropagation();
+      event.preventDefault();
+      this.closePreview();
+      void openLocalFile(hit.path).catch(() => { /* Already reported. */ });
+    } else if (event.key === 'ArrowRight') {
+      event.preventDefault();
+      this.closePreview();
+      this.emit('card-open', { id: hit.id });
+    }
+  }
+
+  override connectedCallback(): void {
+    super.connectedCallback();
+    window.addEventListener('wheel', this.closePreview, { passive: true });
+    window.addEventListener('resize', this.closePreview);
+  }
+
+  override disconnectedCallback(): void {
+    window.removeEventListener('wheel', this.closePreview);
+    window.removeEventListener('resize', this.closePreview);
+    this.closePreview();
+    super.disconnectedCallback();
+  }
+
+  /** New results may have dropped the row on preview; the card never outlives what it describes. */
+  override willUpdate(changed: Map<string, unknown>): void {
+    if (changed.has('view') && this.previewId !== null && this.previewHit() === null) this.closePreview();
+  }
+
+  override updated(): void {
+    const card = this.renderRoot.querySelector<HTMLElement>('.preview');
+    const row = this.previewRow?.getBoundingClientRect();
+    if (card === null || row === undefined) return;
+    const { width, height } = card.getBoundingClientRect();
+    // The card keeps one step of the scale from the window's edges.
+    const edge = 'var(--jf-space-2)';
+    card.style.insetInlineStart = `clamp(${edge}, calc(${row.right - width}px - ${edge}), calc(100vw - ${width}px - ${edge}))`;
+    card.style.insetBlockStart = `clamp(${edge}, calc(${row.top}px + ${edge}), calc(100vh - ${height}px - ${edge}))`;
+  }
+
+  /** The floating card (design system §7, ref-04). Everything in it is already on the row's record. */
+  private preview(): TemplateResult | typeof nothing {
+    const hit = this.previewHit();
+    if (hit === null) return nothing;
+    const view = projectResultView(hit as unknown as ResultViewInput);
+    return html`<section class="preview" role="status" aria-label=${`Preview of ${view.title}`} data-testid="sv3-result-preview">
+      <h3 class="preview-title">${view.title}</h3>
+      <p class="preview-path" title=${hit.path}>${formatLocationBreadcrumb(hit.path)}</p>
+      <p class="preview-text">${view.snippet || 'No preview available.'}</p>
+      <p class="preview-keys">
+        <span><kbd>Space</kbd> close</span><span><kbd>Enter</kbd> open</span><span><kbd>→</kbd> details</span>
+      </p>
+    </section>`;
   }
 
   private emit<T>(name: string, detail?: T): void {
@@ -63,10 +166,12 @@ export class Sv3Results extends JfElement {
   override render(): TemplateResult {
     const view = this.view;
     return html`
-      <section class="results" aria-label="Search results" data-testid="sv3-results">
+      <section class="results" aria-label="Search results" data-testid="sv3-results"
+        @card-preview=${this.onCardPreview} @keydown=${this.onPreviewKeydown}>
         <h2 class="heading" data-testid="sv3-results-heading">Results for “${view.query}”</h2>
         ${this.filters(view.filters)} ${this.selection(view)} ${this.body(view)}
       </section>
+      ${this.preview()}
     `;
   }
 
@@ -250,6 +355,53 @@ export class Sv3Results extends JfElement {
           color-mix(in srgb, var(--foreground) 8%, transparent),
           transparent
         );
+      }
+      .preview {
+        position: fixed;
+        z-index: var(--z-overlay);
+        box-sizing: border-box;
+        inline-size: min(var(--frame-details-min), calc(100vw - var(--space-4)));
+        max-block-size: calc(100vh - var(--space-4));
+        overflow: auto;
+        padding: var(--space-4);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        background: var(--popover);
+        color: var(--popover-foreground);
+        box-shadow: var(--dialog-shadow);
+      }
+      .preview-title {
+        margin: 0;
+        font-size: var(--font-size-sv3-sm);
+        font-weight: 500;
+        overflow-wrap: anywhere;
+      }
+      .preview-path {
+        margin: var(--space-1) 0 var(--space-3);
+        color: var(--secondary-label);
+        font-size: var(--font-size-sv3-xs);
+        overflow-wrap: anywhere;
+      }
+      .preview-text {
+        margin: 0;
+        font-size: var(--font-size-sv3-sm);
+        overflow-wrap: anywhere;
+      }
+      .preview-keys {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-3);
+        margin: var(--space-3) 0 0;
+        padding-block-start: var(--space-3);
+        border-block-start: 1px solid var(--border);
+        color: var(--secondary-label);
+        font-size: var(--font-size-sv3-xs);
+      }
+      kbd {
+        padding-inline: var(--space-1);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        font: inherit;
       }
       .failure-detail {
         color: var(--secondary-label);
