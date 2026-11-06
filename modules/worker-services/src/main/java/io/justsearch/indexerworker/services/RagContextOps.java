@@ -255,7 +255,7 @@ final class RagContextOps {
       Set<String> docIds, int topK, int maxContextTokens,
       boolean allowQueryEmbeddings, String compatibilityReason,
       EngineContext.Urgency urgency, io.justsearch.core.execution.EngineTaskLifetime childLifetime,
-      InferenceRequest acquisition, SemanticDeadline semantic) {
+      InferenceRequest acquisition, SemanticDeadline semantic, boolean includePrivateData) {
     acquisition.remainingNanos();
 
     String question = request.getQuestion();
@@ -291,13 +291,13 @@ final class RagContextOps {
       log.debug("RAG: return_full_documents=true, skipping chunk search");
       return buildFallbackWithVirtualChunks(
           question, effectiveDocIds, topK, 0, "FULL_DOCUMENT_REQUESTED", "FULL_DOCUMENT",
-          docLevelFilterFor(filters));
+          docLevelFilterFor(filters), includePrivateData);
     }
 
     ChunkContextResult chunkContext =
         searchChunksWithMeta(question, effectiveDocIds, topK, maxContextTokens,
             allowQueryEmbeddings, compatibilityReason, filters, request.getExcludedChunksList(),
-            urgency, childLifetime, acquisition, semantic);
+            urgency, childLifetime, acquisition, semantic, includePrivateData);
     if (chunkContext.context() != null && !chunkContext.context().isBlank()) {
       log.debug(
           "RAG: Found {} chars from chunks (chunksUsed={}, chunksFoundTotal={})",
@@ -329,7 +329,7 @@ final class RagContextOps {
         ChunkExclusionQuery.dropExcludedParents(effectiveDocIds, request.getExcludedChunksList());
     var fallback = buildFallbackWithVirtualChunks(
         question, fallbackDocIds, topK, chunksFoundInSearch, fallbackReason, "FULLTEXT_FALLBACK",
-        docLevelFilterFor(filters));
+        docLevelFilterFor(filters), includePrivateData);
     if (SearchReasonCode.SEMANTIC_BUDGET_EXCEEDED.wire().equals(chunkContext.retrievalModeReason())) {
       return fallback.toBuilder()
           .setRetrievalModeReason(chunkContext.retrievalModeReason())
@@ -462,7 +462,8 @@ final class RagContextOps {
       EngineContext.Urgency urgency, io.justsearch.core.execution.EngineTaskLifetime childLifetime) {
     return searchChunksWithMeta(question, docIds, topK, maxContextTokens, allowQueryEmbeddings,
         compatibilityReason, ragFilters, excludedChunks, urgency, childLifetime,
-        InferenceRequest.foreground(), SemanticDeadline.unbounded());
+        InferenceRequest.foreground(), SemanticDeadline.unbounded(),
+        ragFilters != null && io.justsearch.configuration.InternalCollections.includesHistory(ragFilters.collection()));
   }
 
   /**
@@ -490,7 +491,7 @@ final class RagContextOps {
       LuceneRuntimeTypes.RuntimeSearchFilters ragFilters,
       List<io.justsearch.ipc.ChunkRef> excludedChunks,
       EngineContext.Urgency urgency, io.justsearch.core.execution.EngineTaskLifetime childLifetime,
-      InferenceRequest acquisition, SemanticDeadline semantic) {
+      InferenceRequest acquisition, SemanticDeadline semantic, boolean includePrivateData) {
     acquisition.remainingNanos();
     // stage_id is cleaned up by the outer MdcContext.request() scope in WorkerSearchService
     MDC.put("stage_id", "retrieve");
@@ -713,6 +714,7 @@ final class RagContextOps {
     // A diversification that stopped at the semantic deadline does not outlive the request's.
     acquisition.remainingNanos();
 
+    if (!includePrivateData) finalHits = readableHits(finalHits);
     MDC.put("stage_id", "respond");
 
     // 385: Batch-fetch parent doc metadata for source-aware context labels (#3)
@@ -1111,6 +1113,19 @@ final class RagContextOps {
       int endLine,
       double score) {}
 
+  private List<LuceneRuntimeTypes.SearchHit> readableHits(List<LuceneRuntimeTypes.SearchHit> hits) {
+    if (hits.isEmpty()) return hits;
+    if (documentFieldOps != null) {
+      var readable = documentFieldOps.readableDocumentIds(hits.stream().flatMap(hit -> java.util.stream.Stream.of(hit.docId(),
+          hit.fields().getOrDefault(SchemaFields.PARENT_DOC_ID, hit.docId()))).toList(), false);
+      return hits.stream().filter(hit -> readable.contains(hit.docId())
+          && readable.contains(hit.fields().getOrDefault(SchemaFields.PARENT_DOC_ID, hit.docId()))).toList();
+    }
+    var ownership = new io.justsearch.configuration.ReadOwnership();
+    return hits.stream().filter(hit -> !io.justsearch.configuration.ReadOwnership.hiddenFromDefault(
+        ownership.owner(hit.docId(), hit.fields(), null))).toList();
+  }
+
   /**
    * Builds a FULLTEXT_FALLBACK response with virtual chunks for citation support (RAG-005).
    *
@@ -1126,7 +1141,7 @@ final class RagContextOps {
   private RetrieveContextResponse buildFallbackWithVirtualChunks(
       String question, Set<String> docIds, int topK,
       long chunksFoundInSearch, String fallbackReason, String retrievalMode,
-      org.apache.lucene.search.Query docLevelFilter) {
+      org.apache.lucene.search.Query docLevelFilter, boolean includePrivateData) {
     commitOps.maybeRefresh();
     var result = chunkSearchOps.searchFullDocsForDocs(question, docIds, topK, docLevelFilter);
 
@@ -1146,7 +1161,7 @@ final class RagContextOps {
     Set<String> queryTerms = extractQueryTerms(question);
     List<VirtualChunk> allChunks = new ArrayList<>();
 
-    for (var hit : result.hits()) {
+    for (var hit : includePrivateData ? result.hits() : readableHits(result.hits())) {
       String content = hit.fields().get(SchemaFields.CONTENT);
       if (content == null || content.isBlank()) {
         content = hit.fields().get("content");

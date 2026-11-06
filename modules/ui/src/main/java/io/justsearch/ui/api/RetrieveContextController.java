@@ -104,6 +104,7 @@ public class RetrieveContextController {
   public void handleRetrieveContext(Context ctx) {
 
     Map<String, Object> body = ctx.bodyAsClass(Map.class);
+    if (!WindowAuthority.allowKnowledgeRead(ctx, body)) return;
     String question = (String) body.get("query");
     if (question == null || question.isBlank()) {
       ctx.status(400).json(Map.of("error", "query is required"));
@@ -216,8 +217,9 @@ public class RetrieveContextController {
         List.of(), collection);
 
     try {
+      if (!WindowAuthority.allowSelectedDocumentReads(ctx, docIds, documentService())) return;
       ContextResult result = documentService()
-          .retrieveContext(params, RequestEngineContext.get(ctx))
+          .retrieveContext(params, WindowAuthority.hasAuthority(ctx), RequestEngineContext.get(ctx))
           .toCompletableFuture()
           .get(RETRIEVE_TIMEOUT_MS, TimeUnit.MILLISECONDS);
 
@@ -315,6 +317,7 @@ public class RetrieveContextController {
   @SuppressWarnings("unchecked")
   public void handleMatchCitations(Context ctx) {
     Map<String, Object> body = ctx.bodyAsClass(Map.class);
+    if (!WindowAuthority.allowKnowledgeRead(ctx, body)) return;
     String answerText = (String) body.get("answer_text");
     if (answerText == null || answerText.isBlank()) {
       ctx.status(400).json(Map.of("error", "answer_text is required"));
@@ -344,6 +347,8 @@ public class RetrieveContextController {
         .toList();
 
     try {
+      if (!WindowAuthority.allowSelectedDocumentReads(ctx,
+          sources.stream().map(source -> source.citation().parentDocId()).toList(), documentService())) return;
       var result = documentService()
           .matchCitationsAgainst(answerText, sources, threshold, RequestEngineContext.get(ctx))
           .toCompletableFuture()

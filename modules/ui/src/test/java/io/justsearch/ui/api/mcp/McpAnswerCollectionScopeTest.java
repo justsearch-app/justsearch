@@ -71,10 +71,10 @@ final class McpAnswerCollectionScopeTest {
     var params =
         callAnswerWith(
             Map.of(
-                "query", "what did the agent do?",
-                "filters", Map.of("collection", List.of("agent-history"))));
+                "query", "what did the documents say?",
+                "filters", Map.of("collection", List.of("personal"))));
 
-    assertEquals(List.of("agent-history"), params.collection());
+    assertEquals(List.of("personal"), params.collection());
   }
 
   @Test

@@ -79,6 +79,12 @@ public final class ChunkInfoController {
     }
 
     try {
+      if (!WindowAuthority.hasAuthority(ctx)) {
+        var slice = documentService().fetchSlice(docId, 0, 1, RequestEngineContext.get(ctx))
+            .toCompletableFuture().get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+        if (slice == null) throw new DocumentService.UnavailableException("Document ownership unavailable");
+        if (!WindowAuthority.allowDocumentRead(ctx, docId, slice.metadata())) return;
+      }
       Set<String> docIdSet = Set.of(docId);
       String broadQuery = "content text document";
       int maxChunks = 50;

@@ -29,6 +29,16 @@ public interface SearchServiceCalls {
   /** {@code SearchService/Search}. */
   io.justsearch.ipc.SearchResponse search(io.justsearch.ipc.SearchRequest request);
 
+  /** Server-supplied authority; never read from a search request or provenance hint. */
+  default io.justsearch.ipc.SearchResponse search(io.justsearch.ipc.SearchRequest request, boolean includePrivateData) {
+    return search(request);
+  }
+
+  default io.justsearch.ipc.RetrieveContextResponse retrieveContext(
+      io.justsearch.ipc.RetrieveContextRequest request, boolean includePrivateData) {
+    return retrieveContext(request);
+  }
+
   /** {@code SearchService/Suggest}. */
   io.justsearch.ipc.SuggestResponse suggest(io.justsearch.ipc.SuggestRequest request);
 
@@ -61,8 +71,28 @@ public interface SearchServiceCalls {
   /** {@code SearchService/ListFolderFiles}. */
   io.justsearch.ipc.ListFolderFilesResponse listFolderFiles(io.justsearch.ipc.ListFolderFilesRequest request);
 
+  /** Authority is supplied by the HTTP front, never by request JSON or caller-kind hints. */
+  default io.justsearch.ipc.ListFoldersResponse listFolders(
+      io.justsearch.ipc.ListFoldersRequest request, boolean includePrivateData) {
+    if (includePrivateData) throw new UnsupportedOperationException("Private browse authority unavailable");
+    return listFolders(request);
+  }
+
+  default io.justsearch.ipc.ListFolderFilesResponse listFolderFiles(
+      io.justsearch.ipc.ListFolderFilesRequest request, boolean includePrivateData) {
+    if (includePrivateData) throw new UnsupportedOperationException("Private browse authority unavailable");
+    return listFolderFiles(request);
+  }
+
   /** {@code SearchService/ListAllDocumentIds}. */
   io.justsearch.ipc.ListAllDocumentIdsResponse listAllDocumentIds(io.justsearch.ipc.ListAllDocumentIdsRequest request);
+
+  /** A legacy adapter must fail closed when it cannot apply the public ID scope. */
+  default io.justsearch.ipc.ListAllDocumentIdsResponse listAllDocumentIds(
+      io.justsearch.ipc.ListAllDocumentIdsRequest request, boolean includePrivateData) {
+    if (!includePrivateData) throw new UnsupportedOperationException("Public document ID scope unavailable");
+    return listAllDocumentIds(request);
+  }
 
   /** {@code SearchService/Rerank}. */
   io.justsearch.ipc.RerankResponse rerank(io.justsearch.ipc.RerankRequest request);

@@ -81,6 +81,10 @@ public final class FolderBrowseEngine {
    * @return folder entries sorted alphabetically by name
    */
   public FolderBrowseResult enumerateFolders(String parentPath, int maxFolders) {
+    return enumerateFolders(parentPath, maxFolders, false);
+  }
+
+  public FolderBrowseResult enumerateFolders(String parentPath, int maxFolders, boolean includePrivateData) {
     if (parentPath == null || parentPath.isBlank()) {
       throw new IllegalArgumentException("parentPath is required");
     }
@@ -93,7 +97,8 @@ public final class FolderBrowseEngine {
     try {
       searcher = bridge.acquire();
 
-      Query query = buildPathPrefixQuery(normalized);
+      var ownership = includePrivateData ? null : new IndexReadOwnership(searcher);
+      Query query = buildPathPrefixQuery(normalized, includePrivateData);
       Query rewritten = searcher.rewrite(query);
       Weight weight = searcher.createWeight(rewritten, ScoreMode.COMPLETE_NO_SCORES, 1.0f);
 
@@ -133,6 +138,8 @@ public final class FolderBrowseEngine {
 
           String childName = extractChildFolder(docPath, normalized, sep);
           if (childName == null) continue; // direct child file, not in a subfolder
+          if (ownership != null && ownership.owner(leaf.docBase + doc)
+              != io.justsearch.configuration.ReadOwnership.Owner.PUBLIC) continue;
 
           long size = (sizeDv != null && sizeDv.advanceExact(doc)) ? sizeDv.longValue() : 0L;
           long indexed = (indexedDv != null && indexedDv.advanceExact(doc)) ? indexedDv.longValue() : 0L;
@@ -188,6 +195,11 @@ public final class FolderBrowseEngine {
    * @return file entries with projected fields
    */
   public FolderFilesResult listFolderFiles(String folderPath, int maxFiles, Set<String> projection) {
+    return listFolderFiles(folderPath, maxFiles, projection, false);
+  }
+
+  public FolderFilesResult listFolderFiles(String folderPath, int maxFiles, Set<String> projection,
+      boolean includePrivateData) {
     if (folderPath == null || folderPath.isBlank()) {
       throw new IllegalArgumentException("folderPath is required");
     }
@@ -201,7 +213,8 @@ public final class FolderBrowseEngine {
     try {
       searcher = bridge.acquire();
 
-      Query query = buildPathPrefixQuery(normalized);
+      var ownership = includePrivateData ? null : new IndexReadOwnership(searcher);
+      Query query = buildPathPrefixQuery(normalized, includePrivateData);
       Query rewritten = searcher.rewrite(query);
       Weight weight = searcher.createWeight(rewritten, ScoreMode.COMPLETE_NO_SCORES, 1.0f);
 
@@ -260,6 +273,8 @@ public final class FolderBrowseEngine {
           if (files.size() >= limit) continue; // keep counting but stop collecting
 
           int globalDoc = leaf.docBase + doc;
+          if (ownership != null && ownership.owner(globalDoc)
+              != io.justsearch.configuration.ReadOwnership.Owner.PUBLIC) continue;
           Map<String, String> fields =
               SearchResultFormatter.extractFromStoredFields(
                   storedFields, globalDoc, false, storedAllowlist);
@@ -308,6 +323,12 @@ public final class FolderBrowseEngine {
    */
   public ListAllDocumentIdsResult listAllDocumentIds(
       int offset, int limit, Long expectedReaderVersion) {
+    return listAllDocumentIds(offset, limit, expectedReaderVersion, true);
+  }
+
+  /** Public snapshots omit reserved and application-data parents before counting or paging. */
+  public ListAllDocumentIdsResult listAllDocumentIds(
+      int offset, int limit, Long expectedReaderVersion, boolean includePrivateData) {
     if (offset < 0) {
       throw new IllegalArgumentException("offset must be non-negative");
     }
@@ -332,10 +353,14 @@ public final class FolderBrowseEngine {
       BooleanQuery.Builder qb = new BooleanQuery.Builder();
       qb.add(new MatchAllDocsQuery(), BooleanClause.Occur.MUST);
       qb.add(new TermQuery(new Term(SchemaFields.IS_CHUNK, "true")), BooleanClause.Occur.MUST_NOT);
+      if (!includePrivateData) {
+        qb.add(QueryFilterBuilder.privateSourceQuery(true), BooleanClause.Occur.MUST_NOT);
+      }
       Query query = qb.build();
       Query rewritten = searcher.rewrite(query);
       Weight weight = searcher.createWeight(rewritten, ScoreMode.COMPLETE_NO_SCORES, 1.0f);
 
+      var ownership = includePrivateData ? null : new IndexReadOwnership(searcher);
       List<String> page = new ArrayList<>(effectiveLimit);
       long matched = 0;
 
@@ -360,7 +385,10 @@ public final class FolderBrowseEngine {
                 "Live parent document is missing required doc_id DocValues");
           }
           if (matched >= offset && page.size() < effectiveLimit) {
-            page.add(docIdDv.lookupOrd(docIdDv.ordValue()).utf8ToString());
+            if (ownership == null || ownership.owner(leaf.docBase + doc)
+                == io.justsearch.configuration.ReadOwnership.Owner.PUBLIC) {
+              page.add(docIdDv.lookupOrd(docIdDv.ordValue()).utf8ToString());
+            }
           }
           matched++;
         }
@@ -417,10 +445,13 @@ public final class FolderBrowseEngine {
 
   // ========== Internal Helpers ==========
 
-  private static Query buildPathPrefixQuery(String normalizedPath) {
+  private static Query buildPathPrefixQuery(String normalizedPath, boolean includePrivateData) {
     BooleanQuery.Builder qb = new BooleanQuery.Builder();
     qb.add(new PrefixQuery(new Term(SchemaFields.PATH, normalizedPath)), BooleanClause.Occur.MUST);
     qb.add(new TermQuery(new Term(SchemaFields.IS_CHUNK, "true")), BooleanClause.Occur.MUST_NOT);
+    if (!includePrivateData) {
+      qb.add(QueryFilterBuilder.privateSourceQuery(true), BooleanClause.Occur.MUST_NOT);
+    }
     return qb.build();
   }
 

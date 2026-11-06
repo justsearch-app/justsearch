@@ -30,8 +30,8 @@ import tools.jackson.databind.ObjectMapper;
 final class EngineExclusionReplayPolicyTest {
   @Test
   void EX5LegacySyncReplayKeepsServingPolicyAfterLiveCutover(@TempDir Path temp) throws Exception {
-    Path data = temp.resolve("data");
-    Path root = Files.createDirectories(data.resolve("documents"));
+    Path data = Files.createDirectories(temp.resolve("data"));
+    Path root = Files.createDirectories(temp.resolve("documents"));
     Path excluded = Files.writeString(Files.createDirectories(root.resolve("private"))
         .resolve("report.txt"), "private retained text");
     Path allowed = Files.writeString(root.resolve("public.txt"), "public retained text");

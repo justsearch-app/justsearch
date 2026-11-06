@@ -568,6 +568,11 @@ public final class WorkerSearchService {
   }
 
   public SearchResponse search(SearchRequest request, CallContext ctx) {
+    return search(request, io.justsearch.configuration.InternalCollections.includesHistory(
+        request.getFilters().getCollectionList()), ctx);
+  }
+
+  public SearchResponse search(SearchRequest request, boolean includePrivateData, CallContext ctx) {
     try {
       request = resolveSearchSyntax(request);
     } catch (io.justsearch.core.search.SearchSyntax.InvalidQuery invalid) {
@@ -604,8 +609,13 @@ public final class WorkerSearchService {
             case ABSENT, FAILED -> false;
           };
           SearchRequest effectiveRequest = resolveAutoDense(request, denseServiceable);
-          return searchOrchestrator.execute(
+          SearchResponse response = searchOrchestrator.execute(
               effectiveRequest, compat.allowed(), compat.reasonCode(), ctx, acquisition, semantic);
+          if (includePrivateData || response.getResultsCount() == 0) return response;
+          var readable = documentFieldOps.readableDocumentIds(
+              response.getResultsList().stream().map(io.justsearch.ipc.SearchResult::getId).toList(), false);
+          return response.toBuilder().clearResults().addAllResults(response.getResultsList().stream()
+              .filter(hit -> readable.contains(hit.getId())).toList()).build();
         } catch (IllegalArgumentException e) {
           metrics.recordSearchFailed();
           // The CALLER still gets the full message below — it is their own query. This LOG line does
@@ -932,24 +942,20 @@ public final class WorkerSearchService {
             .setDocId(docId);
 
         try {
-          String content = documentFieldOps.getDocumentContent(normalizedDocId);
+          var fields = documentFieldOps.getDocumentFieldsBatch(List.of(normalizedDocId), Set.of(
+              SchemaFields.CONTENT, SchemaFields.COLLECTION, SchemaFields.PARENT_DOC_ID,
+              SchemaFields.TITLE, SchemaFields.PATH, SchemaFields.MIME,
+              io.justsearch.configuration.ReadOwnership.METADATA)).getOrDefault(normalizedDocId, Map.of());
+          for (String field : List.of(SchemaFields.COLLECTION, SchemaFields.PARENT_DOC_ID,
+              SchemaFields.TITLE, SchemaFields.PATH, SchemaFields.MIME,
+              io.justsearch.configuration.ReadOwnership.METADATA)) {
+            String value = fields.get(field);
+            if (value != null) doc.putMetadata(field, value);
+          }
+          String content = fields.get(SchemaFields.CONTENT);
           if (content != null) {
             doc.setContent(ParseUtils.trimToLength(content, MAX_CONTENT_CHARS));
             doc.setFound(true);
-
-            // Add common metadata fields if available
-            String title = documentFieldOps.getDocumentField(normalizedDocId, "title");
-            if (title != null && !title.isBlank()) {
-              doc.putMetadata("title", title);
-            }
-            String path = documentFieldOps.getDocumentField(normalizedDocId, "path");
-            if (path != null && !path.isBlank()) {
-              doc.putMetadata("path", path);
-            }
-            String mime = documentFieldOps.getDocumentField(normalizedDocId, "mime");
-            if (mime != null && !mime.isBlank()) {
-              doc.putMetadata("mime", mime);
-            }
           } else {
             doc.setFound(false);
             doc.setError("Document not found in index");
@@ -1019,13 +1025,16 @@ public final class WorkerSearchService {
           List.of(normalizedDocId),
           Set.of(
               SchemaFields.CONTENT, SchemaFields.CONTENT_SHA256, SchemaFields.TITLE,
-              SchemaFields.PATH, SchemaFields.MIME, SchemaFields.EXTRACTION_METHOD,
+              SchemaFields.PATH, SchemaFields.MIME, SchemaFields.COLLECTION, SchemaFields.PARENT_DOC_ID,
+              io.justsearch.configuration.ReadOwnership.METADATA, SchemaFields.EXTRACTION_METHOD,
               SchemaFields.EXTRACTION_REASON_CODE, SchemaFields.EXTRACTION_STATUS,
               SchemaFields.CONTENT_TRUNCATED, SchemaFields.EXTRACTION_POLICY_ID,
               SchemaFields.EXTRACTION_PARSER_ID, SchemaFields.SOURCE_SHA256,
               SchemaFields.VDU_STATUS, SchemaFields.VDU_PROCESSED, SchemaFields.VDU_PAGE_COUNT,
               SchemaFields.VDU_ENRICHMENT, SchemaFields.VISUAL_EXTRACTION_EVIDENCE))
           .getOrDefault(normalizedDocId, Map.of());
+      String ownership = sliceFields.get(io.justsearch.configuration.ReadOwnership.METADATA);
+      if (ownership != null) response.putMetadata(io.justsearch.configuration.ReadOwnership.METADATA, ownership);
       String content = sliceFields.get(SchemaFields.CONTENT);
       if (content == null) {
         response.setFound(false).setError("Document not found in index");
@@ -1064,6 +1073,10 @@ public final class WorkerSearchService {
         response.putMetadata(SchemaFields.CONTENT_SHA256, contentSha256);
       }
 
+      for (String field : List.of(SchemaFields.COLLECTION, SchemaFields.PARENT_DOC_ID)) {
+        String value = sliceFields.get(field);
+        if (value != null) response.putMetadata(field, value);
+      }
       // Add common metadata fields if available
       String title = sliceFields.get("title");
       if (title != null && !title.isBlank()) {
@@ -1176,6 +1189,12 @@ public final class WorkerSearchService {
    */
   public RetrieveContextResponse retrieveContext(
       RetrieveContextRequest request, CallContext ctx) {
+    return retrieveContext(request, io.justsearch.configuration.InternalCollections.includesHistory(
+        request.getCollectionList()), ctx);
+  }
+
+  public RetrieveContextResponse retrieveContext(
+      RetrieveContextRequest request, boolean includePrivateData, CallContext ctx) {
     // Spec D §5.1: the semantic deadline is fixed first, before anything waits, so the models latch
     // and the query embedding share it, counted from the start of the caller's call (see search).
     long startNanos = callStart(ctx);
@@ -1214,7 +1233,7 @@ public final class WorkerSearchService {
         return ragContextOps.executeRetrieval(
             request, new HashSet<>(docIds), topK, maxContextTokens,
             compat.allowed(), compat.reasonCode(), normalizedCallContext.engineContext().urgency(),
-            normalizedCallContext.childLifetime(), acquisition, semantic);
+            normalizedCallContext.childLifetime(), acquisition, semantic, includePrivateData);
       } catch (RuntimeException e) {
         if (e instanceof InferenceRequest.DeadlineExceeded) {
           throw WorkerServiceException.deadlineExceeded(e.getMessage());
@@ -1274,6 +1293,10 @@ public final class WorkerSearchService {
   // ==================== Folder Browse ====================
 
   public ListFoldersResponse listFolders(ListFoldersRequest request, CallContext ctx) {
+    return listFolders(request, false, ctx);
+  }
+
+  public ListFoldersResponse listFolders(ListFoldersRequest request, boolean includePrivateData, CallContext ctx) {
     try (var ignored = openRequestMdc(ctx)) {
     String parentPath = request.getParentPath();
     if (parentPath.isBlank()) {
@@ -1283,7 +1306,7 @@ public final class WorkerSearchService {
     try {
       commitOps.maybeRefresh();
       FolderBrowseResult result =
-          folderBrowseEngine.enumerateFolders(parentPath, request.getMaxFolders());
+          folderBrowseEngine.enumerateFolders(parentPath, request.getMaxFolders(), includePrivateData);
 
       ListFoldersResponse.Builder response = ListFoldersResponse.newBuilder();
       for (FolderInfo folder : result.folders()) {
@@ -1311,6 +1334,11 @@ public final class WorkerSearchService {
 
   public ListFolderFilesResponse listFolderFiles(
       ListFolderFilesRequest request, CallContext ctx) {
+    return listFolderFiles(request, false, ctx);
+  }
+
+  public ListFolderFilesResponse listFolderFiles(
+      ListFolderFilesRequest request, boolean includePrivateData, CallContext ctx) {
     try (var ignored = openRequestMdc(ctx)) {
     String folderPath = request.getFolderPath();
     if (folderPath.isBlank()) {
@@ -1321,7 +1349,7 @@ public final class WorkerSearchService {
       commitOps.maybeRefresh();
       FolderFilesResult result =
           folderBrowseEngine.listFolderFiles(
-              folderPath, request.getLimit(), new HashSet<>(request.getProjectionList()));
+              folderPath, request.getLimit(), new HashSet<>(request.getProjectionList()), includePrivateData);
 
       ListFolderFilesResponse.Builder response = ListFolderFilesResponse.newBuilder();
       for (SearchHit hit : result.files()) {
@@ -1346,19 +1374,26 @@ public final class WorkerSearchService {
 
   public ListAllDocumentIdsResponse listAllDocumentIds(
       ListAllDocumentIdsRequest request, CallContext ctx) {
+    return listAllDocumentIds(request, true, ctx);
+  }
+
+  public ListAllDocumentIdsResponse listAllDocumentIds(
+      ListAllDocumentIdsRequest request, boolean includePrivateData, CallContext ctx) {
     try (var ignored = openRequestMdc(ctx)) {
     try {
-      Long expectedReaderVersion = parseDocumentIdSnapshot(request);
+      Long expectedReaderVersion = parseDocumentIdSnapshot(request, includePrivateData);
       commitOps.maybeRefresh();
       ListAllDocumentIdsResult result =
-          folderBrowseEngine.listAllDocumentIds(
-              request.getOffset(), request.getLimit(), expectedReaderVersion);
+          includePrivateData ? folderBrowseEngine.listAllDocumentIds(
+              request.getOffset(), request.getLimit(), expectedReaderVersion)
+              : folderBrowseEngine.listAllDocumentIds(
+                  request.getOffset(), request.getLimit(), expectedReaderVersion, false);
 
       return ListAllDocumentIdsResponse.newBuilder()
           .addAllDocIds(result.docIds())
           .setTotalCount(result.totalCount())
           .setTookMs(result.tookMs())
-          .setSnapshotToken(documentIdSnapshotEpoch + ":" + result.readerVersion())
+          .setSnapshotToken(documentIdSnapshotScope(includePrivateData) + ":" + result.readerVersion())
           .build();
     } catch (WorkerServiceException e) {
       // Must precede the RuntimeException catch-all: parseDocumentIdSnapshot throws
@@ -1376,7 +1411,11 @@ public final class WorkerSearchService {
     }
   }
 
-  private Long parseDocumentIdSnapshot(ListAllDocumentIdsRequest request) {
+  private String documentIdSnapshotScope(boolean includePrivateData) {
+    return includePrivateData ? documentIdSnapshotEpoch : documentIdSnapshotEpoch + "/public";
+  }
+
+  private Long parseDocumentIdSnapshot(ListAllDocumentIdsRequest request, boolean includePrivateData) {
     String token = request.getSnapshotToken();
     if (request.getOffset() == 0) {
       if (!token.isEmpty()) {
@@ -1403,7 +1442,7 @@ public final class WorkerSearchService {
     } catch (NumberFormatException e) {
       throw WorkerServiceException.invalidArgument("snapshot_token is malformed");
     }
-    if (!documentIdSnapshotEpoch.equals(token.substring(0, separator))) {
+    if (!documentIdSnapshotScope(includePrivateData).equals(token.substring(0, separator))) {
       throw WorkerServiceException.aborted(
           "Document ID snapshot belongs to a different Worker instance");
     }

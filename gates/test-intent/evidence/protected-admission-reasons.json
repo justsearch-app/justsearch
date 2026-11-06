@@ -1,0 +1,61 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-06T06:14:55.061Z",
+  "revision": "07cba78d13c771ec20ae46df78bfde83ca97abdf",
+  "tree": "9b9869157ebed2aad1daecc9ecee3c4d85a2b1a9",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.WorkerProtectedAdmissionReasonTest.protectedEnvHasDistinctSkipReason\" --tests \"io.justsearch.indexerworker.loop.WorkerProtectedAdmissionReasonTest.ordinaryGitignoreRemainsAdmitted\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 9910
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/WorkerProtectedAdmissionReasonTest.java#protectedEnvHasDistinctSkipReason",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/WorkerProtectedAdmissionReasonTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4b552ebe4d9447552695473d9d5148754e33e34f5f71d6287f83b6799ca126bf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "protectedEnvHasDistinctSkipReason()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/WorkerProtectedAdmissionReasonTest.java#ordinaryGitignoreRemainsAdmitted",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/WorkerProtectedAdmissionReasonTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4b552ebe4d9447552695473d9d5148754e33e34f5f71d6287f83b6799ca126bf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ordinaryGitignoreRemainsAdmitted()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:ff7407636f716aad409d0f23c7794a2d89227efcb72766a034434f5fc2378b2a"
+}

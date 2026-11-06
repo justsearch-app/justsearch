@@ -49,20 +49,22 @@ final class EngineMigrationCollectionOwnershipTest {
   }, nullValues = "DEFAULT")
   void migrationPreservesExactOwnershipThroughCutoverAndCollectionDeletion(
       String parentCollection, String childCollection, boolean childFirst, boolean repair,
-      @TempDir Path data) throws Exception {
+      @TempDir Path temp) throws Exception {
+    Path data = Files.createDirectory(temp.resolve("data"));
     migrateOwnership(parentCollection, childCollection, childFirst, repair, data, "ownership");
   }
 
   @ParameterizedTest
   @ValueSource(strings = {"M5", "M6", "M7"})
-  void servingVectorsAndCollectionConsumersRetainNestedOwnership(String scenario, @TempDir Path data)
+  void servingVectorsAndCollectionConsumersRetainNestedOwnership(String scenario, @TempDir Path temp)
       throws Exception {
+    Path data = Files.createDirectory(temp.resolve("data"));
     migrateOwnership("P", "C", true, false, data, scenario);
   }
 
   private static void migrateOwnership(String parentCollection, String childCollection,
       boolean childFirst, boolean repair, Path data, String scenario) throws Exception {
-    Path parent = Files.createDirectories(data.resolve("parent"));
+    Path parent = Files.createDirectories(data.resolveSibling(data.getFileName() + "-parent"));
     Path child = Files.createDirectories(parent.resolve("child"));
     Path own = Files.writeString(Files.createDirectories(parent.resolve("undeclared"))
         .resolve("own.txt"), EngineTestHarness.chunkedContent("parentownershipmarker"));
@@ -165,8 +167,9 @@ final class EngineMigrationCollectionOwnershipTest {
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
   void killedEnumerationRecoversExactOwnershipAndAllAcceptedDeletionReceipts(
-      boolean legacy, @TempDir Path data) throws Exception {
-    Path parent = Files.createDirectories(data.resolve("parent"));
+      boolean legacy, @TempDir Path temp) throws Exception {
+    Path data = Files.createDirectory(temp.resolve("data"));
+    Path parent = Files.createDirectories(data.resolveSibling(data.getFileName() + "-parent"));
     Path child = Files.createDirectories(parent.resolve("child"));
     Files.writeString(parent.resolve("own.txt"), EngineTestHarness.chunkedContent("parentownershipmarker"));
     Path nested = Files.writeString(child.resolve("nested.txt"), EngineTestHarness.chunkedContent(CHILD_MARKER));
@@ -222,7 +225,7 @@ final class EngineMigrationCollectionOwnershipTest {
     @SuppressWarnings("PMD.DoNotTerminateVM")
     public static void main(String[] args) throws Exception {
       Path data = Path.of(args[0]);
-      Path parent = data.resolve("parent");
+      Path parent = data.resolveSibling(data.getFileName() + "-parent");
       Path child = parent.resolve("child");
       try (var engine = EngineTestHarness.start(data)) {
         engine.addRootAsThePerson(parent);

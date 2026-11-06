@@ -55,6 +55,11 @@ public interface IngestServiceCalls {
     throw new UnsupportedOperationException("Indexed source enumeration is unavailable");
   }
 
+  default long scanIndexedSourcesWithCollection(
+      java.util.function.Consumer<io.justsearch.app.api.IndexingService.IndexedSource> consumer) {
+    throw new UnsupportedOperationException("Indexed collection enumeration is unavailable");
+  }
+
   /** Revisit completed indexed sources outside watched roots using the Worker's presence authority. */
   default io.justsearch.ipc.PruneResponse reconcileIndexedSources() {
     throw new UnsupportedOperationException("Indexed source reconciliation is unavailable");

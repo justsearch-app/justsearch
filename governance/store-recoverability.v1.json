@@ -1653,29 +1653,34 @@
       "id": "agent-history-transcripts",
       "pathVerification": "LITERAL",
       "encryption": "UNSEALED_DERIVED_OS_DISK_ENCRYPTION",
-      "encryptionNote": "Plaintext Markdown holding the agent's final answer to the user plus the title, path and excerpt of every document it grounded that answer in (AgentHistoryIndexer.java:141-164) - user-derived content in the clear. It is a DERIVED projection of the sealed agent-runs terminal event and is re-derivable from it, and it must stay readable as an ordinary file because the Engine index half ingests it BY PATH over the explicit-collection ingest API (:124) - sealing it would break the only thing it exists for. Covered by OS disk encryption only.",
+      "encryptionNote": "Plaintext Markdown holding the agent's final answer to the user plus the title, path and excerpt of every document it grounded that answer in (AgentHistoryIndexer.java:141-164) - user-derived content in the clear. It is a DERIVED projection of the sealed agent-runs terminal event and is re-derivable from it, and it must stay readable as an ordinary file because the Engine index half ingests it BY PATH over the explicit-collection ingest API (:124) - sealing it would break the only thing it exists for. Covered by OS disk encryption only. Sibling .md.tmp files hold the same plaintext while a transcript is replaced. Sibling .md.pending files contain either no bytes or the literal \"pending\"; their filenames identify the run whose indexing obligation survives a crash, and contain no document content.",
       "owner": "HEAD",
       "root": "DATA_DIR",
       "ownedPaths": [
-        "agent-history/*.md"
+        "agent-history/*.md",
+        "agent-history/*.md.tmp",
+        "agent-history/*.md.pending"
       ],
       "recoverability": "DERIVED",
       "upgradeHandling": "REBUILD",
-      "format": "one Markdown transcript per finished agent run, keyed by session id",
+      "format": "one Markdown transcript per finished agent run, keyed by session id; sibling .md.tmp replacement files and empty or literal \"pending\" .md.pending indexing obligations",
       "currentVersion": 0,
       "readableLegacyVersions": [],
       "writeMode": "FULL_REWRITE",
-      "atomicity": "ATOMIC_REPLACE",
+      "atomicity": "NON_ATOMIC",
       "corruptionPolicy": "REGENERATE_FROM_RUN_EVENTS_OR_PRESERVE",
-      "corruptionNote": "A transcript that is missing, empty, or does not start with the header renderTranscript always writes is re-derived from the run's terminal done/error event and re-indexed (AgentHistoryIndexer.reconcileNow, run at boot and again on key unlock from HeadAssembly). When the run is NOT available - deleted, or the store locked on an encrypted install - the bytes on disk are left EXACTLY as they are and the transcript is simply not re-indexed. It is never deleted: a locked store is indistinguishable from an empty one at this layer (the trap AgentRunReconciler documents), so a drop-what-cannot-be-rebuilt rule would erase the user's whole agent history on the first locked boot. That is why this is not REGENERATE_OR_DROP_DERIVED_HISTORY, the nearest existing value.",
+      "corruptionNote": "A transcript that is missing, empty, or does not start with the header renderTranscript always writes is re-derived from the run's terminal done/error event and re-indexed (AgentHistoryIndexer.reconcileNow, run at boot and again on key unlock from HeadAssembly). When the run is NOT available - deleted, or the store locked on an encrypted install - the bytes on disk are left EXACTLY as they are and the transcript is simply not re-indexed. It is never deleted: a locked store is indistinguishable from an empty one at this layer (the trap AgentRunReconciler documents), so a drop-what-cannot-be-rebuilt rule would erase the user's whole agent history on the first locked boot. That is why this is not REGENERATE_OR_DROP_DERIVED_HISTORY, the nearest existing value. Pending markers are presence-based obligations, not parsed payloads: empty or torn marker bytes still trigger resubmission. AgentHistoryIndexer retries when a client becomes available; ExcludesServiceImpl and WorkerIngestService write the same obligation before deleting legacy untagged history and clear it after reserved-collection resubmission. Candidate cleanup preserves the obligation on failure or uncertain source availability and retires it for a missing transcript only after proven absence. Transcript replacement uses a sibling .tmp and ATOMIC_MOVE with a non-atomic replacement fallback; pending-marker creation/truncation is non-atomic.",
       "reconciliation": "REGENERATE_FROM_RUN_EVENTS_AND_REINDEX",
       "status": "READY",
       "implementationSources": [
         "modules/app-services/src/main/java/io/justsearch/app/services/agenthistory/AgentHistoryIndexer.java",
-        "modules/app-services/src/main/java/io/justsearch/app/services/HeadAssembly.java"
+        "modules/app-services/src/main/java/io/justsearch/app/services/HeadAssembly.java",
+        "modules/app-services/src/main/java/io/justsearch/app/services/excludes/ExcludesServiceImpl.java",
+        "modules/worker-services/src/main/java/io/justsearch/indexerworker/services/WorkerIngestService.java"
       ],
       "tests": [
-        "modules/app-services/src/test/java/io/justsearch/app/services/agenthistory/AgentHistoryIndexerTest.java"
+        "modules/app-services/src/test/java/io/justsearch/app/services/agenthistory/AgentHistoryIndexerTest.java",
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineProtectedContentUpgradeTest.java"
       ],
       "fixtures": []
     },
@@ -1907,6 +1912,67 @@
       ],
       "fixtures": [],
       "note": "Added at lane F item A19, and the reason it did not exist before is worth recording rather than quietly fixing: this write site was only ever COVERED by accident. KnowledgeServerBootstrap.java appeared in the retired worker-config-snapshot row's implementationSources (it was one of the files that handled the snapshot), so the coverage check saw the file as classified and never asked what ELSE it wrote. Removing that row exposed a genuine, unrelated durable artifact at KnowledgeServerBootstrap.java:867,901. The gate was right both times; the register was carrying a false negative. Deliberately NON_ATOMIC and untested: it is a one-token marker whose worst failure is re-ingesting a handful of bundled help files, so hardening it would cost more than the outcome it prevents \u2014 but that is now a stated judgement rather than an unexamined gap."
+    },
+    {
+      "id": "protected-content-version",
+      "pathVerification": "COMPOSED",
+      "pathVerificationNote": "ExcludesServiceImpl resolves the literal .protected-content-version in the supplied data directory and appends .tmp to its filename for the pending replacement.",
+      "encryption": "NOT_APPLICABLE",
+      "encryptionNote": "Only the app-defined ProtectedContentPolicy.VERSION token recording a completed upgrade removal; the sibling .tmp holds the same token. No user content, file paths or credentials.",
+      "owner": "HEAD",
+      "root": "DATA_DIR",
+      "ownedPaths": [
+        ".protected-content-version",
+        ".protected-content-version.tmp"
+      ],
+      "recoverability": "DERIVED",
+      "upgradeHandling": "REBUILD",
+      "format": "Bare protected-content policy version token, without a store format envelope",
+      "currentVersion": 0,
+      "readableLegacyVersions": [],
+      "writeMode": "FULL_REWRITE",
+      "atomicity": "NON_ATOMIC",
+      "corruptionPolicy": "REGENERATE_BEFORE_CONSUMPTION",
+      "corruptionNote": "An absent or mismatched completion token reruns protected-source removal; only a completed pass with no failed or unchecked sources writes the current token. Unreadable marker bytes raise IOException rather than certify completion. Replacement attempts ATOMIC_MOVE and falls back to a non-atomic REPLACE_EXISTING move when unsupported. The sibling .tmp is not read as completion evidence and is overwritten by the next successful pass.",
+      "reconciliation": "RERUN_PROTECTED_SOURCE_REMOVAL_ON_MISSING_OR_MISMATCHED_VERSION",
+      "status": "READY",
+      "implementationSources": [
+        "modules/app-services/src/main/java/io/justsearch/app/services/excludes/ExcludesServiceImpl.java"
+      ],
+      "tests": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineProtectedContentUpgradeTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/excludes/ProtectedCleanupUncertaintyTest.java"
+      ],
+      "fixtures": []
+    },
+    {
+      "id": "protected-content-scan-spool",
+      "pathVerification": "LITERAL",
+      "encryption": "UNSEALED_DERIVED_OS_DISK_ENCRYPTION",
+      "encryptionNote": "Binary sort runs hold indexed source file paths, including protected file paths, and optional collection names in the clear; they contain no file content. The files survive a process crash in the data directory. SourceSpool normally deletes them on close; abandoned .protected-content-*.scan files are deleted at the next start of protected-source removal, before checking the completion marker. The spool is rebuilt by enumerating indexed and queued sources, never resumed after a restart. Covered by OS disk encryption only.",
+      "owner": "HEAD",
+      "root": "DATA_DIR",
+      "ownedPaths": [
+        ".protected-content-*.scan"
+      ],
+      "recoverability": "DERIVED",
+      "upgradeHandling": "REBUILD",
+      "format": "Binary external-sort runs: DataOutputStream UTF source path, boolean collection presence, optional UTF collection name; row counts held only in memory",
+      "currentVersion": 0,
+      "readableLegacyVersions": [],
+      "writeMode": "STREAM_WRITE_AND_MERGE",
+      "atomicity": "NON_ATOMIC",
+      "corruptionPolicy": "REGENERATE_BEFORE_CONSUMPTION",
+      "corruptionNote": "Abandoned runs are deleted without reading before each upgrade-removal attempt, even when the completion marker matches. A fresh pass re-enumerates sources and creates new runs. In-pass I/O errors abort removal without writing a completion marker; close attempts to delete every owned run, and a deletion failure propagates.",
+      "reconciliation": "DELETE_ABANDONED_RUNS_AND_REENUMERATE_INDEXED_SOURCES",
+      "status": "READY",
+      "implementationSources": [
+        "modules/app-services/src/main/java/io/justsearch/app/services/excludes/ExcludesServiceImpl.java"
+      ],
+      "tests": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/excludes/ProtectedContentSpoolTest.java"
+      ],
+      "fixtures": []
     },
     {
       "id": "engine-shutdown-request",

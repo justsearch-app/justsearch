@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.justsearch.indexerworker.loop.WorkerProtectedAdmissionReasonTest" tests="2" skipped="0" failures="1" errors="0" timestamp="2026-11-06T06:14:19.696Z" hostname="elias-systemproductname" time="0.646">
+  <properties/>
+  <testcase name="protectedEnvHasDistinctSkipReason()" classname="io.justsearch.indexerworker.loop.WorkerProtectedAdmissionReasonTest" time="0.616">
+    <failure message="org.opentest4j.AssertionFailedError: protected env must carry a protected skip outcome ==&gt; expected: not &lt;null&gt;" type="org.opentest4j.AssertionFailedError">org.opentest4j.AssertionFailedError: protected env must carry a protected skip outcome ==&gt; expected: not &lt;null&gt;
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:152)
+	at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+	at org.junit.jupiter.api.AssertNotNull.failNull(AssertNotNull.java:49)
+	at org.junit.jupiter.api.AssertNotNull.assertNotNull(AssertNotNull.java:35)
+	at org.junit.jupiter.api.Assertions.assertNotNull(Assertions.java:312)
+	at io.justsearch.indexerworker.loop.WorkerProtectedAdmissionReasonTest.protectedEnvHasDistinctSkipReason(WorkerProtectedAdmissionReasonTest.java:28)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+</failure>
+  </testcase>
+  <testcase name="ordinaryGitignoreRemainsAdmitted()" classname="io.justsearch.indexerworker.loop.WorkerProtectedAdmissionReasonTest" time="0.009"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

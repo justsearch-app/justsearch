@@ -33,8 +33,9 @@ import tools.jackson.databind.ObjectMapper;
 @Timeout(600)
 final class EngineHintlessCollectionMigrationTest {
   @Test
-  void hintlessChildAdmissionIsDeletedAcrossPausedMigration(@TempDir Path data) throws Exception {
-    Path parent = Files.createDirectories(data.resolve("parent"));
+  void hintlessChildAdmissionIsDeletedAcrossPausedMigration(@TempDir Path temp) throws Exception {
+    Path data = Files.createDirectory(temp.resolve("data"));
+    Path parent = Files.createDirectories(data.resolveSibling(data.getFileName() + "-parent"));
     Path child = Files.createDirectories(parent.resolve("child"));
     var opening = new MigrationTransitionBarrier.Controlled("migration-before-live-green-open");
     var switching = new MigrationTransitionBarrier.Controlled("migration-before-switching");
@@ -84,8 +85,9 @@ final class EngineHintlessCollectionMigrationTest {
 
   @Test
   void declaredDefaultReadmissionClearsParentAndChunkLabelsBeforeDeletingParentCollection(
-      @TempDir Path data) throws Exception {
-    Path parent = Files.createDirectories(data.resolve("parent"));
+      @TempDir Path temp) throws Exception {
+    Path data = Files.createDirectory(temp.resolve("data"));
+    Path parent = Files.createDirectories(data.resolveSibling(data.getFileName() + "-parent"));
     Path child = Files.createDirectories(parent.resolve("default"));
     Path file = Files.writeString(child.resolve("default.txt"), EngineTestHarness.chunkedContent("olddefaultmarker"));
     try (var engine = EngineTestHarness.start(data)) {
@@ -112,13 +114,14 @@ final class EngineHintlessCollectionMigrationTest {
 
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
-  void legacyNullJobAndReceiptCannotSurviveCollectionDeletionAfterRestart(boolean removeDeclaration, @TempDir Path data)
+  void legacyNullJobAndReceiptCannotSurviveCollectionDeletionAfterRestart(boolean removeDeclaration, @TempDir Path temp)
       throws Exception {
+    Path data = Files.createDirectory(temp.resolve("data"));
     if (removeDeclaration) {
       removedDeclarationRecovery(data);
       return;
     }
-    Path parent = Files.createDirectories(data.resolve("parent"));
+    Path parent = Files.createDirectories(data.resolveSibling(data.getFileName() + "-parent"));
     Path child = Files.createDirectories(parent.resolve("child"));
     // Record physical root identity through the real add-root route, then stop our Engine.
     try (var engine = EngineTestHarness.start(data)) {
@@ -172,7 +175,7 @@ final class EngineHintlessCollectionMigrationTest {
   }
 
   private static void removedDeclarationRecovery(Path data) throws Exception {
-    Path parent = Files.createDirectories(data.resolve("parent"));
+    Path parent = Files.createDirectories(data.resolveSibling(data.getFileName() + "-parent"));
     Path child = Files.createDirectories(parent.resolve("child"));
     Path file = Files.writeString(child.resolve("legacy.txt"), EngineTestHarness.chunkedContent("legacychildmarker"));
     declarations(data, parent, child);
@@ -247,9 +250,10 @@ final class EngineHintlessCollectionMigrationTest {
   }
 
   @Test
-  void outsideAdmissionKeepsNullJobReceiptAndDocumentAcrossMigrationRestart(@TempDir Path data) throws Exception {
-    Path declared = Files.createDirectories(data.resolve("declared"));
-    Path file = data.resolve("outside.txt");
+  void outsideAdmissionKeepsNullJobReceiptAndDocumentAcrossMigrationRestart(@TempDir Path temp) throws Exception {
+    Path data = Files.createDirectory(temp.resolve("data"));
+    Path declared = Files.createDirectories(data.resolveSibling(data.getFileName() + "-declared"));
+    Path file = data.resolveSibling(data.getFileName() + "-outside.txt");
     var opening = new MigrationTransitionBarrier.Controlled("migration-before-live-green-open");
     var switching = new MigrationTransitionBarrier.Controlled("migration-before-switching");
     var activated = new CountDownLatch(1);

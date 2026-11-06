@@ -201,6 +201,9 @@ public final class KnowledgeServerBootstrap implements Closeable {
     private AppInstanceLock appLock;
     private IpcTelemetry ipcTelemetry;
     private final boolean automaticRootProducers;
+    private final io.justsearch.core.execution.EngineExecutorRegistry executors;
+    private io.justsearch.app.services.encryption.UnlockDeferredScan protectedRemoval;
+    private final AtomicBoolean protectedRemovalAttempted = new AtomicBoolean();
 
     /** Uses the Engine's existing index owner and registry for every publication and gate. */
     public KnowledgeServerBootstrap(
@@ -240,6 +243,7 @@ public final class KnowledgeServerBootstrap implements Closeable {
             throw new IllegalArgumentException("Bootstrap requires the index component owner");
         }
         this.workerCapability = new RegistryBackedCapability(components, "index", "worker");
+        this.executors = executors;
 
     }
 
@@ -608,8 +612,41 @@ public final class KnowledgeServerBootstrap implements Closeable {
         return client != null;
     }
 
+    /** Owned by this healthy client lifetime, and recreated after an actual close/restart. */
+    private void scheduleProtectedRemoval() {
+        if (protectedRemoval == null) {
+        protectedRemoval = new io.justsearch.app.services.encryption.UnlockDeferredScan(
+            executors, "protected-content-removal", () -> {
+                KnowledgeClient current = client;
+                if (current == null || protectedRemovalAttempted.get()) return;
+                // Search may already serve from the read-only startup view while its writer opens.
+                // A healthy poll will queue this again; do not spend the one upgrade attempt yet.
+                try { current.captureServingGeneration(ENGINE_CONTEXT); }
+                catch (RuntimeException writerNotReady) { return; }
+                if (!protectedRemovalAttempted.compareAndSet(false, true)) return;
+                try {
+                    new io.justsearch.app.services.excludes.ExcludesServiceImpl(() -> current)
+                        .removeProtectedSources(config.dataDir(), ENGINE_CONTEXT, path ->
+                            {
+                                var accepted = current.submitBatch(List.of(path), true,
+                                    io.justsearch.configuration.InternalCollections.AGENT_HISTORY, ENGINE_CONTEXT);
+                                if (accepted == null || accepted.getAcceptedCount() != 1) {
+                                    throw new IllegalStateException("History reconciliation was not accepted");
+                                }
+                            });
+                } catch (Exception failure) {
+                    log.warn("Protected content removal incomplete; retrying on next start", failure);
+                }
+            });
+        }
+        protectedRemoval.schedule();
+    }
+
     /** Called only under initLock after a direct healthy observation. */
     private void completeHealthyInitialization() {
+        // Destructive upgrade work belongs to an actual started client lifetime, with the
+        // data-directory owner held; observing an injected client is not a startup.
+        if (started.get() && automaticRootProducers && !protectedRemovalAttempted.get()) scheduleProtectedRemoval();
         if (healthyInitializationComplete) return;
         if (automaticRootProducers) {
             // Queue catch-up work once per physically healthy period. Help ingestion keeps its
@@ -1059,6 +1096,12 @@ public final class KnowledgeServerBootstrap implements Closeable {
             return ShutdownOutcome.FAILED;
         }
 
+        // Retire the upgrade scan before its client and index owner.
+        if (protectedRemoval != null) {
+            protectedRemoval.close();
+            protectedRemoval = null;
+        }
+        protectedRemovalAttempted.set(false);
         // Stop the energy-state poller before client and index-component teardown.
         try {
             energyPoller.close();

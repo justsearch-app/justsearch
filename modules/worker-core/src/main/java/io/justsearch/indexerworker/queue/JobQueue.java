@@ -1095,6 +1095,11 @@ public interface JobQueue extends Closeable {
     return List.of();
   }
 
+  /** Bounded ownership enumeration for upgrade cleanup, including failed and pending jobs. */
+  default void forEachSource(java.util.function.BiConsumer<String, String> consumer) {
+    throw new UnsupportedOperationException("Queue source enumeration is unavailable");
+  }
+
   /**
    * Lists jobs in FAILED state, ordered by most recent failure first.
    *

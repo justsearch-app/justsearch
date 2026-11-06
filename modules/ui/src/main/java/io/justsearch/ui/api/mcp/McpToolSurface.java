@@ -532,6 +532,10 @@ public final class McpToolSurface {
         return invalid;
       }
     }
+    if (arguments != null && arguments.get("filters") instanceof Map<?, ?> filters
+        && io.justsearch.configuration.InternalCollections.includesHistory(filters.get("collection"))) {
+      return errorContent("Assistant history is private to the JustSearch app window", ApiErrorCode.INVALID_REQUEST);
+    }
     String operationId = OPERATION_TOOLS.get(name);
     if (operationId != null) return callOperation(operationId, arguments, requestedBy, engineContext);
     return switch (name) {
@@ -1623,6 +1627,9 @@ public final class McpToolSurface {
   private Map<String, Object> callOperation(
       String opIdValue, Map<String, Object> arguments, String requestedBy, EngineContext engineContext) {
     try {
+      if (arguments != null && io.justsearch.configuration.InternalCollections.includesHistory(arguments.get("collection"))) {
+        return errorContent("Assistant history is private to the JustSearch app window", ApiErrorCode.INVALID_REQUEST);
+      }
       Operation op = resolveOperation(opIdValue);
       if (op == null) return errorContent("Operation not available: " + opIdValue);
       var publicArguments = new LinkedHashMap<String, Object>(arguments == null ? Map.of() : arguments);

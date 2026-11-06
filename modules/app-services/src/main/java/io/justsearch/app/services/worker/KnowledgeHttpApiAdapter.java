@@ -67,9 +67,19 @@ public final class KnowledgeHttpApiAdapter {
     return searchEngine.search(req, engineContext);
   }
 
+  public KnowledgeSearchResponse search(KnowledgeSearchRequest req, boolean includePrivateData, EngineContext engineContext) {
+    try (var session = searchEngine.openSearch(req, includePrivateData, engineContext)) {
+      return session.response();
+    }
+  }
+
   /** Retains the exact serving generation and settings through a caller's response rendering. */
   public SearchSession openSearch(KnowledgeSearchRequest req, EngineContext engineContext) {
     return searchEngine.openSearch(req, engineContext);
+  }
+
+  public SearchSession openSearch(KnowledgeSearchRequest req, boolean includePrivateData, EngineContext engineContext) {
+    return searchEngine.openSearch(req, includePrivateData, engineContext);
   }
 
   public interface SearchSession extends AutoCloseable {
@@ -118,12 +128,17 @@ public final class KnowledgeHttpApiAdapter {
   }
 
   public FolderBrowseResponse listFolders(FolderBrowseRequest req, EngineContext engineContext) {
+    return listFolders(req, false, engineContext);
+  }
+
+  public FolderBrowseResponse listFolders(FolderBrowseRequest req, boolean includePrivateData, EngineContext engineContext) {
     Objects.requireNonNull(req, "req");
     ListFoldersResponse proto;
     try (var lease = knowledgeServer.captureClient()) {
       int maxFolders = req.maxFolders() == null ? 0 : req.maxFolders();
       proto = lease.withClient(client ->
-          client.listFolders(req.parentPath(), maxFolders, engineContext));
+          includePrivateData ? client.listFolders(req.parentPath(), maxFolders, true, engineContext)
+              : client.listFolders(req.parentPath(), maxFolders, engineContext));
     }
 
     List<FolderBrowseResponse.Folder> folders = new ArrayList<>();
@@ -139,12 +154,17 @@ public final class KnowledgeHttpApiAdapter {
   }
 
   public FolderFilesResponse listFolderFiles(FolderFilesRequest req, EngineContext engineContext) {
+    return listFolderFiles(req, false, engineContext);
+  }
+
+  public FolderFilesResponse listFolderFiles(FolderFilesRequest req, boolean includePrivateData, EngineContext engineContext) {
     Objects.requireNonNull(req, "req");
     ListFolderFilesResponse proto;
     try (var lease = knowledgeServer.captureClient()) {
       int limit = req.limit() == null ? 0 : req.limit();
-      proto = lease.withClient(client -> client.listFolderFiles(
-          req.folderPath(), limit, req.projection(), engineContext));
+      proto = lease.withClient(client -> includePrivateData
+          ? client.listFolderFiles(req.folderPath(), limit, req.projection(), true, engineContext)
+          : client.listFolderFiles(req.folderPath(), limit, req.projection(), engineContext));
     }
 
     List<FolderFilesResponse.FileEntry> files = new ArrayList<>();

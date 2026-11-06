@@ -235,7 +235,7 @@ public final class NativePolicyReplay {
   public boolean allows(Path path, Path root, String collection) {
     if (!current() || !owns(path, root, collection) || !rootScopeCurrent(path, root)
         || excludedByAnyRoot(path, root, false)
-        || IngestionSkipPolicy.active().shouldSkipName(path)) return false;
+        || IngestionSkipPolicy.shouldSkipWithinRoot(path, root, collection)) return false;
     for (Path parent = path.toAbsolutePath().normalize().getParent();
         parent != null && !parent.equals(root.toAbsolutePath().normalize()); parent = parent.getParent()) {
       if (!parent.startsWith(root.toAbsolutePath().normalize())) return false;
