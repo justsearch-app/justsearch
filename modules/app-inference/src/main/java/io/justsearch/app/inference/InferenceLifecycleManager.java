@@ -2463,7 +2463,9 @@ public class InferenceLifecycleManager
           context, LlamaServerOps.AdoptionPolicy.REQUIRE_MANAGED_CONFIG_WITNESS);
       if (startManaged) {
         validatePrecommitCandidate(request);
-      } else {
+      } else if (enabled) {
+        // A disabled candidate starts nothing, so its files need not exist: answers switched off
+        // with the model not downloaded is a valid target. Switching on validates it here.
         try {
           candidate.validate();
         } catch (Exception invalid) {

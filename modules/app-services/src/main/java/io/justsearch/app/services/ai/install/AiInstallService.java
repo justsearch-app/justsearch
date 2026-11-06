@@ -1743,6 +1743,17 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
         // so a switch-on that landed after that read refuses the removal instead of racing it.
         commitSettings(settings, snapshot.witness(), "ai-file-removal");
       }
+
+      /**
+       * The device plan reads which chat models are on disk. Saving the unchanged settings rebuilds
+       * it through the settings owner, so the runtime stops planning for the removed model now.
+       */
+      @Override
+      public void filesChanged(String id) {
+        if (!"chat".equals(id)) return;
+        var snapshot = settingsStore.inspect();
+        commitSettings(snapshot.settings(), snapshot.witness(), "ai-file-removal-refresh");
+      }
     };
   }
 

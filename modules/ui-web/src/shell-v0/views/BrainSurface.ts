@@ -1843,7 +1843,7 @@ export class BrainSurface extends JfElement {
       this.removalPoll = null;
       await this.refreshDownloadedFiles();
       if (this.downloadedFiles?.removal?.state !== 'running') {
-        await this.refreshInstallPlanPreview();
+        await Promise.all([this.refreshInstallPlanPreview(), this.refreshSettings()]);
         void refreshAiInstallNow();
       }
     }, 1000);
@@ -1882,7 +1882,8 @@ export class BrainSurface extends JfElement {
       }
       await this.refreshDownloadedFiles();
     });
-    await this.refreshInstallPlanPreview();
+    // The removal saved settings, so the next switch needs the witness it left behind.
+    await Promise.all([this.refreshInstallPlanPreview(), this.refreshSettings()]);
     void refreshAiInstallNow();
     await this.updateComplete;
     this.focusPartAction(id);

@@ -190,6 +190,9 @@ final class ModelFileRemoval {
 
     /** Records {@code packageId} as declined against the witness of {@code read}; throws if refused. */
     void decline(UiSettingsStoreView read, String packageId);
+
+    /** Lets the runtime see what is on disk now, while the removal still reports as running. */
+    default void filesChanged(String packageId) {}
   }
 
   /** One settings read: the settings and the opaque witness the decline must be committed against. */
@@ -619,14 +622,16 @@ final class ModelFileRemoval {
     private final PrivateFolder folder;
     private final Journal journal;
     private final List<Target> targets;
+    private final Settings settings;
 
     private Run(ModelFileRemovalFence.Removal held, OperationLeaseHandle lease, PrivateFolder folder,
-        Journal journal, List<Target> targets) {
+        Journal journal, List<Target> targets, Settings settings) {
       this.held = held;
       this.lease = lease;
       this.folder = folder;
       this.journal = journal;
       this.targets = targets;
+      this.settings = settings;
     }
 
     DownloadedFiles.Removal started() {
@@ -645,6 +650,12 @@ final class ModelFileRemoval {
       try {
         for (Target t : targets) removeOne(journal, t, folder);
         recheckCanonical(journal);
+        try {
+          settings.filesChanged(journal.packageId);
+        } catch (RuntimeException notRefreshed) {
+          // The files are gone either way: the next settings save brings the runtime up to date.
+          log.warn("Runtime view not refreshed after removing files", notRefreshed);
+        }
         journal.state = outcome(journal, targets);
         journal.finishedAtEpochMs = System.currentTimeMillis();
         journal.message = summary(journal);
@@ -877,7 +888,7 @@ final class ModelFileRemoval {
             + notSaved.getMessage() + ")");
       }
       checkpointHook.accept("declined");
-      return new Run(held, lease, folder, journal, targets);
+      return new Run(held, lease, folder, journal, targets, settings);
     } catch (RuntimeException | Error failure) {
       // A record may have been saved as running: the next read reconciles it, never this lock.
       recovered = false;

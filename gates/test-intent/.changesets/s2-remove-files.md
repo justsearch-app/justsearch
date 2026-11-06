@@ -1250,6 +1250,110 @@ The brief's adopted scenarios are quoted below; choices the scenarios leave open
       "newChecks": [
         "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppRemovalUsageWiringTest.java#bestMatchFirstRemovalFollowsTheLiveIndexHalfThroughTheProductionComposition"
       ]
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AnswerRemovalSettingsSaveTest.java",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.remove-files-witness.test.ts"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Live test on the real Engine: after Remove files took the answer model, with answers and picture reading off, every save of Best match first failed with GENERATIVE_PREPARATION_REFUSED until a restart. Root cause: the GPU memory plan reads which chat models are on disk, so a save after the deletion re-resolves generative values (justsearch.context.size, and justsearch.mmproj.offload on some devices) and reaches the generative owner, whose disabled path still required the model file. A restart hid it because the serving configuration then already matched the disk. The same refusal happens on unchanged origin/main (51bfa7756c) after deleting the model by other means, so the defect predates Remove files. With the real 5.9 GB model the plan moves generative values on devices up to 10 GiB (12 GiB with no stored model path); at 16 GiB and above only encoder values move. A disabled candidate starts nothing, so it no longer has to prove its files exist: answers off with the model not downloaded is a valid not-startable target. Switching answers on still validates them. Through the production composition (the real settings owner and GPU planner, the real generative owner and lifecycle manager, a real removal in a temporary models folder, a 4 GiB device so these small files move a generative value; the query-role owner is a stub): after the removal Best match first saves On, unrelated settings save, and no key is left pending, with no restart. A model deleted by other means also stops blocking saves, with a precondition that a generative key really moved. That refresh and the decline both move the settings revision, so the page reads settings again when a removal ends (its own or a followed one); otherwise the next switch would be saved against an old revision until the five-second poll.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "N1",
+          "quote": "Answers on/off, Best match first, picture reading and Pause answers while indexing switches keep their behaviour and files; search by exact words and by meaning, indexing and its pacing work as today; installs, consent, decline and Repair of parts not removed keep today's behaviour; source documents, the index and conversations are never touched.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "X2",
+          "quote": "Removal refuses with a plain reason (switch it off first; a download, repair, import or activation is running; an index generation or recovery still needs it; a file is shared with a wanted part) and deletes nothing in that case. After removal: the part shows Not downloaded, Repair does not bring it back, the install total counts it again, \"Download again\" asks for consent and downloads only what is missing.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
+          "choice": "Live test on the real Engine: after Remove files took the answer model, with answers and picture reading off, every save of Best match first failed with GENERATIVE_PREPARATION_REFUSED until a restart. Root cause: the GPU memory plan reads which chat models are on disk, so a save after the deletion re-resolves generative values (justsearch.context.size, and justsearch.mmproj.offload on some devices) and reaches the generative owner, whose disabled path still required the model file. A restart hid it because the serving configuration then already matched the disk. The same refusal happens on unchanged origin/main (51bfa7756c) after deleting the model by other means, so the defect predates Remove files. With the real 5.9 GB model the plan moves generative values on devices up to 10 GiB (12 GiB with no stored model path); at 16 GiB and above only encoder values move. A disabled candidate starts nothing, so it no longer has to prove its files exist: answers off with the model not downloaded is a valid not-startable target. Switching answers on still validates them.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
+          "choice": "Removal updates the runtime itself: once the files are gone, while the lock is held and the removal still reports running, Answers removal saves the unchanged settings through the settings owner, which rebuilds the plan from the disk. A refresh that fails is logged and changes nothing the removal reports; the next save then catches up. Best match first removal does not refresh: no such failure was observed there and this repair is limited to Answers.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
+          "choice": "That refresh and the decline both move the settings revision, so the page reads settings again when a removal ends (its own or a followed one); otherwise the next switch would be saved against an old revision until the five-second poll.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s2-remove-files-settings-save.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AnswerRemovalSettingsSaveTest.java#bestMatchFirstSwitchesOnAfterTheAnswerModelWasRemoved",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AnswerRemovalSettingsSaveTest.java#unrelatedSettingsSaveAfterTheAnswerModelWasRemoved",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AnswerRemovalSettingsSaveTest.java#theRemovalItselfBringsTheRuntimeUpToDateWithWhatIsOnDisk",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AnswerRemovalSettingsSaveTest.java#aModelDeletedByOtherMeansDoesNotBlockSavesWhileAnswersAreOff",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.remove-files-witness.test.ts#a removal that already ended: saved against the revision it left behind",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.remove-files-witness.test.ts#a removal still running when the page returned: saved against the revision it left when it ended"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalRefreshTest.java"
+      ],
+      "class": "New",
+      "behaviour": "What must not change with that repair, so these pass before it too: answers and picture reading still cannot be switched on by a settings save while their files are missing (no answer server starts, the saved choice stays off), and answers start from the model once its files are back, so the target saved while it was missing does not stick. The refresh runs once, after the files are gone, with the lock held and the record still running, and a refresh that fails leaves the removal reported as it happened. These hook checks use the new settings seam, so they have no before state.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "N1",
+          "quote": "Answers on/off, Best match first, picture reading and Pause answers while indexing switches keep their behaviour and files; search by exact words and by meaning, indexing and its pacing work as today; installs, consent, decline and Repair of parts not removed keep today's behaviour; source documents, the index and conversations are never touched.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "X2",
+          "quote": "Removal refuses with a plain reason (switch it off first; a download, repair, import or activation is running; an index generation or recovery still needs it; a file is shared with a wanted part) and deletes nothing in that case. After removal: the part shows Not downloaded, Repair does not bring it back, the install total counts it again, \"Download again\" asks for consent and downloads only what is missing.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261101-uiimpl",
+          "scenario": "X3",
+          "quote": "Removal is safe under failure: permission or sharing errors, a path replaced by a link, process death between steps, restart midway: the page reports the files actually left, never \"removed\" while files remain, and never re-enables the part; a second window or a repeated click cannot start a second removal. Source documents, the index and conversations are untouched.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly",
+          "delegationLocation": "task t-20261101-uiimpl user turn proceed accordingly",
+          "delegationScope": "Implement design D4 (narrow option) and its settlement for Remove files and Download again, within the settled scenarios X1-X4, N1 and N2.",
+          "choice": "Removal updates the runtime itself: once the files are gone, while the lock is held and the removal still reports running, Answers removal saves the unchanged settings through the settings owner, which rebuilds the plan from the disk. A refresh that fails is logged and changes nothing the removal reports; the next save then catches up. Best match first removal does not refresh: no such failure was observed there and this repair is limited to Answers.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s2-remove-files-settings-save-guards.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AnswerRemovalSettingsSaveTest.java#answersStillCannotBeSwitchedOnWithoutTheirFiles",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AnswerRemovalSettingsSaveTest.java#pictureReadingStillCannotBeSwitchedOnWithoutItsFile",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AnswerRemovalSettingsSaveTest.java#answersStartFromTheModelOnceItsFilesAreBack",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalRefreshTest.java#theRefreshRunsOnceTheFilesAreGoneWhileTheRemovalStillHoldsTheLockAndReportsRunning",
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalRefreshTest.java#aRefreshThatFailsLeavesTheRemovalReportedAsItHappened"
+      ]
     }
   ]
 }
