@@ -14,6 +14,8 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.VarHandle;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 
 /** Windows entry security, including protection against later parent ACL changes. */
 public final class WindowsOwnerOnlyDirectory {
@@ -75,7 +77,132 @@ public final class WindowsOwnerOnlyDirectory {
     inspectEntry(path, true);
   }
 
+  /**
+   * The entry's own NTFS identity (volume serial number and file index), opened without following a
+   * link or reparse point: it stays the same across renames on one volume and differs for any other
+   * file, which Java's file key does not offer on Windows.
+   */
+  public static String fileIdentity(Path path) throws IOException {
+    String[] identity = new String[1];
+    inspectEntry(path, false, information -> identity[0] = identityOf(information));
+    return identity[0];
+  }
+
+  /** BY_HANDLE_FILE_INFORMATION: dwVolumeSerialNumber at 28, nFileIndexHigh/Low at 44/48. */
+  private static String identityOf(MemorySegment information) {
+    return Integer.toUnsignedString(information.get(ValueLayout.JAVA_INT, 28), 16) + ":"
+        + Integer.toUnsignedString(information.get(ValueLayout.JAVA_INT, 44), 16) + ":"
+        + Integer.toUnsignedString(information.get(ValueLayout.JAVA_INT, 48), 16);
+  }
+
+  /** What {@link #deleteVerified} found in the file it opened. */
+  public enum HandleCheck {
+    /** It was the expected file, it passed, and its handle was marked for deletion and closed. */
+    DELETED,
+    /** It is not the expected file (another identity, a link or reparse point, a directory). */
+    CHANGED,
+    /** It is the expected file but has another link. */
+    LINKED,
+    /** It is the expected file but its size or content hash differs. */
+    NOT_VERIFIED
+  }
+
+  /**
+   * Deletes a file only through one handle whose checks it passed (design D4, repair round 3): the
+   * file is opened once, without following a link or reparse point, for reading and deletion while
+   * no one else may write, rename or delete it; its NTFS identity, link count and size are read from
+   * that handle, its SHA-256 is computed by reading the same handle, and only then is that handle's
+   * delete disposition set and the handle closed, so exactly that file is deleted, whatever its name
+   * holds meanwhile. A file that fails a check is left as it was (its handle closes without the
+   * disposition). The handle is never opened delete-on-close: that could not be withdrawn after a
+   * failed check.
+   *
+   * @param identity the identity {@link #fileIdentity} read for the expected file
+   * @param size the expected size in bytes, or a negative value when unknown
+   * @param sha256 the expected SHA-256 (hex), or {@code null} for a file without a recorded hash
+   * @param beforeDelete runs after every check passed, immediately before the disposition is set
+   * @throws IOException when the file cannot be opened that way (in use, a sharing violation, no
+   *     such file), read, or marked for deletion, or when the platform calls are unavailable;
+   *     nothing was deleted then
+   */
+  public static HandleCheck deleteVerified(Path path, String identity, long size, String sha256,
+      Runnable beforeDelete) throws IOException {
+    try (Arena arena = Arena.ofConfined()) {
+      MemorySegment captured = arena.allocate(Win32.STATE);
+      // GENERIC_READ | DELETE, FILE_SHARE_READ only, OPEN_EXISTING,
+      // FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_SEQUENTIAL_SCAN (no backup semantics: a folder
+      // cannot be opened).
+      MemorySegment handle = (MemorySegment) Win32.OPEN.invokeExact(captured,
+          wide(arena, path.toString()), 0x80010000, 1, MemorySegment.NULL, 3, 0x08200000,
+          MemorySegment.NULL);
+      if (handle.address() == -1L || handle.address() == 0L) {
+        throw new IOException("Cannot open " + path + " for deletion (Windows error "
+            + (int) Win32.ERROR.get(captured, 0L) + ")");
+      }
+      try {
+        MemorySegment information = arena.allocate(52, 4);
+        if ((int) Win32.INFORMATION.invokeExact(captured, handle, information) == 0) {
+          throw new IOException("Cannot read " + path + " (Windows error "
+              + (int) Win32.ERROR.get(captured, 0L) + ")");
+        }
+        int attributes = information.get(ValueLayout.JAVA_INT, 0);
+        if ((attributes & 0x400) != 0 || (attributes & 0x10) != 0) return HandleCheck.CHANGED;
+        if (!identityOf(information).equals(identity)) return HandleCheck.CHANGED;
+        if (Integer.toUnsignedLong(information.get(ValueLayout.JAVA_INT, 40)) != 1) {
+          return HandleCheck.LINKED;
+        }
+        long length = (Integer.toUnsignedLong(information.get(ValueLayout.JAVA_INT, 32)) << 32)
+            | Integer.toUnsignedLong(information.get(ValueLayout.JAVA_INT, 36));
+        if (size >= 0 && length != size) return HandleCheck.NOT_VERIFIED;
+        if (sha256 != null && !sha256.equalsIgnoreCase(sha256Of(arena, captured, handle, path))) {
+          return HandleCheck.NOT_VERIFIED;
+        }
+        beforeDelete.run();
+        // FILE_DISPOSITION_INFO { BOOLEAN DeleteFile = TRUE } through FileDispositionInfo (4).
+        MemorySegment disposition = arena.allocate(1);
+        disposition.set(ValueLayout.JAVA_BYTE, 0, (byte) 1);
+        if ((int) Win32.DISPOSE.invokeExact(captured, handle, 4, disposition, 1) == 0) {
+          throw new IOException("Cannot delete " + path + " (Windows error "
+              + (int) Win32.ERROR.get(captured, 0L) + ")");
+        }
+        return HandleCheck.DELETED;
+      } finally {
+        int _ = (int) Win32.CLOSE.invokeExact(handle);
+      }
+    } catch (IOException failure) {
+      throw failure;
+    } catch (VirtualMachineError fatal) {
+      throw fatal;
+    } catch (Throwable unavailable) {
+      // Also on a platform without these calls: nothing was deleted.
+      throw new IOException("Cannot delete " + path + " through its handle", unavailable);
+    }
+  }
+
+  private static String sha256Of(Arena arena, MemorySegment captured, MemorySegment handle,
+      Path path) throws Throwable {
+    MessageDigest digest = MessageDigest.getInstance("SHA-256");
+    int chunk = 1 << 20;
+    MemorySegment buffer = arena.allocate(chunk);
+    MemorySegment read = arena.allocate(ValueLayout.JAVA_INT);
+    while (true) {
+      if ((int) Win32.READ.invokeExact(captured, handle, buffer, chunk, read, MemorySegment.NULL) == 0) {
+        throw new IOException("Cannot read " + path + " (Windows error "
+            + (int) Win32.ERROR.get(captured, 0L) + ")");
+      }
+      int n = read.get(ValueLayout.JAVA_INT, 0);
+      if (n == 0) break;
+      digest.update(buffer.asSlice(0, n).asByteBuffer());
+    }
+    return HexFormat.of().formatHex(digest.digest());
+  }
+
   private static void inspectEntry(Path path, boolean singleLink) throws IOException {
+    inspectEntry(path, singleLink, information -> {});
+  }
+
+  private static void inspectEntry(Path path, boolean singleLink,
+      java.util.function.Consumer<MemorySegment> read) throws IOException {
     try (Arena arena = Arena.ofConfined()) {
       MemorySegment captured = arena.allocate(Win32.STATE);
       MemorySegment handle = (MemorySegment) Win32.OPEN.invokeExact(captured,
@@ -93,6 +220,7 @@ public final class WindowsOwnerOnlyDirectory {
         if (singleLink && Integer.toUnsignedLong(information.get(ValueLayout.JAVA_INT, 40)) != 1) {
           throw new IOException("Entry must have exactly one link: " + path);
         }
+        read.accept(information);
       } finally {
         int _ = (int) Win32.CLOSE.invokeExact(handle);
       }
@@ -179,6 +307,12 @@ public final class WindowsOwnerOnlyDirectory {
         FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT,
             ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS,
             ValueLayout.ADDRESS));
+    private static final MethodHandle READ = bind(KERNEL, "ReadFile",
+        FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS,
+            ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS), CAPTURE);
+    private static final MethodHandle DISPOSE = bind(KERNEL, "SetFileInformationByHandle",
+        FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT,
+            ValueLayout.ADDRESS, ValueLayout.JAVA_INT), CAPTURE);
     private static final MethodHandle CLOSE = bind(KERNEL, "CloseHandle",
         FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
     private static final MethodHandle FREE = bind(KERNEL, "LocalFree",

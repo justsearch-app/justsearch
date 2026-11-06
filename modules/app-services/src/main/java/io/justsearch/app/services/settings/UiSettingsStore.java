@@ -112,6 +112,22 @@ public final class UiSettingsStore {
   private volatile io.justsearch.core.scheduling.IndexingHold indexingHold;
 
   /** Bound once before any processor starts. Publication is part of the accepted settings commit. */
+  // The AI install owner's removal lock, consulted by the settings owner before it commits a
+  // candidate that would turn a part on whose files are being removed (design D4). Null until the
+  // install owner binds it; with nothing bound no removal can run in this process.
+  private volatile io.justsearch.app.services.ai.install.ModelFileRemovalFence modelFileRemovalFence;
+
+  /** Binds the AI install owner's removal lock (one per process). */
+  public void bindModelFileRemovalFence(
+      io.justsearch.app.services.ai.install.ModelFileRemovalFence fence) {
+    modelFileRemovalFence = Objects.requireNonNull(fence, "fence");
+  }
+
+  /** The bound removal lock, or {@code null} when no install owner bound one. */
+  public io.justsearch.app.services.ai.install.ModelFileRemovalFence modelFileRemovalFence() {
+    return modelFileRemovalFence;
+  }
+
   public void bindIndexingHold(io.justsearch.core.scheduling.IndexingHold hold) {
     indexingHold = Objects.requireNonNull(hold, "hold");
     hold.setLocalTime(() -> {
@@ -362,6 +378,9 @@ public final class UiSettingsStore {
       }
       if (settings.getRerankerPreferenceRevision() > witness.acceptedRevision()) {
         throw new CorruptDurableStoreException("ui-settings", "reranker preference is ahead of settings revision");
+      }
+      if (settings.getChatPreferenceRevision() > witness.acceptedRevision()) {
+        throw new CorruptDurableStoreException("ui-settings", "answers preference is ahead of settings revision");
       }
       QueryRoleSelection queryRoles = null;
       JsonNode queryNode = root.get("queryRoles");

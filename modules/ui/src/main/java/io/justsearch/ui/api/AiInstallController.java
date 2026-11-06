@@ -64,7 +64,12 @@ public final class AiInstallController {
    */
   public void handleGetPlanPreview(Context ctx) {
     try {
-      ctx.json(service.previewInstallPlan());
+      // "Download again" previews the plan with these parts included; no saved choice changes.
+      String include = ctx.queryParam("include");
+      java.util.Set<String> parts = include == null || include.isBlank() ? java.util.Set.of()
+          : java.util.Arrays.stream(include.split(",")).map(String::trim)
+              .filter(id -> !id.isEmpty()).collect(java.util.stream.Collectors.toUnmodifiableSet());
+      ctx.json(parts.isEmpty() ? service.previewInstallPlan() : service.previewInstallPlan(parts));
     } catch (Exception e) {
       log.error("Failed to compute AI install plan preview", e);
       ctx.status(500)
@@ -72,6 +77,22 @@ public final class AiInstallController {
               ApiErrorHandler.toResponse(
                   ApiErrorCode.MANIFEST_UNAVAILABLE,
                   "Failed to compute install plan preview",
+                  telemetry,
+                  ApiErrorHandler.routeOf(ctx)));
+    }
+  }
+
+  /** Advanced settings - Downloaded files: measured sizes and "Remove files" eligibility (design D4). */
+  public void handleGetDownloadedFiles(Context ctx) {
+    try {
+      ctx.json(service.downloadedFiles());
+    } catch (Exception e) {
+      log.error("Failed to read downloaded AI files", e);
+      ctx.status(500)
+          .json(
+              ApiErrorHandler.toResponse(
+                  ApiErrorCode.AI_INSTALL_ERROR,
+                  "Failed to read downloaded files",
                   telemetry,
                   ApiErrorHandler.routeOf(ctx)));
     }

@@ -1,0 +1,57 @@
+diff --git a/modules/app-inference/src/main/java/io/justsearch/app/inference/InferenceLifecycleManager.java b/modules/app-inference/src/main/java/io/justsearch/app/inference/InferenceLifecycleManager.java
+index 0b97f5c851..1a301daa7e 100644
+--- a/modules/app-inference/src/main/java/io/justsearch/app/inference/InferenceLifecycleManager.java
++++ b/modules/app-inference/src/main/java/io/justsearch/app/inference/InferenceLifecycleManager.java
+@@ -151,6 +151,17 @@ public class InferenceLifecycleManager
+     serverOps.setLaunchFence(fence);
+   }
+ 
++  /** Compatibility shape for the repaired check: the same refusal through the old reason fence. */
++  public void setManagedLaunchFence(ManagedLaunchFence fence) {
++    setManagedLaunchFence((java.util.function.Supplier<Optional<String>>) () -> {
++      try (ManagedLaunchFence.Admission ignored = fence.admit()) {
++        return Optional.<String>empty();
++      } catch (IllegalStateException refused) {
++        return Optional.of(refused.getMessage());
++      }
++    });
++  }
++
+   /** Binds the saved policy and the live Engine backlog observation. */
+   public void setAnswersPaused(BooleanSupplier paused) {
+     generation.setAnswersPaused(paused);
+diff --git a/modules/app-inference/src/main/java/io/justsearch/app/inference/ManagedLaunchFence.java b/modules/app-inference/src/main/java/io/justsearch/app/inference/ManagedLaunchFence.java
+new file mode 100644
+index 0000000000..7c2791af51
+--- /dev/null
++++ b/modules/app-inference/src/main/java/io/justsearch/app/inference/ManagedLaunchFence.java
+@@ -0,0 +1,29 @@
++/* SPDX-License-Identifier: Apache-2.0 */
++package io.justsearch.app.inference;
++
++/**
++ * Admits managed answer-server launches against an owner outside inference: the AI install
++ * owner's file-removal lock (design D4). A launch is registered from just before its process
++ * starts until it returns, so a removal of the answer model's files cannot begin meanwhile, and a
++ * launch is refused while such a removal runs. Once the process exists the runtime reports the
++ * answer server as running, which keeps refusing the removal.
++ */
++@FunctionalInterface
++public interface ManagedLaunchFence {
++
++  /**
++   * Registers one managed launch until the result closes.
++   *
++   * @throws IllegalStateException with a plain reason when no managed launch may start now
++   */
++  Admission admit();
++
++  /** One admitted launch; closing it is idempotent. */
++  interface Admission extends AutoCloseable {
++    @Override
++    void close();
++  }
++
++  /** Admits every launch; the default until composition binds the removal lock. */
++  ManagedLaunchFence OPEN = () -> () -> {};
++}

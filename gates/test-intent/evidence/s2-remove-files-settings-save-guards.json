@@ -1,0 +1,106 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-06T00:15:52.049Z",
+  "revision": "e85e7f919beeedc988dd4b1ba63e3a4bbd51d9ce",
+  "tree": "c43abe2456d56be2117f5b9e4eb172afaf99295d",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.ai.install.AnswerRemovalSettingsSaveTest.answersStillCannotBeSwitchedOnWithoutTheirFiles\" --tests \"io.justsearch.app.services.ai.install.AnswerRemovalSettingsSaveTest.pictureReadingStillCannotBeSwitchedOnWithoutItsFile\" --tests \"io.justsearch.app.services.ai.install.AnswerRemovalSettingsSaveTest.answersStartFromTheModelOnceItsFilesAreBack\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalRefreshTest.theRefreshRunsOnceTheFilesAreGoneWhileTheRemovalStillHoldsTheLockAndReportsRunning\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalRefreshTest.aRefreshThatFailsLeavesTheRemovalReportedAsItHappened\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 7717
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AnswerRemovalSettingsSaveTest.java#answersStillCannotBeSwitchedOnWithoutTheirFiles",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AnswerRemovalSettingsSaveTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:88e142c369848f40d347fa67427fee6bdc1c9155771278bd89306a88d975b89f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "answersStillCannotBeSwitchedOnWithoutTheirFiles()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AnswerRemovalSettingsSaveTest.java#pictureReadingStillCannotBeSwitchedOnWithoutItsFile",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AnswerRemovalSettingsSaveTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:88e142c369848f40d347fa67427fee6bdc1c9155771278bd89306a88d975b89f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pictureReadingStillCannotBeSwitchedOnWithoutItsFile()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AnswerRemovalSettingsSaveTest.java#answersStartFromTheModelOnceItsFilesAreBack",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AnswerRemovalSettingsSaveTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:88e142c369848f40d347fa67427fee6bdc1c9155771278bd89306a88d975b89f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "answersStartFromTheModelOnceItsFilesAreBack()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalRefreshTest.java#theRefreshRunsOnceTheFilesAreGoneWhileTheRemovalStillHoldsTheLockAndReportsRunning",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalRefreshTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c218cfccb2fe0f47df2da6ae9f541d32ee4ea16b7d8124d8570019c3460180ee",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theRefreshRunsOnceTheFilesAreGoneWhileTheRemovalStillHoldsTheLockAndReportsRunning()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalRefreshTest.java#aRefreshThatFailsLeavesTheRemovalReportedAsItHappened",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalRefreshTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c218cfccb2fe0f47df2da6ae9f541d32ee4ea16b7d8124d8570019c3460180ee",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRefreshThatFailsLeavesTheRemovalReportedAsItHappened()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:619aaba45a73c2ff062c24c2696b9f5140182521937a93ac76f8ad4739a5d28f"
+}

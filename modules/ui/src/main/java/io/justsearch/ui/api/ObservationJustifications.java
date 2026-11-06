@@ -33,6 +33,7 @@ public final class ObservationJustifications {
       Map.entry("GET /api/agent/hard-stop", "STATUS: current agent hard-stop state (HardStopController.handleGet)"),
       Map.entry("GET /api/ai/install/manifest", "CONSUMER: ui-web/src/api/domains/packs.ts via ui-web/src/shell-v0/views/BrainSurface.ts automatic Brain catalog hydration on mount"),
       Map.entry("GET /api/ai/install/plan-preview", "CONSUMER: ui-web/src/shell-v0/views/BrainSurface.ts automatic plan hydration on mount"),
+      Map.entry("GET /api/ai/install/downloaded-files", "CONSUMER: ui-web/src/shell-v0/views/BrainSurface.ts Advanced settings Downloaded files rows and removal progress"),
       Map.entry("GET /api/ai/install/status", "STATUS: AI installation progress"),
       Map.entry("GET /api/ai/models/status", "STATUS: current AI model availability (AiModelsController.handleGetStatus)"),
       Map.entry("GET /api/ai/packs/installed", "STATUS: installed AI pack inventory"),

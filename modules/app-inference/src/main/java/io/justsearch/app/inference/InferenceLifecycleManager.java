@@ -143,6 +143,14 @@ public class InferenceLifecycleManager
     generation.fenceForRecovery();
   }
 
+  /**
+   * Binds the managed answer server launch fence: every managed launch registers with it while its
+   * process starts, and is refused while the answer model's files are being removed (design D4).
+   */
+  public void setManagedLaunchFence(ManagedLaunchFence fence) {
+    serverOps.setLaunchFence(fence);
+  }
+
   /** Binds the saved policy and the live Engine backlog observation. */
   public void setAnswersPaused(BooleanSupplier paused) {
     generation.setAnswersPaused(paused);
@@ -428,6 +436,7 @@ public class InferenceLifecycleManager
       java.util.function.Function<EngineWorkHandle, Runnable> generationLifetime,
       java.util.function.Supplier<Optional<String>> pinnedCudaUuid) {
     this.childControl = Objects.requireNonNull(childControl, "childControl");
+    this.selfTests = new io.justsearch.app.inference.chat.ChildSelfTestLauncher(childControl);
     Objects.requireNonNull(generationLifetime, "generationLifetime");
     Objects.requireNonNull(pinnedCudaUuid, "pinnedCudaUuid");
     // The tracker owns the indexing-pacing lifetime (ER beginGeneration) for every GENERATE lease.
@@ -1259,12 +1268,16 @@ public class InferenceLifecycleManager
 
   /** Latches a failed start's code; an exit naming a lost device is reported as well. */
   private void latchStartFailure(ModeTransitionException failure) {
+    // A launch refused before any process started (design D4) is not a failed start.
+    if (failure instanceof ManagedLaunchRefusedException) return;
     latchChatFailure(LlamaServerExitException.failedCodeOf(failure));
     if (failure instanceof LlamaServerExitException exit) reportLlamaDeviceLoss(exit.classification());
   }
 
   /** The code a failed start reports, whatever failed: an exit, a health wait or a check. */
   private static FailedCode startFailureCode(Exception failure) {
+    // A refused launch started nothing: there is no start failure to report.
+    if (failure instanceof ManagedLaunchRefusedException) return null;
     return LlamaServerExitException.failedCodeOf(failure);
   }
 
@@ -1670,7 +1683,27 @@ public class InferenceLifecycleManager
    * child of this manager's control, stopped with {@code SELF_TEST} before the main server starts.
    */
   public io.justsearch.app.inference.chat.SelfTestLauncher selfTestLauncher() {
-    return new io.justsearch.app.inference.chat.ChildSelfTestLauncher(childControl);
+    return selfTests;
+  }
+
+  /** The one self-test launcher of this manager: it also answers whether a candidate outlived it. */
+  private final io.justsearch.app.inference.chat.ChildSelfTestLauncher selfTests;
+
+  /**
+   * Design D4: why the answer model's files may still be in use by a process this Engine started,
+   * read from the physical owners rather than from the mode: a managed llama-server that has not
+   * been seen to exit (also after a failed stop) or whose descendants are not confirmed ended, and a
+   * self-test candidate that is running or outlived its test. Empty only when all are confirmed
+   * released.
+   */
+  public Optional<String> answerFilesInUse() {
+    if (serverOps.managedProcessesMayHoldFiles()) {
+      return Optional.of("The answer model is still loaded - try again in a moment");
+    }
+    if (selfTests.candidatesMayHoldFiles()) {
+      return Optional.of("The answer model is being tested - try again when it finishes");
+    }
+    return Optional.empty();
   }
 
   /** Sends one step to the router and maps the router's verdicts onto the legacy exception. */
@@ -2430,7 +2463,9 @@ public class InferenceLifecycleManager
           context, LlamaServerOps.AdoptionPolicy.REQUIRE_MANAGED_CONFIG_WITNESS);
       if (startManaged) {
         validatePrecommitCandidate(request);
-      } else {
+      } else if (enabled) {
+        // A disabled candidate starts nothing, so its files need not exist: answers switched off
+        // with the model not downloaded is a valid target. Switching on validates it here.
         try {
           candidate.validate();
         } catch (Exception invalid) {

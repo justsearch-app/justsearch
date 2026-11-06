@@ -7,7 +7,9 @@ const { splitJvmOptions } = require('./engine-java-launch.cjs');
 const devDataFolder = require('./dev-data-folder.cjs');
 
 const FOLDER = 'isolated-models';
-const STATES = ['none', 'partial', 'truncated'];
+// 'reuse' seeds nothing: it restarts an already marked folder with its private models and saved state.
+const REUSE = 'reuse';
+const STATES = ['none', 'partial', 'truncated', REUSE];
 const CACHE_FOLDER = 'isolated-ort-cache';
 const ENGINE_CWD = path.resolve(__dirname, '../../..');
 const MARKER = '.justsearch-isolated-models.json';
@@ -20,6 +22,10 @@ const RUN_OUTPUT = new Set([
   'operations.db-wal', 'runtime', 'telemetry', 'temp', 'crashes', 'index', '.help-ingested-version',
   'jobs.db', 'jobs.db-shm', 'jobs.db-wal', 'entity-clusters.db', 'entity-clusters.db-shm', 'entity-clusters.db-wal',
 ]);
+// A marked folder holds whatever its own Engine saved, which only that Engine enumerates, so reuse
+// names what stays refused instead: file configuration and the normal models fallback.
+const REUSE_REFUSED = new Set(['config', 'models']);
+const REUSE_SAVED_STATE = [['ui', 'settings.json'], ['install-contract.v2.json']];
 // These paths are overwritten by the runner before the Engine starts. The chat profile
 // selects a registry variant, not an inherited path.
 const RUNNER_ENV = new Set([
@@ -97,7 +103,30 @@ function validateTree(root) {
   visit(root);
 }
 
-function validateOverrides(dataDir, env = process.env) {
+// Saved state may name a model path, and the Engine would follow it past the private folder.
+function refuseSharedPaths(home, protectedRoots) {
+  const visit = (value, file) => {
+    if (typeof value === 'string') {
+      if (!path.isAbsolute(value)) return;
+      let target;
+      try { target = physicalPath(value); } catch { target = path.resolve(value); }
+      const shared = protectedRoots.find(root => within(root, target));
+      if (shared) refuse(`saved state in ${file} names the shared ${shared}; use a fresh data folder`);
+    } else if (value && typeof value === 'object') {
+      for (const child of Object.values(value)) visit(child, file);
+    }
+  };
+  for (const relative of REUSE_SAVED_STATE) {
+    const file = path.join(home, ...relative);
+    let saved;
+    try { saved = JSON.parse(fs.readFileSync(file, 'utf8')); }
+    // Absent, or unreadable to the Engine too: it quarantines such a file and follows nothing in it.
+    catch (error) { if (error.code === 'ENOENT' || error instanceof SyntaxError) continue; throw error; }
+    visit(saved, file);
+  }
+}
+
+function validateOverrides(dataDir, env = process.env, state = null) {
   for (const [name, value] of Object.entries(env)) {
     if (value == null) continue;
     if (name.startsWith('JUSTSEARCH_') && !RUNNER_ENV.has(name) && !ALLOWED_ENV.has(name)) {
@@ -130,21 +159,24 @@ function validateOverrides(dataDir, env = process.env) {
     if (physicalPath(folder) !== root) refuse(`${folder} redirects outside its private folder`);
     validateTree(root);
   }
+  const reuse = state === REUSE;
+  const nothingToReuse = () => refuse(`${paths.appHome} has no marked isolated folder to reuse; start it once with --isolated-models=none`);
   const stat = fs.lstatSync(paths.appHome, { throwIfNoEntry: false });
-  if (!stat) return paths;
+  if (!stat) return reuse ? nothingToReuse() : paths;
   if (!stat.isDirectory() || stat.isSymbolicLink()) refuse(`${paths.appHome} must be a real data folder`);
   const entries = fs.readdirSync(paths.appHome);
-  if (!entries.length) return paths;
+  if (!entries.length) return reuse ? nothingToReuse() : paths;
   let marker;
   try { marker = fs.readFileSync(path.join(paths.appHome, MARKER), 'utf8'); }
   catch (error) { if (error.code !== 'ENOENT') throw error; }
   if (marker !== MARKER_CONTENT) {
     refuse(`non-empty data folder ${paths.appHome} has no marker from a previous isolated start (${MARKER}); use a fresh data folder`);
   }
-  const foreign = entries.filter(name => !RUN_OUTPUT.has(name));
+  const foreign = entries.filter(name => (reuse ? REUSE_REFUSED.has(name) : !RUN_OUTPUT.has(name)));
   if (foreign.length) {
     refuse(`marked data folder contains foreign content (${foreign.join(', ')}); use a fresh data folder`);
   }
+  if (reuse) refuseSharedPaths(home, protectedRoots);
   // Runtime output must not introduce links to inherited data either.
   validateTree(home);
   return paths;
@@ -169,8 +201,8 @@ function effectiveTargetDir(pkg, variant) {
   return `${target ? `${target}/` : ''}candidates/${suffix}`;
 }
 
-function ensureDirectory(dataDir, env = process.env) {
-  const paths = validateOverrides(dataDir, env);
+function ensureDirectory(dataDir, env = process.env, state = null) {
+  const paths = validateOverrides(dataDir, env, state);
   const claim = devDataFolder.claimDevDataFolder(paths.appHome, { tool: 'dev-runner' });
   if (!claim.ok) refuse(claim.message);
   if (!fs.existsSync(path.join(paths.appHome, MARKER))) {
@@ -182,10 +214,10 @@ function ensureDirectory(dataDir, env = process.env) {
 }
 
 function prepare({ dataDir, state, repoRoot, env = process.env }) {
-  if (!STATES.includes(state)) throw new Error(`Invalid --isolated-models: ${state} (expected none|partial|truncated)`);
-  const paths = validateOverrides(dataDir, env);
-  const models = ensureDirectory(dataDir, env);
-  if (state !== 'none') {
+  if (!STATES.includes(state)) throw new Error(`Invalid --isolated-models: ${state} (expected ${STATES.join('|')})`);
+  const paths = validateOverrides(dataDir, env, state);
+  const models = ensureDirectory(dataDir, env, state);
+  if (state !== 'none' && state !== REUSE) {
     const registry = JSON.parse(fs.readFileSync(path.join(repoRoot,
       'modules/configuration/src/main/resources/ai/model-registry.v2.json'), 'utf8'));
     for (const pkg of registry.packages) {
@@ -216,4 +248,4 @@ function printPaths(paths, write = text => process.stderr.write(text)) {
   write(`[dev-runner] Isolated AI paths: ${JSON.stringify(paths)}\n`);
 }
 
-module.exports = { FOLDER, CACHE_FOLDER, MARKER, STATES, pathsFor, validateOverrides, effectiveTargetDir, ensureDirectory, prepare, printPaths };
+module.exports = { FOLDER, CACHE_FOLDER, MARKER, STATES, REUSE, pathsFor, validateOverrides, effectiveTargetDir, ensureDirectory, prepare, printPaths };

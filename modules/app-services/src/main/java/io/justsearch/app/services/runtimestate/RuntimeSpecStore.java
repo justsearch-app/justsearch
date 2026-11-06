@@ -157,6 +157,10 @@ public final class RuntimeSpecStore {
 
   private OperationResult apply(UiSettingsStore.Snapshot snapshot, boolean enabled, OperationRecordHandle record) {
     snapshot.settings().setChatEnabled(enabled);
+    // The answers switch is an explicit choice even when it repeats the saved value; the settings
+    // owner stamps it, so an install completion consented earlier does not override it.
+    snapshot.settings().setChatPreferenceRevision(
+        Math.addExact(snapshot.witness().acceptedRevision(), 1));
     return attempts.applySettings(record, snapshot.witness(), snapshot.settings());
   }
 

@@ -47,6 +47,7 @@ import io.justsearch.app.services.worker.KnowledgeHttpApiAdapter;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
 import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.app.services.worker.WorkerFeatureCache;
+import io.justsearch.app.services.worker.WorkerHost;
 import io.justsearch.gpu.GpuCapabilitiesService;
 import io.justsearch.telemetry.Telemetry;
 import java.util.List;
@@ -317,6 +318,14 @@ public final class ServicePhase {
             in.knowledgeServer(),
             enterprisePolicy,
             chatHolds, settings);
+    // Answers consented with a missing model are switched on by the install's completion; like a
+    // public settings write that changes answers, it nudges answer-server reconciliation.
+    aiInstallHelper.setChatIntentChanged(() -> {
+      if (settingsReconciler != null) settingsReconciler.specChanged();
+    });
+    // Design D4: the settings owner, pack import and runtime activation read the install owner's
+    // removal lock from the shared settings store; bound before any of them can run.
+    in.settingsStore().bindModelFileRemovalFence(aiInstallHelper.removalFence());
     PackAllowlistService packAllowlistService = new PackAllowlistService();
     AiPackImportService aiPackImportHelper =
         new AiPackImportService(
@@ -363,6 +372,29 @@ public final class ServicePhase {
     // dependency can only run in this direction. A method reference, not a captured value: the
     // observation changes with every activation and must be read at status time.
     aiInstallHelper.setFunctionalStatusSource(runtimeActivationHelper::functionalStatusByPackage);
+    // Design D4: "Remove files" asks each runtime owner whether the part's files are in use, and
+    // the managed answer server refuses to launch while the answer model's files are removed.
+    var removalFence = aiInstallHelper.removalFence();
+    var answerRuntime = in.inferenceManager();
+    if (answerRuntime != null) {
+      answerRuntime.setManagedLaunchFence(removalFence.answerServerLaunches());
+    }
+    var recordedIngestion = in.recordedIngestion();
+    if (recordedIngestion != null) {
+      aiInstallHelper.setInstallerActivationOpen(recordedIngestion::installerActivationOpen);
+    }
+    // The answer model's usage is read from the processes the answer runtime started (a failed stop
+    // or a surviving self-test keeps it in use), never from the server's mode (repair round 2).
+    // Best match first's usage is asked of the index half's query owners at each removal (repair
+    // round 4): a retired view issued queries still hold keeps it in use, which no health
+    // observation of the current view shows. The Engine composes this phase before the index half
+    // connects, so the owner is resolved at each call: unknown only until it has really connected.
+    aiInstallHelper.setRemovalUsageProbe(io.justsearch.app.services.ai.install.ModelFileUsage.probe(
+        () -> {
+          KnowledgeServerBootstrap indexHalf = in.knowledgeServerBootstrapSupplier().get();
+          return indexHalf == null ? WorkerHost.RerankerUse.UNKNOWN : indexHalf.rerankerUse();
+        },
+        answerRuntime, chatHolds));
 
 
     // DiagnosticsService: SPI suppliers read from the late-bindings holder.

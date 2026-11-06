@@ -157,8 +157,74 @@ public interface AiInstallService {
     return startInstall(acceptTerms, enableRerankerOnCompletion);
   }
 
-  /** Request cancellation of an in-flight install. */
-  void cancel();
+  /**
+   * Starts an accepted install that also downloads {@code includePackages}, parts the user had
+   * chosen not to download ("Download again"). {@code planDigest} is the {@link
+   * InstallPlanPreview#planDigest} of the plan the consent showed: the start refuses ("The download
+   * changed - review it again") unless the plan is still exactly that one, read against the same
+   * settings witness. Only then are the saved declines withdrawn, against that witness, and the
+   * download planned with exactly those declines; a closed or cancelled consent changes nothing.
+   */
+  default Attempt startInstall(boolean acceptTerms, boolean enableRerankerOnCompletion,
+      boolean enablePictureReadingOnCompletion, Set<String> includePackages, String planDigest) {
+    if (includePackages != null && !includePackages.isEmpty()) {
+      throw new UnsupportedOperationException("Download again is unavailable");
+    }
+    return startInstall(acceptTerms, enableRerankerOnCompletion, enablePictureReadingOnCompletion);
+  }
+
+  /**
+   * Also carries the consented answers enable: answers are switched on when the download completes
+   * with the answer model's files present, unless a newer answers choice was saved meanwhile.
+   */
+  default Attempt startInstall(boolean acceptTerms, boolean enableRerankerOnCompletion,
+      boolean enablePictureReadingOnCompletion, boolean enableChatOnCompletion,
+      Set<String> includePackages, String planDigest) {
+    if (enableChatOnCompletion) {
+      throw new UnsupportedOperationException("Answers install intent unavailable");
+    }
+    return startInstall(acceptTerms, enableRerankerOnCompletion, enablePictureReadingOnCompletion,
+        includePackages, planDigest);
+  }
+
+  /**
+   * The download plan as it would be with {@code includePackages} downloaded again, without
+   * changing any saved choice (the consent preview for "Download again").
+   */
+  default InstallPlanPreview previewInstallPlan(Set<String> includePackages) {
+    if (includePackages != null && !includePackages.isEmpty()) {
+      throw new UnsupportedOperationException("Download again is unavailable");
+    }
+    return previewInstallPlan();
+  }
+
+  /** Advanced settings - Downloaded files: measured sizes and whether each part can be removed. */
+  default DownloadedFiles downloadedFiles() {
+    throw new UnsupportedOperationException("Downloaded files are unavailable");
+  }
+
+  /** A started removal: its first report and its final report after the owner finished. */
+  record RemovalAttempt(DownloadedFiles.Removal started,
+      java.util.concurrent.CompletionStage<DownloadedFiles.Removal> completion) {}
+
+  /**
+   * Removes the downloaded files of one part when nothing uses them. Takes a part id, never a
+   * path; {@code previewDigest} names the list the confirmation showed.
+   *
+   * @throws AiInstallException with the plain reason when it refuses; nothing is deleted then
+   */
+  default RemovalAttempt removeFiles(String packageId, String previewDigest) {
+    throw new UnsupportedOperationException("Removing files is unavailable");
+  }
+
+  /** Refuses ({@link IllegalStateException}) while a part's files are being removed. */
+  default void refuseWhileRemovingFiles() {}
+
+  /**
+   * Request cancellation of an in-flight install. False when the install's completion has already
+   * been admitted (its settings change is committing or committed): nothing is cancelled then.
+   */
+  boolean cancel();
 
   /**
    * Repair an installed AI runtime. <b>Repair is start</b>: this re-derives the whole install plan

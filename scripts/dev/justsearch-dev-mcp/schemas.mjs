@@ -91,9 +91,10 @@ export const StartInputSchema = z
     apiPort: z.number().int().min(0).optional(),
     uiPort: z.number().int().positive().optional(),
     dataDir: z.string().min(1).optional(),
-    isolatedModels: z.enum(['none', 'partial', 'truncated']).optional()
+    isolatedModels: z.enum(['none', 'partial', 'truncated', 'reuse']).optional()
       .describe('Use <dataDir>/isolated-models instead of shared models. none creates an empty folder; '
-        + 'partial seeds tiny .partial files; truncated seeds tiny incomplete final files from the registry. '
+        + 'partial seeds tiny .partial files; truncated seeds tiny incomplete final files from the registry; '
+        + 'reuse restarts an already marked folder, keeping its private models and saved state, and never cleans it. '
         + 'No downloads or fake installed state. Paths print before launch. Requires a fresh folder without inherited config, '
         + 'or marked isolated-start output from this runner. Inherited JUSTSEARCH_* variables are denied by default '
         + 'except runner-owned values and JUSTSEARCH_SERVER_EXE (inference executable), JUSTSEARCH_GPU_ENABLED (GPU execution), '

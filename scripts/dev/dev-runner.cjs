@@ -222,7 +222,7 @@ function parseArgs(argv) {
       case '--isolated-models':
         out.isolatedModels = inline ?? (args[i + 1] && !args[i + 1].startsWith('--') ? takeValue() : 'none');
         if (!isolatedModels.STATES.includes(out.isolatedModels)) {
-          throw new Error(`Invalid --isolated-models: ${out.isolatedModels} (expected none|partial|truncated)`);
+          throw new Error(`Invalid --isolated-models: ${out.isolatedModels} (expected ${isolatedModels.STATES.join('|')})`);
         }
         break;
       case '--clean':
@@ -293,6 +293,10 @@ function parseArgs(argv) {
     throw new Error(`Invalid --clean: ${out.clean} (expected soft|hard|none)`);
   }
   if (out.isolatedModels != null && out.cmd !== 'start') throw new Error('--isolated-models is only valid for start');
+  if (out.isolatedModels === isolatedModels.REUSE) {
+    if (out.clean === 'hard') throw new Error('--isolated-models=reuse keeps saved state; --clean hard would delete it');
+    out.clean = 'none'; // The default soft clean deletes install records too.
+  }
   if (out.forgetUnresolved && out.cmd !== 'stop') {
     throw new Error('--forget-unresolved is only valid for stop; it leaves processes running and a person decides. It does not clean data.');
   }
@@ -315,7 +319,7 @@ function printUsage() {
       '          [--chat-profile compact|standard]  (backend JUSTSEARCH_CHAT_PROFILE; dev default compact)',
       '          [--prompt-cache-mib <MiB>]  (chat host cache; default 1024, eval and VDU always 0)',
       '          [--dist-from <root>]  (record-only: the checkout the MCP caller asked to launch from)',
-      '          [--isolated-models[=none|partial|truncated]]  (private models under data-dir; no downloads)',
+      '          [--isolated-models[=none|partial|truncated|reuse]]  (private models under data-dir; no downloads)',
       '  status  [--run <runId>|--active] [--json]',
       '  stop    [--run <runId>|--active] [--force] [--json]',
       '  stop    [--run <runId>|--active] --forget-unresolved [--json] (leaves processes running; a person decides)',
@@ -327,6 +331,7 @@ function printUsage() {
       '  - start is a long-running supervisor (foreground). Use Ctrl+C or run stop/cleanup to tear down the stack.',
       '  - Isolated models and ONNX cache stay under data-dir; paths print before launch. Use a fresh folder without inherited config.',
       "    Restarts require this runner's isolation marker and only isolated-start output; inherited settings are refused.",
+      '    --isolated-models=reuse restarts a marked folder keeping its private models and saved state, and never cleans it.',
       '    Inherited JUSTSEARCH_* variables are denied by default, including JUSTSEARCH_CONFIG and JUSTSEARCH_REPO_ROOT.',
       '    Allowlist: JUSTSEARCH_SERVER_EXE (inference executable), JUSTSEARCH_GPU_ENABLED (GPU execution),',
       '    JUSTSEARCH_GH_BIN (developer GitHub CLI), JUSTSEARCH_DEV_MCP_REPO_ROOT (MCP runner location),',
@@ -2527,7 +2532,7 @@ async function cmdStartHeavy(opts, releaseHeavy) {
   // before anything is stopped, started or changed.
   if (opts.isolatedModels != null) {
     isolatedModels.printPaths(isolatedModels.pathsFor(dataDir));
-    isolatedModels.validateOverrides(dataDir);
+    isolatedModels.validateOverrides(dataDir, process.env, opts.isolatedModels);
   }
   assertCleanableDataDir(dataDir, opts.clean);
   const runDir = path.join(runsRoot, runId);
@@ -2720,7 +2725,7 @@ async function runAdmittedStart(opts, ctx) {
   const frontendStderr = fs.createWriteStream(frontendStderrPath, { flags: 'a' });
 
   // The clean gate is the admission above: a non-owner reaches this line only by taking over.
-  if (opts.isolatedModels != null) isolatedModels.ensureDirectory(dataDir);
+  if (opts.isolatedModels != null) isolatedModels.ensureDirectory(dataDir, process.env, opts.isolatedModels);
   await cleanOwnDataDir(dataDir, opts.clean, opts.isolatedModels == null ? []
     : [isolatedModels.FOLDER, isolatedModels.CACHE_FOLDER, isolatedModels.MARKER]);
 
@@ -2891,7 +2896,7 @@ async function runAdmittedStart(opts, ctx) {
   // with the SAME log streams, the same run id and the same lease — 7.6's dev-runner sentence — so
   // what survives the child is everything except the child.
   const spawnEngineChild = (apiPortForThisIncarnation, incarnationEnv = {}, n = 1, startup = {}) => {
-    if (opts.isolatedModels != null) isolatedModels.ensureDirectory(dataDir);
+    if (opts.isolatedModels != null) isolatedModels.ensureDirectory(dataDir, process.env, opts.isolatedModels);
     const executable = harnessActive && Number(process.env.JUSTSEARCH_SUPERVISOR_HARNESS_FAIL_SPAWN_AT) === n
       ? path.join(dataDir, 'missing-java') : spawnBackend.command;
     if (path.isAbsolute(executable) && !fs.existsSync(executable)) {

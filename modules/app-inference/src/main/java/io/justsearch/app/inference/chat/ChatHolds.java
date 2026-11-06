@@ -110,6 +110,9 @@ public interface ChatHolds {
   /** Registers a listener; closing the result removes it. */
   AutoCloseable addListener(Listener listener);
 
+  /** The holds and self-test sessions open now, oldest first (removal eligibility, design D4). */
+  java.util.List<OpenHold> openHolds();
+
   /**
    * Registers {@code listener} for actions that give automatic picture reading a fresh start: a
    * committed settings apply and a person switching chat off or on. It receives a short event name,

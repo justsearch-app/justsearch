@@ -346,6 +346,19 @@ public record InferenceSurface(
         && failedAssemblies.values().stream().allMatch(InferenceSurface::tokenizerClosed);
   }
 
+  /**
+   * Design D4 (Remove files): whether this surface still holds Best match first's files: its
+   * reranker assembly (or a partial one kept after a failed build) is not closed, or its reranker
+   * session handle has not retired.
+   */
+  public boolean holdsReranker() {
+    if (reranker.isPresent() && !reranker.get().tokenizerClosed()) return true;
+    AutoCloseable failed = failedAssemblies.get(EncoderRole.RERANKER);
+    if (failed != null && !tokenizerClosed(failed)) return true;
+    SessionHandle handle = handleRoles.get(EncoderRole.RERANKER);
+    return handle != null && handle.retirementStatus() != SessionHandle.RetirementStatus.RETIRED;
+  }
+
   private static boolean tokenizerClosed(AutoCloseable owner) {
     if (owner instanceof io.justsearch.indexerworker.tokenizer.AssemblyBuildFailure failure) return failure.tokenizerClosed();
     if (owner instanceof io.justsearch.reranker.AssemblyBuildFailure failure) return failure.tokenizerClosed();

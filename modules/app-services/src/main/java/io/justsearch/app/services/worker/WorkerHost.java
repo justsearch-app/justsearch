@@ -28,6 +28,21 @@ public interface WorkerHost extends Closeable {
 
   default boolean heavyIndexing() { return false; }
 
+  /** What the index half's query owners say about Best match first's files (design D4). */
+  enum RerankerUse {
+    /** No query owner holds a Best match first session. */
+    FREE,
+    /** A current, retired-but-unreleased or preparing query owner holds one. */
+    HELD,
+    /** A model composition or swap is running: nothing can be confirmed now. */
+    BUSY,
+    /** The index half is not running or cannot be asked. */
+    UNKNOWN
+  }
+
+  /** Asked of the query owners at the call, never of a health observation. */
+  default RerankerUse rerankerUse() { return RerankerUse.UNKNOWN; }
+
   /** Exact physical serving view retained by an operation after publication capture. */
   interface ServingLease extends AutoCloseable {
     <T> T withClient(KnowledgeClient client,

@@ -875,6 +875,17 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
   }
 
   @Override
+  public OperationResult applySettingsAdmitted(OperationRecordHandle handle,
+      SettingsWitness expected, io.justsearch.app.api.UiSettings candidate,
+      io.justsearch.app.api.settings.SettingsCandidateContext candidateContext,
+      java.util.function.BooleanSupplier commitAdmission) {
+    Objects.requireNonNull(expected, "expected settings witness");
+    return applySettingsOwned(handle, expected, candidate, false, null,
+        Objects.requireNonNull(candidateContext, "candidateContext"),
+        Objects.requireNonNull(commitAdmission, "commitAdmission"));
+  }
+
+  @Override
   public OperationResult applySettingsReset(OperationRecordHandle handle) {
     return applySettingsOwned(handle, null, null, true, null,
         io.justsearch.app.api.settings.SettingsCandidateContext.NONE);
@@ -884,6 +895,14 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
       io.justsearch.app.api.UiSettings candidate, boolean reset,
       io.justsearch.app.api.EngineWorkHandle work,
       io.justsearch.app.api.settings.SettingsCandidateContext candidateContext) {
+    return applySettingsOwned(handle, expected, candidate, reset, work, candidateContext, null);
+  }
+
+  private OperationResult applySettingsOwned(OperationRecordHandle handle, SettingsWitness expected,
+      io.justsearch.app.api.UiSettings candidate, boolean reset,
+      io.justsearch.app.api.EngineWorkHandle work,
+      io.justsearch.app.api.settings.SettingsCandidateContext candidateContext,
+      java.util.function.BooleanSupplier commitAdmission) {
     if (settingsOwner == null) throw new IllegalStateException("Settings owner is not composed");
     if (!(handle instanceof OperationAttemptRunnerImpl.Control control)
         || active.get(control.id) != control || control.bodyThread != Thread.currentThread()
@@ -900,6 +919,7 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
     if (!control.settingsStarted.compareAndSet(false, true)) {
       throw new IllegalStateException("Settings commitment already attempted");
     }
+    synchronized (control) { control.settingsAdmission = commitAdmission; }
     io.justsearch.app.api.EngineWorkHandle.Registration cancellation = work == null ? null
         : work.onCancel(ignored -> {
           synchronized (control) { control.settingsCancellationRequested = true; }
@@ -1188,6 +1208,7 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
     private volatile SettingsCommitOwner.Receipt settingsReceipt;
     private SettingsCommitOwner.Receipt admittedSettingsReceipt;
     private boolean settingsCancellationRequested;
+    private java.util.function.BooleanSupplier settingsAdmission;
     private volatile boolean settingsUncertain;
     private volatile RuntimeException settingsFailure;
     private long settingsExpected;
@@ -1202,6 +1223,9 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
             throw new IllegalStateException("Settings owner supplied a contradictory receipt");
           }
           if (settingsCancellationRequested) return false;
+          // The caller's boundary is decided under this same lock, at the same instant: once it
+          // admits, its own cancellation can no longer win, and once it refuses nothing commits.
+          if (settingsAdmission != null && !settingsAdmission.getAsBoolean()) return false;
           admittedSettingsReceipt = receipt;
           return true;
         }
