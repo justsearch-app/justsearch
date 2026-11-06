@@ -1567,8 +1567,8 @@ def test_real_use_joins_the_default_and_full_checks_once_no_kind_awaits_labels(m
     assert run.default_collections(True) == run.FULL_COLLECTIONS
     labelled = replace(real, pending_kinds=())
     monkeypatch.setattr(run.collections, "load_config", lambda alias: labelled)
-    assert run.default_collections() == run.DEFAULT_COLLECTIONS + ("real-use",)
-    assert run.default_collections(True) == run.FULL_COLLECTIONS + ("real-use",)
+    assert run.default_collections() == ("scifact", "miracl-de", "real-use", "enron-email")
+    assert run.default_collections(True) == ("scifact", "miracl-de", "miracl-fr", "real-use", "enron-email")
 
 
 def test_the_check_without_collections_uses_the_default_list(monkeypatch, tmp_path):
