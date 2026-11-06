@@ -78,6 +78,7 @@ export async function exerciseHostileLocks(c) {
       code: acceptanceConnectionLost.cause?.code ?? acceptanceConnectionLost.code }));
   }
   const expectedPaths = new Set(paths.map(file => path.resolve(file).toLowerCase()));
+  let lastState = null;
   const result = await waitFor('the original operation completes and all 100 documents become searchable',
     Math.max(1, deadline - Date.now()), async () => {
     await releaseAfterCountedExit();
@@ -87,6 +88,16 @@ export async function exerciseHostileLocks(c) {
     let response;
     try {
       outcomeResponse = await request(binding.port, `/api/operation-history/${operationKey}`);
+      if (outcomeResponse.status !== 200) return null;
+      const observed = JSON.parse(outcomeResponse.text);
+      requireThat(!['unknown', 'expired', 'failed'].includes(observed.state),
+        `the original hostile-lock operation must remain recoverable: ${outcomeResponse.text}`);
+      if (observed.state !== lastState) {
+        lastState = observed.state;
+        console.log('LOCK_SURVIVAL_STATE', outcomeResponse.text);
+      }
+      // A search is foreground work that pauses indexing: polling with one starves the import it waits for.
+      if (observed.state !== 'complete') return null;
       response = await post(binding.port, '/api/knowledge/search', {
         query: `${name.replaceAll('-', ' ')} probe`, limit: paths.length, mode: 'text',
       });
@@ -94,15 +105,12 @@ export async function exerciseHostileLocks(c) {
       if (lostConnection(error) || ['AbortError', 'TimeoutError'].includes(error.name)) return null;
       throw error;
     }
-    if (outcomeResponse.status !== 200) return null;
     const outcome = JSON.parse(outcomeResponse.text);
-    requireThat(!['unknown', 'expired', 'failed'].includes(outcome.state),
-      `the original hostile-lock operation must remain recoverable: ${outcomeResponse.text}`);
     if (response.status !== 200) return null;
     const matched = new Set((JSON.parse(response.text).results ?? [])
       .map(candidate => String(candidate.fields?.path ?? '').toLowerCase())
       .filter(file => expectedPaths.has(file)));
-    if (outcome.state !== 'complete' || matched.size !== expectedPaths.size) return null;
+    if (matched.size !== expectedPaths.size) return null;
     requireThat(outcome.result?.code === 'SUCCESS' && outcome.unitsFailed === 0,
       `the complete corpus must have a successful durable outcome: ${outcomeResponse.text}`);
     return { port: binding.port, incarnation: binding.incarnation, matchedCount: matched.size, outcome };
