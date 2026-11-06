@@ -23,6 +23,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.CleanupMode;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mockito;
 import tools.jackson.databind.ObjectMapper;
@@ -36,7 +37,8 @@ import tools.jackson.databind.ObjectMapper;
 final class LlamaServerLaunchFenceTest {
   private static final String REMOVING = "Removing files - try again when it finishes";
 
-  @TempDir Path tmp;
+  // Windows can still hold the fake server's folder just after it exits; never fail on its cleanup.
+  @TempDir(cleanup = CleanupMode.NEVER) Path tmp;
   private LlamaServerOps ops;
 
   @AfterEach
