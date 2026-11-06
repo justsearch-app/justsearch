@@ -167,8 +167,9 @@ describe('Search\u2019s details pane', () => {
     expect(close!.x + close!.width).toBeLessThanOrEqual(1280);
     const tabs = await page.locator('[role="tablist"]').first().boundingBox();
     expect(tabs!.x + tabs!.width).toBeLessThanOrEqual(close!.x);
-    const clipped = await page.locator('[role="tab"][aria-selected="true"] .label').evaluate(label => label.scrollWidth > label.clientWidth);
-    expect(clipped, 'a long name is cut inside its tab').toBe(true);
+    expect(await page.locator('[data-testid="details-source-name"]').count()).toBe(1);
+    const clipped = await page.locator('[data-testid="details-source-name"]').evaluate(name => name.scrollWidth > name.clientWidth);
+    expect(clipped, 'a long name is cut inside the header, not the tab strip').toBe(true);
   }, 60_000);
 
   it.each(['', '?wideFont'])('is a sheet at 900x800 %s, opened with the keyboard in it, and Escape returns it to the opener', async query => {

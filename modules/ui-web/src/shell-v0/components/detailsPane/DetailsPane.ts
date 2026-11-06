@@ -25,7 +25,10 @@ export const DETAILS_CLOSE = 'details-close';
 export interface DetailsTab {
   readonly id: string;
   readonly label: string;
-  /** The source number the answer uses for this tab, when it has one. */
+  /**
+   * The source number the answer uses for this tab, when it has one. A numbered tab shows only the
+   * number; its name is the tooltip, the accessible name and, while selected, the pane's header.
+   */
   readonly number?: string;
   /** The untruncated name, for the tooltip. */
   readonly title?: string;
@@ -50,6 +53,8 @@ export class DetailsPane extends JfElement {
 
   private shownStrip = '';
   private stripObserver: ResizeObserver | null = null;
+  /** The keyboard was on the strip when the selection moved, so it moves with it. */
+  private keyboardFollows = false;
 
   constructor() {
     super();
@@ -67,11 +72,11 @@ export class DetailsPane extends JfElement {
     this.setAttribute('data-details-pane', '');
     if (typeof ResizeObserver === 'undefined') return;
     // A narrower pane must not leave the selected tab behind the strip's edge.
-    this.stripObserver = new ResizeObserver(() => this.revealActiveTab());
-    void this.updateComplete.then(() => {
-      const strip = this.renderRoot.querySelector('.tabs');
-      if (strip !== null) this.stripObserver?.observe(strip);
+    this.stripObserver = new ResizeObserver(() => {
+      this.revealActiveTab();
+      this.syncStripEdges();
     });
+    void this.updateComplete.then(() => this.observeStrip());
   }
 
   override disconnectedCallback(): void {
@@ -80,18 +85,55 @@ export class DetailsPane extends JfElement {
     this.stripObserver = null;
   }
 
+  override willUpdate(changed: Map<string, unknown>): void {
+    // Asked before the render: the tab the selection leaves may not survive it.
+    if (changed.has('activeTab')) this.keyboardFollows = this.shadowRoot?.activeElement?.getAttribute('role') === 'tab';
+  }
+
   override updated(): void {
+    if (this.keyboardFollows) {
+      this.keyboardFollows = false;
+      this.focusActiveTab();
+    }
     // The window rebuilds the list on every render; only a real change may move the reader's scroll.
     const strip = `${this.activeTab}\n${this.tabs.map((tab) => tab.id).join('\n')}`;
     if (strip !== this.shownStrip) {
       this.shownStrip = strip;
+      this.observeStrip();
       this.revealActiveTab();
+      this.syncStripEdges();
     }
+  }
+
+  /** The tabs as well as the strip: a font arriving changes what fits without resizing the strip. */
+  private observeStrip(): void {
+    this.stripObserver?.disconnect();
+    this.renderRoot.querySelectorAll('.tabs, [role="tab"]').forEach((element) => this.stripObserver?.observe(element));
   }
 
   private revealActiveTab(): void {
     this.renderRoot.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
   }
+
+  /** Mark the ends the strip can still scroll towards, for the edge affordances. */
+  private readonly syncStripEdges = (): void => {
+    const strip = this.renderRoot.querySelector<HTMLElement>('.tabs');
+    if (strip === null) return;
+    strip.parentElement?.toggleAttribute('data-more-before', strip.scrollLeft > 1);
+    strip.parentElement?.toggleAttribute('data-more-after', strip.scrollLeft + strip.clientWidth < strip.scrollWidth - 1);
+  };
+
+  /** A wheel turned over a full strip moves the strip; `passive: false` so the page stays where it is. */
+  private readonly onStripWheel = {
+    passive: false,
+    handleEvent: (event: WheelEvent): void => {
+      const strip = event.currentTarget as HTMLElement;
+      if (Math.abs(event.deltaX) >= Math.abs(event.deltaY)) return;
+      const from = strip.scrollLeft;
+      strip.scrollLeft += event.deltaY;
+      if (strip.scrollLeft !== from) event.preventDefault();
+    },
+  };
 
   /** Put the keyboard on the active tab; the window calls this when the reader opened the pane. */
   focusActiveTab(): void {
@@ -118,7 +160,6 @@ export class DetailsPane extends JfElement {
     if (next < 0 || count === 0) return;
     event.preventDefault();
     this.select(this.tabs[next]!.id);
-    void this.updateComplete.then(() => this.focusActiveTab());
   };
 
   private readonly onActionsSlot = (event: Event): void => {
@@ -126,6 +167,7 @@ export class DetailsPane extends JfElement {
   };
 
   override render(): TemplateResult {
+    const shown = this.tabs.find((tab) => tab.id === this.activeTab);
     return html`
       ${this.overlay
         ? html`<button type="button" class="backdrop" data-testid="details-pane-backdrop"
@@ -133,24 +175,36 @@ export class DetailsPane extends JfElement {
         : nothing}
       <aside class="surface" data-testid="details-pane" aria-label=${this.regionLabel}>
         <div class="bar">
-          <div class="tabs" role="tablist" aria-label=${this.regionLabel} @keydown=${this.onTabKeydown}>
-            ${repeat(this.tabs, (tab) => tab.id, (tab) => {
-              const active = tab.id === this.activeTab;
-              return html`<button type="button" role="tab" class="tab" data-tab=${tab.id}
-                id=${`details-tab-${tab.id}`}
-                aria-selected=${active ? 'true' : 'false'}
-                aria-controls="details-panel"
-                tabindex=${active ? 0 : -1}
-                title=${tab.title ?? tab.label}
-                @click=${() => this.select(tab.id)}>
-                ${tab.number !== undefined ? html`<span class="number">${tab.number}</span>` : nothing}
-                <span class="label">${tab.label}</span>
-              </button>`;
-            })}
+          <div class="strip">
+            <div class="tabs" role="tablist" aria-label=${this.regionLabel} @keydown=${this.onTabKeydown}
+              @wheel=${this.onStripWheel} @scroll=${this.syncStripEdges}>
+              ${repeat(this.tabs, (tab) => tab.id, (tab) => {
+                const active = tab.id === this.activeTab;
+                const name = tab.title ?? tab.label;
+                return html`<button type="button" role="tab" class=${tab.number === undefined ? 'tab' : 'tab numbered'}
+                  data-tab=${tab.id}
+                  id=${`details-tab-${tab.id}`}
+                  aria-label=${tab.number === undefined ? nothing : `${tab.number} ${name}`}
+                  aria-selected=${active ? 'true' : 'false'}
+                  aria-controls="details-panel"
+                  tabindex=${active ? 0 : -1}
+                  title=${name}
+                  @click=${() => this.select(tab.id)}>
+                  ${tab.number === undefined
+                    ? html`<span class="label">${tab.label}</span>`
+                    : html`<span class="number">${tab.number}</span>`}
+                </button>`;
+              })}
+            </div>
+            <span class="edge before" data-testid="details-tabs-more-before" aria-hidden="true">${icon({ name: 'chevron-left', size: 14 })}</span>
+            <span class="edge after" data-testid="details-tabs-more-after" aria-hidden="true">${icon({ name: 'chevron-right', size: 14 })}</span>
           </div>
           <jf-button class="close" variant="ghost" size="icon" label=${this.closeLabel}
             data-testid="details-pane-close" .onActivate=${this.close}>${icon({ name: 'x', size: 16 })}</jf-button>
         </div>
+        ${shown?.number === undefined
+          ? nothing
+          : html`<p class="source-name" data-testid="details-source-name" title=${shown.title ?? shown.label}>${shown.label}</p>`}
         <div class="panel" id="details-panel" role="tabpanel" aria-labelledby=${`details-tab-${this.activeTab}`}>
           <slot></slot>
         </div>
@@ -185,14 +239,43 @@ export class DetailsPane extends JfElement {
       padding-inline: var(--jf-space-2);
       border-block-end: var(--frame-hairline) solid var(--border-subtle);
     }
+    .strip {
+      position: relative;
+      flex: 1 1 auto;
+      min-inline-size: 0;
+      display: flex;
+    }
+    /* The tabs' own padding spaces them. The edge affordances say the strip scrolls, so it needs no
+       bar of its own, and a tab revealed at an end clears them. */
     .tabs {
       flex: 1 1 auto;
       min-inline-size: 0;
       display: flex;
-      gap: var(--jf-space-1);
       overflow-x: auto;
-      scrollbar-width: thin;
+      scrollbar-width: none;
+      scroll-padding-inline: var(--jf-space-6);
     }
+    .edge {
+      display: none;
+      position: absolute;
+      inset-block: 0;
+      inline-size: var(--jf-space-6);
+      align-items: center;
+      color: var(--text-primary);
+      pointer-events: none;
+    }
+    .edge.before {
+      inset-inline-start: 0;
+      justify-content: flex-start;
+      background: linear-gradient(to right, var(--surface-1) 60%, transparent);
+    }
+    .edge.after {
+      inset-inline-end: 0;
+      justify-content: flex-end;
+      background: linear-gradient(to left, var(--surface-1) 60%, transparent);
+    }
+    .strip[data-more-before] .edge.before,
+    .strip[data-more-after] .edge.after { display: flex; }
     /* Tabs keep their size and the strip scrolls: a label is never squeezed to fit its neighbours. */
     .tab {
       flex: none;
@@ -210,6 +293,7 @@ export class DetailsPane extends JfElement {
       white-space: nowrap;
       cursor: pointer;
     }
+    .tab.numbered { padding-inline: var(--jf-space-1); }
     .tab:hover { color: var(--text-primary); }
     .tab[aria-selected='true'] {
       color: var(--text-primary);
@@ -222,7 +306,7 @@ export class DetailsPane extends JfElement {
     .label { overflow: hidden; text-overflow: ellipsis; }
     .number {
       flex: none;
-      min-inline-size: 1.25em;
+      min-inline-size: var(--jf-space-4);
       padding-inline: var(--jf-space-1);
       box-sizing: border-box;
       border-radius: var(--frame-control-radius);
@@ -235,6 +319,17 @@ export class DetailsPane extends JfElement {
     }
     .tab[aria-selected='true'] .number { background: var(--accent-tint); color: var(--surface-1); }
     .close { flex: none; align-self: center; }
+    .source-name {
+      flex: none;
+      margin: 0;
+      padding: var(--jf-space-2) var(--jf-space-4);
+      border-block-end: var(--frame-hairline) solid var(--border-subtle);
+      font-size: var(--font-size-sm);
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
     .panel {
       flex: 1 1 auto;
       min-block-size: 0;
@@ -279,6 +374,7 @@ export class DetailsPane extends JfElement {
     @media (forced-colors: active) {
       .tab[aria-selected='true'] { border-block-end-color: Highlight; color: Highlight; }
       .number { border: var(--frame-hairline) solid CanvasText; }
+      .edge.before, .edge.after { background: Canvas; color: CanvasText; }
       .tab[aria-selected='true'] .number { background: Highlight; color: HighlightText; }
       :host([overlay]) .surface { border-inline-start-color: CanvasText; }
     }

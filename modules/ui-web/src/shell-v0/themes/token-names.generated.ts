@@ -230,6 +230,7 @@ export type TokenName =
   | '--text-danger'
   | '--text-ghost'
   | '--text-highlight'
+  | '--text-highlight-weak'
   | '--text-info'
   | '--text-link'
   | '--text-muted'
@@ -477,6 +478,7 @@ export const TOKEN_NAMES: readonly TokenName[] = [
   '--text-danger',
   '--text-ghost',
   '--text-highlight',
+  '--text-highlight-weak',
   '--text-info',
   '--text-link',
   '--text-muted',

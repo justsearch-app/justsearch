@@ -1237,7 +1237,8 @@ describe('DP1 the details pane shows tabs per cited source plus Context', () => 
     await askTwoSources(el);
     await openFirstCitation(el);
     const frame = await frameOf(el);
-    expect(tabLabels(frame)).toEqual(['1 note-0.md', '2 heating.md', 'Context']);
+    expect(tabLabels(frame)).toEqual(['1', '2', 'Context']);
+    expect(tabButtons(frame)[1]!.getAttribute('aria-label')).toContain('heating.md');
     expect(tabButtons(frame)[0]!.getAttribute('aria-selected')).toBe('true');
   });
 
@@ -1274,7 +1275,7 @@ describe('DP1 the details pane shows tabs per cited source plus Context', () => 
     el.paneSource = null;
     el.paneTab = 'document';
     await settle(el);
-    expect(tabLabels(await frameOf(el))[0]).toContain('note-0.md');
+    expect(tabButtons(await frameOf(el))[0]!.getAttribute('aria-label')).toContain('note-0.md');
   });
 });
 
@@ -1522,7 +1523,7 @@ describe('DP4 plugin inspector tabs are details-pane tabs', () => {
       const el = await mount();
       await askGrounded(el);
       await openFirstCitation(el);
-      expect(tabLabels(await frameOf(el))).toEqual(['1 note-0.md', 'Context', 'Notes']);
+      expect(tabLabels(await frameOf(el))).toEqual(['1', 'Context', 'Notes']);
       await chooseTab(el, 'plugin:vendor.notes');
       const pane = await region(el, 'jf-sv3-pane');
       const tab = pane.shadowRoot!.querySelector('jf-details-plugin-tab') as unknown as HTMLElement & { updateComplete: Promise<unknown> };

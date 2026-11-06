@@ -252,13 +252,13 @@ export class Sv3DetailsDomain {
       this.conversation = id;
       this.restorePending = id !== null;
       this.excludedSeen = undefined;
-      setExcludedSources([]);
+      setExcludedSources([], id);
     }
     if (id === null) return;
     const excluded = sessionById(sessions, id)?.history?.excludedSourceIds;
     if (excluded !== undefined && excluded !== this.excludedSeen) {
       this.excludedSeen = excluded;
-      setExcludedSources(excluded);
+      setExcludedSources(excluded, id);
     }
     if (!this.restorePending) return;
     const memory = getDetailsMemory(id);

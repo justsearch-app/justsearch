@@ -986,6 +986,7 @@ export class DocumentPane extends JfElement {
     }
     .blocks .block.hl-weak {
       background: var(--accent-tint-08);
+      color: var(--text-highlight-weak);
       border-left: 2px solid var(--accent-tint-30);
       padding-left: 0.5rem;
       margin-left: -0.5rem;
@@ -1014,6 +1015,7 @@ export class DocumentPane extends JfElement {
     }
     pre.source span.hl-weak {
       background: var(--accent-tint-08);
+      color: var(--text-highlight-weak);
       border-left: 2px solid var(--accent-tint-30);
     }
     pre.source span.hl-strong {

@@ -26,8 +26,18 @@ if (params.has('wideFont')) {
 }
 const json = (body) => new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
 const hit = (i) => ({ id: 'doc-' + i, score: 1 - i / 10, fields: { title: 'Result ' + i, filename: 'result-' + i + '.md', path: 'C:/Docs/result-' + i + '.md', content_preview: 'A passage about heating ' + i, collection: 'docs', mime: 'text/markdown', mime_base: 'text', file_kind: 'markdown', language: 'en', modified_at: '2025-06-15T10:30:00Z', size_bytes: '100' }, matchedFields: ['title'], matchSpans: [], excerptRegions: [] });
-window.fetch = async (input) => {
+const hiddenBy = {};
+window.fetch = async (input, init) => {
   const url = String(input?.url ?? input);
+  const excluding = url.match(/conversations\\/([^/]+)\\/sources\\/exclude/);
+  if (excluding) {
+    const { sourceId } = JSON.parse(init.body);
+    await new Promise(resolve => { window.releaseExclude = resolve; });
+    (hiddenBy[excluding[1]] ??= []).push(sourceId);
+    return json({});
+  }
+  const history = url.match(/conversations\\/([^/]+)\\/history/);
+  if (history) return json({ messages: [], excludedSourceIds: hiddenBy[history[1]] ?? [] });
   if (url.includes('/api/preview')) return json({ content: 'Some document text. '.repeat(400), totalChars: 8000 });
   if (url.includes('/api/knowledge/search')) return json({ totalHits: 4, matchCount: 4, tookMs: 4, results: [0, 1, 2, 3].map(hit), nextCursor: null, facets: {}, facetsTruncated: false });
   if (url.includes('/api/indexing-roots/substrate')) return json({ items: [root('a'), root('b')], count: 2 });
@@ -63,9 +73,9 @@ window.split = async (left, right) => {
   await el.updateComplete;
 };
 const source = (i) => ({ parentDocId: 'C:/Docs/Source ' + i + ' with a name too long for one details tab.md', chunkIndex: i, excerpt: 'excerpt ' + i, startLine: i * 10, endLine: i * 10 + 2, headingText: '', startChar: i * 10, endChar: i * 10 + 8 });
-window.converse = async (count) => {
+window.converse = async (count, { excerpt, conversations = ['c1'] } = {}) => {
   const win = stage().shadowRoot.querySelector('jf-sv3-window');
-  const sources = Array.from({ length: count }, (_, i) => source(i));
+  const sources = Array.from({ length: count }, (_, i) => ({ ...source(i), ...(excerpt ? { excerpt } : {}) }));
   const marks = sources.map((item, i) => ({ sentenceText: 'A sentence about heating.', similarity: 0.9, sentenceIndex: 0, label: i + 1,
     detail: { parentDocId: item.parentDocId, startLine: item.startLine, endLine: item.endLine, excerpt: item.excerpt, startChar: item.startChar, endChar: item.endChar },
     hover: { excerpt: item.excerpt, title: 'source', headingText: '' } }));
@@ -73,7 +83,7 @@ window.converse = async (count) => {
   const turn = { id: 't1', recordId: null, assistantRecordId: null, recordOpenedByUser: false, kind: 'ask', question: 'heating', answer: 'A sentence about heating.', status: 'complete',
     evidence: { sources, matches, marks, retrievalMode: 'HYBRID' }, detail: '', toolCalls: 0, activity: [], reasoning: [], askedAt: 1 };
   win.tier = 'ask';
-  win.sessions = { sessions: [{ id: 'c1', title: 'One', turns: [turn], pinned: false, createdAt: 1, completedAt: 1, lastVisitedAt: 1, history: null, usage: null }], activeId: 'c1' };
+  win.sessions = { sessions: conversations.map(id => ({ id, title: id, turns: [turn], pinned: false, createdAt: 1, completedAt: 1, lastVisitedAt: 1, history: null, usage: null })), activeId: conversations[0] };
   await win.updateComplete;
 };
 document.body.dataset.ready = 'true';
@@ -355,19 +365,6 @@ describe('DP4 tabs keep readable labels', () => {
     };
   });
 
-  it.each(['', '?wideFont'])('at 1280 with 3 sources %s: Context keeps its word and the selected tab stays on show', async query => {
-    const page = await open(1280, 800, query);
-    await page.evaluate(() => (window as unknown as { converse(count: number): Promise<void> }).converse(3));
-    await settle(page, 300);
-    await page.locator('.cite-ref').first().click();
-    await settle(page, 300);
-    expect(await strip(page)).toMatchObject({ short: [], narrow: 0, selectedVisible: true, overflow: 'auto' });
-    await page.keyboard.press('End');
-    await settle(page, 300);
-    expect(await page.locator('[data-testid="details-pane"] [role="tab"][aria-selected="true"]').textContent()).toContain('Context');
-    expect(await strip(page)).toMatchObject({ short: [], selectedVisible: true });
-  }, 120_000);
-
   it.each(['', '?wideFont'])('in a split with plugin tabs %s: labels stay whole and the strip scrolls', async query => {
     const page = await open(1280, 800, query);
     await page.evaluate(`(async () => {
@@ -384,6 +381,280 @@ describe('DP4 tabs keep readable labels', () => {
     await page.keyboard.press('End');
     await settle(page, 300);
     expect(await strip(page)).toMatchObject({ short: [], selectedVisible: true });
+  }, 120_000);
+});
+
+type Converse = { converse(count: number, options?: { excerpt?: string; conversations?: string[] }): Promise<void> };
+
+const conversed = async (page: Page, count: number, options?: { excerpt?: string; conversations?: string[] }): Promise<void> => {
+  await page.evaluate(([sources, shape]) => (window as unknown as Converse).converse(sources as number, shape as { excerpt?: string }), [count, options] as const);
+  await settle(page, 300);
+};
+
+/** Follow citation 1 from the keyboard, which works whatever overlaps it at the smallest window. */
+const openWithEnter = async (page: Page): Promise<void> => {
+  await page.locator('.cite-ref').first().focus();
+  await page.keyboard.press('Enter');
+  await settle(page, 300);
+};
+
+const addPluginTabs = (page: Page, labels: string[]): Promise<void> => page.evaluate(`(async () => {
+  const { makePluginProvenance } = await import('/src/shell-v0/primitives/provenance.ts');
+  for (const label of ${JSON.stringify(labels)}) window.tabs.registerInspectorTab({ id: 'acme.' + label, label, source: 'plugin',
+    provenance: makePluginProvenance('acme.tabs', '1.0.0'), render: () => document.createElement('div') });
+})()`);
+
+const tabStrip = (page: Page) => page.locator('[data-testid="details-pane"] [role="tablist"]');
+const selectedTab = (page: Page) => page.locator('[data-testid="details-pane"] [role="tab"][aria-selected="true"]');
+const SOURCE_NAME = (i: number): string => `Source ${i} with a name too long for one details tab.md`;
+
+/** Where each tab sits against the strip, and whether the selected one clears the edge affordances. */
+const stripFacts = (page: Page) => tabStrip(page).evaluate(list => {
+  const box = list.getBoundingClientRect();
+  const tabs = [...list.querySelectorAll<HTMLElement>('[role="tab"]')];
+  const selected = list.querySelector('[aria-selected="true"]')!.getBoundingClientRect();
+  const edges = [...list.parentElement!.querySelectorAll<HTMLElement>('.edge')].filter(edge => getComputedStyle(edge).display !== 'none')
+    .map(edge => edge.getBoundingClientRect());
+  return {
+    shown: tabs.map(tab => tab.textContent?.trim()),
+    cut: tabs.filter(tab => tab.getBoundingClientRect().left < box.left - 1 || tab.getBoundingClientRect().right > box.right + 1).map(tab => tab.textContent?.trim()),
+    selectedClear: selected.left >= box.left - 1 && selected.right <= box.right + 1
+      && edges.every(edge => selected.right <= edge.left + 1 || selected.left >= edge.right - 1),
+    scrollLeft: list.scrollLeft,
+  };
+});
+
+describe('DP4 tabs with source numbers', () => {
+  const SIZES = [[1280, 800], [900, 800], [600, 400]] as const;
+  const FONTS = ['', '?wideFont'] as const;
+  const CASES = SIZES.flatMap(([width, height]) => FONTS.map(font => [width, height, font] as const));
+
+  it.each(CASES)('at %ix%i %s six sources, Context and a plugin tab all fit, sources by number', async (width, height, font) => {
+    const page = await open(width, height, font);
+    await addPluginTabs(page, ['Entities']);
+    await conversed(page, 6);
+    await openWithEnter(page);
+    const facts = await stripFacts(page);
+    expect(facts.shown).toEqual(['1', '2', '3', '4', '5', '6', 'Context', 'Entities']);
+    expect(facts.cut).toEqual([]);
+    expect(await tabStrip(page).evaluate(list => list.scrollWidth <= list.clientWidth)).toBe(true);
+  }, 120_000);
+
+  it.each(FONTS)('a source tab is named and tipped by its full name, and the header names the selected source %s', async font => {
+    const page = await open(1280, 800, font);
+    await conversed(page, 3);
+    await openWithEnter(page);
+    for (const i of [0, 1, 2]) {
+      const full = `C:/Docs/${SOURCE_NAME(i)}`;
+      const tab = page.getByRole('tab', { name: full });
+      expect(await tab.count(), full).toBe(1);
+      expect(await tab.getAttribute('title')).toBe(full);
+      expect((await tab.textContent())?.trim()).toBe(String(i + 1));
+    }
+    const header = page.locator('[data-testid="details-source-name"]');
+    expect(await header.textContent()).toBe(SOURCE_NAME(0));
+    await page.keyboard.press('ArrowRight');
+    await settle(page, 300);
+    expect(await header.textContent()).toBe(SOURCE_NAME(1));
+    expect(await header.getAttribute('title')).toBe(`C:/Docs/${SOURCE_NAME(1)}`);
+    await page.keyboard.press('End');
+    await settle(page, 300);
+    expect(await header.count()).toBe(0);
+    expect((await selectedTab(page).textContent())?.trim()).toBe('Context');
+  }, 120_000);
+
+  it.each(FONTS)('past what fits the strip takes the wheel, shows its edges and keeps the selected tab clear of them %s', async font => {
+    const page = await open(1280, 800, font);
+    await conversed(page, 14);
+    await openWithEnter(page);
+    const before = page.locator('[data-testid="details-tabs-more-before"]');
+    const after = page.locator('[data-testid="details-tabs-more-after"]');
+    expect(await tabStrip(page).evaluate(list => list.scrollWidth > list.clientWidth)).toBe(true);
+    expect(await after.isVisible()).toBe(true);
+    expect(await before.isVisible()).toBe(false);
+    const strip = await tabStrip(page).boundingBox();
+    await page.mouse.move(strip!.x + strip!.width / 2, strip!.y + strip!.height / 2);
+    await page.mouse.wheel(0, 120);
+    await settle(page);
+    expect((await stripFacts(page)).scrollLeft).toBeGreaterThan(0);
+    expect(await before.isVisible()).toBe(true);
+    await selectedTab(page).focus();
+    for (let i = 0; i < 14; i += 1) {
+      await page.keyboard.press('ArrowRight');
+      await settle(page, 60);
+      expect((await stripFacts(page)).selectedClear, `after ${i + 1} presses`).toBe(true);
+    }
+    expect((await selectedTab(page).textContent())?.trim()).toBe('Context');
+    expect(await after.isVisible()).toBe(false);
+    await page.keyboard.press('Home');
+    await settle(page, 300);
+    expect((await stripFacts(page)).selectedClear).toBe(true);
+    expect(await before.isVisible()).toBe(false);
+  }, 120_000);
+});
+
+describe('DP4 the keyboard stays on the selected tab', () => {
+  const keyboardOn = (page: Page): Promise<string | null> => page.evaluate(() => {
+    let active = document.activeElement;
+    while (active?.shadowRoot?.activeElement) active = active.shadowRoot.activeElement;
+    return active?.getAttribute('data-tab') ?? null;
+  });
+
+  async function walk(page: Page, ids: string[]): Promise<void> {
+    expect(await keyboardOn(page)).toBe(ids[0]);
+    for (const id of ids.slice(1)) {
+      await page.keyboard.press('ArrowRight');
+      await settle(page, 120);
+      expect(await selectedTab(page).getAttribute('data-tab')).toBe(id);
+      expect(await keyboardOn(page)).toBe(id);
+    }
+    await page.keyboard.press('Enter');
+    await settle(page, 120);
+    expect(await selectedTab(page).getAttribute('data-tab')).toBe(ids.at(-1));
+    await page.keyboard.press('Home');
+    await settle(page, 120);
+    expect(await selectedTab(page).getAttribute('data-tab')).toBe(ids[0]);
+    expect(await keyboardOn(page)).toBe(ids[0]);
+    await page.keyboard.press('End');
+    await settle(page, 120);
+    expect(await selectedTab(page).getAttribute('data-tab')).toBe(ids.at(-1));
+    expect(await keyboardOn(page)).toBe(ids.at(-1));
+  }
+
+  it('in Search, from a citation opened with Enter', async () => {
+    const page = await open(1280, 800);
+    await conversed(page, 3);
+    await openWithEnter(page);
+    await walk(page, ['source:0', 'source:1', 'source:2', 'context']);
+  }, 120_000);
+
+  it('in Library\u2019s pane', async () => {
+    const page = await open(1280, 800);
+    await addPluginTabs(page, ['Entities', 'Timeline', 'Relations']);
+    await area(page, LIBRARY);
+    await focusIn(page, 'jf-library-surface');
+    await showDocument(page, 'report.md');
+    await page.locator('[data-testid="details-pane"] [role="tab"]').first().focus();
+    await walk(page, ['document', 'plugin:acme.Entities', 'plugin:acme.Timeline', 'plugin:acme.Relations']);
+  }, 120_000);
+});
+
+describe('C4 a late hide belongs to its own conversation', () => {
+  const toggle = (page: Page) => page.locator('[data-testid="sv3-pane-toggle-hidden"] button');
+  const conversation = (page: Page, name: string) => page.locator('[data-testid="sv3-sidebar-row"]').filter({ hasText: name });
+
+  it('a response released in B leaves B\u2019s Hide alone, and A has it when the reader returns', async () => {
+    const page = await open(1280, 800);
+    await conversed(page, 2, { conversations: ['First', 'Second'] });
+    await page.locator('.cite-ref').first().click();
+    await settle(page, 300);
+    await toggle(page).click();
+    await conversation(page, 'Second').click();
+    await settle(page, 400);
+    await page.locator('.cite-ref').first().click();
+    await settle(page, 300);
+    expect(await toggle(page).textContent()).toContain('Hide');
+    await page.evaluate(() => (window as unknown as { releaseExclude(): void }).releaseExclude());
+    await settle(page, 300);
+    expect(await toggle(page).textContent()).toContain('Hide');
+    await conversation(page, 'First').click();
+    await settle(page, 400);
+    await page.locator('.cite-ref').first().click();
+    await settle(page, 300);
+    expect(await toggle(page).textContent()).toContain('Restore');
+  }, 120_000);
+});
+
+describe('DP1 a citation opens from the mouse at every width', () => {
+  const LONG_EXCERPT = 'A passage long enough to fill the preview to its three lines. '.repeat(12);
+
+  it.each([[1280, 800], [900, 800], [600, 800]] as const)('at %ix%i the preview sits under the mark and the click reaches it', async (width, height) => {
+    const page = await open(width, height);
+    await conversed(page, 3, { excerpt: LONG_EXCERPT });
+    const mark = await page.locator('.cite-ref').first().boundingBox();
+    const [x, y] = [mark!.x + mark!.width / 2, mark!.y + mark!.height / 2];
+    await page.mouse.move(x, y);
+    await settle(page, 300);
+    const card = await page.locator('[data-testid="sv3-citation-hover"] .card').boundingBox();
+    await page.mouse.down();
+    await page.mouse.up();
+    await settle(page, 300);
+    expect(await pane(page).count()).toBe(1);
+    expect(Math.round(card!.x)).toBe(Math.round(mark!.x));
+    expect(Math.round(card!.y)).toBe(Math.round(mark!.y + mark!.height) + 4);
+  }, 120_000);
+});
+
+describe('DP5 the reader on a search result', () => {
+  it('has no citation notice: a result is not a citation', async () => {
+    const page = await open(1280, 800);
+    await search(page);
+    await row(page).click();
+    await page.locator('jf-document-pane [role="region"][aria-label="Document content"]').first().waitFor();
+    await settle(page, 300);
+    expect(await page.locator('jf-document-pane [role="note"]').allTextContents()).toEqual([]);
+  }, 120_000);
+});
+
+describe('X1 the reader\u2019s quiet highlight', () => {
+  /** The ink and fill of the passage as painted, composed over the pane through a canvas. */
+  const painted = (page: Page, selector: string) => page.locator(`jf-document-pane ${selector}`).first().evaluate(mark => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1;
+    canvas.height = 1;
+    const paint = canvas.getContext('2d', { willReadFrequently: true })!;
+    const fills: string[] = [];
+    for (let at: Element | null = mark; at !== null; at = at.parentElement ?? ((at.getRootNode() as ShadowRoot).host ?? null)) {
+      const fill = getComputedStyle(at).backgroundColor;
+      if (fill !== 'rgba(0, 0, 0, 0)') fills.unshift(fill);
+    }
+    for (const fill of fills) { paint.fillStyle = fill; paint.fillRect(0, 0, 1, 1); }
+    const rgb = (): number[] => [...paint.getImageData(0, 0, 1, 1).data.slice(0, 3)];
+    const fill = rgb();
+    let inked: Element = mark;
+    while (inked.firstElementChild !== null) inked = inked.firstElementChild;
+    paint.fillStyle = getComputedStyle(inked).color;
+    paint.fillRect(0, 0, 1, 1);
+    const ink = rgb();
+    const luminance = (colour: number[]): number => {
+      const [r, g, b] = colour.map(value => { const c = value / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; });
+      return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
+    };
+    const [hi, lo] = [luminance(fill), luminance(ink)].sort((a, b) => b - a);
+    return { ink, fill, ratio: (hi! + 0.05) / (lo! + 0.05) };
+  });
+
+  async function openAt(page: Page, theme: 'light' | 'dark', view: 'Rendered' | 'Source'): Promise<void> {
+    await page.evaluate(mode => document.documentElement.setAttribute('data-theme', mode), theme);
+    await conversed(page, 2);
+    await openWithEnter(page);
+    await page.getByRole('radio', { name: view }).click();
+    await page.locator('jf-document-pane .hl-weak').first().waitFor({ timeout: 10_000 });
+    await settle(page, 400);
+  }
+
+  it.each(['Rendered', 'Source'] as const)('reads at 4.5:1 in the light theme, %s view', async view => {
+    const page = await open(1280, 800);
+    await openAt(page, 'light', view);
+    expect((await painted(page, '.hl-weak')).ratio).toBeGreaterThanOrEqual(4.5);
+  }, 120_000);
+
+  it.each([['dark', 'Rendered', '.blocks'], ['dark', 'Source', 'pre.source'], ['forced', 'Rendered', '.blocks'], ['forced', 'Source', 'pre.source']] as const)('in %s colours, %s view, the passage keeps the ink around it', async (palette, view, around) => {
+    const page = await open(1280, 800);
+    if (palette === 'forced') await page.emulateMedia({ forcedColors: 'active' });
+    await openAt(page, 'dark', view);
+    const ink = (selector: string): Promise<string> => page.locator(`jf-document-pane ${selector}`).first().evaluate(element => getComputedStyle(element).color);
+    expect(await ink('.hl-weak')).toBe(await ink(around));
+  }, 120_000);
+});
+
+describe('X1 a tab\u2019s number is sized from the scale', () => {
+  it('its least width is the token', async () => {
+    const page = await open(1280, 800);
+    await page.evaluate(() => document.documentElement.style.setProperty('--jf-space-4', '40px'));
+    await conversed(page, 2);
+    await openWithEnter(page);
+    expect(await page.locator('[data-testid="details-pane"] [role="tab"] .number').first().evaluate(number => getComputedStyle(number).minInlineSize)).toBe('40px');
   }, 120_000);
 });
 
@@ -549,6 +820,36 @@ describe('DP3 a folder\u2019s failed files', () => {
     await settle(page, 300);
     expect(await lists(page).count()).toBe(1);
     expect(await focusNow(page)).toContain('list');
+  }, 120_000);
+});
+
+describe('DP3 a failed file\u2019s actions', () => {
+  it('wear the shared button styling', async () => {
+    const page = await open(1280, 800);
+    await page.evaluate(`(async () => {
+      const { __seedForTest: resources } = await import('/src/api/registry/ResourceCatalogClient.ts');
+      const { __seedForTest: operations } = await import('/src/api/registry/OperationCatalogClient.ts');
+      const operation = (id) => ({ id, policy: { risk: 'LOW' }, presentation: { labelKey: id, descriptionKey: id }, provenance: { tier: 'CORE', contributorId: 'core', version: '1.0.0' } });
+      resources({ schemaVersion: '1.0.0', catalogVersion: 1, namespace: 'core', primitive: 'Resource', entries: [{ id: 'core.failed-indexing-jobs', itemOperations: ['core.retry-indexing-job', 'core.cancel-indexing-job'], collectionOperations: [], primaryKey: 'pathHash', provenance: { tier: 'CORE', contributorId: 'core', version: '1.0.0' } }] });
+      operations({ schemaVersion: '1.0.0', catalogVersion: 1, namespace: 'core', primitive: 'Operation', entries: [operation('core.retry-indexing-job'), operation('core.cancel-indexing-job')] });
+      await import('/src/shell-v0/components/ActionButton.ts');
+      const shared = document.createElement('jf-action-button');
+      shared.id = 'shared';
+      shared.setAttribute('label', 'Shared');
+      document.body.append(shared);
+    })()`);
+    await area(page, LIBRARY);
+    await page.locator('.folder-toggle').first().click();
+    await settle(page, 400);
+    const button = page.locator('jf-failed-files-list jf-row-actions button.invoke').first();
+    await button.waitFor();
+    const style = (element: Element): string[] => {
+      const css = getComputedStyle(element);
+      return [css.borderTopColor, css.borderTopWidth, css.backgroundColor, css.paddingBlockStart, css.paddingInlineStart, css.borderTopLeftRadius];
+    };
+    const row = await button.evaluate(style);
+    expect(row).toEqual(await page.locator('#shared button.invoke').evaluate(style));
+    expect(row[0]).not.toBe('rgba(0, 0, 0, 0)');
   }, 120_000);
 });
 

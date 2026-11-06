@@ -245,9 +245,6 @@ export class FailedFilesList extends JfElement {
     :host {
       display: block;
       margin: .5rem 0 0 1.7rem;
-      --justsearch-shell-form-button-border: transparent;
-      --justsearch-shell-form-button-bg: transparent;
-      --justsearch-shell-action-button-padding: .4rem 0;
       --justsearch-shell-form-control-spacing: 0;
     }
     :host([collapsed]) { display: none; }

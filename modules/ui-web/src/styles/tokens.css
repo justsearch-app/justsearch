@@ -225,6 +225,9 @@
   --text-command: rgb(168, 140, 238);
   --text-chat: rgb(95, 194, 212);
   --text-tint: rgb(95, 194, 212);
+  /* Ink of the reader's quiet highlight: the passage keeps its own colour wherever that reads on the
+     tint; the light block below replaces it. */
+  --text-highlight-weak: currentcolor;
   /* --accent-info aliases --accent-chat (line 147), so the text grade tracks --text-chat. */
   --text-info: var(--text-chat);
   /* 577 Phase 7 — text grades for the new roles (legible on the dark surface). */
@@ -521,6 +524,8 @@
   --text-command: rgb(73, 35, 140);
   --text-chat: rgb(0, 80, 120);
   --text-tint: rgb(0, 80, 120);
+  /* A muted passage falls below AA on the tint over a light surface (4.2:1). */
+  --text-highlight-weak: var(--text-primary);
   /* --accent-info aliases --accent-chat, so the text grade tracks --text-chat (light theme). */
   --text-info: var(--text-chat);
   /* 577 Phase 7 — light theme: pale highlight fill with dark ink; deep link blue. */
