@@ -113,6 +113,12 @@ export const SETTINGS_REGISTER: readonly SettingsGroup[] = [
         ],
       },
       {
+        id: 'notifications',
+        kind: 'native',
+        labelKey: 'settings.category.notifications',
+        sections: [{ key: 'notifications', labelKey: 'settings.section.notifications' }],
+      },
+      {
         id: 'core.presentation-gallery-surface',
         kind: 'member',
         memberSurfaceId: 'core.presentation-gallery-surface',

@@ -121,19 +121,17 @@ function loadUserOverrides(): KeybindingEntry[] {
   return doc.keybindingOverrides ?? [];
 }
 
-function saveUserOverrides(overrides: KeybindingEntry[]): void {
+function updateUserOverrides(update: (overrides: KeybindingEntry[]) => KeybindingEntry[]): void {
   mutateDocument((doc) => ({
     ...doc,
-    keybindingOverrides: overrides,
+    keybindingOverrides: update((doc as unknown as { keybindingOverrides?: KeybindingEntry[] }).keybindingOverrides ?? []),
   } as unknown as ReturnType<typeof getDocument>));
 }
 
 export function registerKeybinding(entry: KeybindingEntry): void {
   bindings.set(bindingKey(entry), entry);
   if (entry.source === 'user') {
-    const overrides = loadUserOverrides().filter((b) => b.key !== entry.key);
-    overrides.push(entry);
-    saveUserOverrides(overrides);
+    updateUserOverrides((overrides) => [...overrides.filter((b) => b.key !== entry.key), entry]);
   }
   notify();
 }

@@ -13,6 +13,7 @@ mod exit_ledger;
 #[cfg(target_os = "linux")]
 mod linux_process;
 mod native_targets;
+mod notices;
 mod platform_paths;
 // Lane F stage B item B10: the Engine supervisor (design 7.1). The DECISION half is a pure
 // function over the register the dev-runner also reads; only the actuator lives in this file.
@@ -1778,6 +1779,7 @@ pub fn run() {
         .manage(state.clone())
         .manage(update_coordinator.clone())
         .manage(search_shortcut::SearchShortcut::default())
+        .manage(notices::NoticeLedger::default())
         .invoke_handler(tauri::generate_handler![
             supervisor_state,
             restart_engine,
@@ -1804,7 +1806,9 @@ pub fn run() {
             updater::install_app_update,
             search_shortcut::search_shortcut_status,
             search_shortcut::set_search_shortcut_enabled,
-            search_shortcut::take_search_summon
+            search_shortcut::take_search_summon,
+            notices::show_desktop_notice,
+            notices::set_needs_you_badge
         ])
         .setup(move |app| {
             let session_app = app.handle().clone();

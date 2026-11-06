@@ -462,6 +462,20 @@ export class AuthorizationHost extends JfElement {
     });
   }
 
+  /**
+   * The person asked for another request: an agent request's open dialog returns undecided to Needs
+   * you. Any other dialog is something they started, and stays until it is answered.
+   */
+  yieldDialogTo(id: string): void {
+    const active = this.active;
+    if (active?.kind !== 'authorize' || active.prompt.arrival !== 'needs-you' || `authorization:${active.prompt.pendingId}` === id) return;
+    this.active = null;
+    this.park(active);
+    this.modal.close();
+    this.requestUpdate();
+    this.pumpQueue();
+  }
+
   /** A displaced prompt returns undecided: an agent request to Needs you, any other to the queue head. */
   private park(item: CeremonyItem): void {
     if (item.kind === 'authorize' && item.prompt.arrival === 'needs-you') {

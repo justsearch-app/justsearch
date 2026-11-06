@@ -68,6 +68,8 @@ const DOCUMENT_STORAGE_KEY_V1 = 'justsearch.userState.v1';
  * preserves it rather than overwriting (F9 — see docs/tempdocs/547).
  */
 const CURRENT_SCHEMA_VERSION = 2;
+/** How many times an edit starts over because another window saved while it was being made. */
+const SAVE_CONFLICT_RETRIES = 5;
 
 /** Built-in default profile id; cannot be deleted. */
 export const DEFAULT_PROFILE_ID = 'default';
@@ -280,6 +282,8 @@ export interface UserStateV2Storage {
   readonly surfaceMode?: 'glass' | 'solid';
   /** Tempdoc 874 — the Search v3 chat-column width preset. Cross-profile, FE-only (no backend setting). */
   readonly chatWidth?: 'narrow' | 'default' | 'wide';
+  /** DE5 — the Notifications choice. Cross-profile, FE-only; absent means On. */
+  readonly notifications?: 'off' | 'on' | 'sound';
 }
 
 /**
@@ -318,6 +322,8 @@ export interface UserStateV1 {
   readonly surfaceMode?: 'glass' | 'solid';
   /** Tempdoc 874 — Search v3 chat-column width preset (cross-profile, FE-only). */
   readonly chatWidth?: 'narrow' | 'default' | 'wide';
+  /** DE5 — the Notifications choice. Cross-profile, FE-only; absent means On. */
+  readonly notifications?: 'off' | 'on' | 'sound';
 }
 
 /** 569 §19 Seam 6 — one entry in the presentation apply history. */
@@ -417,6 +423,7 @@ function viewFromStorage(storage: UserStateV2Storage): UserStateV1 {
       : {}),
     ...(storage.surfaceMode !== undefined ? { surfaceMode: storage.surfaceMode } : {}),
     ...(storage.chatWidth !== undefined ? { chatWidth: storage.chatWidth } : {}),
+    ...(storage.notifications !== undefined ? { notifications: storage.notifications } : {}),
   };
 }
 
@@ -463,6 +470,7 @@ function storageFromView(view: UserStateV1): UserStateV2Storage {
       : {}),
     ...(view.surfaceMode !== undefined ? { surfaceMode: view.surfaceMode } : {}),
     ...(view.chatWidth !== undefined ? { chatWidth: view.chatWidth } : {}),
+    ...(view.notifications !== undefined ? { notifications: view.notifications } : {}),
   };
 }
 
@@ -524,6 +532,10 @@ function projectionEquals(a: unknown, b: unknown): boolean {
 let initialized = false;
 /** Last error thrown by saveDocument, or null if the last write succeeded (F10). */
 let lastPersistError: unknown = null;
+/** The stored text this window last read or wrote; any other text is another window's save. */
+let lastStoredRaw: string | null = null;
+/** Another window's active profile, kept in storage while this window stays on its own. */
+let otherWindowProfileId: string | null = null;
 
 /**
  * Read the persisted document from localStorage, applying the
@@ -547,6 +559,7 @@ function ensureInitialized(): void {
     }
   };
   const v2Raw = readKey(DOCUMENT_STORAGE_KEY);
+  lastStoredRaw = v2Raw;
   if (v2Raw !== null) {
     const parsed = parseDocument(v2Raw);
     if (parsed !== null) {
@@ -1000,6 +1013,13 @@ function validateV2(candidate: unknown): UserStateV2Storage | null {
       ? rawChatWidth
       : undefined;
 
+  // DE5 — the Notifications choice (cross-profile); only the three valid literals survive.
+  const rawNotifications = c['notifications'];
+  const notifications: 'off' | 'on' | 'sound' | undefined =
+    rawNotifications === 'off' || rawNotifications === 'on' || rawNotifications === 'sound'
+      ? rawNotifications
+      : undefined;
+
   // 569 §19 Seam 6 — presentation apply history (cross-profile); malformed entries dropped.
   const rawHistory = c['presentationHistory'];
   let presentationHistory: PresentationHistoryEntry[] | undefined;
@@ -1027,6 +1047,7 @@ function validateV2(candidate: unknown): UserStateV2Storage | null {
     ...(walkthroughState !== undefined ? { walkthroughState } : {}),
     ...(surfaceMode !== undefined ? { surfaceMode } : {}),
     ...(chatWidth !== undefined ? { chatWidth } : {}),
+    ...(notifications !== undefined ? { notifications } : {}),
   };
 }
 
@@ -1196,7 +1217,10 @@ function saveDocument(doc: UserStateV1): boolean {
     // Serialize the V2 storage shape (no duplication of root flat
     // fields — they're derived from profiles on read).
     const storage = storageFromView(doc);
-    localStorage.setItem(DOCUMENT_STORAGE_KEY, JSON.stringify(storage));
+    const raw = JSON.stringify(otherWindowProfileId !== null && storage.profiles[otherWindowProfileId]
+      ? { ...storage, activeProfileId: otherWindowProfileId } : storage);
+    localStorage.setItem(DOCUMENT_STORAGE_KEY, raw);
+    lastStoredRaw = raw;
     lastPersistError = null;
     return true;
   } catch (err) {
@@ -1212,6 +1236,35 @@ function saveDocument(doc: UserStateV1): boolean {
     });
     return false;
   }
+}
+
+/**
+ * Take in what another window saved, before a write here: every window holds the whole document, so
+ * writing an older copy would drop that window's values, in any field. The edit then applies to the
+ * latest document. This window stays on its own profile, so the edit lands on the profile it shows,
+ * while storage keeps the other window's choice. A stored document this build cannot read stays
+ * unadopted (F9). A session-only edit whose save failed (F10) yields to what another window saved.
+ * True when something was taken in.
+ */
+function adoptOtherWindowSaves(): boolean {
+  if (typeof localStorage === 'undefined') return false;
+  let raw: string | null;
+  try {
+    raw = localStorage.getItem(DOCUMENT_STORAGE_KEY);
+  } catch {
+    return false;
+  }
+  if (raw === null || raw === lastStoredRaw) return false;
+  lastStoredRaw = raw;
+  const stored = parseDocument(raw);
+  if (stored === null) return false;
+  const storage = storageFromView(migrateSurfacePreferences(stored));
+  const here = storageSig.get().activeProfileId;
+  const held = storage.profiles[here] ? here : storage.activeProfileId;
+  otherWindowProfileId = held === storage.activeProfileId ? null : storage.activeProfileId;
+  storageSig.set({ ...storage, activeProfileId: held });
+  notify();
+  return true;
 }
 
 function notify(): void {
@@ -1299,13 +1352,23 @@ const SENTINEL = Symbol('userstate-projection-sentinel');
  * Producer must return a NEW object reference; mutating in place
  * doesn't fire listeners (listener equality check would short-
  * circuit). The TS type enforces this via `readonly` fields.
+ *
+ * The producer sees the latest stored document, which another window may have saved: it must build
+ * on what it receives, not on a value read before this call, or that window's edit is lost (C11).
+ * A save from another window while the producer runs starts the edit over on that save, so the
+ * producer can run more than once. The stored text is the revision checked. localStorage has no
+ * compare-and-set, so a save landing between this check and the write below is still overwritten.
  */
 export function mutateDocument(
   producer: (current: UserStateV1) => UserStateV1,
   persistFirst = false,
 ): void {
   ensureInitialized();
-  const produced = producer(docSig.get());
+  adoptOtherWindowSaves();
+  let produced = producer(docSig.get());
+  for (let retry = 0; retry < SAVE_CONFLICT_RETRIES && adoptOtherWindowSaves(); retry++) {
+    produced = producer(docSig.get());
+  }
   if (produced === docSig.get()) return;
   if (persistFirst && !saveDocument(produced)) {
     throw lastPersistError ?? new Error('User state could not be saved.');
@@ -1328,6 +1391,8 @@ export function __resetUserStateForTest(): void {
   listeners.clear();
   initialized = false;
   lastPersistError = null;
+  lastStoredRaw = null;
+  otherWindowProfileId = null;
   if (typeof localStorage !== 'undefined') {
     try {
       localStorage.removeItem(DOCUMENT_STORAGE_KEY);
@@ -1351,6 +1416,8 @@ export function __resetInMemoryStateForTest(): void {
   listeners.clear();
   initialized = false;
   lastPersistError = null;
+  lastStoredRaw = null;
+  otherWindowProfileId = null;
 }
 
 /**
@@ -1409,16 +1476,16 @@ export function getPluginSetting(pluginId: string, key: string): unknown {
 }
 
 export function setPluginSetting(pluginId: string, key: string, value: unknown): void {
-  const doc = getDocument();
-  const current = doc.pluginSettings ?? {};
-  const pluginCurrent = current[pluginId] ?? {};
-  mutateDocument((d) => ({
-    ...d,
-    pluginSettings: {
-      ...current,
-      [pluginId]: { ...pluginCurrent, [key]: value },
-    },
-  }));
+  mutateDocument((d) => {
+    const current = d.pluginSettings ?? {};
+    return {
+      ...d,
+      pluginSettings: {
+        ...current,
+        [pluginId]: { ...current[pluginId], [key]: value },
+      },
+    };
+  });
 }
 
 export function subscribePluginSetting(
@@ -1448,9 +1515,10 @@ export function getRecentCommandIds(): readonly string[] {
 }
 
 export function recordRecentCommandId(id: string): void {
-  const current = getDocument().recentCommandIds ?? [];
-  const next = [id, ...current.filter((x) => x !== id)].slice(0, RECENT_COMMANDS_CAP);
-  mutateDocument((doc) => ({ ...doc, recentCommandIds: next }));
+  mutateDocument((doc) => ({
+    ...doc,
+    recentCommandIds: [id, ...(doc.recentCommandIds ?? []).filter((x) => x !== id)].slice(0, RECENT_COMMANDS_CAP),
+  }));
 }
 
 export function subscribeRecentCommandIds(handler: (ids: readonly string[]) => void): () => void {
@@ -1606,6 +1674,7 @@ export function getProfile(id: string): Profile | undefined {
  */
 export function setActiveProfileId(id: string): void {
   ensureInitialized();
+  adoptOtherWindowSaves();
   const storage = storageSig.get();
   if (storage.activeProfileId === id) return;
   if (!storage.profiles[id]) {
@@ -1621,6 +1690,7 @@ export function setActiveProfileId(id: string): void {
   // slices into the incoming profile — the F11 bug. With the slices held only
   // in `storage.profiles[id]`, that drift is unrepresentable.
   storageSig.set({ ...storage, activeProfileId: id });
+  otherWindowProfileId = null;
   saveDocument(docSig.get());
   notify();
 }
