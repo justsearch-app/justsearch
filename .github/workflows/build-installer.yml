@@ -48,7 +48,6 @@ jobs:
       RELEASE_BUILD: 'false'
       ORG_GRADLE_PROJECT_includeCuda: 'false'
       ORG_GRADLE_PROJECT_skipOnnxModels: 'true'
-      JUSTSEARCH_CODESIGN_LEDGER_PATH: ${{ runner.temp }}/native-tls-unused-signing-ledger.jsonl
     steps:
       - name: Checkout carrier, without retained credentials
         uses: actions/checkout@v7
@@ -120,10 +119,16 @@ jobs:
       - name: Initialize shared deterministic public TEST pins
         run: python "$RUNNER_TEMP/native-tls-proof/native-tls-proof-build.py" initialize
       - name: Build predecessor / 0.3.80
+        env:
+          JUSTSEARCH_CODESIGN_LEDGER_PATH: ${{ runner.temp }}/native-tls-unused-signing-ledger.jsonl
         run: python "$RUNNER_TEMP/native-tls-proof/native-tls-proof-build.py" build before
       - name: Build candidate probe / 0.3.81
+        env:
+          JUSTSEARCH_CODESIGN_LEDGER_PATH: ${{ runner.temp }}/native-tls-unused-signing-ledger.jsonl
         run: python "$RUNNER_TEMP/native-tls-proof/native-tls-proof-build.py" build probe
       - name: Build candidate target / 0.3.82 (warm candidate outputs)
+        env:
+          JUSTSEARCH_CODESIGN_LEDGER_PATH: ${{ runner.temp }}/native-tls-unused-signing-ledger.jsonl
         run: python "$RUNNER_TEMP/native-tls-proof/native-tls-proof-build.py" build target
       - name: Seal public build evidence and erase ephemeral private fixture material
         id: seal
