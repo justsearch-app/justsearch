@@ -303,3 +303,14 @@ methods have display names. Its one changed oracle fails on the base; the other
 expectations pass in both trees.
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1ae94-d4b6-7690-8035-cf490bc84f3b",
+  "verdict": "accept",
+  "digest": "sha256:53fb7fdf8cd25d662e8d1c3d59132cfbfec7f75cf73298de5170be9562ba43c8",
+  "note": "Entry 1 Obsolete accept; entry 2 New repair accept; entry 3 New preservation accept; entry 4 Adaptation accept. Transcribed from the verifier's result by the orchestrator."
+}
+```
