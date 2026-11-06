@@ -401,6 +401,25 @@ final class KnowledgeSearchEngine {
     return reordered;
   }
 
+  /** Returns the unique document ranked first by both retrieval legs, or -1 without agreement. */
+  private static int sparseDenseTopOneIndex(List<SearchResult> results) {
+    int sparseFirst = -1;
+    int denseFirst = -1;
+    for (int i = 0; i < results.size(); i++) {
+      for (io.justsearch.ipc.HitStage stage : results.get(i).getTraceList()) {
+        if (!stage.hasRank() || stage.getRank() != 1) continue;
+        if ("sparse-retrieval".equals(stage.getId())) {
+          if (sparseFirst >= 0) return -1;
+          sparseFirst = i;
+        } else if ("dense-retrieval".equals(stage.getId())) {
+          if (denseFirst >= 0) return -1;
+          denseFirst = i;
+        }
+      }
+    }
+    return sparseFirst == denseFirst ? sparseFirst : -1;
+  }
+
   /** Top-K doc-ids (within the CE window) at/below the given per-leg HitStage rank, for judge-arbitration
    * leg agreement (tempdoc 643 E1). Only counts a candidate whose stage rank is PRESENT (proto3 {@code
    * optional}) and {@code <= topK} — mirrors {@code HybridSearchOps.topKDocIds}'s rank-based selection. */
@@ -845,6 +864,7 @@ final class KnowledgeSearchEngine {
     QueryUnderstandingService.QuResult quResultForResponse = null;
     FilterNormalizationService.NormResult normResultForResponse = null;
     SearchResponse resp;
+    boolean selectedResponseIsGlobal = true;
     boolean expansionApplied = false;
     String expansionSkipReason = null;
     long searchStartNs = System.nanoTime();
@@ -1001,6 +1021,7 @@ final class KnowledgeSearchEngine {
       // Gate: any query mentioning 2+ sources benefits from balanced per-source retrieval,
       // not just COMPARISON queries (FeB4RAG research). Answer type remains a separate hint.
       if (!advancedSearch && structuredAnalysis.detectedSources().size() >= 2) {
+        selectedResponseIsGlobal = false;
         resp = withinHead(head, () -> includePrivateData
             ? perSourceSearch.execute(client, baseReq, structuredAnalysis.detectedSources(), searchLimit, true, engineContext)
             : perSourceSearch.execute(client, baseReq, structuredAnalysis.detectedSources(), searchLimit, engineContext));
@@ -1052,6 +1073,7 @@ final class KnowledgeSearchEngine {
                   log.debug("LLM expansion re-search missed its semantic budget; using base results");
                 } else {
                   resp = expanded;
+                  selectedResponseIsGlobal = true;
                   expansionApplied = true;
                   log.debug("LLM expansion applied to query");
                 }
@@ -1164,6 +1186,7 @@ final class KnowledgeSearchEngine {
 
     // 250: Cross-encoder execution tracking
     boolean crossEncoderApplied = false;
+    String crossEncoderDetail = null;
     // Register F-052: the skip reason is a closed head-owned vocabulary, not a raw string — a
     // drop-class member (deadline / RPC / model-absent) is worded at the user tier by the FE.
     CrossEncoderSkipReason crossEncoderSkipReason = null;
@@ -1319,6 +1342,17 @@ final class KnowledgeSearchEngine {
         // Reorder the CE window by the (possibly blended) order, then append the candidates
         // beyond topK that were never reranked. Count in equals count out.
         results = applyRerankOrder(results, orderToApply, topK);
+        // Only global, current-page document ranks establish sparse/dense agreement. Scan the
+        // complete selected response, including candidates LambdaMART left outside the CE window.
+        if (selectedResponseIsGlobal && (req.cursor() == null || req.cursor().isBlank())
+            && pipelineConfig.sparseEnabled() && (pipelineConfig.denseEnabled() || denseAuto)) {
+          int winner = sparseDenseTopOneIndex(results);
+          if (winner > 0) {
+            results = new ArrayList<>(results);
+            results.addFirst(results.remove(winner));
+            crossEncoderDetail = "keyword_dense_top1_promoted";
+          }
+        }
         crossEncoderApplied = true;
         crossEncoderMs = reranked.getElapsedMs();
         log.debug("Reranked {} docs in {}ms (remote)", topK, reranked.getElapsedMs());
@@ -1463,6 +1497,7 @@ final class KnowledgeSearchEngine {
                     lambdaMartSkipReason,
                     crossEncoderApplied,
                     crossEncoderSkipReason,
+                    crossEncoderDetail,
                     expansionApplied,
                     expansionSkipReason,
                     queryType,

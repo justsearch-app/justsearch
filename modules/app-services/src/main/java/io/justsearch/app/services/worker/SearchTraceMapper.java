@@ -185,6 +185,7 @@ final class SearchTraceMapper {
       String lambdaMartSkipReason,
       boolean crossEncoderApplied,
       CrossEncoderSkipReason crossEncoderSkipReason,
+      String crossEncoderDetail,
       boolean expansionApplied,
       String expansionSkipReason,
       QueryType queryType,
@@ -224,7 +225,7 @@ final class SearchTraceMapper {
                     crossEncoderApplied || crossEncoderSkipReason == null
                         ? null
                         : crossEncoderSkipReason.wire(),
-                    null,
+                    crossEncoderApplied ? crossEncoderDetail : null,
                     crossEncoderApplied && crossEncoderMs > 0 ? crossEncoderMs : null);
             case FRESHNESS ->
                 stageNode(
