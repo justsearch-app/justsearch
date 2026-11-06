@@ -687,6 +687,8 @@ class IndexHandle:
     _backend: Any = dataclasses.field(default=None, repr=False)
     base_url: str | None = None
     index_state: dict = dataclasses.field(default_factory=dict)
+    # Only explicit scoring overrides; prepared env/components remain the key authority.
+    _sensitivity: Mapping[str, str] | None = dataclasses.field(default=None, repr=False)
     # Shared hold on the snapshot the engine runs from; retention never removes it meanwhile.
     _lease: Any = dataclasses.field(default=None, repr=False)
 
@@ -758,7 +760,27 @@ class IndexHandle:
             raise
         failure = None
         try:
-            self._backend = _start_serving(self.config, self.data_dir, self.env, port, deadline,
+            launch_env = self.env
+            if self._sensitivity is not None:
+                from .sensitivity import launch_environment
+                launch_env = launch_environment(self.env, self._sensitivity)
+                # Retained attestations do not prove that the job store is idle now.
+                # Recover/check it with prepared settings before any override can
+                # reach startup ingestion. The data lock spans both writer lifetimes.
+                from .sensitivity import SensitivityRefused, require_ready_idle
+                self._backend = _start_serving(self.config, self.data_dir, self.env, port, deadline,
+                    prepared_only=True, startup_admission=False)
+                try:
+                    with httpx.Client(base_url=f"http://127.0.0.1:{port}", timeout=30) as client:
+                        require_ready_idle(client, self.collection,
+                                           self.config.request.get("mode") == "splade", deadline)
+                except SensitivityRefused as e:
+                    raise IndexRefused(f"not ready: {e}") from e
+                finally:
+                    backend.stop_backend(self._backend.proc, data_dir=self.data_dir)
+                    self._backend = None
+                port = _free_port()
+            self._backend = _start_serving(self.config, self.data_dir, launch_env, port, deadline,
                 prepared_only=prepared_only, startup_admission=not prepared_only)
             self.base_url = f"http://127.0.0.1:{port}"
             result = _confirm_ready(self, deadline, external=True)
@@ -773,7 +795,7 @@ class IndexHandle:
                 if self._backend:
                     backend.stop_backend(self._backend.proc, data_dir=self.data_dir)
                     self._backend = None
-                if failure and self.index_build == "cached":
+                if failure and self.index_build == "cached" and self._sensitivity is None:
                     _quarantine(self.root, self.data_dir, self.collection, self.index_key, failure)
             finally:
                 self.close()
@@ -833,7 +855,10 @@ class IndexHandle:
         self.close()
 
 
-def prepare_index(collection: Collection, config: IndexConfig, *, prepared_only: bool = False) -> IndexHandle:
+def prepare_index(collection: Collection, config: IndexConfig, *, prepared_only: bool = False,
+                  sensitivity: Mapping[str, str] | None = None) -> IndexHandle:
+    if sensitivity is not None and not prepared_only:
+        raise IndexRefused("sensitivity requires a prepared-only index")
     if (collection.version != collection.compute_version() or not collection.documents
             or len(collection.documents) > 50000):
         raise IndexRefused("empty or modified collection")
@@ -867,6 +892,10 @@ def prepare_index(collection: Collection, config: IndexConfig, *, prepared_only:
             raise IndexRefused("nonempty data folder has no collection owner")
         entry_path = root / "entry.json"
         adopted = entry_path.exists()
+        # The preflight can race a previous lock holder retiring this entry.
+        # Prepared-only callers must never enter the replacement/build branch.
+        if prepared_only and not adopted:
+            raise IndexRefused("not ready: no complete prepared index; run quality prepare outside the scoring window")
         if adopted:
             _check_owner(_json(entry_path)["owner"], collection, key)
             if not owner_path.exists():
@@ -883,7 +912,8 @@ def prepare_index(collection: Collection, config: IndexConfig, *, prepared_only:
             data.mkdir()
             _write(owner_path, _population_owner(collection, key))
         handle = IndexHandle(collection, config, key, root, data,
-                             "cached" if adopted else "fresh", components, env, lock, _lease=lease)
+                             "cached" if adopted else "fresh", components, env, lock,
+                             _sensitivity=sensitivity, _lease=lease)
         if adopted:
             _materialize(collection, config, root)  # rehash the source files before boot
             if prepared_only:
@@ -923,7 +953,7 @@ def prepare_index(collection: Collection, config: IndexConfig, *, prepared_only:
         try:
             # A held data lock is required; lock contention must not mutate
             # another preparer's cache. Only our exact owned data can move.
-            if not isinstance(e, (BlockingIOError, TransientIndexRefused, httpx.HTTPError)):
+            if sensitivity is None and not isinstance(e, (BlockingIOError, TransientIndexRefused, httpx.HTTPError)):
                 _quarantine(root, data, collection, key, f"{type(e).__name__}: {e}")
         finally:
             lock.close()
@@ -961,9 +991,17 @@ def _confirm(handle: IndexHandle, entry: dict | None = None) -> index_identity.C
         _check_owner(entry["owner"], handle.collection, handle.index_key)
         m = _materialize(handle.collection, handle.config, handle.root)
         current = witness(handle.base_url, handle.collection, m, handle.root / "documents", handle.config)
+        if handle._sensitivity is not None:
+            from .sensitivity import require_idle
+            with httpx.Client(base_url=handle.base_url, timeout=30) as client:
+                require_idle(_get(client, "/api/status"))
         failures.extend(_adoption_agreement(entry["witness"], current))
-        adopted = index_identity.confirm_adoption(handle.base_url, entry, handle.data_dir,
-                                                  handle.env, index_key=handle.index_key)
+        if handle._sensitivity is not None:
+            from .sensitivity import confirm_identity
+            adopted = confirm_identity(handle, entry)
+        else:
+            adopted = index_identity.confirm_adoption(handle.base_url, entry, handle.data_dir,
+                                                      handle.env, index_key=handle.index_key)
         failures.extend(adopted.failures)
         checks.update(adopted.checks)
         if not failures:

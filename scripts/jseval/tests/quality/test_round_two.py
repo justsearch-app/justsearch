@@ -285,19 +285,19 @@ def leg_response(reason='sparse-shortcut'):
         {'id': 'cross-encoder', 'status': 'skipped', 'reason': 'BELOW_MIN_THRESHOLD'}]}}
 
 
-def collect_leg_result(c, reason='sparse-shortcut'):
-    handle = Mock()
-    handle.ranked_doc_ids.return_value = []
+def collect_leg_result(c, tmp_path, reason='sparse-shortcut'):
+    (tmp_path/'materialized.json').write_text(json.dumps(c.documents))
+    handle = index.IndexHandle(c, index.IndexConfig(), 'key', tmp_path, tmp_path, 'cached', {}, {}, None)
     with httpx.Client(base_url='http://engine', transport=httpx.MockTransport(
             lambda _: httpx.Response(200, json=leg_response(reason)))) as client:
         return run.search_query(client, handle, 'q000', c.queries['q000'], run.refined_request(), 5)
 
 
-def test_leg_trace_is_retained_and_identical_sparse_shortcuts_pass():
+def test_leg_trace_is_retained_and_identical_sparse_shortcuts_pass(tmp_path):
     from jseval.quality.types import QueryResult
     c = make_collection()
     record = make_run(c)
-    result = collect_leg_result(c)
+    result = collect_leg_result(c, tmp_path)
     assert result.served.to_dict()['leg_details'] == {
         'lexical': {'status': 'executed', 'reason': None},
         'dense': {'status': 'skipped', 'reason': 'sparse-shortcut'},
@@ -310,10 +310,10 @@ def test_leg_trace_is_retained_and_identical_sparse_shortcuts_pass():
 
 @pytest.mark.parametrize('reason', ['INFERENCE_FAILED', 'MODEL_LOADING', 'SEARCH_DEADLINE_EXCEEDED',
                                   'ACQUIRE_BUDGET_EXCEEDED', 'future-reason', None])
-def test_leg_drops_stay_invalid_even_with_legitimate_reranker_skip(reason):
+def test_leg_drops_stay_invalid_even_with_legitimate_reranker_skip(tmp_path, reason):
     c = make_collection()
     record = make_run(c)
-    result = collect_leg_result(c, reason)
+    result = collect_leg_result(c, tmp_path, reason)
     assert result.served.leg_details['dense'] == {'status': 'skipped', 'reason': reason}
     reduced = replace(record, results=(result, *record.results[1:]))
     comparison = compare.compare(c, config_for(c), reduced, reduced)
@@ -321,11 +321,11 @@ def test_leg_drops_stay_invalid_even_with_legitimate_reranker_skip(reason):
     assert any('q000' in s and 'dense' in s for s in comparison.verdict.reasons)
 
 
-def test_leg_reasons_differ_even_when_executed_leg_set_is_identical():
+def test_leg_reasons_differ_even_when_executed_leg_set_is_identical(tmp_path):
     c = make_collection()
     record = make_run(c)
-    left = collect_leg_result(c)
-    right = collect_leg_result(c, 'not-selected')
+    left = collect_leg_result(c, tmp_path)
+    right = collect_leg_result(c, tmp_path, 'not-selected')
     a = replace(record, results=(left, *record.results[1:]))
     b = replace(record, results=(right, *record.results[1:]))
     assert compare.compare(c, config_for(c), a, b).verdict.outcome is Outcome.INCONCLUSIVE

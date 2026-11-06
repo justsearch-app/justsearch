@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 from typing import Mapping
+import json
+import math
+import numpy as np
 
 from .compare import Comparison, syntax_refused
 from .types import Collection, GroupVerdict, Outcome, RunHeader
@@ -33,6 +36,8 @@ def outcome_line(cmp: Comparison) -> str:
             f"qid={qid} doc_id={doc} arm={arm}" for qid, doc, arm in rows[:3])
         if len(rows) > 3:
             line += f" (+{len(rows)-3} more; full list in report/JSON)"
+    if cmp.candidate:
+        line += "; " + timing_text(search_timings(cmp.candidate.results))
     return compact(line)
 
 
@@ -49,9 +54,10 @@ def _headline_group(groups: tuple[GroupVerdict, ...]) -> GroupVerdict:
     return next((g for g in groups if g.group == "all"), groups[0])
 
 
-def score_line(c: Collection, aggregate: Mapping[str, float], unjudged_share: float, n: int) -> str:
+def score_line(c: Collection, aggregate: Mapping[str, float], unjudged_share: float, n: int,
+               results=()) -> str:
     metrics = " ".join(f"{k} {v:.4f}" for k, v in aggregate.items())
-    return f"VALID {c.name} n={n} {metrics} unjudged@10 {unjudged_share:.1%}"
+    return f"VALID {c.name} n={n} {metrics} unjudged@10 {unjudged_share:.1%}; {timing_text(search_timings(results))}"
 
 
 def _identity_rows(h: RunHeader) -> dict[str, str]:
@@ -96,6 +102,7 @@ def render(cmp: Comparison) -> str:
     for arm, record in (("baseline", cmp.baseline), ("candidate", cmp.candidate)):
         if record:
             ids = [r.qid for r in record.results if syntax_refused(r)]
+            out += [f"{arm} search time: {timing_text(search_timings(record.results))}", ""]
             out += [f"{arm} syntax refusals ({len(ids)}): " + (", ".join(ids) or "none"), ""]
     if cmp.baseline and cmp.candidate:
         b, n = _identity_rows(cmp.baseline.header), _identity_rows(cmp.candidate.header)
@@ -162,3 +169,35 @@ def _most_changed(cmp: Comparison) -> list[str]:
                 out.append("(no results)")
             out.append("")
     return out
+
+
+def search_timings(results):
+    values = [r.timings.get('elapsed_seconds') for r in results]
+    if not values or not all(isinstance(v, (int, float)) and not isinstance(v, bool)
+                             and math.isfinite(v) and v >= 0 for v in values):
+        return {'p50_seconds': None, 'p95_seconds': None}
+    p50, p95 = np.percentile(values, [50, 95])
+    return {'p50_seconds': float(p50), 'p95_seconds': float(p95)}
+
+
+def timing_text(row):
+    def value(key):
+        number = row.get(key)
+        return 'unavailable' if number is None else f'{number:.3f}s'
+    return f"p50 {value('p50_seconds')}, p95 {value('p95_seconds')}"
+
+
+def run_measurements(c, record, groups=()):
+    from . import scoring, sensitivity
+    return {**search_timings(record.results), 'queries': len(record.results),
+            'nDCG@10': scoring.aggregate(scoring.score_results(c.judgments, record.results))['nDCG@10'],
+            'counts': sensitivity.counts(c, record.results, groups)}
+
+
+def measurement_text(name, row, is_sensitivity=False):
+    from .sensitivity import DEADLINE_NOTE
+    text = (f"{name}: n={row['queries']}, nDCG@10 {row['nDCG@10']:.4f}; {timing_text(row)}")
+    if is_sensitivity:
+        text += '\n\nReranker counts by collection and fixed query group (each with its query denominator):\n\n```json\n'
+        text += json.dumps(row['counts'], indent=2) + '\n```\n\n' + DEADLINE_NOTE
+    return text

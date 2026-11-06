@@ -165,7 +165,7 @@ def test_served_reranker_values_are_checked():
 
 
 def test_exit_codes():
-    assert [o.exit_code for o in Outcome] == [0, 1, 2, 2]
+    assert [o.exit_code for o in Outcome] == [0, 1, 2, 2, 3]
 
 
 def _header_line(**changes):

@@ -12,7 +12,7 @@ import pytest
 from .conftest import ready_distribution
 
 from jseval import backend
-from jseval.quality import compare, run
+from jseval.quality import compare, index, run
 from jseval.quality.types import Outcome, Served, sha256_text
 from .helpers import make_collection, make_run, config_for
 
@@ -42,15 +42,17 @@ def response(reason=None):
         {'id': 'cross-encoder', 'status': 'skipped' if reason else 'executed', 'reason': reason}]}}
 
 
-def test_refined_request_and_delivered_order():
+def test_refined_request_and_delivered_order(tmp_path):
     c = make_collection()
     qid = next(iter(c.queries))
     seen = []
-    handle = Mock()
-    handle.ranked_doc_ids.return_value = ['d001', 'd000']
+    handle = index.IndexHandle(c, index.IndexConfig(), 'key', tmp_path, tmp_path, 'cached', {}, {}, None)
+    (tmp_path/'materialized.json').write_text(json.dumps(c.documents))
     def reply(req):
         seen.append(json.loads(req.content))
-        return httpx.Response(200, json=response())
+        body = response()
+        body['results'] = [{'fields': {'path': c.documents[doc]}} for doc in ('d001', 'd000')]
+        return httpx.Response(200, json=body)
     with httpx.Client(transport=httpx.MockTransport(reply), base_url='http://engine') as client:
         r = run.search_query(client, handle, qid, c.queries[qid], run.refined_request(), 5)
     body = seen[0]
@@ -63,10 +65,12 @@ def test_refined_request_and_delivered_order():
 
 
 @pytest.mark.parametrize('wire,status,error', [(response('SEARCH_DEADLINE_EXCEEDED'), 200, False), ({'error':'bad syntax'}, 400, True), ({'results':[]}, 200, True)])
-def test_errors_never_become_empty_success(wire, status, error):
+def test_errors_never_become_empty_success(tmp_path, wire, status, error):
     c = make_collection()
+    (tmp_path/'materialized.json').write_text(json.dumps({'d000': 'docs/a.txt',
+        **{doc: rel for doc, rel in c.documents.items() if doc != 'd000'}}))
     with httpx.Client(transport=httpx.MockTransport(lambda _: httpx.Response(status, json=wire)), base_url='http://engine') as client:
-        h = Mock(); h.ranked_doc_ids.return_value = []
+        h = index.IndexHandle(c, index.IndexConfig(), 'key', tmp_path, tmp_path, 'cached', {}, {}, None)
         r = run.search_query(client, h, 'q000', c.queries['q000'], run.refined_request(), 5)
     assert bool(r.error) == error
     if not error:
