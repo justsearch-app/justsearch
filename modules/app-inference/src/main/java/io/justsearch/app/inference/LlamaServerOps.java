@@ -156,6 +156,8 @@ final class LlamaServerOps {
   private volatile ChildHandle child;
   /** A launched server whose exit was confirmed while its descendants could not be listed. */
   private volatile ChildHandle unverifiedExit;
+  /** What an exited server started that could not be confirmed ended (design D4 reads it). */
+  private volatile List<ProcessHandle> leftRunning = List.of();
   private volatile CompletableFuture<?> crashMonitor;
   /** The owner a planned stop is ending; its exit, whatever its class, is not a crash. */
   private volatile ActiveServer stoppingOwner;
@@ -205,6 +207,17 @@ final class LlamaServerOps {
    * when the pass launched or relaunched the server.
    */
   private final AtomicLong launchAttempts = new AtomicLong();
+
+  /**
+   * Admits each managed launch against the answer model's file-removal lock (design D4); open
+   * until composition binds it.
+   */
+  private volatile ManagedLaunchFence launchFence = ManagedLaunchFence.OPEN;
+
+  /** Binds the managed-launch fence (design D4). */
+  void setLaunchFence(ManagedLaunchFence fence) {
+    this.launchFence = fence == null ? ManagedLaunchFence.OPEN : fence;
+  }
 
   /**
    * T6/T27: the rung a RESOURCE step-down reached, for the configuration it was reached under. A
@@ -1023,6 +1036,7 @@ final class LlamaServerOps {
     }
     if (!io.justsearch.app.inference.chat.StartedProcesses.awaitExit(started, STOP_WAIT)) {
       LOG.warn("A process llama-server PID {} started is still running", exited.pid());
+      leftRunning = List.copyOf(started);
     }
   }
 
@@ -1773,7 +1787,24 @@ final class LlamaServerOps {
     launchManagedLlamaServer(argv, result, port);
   }
 
+  /**
+   * Admits the launch against the file-removal lock for as long as it takes to start the process
+   * (design D4); a refused launch starts nothing and is a {@link ManagedLaunchRefusedException}.
+   */
   private void launchManagedLlamaServer(List<String> command, StartResult result, int port)
+      throws IOException, ModeTransitionException {
+    final ManagedLaunchFence.Admission admitted;
+    try {
+      admitted = launchFence.admit();
+    } catch (IllegalStateException refused) {
+      throw new ManagedLaunchRefusedException(refused.getMessage());
+    }
+    try (admitted) {
+      launchAdmittedLlamaServer(command, result, port);
+    }
+  }
+
+  private void launchAdmittedLlamaServer(List<String> command, StartResult result, int port)
       throws IOException, ModeTransitionException {
     // Tempdoc 656 Task 3: a missing llama-server.exe previously failed inside ProcessBuilder.start()
     // below with a raw IOException (Windows error 2), which propagates past every typed handler and
@@ -2219,6 +2250,32 @@ final class LlamaServerOps {
 
   boolean hasLiveManagedProcess() {
     return alive(child);
+  }
+
+  /**
+   * Design D4: whether a llama-server process this Engine launched may still hold the answer
+   * model's files, read from the physical owner and never from the mode (a failed stop leaves the
+   * mode offline while the child lives). True while a launch is inside the OS or a launched server
+   * has not been seen to exit, while a retained server (one whose stop failed) is not confirmed
+   * gone, while an exit's descendants are unverified, and while anything a server started that
+   * could not be ended still runs. An unreadable descendant list counts as in use.
+   */
+  boolean managedProcessesMayHoldFiles() {
+    if (processOwnership.anyOwned() || unverifiedExit != null) return true;
+    ChildHandle held = child;
+    if (held != null) {
+      if (held.state() != ChildHandle.State.EXITED) return true;
+      try {
+        if (io.justsearch.app.inference.chat.StartedProcesses.of(held).stream()
+            .anyMatch(io.justsearch.app.api.runtime.child.ProcessTerminator::isRunning)) {
+          return true;
+        }
+      } catch (RuntimeException unreadable) {
+        return true;
+      }
+    }
+    return leftRunning.stream()
+        .anyMatch(io.justsearch.app.api.runtime.child.ProcessTerminator::isRunning);
   }
 
   void handlePeriodicHealthFailure(String reason, boolean external) {

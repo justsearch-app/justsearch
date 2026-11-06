@@ -917,6 +917,18 @@ Source: tempdoc 500, ADR-0015, tempdoc 366.
 - `filters` (`mime`, `mimeBase`, `fileKind`, `language`, `pathPrefix`, `includeChunks`, `modifiedAt`, `sizeBytes`)
 - Entity filter fields: `entityPersons`, `entityOrganizations`, `entityLocations` (repeated string) (362)
 - Metadata filter fields: `metaSource`, `metaAuthor`, `metaCategory` (repeated string), `metaPublishedAt` (long range) (362)
+- Ordinary passage retrieval enforces these entity and metadata predicates against parents before
+  candidate budgets, across BM25, dense, sparse, fusion, retries and recall rescue. Unknown parent
+  values do not match active predicates; no matching parent gives the normal empty result.
+  Predicates intersect with folder, date, size and selected files. Parent resolution runs once per
+  passage leg/retry on its searcher, uncached; refresh/reopen follow that searcher's parent state.
+  No effective parent predicate adds no parent resolution. Lists activate only with a nonblank
+  value, publication endpoints only above zero; a present size endpoint includes zero.
+- List filters use within-list OR and between-filter intersection, accepting 1,024 and 10,000
+  selected paths without Boolean-clause limits on text, dense, hybrid and passage paths. Null and
+  blank elements are ignored; all-blank lists add no restriction. Duplicates and exact nonblank
+  values keep their meaning. Search facet counts keep their existing behavior. Ask retains its
+  prefilter and original filters, so it resolves parents again for passage retrieval.
 - `doc_ids` (repeated string, TermInSetQuery on PATH field — scopes search to specific documents) (366)
 - `boostFilters` (soft boost clauses, same fields as filters — additive SHOULD clauses) (363/366)
 - `facets` (`include`, `maxDocsScanned`, `fields[]`)
@@ -993,7 +1005,10 @@ Response fields (additive/optional-by-presence):
 - `nextCursor` (TEXT mode pagination)
 - `cursor`/`nextCursor` use the current stateless `searchAfter` request path. A cursor does not
   pin a Lucene reader or generation across requests; D2's proposed pinned-reader lifetime and
-  `cursor expired` eviction contract are not shipped.
+  `cursor expired` eviction contract are not shipped. Relevance scores must be finite floats:
+  `NaN`, `Infinity`, `-Infinity` and overflow such as `1e100` receive the same HTTP **400**
+  invalid-score outcome as non-numeric input, without restarting at page one. Finite zero and
+  non-relevance `_` score placeholders remain valid.
 - `facets`, `facetsTruncated`
 - `entityFacetVariants`
 - `queryUnderstanding` (object: `appliedBoosts` map, `latencyMs`) — present when QU is enabled (363/366)
@@ -1472,7 +1487,8 @@ Other debug endpoints: `/api/debug/commit-metadata`, `/api/debug/effective-confi
 | Route | Method | Request | Success | Errors |
 |---|---|---|---|---|
 | `/api/ai/install/manifest` | GET | – | `ModelRegistry` | 500 `MANIFEST_UNAVAILABLE` |
-| `/api/ai/install/plan-preview` | GET | – | `InstallPlanPreview` | 500 `MANIFEST_UNAVAILABLE` |
+| `/api/ai/install/plan-preview` | GET | optional `?include=<id>[,<id>]` | `InstallPlanPreview` | 500 `MANIFEST_UNAVAILABLE` |
+| `/api/ai/install/downloaded-files` | GET | – | `DownloadedFiles` | 500 `AI_INSTALL_ERROR` |
 | `/api/ai/install/status` | GET | – | `AiInstallStatus` | – |
 | `/api/ai/install/start` | POST | `{"acceptTerms": true}` | `AiInstallStatus` | 400 `TERMS_REQUIRED`, 403 `DOWNLOADS_DISABLED`, 409 `INSTALL_ALREADY_RUNNING`, 500 `INSTALL_START_FAILED` |
 | `/api/ai/install/cancel` | POST | – | `AiInstallStatus` | 500 `INSTALL_CANCEL_FAILED` |
@@ -1531,6 +1547,12 @@ the next one.
 `GET /api/ai/install/plan-preview` returns a **side-effect-free** projection of the download plan grouped by capability tier, for the current hardware and install intent — the honest first-run weight breakdown shown before the user commits (realizes tempdoc 381 §F). Shape: `{ intent, downloadProfile, totalDownloadBytes, resumableBytes, tiers: [{ tier, label, includedByIntent, totalBytes, downloadBytes }], components: [{ id, label, description, tier, necessity, declinable, declined, totalBytes, downloadBytes, state, unavailableReason }] }`. Computing it runs no downloads (reuses the pure `InstallPlanner`).
 
 `components[]` is the per-component list the install UI is built from, and it lives here rather than on `GET /api/ai/install/status` deliberately: `status.packages` is run bookkeeping and is EMPTY on an idle machine that is not fully installed, so a list sourced from it would show a first-run user nothing — the user for whom it matters most. `state` is `installed | to-download | declined | unavailable | not-in-mode`, derived from the same plan the tier totals come from, so the list cannot disagree with what an install would actually do. `declined` (the user's standing preference) and `unavailable` (hardware this machine lacks) are deliberately distinct — presenting an unavailable component as an unticked box would imply an option that does not exist. `declinable` is derived from `necessity`, never stored twice. The install/runtime **mode** itself is reported on the runtime manifest (`GET /api/runtime/manifest#mode`, with `intent` + coarse `realized`) per the tempdoc 501 closure rule.
+
+### Downloaded files and "Remove files" (design D4)
+
+`GET /api/ai/install/downloaded-files` lists each registry part with its **measured** size on disk (`null` when unreadable, never estimated), whether "Remove files" is offered now and, if not, the plain reason: `{ parts: [{ id, label, state: downloaded|incomplete|not-downloaded|not-measured, sizeOnDiskBytes, declined, removable, reason, previewDigest, unavailableAfter, delete: [{ path, sizeBytes }], kept: [{ path, sizeBytes, reason }] }], removal: { packageId, label, state: running|removed|partly-removed|not-removed|refused|interrupted, message, deleted[], kept[], startedAtEpochMs, finishedAtEpochMs } | null }`. Paths are relative to the models folder. `downloaded` means a usable copy (a model file and every required file beside it); `incomplete` means files are left but not that whole set. A malformed removal record is reported as `interrupted` ("The removal record could not be read; files in the removal folder were kept"), never as an error. Only Best match first (`reranker`) and the answer model (`chat`, its weights and picture-reading file together) are removable in this step; SPLADE, entity recognition and citation scoring say "Removal not available yet".
+
+The removal itself is the HIGH-risk operation `core.remove-ai-files` (`{ packageId, previewDigest }` - a part id, never a path; the digest names the list the confirmation showed). It refuses with a plain reason and deletes nothing while the part is switched on, while a download, Repair, pack import or runtime activation runs, while the runtime still has the files loaded, or while a user-run answer server is configured; it records the part as declined (so Repair does not restore it) and then captures, verifies and deletes each file. Programs running under the user's own account are trusted (other accounts are kept out of the owner-only removal folder): on POSIX a captured file is checked and then unlinked by name, and a file put back by a hard link has its captured name dropped by name, so another program running under your account could swap a file at the moment of deletion; such a program can already change your files directly. `?include=` on the plan preview and `includePackages` on `core.start-ai-install` implement "Download again": the preview carries `planDigest`, the identity of exactly that plan and the settings it was read against, and the accepted start sends it back as `planDigest`; the start refuses ("The download changed - review it again") before saving or downloading anything unless the plan is still that one, then withdraws the decline against the same settings witness and downloads with exactly those choices. `enableChatOnCompletion` on `core.start-ai-install` carries a consented answers enable (switching on answers whose model is missing): the Engine switches answers on when the download completes with the answer model on disk, not when it starts, and not if a newer answers choice was saved meanwhile (`chatPreferenceRevision`, stamped by the settings owner for a changed answers value and for the answers switch repeating one). A removal also refuses while an application update is being prepared, and an update waits for a running removal (it holds a must-complete upgrade-admission lease).
 
 ## Error Response Sanitization
 

@@ -1410,6 +1410,23 @@
         },
         "enablePictureReadingOnCompletion" : {
           "type" : "boolean"
+        },
+        "enableChatOnCompletion" : {
+          "type" : "boolean"
+        },
+        "includePackages" : {
+          "type" : "array",
+          "maxItems" : 8,
+          "uniqueItems" : true,
+          "items" : {
+            "type" : "string",
+            "minLength" : 1,
+            "maxLength" : 64
+          }
+        },
+        "planDigest" : {
+          "type" : "string",
+          "pattern" : "^[0-9a-f]{64}$"
         }
       }
     },
@@ -1550,6 +1567,57 @@
   },
   "policy" : {
     "risk" : "MEDIUM",
+    "confirm" : {
+      "kind" : "INLINE"
+    },
+    "audit" : "METADATA_ONLY",
+    "undoSupported" : false,
+    "inverseOperationId" : null
+  },
+  "availability" : { },
+  "lineage" : {
+    "affects" : [ ],
+    "supersedes" : [ ]
+  },
+  "provenance" : {
+    "tier" : "CORE",
+    "contributorId" : "core",
+    "version" : "1.0"
+  },
+  "executors" : [ "UI" ],
+  "audience" : "USER",
+  "consumers" : [ ]
+}, {
+  "id" : "core.remove-ai-files",
+  "type" : "operation",
+  "presentation" : {
+    "labelKey" : "ops.remove-ai-files.label",
+    "descriptionKey" : "ops.remove-ai-files.description",
+    "iconHint" : "warning",
+    "category" : "destructive"
+  },
+  "intf" : {
+    "inputs" : {
+      "type" : "object",
+      "additionalProperties" : false,
+      "properties" : {
+        "packageId" : {
+          "type" : "string",
+          "enum" : [ "reranker", "chat" ]
+        },
+        "previewDigest" : {
+          "type" : "string",
+          "pattern" : "^[0-9a-f]{64}$"
+        }
+      },
+      "required" : [ "packageId", "previewDigest" ]
+    },
+    "result" : { },
+    "errors" : [ ],
+    "uiHints" : { }
+  },
+  "policy" : {
+    "risk" : "HIGH",
     "confirm" : {
       "kind" : "INLINE"
     },

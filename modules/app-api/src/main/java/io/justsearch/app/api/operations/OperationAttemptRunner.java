@@ -262,6 +262,18 @@ public interface OperationAttemptRunner {
     throw new UnsupportedOperationException("Transient settings candidate context is unavailable");
   }
 
+  /**
+   * The caller's own precommit admission joins this attempt's cancellation arbitration: it is asked
+   * once, under the runner's commit-admission lock, immediately before the settings replacement,
+   * and false refuses the commit exactly as a precommit cancellation does. It must not block.
+   */
+  default OperationResult applySettingsAdmitted(OperationRecordHandle handle, SettingsWitness expected,
+      io.justsearch.app.api.UiSettings candidate,
+      io.justsearch.app.api.settings.SettingsCandidateContext candidateContext,
+      java.util.function.BooleanSupplier commitAdmission) {
+    throw new UnsupportedOperationException("Caller commit admission is unavailable");
+  }
+
   /** Fixed reset from this executing attempt's persisted server preparation; no caller authority flags. */
   OperationResult applySettingsReset(OperationRecordHandle handle);
 

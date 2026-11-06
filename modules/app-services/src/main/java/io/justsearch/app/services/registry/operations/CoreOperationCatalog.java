@@ -283,6 +283,15 @@ public final class CoreOperationCatalog implements OperationCatalog {
       new OperationRef("core.activate-installed-models");
 
   /**
+   * Design D4: Advanced settings - Downloaded files - "Remove files". HIGH risk (destroys downloaded
+   * model files, even though they can be downloaded again) with inline confirmation and no retry.
+   * Args: {@code {"packageId": "reranker"|"chat", "previewDigest": hex}} - a part id, never a path;
+   * the digest names the list the confirmation showed, and the owner refuses if it changed.
+   */
+  public static final OperationRef REMOVE_AI_FILES =
+      new OperationRef("core.remove-ai-files");
+
+  /**
    * Slice 3a-2-c BrainInstallSection Cancel Install. MEDIUM risk (cancels
    * a running install). No args. Idempotent if no install is running.
    */
@@ -383,6 +392,7 @@ public final class CoreOperationCatalog implements OperationCatalog {
       activateInstalledModels(),
       cancelAiInstall(),
       repairAiInstall(),
+      removeAiFiles(),
       createUserPolicy(),
       allowlistAddDigest(),
       resetSettings(),
@@ -1140,7 +1150,12 @@ public final class CoreOperationCatalog implements OperationCatalog {
         Presentation.forId(START_AI_INSTALL),
         Interface.of("{\"type\":\"object\",\"properties\":{\"acceptTerms\":{\"type\":\"boolean\"},"
             + "\"enableRerankerOnCompletion\":{\"type\":\"boolean\"},"
-            + "\"enablePictureReadingOnCompletion\":{\"type\":\"boolean\"}}}", "{\"type\":\"object\"}"),
+            + "\"enablePictureReadingOnCompletion\":{\"type\":\"boolean\"},"
+            + "\"enableChatOnCompletion\":{\"type\":\"boolean\"},"
+            + "\"includePackages\":{\"type\":\"array\",\"maxItems\":8,\"uniqueItems\":true,"
+            + "\"items\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":64}},"
+            + "\"planDigest\":{\"type\":\"string\",\"pattern\":\"^[0-9a-f]{64}$\"}}}",
+            "{\"type\":\"object\"}"),
         new OperationPolicy(
             RiskTier.MEDIUM,
             ConfirmStrategy.Inline.INSTANCE,
@@ -1153,6 +1168,22 @@ public final class CoreOperationCatalog implements OperationCatalog {
         Binding.of(START_AI_INSTALL),
         Provenance.core("1.0"),
         Set.of(ExecutorTag.UI));
+  }
+
+  private static Operation removeAiFiles() {
+    return new Operation(
+        REMOVE_AI_FILES,
+        Presentation.forId(REMOVE_AI_FILES, Optional.of("warning"), Optional.of("destructive")),
+        Interface.inputsOnly("""
+            {"type":"object","additionalProperties":false,"properties":{
+              "packageId":{"type":"string","enum":["reranker","chat"]},
+              "previewDigest":{"type":"string","pattern":"^[0-9a-f]{64}$"}},
+             "required":["packageId","previewDigest"]}
+            """),
+        new OperationPolicy(RiskTier.HIGH, ConfirmStrategy.Inline.INSTANCE,
+            AuditPolicy.METADATA_ONLY, RetryPolicy.noRetry(), Set.of(), false),
+        OperationAvailability.empty(), OperationLineage.empty(), Binding.of(REMOVE_AI_FILES),
+        Provenance.core("1.0"), Set.of(ExecutorTag.UI), Audience.USER);
   }
 
   private static Operation activateInstalledModels() {

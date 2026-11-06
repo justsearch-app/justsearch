@@ -4,6 +4,7 @@ package io.justsearch.app.inference.chat;
 import io.justsearch.app.api.runtime.child.ChildControl;
 import io.justsearch.app.api.runtime.child.ChildHandle;
 import io.justsearch.app.api.runtime.child.ChildKind;
+import io.justsearch.app.api.runtime.child.ChildRegistrationRefusedException;
 import io.justsearch.app.api.runtime.child.ChildSpec;
 import io.justsearch.app.api.runtime.child.ExitOutcome;
 import io.justsearch.app.api.runtime.child.StopMode;
@@ -20,9 +21,11 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,30 +54,88 @@ public final class ChildSelfTestLauncher implements SelfTestLauncher {
 
   private final ChildControl control;
 
+  /** Runs inside {@link #run} (a candidate may be starting, serving or stopping). */
+  private final AtomicInteger running = new AtomicInteger();
+  /** Candidates whose stop did not confirm them and everything they started gone. */
+  private final Set<Unreleased> unreleased = ConcurrentHashMap.newKeySet();
+
+  /** A candidate that outlived its self-test, with the processes it was seen to start. */
+  private record Unreleased(ChildHandle candidate, Set<ProcessHandle> started) {
+    /** Confirmed gone: exited, nothing it started still runs, and its scope reads empty. */
+    boolean released() {
+      if (started.stream().anyMatch(io.justsearch.app.api.runtime.child.ProcessTerminator::isRunning)) {
+        return false;
+      }
+      return StartedProcesses.released(candidate);
+    }
+  }
+
   public ChildSelfTestLauncher(ChildControl control) {
     this.control = Objects.requireNonNull(control, "control");
+  }
+
+  /**
+   * Design D4: whether a self-test candidate may still hold the answer model's files: a run is in
+   * progress, or a candidate outlived its run (its stop was not confirmed, or something it started
+   * still runs) and is not yet seen gone. This outlives the controller's self-test hold.
+   */
+  public boolean candidatesMayHoldFiles() {
+    unreleased.removeIf(Unreleased::released);
+    return running.get() > 0 || !unreleased.isEmpty();
   }
 
   @Override
   public SelfTestRun run(SelfTestSpec spec) {
     Objects.requireNonNull(spec, "spec");
+    running.incrementAndGet();
+    try {
+      return runCandidate(spec);
+    } finally {
+      running.decrementAndGet();
+    }
+  }
+
+  private SelfTestRun runCandidate(SelfTestSpec spec) {
     ChildHandle candidate;
     try {
       candidate = start(spec);
+    } catch (ChildRegistrationRefusedException refused) {
+      // A candidate whose registration was refused is retained with the processes it was seen to
+      // start until it and they are confirmed gone: one whose rollback stop did not confirm its
+      // exit still runs (repair round 3), and one whose root exited may have left a descendant its
+      // rollback could not end, which may still hold the answer model's files.
+      ChildHandle rolledBack = refused.rolledBack();
+      refused.survivor().ifPresent(survivor -> LOG.error("Self-test llama-server PID {} survived"
+          + " registration rollback; retaining its handle", survivor.pid()));
+      unreleased.add(new Unreleased(rolledBack, startedSoFar(rolledBack)));
+      return SelfTestRun.failed("llama-server could not start: " + message(refused));
     } catch (IOException | RuntimeException failure) {
       return SelfTestRun.failed("llama-server could not start: " + message(failure));
     }
     Set<ProcessHandle> started = new LinkedHashSet<>();
     SelfTestRun outcome;
-    String survived;
+    String survived = "Self-test cleanup unverified";
     try {
       outcome = exercise(candidate, spec, started);
     } finally {
-      survived = stopAndRelease(candidate, started);
+      try {
+        survived = stopAndRelease(candidate, started);
+      } finally {
+        if (survived != null) unreleased.add(new Unreleased(candidate, Set.copyOf(started)));
+      }
     }
     // A candidate that may still run (and hold the GPU) is not a passed self-test (S19).
     if (survived == null) return outcome;
     return SelfTestRun.failed(outcome.exercised() ? survived : outcome.failure() + "; " + survived);
+  }
+
+  /** The processes a survivor was seen to start; its scope is read again until it is released. */
+  private static Set<ProcessHandle> startedSoFar(ChildHandle survivor) {
+    try {
+      return Set.copyOf(StartedProcesses.of(survivor));
+    } catch (RuntimeException unreadable) {
+      return Set.of();
+    }
   }
 
   private SelfTestRun exercise(ChildHandle candidate, SelfTestSpec spec, Set<ProcessHandle> started) {

@@ -107,6 +107,18 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
   private final Path homeDir;
   private final Path modelsDir;
 
+  /** Format version of the "Remove files" record, for the boot data-version marker (design D4). */
+  public static final int MODEL_FILE_REMOVAL_RECORD_VERSION = ModelFileRemoval.JOURNAL_VERSION;
+
+  /** The one removal lock (design D4); this owner holds it for a whole "Remove files" run. */
+  private final ModelFileRemovalFence removalFence = new ModelFileRemovalFence();
+  private final ModelFileRemoval removal;
+  /** What the runtime owners say about a part's files; fail closed until composition binds it. */
+  private volatile java.util.function.Function<String, Optional<String>> removalUsage =
+      ModelFileRemoval.UsageProbe.UNBOUND::inUse;
+  /** Whether an accepted installed-model activation is open; none until composition binds it. */
+  private volatile BooleanSupplier installerActivationOpen = () -> false;
+
   // Liveness backstop window (575 §17 Face C, polled-state model): a "running" install with no
   // progress for longer than this is treated as a dead owner and reclaimed to terminal on read.
   private static final long STALE_RUNNING_MS = 5 * 60_000L; // 5 min
@@ -136,6 +148,16 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     this.operationLeases = leases == null ? OperationLeaseService.noOp() : leases;
   }
   private final AtomicBoolean cancelFlag = new AtomicBoolean(false);
+  /**
+   * The one boundary between cancellation and successful completion. {@link #cancel()} sets the
+   * cancel flag only under it, and a completion's settings commit (or, without one, its completed
+   * bookkeeping) is admitted only under it, from inside the settings owner's commit admission. So
+   * exactly one wins within this process: a cancelled install commits nothing, a completed one
+   * cancels nothing. A claim stands after a failed commit unless {@link #completionLost} proves
+   * nothing was saved.
+   */
+  private final Object completionBoundary = new Object();
+  private boolean completionAdmitted;
   private final AiInstallStatus status = new AiInstallStatus();
   private volatile boolean activationDownloadComplete;
   private volatile DownloadExecutor downloadExecutor;
@@ -189,6 +211,10 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
   private boolean enableRerankerOnCompletion;
   private boolean enablePictureReadingOnCompletion;
   private UiSettingsStore.Snapshot picturePreferenceAtInstallStart;
+  private boolean enableChatOnCompletion;
+  private UiSettingsStore.Snapshot chatPreferenceAtInstallStart;
+  /** Tells answer-server reconciliation that the completion switched answers on (composition-bound). */
+  private volatile Runnable chatIntentChanged = () -> {};
   private UiSettingsStore.Snapshot rerankerPreferenceAtInstallStart;
 
   /**
@@ -307,6 +333,9 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     } else {
       this.modelsDir = homeDir.resolve("models");
     }
+    // The removal reads the lease service late: composition binds it after construction.
+    this.removal = new ModelFileRemoval(homeDir, modelsDir, this::getManifest,
+        this::readInstallContractBestEffort, removalFence, () -> operationLeases);
   }
 
   /** Production constructor — resolves AI Home from ConfigStore / platform defaults. */
@@ -349,7 +378,15 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
   }
 
   public ModelRegistry getManifest() {
-    return ModelRegistryLoader.loadFromClasspath(REGISTRY_RESOURCE);
+    ModelRegistry override = manifestForTest;
+    return override != null ? override : ModelRegistryLoader.loadFromClasspath(REGISTRY_RESOURCE);
+  }
+
+  /** Test seam: a registry whose hashes match temporary test files. */
+  private volatile ModelRegistry manifestForTest;
+
+  void setManifestForTest(ModelRegistry registry) {
+    this.manifestForTest = registry;
   }
 
   /**
@@ -456,6 +493,23 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
 
   @Override
   public InstallPlanPreview previewInstallPlan() {
+    return previewInstallPlan(Set.of());
+  }
+
+  /**
+   * The plan preview as if {@code includePackages} were no longer declined ("Download again"). The
+   * saved choice is not changed: the consent shows this plan, and only the accepted install start
+   * withdraws the decline.
+   */
+  @Override
+  public InstallPlanPreview previewInstallPlan(Set<String> includePackages) {
+    Set<String> include = includePackages == null ? Set.of() : Set.copyOf(includePackages);
+    // Download again: the declines and the settings witness come from one read, so the plan the
+    // consent shows can be named exactly by the accepted start (repair round 2).
+    UiSettingsStore.Snapshot read = include.isEmpty() ? null : settingsSnapshotOrNull();
+    Set<String> declinedNow = new HashSet<>(read != null
+        ? read.settings().getDeclinedAiPackages() : declinedPackages());
+    declinedNow.removeAll(include);
     InstallPlanPreview preview = new InstallPlanPreview();
     ModelRegistry registry = getManifest();
     InstallHardware installHardware = buildInstallHardware();
@@ -467,8 +521,11 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
 
     // Reuse the PURE planner (no side effects) — tempdoc 381 §F "show the plan before download".
     InstallPlan plan =
-        InstallPlanner.plan(registry, hardware, intent, declinedPackages(), modelsDir, homeDir,
+        InstallPlanner.plan(registry, hardware, intent, declinedNow, modelsDir, homeDir,
             installHardware.policyExcluded());
+    if (read != null) {
+      preview.planDigest = downloadAgainDigest(include, declinedNow, plan, read.witness());
+    }
     // What the download will actually COST: complete files are already excluded by the planner, and
     // `remainingBytes()` also drops the bytes an interrupted run left staged. Stating `totalBytes()`
     // here charged the user for bytes already on their disk (Sandbox round 8).
@@ -520,7 +577,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     for (var sk : plan.skipped()) {
       skippedById.putIfAbsent(sk.packageId(), sk);
     }
-    Set<String> declined = declinedPackages();
+    Set<String> declined = declinedNow;
     for (ModelPackage pkg : registry.packages()) {
       // A devOnly package (tempdoc 842) is not a component the user has any decision about: it is
       // never installed, never declinable, and listing it would offer a choice that does nothing.
@@ -604,6 +661,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
       return;
     }
     try {
+      removal.recoverIfNeeded(); // report an interrupted removal before measuring presence
       ModelRegistry registry = getManifest();
       InstallHardware installHardware = buildInstallHardware();
       InstallPlan plan =
@@ -1068,24 +1126,96 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
   @Override
   public Attempt startInstall(boolean acceptTerms, boolean enableRerankerOnCompletion,
       boolean enablePictureReadingOnCompletion) {
+    return startInstall(acceptTerms, enableRerankerOnCompletion, enablePictureReadingOnCompletion,
+        Set.of(), null);
+  }
+
+  @Override
+  public Attempt startInstall(boolean acceptTerms, boolean enableRerankerOnCompletion,
+      boolean enablePictureReadingOnCompletion, Set<String> includePackages, String planDigest) {
+    return startInstall(acceptTerms, enableRerankerOnCompletion, enablePictureReadingOnCompletion,
+        false, includePackages, planDigest);
+  }
+
+  @Override
+  public Attempt startInstall(boolean acceptTerms, boolean enableRerankerOnCompletion,
+      boolean enablePictureReadingOnCompletion, boolean enableChatOnCompletion,
+      Set<String> includePackages, String planDigest) {
     if (!acceptTerms) {
       throw new AiInstallException(
           400, ApiErrorCode.TERMS_REQUIRED, "You must accept the model terms before downloading.");
     }
     checkPolicy();
-    var preferenceAtStart = (enableRerankerOnCompletion || enablePictureReadingOnCompletion) && settingsStore != null
-        ? settingsStore.inspect() : null;
+    Set<String> include = includePackages == null ? Set.of() : Set.copyOf(includePackages);
+    // Registered for the whole run, so a removal cannot begin while this install owns model files,
+    // and this install cannot start while a removal holds the lock (design D4, both orders).
+    final ModelFileRemovalFence.Ticket filesUser;
+    try {
+      filesUser = removalFence.enter("A download or Repair");
+    } catch (ModelFileRemovalFence.Refused removing) {
+      throw new AiInstallException(409, ApiErrorCode.MODEL_FILES_REMOVING, removing.getMessage());
+    }
+    try {
+      // An interrupted removal puts its captured files back before anything plans downloads.
+      removal.recoverIfNeeded();
+      return startInstallRun(enableRerankerOnCompletion, enablePictureReadingOnCompletion,
+          enableChatOnCompletion, include, planDigest, filesUser);
+    } catch (RuntimeException | Error failure) {
+      filesUser.close();
+      throw failure;
+    }
+  }
+
+  private Attempt startInstallRun(boolean enableRerankerOnCompletion,
+      boolean enablePictureReadingOnCompletion, boolean enableChatOnCompletion, Set<String> include,
+      String planDigest, ModelFileRemovalFence.Ticket filesUser) {
+    Set<String> acceptedDeclines = null;
+    if (!include.isEmpty()) {
+      // "Download again": the guard is taken first so no other start can interleave, then the
+      // presented plan is checked against one settings read and the declines are withdrawn against
+      // that read's witness. A changed plan refuses before anything is saved or downloaded, and
+      // leaves the install status as it was; a cancelled consent never reaches this point.
+      synchronized (lock) {
+        if (!running.compareAndSet(false, true)) {
+          throw new AiInstallException(
+              409, ApiErrorCode.INSTALL_ALREADY_RUNNING, "AI install is already running.");
+        }
+      }
+      try {
+        acceptedDeclines = acceptDownloadAgain(include, planDigest);
+      } catch (RuntimeException | Error refused) {
+        running.set(false);
+        throw refused instanceof AiInstallException typed ? typed : new AiInstallException(409,
+            ApiErrorCode.AI_INSTALL_ERROR, "Download again could not be saved: " + refused.getMessage());
+      }
+    }
+    // Read after any withdrawal, so a completion enable commits against the current witness.
+    final UiSettingsStore.Snapshot preferenceAtStart;
+    try {
+      preferenceAtStart = (enableRerankerOnCompletion || enablePictureReadingOnCompletion
+          || enableChatOnCompletion) && settingsStore != null ? settingsStore.inspect() : null;
+    } catch (RuntimeException | Error unreadable) {
+      if (acceptedDeclines != null) installStartFailed(unreadable);
+      throw unreadable;
+    }
     AiInstallStatus started;
     synchronized (lock) {
-      if (!running.compareAndSet(false, true)) {
+      if (acceptedDeclines == null && !running.compareAndSet(false, true)) {
         throw new AiInstallException(
             409, ApiErrorCode.INSTALL_ALREADY_RUNNING, "AI install is already running.");
       }
+      // The accepted plan's declines drive this run's acquisition planning (null: read live).
+      this.runDeclines = acceptedDeclines == null ? null : Set.copyOf(acceptedDeclines);
       this.enableRerankerOnCompletion = enableRerankerOnCompletion;
       this.rerankerPreferenceAtInstallStart = enableRerankerOnCompletion ? preferenceAtStart : null;
       this.enablePictureReadingOnCompletion = enablePictureReadingOnCompletion;
       this.picturePreferenceAtInstallStart = enablePictureReadingOnCompletion ? preferenceAtStart : null;
-      cancelFlag.set(false);
+      this.enableChatOnCompletion = enableChatOnCompletion;
+      this.chatPreferenceAtInstallStart = enableChatOnCompletion ? preferenceAtStart : null;
+      synchronized (completionBoundary) {
+        completionAdmitted = false;
+        cancelFlag.set(false);
+      }
       pause.resume();
       status.cancelRequested = false;
       status.startedAtEpochMs = System.currentTimeMillis();
@@ -1135,7 +1265,11 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
             status.paused = pause.isPaused();
             status.resumableBytes = resumableBytesOnDisk;
             outcome = status.snapshot();
-          } finally { running.set(false); }
+          } finally {
+            runDeclines = null;
+            running.set(false);
+            filesUser.close();
+          }
         }
         if (failure == null) completion.complete(outcome);
         else {
@@ -1156,6 +1290,7 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
   private void installStartFailed(Throwable failure) {
     synchronized (lock) {
       try {
+        runDeclines = null;
         pause.clear();
         fail("INSTALL_START_FAILED", "AI install could not start: " + failure.getMessage());
       } finally { running.set(false); }
@@ -1177,19 +1312,37 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     return running.get();
   }
 
-  public void cancel() {
+  @Override
+  public boolean cancel() {
     synchronized (lock) {
+      synchronized (completionBoundary) {
+        if (completionAdmitted) return false;
+        cancelFlag.set(true);
+      }
       status.cancelRequested = true;
       status.message = "Cancellation requested.";
       touch();
     }
-    cancelFlag.set(true);
     // A run halted between items is waiting on the pause monitor, not on the transport, so the
     // cancel flag alone would not be read until the wait's next slice. Wakes it without resuming it:
     // a cancelled run must not look like a continued one.
     pause.wakeForCancellation();
     DownloadExecutor exec = downloadExecutor;
     if (exec != null) exec.cancel();
+    return true;
+  }
+
+  /**
+   * Claims completion at the boundary {@link #cancel()} takes. Called from inside the settings
+   * owner's commit admission (or, for a completion without a settings change, just before its
+   * bookkeeping); false means cancellation won and nothing may complete.
+   */
+  private boolean admitCompletion() {
+    synchronized (completionBoundary) {
+      if (cancelFlag.get()) return false;
+      completionAdmitted = true;
+      return true;
+    }
   }
 
   /**
@@ -1303,6 +1456,305 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
           ApiErrorCode.AI_INSTALL_ERROR,
           "Failed to save the component choice: " + e.getMessage());
     }
+  }
+
+  /** The refusal when the accepted Download again no longer matches the plan its consent showed. */
+  static final String DOWNLOAD_CHANGED = "The download changed - review it again";
+
+  /** The accepted plan's declines for the running install's acquisition planning; null: live. */
+  private volatile Set<String> runDeclines;
+
+  private UiSettingsStore.Snapshot settingsSnapshotOrNull() {
+    if (settingsStore == null) return null;
+    try {
+      return settingsStore.inspect();
+    } catch (RuntimeException unreadable) {
+      log.debug("Download again preview: settings unreadable: {}", unreadable.toString());
+      return null;
+    }
+  }
+
+  /**
+   * The identity of a Download again plan: the parts included, the declines it was planned with,
+   * every file it downloads, and the settings witness those declines were read against. The
+   * consent preview carries it, and the accepted start presents it back.
+   */
+  static String downloadAgainDigest(Set<String> include, Set<String> declines, InstallPlan plan,
+      io.justsearch.app.api.settings.SettingsWitness witness) {
+    StringBuilder identity = new StringBuilder("download-again.v1\n");
+    identity.append(witness.acceptedRevision()).append('\n')
+        .append(String.valueOf(witness.lastCommittedOperationKey())).append('\n');
+    include.stream().sorted().forEach(id -> identity.append("include ").append(id).append('\n'));
+    declines.stream().sorted().forEach(id -> identity.append("declined ").append(id).append('\n'));
+    plan.downloads().stream()
+        .map(d -> d.packageId() + "\u0000" + d.targetPath() + "\u0000" + d.sha256())
+        .sorted().forEach(line -> identity.append("file ").append(line).append('\n'));
+    try {
+      return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+          .digest(identity.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+    } catch (NoSuchAlgorithmException impossible) {
+      throw new AssertionError(impossible);
+    }
+  }
+
+  /**
+   * The accepted Download again: from one settings read, re-plans with {@code include} no longer
+   * declined, refuses with {@link #DOWNLOAD_CHANGED} unless that is exactly the plan the consent
+   * showed ({@code planDigest}), and withdraws the declines through the settings owner against
+   * that read's witness (a change committed meanwhile refuses the same way). Nothing is saved when
+   * it refuses.
+   *
+   * @return the declines the accepted plan was made with
+   */
+  private Set<String> acceptDownloadAgain(Set<String> include, String planDigest) {
+    if (settingsStore == null || !settingsStore.mode().isWritable()) {
+      throw new AiInstallException(409, ApiErrorCode.SETTINGS_READ_ONLY,
+          "Settings are read-only in this session, so Download again cannot be remembered.");
+    }
+    ModelRegistry registry = getManifest();
+    for (String id : include) {
+      if (registry.findPackage(id) == null) {
+        throw new AiInstallException(404, ApiErrorCode.PACKAGE_NOT_FOUND,
+            "No AI component with id '" + id + "'.");
+      }
+    }
+    var snapshot = settingsStore.inspect();
+    UiSettings settings = snapshot.settings();
+    Set<String> declines = new HashSet<>(settings.getDeclinedAiPackages());
+    declines.removeAll(include);
+    InstallHardware hardware = buildInstallHardware();
+    InstallPlan plan = InstallPlanner.plan(registry, hardware.effective(), installIntent(), declines,
+        modelsDir, homeDir, hardware.policyExcluded());
+    if (planDigest == null
+        || !planDigest.equals(downloadAgainDigest(include, declines, plan, snapshot.witness()))) {
+      throw new AiInstallException(409, ApiErrorCode.AI_INSTALL_ERROR, DOWNLOAD_CHANGED);
+    }
+    List<String> next = new ArrayList<>(settings.getDeclinedAiPackages());
+    if (next.removeAll(include)) {
+      settings.setDeclinedAiPackages(next);
+      try {
+        commitSettings(settings, snapshot.witness(), "ai-download-again");
+      } catch (io.justsearch.app.api.settings.SettingsCommitOwner.Refused refused) {
+        // A save that landed after the read refuses the commit: the plan changed. Anything else is
+        // reported as what it is.
+        UiSettingsStore.Snapshot now = settingsSnapshotOrNull();
+        boolean changed = now == null || !snapshot.witness().equals(now.witness());
+        throw new AiInstallException(409, ApiErrorCode.AI_INSTALL_ERROR, changed ? DOWNLOAD_CHANGED
+            : "Download again could not be saved: " + refused.getMessage());
+      }
+    }
+    return Set.copyOf(declines);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Downloaded files and "Remove files" (design D4)
+  // ---------------------------------------------------------------------------
+
+  /** The removal lock, for the other owners composition fences with it. */
+  public ModelFileRemovalFence removalFence() {
+    return removalFence;
+  }
+
+  /**
+   * Binds what the runtime owners report about a part's files: a plain reason while something uses
+   * them (a live Best match first session; a managed or user-run answer server, a self-test or a
+   * picture-reading hold), empty when nothing does.
+   */
+  public void setRemovalUsageProbe(java.util.function.Function<String, Optional<String>> probe) {
+    this.removalUsage = probe == null ? ModelFileRemoval.UsageProbe.UNBOUND::inUse : probe;
+  }
+
+  /** Binds the recorded-ingestion owner's open installed-model activation (design D4). */
+  public void setInstallerActivationOpen(BooleanSupplier open) {
+    this.installerActivationOpen = open == null ? () -> false : open;
+  }
+
+  @Override
+  public void refuseWhileRemovingFiles() {
+    removalFence.refuseWhileRemoving();
+  }
+
+  /** Test seam: the engine, for checkpoint hooks. */
+  ModelFileRemoval removalForTest() {
+    return removal;
+  }
+
+  @Override
+  public io.justsearch.app.api.DownloadedFiles downloadedFiles() {
+    UiSettings settings = null;
+    if (settingsStore != null) {
+      try {
+        settings = settingsStore.inspect().settings();
+      } catch (RuntimeException unreadable) {
+        log.debug("Downloaded files: settings unreadable: {}", unreadable.toString());
+      }
+    }
+    return removal.view(settings, (id, read) -> {
+      Optional<String> refused = removalRefusal(id, read);
+      return refused.isPresent() ? refused : removalUsage.apply(id);
+    });
+  }
+
+  /**
+   * Part-level eligibility at the owners' own state: the part is switched off, the install owner is
+   * not acquiring or waiting to activate files, and no operator source controls the part.
+   */
+  private Optional<String> removalRefusal(String packageId, UiSettings settings) {
+    if (settings == null || settingsStore == null || settingsService == null) {
+      return Optional.of("Settings can't be read right now, so nothing can be removed");
+    }
+    if (!settingsStore.mode().isWritable()) {
+      return Optional.of("Settings are read-only in this session, so nothing can be removed");
+    }
+    synchronized (lock) {
+      if (running.get()) return Optional.of("A download or Repair is running - try again when it finishes");
+      if ("activation_required".equals(status.phase)) {
+        return Optional.of("Downloaded files are waiting to be activated - try again after that");
+      }
+    }
+    try {
+      // An accepted activation, also one continuing after a restart, was prepared from these files.
+      if (installerActivationOpen.getAsBoolean()) {
+        return Optional.of("Downloaded models are being activated - try again when it finishes");
+      }
+    } catch (RuntimeException unknown) {
+      return Optional.of("JustSearch can't confirm nothing uses these files yet - try again in a moment");
+    }
+    switch (packageId) {
+      case "reranker" -> {
+        if (!Boolean.FALSE.equals(settings.getRerankerEnabled())) {
+          return Optional.of("Switch Best match first off first");
+        }
+        if (operatorSource(io.justsearch.configuration.EnvRegistry.RERANK_ENABLED.configKey())
+            || operatorSource(io.justsearch.configuration.EnvRegistry.RERANK_MODEL_PATH.configKey())) {
+          return Optional.of("Best match first is set by an operator override");
+        }
+      }
+      case "chat" -> {
+        if (Boolean.TRUE.equals(settings.getChatEnabled())) return Optional.of("Switch answers off first");
+        if (!Boolean.FALSE.equals(settings.getPictureReadingEnabled())) {
+          return Optional.of("Switch picture reading off first");
+        }
+        ConfigStore published = ConfigStore.globalOrNull();
+        var external = published == null ? null
+            : published.get().resolution("justsearch.inference.external_endpoint");
+        if (external != null && external.isResolved() && external.value() != null
+            && !external.value().isBlank()) {
+          return Optional.of("An answer server you run yourself is configured");
+        }
+        if (operatorSource(io.justsearch.configuration.EnvRegistry.LLM_MODEL_PATH.configKey())
+            || operatorSource(io.justsearch.configuration.EnvRegistry.MMPROJ_MODEL.configKey())) {
+          return Optional.of("The answer model is set by an operator override");
+        }
+      }
+      default -> {
+        return Optional.empty();
+      }
+    }
+    return Optional.empty();
+  }
+
+  private static boolean operatorSource(String key) {
+    ConfigStore published = ConfigStore.globalOrNull();
+    var source = published == null ? null : published.get().resolution(key);
+    return source != null && source.isResolved() && source.sourceOrdinal()
+        >= io.justsearch.configuration.resolved.ResolvedConfigBuilder.ORDINAL_ENV_VAR;
+  }
+
+  @Override
+  public RemovalAttempt removeFiles(String packageId, String previewDigest) {
+    String id = packageId == null ? "" : packageId.trim();
+    final ModelFileRemoval.Run run;
+    try {
+      run = removal.prepare(id, previewDigest, removalSettings(), this::removalRefusal,
+          removalUsage::apply);
+    } catch (ModelFileRemoval.Refusal | ModelFileRemovalFence.Refused refused) {
+      throw new AiInstallException(409, ApiErrorCode.FILES_NOT_REMOVED, refused.getMessage());
+    } catch (RuntimeException failed) {
+      // Preparation deletes nothing; the decline is its last step and the lock is already released.
+      log.warn("Remove files could not be prepared", failed);
+      throw new AiInstallException(500, ApiErrorCode.FILES_NOT_REMOVED,
+          "Nothing was removed: " + failed.getMessage());
+    }
+    var completion = new CompletableFuture<io.justsearch.app.api.DownloadedFiles.Removal>();
+    io.justsearch.app.api.DownloadedFiles.Removal started = run.started();
+    Runnable finish = () -> {
+      try {
+        var outcome = run.finish();
+        reconcileRemovedPresence(id);
+        completion.complete(outcome);
+      } catch (RuntimeException | Error failure) {
+        completion.completeExceptionally(failure);
+        throw failure;
+      } finally {
+        functionalStatusCache = null;
+      }
+    };
+    try {
+      Thread.ofVirtual().name("ai-file-removal").start(finish);
+    } catch (RuntimeException | Error notStarted) {
+      finish.run();
+    }
+    return new RemovalAttempt(started, completion.minimalCompletionStage());
+  }
+
+  /**
+   * After a removal the run bookkeeping must not keep saying "installed": the page trusts that row,
+   * and a stale one would let a switch-on withdraw the decline without consent. When the part's
+   * required files are no longer all on disk, its row becomes what a fresh plan reports for a
+   * declined part (skipped by the user's choice).
+   */
+  private void reconcileRemovedPresence(String packageId) {
+    boolean usable = removal.usable(packageId);
+    synchronized (lock) {
+      if (usable || running.get()) return;
+      var ps = findPackageStatus(packageId);
+      if (ps == null || !"installed".equals(ps.state)) return;
+      ps.state = "skipped";
+      ps.skipCause = SkipCause.USER_DECLINED.id();
+      ps.skipReason = "Its files were removed";
+      touch();
+    }
+  }
+
+  /** The settings owner as the removal sees it: one read, and the decline against its witness. */
+  private ModelFileRemoval.Settings removalSettings() {
+    return new ModelFileRemoval.Settings() {
+      @Override
+      public ModelFileRemoval.UiSettingsStoreView inspect() {
+        if (settingsStore == null) throw new ModelFileRemoval.Refusal("Settings are unavailable");
+        try {
+          var snapshot = settingsStore.inspect();
+          return new ModelFileRemoval.UiSettingsStoreView(snapshot.settings(), snapshot);
+        } catch (RuntimeException unreadable) {
+          throw new ModelFileRemoval.Refusal(
+              "Settings can't be read right now, so nothing can be removed");
+        }
+      }
+
+      @Override
+      public void decline(ModelFileRemoval.UiSettingsStoreView read, String id) {
+        var snapshot = (UiSettingsStore.Snapshot) read.witness();
+        UiSettings settings = snapshot.settings();
+        List<String> next = new ArrayList<>(settings.getDeclinedAiPackages());
+        if (!next.contains(id)) next.add(id);
+        settings.setDeclinedAiPackages(next);
+        // Committed even when already declined: the commit binds the eligibility read's witness,
+        // so a switch-on that landed after that read refuses the removal instead of racing it.
+        commitSettings(settings, snapshot.witness(), "ai-file-removal");
+      }
+
+      /**
+       * The device plan reads which chat models are on disk. Saving the unchanged settings rebuilds
+       * it through the settings owner, so the runtime stops planning for the removed model now.
+       */
+      @Override
+      public void filesChanged(String id) {
+        if (!"chat".equals(id)) return;
+        var snapshot = settingsStore.inspect();
+        commitSettings(snapshot.settings(), snapshot.witness(), "ai-file-removal-refresh");
+      }
+    };
   }
 
   /** Whether an install run is currently halted between files. */
@@ -1473,9 +1925,14 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
         return;
       }
 
-      if (enablePictureReadingOnCompletion) completePictureReadingInstall();
+      if ((enablePictureReadingOnCompletion && !completePictureReadingInstall())
+          || (enableChatOnCompletion && !completeChatInstall())) {
+        cancelled();
+        return;
+      }
       if (enableRerankerOnCompletion) completeRerankerInstall(registry);
-      else applyCompletionState();
+      else if (admitCompletion()) applyCompletionState();
+      else cancelled();
     } finally {
       if (acquisitionFreeze != null) {
         acquisitionFreeze.close();
@@ -2150,8 +2607,11 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
   }
 
   private InstallPlan planInstallRun(ModelRegistry registry, InstallHardware hardware) {
+    // An accepted Download again plans with exactly the declines its consent was shown.
+    Set<String> accepted = runDeclines;
     return InstallPlanner.planInstallRun(registry, hardware.effective(), installIntent(),
-        declinedPackages(), modelsDir, homeDir, hardware.policyExcluded());
+        accepted != null ? accepted : declinedPackages(), modelsDir, homeDir,
+        hardware.policyExcluded());
   }
 
   HardwareProfile detectHardwareProfile() {
@@ -2324,8 +2784,11 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     commitSettings(prepared.candidateSettings(), prepared.settingsWitness(), "ai-install-onnx-models");
   }
 
-  /** A newer picture-reader choice wins over the enable consented before this download. */
-  private void completePictureReadingInstall() {
+  /**
+   * A newer picture-reader choice wins over the enable consented before this download. False when
+   * cancellation won before the enable was admitted (nothing was saved).
+   */
+  private boolean completePictureReadingInstall() {
     if (settingsStore == null || picturePreferenceAtInstallStart == null) {
       throw new IllegalStateException("Settings authority unavailable");
     }
@@ -2337,13 +2800,48 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     if (!Objects.equals(latest.settings().getPictureReadingEnabled(),
         picturePreferenceAtInstallStart.settings().getPictureReadingEnabled())
         || latest.settings().getPictureReadingPreferenceRevision()
-            > picturePreferenceAtInstallStart.witness().acceptedRevision()) return;
+            > picturePreferenceAtInstallStart.witness().acceptedRevision()) return true;
     UiSettings candidate = latest.settings();
     candidate.setPictureReadingEnabled(true);
     candidate.setPictureReadingPreferenceRevision(
         Math.addExact(latest.witness().acceptedRevision(), 1));
-    if (cancelFlag.get()) return;
-    commitSettings(candidate, latest.witness(), "ai-install-picture-reading");
+    return commitCompletionSettings(candidate, latest.witness(), "ai-install-picture-reading");
+  }
+
+  /**
+   * Answers consented with a missing answer model are switched on here, once its files are on disk
+   * (switching on at the start is refused while the model is missing, and nothing would retry). A
+   * newer answers choice saved during the download wins: a changed value, or an explicit choice the
+   * settings owner stamped after this install started (also one repeating the same value). False
+   * when cancellation won before the enable was admitted (answers stay as they were).
+   */
+  private boolean completeChatInstall() {
+    if (settingsStore == null || chatPreferenceAtInstallStart == null) {
+      throw new IllegalStateException("Settings authority unavailable");
+    }
+    var truth = recomputeCompletenessFromDiskBestEffort();
+    if (truth == null || truth.packagesWithMissingRequiredFiles().contains("chat")) {
+      throw new IllegalStateException("Answer model files are not ready");
+    }
+    var latest = settingsStore.inspect();
+    if (!Objects.equals(latest.settings().getChatEnabled(),
+        chatPreferenceAtInstallStart.settings().getChatEnabled())
+        || latest.settings().getChatPreferenceRevision()
+            > chatPreferenceAtInstallStart.witness().acceptedRevision()) return true;
+    UiSettings candidate = latest.settings();
+    candidate.setChatEnabled(true);
+    candidate.setChatPreferenceRevision(Math.addExact(latest.witness().acceptedRevision(), 1));
+    if (!commitCompletionSettings(candidate, latest.witness(), "ai-install-answers")) return false;
+    try { chatIntentChanged.run(); }
+    catch (RuntimeException failure) {
+      log.warn("Answers were switched on but answer-server reconciliation was not notified", failure);
+    }
+    return true;
+  }
+
+  /** Binds the answer-server reconciliation notice the completion enable sends. */
+  public void setChatIntentChanged(Runnable notice) {
+    chatIntentChanged = Objects.requireNonNull(notice, "notice");
   }
 
   /** The enable intent and installed query path are committed by one completion batch. */
@@ -2390,12 +2888,12 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
       }
     }
     synchronized (lock) {
-      if (cancelFlag.get()) {
+      boolean admitted = prepared != null
+          ? commitCompletionSettings(candidate, prepared.settingsWitness(), "ai-install-onnx-models")
+          : admitCompletion();
+      if (!admitted) {
         cancelled();
         return;
-      }
-      if (prepared != null) {
-        commitSettings(candidate, prepared.settingsWitness(), "ai-install-onnx-models");
       }
       applyCompletionState(diskTruth);
       if ("completed".equals(status.state) && activationRequired) markActivationRequired();
@@ -2577,6 +3075,65 @@ public final class AiInstallService implements io.justsearch.app.api.AiInstallSe
     }
     if (result.record().state() != io.justsearch.app.api.operations.OperationState.COMPLETE) {
       throw new IllegalStateException("Settings commitment is unresolved");
+    }
+  }
+
+  /**
+   * A completion's settings change, admitted by the settings owner only through {@link
+   * #admitCompletion()} at its commit boundary. False when cancellation won there (nothing was
+   * saved); any other refusal propagates as from {@link #commitSettings}.
+   */
+  private boolean commitCompletionSettings(UiSettings candidate,
+      io.justsearch.app.api.settings.SettingsWitness witness, String producer) {
+    if (settingsService == null) throw new IllegalStateException("Recorded settings owner unavailable");
+    boolean admittedBefore;
+    synchronized (completionBoundary) { admittedBefore = completionAdmitted; }
+    var context = io.justsearch.app.services.intent.EngineProvenance.internal(producer,
+        io.justsearch.core.context.EngineContext.Survival.INTERACTIVE,
+        io.justsearch.core.context.EngineContext.Urgency.BACKGROUND);
+    io.justsearch.app.api.operations.OperationAttemptRunner.Result result;
+    try {
+      result = settingsService.applyInternal(candidate, witness, context,
+          io.justsearch.app.api.settings.SettingsCandidateContext.NONE, this::admitCompletion);
+    } catch (RuntimeException | Error failure) {
+      if (completionLost(admittedBefore, witness)) return false;
+      throw failure;
+    }
+    if (!result.response().success()) {
+      if (completionLost(admittedBefore, witness)) return false;
+      log.warn("AI install settings refused: producer={}, code={}, details={}",
+          producer, result.response().errorCode().orElse(null), result.response().errorDetails());
+      throw new io.justsearch.app.api.settings.SettingsCommitOwner.Refused(result.response());
+    }
+    if (result.record().state() != io.justsearch.app.api.operations.OperationState.COMPLETE) {
+      throw new IllegalStateException("Settings commitment is unresolved");
+    }
+    return true;
+  }
+
+  /**
+   * After an unsuccessful completion commit: true when cancellation won the boundary. Otherwise a
+   * claim this commit made is withdrawn only when the saved settings prove nothing committed. A
+   * failure can follow the commit (publishing components, saving the operation's terminal state),
+   * so a moved or unreadable witness keeps the claim: cancelling cannot report success while the
+   * saved feature stays on.
+   */
+  private boolean completionLost(boolean admittedBefore,
+      io.justsearch.app.api.settings.SettingsWitness expected) {
+    boolean nothingCommitted = savedSettingsStillAt(expected);
+    synchronized (completionBoundary) {
+      if (cancelFlag.get()) return true;
+      if (nothingCommitted) completionAdmitted = admittedBefore;
+      return false;
+    }
+  }
+
+  private boolean savedSettingsStillAt(io.justsearch.app.api.settings.SettingsWitness expected) {
+    try {
+      return expected.equals(settingsStore.inspect().witness());
+    } catch (RuntimeException unreadable) {
+      log.warn("Install completion outcome is uncertain: saved settings are unreadable", unreadable);
+      return false;
     }
   }
 

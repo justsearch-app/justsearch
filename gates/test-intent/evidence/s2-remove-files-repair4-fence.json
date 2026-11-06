@@ -1,0 +1,181 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-05T12:45:30.674Z",
+  "revision": "c12aac8d4749afcf75e6a3f3675224d8e05b03c8",
+  "tree": "99fa69dac53f4a086b7ad5819811b9d57ac39c09",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalFenceTest.aUserCannotEnterWhileARemovalHoldsTheLock\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalFenceTest.aRemovalCannotBeginWhileAUserIsRegisteredAndNamesIt\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalFenceTest.aSecondRemovalCannotStartWhileOneRuns\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalFenceTest.bestMatchFirstIsInUseUntilTheQueryOwnersSayNoneHoldsASession\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalFenceTest.theAnswerModelIsInUseWhileAProcessMayHoldItOrAHoldIsOpen\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalFenceTest.anUnboundProbeFailsClosed\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalFenceTest.anAnswerServerLaunchInProgressRefusesTheAnswerModelRemovalOnly\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalFenceTest.aRemovalOfTheAnswerModelRefusesALaunchAndOtherRemovalsDoNot\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalFenceTest.aLaunchAndARemovalRacingNeverBothProceed\" --tests \"io.justsearch.app.services.ai.install.ModelFileRemovalQueryOwnersTest.aHeldQueryOwnerRefusesTheRemovalAndItsReleaseLetsTheSameRemovalProceed\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4983
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java#aUserCannotEnterWhileARemovalHoldsTheLock",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:71d4e510522ef9cc45c1fa9ab2dd3994e9c1ca7d8ecd04120d8ef2aa8aba3b29",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aUserCannotEnterWhileARemovalHoldsTheLock()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java#aRemovalCannotBeginWhileAUserIsRegisteredAndNamesIt",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:71d4e510522ef9cc45c1fa9ab2dd3994e9c1ca7d8ecd04120d8ef2aa8aba3b29",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRemovalCannotBeginWhileAUserIsRegisteredAndNamesIt()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java#aSecondRemovalCannotStartWhileOneRuns",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:71d4e510522ef9cc45c1fa9ab2dd3994e9c1ca7d8ecd04120d8ef2aa8aba3b29",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aSecondRemovalCannotStartWhileOneRuns()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java#bestMatchFirstIsInUseUntilTheQueryOwnersSayNoneHoldsASession",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:71d4e510522ef9cc45c1fa9ab2dd3994e9c1ca7d8ecd04120d8ef2aa8aba3b29",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "bestMatchFirstIsInUseUntilTheQueryOwnersSayNoneHoldsASession()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java#theAnswerModelIsInUseWhileAProcessMayHoldItOrAHoldIsOpen",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:71d4e510522ef9cc45c1fa9ab2dd3994e9c1ca7d8ecd04120d8ef2aa8aba3b29",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theAnswerModelIsInUseWhileAProcessMayHoldItOrAHoldIsOpen()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java#anUnboundProbeFailsClosed",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:71d4e510522ef9cc45c1fa9ab2dd3994e9c1ca7d8ecd04120d8ef2aa8aba3b29",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anUnboundProbeFailsClosed()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java#anAnswerServerLaunchInProgressRefusesTheAnswerModelRemovalOnly",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:71d4e510522ef9cc45c1fa9ab2dd3994e9c1ca7d8ecd04120d8ef2aa8aba3b29",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anAnswerServerLaunchInProgressRefusesTheAnswerModelRemovalOnly()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java#aRemovalOfTheAnswerModelRefusesALaunchAndOtherRemovalsDoNot",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:71d4e510522ef9cc45c1fa9ab2dd3994e9c1ca7d8ecd04120d8ef2aa8aba3b29",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRemovalOfTheAnswerModelRefusesALaunchAndOtherRemovalsDoNot()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java#aLaunchAndARemovalRacingNeverBothProceed",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalFenceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:71d4e510522ef9cc45c1fa9ab2dd3994e9c1ca7d8ecd04120d8ef2aa8aba3b29",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aLaunchAndARemovalRacingNeverBothProceed()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalQueryOwnersTest.java#aHeldQueryOwnerRefusesTheRemovalAndItsReleaseLetsTheSameRemovalProceed",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalQueryOwnersTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ab8dca571375883d825c84bc48bfb596c8904d964cb5e6354088486d71a7d96f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aHeldQueryOwnerRefusesTheRemovalAndItsReleaseLetsTheSameRemovalProceed()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:cd6b312f58d3817951f93584317fdee834ef7d87a35892dd73be5736a818074e"
+}

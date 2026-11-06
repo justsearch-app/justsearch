@@ -1717,6 +1717,44 @@
       "fixtures": []
     },
     {
+      "id": "ai-model-file-removal-journal",
+      "pathVerification": "COMPOSED",
+      "pathVerificationNote": "The record is the literal \"model-file-removal.v1.json\" in AI Home; the removal folder is the literal \".removing\" (ModelFileRemoval.REMOVAL_FOLDER) resolved against the managed models folder, which AiInstallService composes at runtime as JUSTSEARCH_MODELS_DIR or <AI Home>/models. That prefix is not a literal, so the literal check cannot speak for models/.removing/**.",
+      "encryption": "NOT_APPLICABLE",
+      "encryptionNote": "The record of one 'Remove files' run (design D4): the part id, each model file's path relative to the app's own models folder, its measured size, its checkpoint (planned, captured, deleted, kept) with the plain reason, and the private name a captured file has in models/.removing/. App-install facts only - no user content and no user-chosen path.",
+      "owner": "HEAD",
+      "root": "AI_HOME",
+      "ownedPaths": [
+        "model-file-removal.v1.json",
+        "models/.removing/**"
+      ],
+      "recoverability": "DERIVED",
+      "upgradeHandling": "READ_IN_PLACE",
+      "format": "JSON record v1: {version, packageId, label, state, message, startedAtEpochMs, finishedAtEpochMs, files: [{path, staged, sizeBytes, state, reason}]}",
+      "currentVersion": 1,
+      "readableLegacyVersions": [],
+      "versionAuthority": "modules/app-services/src/main/java/io/justsearch/app/services/ai/install/ModelFileRemoval.java",
+      "versionSource": {
+        "file": "modules/app-services/src/main/java/io/justsearch/app/services/ai/install/ModelFileRemoval.java",
+        "symbol": "JOURNAL_VERSION"
+      },
+      "futureVersionRefusalTest": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalTest.java",
+      "writeMode": "FULL_REWRITE",
+      "atomicity": "ATOMIC_REPLACE",
+      "corruptionPolicy": "DISCARD_UNREADABLE_DERIVED_STATUS_AND_RESCAN",
+      "corruptionNote": "An unreadable, truncated or other-version record is never used to restore or delete anything: the page reports an interrupted removal, rescans models/.removing/ and lists every file found there as kept. The model files themselves are never deleted by recovery; a captured file goes back to its canonical place only when a readable v1 record names it and that place is free. The next removal rewrites the record.",
+      "reconciliation": "REPORT_INTERRUPTED_REMOVAL_AND_RESTORE_CAPTURED_FILES_IF_FREE",
+      "status": "READY",
+      "implementationSources": [
+        "modules/app-services/src/main/java/io/justsearch/app/services/ai/install/ModelFileRemoval.java",
+        "modules/configuration/src/main/java/io/justsearch/configuration/persistence/AtomicFileWrites.java"
+      ],
+      "tests": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalTest.java"
+      ],
+      "fixtures": []
+    },
+    {
       "id": "gpl-eval-snapshot",
       "pathVerification": "LITERAL",
       "encryption": "NOT_APPLICABLE",

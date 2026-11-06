@@ -85,6 +85,7 @@ SPLADE injection.
 | `none` | Empty models folder: check the real app's AI-not-installed state. |
 | `partial` | Tiny sibling `.partial` staging files at registry-derived install targets. |
 | `truncated` | Tiny final files shorter than the registry's declared sizes. |
+| `reuse` | Nothing: restarts an already marked folder, keeping its private models and saved state. |
 
 For example, call `justsearch.dev.start` with
 `{"dataDir":"tmp/install-check","apiPort":0,"isolatedModels":"partial"}` or run:
@@ -107,6 +108,13 @@ contracts, normal `models/` fallbacks and foreign top-level content are refused 
 folder. Keep this folder dedicated to isolated starts; do not copy configuration or index data into
 it. Restart preserves its private folders and marker, including through soft/hard start cleans;
 a deleted private folder is recreated. Use a fresh data folder to change seed state.
+
+`reuse` is for restarting a folder whose Engine has saved settings or install records, for example
+after killing it to check crash recovery. It accepts what that Engine saved and never cleans
+(`--clean hard` is refused; `soft` is ignored). It still requires the marker, so an absent, empty or
+unmarked folder is refused, and it still refuses escaping links, overlap with the shared trees,
+inherited variables, a `config/` or `models/` folder, and saved settings or install records that
+name a path inside the shared models or graph cache.
 
 Before admission or cleaning, the runner denies inherited `JUSTSEARCH_*` variables by default,
 including `JUSTSEARCH_CONFIG` and `JUSTSEARCH_REPO_ROOT`. Only these variables are allowed:
@@ -489,7 +497,7 @@ and writes no signal — distinct from a push that failed.
 | `RUN_NOT_FOUND` / `NO_API_URL` | The active run record references a runId that no longer exists or has no `apiBaseUrl`. | Call `quick_health` to re-orient; the run may have partially failed. |
 | `DIST_NOT_BUILT` | The checkout being launched from has no Head dist (`modules/ui/build/install/ui/bin/ui.bat`) — typically a fresh worktree, or `skipBuild: true` without a prior `installDist`. `error.details` carries `distPath`, `repoRoot`, and `remedy`. | `node scripts/dev/prepare-worktree.cjs` in that checkout, or `node scripts/lib/tool-invoker.cjs gradle :modules:ui:installDist`. Run `preflight { distFrom }` with the same value first — it checks the dists in the tree `start` will use. |
 | `DATA_DIR_NOT_OURS` | A start (or cleanup) with `clean: "soft"` or `"hard"` named a data folder that no dev tool created and marked (`.justsearch-dev-data.json`) and that is not empty, or the default `modules/ui-web/.dev-data` from older runs holds something a dev data folder does not. Nothing in the folder was changed and nothing was started. `error.details` carries `dataDir`, `reason` and, for the default folder, the `unknown` entries. | Pass a new or empty folder (it is created or marked), omit `dataDir` to use the default dev folder, or use `clean: "none"`, which deletes nothing. |
-| `ISOLATED_MODELS_CONFLICT` | An isolated start found inherited configuration, a JVM property/argument file, an unmarked non-empty folder, foreign content, or an escaping symlink. | Unset the named source or use a fresh data folder dedicated to isolated starts. |
+| `ISOLATED_MODELS_CONFLICT` | An isolated start found inherited configuration, a JVM property/argument file, an unmarked non-empty folder, foreign content, or an escaping symlink, or `reuse` found no marked folder or saved state naming a shared path. | Unset the named source or use a fresh data folder dedicated to isolated starts. |
 | `START_TIMED_OUT` | The dev-runner start subprocess did not report a result inside `startTimeoutMs`. **Readiness was not confirmed and it is not established that this call started anything.** Whatever could be read off disk afterwards is under `observed` (active runId, recorded ports/URLs, and one `/api/health` status code) — observations, not a started stack. Before tempdoc 844 this branch synthesized `ok: true` from any runId in `active.json`, so a start that died mid-boot, or a run that was already there, was reported as a successful start. | Call `quick_health { probe: true }` to find out what is actually running, and `tail_log { kind: "backend_stderr" }` if the boot failed. |
 | `INVALID_DIST_FROM` | `distFrom` is neither the main repo nor a sibling worktree under `.claude/worktrees`, or that checkout has no `scripts/dev/dev-runner.cjs`. A **bare worktree name** (`"round14"`) is resolved against `.claude/worktrees/<name>`; when no such directory exists the message lists the names that do. | Pass a worktree name, a path to a sibling worktree, or the main repo root. |
 

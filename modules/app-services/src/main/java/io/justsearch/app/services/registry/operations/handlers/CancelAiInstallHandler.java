@@ -44,7 +44,11 @@ public final class CancelAiInstallHandler implements OperationHandler {
 
     try {
       Map<String, Object> status = svc.cancelInstall();
-      return OperationResult.success("AI install cancel requested", status);
+      return OperationResult.success(
+          Boolean.TRUE.equals(status.get(BrainInstallService.ALREADY_COMPLETED_KEY))
+              ? "AI install already completed; nothing was cancelled"
+              : "AI install cancel requested",
+          status);
     } catch (Exception e) {
       log.error("CancelAiInstallHandler: cancelInstall threw", e);
       return OperationResult.failure(

@@ -33,6 +33,12 @@ final class LlamaServerProcessOwnership {
   private final Object gate = new Object();
   private final Set<CompletableFuture<ChildHandle>> owned =
       java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+  /**
+   * Design D4: servers whose registration was refused, kept until their root and everything they
+   * started are confirmed gone (a rollback can end the root while ending its descendants fails).
+   */
+  private final Set<ChildHandle> rolledBack =
+      java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
   private boolean terminal;
   private StopRequest terminalRequest;
 
@@ -66,6 +72,11 @@ final class LlamaServerProcessOwnership {
       try {
         started = starter.start();
       } catch (ChildRegistrationRefusedException refused) {
+        // A rolled-back server may still hold the answer model's files through what it started,
+        // also once its root exited: it stays owned until both are confirmed gone.
+        synchronized (gate) {
+          rolledBack.add(refused.rolledBack());
+        }
         // A rolled-back server whose stop did not confirm its exit is still ours to end: the
         // terminal stop owns it until it exits.
         var survivor = refused.survivor();
@@ -98,6 +109,31 @@ final class LlamaServerProcessOwnership {
         }
       }
     }
+  }
+
+  /**
+   * Whether a launch is still inside the OS or a launched server has not been seen to exit (also one
+   * whose stop failed), or a server whose registration was refused is not confirmed gone with
+   * everything it started: design D4 reads this, not the mode, before the answer model's files go.
+   */
+  boolean anyOwned() {
+    List<ChildHandle> retained;
+    synchronized (gate) {
+      if (!owned.isEmpty()) return true;
+      retained = List.copyOf(rolledBack);
+    }
+    // OS reads stay outside the gate.
+    boolean held = false;
+    for (ChildHandle child : retained) {
+      if (!io.justsearch.app.inference.chat.StartedProcesses.released(child)) {
+        held = true;
+        continue;
+      }
+      synchronized (gate) {
+        rolledBack.remove(child);
+      }
+    }
+    return held;
   }
 
   /** Owns {@code child} through {@code reservation} until the child exits. */

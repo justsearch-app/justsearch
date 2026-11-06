@@ -775,6 +775,46 @@ public final class KnowledgeServer implements Closeable {
   private int[] retainedEncoderCounts() {
     var index = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<EncoderSet, Boolean>());
     var query = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<QueryRoleSet, Boolean>());
+    retainedOwners(index, query);
+    index.removeIf(owner -> owner == null || owner.isClosed());
+    query.removeIf(owner -> owner == null || owner.isClosed());
+    return new int[] {index.size(), query.size()};
+  }
+
+  /**
+   * Design D4 (Remove files): whether a query owner of this server still holds a Best match first
+   * session: the serving view's, a retired view's that issued work (forked leases included) has not
+   * released, a recovery's, a candidate's, a preparing, composing or rejected owner, or a boot or
+   * failed composition surface not yet retired. Read from the owners themselves at the call, never
+   * from a health observation. Empty while a composition or swap holds the runtime lock, and while
+   * the boot model composition has not finished (it composes on its own thread without that lock,
+   * and a reranker it is opening belongs to no owner yet): nothing can be confirmed then, and the
+   * caller refuses.
+   */
+  public java.util.Optional<Boolean> rerankerSessionHeld() {
+    if (!runtimeSwapLock.tryLock()) return java.util.Optional.empty();
+    try {
+      CompletableFuture<Void> boot = deferredModelInit;
+      if (boot != null ? !boot.isDone() : running) return java.util.Optional.empty();
+      var index = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<EncoderSet, Boolean>());
+      var query = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<QueryRoleSet, Boolean>());
+      retainedOwners(index, query);
+      for (QueryRoleSet owner : query) {
+        if (owner != null && owner.holdsReranker()) return java.util.Optional.of(true);
+      }
+      List<InferenceSurface> surfaces = new ArrayList<>();
+      surfaces.add(pendingInitialSurface);
+      surfaces.add(pendingInitialQuerySurface);
+      synchronized (failedCompositionSurfaces) { surfaces.addAll(failedCompositionSurfaces); }
+      for (InferenceSurface surface : surfaces) {
+        if (surface != null && surface.holdsReranker()) return java.util.Optional.of(true);
+      }
+      return java.util.Optional.of(false);
+    } finally { runtimeSwapLock.unlock(); }
+  }
+
+  /** Every retained model owner this server knows of, as the owners themselves record them. */
+  private void retainedOwners(Set<EncoderSet> index, Set<QueryRoleSet> query) {
     synchronized (servingViewMonitor) {
       index.add(initialEncoderSet);
       query.add(initialQueryRoleSet);
@@ -797,9 +837,6 @@ public final class KnowledgeServer implements Closeable {
       addRetainedModels(candidateModels, index, query);
       addRetainedModels(unpublishedModels, index, query);
       addRetainedQuery(preparedQueryRoles, index, query);
-      index.removeIf(owner -> owner == null || owner.isClosed());
-      query.removeIf(owner -> owner == null || owner.isClosed());
-      return new int[] {index.size(), query.size()};
     }
   }
 

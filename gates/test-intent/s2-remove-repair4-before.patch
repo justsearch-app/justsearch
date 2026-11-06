@@ -1,0 +1,22 @@
+diff --git a/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java b/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java
+index 06f4699d9e..1fb9174e93 100644
+--- a/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java
++++ b/modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java
+@@ -772,6 +772,17 @@ public final class KnowledgeServer implements Closeable {
+     } finally { runtimeSwapLock.unlock(); }
+   }
+ 
++  /**
++   * Compatibility shape for the repaired check: c12aac8d47's rule. Removal trusted the Worker's
++   * health report, whose reranker session flag is the serving view's search reranker only.
++   */
++  public java.util.Optional<Boolean> rerankerSessionHeld() {
++    synchronized (servingViewMonitor) {
++      QueryRoleSet current = servingView == null ? null : servingView.queryRoleSet;
++      return java.util.Optional.of(current != null && current.reranker() != null);
++    }
++  }
++
+   private int[] retainedEncoderCounts() {
+     var index = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<EncoderSet, Boolean>());
+     var query = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<QueryRoleSet, Boolean>());

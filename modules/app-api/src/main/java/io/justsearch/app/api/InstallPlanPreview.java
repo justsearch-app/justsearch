@@ -38,6 +38,14 @@ public final class InstallPlanPreview {
    */
   public long resumableBytes;
 
+  /**
+   * For a "Download again" preview only: the identity of this exact plan (the parts included, the
+   * declines it was planned with, every file it downloads and the settings witness those declines
+   * were read against). The accepted start presents it back and refuses when the plan changed;
+   * empty for an ordinary preview.
+   */
+  public String planDigest = "";
+
   /** Per-tier estimates, in canonical tier order. */
   public final List<TierEstimate> tiers = new ArrayList<>();
 

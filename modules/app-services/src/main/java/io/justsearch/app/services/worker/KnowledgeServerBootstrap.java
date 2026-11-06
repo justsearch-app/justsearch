@@ -93,6 +93,9 @@ public final class KnowledgeServerBootstrap implements Closeable {
     /** Engine owner observation, independent of the window status cache. */
     public boolean heavyIndexing() { return workerHost.heavyIndexing(); }
 
+    /** Design D4: the index half's query owners on Best match first's files, asked now. */
+    public WorkerHost.RerankerUse rerankerUse() { return workerHost.rerankerUse(); }
+
     /** The Engine's Retry-After for a capture refused while no verified client can serve. */
     private final int retryAfterSeconds;
 

@@ -267,7 +267,8 @@ public final class RuntimeActivationService
    * to write. Registration must precede asynchronous work publication.
    */
   private CompletionStage<AiRuntimeActivationStatus> startLeasedThread(
-      String opClass, String threadName, Runnable body) {
+      String opClass, String threadName, Runnable body,
+      io.justsearch.app.services.ai.install.ModelFileRemovalFence.Ticket filesUser) {
     var completion = new CompletableFuture<AiRuntimeActivationStatus>();
     OperationLeaseHandle lease;
     try {
@@ -303,6 +304,7 @@ public final class RuntimeActivationService
           outcome = copyStatus(status);
           running.set(false);
         }
+        filesUser.close();
         if (failure != null) {
           completion.completeExceptionally(failure);
           if (failure instanceof Error fatal) throw fatal;
@@ -848,6 +850,25 @@ public final class RuntimeActivationService
    *     variants compose through the accepted settings owner before its file commitment.
    */
   public Attempt startActivate(String variantId, String chatProfile) {
+    // Activation launches the answer server on the managed files and can switch the chat profile:
+    // it registers with the removal lock for its whole run (design D4, both orders).
+    var filesUser = enterFilesUser();
+    try {
+      return startActivateRun(variantId, chatProfile, filesUser);
+    } catch (RuntimeException | Error failure) {
+      filesUser.close();
+      throw failure;
+    }
+  }
+
+  private io.justsearch.app.services.ai.install.ModelFileRemovalFence.Ticket enterFilesUser() {
+    return io.justsearch.app.services.ai.install.ModelFileRemovalFence.enterIfBound(
+        settingsStore == null ? null : settingsStore.modelFileRemovalFence(),
+        "A graphics runtime change");
+  }
+
+  private Attempt startActivateRun(String variantId, String chatProfile,
+      io.justsearch.app.services.ai.install.ModelFileRemovalFence.Ticket filesUser) {
     String v = variantId == null ? "" : variantId.trim();
     if (v.isBlank()) {
       if (NativeTargets.current().hasCpuBaselineRuntime()) {
@@ -883,10 +904,22 @@ public final class RuntimeActivationService
       throw failure;
     }
     return new Attempt(started, startLeasedThread(
-        "ai.runtime-activate", "ai-runtime-activate", () -> runActivate(selectedVariant, profileRaw, publication)));
+        "ai.runtime-activate", "ai-runtime-activate", () -> runActivate(selectedVariant, profileRaw, publication),
+        filesUser));
   }
 
   public Attempt startDeactivate() {
+    var filesUser = enterFilesUser();
+    try {
+      return startDeactivateRun(filesUser);
+    } catch (RuntimeException | Error failure) {
+      filesUser.close();
+      throw failure;
+    }
+  }
+
+  private Attempt startDeactivateRun(
+      io.justsearch.app.services.ai.install.ModelFileRemovalFence.Ticket filesUser) {
     AiRuntimeActivationStatus started;
     AttemptPublication publication;
     synchronized (lock) {
@@ -904,7 +937,7 @@ public final class RuntimeActivationService
     }
     return new Attempt(started,
         startLeasedThread("ai.runtime-deactivate", "ai-runtime-deactivate",
-            () -> runDeactivate(publication)));
+            () -> runDeactivate(publication), filesUser));
   }
 
   // -------------------- Implementation --------------------
@@ -1146,6 +1179,7 @@ public final class RuntimeActivationService
       }
       UiSettings rebased = MAPPER.readValue(MAPPER.writeValueAsString(next), UiSettings.class);
       rebased.setChatEnabled(fresh.settings().getChatEnabled());
+      rebased.setChatPreferenceRevision(fresh.settings().getChatPreferenceRevision());
       try {
         return commitCandidate(rebased, fresh.witness(), "runtime-variant-apply", profile);
       } catch (SettingsCommitOwner.Refused refused) {
@@ -1163,6 +1197,8 @@ public final class RuntimeActivationService
   private static boolean onlyChatSwitched(UiSettings earlier, UiSettings later) {
     UiSettings aligned = MAPPER.readValue(MAPPER.writeValueAsString(later), UiSettings.class);
     aligned.setChatEnabled(earlier.getChatEnabled());
+    // The switch stamps its own revision with the choice (answers completion guard).
+    aligned.setChatPreferenceRevision(earlier.getChatPreferenceRevision());
     return MAPPER.valueToTree(earlier).equals(MAPPER.valueToTree(aligned));
   }
 
