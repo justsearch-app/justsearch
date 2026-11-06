@@ -1,0 +1,645 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-06T01:59:27.198Z",
+  "revision": "67cd75a1533d174c9facd7770991bacbe3996244",
+  "tree": "ff0ba325f4ab49c378939609845b9a07073ea100",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"notices::tests::an_event_never_shows_twice_while_the_ledger_remembers_it\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5607
+    },
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.noticeClick.test.ts\" \"src/shell-v0/components/StatusPill.notices.test.ts\" \"src/shell-v0/state/UserStateDocument.multiWindow.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/l_9dy34b/tmp/test-intent-vitest-39873-1793930268953.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 5132
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.noticeClick.test.ts#DE5 a notification clicked with Settings open leaves Settings where it is, and opens the review once Settings closes",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.noticeClick.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b489fe27c7d405d83b5abf6d8ccb0e70a6e8cf176cc2d859e351bad2a90b8dc4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 a notification clicked with Settings open leaves Settings where it is, and opens the review once Settings closes",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.noticeClick.test.ts#DE5 a notification clicked with Settings open a request answered before Settings closes opens no review and says so in the panel",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.noticeClick.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b489fe27c7d405d83b5abf6d8ccb0e70a6e8cf176cc2d859e351bad2a90b8dc4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 a notification clicked with Settings open a request answered before Settings closes opens no review and says so in the panel",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.noticeClick.test.ts#DE5 a notification clicked with Settings open the return to the area under Settings landing after the panel opened leaves it open",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.noticeClick.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b489fe27c7d405d83b5abf6d8ccb0e70a6e8cf176cc2d859e351bad2a90b8dc4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 a notification clicked with Settings open the return to the area under Settings landing after the panel opened leaves it open",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification a request answered since says so in the panel, and opens no review",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6eb4498d1678f1d2a49b05f8a61d70ed47d6315726f3bcbe9d819b42849254cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 clicking a notification a request answered since says so in the panel, and opens no review",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification while a dialog is open waits for the dialog, then opens the review",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6eb4498d1678f1d2a49b05f8a61d70ed47d6315726f3bcbe9d819b42849254cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 clicking a notification while a dialog is open waits for the dialog, then opens the review",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification while a dialog is open waits for the last of two dialogs",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6eb4498d1678f1d2a49b05f8a61d70ed47d6315726f3bcbe9d819b42849254cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 clicking a notification while a dialog is open waits for the last of two dialogs",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification while a dialog is open keeps waiting when another dialog follows the closed one in the same turn",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6eb4498d1678f1d2a49b05f8a61d70ed47d6315726f3bcbe9d819b42849254cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 clicking a notification while a dialog is open keeps waiting when another dialog follows the closed one in the same turn",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification while a dialog is open the latest click is the one remembered",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6eb4498d1678f1d2a49b05f8a61d70ed47d6315726f3bcbe9d819b42849254cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 clicking a notification while a dialog is open the latest click is the one remembered",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification while a dialog is open a request answered meanwhile opens no review and says so in the panel",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6eb4498d1678f1d2a49b05f8a61d70ed47d6315726f3bcbe9d819b42849254cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 clicking a notification while a dialog is open a request answered meanwhile opens no review and says so in the panel",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification while a dialog is open a request that expired meanwhile opens no review and says so in the panel",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6eb4498d1678f1d2a49b05f8a61d70ed47d6315726f3bcbe9d819b42849254cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 clicking a notification while a dialog is open a request that expired meanwhile opens no review and says so in the panel",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification while a dialog is open with a review open, a request that has gone leaves the review where it is and says so",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6eb4498d1678f1d2a49b05f8a61d70ed47d6315726f3bcbe9d819b42849254cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 clicking a notification while a dialog is open with a review open, a request that has gone leaves the review where it is and says so",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification while a dialog is open with a request's security dialog open, the review moves to the request clicked, and the first keeps waiting",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6eb4498d1678f1d2a49b05f8a61d70ed47d6315726f3bcbe9d819b42849254cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 clicking a notification while a dialog is open with a request's security dialog open, the review moves to the request clicked, and the first keeps waiting",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification while a dialog is open with a request's security dialog open, a typed request clicked takes the dialog",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6eb4498d1678f1d2a49b05f8a61d70ed47d6315726f3bcbe9d819b42849254cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 clicking a notification while a dialog is open with a request's security dialog open, a typed request clicked takes the dialog",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 each end is its own event two AI install failures a second apart each notify",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6eb4498d1678f1d2a49b05f8a61d70ed47d6315726f3bcbe9d819b42849254cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 each end is its own event two AI install failures a second apart each notify",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 each end is its own event two installs completing each notify",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6eb4498d1678f1d2a49b05f8a61d70ed47d6315726f3bcbe9d819b42849254cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 each end is its own event two installs completing each notify",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 each end is its own event two settlings at different engine times each notify",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6eb4498d1678f1d2a49b05f8a61d70ed47d6315726f3bcbe9d819b42849254cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 each end is its own event two settlings at different engine times each notify",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 each end is its own event a settling that changed nothing in the engine's indexing state is still its own event",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6eb4498d1678f1d2a49b05f8a61d70ed47d6315726f3bcbe9d819b42849254cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 each end is its own event a settling that changed nothing in the engine's indexing state is still its own event",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 each end is its own event a second window seeing the same end later gives the same id, so the shell shows it once",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6eb4498d1678f1d2a49b05f8a61d70ed47d6315726f3bcbe9d819b42849254cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 each end is its own event a second window seeing the same end later gives the same id, so the shell shows it once",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 each end is its own event clicking one lands on its row by its words",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6eb4498d1678f1d2a49b05f8a61d70ed47d6315726f3bcbe9d819b42849254cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 each end is its own event clicking one lands on its row by its words",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 live regions follow the same rule as notifications a transition finished while disconnected says nothing, and Earlier lists it",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6eb4498d1678f1d2a49b05f8a61d70ed47d6315726f3bcbe9d819b42849254cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C6 live regions follow the same rule as notifications a transition finished while disconnected says nothing, and Earlier lists it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 live regions follow the same rule as notifications indexing finished while disconnected says nothing, and Earlier lists it",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6eb4498d1678f1d2a49b05f8a61d70ed47d6315726f3bcbe9d819b42849254cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C6 live regions follow the same rule as notifications indexing finished while disconnected says nothing, and Earlier lists it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 live regions follow the same rule as notifications an install that failed while disconnected says nothing, in either announcer, and Earlier lists it",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6eb4498d1678f1d2a49b05f8a61d70ed47d6315726f3bcbe9d819b42849254cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C6 live regions follow the same rule as notifications an install that failed while disconnected says nothing, in either announcer, and Earlier lists it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 live regions follow the same rule as notifications an install completed while disconnected says nothing, and Earlier lists it",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6eb4498d1678f1d2a49b05f8a61d70ed47d6315726f3bcbe9d819b42849254cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C6 live regions follow the same rule as notifications an install completed while disconnected says nothing, and Earlier lists it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 live regions follow the same rule as notifications an operation finished while disconnected says nothing, and Earlier lists it",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6eb4498d1678f1d2a49b05f8a61d70ed47d6315726f3bcbe9d819b42849254cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C6 live regions follow the same rule as notifications an operation finished while disconnected says nothing, and Earlier lists it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 overlapping saves a plugin value another window saves while this window is writing survives",
+      "file": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5ea52be13a3c2ea8b7af904d1a38ac364c57532ff117b120117bb617b8be7449",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C11 overlapping saves a plugin value another window saves while this window is writing survives",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 overlapping saves both windows' values in the same plugin survive",
+      "file": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5ea52be13a3c2ea8b7af904d1a38ac364c57532ff117b120117bb617b8be7449",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C11 overlapping saves both windows' values in the same plugin survive",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 overlapping saves a profile another window deletes while this window is writing stays deleted",
+      "file": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5ea52be13a3c2ea8b7af904d1a38ac364c57532ff117b120117bb617b8be7449",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C11 overlapping saves a profile another window deletes while this window is writing stays deleted",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 overlapping saves a save that must land first still builds on the other window's save",
+      "file": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5ea52be13a3c2ea8b7af904d1a38ac364c57532ff117b120117bb617b8be7449",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C11 overlapping saves a save that must land first still builds on the other window's save",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/notices.rs#notices::tests::an_event_never_shows_twice_while_the_ledger_remembers_it",
+      "file": "modules/shell/src-tauri/src/notices.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:69b4bee2981b3a34c48aa662cf77450682d471dc23c1b6fcba937c2df7a5b736",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "notices::tests::an_event_never_shows_twice_while_the_ledger_remembers_it",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "67cd75a1533d174c9facd7770991bacbe3996244",
+    "revision": "67cd75a1533d174c9facd7770991bacbe3996244",
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/compatibility/shell-s3d-ledger-before.patch",
+        "contentDigest": "sha256:d5fb8a4820c2f099b2990fd4e0b690a6646b32e74776c5d3f3dd6bff961ae665"
+      }
+    ],
+    "runs": [
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"notices::tests::an_event_never_shows_twice_while_the_ledger_remembers_it\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 83631,
+        "output": "\nrunning 1 test\ntest notices::tests::an_event_never_shows_twice_while_the_ledger_remembers_it ... FAILED\n\nfailures:\n\n---- notices::tests::an_event_never_shows_twice_while_the_ledger_remembers_it stdout ----\n\nthread 'notices::tests::an_event_never_shows_twice_while_the_ledger_remembers_it' (48583) panicked at src/notices.rs:304:13:\nassertion failed: !ledger.claim(\"operation:a\")\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    notices::tests::an_event_never_shows_twice_while_the_ledger_remembers_it\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 292 filtered out; finished in 0.00s\n\n\n   Compiling unicode-ident v1.0.24\n   Compiling quote v1.0.45\n   Compiling proc-macro2 v1.0.106\n   Compiling libc v0.2.183\n   Compiling serde_core v1.0.229\n   Compiling serde v1.0.229\n   Compiling equivalent v1.0.2\n   Compiling hashbrown v0.16.1\n   Compiling smallvec v1.15.1\n   Compiling cfg-if v1.0.4\n   Compiling heck v0.5.0\n   Compiling pkg-config v0.3.32\n   Compiling winnow v0.5.40\n   Compiling target-lexicon v0.12.16\n   Compiling memchr v2.8.0\n   Compiling version-compare v0.2.1\n   Compiling siphasher v1.0.2\n   Compiling itoa v1.0.17\n   Compiling syn v1.0.109\n   Compiling zerocopy v0.8.42\n   Compiling thiserror v1.0.69\n   Compiling autocfg v1.5.0\n   Compiling writeable v0.6.2\n   Compiling litemap v0.8.1\n   Compiling stable_deref_trait v1.2.1\n   Compiling winnow v1.0.3\n   Compiling phf_shared v0.13.1\n   Compiling fastrand v2.3.0\n   Compiling pin-project-lite v0.2.17\n   Compiling icu_properties_data v2.1.2\n   Compiling icu_normalizer_data v2.1.1\n   Compiling log v0.4.29\n   Compiling once_cell v1.21.3\n   Compiling bytes v1.11.1\n   Compiling parking_lot_core v0.9.12\n   Compiling phf_generator v0.13.1\n   Compiling getrandom v0.4.2\n   Compiling zmij v1.0.21\n   Compiling futures-core v0.3.32\n   Compiling scopeguard v1.2.0\n   Compiling siphasher v0.3.11\n   Compiling indexmap v2.13.0\n   Compiling cfg-expr v0.15.8\n   Compiling lock_api v0.4.14\n   Compiling new_debug_unreachable v1.0.6\n   Compiling winnow v0.7.15\n   Compiling utf8_iter v1.0.4\n   Compiling getrandom v0.1.16\n   Compiling version_check v0.9.5\n   Compiling powerfmt v0.2.0\n   Compiling toml_parser v1.1.2+spec-1.1.0\n   Compiling precomputed-hash v0.1.1\n   Compiling byteorder v1.5.0\n   Compiling phf_shared v0.11.3\n   Compiling bitflags v1.3.2\n   Compiling thiserror v2.0.18\n   Compiling num-conv v0.2.0\n   Compiling time-core v0.1.8\n   Compiling phf_codegen v0.13.1\n   Compiling toml_writer v1.1.1+spec-1.1.0\n   Compiling syn v2.0.117\n   Compiling syn v3.0.3\n   Compiling http v1.4.0\n   Compiling strsim v0.11.1\n   Compiling ident_case v1.0.1\n   Compiling typeid v1.0.3\n   Compiling base64 v0.22.1\n   Compiling utf-8 v0.7.6\n   Compiling erased-serde v0.4.10\n   Compiling phf_shared v0.8.0\n   Compiling aho-corasick v1.1.4\n   Compiling fnv v1.0.7\n   Compiling unic-common v0.9.0\n   Compiling dtoa v1.0.11\n   Compiling regex-syntax v0.8.10\n   Compiling unic-char-range v0.9.0\n   Compiling proc-macro-hack v0.5.20+deprecated\n   Compiling unic-ucd-version v0.9.0\n   Compiling dtoa-short v0.3.5\n   Compiling unic-char-property v0.9.0\n   Compiling getrandom v0.2.17\n   Compiling string_cache_codegen v0.6.1\n   Compiling phf_shared v0.10.0\n   Compiling alloc-no-stdlib v2.0.4\n   Compiling serde_json v1.0.151\n   Compiling rand_core v0.5.1\n   Compiling unic-ucd-ident v0.9.0\n   Compiling rand_core v0.6.4\n   Compiling parking_lot v0.12.5\n   Compiling rand_pcg v0.2.1\n   Compiling alloc-stdlib v0.2.2\n   Compiling quick-xml v0.38.4\n   Compiling slab v0.4.12\n   Compiling anyhow v1.0.102\n   Compiling mac v0.1.1\n   Compiling brotli-decompressor v5.0.0\n   Compiling dunce v1.0.5\n   Compiling futf v0.1.5\n   Compiling string_cache v0.9.0\n   Compiling ctor-proc-macro v0.0.7\n   Compiling percent-encoding v2.3.2\n   Compiling web_atoms v0.2.3\n   Compiling same-file v1.0.6\n   Compiling bitflags v2.11.0\n   Compiling form_urlencoded v1.2.2\n   Compiling walkdir v2.5.0\n   Compiling semver v1.0.27\n   Compiling toml_datetime v1.1.1+spec-1.1.0\n   Compiling serde_spanned v1.1.1\n   Compiling ctor v0.8.0\n   Compiling uuid v1.24.0\n   Compiling tendril v0.4.3\n   Compiling tendril v0.5.0\n   Compiling selectors v0.36.1\n   Compiling phf v0.11.3\n   Compiling brotli v8.0.2\n   Compiling indexmap v1.9.3\n   Compiling glob v0.3.3\n   Compiling convert_case v0.4.0\n   Compiling camino v1.2.2\n   Compiling nodrop v0.1.14\n   Compiling matches v0.1.10\n   Compiling phf v0.8.0\n   Compiling fxhash v0.2.1\n   Compiling deranged v0.5.8\n   Compiling servo_arc v0.2.0\n   Compiling servo_arc v0.4.3\n   Compiling schemars v0.8.22\n   Compiling hashbrown v0.12.3\n   Compiling rustc-hash v2.1.1\n   Compiling bit-vec v0.8.0\n   Compiling cfb v0.7.3\n   Compiling rustc_version v0.4.1\n   Compiling toml_datetime v0.7.5+spec-1.1.0\n   Compiling dyn-clone v1.0.20\n   Compiling foldhash v0.2.0\n   Compiling regex-automata v0.4.14\n   Compiling bit-set v0.8.0\n   Compiling toml v1.1.2+spec-1.1.0\n   Compiling toml v0.9.12+spec-1.1.0\n   Compiling find-msvc-tools v0.1.9\n   Compiling shlex v1.3.0\n   Compiling futures-task v0.3.32\n   Compiling serde-untagged v0.1.9\n   Compiling cc v1.2.56\n   Compiling proc-macro-error-attr v1.0.4\n   Compiling futures-io v0.3.32\n   Compiling proc-macro-error v1.0.4\n   Compiling futures-channel v0.3.32\n   Compiling crossbeam-utils v0.8.21\n   Compiling heck v0.4.1\n   Compiling option-ext v0.2.0\n   Compiling gio v0.18.4\n   Compiling dirs-sys v0.5.0\n   Compiling time v0.3.47\n   Compiling dirs v6.0.0\n   Compiling serde_derive v1.0.229\n   Compiling infer v0.19.0\n   Compiling memoffset v0.9.1\n   Compiling field-offset v0.3.6\n   Compiling gtk v0.18.2\n   Compiling mio v1.2.1\n   Compiling socket2 v0.6.3\n   Compiling simd-adler32 v0.3.8\n   Compiling crc32fast v1.5.0\n   Compiling ppv-lite86 v0.2.21\n   Compiling typenum v1.19.0\n   Compiling generic-array v0.14.7\n   Compiling adler2 v2.0.1\n   Compiling rand_chacha v0.3.1\n   Compiling rand_chacha v0.2.2\n   Compiling miniz_oxide v0.8.9\n   Compiling time-macros v0.2.27\n   Compiling rand v0.8.6\n   Compiling rand v0.7.3\n   Compiling embed-resource v3.0.6\n   Compiling x11 v2.21.0\n   Compiling flate2 v1.1.9\n   Compiling synstructure v0.13.2\n   Compiling darling_core v0.23.0\n   Compiling serde_derive_internals v0.29.1\n   Compiling tauri-winres v0.3.5\n   Compiling fdeflate v0.3.7\n   Compiling phf_generator v0.11.3\n   Compiling phf_generator v0.10.0\n   Compiling rustix v1.1.4\n   Compiling phf_codegen v0.11.3\n   Compiling string_cache_codegen v0.5.4\n   Compiling regex v1.12.3\n   Compiling crossbeam-channel v0.5.15\n   Compiling cookie v0.18.1\n   Compiling libdbus-sys v0.2.7\n   Compiling x11-dl v2.21.0\n   Compiling linux-raw-sys v0.12.1\n   Compiling parking v2.2.1\n   Compiling raw-window-handle v0.6.2\n   Compiling phf_generator v0.8.0\n   Compiling getrandom v0.3.4\n   Compiling phf_codegen v0.8.0\n   Compiling crypto-common v0.1.7\n   Compiling block-buffer v0.10.4\n   Compiling concurrent-queue v2.5.0\n   Compiling selectors v0.24.0\n   Compiling markup5ever v0.14.1\n   Compiling unicode-segmentation v1.12.0\n   Compiling digest v0.10.7\n   Compiling png v0.17.16\n   Compiling libloading v0.7.4\n   Compiling cpufeatures v0.2.17\n   Compiling wry v0.55.1\n   Compiling tauri-runtime v2.11.3\n   Compiling sha2 v0.10.9\n   Compiling dbus v0.9.11\n   Compiling tauri-runtime-wry v2.11.4\n   Compiling png v0.18.1\n   Compiling toml_edit v0.25.4+spec-1.1.0\n   Compiling atomic-waker v1.1.2\n   Compiling event-listener v5.4.1\n   Compiling ring v0.17.14\n   Compiling tracing-core v0.1.36\n   Compiling mime v0.3.17\n   Compiling futures-lite v2.6.1\n   Compiling endi v1.1.1\n   Compiling event-listener-strategy v0.5.4\n   Compiling async-io v2.6.0\n   Compiling zeroize v1.9.0\n   Compiling zerofrom-derive v0.1.6\n   Compiling yoke-derive v0.8.1\n   Compiling zerovec-derive v0.11.2\n   Compiling displaydoc v0.2.5\n   Compiling thiserror-impl v1.0.69\n   Compiling phf_macros v0.13.1\n   Compiling thiserror-impl v2.0.18\n   Compiling cssparser-macros v0.6.1\n   Compiling derive_more-impl v2.1.1\n   Compiling cssparser v0.29.6\n   Compiling phf_macros v0.10.0\n   Compiling match_token v0.1.0\n   Compiling derive_more v0.99.20\n   Compiling schemars_derive v0.8.22\n   Compiling phf v0.13.1\n   Compiling futures-macro v0.3.32\n   Compiling tokio-macros v2.7.0\n   Compiling cssparser v0.36.0\n   Compiling darling_macro v0.23.0\n   Compiling phf v0.10.1\n   Compiling dlopen2_derive v0.4.3\n   Compiling derive_more v2.1.1\n   Compiling darling v0.23.0\n   Compiling ico v0.5.0\n   Compiling tokio v1.53.1\n   Compiling serde_repr v0.1.20\n   Compiling enumflags2_derive v0.7.12\n   Compiling zerofrom v0.1.6\n   Compiling serialize-to-javascript-impl v0.1.2\n   Compiling serde_with_macros v3.21.0\n   Compiling yoke v0.8.1\n   Compiling futures-util v0.3.32\n   Compiling toml_datetime v0.6.3\n   Compiling serde_spanned v0.6.9\n   Compiling zerovec v0.11.5\n   Compiling zerotrie v0.2.3\n   Compiling string_cache v0.8.9\n   Compiling markup5ever v0.38.0\n   Compiling toml_edit v0.20.2\n   Compiling cargo-platform v0.1.9\n   Compiling jsonptr v0.6.3\n   Compiling plist v1.8.0\n   Compiling html5ever v0.38.0\n   Compiling cargo_toml v0.22.3\n   Compiling tinystr v0.8.2\n   Compiling potential_utf v0.1.4\n   Compiling icu_collections v2.1.1\n   Compiling icu_locale_core v2.1.1\n   Compiling json-patch v3.0.1\n   Compiling cargo_metadata v0.19.2\n   Compiling serde_with v3.21.0\n   Compiling html5ever v0.29.1\n   Compiling toml_edit v0.19.15\n   Compiling dpi v0.1.2\n   Compiling keyboard-types v0.7.0\n   Compiling toml v0.8.2\n   Compiling icu_provider v2.1.1\n   Compiling dom_query v0.27.0\n   Compiling proc-macro-crate v2.0.2\n   Compiling system-deps v6.2.2\n   Compiling icu_properties v2.1.2\n   Compiling icu_normalizer v2.1.1\n   Compiling futures-executor v0.3.32\n   Compiling dlopen2 v0.8.2\n   Compiling serialize-to-javascript v0.1.2\n   Compiling zvariant_utils v3.3.0\n   Compiling proc-macro-crate v3.5.0\n   Compiling tracing-attributes v0.1.31\n   Compiling glib-macros v0.18.5\n   Compiling glib-sys v0.18.1\n   Compiling gobject-sys v0.18.0\n   Compiling gio-sys v0.18.1\n   Compiling idna_adapter v1.2.1\n   Compiling kuchikiki v0.8.8-speedreader\n   Compiling gdk-sys v0.18.2\n   Compiling idna v1.1.0\n   Compiling atk-sys v0.18.2\n   Compiling pango-sys v0.18.0\n   Compiling cairo-sys-rs v0.18.2\n   Compiling url v2.5.8\n   Compiling gdk-pixbuf-sys v0.18.0\n   Compiling gtk-sys v0.18.2\n   Compiling proc-macro-crate v1.3.1\n   Compiling javascriptcore-rs-sys v1.1.1\n   Compiling soup3-sys v0.5.0\n   Compiling webkit2gtk-sys v2.0.2\n   Compiling gdkx11-sys v0.18.2\n   Compiling tracing v0.1.44\n   Compiling zvariant_derive v5.10.0\n   Compiling urlpattern v0.3.0\n   Compiling gtk3-macros v0.18.2\n   Compiling crunchy v0.2.4\n   Compiling polling v3.11.0\n   Compiling enumflags2 v0.7.12\n   Compiling rustls-pki-types v1.15.1\n   Compiling errno v0.3.14\n   Compiling async-task v4.7.1\n   Compiling tiny-keccak v2.0.2\n   Compiling untrusted v0.9.0\n   Compiling signal-hook-registry v1.4.8\n   Compiling async-channel v2.5.0\n   Compiling http-body v1.0.1\n   Compiling tauri-utils v2.9.3\n   Compiling rustls v0.23.45\n   Compiling httparse v1.10.1\n   Compiling zvariant v5.10.0\n   Compiling gdkwayland-sys v0.18.2\n   Compiling async-lock v3.4.2\n   Compiling piper v0.2.5\n   Compiling subtle v2.6.1\n   Compiling tower-service v0.3.3\n   Compiling try-lock v0.2.5\n   Compiling async-signal v0.2.13\n   Compiling want v0.3.1\n   Compiling const-random-macro v0.1.16\n   Compiling blocking v1.6.2\n   Compiling async-executor v1.14.0\n   Compiling async-process v2.5.0\n   Compiling async-trait v0.1.89\n   Compiling async-recursion v1.1.1\n   Compiling async-broadcast v0.7.2\n   Compiling ordered-stream v0.2.0\n   Compiling hex v0.4.3\n   Compiling pin-utils v0.1.0\n   Compiling const-random v0.1.18\n   Compiling sync_wrapper v1.0.2\n   Compiling ipnet v2.12.0\n   Compiling openssl-probe v0.2.1\n   Compiling tower-layer v0.3.3\n   Compiling dlv-list v0.5.2\n   Compiling rustls-native-certs v0.8.4\n   Compiling gethostname v1.1.0\n   Compiling rand_core v0.9.5\n   Compiling dirs-sys v0.3.7\n   Compiling is-docker v0.2.0\n   Compiling futures-sink v0.3.32\n   Compiling glib v0.18.5\n   Compiling hashbrown v0.14.5\n   Compiling x11rb-protocol v0.13.2\n   Compiling iri-string v0.7.10\n   Compiling rfd v0.16.0\n   Compiling rand_chacha v0.9.0\n   Compiling dirs v4.0.0\n   Compiling is-wsl v0.4.0\n   Compiling http-body-util v0.1.3\n   Compiling xkeysym v0.2.1\n   Compiling rand v0.9.3\n   Compiling auto-launch v0.5.0\n   Compiling tempfile v3.27.0\n   Compiling minisign-verify v0.2.5\n   Compiling open v5.4.0\n   Compiling hyper v1.8.1\n   Compiling tower v0.5.3\n   Compiling tokio-util v0.7.18\n   Compiling libappindicator-sys v0.9.0\n   Compiling ordered-multimap v0.7.3\n   Compiling zbus_names v4.3.1\n   Compiling rustls-webpki v0.103.15\n   Compiling hyper-util v0.1.20\n   Compiling rust-ini v0.21.3\n   Compiling tower-http v0.6.8\n   Compiling zbus_macros v5.14.0\n   Compiling zbus v5.14.0\n   Compiling cairo-rs v0.18.5\n   Compiling atk v0.18.2\n   Compiling javascriptcore-rs v1.1.2\n   Compiling tokio-rustls v0.26.4\n   Compiling rustls-platform-verifier v0.6.2\n   Compiling x11rb v0.13.2\n   Compiling hyper-rustls v0.27.9\n   Compiling reqwest v0.13.2\n   Compiling global-hotkey v0.7.0\n   Compiling tauri-plugin v2.5.4\n   Compiling tauri-build v2.6.3\n   Compiling tauri-codegen v2.6.3\n   Compiling tauri v2.11.5\n   Compiling tauri-macros v2.6.3\n   Compiling tauri-plugin-fs v2.5.1\n   Compiling tauri-plugin-opener v2.5.4\n   Compiling tauri-plugin-global-shortcut v2.3.1\n   Compiling tauri-plugin-notification v2.3.3\n   Compiling tauri-plugin-updater v2.10.1\n   Compiling tauri-plugin-deep-link v2.4.9\n   Compiling tauri-plugin-autostart v2.5.1\n   Compiling tauri-plugin-dialog v2.7.2\n   Compiling tauri-plugin-window-state v2.4.1\n   Compiling shell v0.3.2 (/home/elias/.cache/am/l_9dy34b/tmp/roots/test-intent-before-PJFabK/modules/shell/src-tauri)\n   Compiling notify-rust v4.12.0\n   Compiling pango v0.18.3\n   Compiling gdk-pixbuf v0.18.5\n   Compiling soup3 v0.5.0\n   Compiling gdk v0.18.2\n   Compiling gdkx11 v0.18.2\n   Compiling webkit2gtk v2.0.2\n   Compiling tao v0.35.3\n   Compiling muda v0.19.3\n   Compiling libappindicator v0.9.0\n   Compiling tray-icon v0.24.1\n   Compiling tauri-plugin-single-instance v2.4.3\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:978:15\n    |\n978 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:595:19\n    |\n133 | impl EngineHost {\n    | --------------- method in this implementation\n...\n595 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:643:8\n    |\n599 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n643 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n646 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1746:10\n     |\n1746 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:2125:4\n     |\n2125 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 10 warnings\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 23s\n     Running unittests src/lib.rs (modules/shell/src-tauri/target/debug/deps/shell_lib-3fbd4781eadfa5af)\nerror: test failed, to rerun pass `--lib`\n"
+      },
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.noticeClick.test.ts\" \"src/shell-v0/components/StatusPill.notices.test.ts\" \"src/shell-v0/state/UserStateDocument.multiWindow.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/l_9dy34b/tmp/test-intent-vitest-39873-1793930363304.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 3219,
+        "output": "JSON report written to /home/elias/.cache/am/l_9dy34b/tmp/test-intent-vitest-39873-1793930363304.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.noticeClick.test.ts#DE5 a notification clicked with Settings open leaves Settings where it is, and opens the review once Settings closes",
+        "classification": "assertion",
+        "detail": "DE5 a notification clicked with Settings open leaves Settings where it is, and opens the review once Settings closes:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/l_9dy34b/tmp/roots/test-intent-before-PJFabK/modules/ui-web/src/shell-v0/chrome/Shell.noticeClick.test.ts:100:32\n    at file:///home/elias/.cache/am/l_9dy34b/tmp/roots/test-intent-before-PJFabK/modules/ui-we"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.noticeClick.test.ts#DE5 a notification clicked with Settings open a request answered before Settings closes opens no review and says so in the panel",
+        "classification": "assertion",
+        "detail": "DE5 a notification clicked with Settings open a request answered before Settings closes opens no review and says so in the panel:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/l_9dy34b/tmp/roots/test-intent-before-PJFabK/modules/ui-web/src/shell-v0/chrome/Shell.noticeClick.test.ts:111:32\n    at file:///home/elias/.cache/am/l_9dy34b/tmp/roots/test-intent-before-PJFabK/modules/ui-we"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.noticeClick.test.ts#DE5 a notification clicked with Settings open the return to the area under Settings landing after the panel opened leaves it open",
+        "classification": "assertion",
+        "detail": "DE5 a notification clicked with Settings open the return to the area under Settings landing after the panel opened leaves it open:  AssertionError: expected undefined to be 'authorization:s3' // Object.is equality\n    at /home/elias/.cache/am/l_9dy34b/tmp/roots/test-intent-before-PJFabK/modules/ui-web/src/shell-v0/chrome/Shell.noticeClick.test.ts:122:30\n    at file:///home/elias/.cache/am/l_9dy34b/tmp/roots/test-intent-before-PJ"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification a request answered since says so in the panel, and opens no review",
+        "classification": "assertion",
+        "detail": "DE5 clicking a notification a request answered since says so in the panel, and opens no review:  AssertionError: expected undefined to be 'What that notification was about is n…' // Object.is equality\n    at /home/elias/.cache/am/l_9dy34b/tmp/roots/test-intent-before-PJFabK/modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts:458:26\n    at file:///home/elias/.cache/am/l_9dy34b/tmp/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification while a dialog is open waits for the dialog, then opens the review",
+        "classification": "assertion",
+        "detail": "DE5 clicking a notification while a dialog is open waits for the dialog, then opens the review:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/l_9dy34b/tmp/roots/test-intent-before-PJFabK/modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts:492:23\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node:i"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification while a dialog is open waits for the last of two dialogs",
+        "classification": "assertion",
+        "detail": "DE5 clicking a notification while a dialog is open waits for the last of two dialogs:  AssertionError: expected undefined to be 'authorization:m2' // Object.is equality\n    at /home/elias/.cache/am/l_9dy34b/tmp/roots/test-intent-before-PJFabK/modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts:502:25\n    at file:///home/elias/.cache/am/l_9dy34b/tmp/roots/test-intent-befo"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification while a dialog is open keeps waiting when another dialog follows the closed one in the same turn",
+        "classification": "assertion",
+        "detail": "DE5 clicking a notification while a dialog is open keeps waiting when another dialog follows the closed one in the same turn:  AssertionError: expected undefined to be 'authorization:m3' // Object.is equality\n    at /home/elias/.cache/am/l_9dy34b/tmp/roots/test-intent-before-PJFabK/modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts:512:25\n    at file:///home/elias/.cache/am/l_9dy34b/tmp/roots/test-intent-befo"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification while a dialog is open the latest click is the one remembered",
+        "classification": "assertion",
+        "detail": "DE5 clicking a notification while a dialog is open the latest click is the one remembered:  AssertionError: expected undefined to be 'authorization:m5' // Object.is equality\n    at /home/elias/.cache/am/l_9dy34b/tmp/roots/test-intent-before-PJFabK/modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts:519:25\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at lis"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification while a dialog is open a request answered meanwhile opens no review and says so in the panel",
+        "classification": "assertion",
+        "detail": "DE5 clicking a notification while a dialog is open a request answered meanwhile opens no review and says so in the panel:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/l_9dy34b/tmp/roots/test-intent-before-PJFabK/modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts:527:23\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node:i"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification while a dialog is open a request that expired meanwhile opens no review and says so in the panel",
+        "classification": "assertion",
+        "detail": "DE5 clicking a notification while a dialog is open a request that expired meanwhile opens no review and says so in the panel:  AssertionError: expected undefined to be 'What that notification was about is n…' // Object.is equality\n    at /home/elias/.cache/am/l_9dy34b/tmp/roots/test-intent-before-PJFabK/modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts:538:26\n    at runNextTicks (node:internal/process/task_q"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification while a dialog is open with a review open, a request that has gone leaves the review where it is and says so",
+        "classification": "assertion",
+        "detail": "DE5 clicking a notification while a dialog is open with a review open, a request that has gone leaves the review where it is and says so:  AssertionError: expected undefined to be 'What that notification was about is n…' // Object.is equality\n    at /home/elias/.cache/am/l_9dy34b/tmp/roots/test-intent-before-PJFabK/modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts:560:26\n    at file:///home/elias/.cache/am/l_9dy34b/tmp/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification while a dialog is open with a request's security dialog open, the review moves to the request clicked, and the first keeps waiting",
+        "classification": "assertion",
+        "detail": "DE5 clicking a notification while a dialog is open with a request's security dialog open, the review moves to the request clicked, and the first keeps waiting:  AssertionError: expected true to be false // Object.is equality\n    at /home/elias/.cache/am/l_9dy34b/tmp/roots/test-intent-before-PJFabK/modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts:567:30\n    at file:///home/elias/.cache/am/l_9dy34b/tmp/roots/test-intent-before-PJFabK/modules/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification while a dialog is open with a request's security dialog open, a typed request clicked takes the dialog",
+        "classification": "assertion",
+        "detail": "DE5 clicking a notification while a dialog is open with a request's security dialog open, a typed request clicked takes the dialog:  AssertionError: expected { kind: 'authorize', …(3) } to match object { prompt: { pendingId: 'n9' } }\n(14 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/l_9dy34b/tmp/roots/test-intent-before-PJFabK/modules/ui-web/node_modules/@vitest/expect/dist/index."
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 each end is its own event two AI install failures a second apart each notify",
+        "classification": "assertion",
+        "detail": "DE5 each end is its own event two AI install failures a second apart each notify:  AssertionError: expected [ 'AI install failed', …(1) ] to deeply equal [ 'AI install failed@1000', …(1) ]\n    at /home/elias/.cache/am/l_9dy34b/tmp/roots/test-intent-before-PJFabK/modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts:602:19\n    at file:///home/elias/.cache/am/l_9dy34b/tm"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 each end is its own event two installs completing each notify",
+        "classification": "assertion",
+        "detail": "DE5 each end is its own event two installs completing each notify:  AssertionError: expected [ 'AI install complete', …(1) ] to deeply equal [ 'AI install complete@1000', …(1) ]\n    at /home/elias/.cache/am/l_9dy34b/tmp/roots/test-intent-before-PJFabK/modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts:607:19\n    at file:///home/elias/.cache/am/l_9dy34"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 each end is its own event two settlings at different engine times each notify",
+        "classification": "assertion",
+        "detail": "DE5 each end is its own event two settlings at different engine times each notify:  AssertionError: expected [ 'Search is up to date', …(1) ] to deeply equal [ …(2) ]\n    at /home/elias/.cache/am/l_9dy34b/tmp/roots/test-intent-before-PJFabK/modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts:613:19\n    at file:///home/elias/.cache/am/l_9dy34b/tmp/roots/test-intent-bef"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 each end is its own event a settling that changed nothing in the engine's indexing state is still its own event",
+        "classification": "assertion",
+        "detail": "DE5 each end is its own event a settling that changed nothing in the engine's indexing state is still its own event:  AssertionError: expected [ 'Search is up to date', …(1) ] to deeply equal [ …(2) ]\n    at /home/elias/.cache/am/l_9dy34b/tmp/roots/test-intent-before-PJFabK/modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts:619:19\n    at file:///home/elias/.cache/am/l_9dy34b/tmp/roots/test-intent-bef"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 each end is its own event a second window seeing the same end later gives the same id, so the shell shows it once",
+        "classification": "assertion",
+        "detail": "DE5 each end is its own event a second window seeing the same end later gives the same id, so the shell shows it once:  AssertionError: expected [ 'AI install failed', …(1) ] to deeply equal [ 'AI install failed@1000', …(1) ]\n    at /home/elias/.cache/am/l_9dy34b/tmp/roots/test-intent-before-PJFabK/modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts:633:21\n    at file:///home/elias/.cache/am/l_9dy34b/tm"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 each end is its own event clicking one lands on its row by its words",
+        "classification": "assertion",
+        "detail": "DE5 each end is its own event clicking one lands on its row by its words:  AssertionError: the given combination of arguments (undefined and string) is invalid for this assertion. You can use an array, a map, an object, a set, a string, or a weakset instead of a string\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/l_9dy34b/tmp/roots/test-intent-before-PJFabK/modul"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 live regions follow the same rule as notifications a transition finished while disconnected says nothing, and Earlier lists it",
+        "classification": "assertion",
+        "detail": "C6 live regions follow the same rule as notifications a transition finished while disconnected says nothing, and Earlier lists it:  AssertionError: expected [ 'Indexing queue empty', …(3) ] to not include 'Search is up to date'\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/l_9dy34b/tmp/roots/test-intent-before-PJFabK/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1319:15)\n    at Proxy.<anonymous> (file:///home"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 live regions follow the same rule as notifications indexing finished while disconnected says nothing, and Earlier lists it",
+        "classification": "assertion",
+        "detail": "C6 live regions follow the same rule as notifications indexing finished while disconnected says nothing, and Earlier lists it:  AssertionError: expected [ 'Indexing queue empty', …(3) ] to not include 'Search is up to date'\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/l_9dy34b/tmp/roots/test-intent-before-PJFabK/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1319:15)\n    at Proxy.<anonymous> (file:///home"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 live regions follow the same rule as notifications an install that failed while disconnected says nothing, in either announcer, and Earlier lists it",
+        "classification": "assertion",
+        "detail": "C6 live regions follow the same rule as notifications an install that failed while disconnected says nothing, in either announcer, and Earlier lists it:  AssertionError: expected [ 'Indexing queue empty', …(3) ] to not include 'AI install failed'\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/l_9dy34b/tmp/roots/test-intent-before-PJFabK/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1319:15)\n    at Proxy.<anonymous> (file:///home/el"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 live regions follow the same rule as notifications an install completed while disconnected says nothing, and Earlier lists it",
+        "classification": "assertion",
+        "detail": "C6 live regions follow the same rule as notifications an install completed while disconnected says nothing, and Earlier lists it:  AssertionError: expected [ 'Indexing queue empty', …(3) ] to not include 'AI install complete'\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/l_9dy34b/tmp/roots/test-intent-before-PJFabK/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1319:15)\n    at Proxy.<anonymous> (file:///home/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 live regions follow the same rule as notifications an operation finished while disconnected says nothing, and Earlier lists it",
+        "classification": "assertion",
+        "detail": "C6 live regions follow the same rule as notifications an operation finished while disconnected says nothing, and Earlier lists it:  AssertionError: expected [ 'Indexing queue empty', …(3) ] to not include 'Rebuild search finished'\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/l_9dy34b/tmp/roots/test-intent-before-PJFabK/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1319:15)\n    at Proxy.<anonymous> (file:///h"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 overlapping saves a plugin value another window saves while this window is writing survives",
+        "classification": "assertion",
+        "detail": "C11 overlapping saves a plugin value another window saves while this window is writing survives:  AssertionError: expected { version: 2, …(3) } to match object { chatWidth: 'wide', …(1) }\n(4 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/l_9dy34b/tmp/roots/test-intent-before-PJFabK/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:10)"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 overlapping saves both windows' values in the same plugin survive",
+        "classification": "assertion",
+        "detail": "C11 overlapping saves both windows' values in the same plugin survive:  AssertionError: expected { plugin: { 'from-a': 2 } } to deeply equal { Object (plugin) }\n    at /home/elias/.cache/am/l_9dy34b/tmp/roots/test-intent-before-PJFabK/modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts:165:40\n    at file:///home/elias/.cache/am/l_9dy34b/tmp/roots/tes"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 overlapping saves a profile another window deletes while this window is writing stays deleted",
+        "classification": "assertion",
+        "detail": "C11 overlapping saves a profile another window deletes while this window is writing stays deleted:  AssertionError: expected [ 'default', 'work' ] to deeply equal [ 'default' ]\n    at /home/elias/.cache/am/l_9dy34b/tmp/roots/test-intent-before-PJFabK/modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts:174:44\n    at file:///home/elias/.cache/am/l_9dy34b/tmp/roots/test-intent-bef"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 overlapping saves a save that must land first still builds on the other window's save",
+        "classification": "assertion",
+        "detail": "C11 overlapping saves a save that must land first still builds on the other window's save:  AssertionError: expected { version: 2, …(3) } to match object { notifications: 'off', …(1) }\n(4 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/l_9dy34b/tmp/roots/test-intent-before-PJFabK/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:1"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/notices.rs#notices::tests::an_event_never_shows_twice_while_the_ledger_remembers_it",
+        "classification": "assertion",
+        "detail": "notices::tests::an_event_never_shows_twice_while_the_ledger_remembers_it:  ---- notices::tests::an_event_never_shows_twice_while_the_ledger_remembers_it stdout ----\n\nthread 'notices::tests::an_event_never_shows_twice_while_the_ledger_remembers_it' (48583) panicked at src/notices.rs:304:13:\nassertion failed: !ledger.claim(\"operation:a\")\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    notices::tests::an_event_never_shows_twice_while_the_ledger_remember"
+      }
+    ]
+  },
+  "digest": "sha256:2e9e8d7e489282edbb6a9517ad278a2baf7643248ce93bdf9247efebb78c5fa5"
+}

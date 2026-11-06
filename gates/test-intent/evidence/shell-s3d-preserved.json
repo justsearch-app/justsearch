@@ -1,0 +1,1015 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-06T02:00:21.281Z",
+  "revision": "67cd75a1533d174c9facd7770991bacbe3996244",
+  "tree": "3969be97fe37600049eac48e58db6effeede7533",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"notices::tests::an_event_reported_by_two_windows_shows_once\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2065
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"notices::tests::different_events_each_show\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1941
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"notices::tests::zero_clears_the_badge\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1871
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"notices::tests::the_overlay_clears_at_zero_and_rejects_a_wrong_size\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1898
+    },
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/utils/notify.test.ts\" \"src/utils/taskbarBadge.test.ts\" \"src/utils/windowFocus.test.ts\" \"src/shell-v0/components/StatusPill.notices.test.ts\" \"src/shell-v0/router/tauriBridge.notices.test.ts\" \"src/shell-v0/state/noticePolicy.test.ts\" \"src/shell-v0/state/notificationsState.test.ts\" \"src/shell-v0/views/SettingsSurface.notifications.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/l_9dy34b/tmp/test-intent-vitest-50015-1793930419414.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1862
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/utils/notify.test.ts#sendDesktopNotification hands the event and its id to the shell, which shows it once and reports the click",
+      "file": "modules/ui-web/src/utils/notify.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5875278fba031dbb4300c49c8b8abf58c0135a8dad5dfedc7b10617c0f6666ed",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "sendDesktopNotification hands the event and its id to the shell, which shows it once and reports the click",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/utils/notify.test.ts#sendDesktopNotification does nothing in a plain browser, and asks no permission",
+      "file": "modules/ui-web/src/utils/notify.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5875278fba031dbb4300c49c8b8abf58c0135a8dad5dfedc7b10617c0f6666ed",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "sendDesktopNotification does nothing in a plain browser, and asks no permission",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/utils/notify.test.ts#sendDesktopNotification a shell that cannot show it raises no error",
+      "file": "modules/ui-web/src/utils/notify.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5875278fba031dbb4300c49c8b8abf58c0135a8dad5dfedc7b10617c0f6666ed",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "sendDesktopNotification a shell that cannot show it raises no error",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/utils/taskbarBadge.test.ts#DE5 setTaskbarBadge sends the count with the overlay Windows shows instead of a badge",
+      "file": "modules/ui-web/src/utils/taskbarBadge.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c55b715a28eaeed1fc76435c409ccfa875cc3790004f4cc9f3160560d70d3710",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 setTaskbarBadge sends the count with the overlay Windows shows instead of a badge",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/utils/taskbarBadge.test.ts#DE5 setTaskbarBadge more than nine reads 9+",
+      "file": "modules/ui-web/src/utils/taskbarBadge.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c55b715a28eaeed1fc76435c409ccfa875cc3790004f4cc9f3160560d70d3710",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 setTaskbarBadge more than nine reads 9+",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/utils/taskbarBadge.test.ts#DE5 setTaskbarBadge zero clears it, with nothing drawn",
+      "file": "modules/ui-web/src/utils/taskbarBadge.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c55b715a28eaeed1fc76435c409ccfa875cc3790004f4cc9f3160560d70d3710",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 setTaskbarBadge zero clears it, with nothing drawn",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/utils/taskbarBadge.test.ts#DE5 setTaskbarBadge a start with nothing waiting makes no native call",
+      "file": "modules/ui-web/src/utils/taskbarBadge.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c55b715a28eaeed1fc76435c409ccfa875cc3790004f4cc9f3160560d70d3710",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 setTaskbarBadge a start with nothing waiting makes no native call",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/utils/taskbarBadge.test.ts#DE5 setTaskbarBadge an unchanged count is not sent again",
+      "file": "modules/ui-web/src/utils/taskbarBadge.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c55b715a28eaeed1fc76435c409ccfa875cc3790004f4cc9f3160560d70d3710",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 setTaskbarBadge an unchanged count is not sent again",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/utils/taskbarBadge.test.ts#DE5 setTaskbarBadge a reload clears the count the page before it left on the taskbar",
+      "file": "modules/ui-web/src/utils/taskbarBadge.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c55b715a28eaeed1fc76435c409ccfa875cc3790004f4cc9f3160560d70d3710",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 setTaskbarBadge a reload clears the count the page before it left on the taskbar",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/utils/taskbarBadge.test.ts#DE5 setTaskbarBadge without a canvas the count is still sent",
+      "file": "modules/ui-web/src/utils/taskbarBadge.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c55b715a28eaeed1fc76435c409ccfa875cc3790004f4cc9f3160560d70d3710",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 setTaskbarBadge without a canvas the count is still sent",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/utils/taskbarBadge.test.ts#DE5 setTaskbarBadge does nothing in a plain browser",
+      "file": "modules/ui-web/src/utils/taskbarBadge.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c55b715a28eaeed1fc76435c409ccfa875cc3790004f4cc9f3160560d70d3710",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 setTaskbarBadge does nothing in a plain browser",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/utils/taskbarBadge.test.ts#DE5 setTaskbarBadge a platform without a badge raises no error",
+      "file": "modules/ui-web/src/utils/taskbarBadge.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c55b715a28eaeed1fc76435c409ccfa875cc3790004f4cc9f3160560d70d3710",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 setTaskbarBadge a platform without a badge raises no error",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/utils/windowFocus.test.ts#isWindowFocused outside Tauri, defers to document.hasFocus()",
+      "file": "modules/ui-web/src/utils/windowFocus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:62ebc9cf53fe72879a5c9a7db3a3f436bd7e80489e47559fa651390d20ed8cdf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "isWindowFocused outside Tauri, defers to document.hasFocus()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/utils/windowFocus.test.ts#isWindowFocused outside Tauri, reflects document.hasFocus() === false",
+      "file": "modules/ui-web/src/utils/windowFocus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:62ebc9cf53fe72879a5c9a7db3a3f436bd7e80489e47559fa651390d20ed8cdf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "isWindowFocused outside Tauri, reflects document.hasFocus() === false",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/utils/windowFocus.test.ts#isWindowFocused inside Tauri, uses the native getCurrentWindow().isFocused() signal, not document.hasFocus()",
+      "file": "modules/ui-web/src/utils/windowFocus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:62ebc9cf53fe72879a5c9a7db3a3f436bd7e80489e47559fa651390d20ed8cdf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "isWindowFocused inside Tauri, uses the native getCurrentWindow().isFocused() signal, not document.hasFocus()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/utils/windowFocus.test.ts#isWindowFocused inside Tauri with a focused window, returns true",
+      "file": "modules/ui-web/src/utils/windowFocus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:62ebc9cf53fe72879a5c9a7db3a3f436bd7e80489e47559fa651390d20ed8cdf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "isWindowFocused inside Tauri with a focused window, returns true",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/utils/windowFocus.test.ts#isWindowFocused inside Tauri, fails safe (assumes focused) if the native API throws",
+      "file": "modules/ui-web/src/utils/windowFocus.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:62ebc9cf53fe72879a5c9a7db3a3f436bd7e80489e47559fa651390d20ed8cdf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "isWindowFocused inside Tauri, fails safe (assumes focused) if the native API throws",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 an agent request with the window focused stays in the app: the pill and its announcement are the notice",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6eb4498d1678f1d2a49b05f8a61d70ed47d6315726f3bcbe9d819b42849254cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 an agent request with the window focused stays in the app: the pill and its announcement are the notice",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 an agent request C6 a request rediscovered after a reload notifies nothing and still counts as needing you",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6eb4498d1678f1d2a49b05f8a61d70ed47d6315726f3bcbe9d819b42849254cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 an agent request C6 a request rediscovered after a reload notifies nothing and still counts as needing you",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 an agent request C10 a teardown while the focus check is in flight sends nothing, and a remount does not repeat it",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6eb4498d1678f1d2a49b05f8a61d70ed47d6315726f3bcbe9d819b42849254cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 an agent request C10 a teardown while the focus check is in flight sends nothing, and a remount does not repeat it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 long work C6 a complete receipt discovered late is silent",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6eb4498d1678f1d2a49b05f8a61d70ed47d6315726f3bcbe9d819b42849254cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 long work C6 a complete receipt discovered late is silent",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 long work C6 a failed receipt discovered late is silent",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6eb4498d1678f1d2a49b05f8a61d70ed47d6315726f3bcbe9d819b42849254cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 long work C6 a failed receipt discovered late is silent",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 long work complete with gaps is a decision, not a completion",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6eb4498d1678f1d2a49b05f8a61d70ed47d6315726f3bcbe9d819b42849254cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 long work complete with gaps is a decision, not a completion",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 long work with the window focused the pill is enough",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6eb4498d1678f1d2a49b05f8a61d70ed47d6315726f3bcbe9d819b42849254cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 long work with the window focused the pill is enough",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 the taskbar badge C6 retained Earlier records do not count",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6eb4498d1678f1d2a49b05f8a61d70ed47d6315726f3bcbe9d819b42849254cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 the taskbar badge C6 retained Earlier records do not count",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification opens the review of the agent request",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6eb4498d1678f1d2a49b05f8a61d70ed47d6315726f3bcbe9d819b42849254cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 clicking a notification opens the review of the agent request",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification opens the panel on a failed operation, with focus on its row",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6eb4498d1678f1d2a49b05f8a61d70ed47d6315726f3bcbe9d819b42849254cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 clicking a notification opens the panel on a failed operation, with focus on its row",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification finds an event listed only by its words in Earlier",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6eb4498d1678f1d2a49b05f8a61d70ed47d6315726f3bcbe9d819b42849254cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 clicking a notification finds an event listed only by its words in Earlier",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification a request answered since opens the panel on what is true now",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6eb4498d1678f1d2a49b05f8a61d70ed47d6315726f3bcbe9d819b42849254cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 clicking a notification a request answered since opens the panel on what is true now",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification never opens over a must-stop dialog",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6eb4498d1678f1d2a49b05f8a61d70ed47d6315726f3bcbe9d819b42849254cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 clicking a notification never opens over a must-stop dialog",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification C10 a remount listens once: the old listener is stopped",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6eb4498d1678f1d2a49b05f8a61d70ed47d6315726f3bcbe9d819b42849254cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 clicking a notification C10 a remount listens once: the old listener is stopped",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/router/tauriBridge.notices.test.ts#DE5 the shell contract the commands the frontend invokes are registered, and the clicked event has one name",
+      "file": "modules/ui-web/src/shell-v0/router/tauriBridge.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:86571b3398d03b7736a7c2fee17725a890db56d8a50a432947f0949a08adec95",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 the shell contract the commands the frontend invokes are registered, and the clicked event has one name",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/router/tauriBridge.notices.test.ts#DE5 the shell contract both sides agree on the overlay size the shell validates",
+      "file": "modules/ui-web/src/shell-v0/router/tauriBridge.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:86571b3398d03b7736a7c2fee17725a890db56d8a50a432947f0949a08adec95",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 the shell contract both sides agree on the overlay size the shell validates",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/router/tauriBridge.notices.test.ts#DE5 installNoticeActivationBridge reports the clicked event id from the shell",
+      "file": "modules/ui-web/src/shell-v0/router/tauriBridge.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:86571b3398d03b7736a7c2fee17725a890db56d8a50a432947f0949a08adec95",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 installNoticeActivationBridge reports the clicked event id from the shell",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/router/tauriBridge.notices.test.ts#DE5 installNoticeActivationBridge stopping removes the listener",
+      "file": "modules/ui-web/src/shell-v0/router/tauriBridge.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:86571b3398d03b7736a7c2fee17725a890db56d8a50a432947f0949a08adec95",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 installNoticeActivationBridge stopping removes the listener",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/router/tauriBridge.notices.test.ts#DE5 installNoticeActivationBridge C10 stopping before the subscription lands still removes it",
+      "file": "modules/ui-web/src/shell-v0/router/tauriBridge.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:86571b3398d03b7736a7c2fee17725a890db56d8a50a432947f0949a08adec95",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 installNoticeActivationBridge C10 stopping before the subscription lands still removes it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/router/tauriBridge.notices.test.ts#DE5 installNoticeActivationBridge listens to nothing in a plain browser",
+      "file": "modules/ui-web/src/shell-v0/router/tauriBridge.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:86571b3398d03b7736a7c2fee17725a890db56d8a50a432947f0949a08adec95",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 installNoticeActivationBridge listens to nothing in a plain browser",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts#DE5 routeDesktopNotice agent-request: a focused window keeps it in the app, in every setting",
+      "file": "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:50e5aee44bfe8708ecd5d8510a173c812912314259787ee1dbbb5be8ced6c799",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 routeDesktopNotice agent-request: a focused window keeps it in the app, in every setting",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts#DE5 routeDesktopNotice work-finished: a focused window keeps it in the app, in every setting",
+      "file": "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:50e5aee44bfe8708ecd5d8510a173c812912314259787ee1dbbb5be8ced6c799",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 routeDesktopNotice work-finished: a focused window keeps it in the app, in every setting",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts#DE5 routeDesktopNotice work-failed: a focused window keeps it in the app, in every setting",
+      "file": "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:50e5aee44bfe8708ecd5d8510a173c812912314259787ee1dbbb5be8ced6c799",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 routeDesktopNotice work-failed: a focused window keeps it in the app, in every setting",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts#DE5 routeDesktopNotice agent-request: in the background Off is silent, On has no sound, On with sound has it",
+      "file": "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:50e5aee44bfe8708ecd5d8510a173c812912314259787ee1dbbb5be8ced6c799",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 routeDesktopNotice agent-request: in the background Off is silent, On has no sound, On with sound has it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts#DE5 routeDesktopNotice work-finished: in the background Off is silent, On has no sound, On with sound has it",
+      "file": "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:50e5aee44bfe8708ecd5d8510a173c812912314259787ee1dbbb5be8ced6c799",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 routeDesktopNotice work-finished: in the background Off is silent, On has no sound, On with sound has it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts#DE5 routeDesktopNotice work-failed: in the background Off is silent, On has no sound, On with sound has it",
+      "file": "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:50e5aee44bfe8708ecd5d8510a173c812912314259787ee1dbbb5be8ced6c799",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 routeDesktopNotice work-failed: in the background Off is silent, On has no sound, On with sound has it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts#DE5 routeDesktopNotice C6 a rediscovered event stays silent in the background, in every setting",
+      "file": "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:50e5aee44bfe8708ecd5d8510a173c812912314259787ee1dbbb5be8ced6c799",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 routeDesktopNotice C6 a rediscovered event stays silent in the background, in every setting",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts#DE5 words an agent request says who, what and the deadline, and is found by its row",
+      "file": "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:50e5aee44bfe8708ecd5d8510a173c812912314259787ee1dbbb5be8ced6c799",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 words an agent request says who, what and the deadline, and is found by its row",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts#DE5 words an agent request without a deadline has no body",
+      "file": "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:50e5aee44bfe8708ecd5d8510a173c812912314259787ee1dbbb5be8ced6c799",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 words an agent request without a deadline has no body",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts#DE5 words finished and failed work is found by its row, or by its words when it has none",
+      "file": "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:50e5aee44bfe8708ecd5d8510a173c812912314259787ee1dbbb5be8ced6c799",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 words finished and failed work is found by its row, or by its words when it has none",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts#DE5 needsYouCount counts Needs you only, and reaches zero",
+      "file": "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:50e5aee44bfe8708ecd5d8510a173c812912314259787ee1dbbb5be8ced6c799",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 needsYouCount counts Needs you only, and reaches zero",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts#DE5 needsYouCount C6 retained Earlier records never add to the badge",
+      "file": "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:50e5aee44bfe8708ecd5d8510a173c812912314259787ee1dbbb5be8ced6c799",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 needsYouCount C6 retained Earlier records never add to the badge",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/notificationsState.test.ts#DE5 the Notifications choice is On for a person who never chose, including an existing document without the field",
+      "file": "modules/ui-web/src/shell-v0/state/notificationsState.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:18fece0b41ae52916a9ea4470b842f7ef280e791d94120d3757eb8d3cdbc0e1c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 the Notifications choice is On for a person who never chose, including an existing document without the field",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/notificationsState.test.ts#DE5 the Notifications choice off survives a reload",
+      "file": "modules/ui-web/src/shell-v0/state/notificationsState.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:18fece0b41ae52916a9ea4470b842f7ef280e791d94120d3757eb8d3cdbc0e1c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 the Notifications choice off survives a reload",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/notificationsState.test.ts#DE5 the Notifications choice on survives a reload",
+      "file": "modules/ui-web/src/shell-v0/state/notificationsState.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:18fece0b41ae52916a9ea4470b842f7ef280e791d94120d3757eb8d3cdbc0e1c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 the Notifications choice on survives a reload",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/notificationsState.test.ts#DE5 the Notifications choice sound survives a reload",
+      "file": "modules/ui-web/src/shell-v0/state/notificationsState.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:18fece0b41ae52916a9ea4470b842f7ef280e791d94120d3757eb8d3cdbc0e1c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 the Notifications choice sound survives a reload",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/notificationsState.test.ts#DE5 the Notifications choice a value outside the three choices reads as On and never reaches the document",
+      "file": "modules/ui-web/src/shell-v0/state/notificationsState.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:18fece0b41ae52916a9ea4470b842f7ef280e791d94120d3757eb8d3cdbc0e1c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 the Notifications choice a value outside the three choices reads as On and never reaches the document",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/notificationsState.test.ts#DE5 the Notifications choice C11 preserves co-resident values, in both directions",
+      "file": "modules/ui-web/src/shell-v0/state/notificationsState.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:18fece0b41ae52916a9ea4470b842f7ef280e791d94120d3757eb8d3cdbc0e1c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 the Notifications choice C11 preserves co-resident values, in both directions",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.notifications.test.ts#DE5 Settings › General › Notifications lives in the General group and settings search finds it",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.notifications.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d46ab8c8f15868df9390433eb878f1172671c86926957e70415fe1fa5fd2f1b7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 Settings › General › Notifications lives in the General group and settings search finds it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.notifications.test.ts#DE5 Settings › General › Notifications offers Off, On and On with sound with the stored value selected, named for assistive technology",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.notifications.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d46ab8c8f15868df9390433eb878f1172671c86926957e70415fe1fa5fd2f1b7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 Settings › General › Notifications offers Off, On and On with sound with the stored value selected, named for assistive technology",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.notifications.test.ts#DE5 Settings › General › Notifications says when it applies, in the words of ref-13",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.notifications.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d46ab8c8f15868df9390433eb878f1172671c86926957e70415fe1fa5fd2f1b7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 Settings › General › Notifications says when it applies, in the words of ref-13",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.notifications.test.ts#DE5 Settings › General › Notifications choosing writes the store and shows the choice",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.notifications.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d46ab8c8f15868df9390433eb878f1172671c86926957e70415fe1fa5fd2f1b7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 Settings › General › Notifications choosing writes the store and shows the choice",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.notifications.test.ts#DE5 Settings › General › Notifications a retained surface shows the value the document holds now",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.notifications.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d46ab8c8f15868df9390433eb878f1172671c86926957e70415fe1fa5fd2f1b7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 Settings › General › Notifications a retained surface shows the value the document holds now",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/notices.rs#notices::tests::an_event_reported_by_two_windows_shows_once",
+      "file": "modules/shell/src-tauri/src/notices.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:69b4bee2981b3a34c48aa662cf77450682d471dc23c1b6fcba937c2df7a5b736",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "notices::tests::an_event_reported_by_two_windows_shows_once",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/notices.rs#notices::tests::different_events_each_show",
+      "file": "modules/shell/src-tauri/src/notices.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:69b4bee2981b3a34c48aa662cf77450682d471dc23c1b6fcba937c2df7a5b736",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "notices::tests::different_events_each_show",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/notices.rs#notices::tests::zero_clears_the_badge",
+      "file": "modules/shell/src-tauri/src/notices.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:69b4bee2981b3a34c48aa662cf77450682d471dc23c1b6fcba937c2df7a5b736",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "notices::tests::zero_clears_the_badge",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/notices.rs#notices::tests::the_overlay_clears_at_zero_and_rejects_a_wrong_size",
+      "file": "modules/shell/src-tauri/src/notices.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:69b4bee2981b3a34c48aa662cf77450682d471dc23c1b6fcba937c2df7a5b736",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "notices::tests::the_overlay_clears_at_zero_and_rejects_a_wrong_size",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:3f970d5953b265979266f01cea16036e13692147abe10dfbc0e78046efd2a7fe"
+}

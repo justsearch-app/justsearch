@@ -59,10 +59,12 @@ function shownText(node: Node): string {
 export class StatusPanel extends JfElement {
   static override properties = {
     model: { attribute: false }, plugins: { attribute: false }, apiBase: { attribute: 'api-base' },
-    expanded: { state: true }, pluginsOpen: { state: true }, reviewing: { state: true }, always: { state: true }, gone: { state: true },
+    expanded: { state: true }, pluginsOpen: { state: true }, reviewing: { state: true }, always: { state: true }, gone: { state: true }, noticeGone: { state: true },
   };
   /** DE3 — the Needs-you row whose review is open inside the panel (ref-10), or null for the list. */
   declare reviewing: string | null;
+  /** A clicked desktop notification's item has left the panel: answered, expired or cleared. */
+  declare noticeGone: boolean;
   /** The review's "always allow" choice; reset for every review. */
   declare always: boolean;
   /** The reviewed request left (answered elsewhere, withdrawn or expired) while it was open. */
@@ -89,7 +91,7 @@ export class StatusPanel extends JfElement {
   declare pluginsOpen: boolean;
   constructor() {
     super(); this.model = null; this.plugins = []; this.apiBase = ''; this.expanded = new Set(); this.pluginsOpen = false;
-    this.reviewing = null; this.always = false; this.gone = false;
+    this.reviewing = null; this.always = false; this.gone = false; this.noticeGone = false;
   }
   private readonly overflow = new OverflowController(this, {
     items: () => [...this.renderRoot.querySelectorAll<HTMLElement>('.plugin')],
@@ -287,6 +289,14 @@ export class StatusPanel extends JfElement {
     if (row.review?.open) this.action(row.review.open);
     void this.updateComplete.then(() => this.shadowRoot?.querySelector<HTMLElement>('.review h2')?.focus());
   }
+  /** Bring one row into view and put focus on it (a clicked desktop notification). */
+  revealRow(id: string): void {
+    void this.updateComplete.then(() => {
+      const row = this.shadowRoot?.querySelector<HTMLElement>(`article[data-fact="${CSS.escape(id)}"]`);
+      row?.scrollIntoView({ block: 'nearest' });
+      row?.querySelector<HTMLElement>('button')?.focus();
+    });
+  }
   /** Back to the list; the request keeps waiting. True when a review was open (Escape uses this). */
   back(): boolean {
     const id = this.reviewing;
@@ -401,6 +411,9 @@ export class StatusPanel extends JfElement {
       <p class="keys" aria-hidden="true"><span><kbd>1</kbd> allow</span><span><kbd>2</kbd> deny</span><span><kbd>Esc</kbd> back, still waiting</span></p>`}
     </div>`;
   }
+  private renderNoticeGone(): TemplateResult | typeof nothing {
+    return this.noticeGone ? html`<p class="detail" role="status" data-testid="status-notice-gone">What that notification was about is no longer here.</p>` : nothing;
+  }
   // B5 — the header and footer rows are plain containers: page banner/contentinfo landmarks belong
   // to the app frame, never to a popover.
   override render(): TemplateResult {
@@ -411,7 +424,7 @@ export class StatusPanel extends JfElement {
         @pointerdown=${{ handleEvent: this.onDecisionPointerDown, capture: true }} @click=${{ handleEvent: this.onDecisionClick, capture: true }}
         @keydown=${{ handleEvent: this.onDecisionKey, capture: true }} @keyup=${{ handleEvent: this.onDecisionKey, capture: true }}
         @scroll=${() => this.placeControls()}>
-        ${this.renderReview(reviewed, reviewed.review)}</div>`;
+        ${this.renderNoticeGone()}${this.renderReview(reviewed, reviewed.review)}</div>`;
     }
     return html`<div class="panel" data-testid="status-panel" role="dialog" aria-label="What's going on" tabindex="-1"
       @pointerdown=${{ handleEvent: this.onDecisionPointerDown, capture: true }} @click=${{ handleEvent: this.onDecisionClick, capture: true }}
@@ -423,7 +436,8 @@ export class StatusPanel extends JfElement {
         if (!(event.relatedTarget instanceof Node) || !this.shadowRoot?.contains(event.relatedTarget)) this.focusedRow = null;
       }}>
       <div class="header"><div><h2>What's going on</h2><p class="detail">${model ? summary(model) : 'Checking search status'}</p>
-        ${this.gone ? html`<p class="detail" role="status">The request you were reviewing is no longer waiting.</p>` : nothing}</div>
+        ${this.gone ? html`<p class="detail" role="status">The request you were reviewing is no longer waiting.</p>` : nothing}
+        ${this.renderNoticeGone()}</div>
         <button type="button" aria-label="Close status panel" @click=${() => this.dispatchEvent(new CustomEvent('status-close', { bubbles: true, composed: true }))}>×</button></div>
       ${model ? (['needs', 'problems', 'running', 'earlier'] as const).map(section => {
         const rows = model.sections[section];

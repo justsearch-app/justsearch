@@ -1,29 +1,25 @@
 // SPDX-License-Identifier: Apache-2.0
 import { isTauriRuntime } from './tauriRuntime';
 
+export interface DesktopNotification {
+  /** The event's id: the shell shows it once and reports it back when it is clicked. */
+  readonly id: string;
+  readonly title: string;
+  readonly body?: string;
+  readonly sound: boolean;
+}
+
 /**
- * Send a desktop notification via the Tauri notification plugin.
- * No-ops silently in browser mode or if permissions are denied.
+ * Show a desktop notification through the shell. The shell owns delivery because only it can see
+ * the click. No-ops silently in browser mode or if the shell cannot show it.
  */
-export async function sendDesktopNotification(title: string, body?: string): Promise<void> {
+export async function sendDesktopNotification(notification: DesktopNotification): Promise<void> {
   if (!isTauriRuntime()) return;
 
   try {
-    const {
-      isPermissionGranted,
-      requestPermission,
-      sendNotification,
-    } = await import('@tauri-apps/plugin-notification');
-
-    let granted = await isPermissionGranted();
-    if (!granted) {
-      const permission = await requestPermission();
-      granted = permission === 'granted';
-    }
-    if (!granted) return;
-
-    sendNotification({ title, body });
+    const { invoke } = await import('@tauri-apps/api/core');
+    await invoke('show_desktop_notice', { ...notification });
   } catch {
-    // Plugin not available — swallow silently.
+    // Shell command not available — swallow silently.
   }
 }

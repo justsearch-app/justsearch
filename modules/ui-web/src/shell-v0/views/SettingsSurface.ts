@@ -54,6 +54,7 @@ import { localizeResourceKey, onCatalogUpdated } from '../../i18n/resourceCatalo
 import { applyAppearance, getSurfaceMode, setSurfaceMode } from '../state/themeState.js';
 // Tempdoc 874 — the Search v3 chat-column width preset (FE-only, user-state document).
 import { getChatWidth, setChatWidth, type ChatWidth } from '../state/chatWidthState.js';
+import { getNotifications, setNotifications, type NotificationsChoice } from '../state/notificationsState.js';
 import {
   enqueueUiModeSettings,
   setUiMode,
@@ -273,6 +274,7 @@ export class SettingsSurface extends JfElement {
     surfaceMode: { state: true },
     // Tempdoc 874 — the Search v3 chat-column width preset (FE-only pref, mirrors surfaceMode).
     chatWidth: { state: true },
+    notifications: { state: true },
   };
 
   declare apiBase: string;
@@ -313,6 +315,7 @@ export class SettingsSurface extends JfElement {
   declare renameDraft: string;
   declare surfaceMode: 'glass' | 'solid';
   declare chatWidth: ChatWidth;
+  declare notifications: NotificationsChoice;
   declare userConfig: RendererUserConfig;
   declare railSurfaces: Surface[];
   /** Active settings-window category id: a native category id, or a member surface id. */
@@ -419,6 +422,7 @@ export class SettingsSurface extends JfElement {
     this.renameDraft = '';
     this.surfaceMode = getSurfaceMode();
     this.chatWidth = getChatWidth();
+    this.notifications = getNotifications();
     this.userConfig = {} as RendererUserConfig;
     this.railSurfaces = SettingsSurface.railSurfacesForCustomization();
     this.activeCategory = firstCategoryId();
@@ -927,6 +931,7 @@ export class SettingsSurface extends JfElement {
     // Tempdoc 874 — a retained instance re-attaches showing the preset the document holds NOW, not
     // the one it was constructed with (the window can be closed, the preference changed elsewhere).
     this.chatWidth = getChatWidth();
+    this.notifications = getNotifications();
     // Tempdoc 738 — reflect external Simple/Detailed changes (e.g. the topbar toggle, which writes the
     // same uiModeState store) in the Interface section's selected state; the section renders from the
     // live getUiMode() so the two controls cannot disagree.
@@ -1801,6 +1806,41 @@ export class SettingsSurface extends JfElement {
   private selectChatWidth(w: ChatWidth): void {
     this.chatWidth = w;
     setChatWidth(w);
+  }
+
+  private static readonly NOTIFICATIONS_OPTIONS: OptionButtonGroupOption[] = [
+    { value: 'off', label: 'Off' },
+    { value: 'on', label: 'On' },
+    { value: 'sound', label: 'On with sound' },
+  ];
+
+  /** DE5 / ref-13 — the one Notifications choice; the taskbar badge is passive and stays either way. */
+  private renderNotifications(): TemplateResult {
+    return html`
+      <div class="section" data-testid="settings-notifications">
+        <h3>${icon({ name: 'monitor', size: 12 })} Notifications</h3>
+        ${this.renderSettingRow(
+          'Desktop notifications',
+          'Only while JustSearch is in the background: an agent request is waiting, or long work finished or failed. The taskbar badge always counts what needs you.',
+          html`
+            <jf-option-button-group
+              .options=${SettingsSurface.NOTIFICATIONS_OPTIONS}
+              .value=${this.notifications}
+              .groupLabel=${'Desktop notifications'}
+              ?enabled=${!this.readOnly}
+              @change=${(e: CustomEvent<{ value: string }>) =>
+                this.selectNotifications(e.detail.value as NotificationsChoice)}
+            ></jf-option-button-group>
+          `,
+          { below: true },
+        )}
+      </div>
+    `;
+  }
+
+  private selectNotifications(notifications: NotificationsChoice): void {
+    this.notifications = notifications;
+    setNotifications(notifications);
   }
 
   /**
@@ -3077,6 +3117,7 @@ export class SettingsSurface extends JfElement {
       theme: () => this.renderThemes(),
       accessibility: () => this.renderAccessibility(),
       'chat-width': () => this.renderChatWidth(),
+      notifications: () => this.renderNotifications(),
       'token-editor': () => this.renderTokenEditorLink(),
       layout: () => this.renderLayout(),
       rail: () => this.renderRail(),

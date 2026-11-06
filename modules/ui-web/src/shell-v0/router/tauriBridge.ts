@@ -76,6 +76,18 @@ export function installSearchSummonBridge(
   return stop;
 }
 
+/** DE5 — a clicked desktop notification: the shell has brought the app forward and names the event. */
+export function installNoticeActivationBridge(activated: (id: string) => void): () => void {
+  if (!isTauriRuntime()) return () => {};
+  let stop: (() => void) | null = null;
+  let disposed = false;
+  void import('@tauri-apps/api/event')
+    .then(({ listen }) => listen<string>('justsearch://notice-activated', (event) => activated(event.payload)))
+    .then((unlisten) => { if (disposed) unlisten(); else stop = unlisten; })
+    .catch(() => {});
+  return () => { disposed = true; stop?.(); };
+}
+
 const TAURI_EVENT_NAME = 'justsearch://deep-link';
 
 /**
