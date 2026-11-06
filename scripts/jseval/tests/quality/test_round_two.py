@@ -90,6 +90,42 @@ def test_estimate_models_startup_overlap_once():
     assert run.estimate_window([100, 100], [80, 80], True) == 225
 
 
+@pytest.mark.parametrize('enabled,free,expected', [
+    (True, 10426, 585.0225790662516),
+    (False, 10426, 781.752033515006),
+    (True, None, 781.752033515006),
+    (True, 5007, 781.752033515006),
+])
+def test_activated_default_order_fits_measured_window_only_with_overlap(monkeypatch, enabled, free, expected):
+    # Frozen four-collection history from 2026-11-06: identical totals/startups,
+    # 1.25 measurement headroom and 45s cleanup; only the default order changes.
+    measured = {
+        'scifact': (219.59106951875074, 129.9676277774961),
+        'miracl-de': (211.56785927375128, 123.50600128374936),
+        'enron-email': (60.66988024125337, 38.60209421374748),
+        'real-use': (244.92322448125063, 68.50391849375228),
+    }
+    monkeypatch.setattr(run, 'gpu_memory', lambda _: (free, None))
+    overlap = run.can_overlap(enabled, None, 1480)
+    selected = run.default_collections()
+    assert len(selected) == len(measured) and set(selected) == set(measured)
+    estimate = run.estimate_window([measured[a][0] for a in selected],
+                                   [measured[a][1] for a in selected], overlap)
+    if overlap:
+        # On the previous default selector this fails with 631.5 > 600, before admission.
+        run.require_budget(estimate, 600)
+        old_order = ('scifact', 'miracl-de', 'enron-email', 'real-use')
+        old_estimate = run.estimate_window([measured[a][0] for a in old_order],
+                                          [measured[a][1] for a in old_order], overlap)
+        assert old_estimate == pytest.approx(631.458711532498)
+        with pytest.raises(run.RunRefused, match='estimate 631.5s exceeds budget 600s'):
+            run.require_budget(old_estimate, 600)
+    else:
+        with pytest.raises(run.RunRefused, match='estimate 781.8s exceeds budget 600s'):
+            run.require_budget(estimate, 600)
+    assert estimate == pytest.approx(expected)
+
+
 @pytest.mark.parametrize('phases,expected', [
     ({'waiting': 100, 'startup': 20}, 255),
     ({}, 111.25),  # 40s measured query work + 45s cold overhead, with headroom
