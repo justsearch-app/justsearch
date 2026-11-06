@@ -202,15 +202,15 @@ the inputs and outputs without document text:
 Known-item queries have one target each, judged grade 2. A byte-identical copy
 would get grade 1, but the corpus has none. Topical queries come from clusters
 or topic groups, never from a single document. They are stored with
-`kind: topical` and no judgments. The config's `pending_kinds` excludes them
-from scoring until a pooled labelling pass; `check` reports how many are
-pending.
+`kind: topical` and frozen pooled binary judgments (see Topical labels below).
+The config has no pending kinds, so real-use is included in the default
+`quality check` and `full-suite` collections.
 
 The plan holds 10% spare queries (`SPARE`) for drops. Four planned queries
 never passed the verbatim-leak and word-limit gates (reason `gates`). Five
 topical queries repeat an earlier query's text and are dropped (reason
 `duplicate`). That leaves 187 known-item queries, all judged, and 122 topical
-queries pending labels.
+queries with frozen topical labels.
 
 Triviality is measured, not gated. The `gate` step ranks every known-item
 target with keyword search alone (the lexical leg, with the reranker and every
@@ -344,8 +344,10 @@ python -m jseval.quality.topical_labels freeze
   "chatgpt"`, approval never, read-only sandbox, web search and every tool
   feature off, `request_user_input` off, no MCP server) and a copy of
   `~/.codex/auth.json`, copied only when it says `auth_mode` `chatgpt` and holds
-  no API key; a token refresh during the run is written back unless the stored
-  login changed meanwhile. The model's catalog entry, not a feature, turns on
+  no API key. The isolated copy replaces the refresh token with a placeholder,
+  so it cannot refresh or rotate the stored login. Nothing is written back to
+  the stored login; if the access token expires, the run stops with the CLI's
+  error. The model's catalog entry, not a feature, turns on
   code mode, sub-agents, `apply_patch` and tool search, so the home pins its own
   catalog (`model_catalog_json`, from `codex debug models`) with those off.
   Before the first call, in that same home: `codex login status` must report

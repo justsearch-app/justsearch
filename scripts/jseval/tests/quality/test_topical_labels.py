@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import sys
 from collections import Counter
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -730,6 +731,42 @@ def test_the_sample_is_fixed_and_has_no_owner_sheet(sampled):
         tl.sample()
 
 
+def test_sample_refuses_duplicate_pairs_even_with_the_right_size_and_balance(sampled):
+    record = sampled.sample
+    first = record["pairs"][0]
+    duplicate = next(p for p in record["pairs"][1:] if p["label"] == first["label"])
+    duplicate.update(qid=first["qid"], doc=first["doc"], grade=first["grade"])
+    tl._write_json(tl.WORK / "samples" / "r0-b1.json", record)
+    done = tl.current_judgments(sampled.c, sampled.pools, tl.load_excerpts(sampled.pools))
+    with pytest.raises(tl.LabelError, match="duplicate.*pair"):
+        tl.load_sample(0, done)
+
+
+def test_sample_refuses_pairs_without_primary_judgments(sampled):
+    record = sampled.sample
+    record["pairs"][0]["doc"] = "not-in-primary-judgments"
+    tl._write_json(tl.WORK / "samples" / "r0-b1.json", record)
+    done = tl.current_judgments(sampled.c, sampled.pools, tl.load_excerpts(sampled.pools))
+    with pytest.raises(tl.LabelError, match="no primary judgment"):
+        tl.load_sample(0, done)
+
+
+@pytest.mark.parametrize("field", ["grade", "label"])
+def test_sample_refuses_cached_primary_fields_inconsistent_with_judgments(sampled, monkeypatch, field):
+    second_judged(sampled, monkeypatch)
+    record = sampled.sample
+    first = record["pairs"][0]
+    if field == "label":
+        # Keep both label halves intact so quota validation cannot hide the defect.
+        other = next(p for p in record["pairs"] if p["label"] != first["label"])
+        other["label"] ^= 1
+    first[field] ^= 1  # changing a raw grade preserves its binary label
+    tl._write_json(tl.WORK / "samples" / "r0-b1.json", record)
+    with pytest.raises(tl.LabelError, match="primary grade or label"):
+        tl.accept(0)
+    assert not (tl.WORK / "acceptance-r0.json").exists()
+
+
 # --------------------------------------------------------------------------- second judge
 
 
@@ -1169,6 +1206,61 @@ def test_a_recorded_pass_is_final_too(sampled, monkeypatch):
     assert tl.freeze(0) == 0
 
 
+def test_new_decision_binds_the_validated_sample(sampled, monkeypatch):
+    decision = _accept_with(sampled, monkeypatch)
+    assert decision.get("sample_sha256") == sha256_text(tl.canonical_json(sampled.sample))
+
+
+def test_freeze_refuses_sample_edits_after_new_decision(sampled, monkeypatch):
+    assert _accept_with(sampled, monkeypatch)["outcome"] == "PASS"
+    recorded = (tl.WORK / "acceptance-r0.json").read_bytes()
+    # The pair contents still validate, but an edit to the sample after acceptance is refused.
+    sampled.sample["pairs"][0]["id"] = "changed-after-acceptance"
+    tl._write_json(tl.WORK / "samples" / "r0-b1.json", sampled.sample)
+    with pytest.raises(tl.LabelError, match="sample changed since the decision"):
+        tl.freeze(0)
+    assert (tl.WORK / "acceptance-r0.json").read_bytes() == recorded
+    assert not (tl.RECORD / "topical-labels.json").exists()
+
+
+def test_legacy_decision_stays_readable_and_immutable(sampled, monkeypatch):
+    decision = _accept_with(sampled, monkeypatch)
+    decision.pop("sample_sha256", None)
+    path = tl.WORK / "acceptance-r0.json"
+    tl._write_json(path, decision)  # an isolated historical decision, never the real acceptance
+    recorded = path.read_bytes()
+    assert tl.freeze(0) == 0
+    with pytest.raises(tl.LabelError, match="decided"):
+        tl.accept(0)
+    assert path.read_bytes() == recorded
+    assert "sample_sha256" not in json.loads(recorded)
+
+
+def test_legacy_decision_refuses_a_different_validated_pair_set(sampled, monkeypatch):
+    decision = _accept_with(sampled, monkeypatch)
+    decision.pop("sample_sha256", None)
+    path = tl.WORK / "acceptance-r0.json"
+    tl._write_json(path, decision)
+    recorded = path.read_bytes()
+    record = sampled.sample
+    selected = {(p["qid"], p["doc"]) for p in record["pairs"]}
+    ex = tl.load_excerpts(sampled.pools)
+    done = tl.current_judgments(sampled.c, sampled.pools, ex)
+    first = record["pairs"][0]
+    qid, doc = next(pair for pair, r in done.items()
+                    if pair not in selected and r["grade"] == first["grade"])
+    first.update(qid=qid, doc=doc, lang=sampled.c.queries[qid].groups.get("lang"))
+    tl._write_json(tl.WORK / "samples" / "r0-b1.json", record)
+    # Even a second judgment for the replacement cannot match the accepted pair-set digest.
+    tl.append_rows(tl.WORK / "second" / "judgments.jsonl", [{
+        **done[(qid, doc)], "identity": tl.identity(sampled.c, sampled.pools, qid, doc, ex[qid][doc],
+                                                   model=tl.SECOND_MODEL)}])
+    with pytest.raises(tl.LabelError, match="current judges' grades"):
+        tl.freeze(0)
+    assert path.read_bytes() == recorded
+    assert not (tl.RECORD / "topical-labels.json").exists()
+
+
 def _rows(n_primary_only, n_second_only, n_agree, lang_of=lambda n: "de" if n % 3 == 0 else "en"):
     rows, n = [], 0
     for label, second, count in ((1, 0, n_primary_only), (0, 1, n_second_only), (1, 1, n_agree)):
@@ -1355,8 +1447,14 @@ def test_frozen_provenance_explicitly_records_no_human_check(sampled, monkeypatc
 
 
 @pytest.mark.parametrize("judge", ["primary", "second"])
-def test_freeze_refuses_grades_changed_since_the_decision(sampled, monkeypatch, judge):
+@pytest.mark.parametrize("legacy", [False, True])
+def test_freeze_refuses_grades_changed_since_the_decision(sampled, monkeypatch, judge, legacy):
     assert _accept_with(sampled, monkeypatch)["outcome"] == "PASS"
+    if legacy:
+        path = tl.WORK / "acceptance-r0.json"
+        decision = json.loads(path.read_text())
+        decision.pop("sample_sha256", None)
+        tl._write_json(path, decision)
     path = tl.WORK / "judgments.jsonl" if judge == "primary" else tl.WORK / "second" / "judgments.jsonl"
     rows = tl.read_checkpoint(path)
     # Change the raw grade while preserving its binary label: the decision binds both.
@@ -1389,10 +1487,16 @@ def test_freeze_writes_binary_qrels_that_reload_with_counts_and_histogram(sample
     assert all(len(line.split("\t")) == 4 for line in text.splitlines())
 
 
-def test_freeze_keeps_known_item_labels_and_document_identity(sampled, monkeypatch):
+@pytest.mark.parametrize("with_topical_labels", [False, True])
+def test_freeze_keeps_known_item_labels_and_document_identity(sampled, monkeypatch, with_topical_labels):
     before = sampled.c
+    if not with_topical_labels:
+        before = replace(before, judgments={q: j for q, j in before.judgments.items()
+                                           if q.startswith("ki-")}, version="")
+    monkeypatch.setattr(tl, "_collection", lambda: (before, sampled.cfg))
     c, _ = _frozen(sampled, monkeypatch)
-    assert {q: j for q, j in c.judgments.items() if q.startswith("ki-")} == before.judgments
+    assert {q: j for q, j in c.judgments.items() if q.startswith("ki-")} == {
+        q: j for q, j in before.judgments.items() if q.startswith("ki-")}
     assert c.document_identity() == before.document_identity()
     assert c.queries == before.queries and c.version != before.version
 
@@ -1456,10 +1560,12 @@ def test_an_excluded_query_with_a_relevant_judgment_or_unknown_id_is_refused(sam
 
 
 def test_real_use_joins_the_default_and_full_checks_once_no_kind_awaits_labels(monkeypatch):
-    assert run.default_collections() == run.DEFAULT_COLLECTIONS  # topical labels still pending
-    assert run.default_collections(True) == run.FULL_COLLECTIONS
     real = qcoll.load_config("real-use")
-    labelled = qcoll.QualityConfig(**{**vars(real), "pending_kinds": ()})
+    pending = replace(real, pending_kinds=("topical",))
+    monkeypatch.setattr(run.collections, "load_config", lambda alias: pending)
+    assert run.default_collections() == run.DEFAULT_COLLECTIONS
+    assert run.default_collections(True) == run.FULL_COLLECTIONS
+    labelled = replace(real, pending_kinds=())
     monkeypatch.setattr(run.collections, "load_config", lambda alias: labelled)
     assert run.default_collections() == run.DEFAULT_COLLECTIONS + ("real-use",)
     assert run.default_collections(True) == run.FULL_COLLECTIONS + ("real-use",)

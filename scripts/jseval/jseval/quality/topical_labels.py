@@ -1192,6 +1192,18 @@ def load_sample(revision: int, done: dict) -> dict:
     _check_sample_halves(record["pairs"])
     if record["labels_sha256"] != labels_sha256(done):
         raise LabelError(f"{record['name']}: the model labels changed since this sample was drawn")
+    seen = set()
+    for row in record["pairs"]:
+        pair = (row["qid"], row["doc"])
+        if pair in seen:
+            raise LabelError(f"{record['name']}: duplicate sample pair {pair}")
+        seen.add(pair)
+        primary = done.get(pair)
+        if primary is None:
+            raise LabelError(f"{record['name']}: sample pair {pair} has no primary judgment")
+        if (type(row.get("grade")) is not int or row["grade"] != primary["grade"]
+                or type(row.get("label")) is not int or row["label"] != label_of(primary["grade"])):
+            raise LabelError(f"{record['name']}: sample pair {pair} has an inconsistent primary grade or label")
     return record
 
 
@@ -1282,6 +1294,7 @@ def accept(revision: int = 0) -> dict:
                           else "stop and report to the user")
     result.update(revision=revision, labels_sha256=labels_sha256(done), second_sha256=labels_sha256(second),
                   template_sha256=sha256_text(template()), at=time.time(), sample=record["name"],
+                  sample_sha256=sha256_text(canonical_json(record)),
                   agreement=agreement, report=agreement_report(rows))
     _record_decision(revision, result)
     return result
@@ -1321,12 +1334,16 @@ def freeze(revision: int = 0) -> int:
     if not decided or decided[-1] != revision:
         raise LabelError(f"labels freeze only after a PASS decision of the latest decided revision "
                          f"({decided[-1] if decided else 'none decided'})")
-    c, pools, _, done, _, second, _ = _state(revision)  # revision 1 only after a recorded r0 FAIL
+    c, pools, _, done, record, second, _ = _state(revision)  # revision 1 only after a recorded r0 FAIL
     decision = _json(_acceptance_path(revision))
     if (decision["outcome"] != "PASS" or decision.get("revision") != revision
             or decision["labels_sha256"] != labels_sha256(done)
             or decision.get("second_sha256") != labels_sha256(second)):
         raise LabelError("labels freeze only after a PASS decision on exactly the current judges' grades")
+    # Legacy decisions bind the unique, primary-validated pair set through both judge digests.
+    # New decisions additionally bind the entire sample record, including its order and metadata.
+    if "sample_sha256" in decision and decision["sample_sha256"] != sha256_text(canonical_json(record)):
+        raise LabelError("agreement sample changed since the decision")
     new, excluded, audit = frozen_collection(c, pools, done)
     qcoll.write_collection(new, RECORD.parent / COLLECTION)
     config_path = qcoll.CONFIG_DIR / f"{COLLECTION}.json"
