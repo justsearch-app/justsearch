@@ -25,7 +25,7 @@ import org.apache.lucene.util.BytesRef;
  * <p>This class is responsible for constructing filter queries that apply structured filters
  * (mime, language, file kind, path prefix, modified date range) and chunk exclusion logic.
  *
- * <p>All methods are pure query-building operations with no state dependencies.
+ * <p>Default scopes also exclude the resolved application history directory.
  */
 public final class QueryFilterBuilder {
 
@@ -136,21 +136,40 @@ public final class QueryFilterBuilder {
    * {@code collections}) includes ONLY those collections (the "Agent history" scope passes
    * {@code ["agent-history"]}); the DEFAULT (empty) excludes the reserved {@code agent-history}
    * collection with a {@code MUST_NOT}, so indexed run transcripts never pollute normal document
-   * search. The {@code MUST_NOT} only matches docs that carry the agent-history tag — untagged docs
-   * (no collection field) pass through. Always contributes a clause, so returns true.
+   * search. Source-path exclusions also protect legacy untagged parents and chunks.
    */
   private static boolean addCollectionScope(BooleanQuery.Builder qb, List<String> collections) {
+    if (!io.justsearch.configuration.InternalCollections.includesHistory(collections)) {
+      var publicScope = new BooleanQuery.Builder()
+          .add(new MatchAllDocsQuery(), BooleanClause.Occur.MUST)
+          .add(new TermQuery(new Term(SchemaFields.COLLECTION, SchemaFields.AGENT_HISTORY_COLLECTION)), BooleanClause.Occur.MUST_NOT)
+          .add(privateSourceQuery(false), BooleanClause.Occur.MUST_NOT).build();
+      qb.add(publicScope, BooleanClause.Occur.FILTER);
+    }
     if (collections != null && !collections.isEmpty()) {
       // An explicit scope is a POSITIVE include filter.
       return addTermOrFilter(qb, collections, SchemaFields.COLLECTION);
     }
-    // The default exclusion is a MUST_NOT — NOT a positive filter: like the chunk exclusion it needs
-    // a MatchAllDocs anchor when no positive filter is present (a pure-negative query matches none),
-    // so it returns false (does not set hasFilters).
-    qb.add(
-        new TermQuery(new Term(SchemaFields.COLLECTION, SchemaFields.AGENT_HISTORY_COLLECTION)),
-        BooleanClause.Occur.MUST_NOT);
+    // A default scope still uses the caller's MatchAllDocs anchor when there is no user filter.
     return false;
+  }
+
+  /** Cacheable postings-only guard. Alias/parent ownership is checked on returned rows. */
+  static Query privateSourceQuery(boolean includeAppData) {
+    var excluded = new BooleanQuery.Builder();
+    if (includeAppData) excluded.add(new TermQuery(new Term(SchemaFields.COLLECTION, SchemaFields.AGENT_HISTORY_COLLECTION)),
+        BooleanClause.Occur.SHOULD);
+    if (includeAppData) excluded.add(new TermQuery(new Term(SchemaFields.COLLECTION,
+        io.justsearch.configuration.InternalCollections.HELP)), BooleanClause.Occur.SHOULD);
+    java.nio.file.Path data = io.justsearch.configuration.InternalCollections.dataDirectory();
+    java.nio.file.Path source = includeAppData ? data : data.resolve("agent-history");
+    try { source = source.toRealPath(); }
+    catch (java.io.IOException unavailable) { /* Configured identity remains useful offline. */ }
+    String prefix = normalizePathPrefix(source.toString());
+    for (String field : List.of(SchemaFields.PATH, SchemaFields.DOC_ID, SchemaFields.PARENT_DOC_ID)) {
+      excluded.add(new PrefixQuery(new Term(field, prefix)), BooleanClause.Occur.SHOULD);
+    }
+    return excluded.build();
   }
 
   /**
@@ -366,12 +385,7 @@ public final class QueryFilterBuilder {
     hasClause |= addTermOrFilter(qb, filters.mimeBase(), SchemaFields.MIME_BASE);
     hasClause |= addTermOrFilter(qb, filters.language(), SchemaFields.LANGUAGE);
 
-    // Tempdoc 811 item 3 — the collection scope on the chunk branch. STALE-INDEX DISPOSITION
-    // (owner precedent, tempdoc 798, 2026-07-30: no current users, no data repair; dev indices are
-    // rebuilt with --clean): chunk documents written BEFORE this change carry no `collection`
-    // field, and the default exclusion is a MUST_NOT that only matches docs which DO carry the
-    // agent-history tag. Pre-existing agent-history chunks therefore remain un-excluded until the
-    // index is rebuilt. This is accepted and deliberately not migrated — a re-index is the fix.
+    // Collection and source ownership apply to legacy chunks as well as current parents.
     hasClause |= addCollectionScope(qb, filters.collection());
 
     if (filters.pathPrefix() != null && !filters.pathPrefix().isBlank()) {

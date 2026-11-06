@@ -27,6 +27,8 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import tools.jackson.databind.json.JsonMapper;
 import org.apache.lucene.search.TermQuery;
+import org.apache.lucene.search.Query;
+import io.justsearch.adapters.lucene.runtime.QueryFilterBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -471,6 +473,8 @@ final class CitationMatchOps {
       // Only a request that will actually read the index pays for a reader refresh.
       commitOps.maybeRefresh();
     }
+    Set<String> readable = anyLookupNeeded
+        ? readPathOps.readableDocumentIds(chunkDocIds, false) : Set.of();
     return PassageWindows.prepare(
         chunkDocIds,
         chunkIndices,
@@ -479,7 +483,7 @@ final class CitationMatchOps {
         // a chunk ordinal, mirroring AgentSession.DOC_LEVEL_SENTINEL), not an ordinal to look up.
         // A source that supplies no text and has no ordinal is unverifiable; searching for chunk
         // "-1" would return nothing anyway, and asking is what makes a fabricated 0 tempting.
-        i -> chunkIndices.get(i) < 0 ? null
+        i -> chunkIndices.get(i) < 0 || !readable.contains(chunkDocIds.get(i)) ? null
             : lookupChunkContent(chunkDocIds.get(i), chunkIndices.get(i), acquisition),
         sentenceCount,
         deadlineMs,
@@ -552,7 +556,10 @@ final class CitationMatchOps {
       TermQuery query =
           new TermQuery(
               new org.apache.lucene.index.Term(SchemaFields.PARENT_DOC_ID, parentDocId));
-      LuceneRuntimeTypes.SearchResult result = readPathOps.search(query, 500,
+      Query scoped = QueryFilterBuilder.applyRuntimeFilters(query,
+          io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypesRuntimeSearchFiltersBuilder.builder()
+              .includeChunks(true).build());
+      LuceneRuntimeTypes.SearchResult result = readPathOps.search(scoped, 500,
           Set.of(SchemaFields.CHUNK_CONTENT, SchemaFields.CHUNK_INDEX), null, null);
       for (var hit : result.hits()) {
         int idx = ParseUtils.parseIntSafe(hit.fields().get(SchemaFields.CHUNK_INDEX), -1);

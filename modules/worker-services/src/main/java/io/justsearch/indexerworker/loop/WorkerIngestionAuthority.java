@@ -60,7 +60,7 @@ final class WorkerIngestionAuthority {
               recovery ? IngestionRetryPolicy.RETRY_WITH_BACKOFF : IngestionRetryPolicy.NONE,
               "Missing ingestion policy boundary; fresh admission required"));
     }
-    return admit(job.path(), job.ingestionRoot());
+    return admit(job.path(), job.ingestionRoot(), job.collection());
   }
 
   private volatile java.util.function.BiPredicate<Path, Path> userExclusions = (file, root) -> false;
@@ -69,19 +69,21 @@ final class WorkerIngestionAuthority {
     userExclusions = java.util.Objects.requireNonNull(exclusions, "exclusions");
   }
 
-  boolean excludes(Path file, Path root) {
-    return IngestionSkipPolicy.shouldSkipWithinRoot(file, root) || userExclusions.test(file, root);
+  boolean excludes(Path file, Path root, String collection) {
+    return IngestionSkipPolicy.shouldSkipWithinRoot(file, root, collection) || userExclusions.test(file, root);
   }
 
-  SourceAdmission admit(Path filePath, Path root) throws IOException {
-    if (excludes(filePath, root)) {
+  SourceAdmission admit(Path filePath, Path root, String collection) throws IOException {
+    if (excludes(filePath, root, collection)) {
       return SourceAdmission.terminal(
           SourceAdmissionAction.SKIP_DONE,
           outcome(
               IngestionOutcomeClass.SKIPPED_POLICY,
-              IngestionReasonCodes.SKIPPED_TEMP_OR_SYSTEM,
+              IngestionSkipPolicy.isProtected(filePath, root, collection)
+                  ? IngestionReasonCodes.SKIPPED_PROTECTED : IngestionReasonCodes.SKIPPED_TEMP_OR_SYSTEM,
               IngestionRetryPolicy.NONE,
-              "Skipped by ingestion or user exclusion policy"));
+              IngestionSkipPolicy.isProtected(filePath, root, collection)
+                  ? "Skipped protected credential or application data file" : "Skipped by ingestion or user exclusion policy"));
     }
 
     // #758: "cannot read it" is never "it is gone". The snapshot is taken first

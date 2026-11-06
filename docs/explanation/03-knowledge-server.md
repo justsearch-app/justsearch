@@ -31,26 +31,36 @@ The `IndexingLoop.java` class is an infinite loop that processes files one by on
 
 ## File skip lists
 
-The index half applies hardcoded skip rules at two stages, independent of user-configured exclude patterns.
+Every admission and publication path uses `IngestionSkipPolicy`. Its protected rules are always
+on, independently of environment skip settings and the user's exclusion patterns.
 
-### Directory traversal skips (`WALK_SKIP_DIRS` in `SyncDirectoryOps.java`)
+- Password, key and credential file names are excluded, case-insensitively. This includes `.env`,
+  SSH identity files, certificates and private keys, password databases, browser login stores,
+  cloud credentials, Terraform state and shell histories. `.gitignore` remains searchable.
+- Files below a dot-directory are excluded relative to the watched root. A dot-directory explicitly
+  added as a watched root can still contain searchable ordinary documents.
+- Credential-store directories (`.ssh`, `.aws`, `.gnupg`, `.docker`, `.kube`, `.azure`,
+  `.password-store`, `ssh`, `aws`, `gnupg`, and `gcloud` under `config` or `.config`) are excluded
+  even when the selected root or an individually ingested file lies inside them.
+- JustSearch's own data folder is excluded from user ingestion. Only the app's own submissions to
+  the corresponding reserved help and assistant-history folders are admitted.
 
-During `Files.walkFileTree`, these directories trigger `SKIP_SUBTREE` (name compared lowercase):
+Ordinary defaults also skip temporary files, build output (`pyc`, `pyo`, `class`, `o`, `obj`),
+system files such as `thumbs.db`, and tool directories such as `node_modules`. The
+`JUSTSEARCH_INGESTION_SKIP_*` settings replace these ordinary defaults, but cannot disable the
+protected rules. User exclusion patterns and their Apply action continue to work separately.
 
-`$recycle.bin`, `system volume information`, `.git`, `.svn`, `.hg`, `.bzr`, `cvs`, `node_modules`, `bower_components`, `__pycache__`, `.tox`, `.pytest_cache`, `.mypy_cache`
+On upgrade, a background pass removes previously indexed protected sources through the Worker's
+normal deletion route, including chunks, enrichment and queue rows. It reads the index rather than
+walking disks, so offline roots and individually ingested sources are covered. Source files and
+assistant run records are preserved. A version marker is written only after confirmed completion;
+failed or interrupted work retries on the next start. A migration candidate defers that marker
+until a later start after cutover. Search continues serving while removal runs.
 
-### Per-file skips (`shouldSkip()` in `IndexingLoop.java`)
-
-Before processing, each file is checked against:
-
-1. **Hidden files** — names starting with `.` (except `.env`, `.gitignore`)
-2. **Extension skip list** (`SKIP_EXTENSIONS`): `pyc`, `pyo`, `class`, `o`, `obj`
-3. **Name-contains patterns** (`SKIP_PATTERNS`): system/temp files like `thumbs.db`, `desktop.ini`
-4. **Binary content detection** — files detected as binary by content inspection are skipped
-
-### Design rationale
-
-Only unambiguously tool-generated patterns are hardcoded. Context-dependent directories (`build/`, `dist/`, `vendor/`, `.cache`, `.venv`) are left to user-configurable exclude patterns (see `docs/explanation/06-configuration-ssot.md` § "Exclude patterns").
+Assistant history is excluded from ordinary search. MCP cannot request its collection or browse
+application data. In the packaged app, token-only knowledge reads cannot select assistant history:
+the app window's credential is required. Headless and development modes keep their existing
+token-as-operator behavior for HTTP reads. The app can still search its own history scope.
 
 ## The Job Queue (`SqliteJobQueue`)
 

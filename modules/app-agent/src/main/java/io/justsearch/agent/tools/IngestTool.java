@@ -71,6 +71,9 @@ public final class IngestTool implements OperationHandler {
       if (input == null) {
         throw badInput("Path could not be resolved: " + rawPath);
       }
+      if (io.justsearch.configuration.InternalCollections.isDataPath(input.toString())) {
+        throw badInput("The JustSearch application data folder cannot be ingested as user content");
+      }
       BasicFileAttributes attributes = attributes(input);
       String collection = requestedCollection == null
           ? IngestCollectionPolicy.resolve(null, input, bindings)

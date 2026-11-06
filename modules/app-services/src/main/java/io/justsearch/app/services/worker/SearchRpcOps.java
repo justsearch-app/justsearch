@@ -82,11 +82,16 @@ final class SearchRpcOps {
      * Worker.
      */
     SearchResponse search(SearchRequest request, EngineContext engineContext) {
+        return search(request, io.justsearch.configuration.InternalCollections.includesHistory(
+            request == null ? List.of() : request.getFilters().getCollectionList()), engineContext);
+    }
+
+    SearchResponse search(SearchRequest request, boolean includePrivateData, EngineContext engineContext) {
         SearchRequest req = request == null ? SearchRequest.newBuilder().build() : request;
         return (mayRunInference(req) ? inferenceRpc : rpc).execute(
                 "search",
                 KnowledgeClient.RpcDeadlineCategory.STANDARD,
-                stub -> stub.search(req), engineContext);
+                stub -> includePrivateData ? stub.search(req, true) : stub.search(req), engineContext);
     }
 
     /** Classify before dispatch: AUTO and legacy semantic modes can enter native query encoders. */
@@ -166,6 +171,11 @@ final class SearchRpcOps {
 
     ListAllDocumentIdsResponse listAllDocumentIds(
             int offset, int limit, String snapshotToken, EngineContext engineContext) {
+        return listAllDocumentIds(offset, limit, snapshotToken, true, engineContext);
+    }
+
+    ListAllDocumentIdsResponse listAllDocumentIds(
+            int offset, int limit, String snapshotToken, boolean includePrivateData, EngineContext engineContext) {
         ListAllDocumentIdsRequest request =
                 ListAllDocumentIdsRequest.newBuilder()
                         .setOffset(offset)
@@ -175,7 +185,8 @@ final class SearchRpcOps {
         return rpc.execute(
                 "listAllDocumentIds",
                 KnowledgeClient.RpcDeadlineCategory.STANDARD,
-                stub -> stub.listAllDocumentIds(request), engineContext);
+                stub -> includePrivateData ? stub.listAllDocumentIds(request)
+                    : stub.listAllDocumentIds(request, false), engineContext);
     }
 
     FetchDocumentsResponse fetchDocuments(List<String> docIds, EngineContext engineContext) {
@@ -277,6 +288,13 @@ final class SearchRpcOps {
             io.justsearch.app.api.RetrieveContextParams params,
             boolean semanticLoadingObserved,
             EngineContext engineContext) {
+        return retrieveContext(params, semanticLoadingObserved,
+            io.justsearch.configuration.InternalCollections.includesHistory(params.collection()), engineContext);
+    }
+
+    RetrieveContextResponse retrieveContext(
+            io.justsearch.app.api.RetrieveContextParams params, boolean semanticLoadingObserved,
+            boolean includePrivateData, EngineContext engineContext) {
         RetrieveContextRequest.Builder builder = RetrieveContextRequest.newBuilder()
                 .setQuestion(params.question())
                 .addAllDocIds(params.docIds())
@@ -368,7 +386,7 @@ final class SearchRpcOps {
                 // Tempdoc 806 B.2 — see the sibling overload above: this RPC reranks, so it takes the
                 // RERANK budget rather than CONTENT_FETCH's 10s.
                 KnowledgeClient.RpcDeadlineCategory.RERANK,
-                stub -> stub.retrieveContext(request), engineContext);
+                stub -> includePrivateData ? stub.retrieveContext(request, true) : stub.retrieveContext(request), engineContext);
     }
 
     /**
@@ -396,7 +414,7 @@ final class SearchRpcOps {
 
     // ========== Folder Browse ==========
 
-    ListFoldersResponse listFolders(String parentPath, int maxFolders, EngineContext engineContext) {
+    ListFoldersResponse listFolders(String parentPath, int maxFolders, boolean includePrivateData, EngineContext engineContext) {
         ListFoldersRequest request = ListFoldersRequest.newBuilder()
                 .setParentPath(parentPath == null ? "" : parentPath)
                 .setMaxFolders(maxFolders)
@@ -404,10 +422,10 @@ final class SearchRpcOps {
         return rpc.execute(
                 "listFolders",
                 KnowledgeClient.RpcDeadlineCategory.STANDARD,
-                stub -> stub.listFolders(request), engineContext);
+                stub -> includePrivateData ? stub.listFolders(request, true) : stub.listFolders(request), engineContext);
     }
 
-    ListFolderFilesResponse listFolderFiles(String folderPath, int limit, List<String> projection, EngineContext engineContext) {
+    ListFolderFilesResponse listFolderFiles(String folderPath, int limit, List<String> projection, boolean includePrivateData, EngineContext engineContext) {
         ListFolderFilesRequest.Builder builder = ListFolderFilesRequest.newBuilder()
                 .setFolderPath(folderPath == null ? "" : folderPath)
                 .setLimit(limit);
@@ -417,7 +435,7 @@ final class SearchRpcOps {
         return rpc.execute(
                 "listFolderFiles",
                 KnowledgeClient.RpcDeadlineCategory.STANDARD,
-                stub -> stub.listFolderFiles(builder.build()), engineContext);
+                stub -> includePrivateData ? stub.listFolderFiles(builder.build(), true) : stub.listFolderFiles(builder.build()), engineContext);
     }
 
     // ========== Reranking (360) ==========

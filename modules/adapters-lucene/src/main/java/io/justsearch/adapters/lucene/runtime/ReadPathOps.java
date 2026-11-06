@@ -68,6 +68,21 @@ public final class ReadPathOps {
     return new SearcherBridge(session).withSearcher(operation);
   }
 
+  /** Bounded final-result/selected-ID ownership check on one immutable reader. */
+  public Set<String> readableDocumentIds(java.util.Collection<String> ids, boolean hideAppData) {
+    if (ids.isEmpty()) return Set.of();
+    try { return withSearcher(searcher -> {
+      var ownership = new IndexReadOwnership(searcher);
+      Set<String> readable = new HashSet<>();
+      for (String id : ids) {
+        var owner = ownership.owner(id);
+        if (!io.justsearch.configuration.ReadOwnership.hiddenFromDefault(owner)
+            && (!hideAppData || owner == io.justsearch.configuration.ReadOwnership.Owner.PUBLIC)) readable.add(id);
+      }
+      return Set.copyOf(readable);
+    }); } catch (IOException failure) { throw new java.io.UncheckedIOException(failure); }
+  }
+
   /**
    * Complete metadata-only inspection of one live reader. The caller must exclude all writers
    * through use of the result; a sequence witness additionally rejects owner-thread replay writes.

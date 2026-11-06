@@ -347,6 +347,10 @@ public final class DocumentFieldOps {
     }
   }
 
+  public Set<String> readableDocumentIds(java.util.Collection<String> ids, boolean hideAppData) {
+    return readPathOps.readableDocumentIds(ids, hideAppData);
+  }
+
   /**
    * Fetches multiple field values for a batch of document IDs using a single shared searcher.
    *
@@ -423,6 +427,12 @@ public final class DocumentFieldOps {
           }
         }
 
+        boolean captureOwnership = fieldNames.contains(io.justsearch.configuration.ReadOwnership.METADATA);
+        var ownership = captureOwnership ? new IndexReadOwnership(searcher) : null;
+        if (captureOwnership && fieldNames.contains(SchemaFields.CONTENT)) {
+          storedFieldNames.addAll(Set.of(SchemaFields.PARENT_DOC_ID, SchemaFields.CHUNK_START_CHAR,
+              SchemaFields.CHUNK_END_CHAR, SchemaFields.CHUNK_PARENT_CONTENT_SHA256));
+        }
         boolean hasStored = !storedFieldNames.isEmpty();
         org.apache.lucene.index.StoredFields storedFields =
             hasStored ? searcher.storedFields() : null;
@@ -444,7 +454,20 @@ public final class DocumentFieldOps {
             values.putAll(stored);
           }
 
+          if (captureOwnership) values.put(io.justsearch.configuration.ReadOwnership.METADATA,
+              ownership.owner(docId).name());
           result.put(docId, values);
+        }
+        if (captureOwnership && fieldNames.contains(SchemaFields.CONTENT)) {
+          Map<String, ChunkSlice> slices = new LinkedHashMap<>();
+          for (var entry : result.entrySet()) {
+            if (entry.getValue().get(SchemaFields.CONTENT) == null) {
+              ChunkSlice slice = chunkSliceFrom(entry.getValue());
+              if (slice != null) slices.put(entry.getKey(), slice);
+            }
+          }
+          resolveChunkContents(searcher, idField, slices, Map.of(), session.telemetryEvents)
+              .forEach((id, content) -> result.get(id).put(SchemaFields.CONTENT, content));
         }
         return Collections.unmodifiableMap(result);
       });
@@ -1053,7 +1076,7 @@ public final class DocumentFieldOps {
   }
 
   /** An indexed row's own backing source, including a child left by a partial deletion. */
-  public record IndexedSource(String docId, String path, String docUid) {}
+  public record IndexedSource(String docId, String path, String docUid, String collection) {}
 
   /** Streams the existing ownership evidence; no queue history or separate source list is needed. */
   public long scanIndexedSources(int batchSize, Consumer<List<IndexedSource>> consumer) {
@@ -1073,7 +1096,20 @@ public final class DocumentFieldOps {
             var row = PruneOps.Row.read(searcher, stored, leaf.docBase + doc, idField);
             if (row == null) { skipped++; continue; }
             String uid = uids.advanceExact(doc) ? uids.lookupOrd(uids.ordValue()).utf8ToString() : null;
-            batch.add(new IndexedSource(row.docId(), row.filePath(), uid));
+            String collection = SearchResultFormatter.extractFromStoredFields(
+                stored, leaf.docBase + doc, false, Set.of(SchemaFields.COLLECTION))
+                .get(SchemaFields.COLLECTION);
+            if (!row.docId().equals(row.filePath())) {
+              // Whole-source deletion must use its parent's ownership, never an old child's tag.
+              var parents = searcher.search(new TermQuery(new Term(idField, row.filePath())), 2);
+              if (parents.scoreDocs.length > 1) { skipped++; continue; }
+              if (parents.scoreDocs.length == 1) {
+                collection = SearchResultFormatter.extractFromStoredFields(stored,
+                    parents.scoreDocs[0].doc, false, Set.of(SchemaFields.COLLECTION))
+                    .get(SchemaFields.COLLECTION);
+              }
+            }
+            batch.add(new IndexedSource(row.docId(), row.filePath(), uid, collection));
             if (batch.size() == batchSize) {
               consumer.accept(List.copyOf(batch)); batch.clear();
             }

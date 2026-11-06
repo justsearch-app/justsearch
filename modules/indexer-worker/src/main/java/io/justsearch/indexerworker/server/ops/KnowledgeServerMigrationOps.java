@@ -2667,7 +2667,7 @@ public final class KnowledgeServerMigrationOps {
         // A declared forced ROOT can establish the namespace of its ordered deletion
         // without inventing the provenance of a member already removed from Q.
         var deletionOwner = retirement && upsert.unitRevision() == null
-            ? declaredReleaseDeletionOwner(context, orderedOps, upsert.path(), op.acceptedOrder()) : null;
+            ? declaredReleaseDeletionOwner(context, orderedOps, upsert.path(), upsert.collection(), op.acceptedOrder()) : null;
         if (deletionOwner != null) {
           String namespace = queue.retirementRootCollection(deletionOwner);
           int ownerPosition = deleteOrder.positions().get(deletionOwner);
@@ -3489,7 +3489,7 @@ public final class KnowledgeServerMigrationOps {
 
   private static SwitchBufferCapableQueue.SwitchBufferOp declaredReleaseDeletionOwner(
       DrainSwitchBufferContext context,List<SwitchBufferCapableQueue.SwitchBufferOp> ops,
-      String path,long after) {
+      String path,String collection,long after) {
     if (!(context.jobQueue() instanceof SqliteJobQueue queue)) return null;
     var cp=queue.release030RecoveryState();
     return ops.stream().filter(op -> "SYNC_ROOT".equals(op.op()) && op.acceptedOrder()>after
@@ -3499,7 +3499,7 @@ public final class KnowledgeServerMigrationOps {
           var scope=cp.rootScope(op);String policy=cp.rootPolicy(op);
           return intent.force() && policy!=null && policy.startsWith("DECLARED:")
               && scope!=null && scope.contains(path) && (cp.rootEnumerated(op)||cp.rootWalked(op))
-              && !io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(Path.of(path),Path.of(intent.rootPath()));
+              && !io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(Path.of(path),Path.of(intent.rootPath()),collection);
         }).max(java.util.Comparator.comparingLong(SwitchBufferCapableQueue.SwitchBufferOp::acceptedOrder)).orElse(null);
   }
 
@@ -3803,7 +3803,7 @@ public final class KnowledgeServerMigrationOps {
           requireEnumerationRunning(context);
           if (scope.excludes(path.toAbsolutePath().normalize().toString())) return java.nio.file.FileVisitResult.CONTINUE;
           if (!attributes.isRegularFile()) return java.nio.file.FileVisitResult.CONTINUE;
-          if (io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(path, root)
+          if (io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(path, root, source.collection())
               || excludes.isExcludedPath(root, path)
               || publisher != null && publisher.isUserExcluded(path, root)) return java.nio.file.FileVisitResult.CONTINUE;
           if (io.justsearch.indexerworker.ingest.CloudPlaceholderDetector.isCloudPlaceholder(path)) {
@@ -3860,7 +3860,7 @@ public final class KnowledgeServerMigrationOps {
         @Override public java.nio.file.FileVisitResult visitFileFailed(Path path, IOException failure) throws IOException {
           requireEnumerationRunning(context);
           if (scope.excludes(path.toAbsolutePath().normalize().toString())
-              || io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(path, root)
+              || io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(path, root, source.collection())
               || excludes.isExcludedDirectory(root, path)
               || publisher != null && publisher.isUserExcludedDirectory(path, root)) return java.nio.file.FileVisitResult.CONTINUE;
           throw failure;

@@ -67,7 +67,7 @@ final class EngineVduMigrationReplayTest {
       "legacy VDU replay waits for Green and settles during live cutover")
   void legacyVduReplayWaitsForPromotedServingGeneration(@TempDir Path tempDir) throws Exception {
     Path dataDir = tempDir.resolve("data");
-    Path watchedRoot = dataDir.resolve("watched");
+    Path watchedRoot = tempDir.resolve("watched");
     Files.createDirectories(watchedRoot);
     Path source = watchedRoot.resolve("document.txt");
 

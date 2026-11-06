@@ -4,6 +4,7 @@ package io.justsearch.ui.api.mcp;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.AdditionalAnswers.delegatesTo;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.*;
 
 import io.javalin.Javalin;
@@ -281,6 +282,9 @@ final class RetrievalRequestEndInterfacesIntegrationTest extends MmrEngineFixtur
           }
         }
       }).when(adapter).retrieveContext(any(RetrieveContextParams.class), any());
+      doAnswer(call -> adapter.retrieveContext(call.getArgument(0, RetrieveContextParams.class),
+          call.getArgument(3, EngineContext.class))).when(adapter)
+          .retrieveContext(any(RetrieveContextParams.class), anyBoolean(), anyBoolean(), any());
       when(ai.isAvailable()).thenReturn(true);
       when(ai.llmContextTokens()).thenReturn(8192);
       doAnswer(call -> {

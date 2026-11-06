@@ -63,9 +63,10 @@ final class BootstrapPhysicalInitializationTest {
       throws Exception {
     try (var fixture = new Fixture(dir)) {
       fixture.healthy.set(true);
-      fixture.bootstrap.start();
-      when(fixture.client.isHealthy(any()))
+      // Configure before startup: the asynchronous cleanup also uses this client mock.
+      when(fixture.client.isHealthy(any())).thenReturn(true)
           .thenThrow(new IllegalStateException("health observation failed")).thenReturn(true);
+      fixture.bootstrap.start();
       assertThrows(IllegalStateException.class, fixture.bootstrap::checkHealth);
       assertEquals("index.failed", fixture.capability.pendingReason());
       assertTrue(fixture.bootstrap.checkHealth());

@@ -10217,6 +10217,9 @@ public final class KnowledgeServer implements Closeable {
       }
       if (remainingMs <= 0L) return null;
       long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(remainingMs);
+      // Reconciliation may submit legitimate transcripts. Let the existing writer drain them
+      // before the final fence pauses publication; the fenced proof below covers later replay.
+      current.ingestService().removeProtectedCandidateSources(deadline, () -> closeStarted);
       try (var fence = current.mutationAdmission().beginFinalFence(
           current.mutationOwnerToken(), 10_000)) {
         if (fence == null) return null;
@@ -10285,6 +10288,8 @@ public final class KnowledgeServer implements Closeable {
                 && Math.max(0L, settled.failedCount() - jobQueue.unownedFailureCount())
                     > cutoverMaxFailedJobs)
             || (!installerEmpty && !finalizeEmbeddingRebuildBeforeCutover())) return null;
+        // Never publish a protected row introduced by legacy replay after the cleanup pass.
+        current.ingestService().requireProtectedCandidateClean(deadline, () -> closeStarted);
         migrationTransition("migration-green-drained");
         // Failure callbacks can retain new root debt without taking the admission fence.
         if (!current.mutationAdmission().replayCertain()

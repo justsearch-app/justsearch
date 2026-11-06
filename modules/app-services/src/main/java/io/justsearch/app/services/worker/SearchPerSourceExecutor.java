@@ -70,6 +70,13 @@ public final class SearchPerSourceExecutor implements AutoCloseable {
       List<String> sources,
       int totalLimit,
       EngineContext engineContext) {
+    return execute(client, baseReq, sources, totalLimit, false, engineContext);
+  }
+
+  /** Carries the front's verified window authority through every child and backfill call. */
+  public SearchResponse execute(
+      KnowledgeClient client, SearchRequest baseReq, List<String> sources, int totalLimit,
+      boolean includePrivateData, EngineContext engineContext) {
     Objects.requireNonNull(client, "client");
     Objects.requireNonNull(baseReq, "baseReq");
     Objects.requireNonNull(sources, "sources");
@@ -98,8 +105,8 @@ public final class SearchPerSourceExecutor implements AutoCloseable {
           CompletableFuture<SearchResponse> future = group.submit(
               () -> head.isPresent()
                   ? HeadSearchDeadline.within(
-                      head.getAsLong(), () -> client.search(perSourceReq, work.context()))
-                  : client.search(perSourceReq, work.context()));
+                      head.getAsLong(), () -> (includePrivateData ? client.search(perSourceReq, true, work.context()) : client.search(perSourceReq, work.context())))
+                  : (includePrivateData ? client.search(perSourceReq, true, work.context()) : client.search(perSourceReq, work.context())));
           futures.add(future);
           // The child may be releasing a Lucene searcher. Cancellation ends the caller's
           // wait immediately, while its retained work owner closes only after actual exit.
@@ -126,10 +133,10 @@ public final class SearchPerSourceExecutor implements AutoCloseable {
 
         if (responses.isEmpty()) {
           log.debug("385: All per-source calls failed, falling back to unfiltered retrieval");
-          return client.search(baseReq, work.context());
+          return (includePrivateData ? client.search(baseReq, true, work.context()) : client.search(baseReq, work.context()));
         }
         return mergeSearchResponses(
-            responses, totalLimit, baseReq, request -> client.search(request, work.context()));
+            responses, totalLimit, baseReq, request -> (includePrivateData ? client.search(request, true, work.context()) : client.search(request, work.context())));
       }
     } catch (RuntimeException | Error failure) {
       bodyFailure = failure;

@@ -44,15 +44,15 @@ final class IngestionSkipPolicyTest {
   }
 
   @Test
-  void allowsDotEnv() {
-    assertFalse(IngestionSkipPolicy.shouldSkip(Paths.get(".env")));
+  void protectsDotEnv() {
+    assertTrue(IngestionSkipPolicy.shouldSkip(Paths.get(".env")));
   }
 
   @Test
   void allowsDotGitignore() {
     // observations.md `#181` fix: the hidden-file exemption for ".gitignore" was previously
     // shadowed by the name.contains(".git") rule in SKIP_PATTERNS, leaving .gitignore filtered.
-    // The fix routes both .env and .gitignore through an explicit EXEMPT_NAMES set that
+    // The fix routes .gitignore through an explicit EXEMPT_NAMES set that
     // short-circuits ALL skip rules, so the exemption is now authoritative.
     assertFalse(IngestionSkipPolicy.shouldSkip(Paths.get(".gitignore")));
   }
@@ -62,7 +62,7 @@ final class IngestionSkipPolicyTest {
     // EXEMPT_NAMES is consulted after the path basename is lowercased, so any case form
     // of an exempt name is preserved.
     assertFalse(IngestionSkipPolicy.shouldSkip(Paths.get(".GitIgnore")));
-    assertFalse(IngestionSkipPolicy.shouldSkip(Paths.get(".ENV")));
+    assertTrue(IngestionSkipPolicy.shouldSkip(Paths.get(".ENV")));
   }
 
   @Test
@@ -73,7 +73,7 @@ final class IngestionSkipPolicyTest {
         new IngestionSkipPolicy(Set.of(".git", "thumbs.db"), null, null);
     IngestionSkipPolicy.installResolved(custom);
     assertFalse(IngestionSkipPolicy.shouldSkip(Paths.get(".gitignore")));
-    assertFalse(IngestionSkipPolicy.shouldSkip(Paths.get(".env")));
+    assertTrue(IngestionSkipPolicy.shouldSkip(Paths.get(".env")));
     // Regression coverage: .git itself (the file/directory) is still skipped.
     assertTrue(IngestionSkipPolicy.shouldSkip(Paths.get(".git")));
   }

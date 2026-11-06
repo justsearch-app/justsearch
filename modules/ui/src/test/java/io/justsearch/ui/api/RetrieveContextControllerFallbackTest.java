@@ -42,6 +42,7 @@ final class RetrieveContextControllerFallbackTest {
 
   private static JsonNode retrieve(String mode, String reason, String cause) throws Exception {
     var documents = mock(DocumentService.class);
+    org.mockito.Mockito.doCallRealMethod().when(documents).retrieveContext(any(), org.mockito.ArgumentMatchers.anyBoolean(), any());
     var result = new DocumentService.ContextResult(
         "BM25 context", 1, 1, 1, List.of(), mode, reason, false, List.of(),
         new DocumentService.QualitySignals(0.8f, 0.2f, 1f, 1, 1), cause);

@@ -181,8 +181,8 @@ final class SyncDirectoryOps {
     retirementExclusions = java.util.Objects.requireNonNull(exclusions, "exclusions");
   }
 
-  private boolean excludedRecoveryPath(Path file, Path root) {
-    return IngestionSkipPolicy.shouldSkipWithinRoot(file, root) || userExclusions.test(file, root);
+  private boolean excludedRecoveryPath(Path file, Path root, String collection) {
+    return IngestionSkipPolicy.shouldSkipWithinRoot(file, root, collection) || userExclusions.test(file, root);
   }
 
   /**
@@ -392,7 +392,7 @@ final class SyncDirectoryOps {
               if (nativePolicy != null && nativePolicy.excludes(file, root, collection)) {
                 return FileVisitResult.CONTINUE;
               }
-              if (nativePolicy == null && (IngestionSkipPolicy.shouldSkipWithinRoot(file, root) || userExclusions.test(file, root))) {
+              if (nativePolicy == null && (IngestionSkipPolicy.shouldSkipWithinRoot(file, root, collection) || userExclusions.test(file, root))) {
                 return FileVisitResult.CONTINUE;
               }
               if (isCloudPlaceholder(file)) return FileVisitResult.CONTINUE;
@@ -400,7 +400,7 @@ final class SyncDirectoryOps {
                 throw new UnreadableWalkMemberException(
                     "Reconciliation file is unreadable: " + file, null);
               }
-              if ((nativePolicy == null ? !IngestionSkipPolicy.shouldSkipWithinRoot(file, root)
+              if ((nativePolicy == null ? !IngestionSkipPolicy.shouldSkipWithinRoot(file, root, collection)
                       : nativePolicy.allows(file, root, collection)) && !isCloudPlaceholder(file)) {
                 // Conservatively account for the Path's spelling and component storage as well
                 // as the separately retained normalized disk key.
@@ -435,7 +435,7 @@ final class SyncDirectoryOps {
                 return FileVisitResult.CONTINUE;
               }
               if (Files.isRegularFile(file, java.nio.file.LinkOption.NOFOLLOW_LINKS)
-                  && excludedRecoveryPath(file, root)) return FileVisitResult.CONTINUE;
+                  && excludedRecoveryPath(file, root, collection)) return FileVisitResult.CONTINUE;
               throw new UnreadableWalkMemberException(
                   "Reconciliation walk could not read: " + file, failure);
             }
@@ -867,7 +867,7 @@ final class SyncDirectoryOps {
         return syncDirectoryErrorResponse("Upgrade recovery root was removed or is no longer declared");
       }
       // STEP 1: Prune orphans (reuse existing logic with throttle + abort)
-      PruneOps.PruneResult pruneResult = pruneOrphansForSync(root, force, cancelled, upgradeRecovery);
+      PruneOps.PruneResult pruneResult = pruneOrphansForSync(root, force, cancelled, upgradeRecovery, collection);
 
       SyncDirectoryResponse pruneAbort = handleSyncPruneAbortIfNeeded(pruneResult, force);
       if (pruneAbort != null) {
@@ -969,7 +969,7 @@ final class SyncDirectoryOps {
   }
 
   private PruneOps.PruneResult pruneOrphansForSync(Path root, boolean force,
-      java.util.function.BooleanSupplier cancelled, boolean upgradeRecovery) {
+      java.util.function.BooleanSupplier cancelled, boolean upgradeRecovery, String collection) {
     if (pruneOps == null) {
       return new PruneOps.PruneResult(0, PruneOps.Completion.COMPLETE);
     }
@@ -984,7 +984,7 @@ final class SyncDirectoryOps {
       @Override public boolean rootCurrent() { return authority.rootCurrent(); }
       @Override public io.justsearch.adapters.lucene.runtime.PathPresence presence(Path file) {
         return prefixScopeFactory.apply(root).excludes(file.toString())
-                || (upgradeRecovery && excludedRecoveryPath(file, root))
+                || (upgradeRecovery && excludedRecoveryPath(file, root, collection))
             ? io.justsearch.adapters.lucene.runtime.PathPresence.PRESENT : authority.presence(file);
       }
     };
@@ -1055,10 +1055,10 @@ final class SyncDirectoryOps {
               if (originalRoot != null && retirementExclusions.test(file, root)) {
                 return FileVisitResult.CONTINUE;
               }
-              if (admissionMode == AdmissionMode.UPGRADE_RECOVERY && excludedRecoveryPath(file, root)) {
+              if (admissionMode == AdmissionMode.UPGRADE_RECOVERY && excludedRecoveryPath(file, root, collection)) {
                 return FileVisitResult.CONTINUE;
               }
-              if (IngestionSkipPolicy.shouldSkipWithinRoot(file, root) || userExclusions.test(file, root)) return FileVisitResult.CONTINUE;
+              if (IngestionSkipPolicy.shouldSkipWithinRoot(file, root, collection) || userExclusions.test(file, root)) return FileVisitResult.CONTINUE;
               if (isCloudPlaceholder(file)) {
                 recordCloudPlaceholderObservation(file, provenance);
                 return FileVisitResult.CONTINUE;
@@ -1067,7 +1067,7 @@ final class SyncDirectoryOps {
                 walkIncomplete[0] = true;
                 return FileVisitResult.CONTINUE;
               }
-              if (IngestionSkipPolicy.shouldSkipWithinRoot(file, root)) {
+              if (IngestionSkipPolicy.shouldSkipWithinRoot(file, root, collection)) {
                 return FileVisitResult.CONTINUE;
               }
 
@@ -1126,7 +1126,7 @@ final class SyncDirectoryOps {
                 return FileVisitResult.CONTINUE;
               }
               if (Files.isRegularFile(file, java.nio.file.LinkOption.NOFOLLOW_LINKS)
-                  && excludedRecoveryPath(file, root)) return FileVisitResult.CONTINUE;
+                  && excludedRecoveryPath(file, root, collection)) return FileVisitResult.CONTINUE;
               walkIncomplete[0] = true;
               log.debug(
                   "Skipping inaccessible path: {} ({})",
@@ -1156,7 +1156,7 @@ final class SyncDirectoryOps {
             var admissionScope = prefixScopeFactory.apply(root);
             var admitted = entries.stream()
                 .filter(entry -> !admissionScope.excludes(entry.path().toString()))
-                .filter(entry -> !IngestionSkipPolicy.shouldSkipWithinRoot(entry.path(), root))
+                .filter(entry -> !IngestionSkipPolicy.shouldSkipWithinRoot(entry.path(), root, collection))
                 .filter(entry -> originalRoot == null || !retirementExclusions.test(entry.path(), root))
                 .map(entry -> entry.withinRoot(root))
                 .toList();

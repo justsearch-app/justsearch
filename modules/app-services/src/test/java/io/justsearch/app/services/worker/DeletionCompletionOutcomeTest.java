@@ -35,6 +35,9 @@ final class DeletionCompletionOutcomeTest {
           if (method.getName().equals("getWatchedRoots")) {
             return java.util.List.of(new io.justsearch.app.api.IndexingService.WatchedRoot("docs", root));
           }
+          if (method.getName().equals("deleteDocByIdWithOutcome")) {
+            return invokeOutcome(ops, method.getName(), args[0], (EngineContext) args[1]);
+          }
           return RootLifecycleOps.class.getDeclaredMethod(method.getName(), method.getParameterTypes()).invoke(ops, args);
         });
     var previous = io.justsearch.configuration.resolved.ConfigStore.globalOrNull();
@@ -111,11 +114,20 @@ final class DeletionCompletionOutcomeTest {
   }
 
   private static JsonNode outcome(RootLifecycleOps ops, String name) throws Exception {
-    var method = java.util.Arrays.stream(RootLifecycleOps.class.getDeclaredMethods())
-        .filter(m -> m.getName().equals(name)).findFirst();
-    assertTrue(method.isPresent(), "Apply requires completion-aware deletion: " + name);
     Object path = name.startsWith("deleteDocs") ? Path.of("excluded") : "excluded";
-    return new ObjectMapper().valueToTree(method.orElseThrow().invoke(ops, path, TestEngineContexts.internal()));
+    return new ObjectMapper().valueToTree(invokeOutcome(ops, name, path, TestEngineContexts.internal()));
+  }
+
+  private static Object invokeOutcome(RootLifecycleOps ops, String name, Object path, EngineContext context)
+      throws Exception {
+    boolean prefix = name.startsWith("deleteDocs");
+    var method = java.util.Arrays.stream(RootLifecycleOps.class.getDeclaredMethods())
+        .filter(m -> m.getName().equals(name) && m.getParameterCount() == (prefix ? 2 : 3)).findFirst();
+    assertTrue(method.isPresent(), "Apply requires completion-aware deletion: " + name);
+    if (prefix) return method.orElseThrow().invoke(ops, path, context);
+    var callback = RootLifecycleOps.class.getDeclaredField("deleteByIdFn");
+    callback.setAccessible(true);
+    return method.orElseThrow().invoke(ops, path, context, callback.get(ops));
   }
 
   private static RootLifecycleOps ops(BiFunction<Path, EngineContext, DeleteByPathResponse> prefix,

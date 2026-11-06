@@ -28,8 +28,8 @@ class WorkerUserExclusionsTest {
         installed.update(config("[\"[legacy\",\"{broken\",\"private.txt\"]"));
         assertEquals(SourceAdmissionAction.SKIP_DONE, authority.admit(claim).action(),
             "EX2: a queued file must obey policy saved after enqueue");
-        assertEquals(SourceAdmissionAction.ADMIT, authority.admit(publicFile, root).action());
-        assertEquals(SourceAdmissionAction.SKIP_DONE, authority.admit(system, root).action());
+        assertEquals(SourceAdmissionAction.ADMIT, authority.admit(publicFile, root, null).action());
+        assertEquals(SourceAdmissionAction.SKIP_DONE, authority.admit(system, root, null).action());
       } finally {
         ConfigStore.restoreGlobal(installed, previous);
       }
@@ -53,8 +53,8 @@ class WorkerUserExclusionsTest {
       installed.update(config("[\"private.txt\"]"));
       assertEquals(SourceAdmissionAction.SKIP_DONE, authority.admit(claim).action(),
           "EX2: a queued file must obey policy saved after enqueue");
-      assertEquals(SourceAdmissionAction.ADMIT, authority.admit(publicFile, root).action());
-      assertEquals(SourceAdmissionAction.SKIP_DONE, authority.admit(system, root).action());
+      assertEquals(SourceAdmissionAction.ADMIT, authority.admit(publicFile, root, null).action());
+      assertEquals(SourceAdmissionAction.SKIP_DONE, authority.admit(system, root, null).action());
     } finally {
       ConfigStore.restoreGlobal(installed, previous);
     }
@@ -68,10 +68,10 @@ class WorkerUserExclusionsTest {
     ConfigStore installed = new ConfigStore(config("[\"private.txt\"]"));
     ConfigStore.setGlobal(installed);
     try {
-      assertEquals(SourceAdmissionAction.SKIP_DONE, authority.admit(file, root).action(),
+      assertEquals(SourceAdmissionAction.SKIP_DONE, authority.admit(file, root, null).action(),
           "EX3: the saved pattern initially excludes the file");
       installed.update(config("[]"));
-      assertEquals(SourceAdmissionAction.ADMIT, authority.admit(file, root).action(),
+      assertEquals(SourceAdmissionAction.ADMIT, authority.admit(file, root, null).action(),
           "EX3: removing policy is visible on the next admission");
     } finally {
       ConfigStore.restoreGlobal(installed, previous);
@@ -79,16 +79,16 @@ class WorkerUserExclusionsTest {
   }
 
   @Test
-  void EN1BuiltInSkipsAndExplicitExemptionsRemain() throws Exception {
+  void EN1BuiltInSkipsPreserveGitignoreAndProtectEnv() throws Exception {
     Path system = Files.writeString(root.resolve("Thumbs.db"), "system");
     Path compiled = Files.writeString(root.resolve("module.pyc"), "compiled");
     Path git = Files.writeString(Files.createDirectory(root.resolve(".git")).resolve("notes.txt"), "git");
     Path env = Files.writeString(root.resolve(".env"), "env");
     var authority = new WorkerIngestionAuthority();
-    assertEquals(SourceAdmissionAction.SKIP_DONE, authority.admit(system, root).action());
-    assertEquals(SourceAdmissionAction.SKIP_DONE, authority.admit(compiled, root).action());
-    assertEquals(SourceAdmissionAction.SKIP_DONE, authority.admit(git, root).action());
-    assertEquals(SourceAdmissionAction.ADMIT, authority.admit(env, root).action());
+    assertEquals(SourceAdmissionAction.SKIP_DONE, authority.admit(system, root, null).action());
+    assertEquals(SourceAdmissionAction.SKIP_DONE, authority.admit(compiled, root, null).action());
+    assertEquals(SourceAdmissionAction.SKIP_DONE, authority.admit(git, root, null).action());
+    assertEquals(SourceAdmissionAction.SKIP_DONE, authority.admit(env, root, null).action());
   }
 
   private static ResolvedConfig config(String patterns) {

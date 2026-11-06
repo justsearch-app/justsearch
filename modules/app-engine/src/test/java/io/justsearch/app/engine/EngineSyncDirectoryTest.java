@@ -319,7 +319,7 @@ final class EngineSyncDirectoryTest {
     assertSkipPolicyOverridesAbsent();
 
     // Drain whatever the earlier ordered tests enqueued before the baseline is read, so the
-    // exact "+7" below counts only this test's admissions.
+    // exact "+6" below counts only this test's admissions.
     assertTrue(
         harness.awaitIndexed(docCount(), 60_000),
         "earlier ordered tests should drain before the layout baseline is captured");
@@ -361,10 +361,10 @@ final class EngineSyncDirectoryTest {
     assertTrue(response.getError().isEmpty(), "layout sync should have no error");
     assertFalse(response.getSkipped(), "force=true layout sync should not be skipped");
     assertEquals(
-        7, response.getFilesAdded(), "only the seven admitted layout files should enqueue");
+        6, response.getFilesAdded(), "only the six ordinary layout files should enqueue");
     assertTrue(
-        harness.awaitIndexed(baseline + 7, 60_000),
-        "the seven admitted layout files should become searchable");
+        harness.awaitIndexed(baseline + 6, 60_000),
+        "the six ordinary layout files should become searchable");
 
     for (String marker :
         List.of(
@@ -372,13 +372,15 @@ final class EngineSyncDirectoryTest {
             "javasource897",
             "typescriptsource897",
             "pythonsource897",
-            "obsidianmetadata897",
             "buildcontent897",
             "distcontent897")) {
       assertTrue(
           harness.awaitSearchable(marker, 30_000),
           "admitted layout marker should be searchable: " + marker);
     }
+    assertEquals(0,
+        harness.client().search("obsidianmetadata897", 10, TestEngineContexts.FOREGROUND).getResultsCount(),
+        "S1: metadata below an unselected dot-directory must remain protected");
     assertEquals(
         0,
         harness.client().search("forbiddenlayout897", 10, TestEngineContexts.FOREGROUND).getResultsCount(),

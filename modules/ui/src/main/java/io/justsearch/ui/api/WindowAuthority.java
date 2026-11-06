@@ -55,6 +55,42 @@ final class WindowAuthority {
     });
   }
 
+  static boolean privateDocument(String id, Map<String, ?> metadata) {
+    return io.justsearch.configuration.ReadOwnership.privateDocument(id, metadata);
+  }
+
+  static boolean allowDocumentRead(Context ctx, String id, Map<String, ?> metadata) {
+    if (hasAuthority(ctx) || !privateDocument(id, metadata)) return true;
+    ctx.status(403).json(Map.of("errorCode", "ASSISTANT_HISTORY_PRIVATE",
+        "error", "Assistant history is available only in the JustSearch app window"));
+    return false;
+  }
+
+  /** All selected-ID reads use the same index-owned facts as preview and fallback reads. */
+  static boolean allowSelectedDocumentReads(Context ctx, java.util.Collection<String> ids,
+      io.justsearch.app.api.DocumentService documents) throws Exception {
+    if (hasAuthority(ctx) || ids == null || ids.isEmpty()) return true;
+    long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(30);
+    var records = documents.fetchBatch(java.util.List.copyOf(ids), RequestEngineContext.get(ctx))
+        .toCompletableFuture().get(30, java.util.concurrent.TimeUnit.SECONDS);
+    if (records == null) throw new io.justsearch.app.api.DocumentService.UnavailableException("Document ownership unavailable");
+    for (String id : ids) {
+      var record = records.get(id);
+      if (record != null && !allowDocumentRead(ctx, id, record.metadata())) return false;
+      if (record == null) {
+        // Batch records omit unreadable text. A slice still carries the row's ownership, so a
+        // missing body must not turn presence/citation/selected-ID reads into an ownership bypass.
+        long remaining = deadline - System.nanoTime();
+        if (remaining <= 0) throw new java.util.concurrent.TimeoutException("Document ownership deadline exceeded");
+        var slice = documents.fetchSlice(id, 0, 1, RequestEngineContext.get(ctx))
+            .toCompletableFuture().get(remaining, java.util.concurrent.TimeUnit.NANOSECONDS);
+        if (slice == null) throw new io.justsearch.app.api.DocumentService.UnavailableException("Document ownership unavailable");
+        if (!allowDocumentRead(ctx, id, slice.metadata())) return false;
+      }
+    }
+    return true;
+  }
+
   static boolean hasAuthority(Context ctx) {
     return !Boolean.TRUE.equals(ctx.attribute(REQUIRED))
         || Boolean.TRUE.equals(ctx.attribute(VERIFIED));
@@ -71,6 +107,16 @@ final class WindowAuthority {
             Map.of("errorCode", "WINDOW_CREDENTIAL_REQUIRED"));
       }
     });
+    // Let the router match templates, including its normal case/encoding rules.
+    for (String route : Set.of("/api/chat/sessions", "/api/chat/sessions/*",
+        "/api/chat/conversations", "/api/chat/conversations/*", "/api/chat/runs", "/api/chat/runs/*",
+        "/api/chat/agent/history", "/api/chat/agent/history/*", "/api/thread/*", "/api/presence",
+        "/api/chat/approval", "/api/chat/agent/{sessionId}/attach", "/api/chat/agent/{sessionId}/ag-ui")) {
+      app.before(route, ctx -> {
+        if (ctx.method() != io.javalin.http.HandlerType.OPTIONS && !hasAuthority(ctx)) throw new io.javalin.http.HttpResponseException(403,
+            "Assistant history is private", Map.of("errorCode", "ASSISTANT_HISTORY_PRIVATE"));
+      });
+    }
   }
 
   private static boolean tokenOnlyRoute(String method, String path) {
@@ -86,6 +132,31 @@ final class WindowAuthority {
     if (hasAuthority(ctx)) return true;
     ctx.status(403).json(Map.of("errorCode", "WINDOW_CREDENTIAL_REQUIRED",
         "error", "Approve this action in the JustSearch app window"));
+    return false;
+  }
+
+  /** Token authentication does not grant access to the app's private assistant history. */
+  static boolean allowKnowledgeRead(Context ctx, Map<?, ?> body) {
+    if (hasAuthority(ctx) || body == null) return true;
+    boolean history = io.justsearch.configuration.InternalCollections.includesHistory(body.get("collection"));
+    if (body.get("filters") instanceof Map<?, ?> filters) {
+      history |= io.justsearch.configuration.InternalCollections.includesHistory(filters.get("collection"));
+    }
+    if (body.get("chunk_refs") instanceof Iterable<?> refs) {
+      for (Object ref : refs) if (ref instanceof Map<?, ?> fields
+          && fields.get("parent_doc_id") instanceof String path
+          && io.justsearch.configuration.InternalCollections.isDataPath(path)) history = true;
+    }
+    boolean folder = ctx.path().endsWith("/folders") || ctx.path().endsWith("/folder-files");
+    if (folder) {
+      for (String key : Set.of("parentPath", "folderPath")) {
+        if (body.get(key) instanceof String path
+            && io.justsearch.configuration.InternalCollections.isDataPath(path)) history = true;
+      }
+    }
+    if (!history) return true;
+    ctx.status(403).json(Map.of("errorCode", "ASSISTANT_HISTORY_PRIVATE",
+        "error", "Assistant history is available only in the JustSearch app window"));
     return false;
   }
 

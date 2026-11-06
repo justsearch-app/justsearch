@@ -109,6 +109,10 @@ public final class BrowseTool implements OperationHandler {
         }
       }
 
+      if (io.justsearch.configuration.InternalCollections.isDataPath(parentPath)) {
+        return OperationResult.failure("Application data and assistant history are private to the JustSearch app window");
+      }
+
       // --- branch: explicit file listing ---
       if (listFiles) {
         if (parentPath == null) {
@@ -138,6 +142,7 @@ public final class BrowseTool implements OperationHandler {
       List<RootInfo> roots = rootsView.roots(engineContext);
       List<FolderBrowseResponse.Folder> folders =
           roots.stream()
+              .filter(root -> !io.justsearch.configuration.InternalCollections.isDataPath(root.path()))
               .map(r -> new FolderBrowseResponse.Folder(r.path(), r.name(), -1, -1, 0))
               .toList();
       response = new FolderBrowseResponse(folders, 0, false);

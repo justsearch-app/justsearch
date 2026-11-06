@@ -139,6 +139,8 @@ class WorkerSearchServiceMatchCitationsTest extends io.justsearch.adapters.lucen
           (sentences, passages, ids, threshold, budget, authority) -> { throw wrapped; });
     } else if (branch.equals("lookup")) {
       var reads = Mockito.mock(io.justsearch.adapters.lucene.runtime.ReadPathOps.class);
+      Mockito.when(reads.readableDocumentIds(Mockito.anyCollection(), Mockito.eq(false)))
+          .thenAnswer(call -> java.util.Set.copyOf(call.<java.util.Collection<String>>getArgument(0)));
       Mockito.when(reads.search(Mockito.any(), Mockito.anyInt(), Mockito.anySet(),
           Mockito.any(), Mockito.any())).thenThrow(wrapped);
       var runtime = Mockito.mock(RunningRuntime.class, Mockito.RETURNS_DEEP_STUBS);
