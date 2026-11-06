@@ -306,11 +306,14 @@ def test_stored_real_use_collection_matches_recipe_and_its_config():
     assert set(c.documents) == set(chosen["kept"]) | set(chosen["sampled"]) <= full
     assert len(c.documents) == chosen["documents"] == 1000
     assert all(rows[d]["path"] == p and rows[d]["sha256"] == c.content[d] for d, p in c.documents.items())
-    assert cfg.layout == "as-is" and cfg.witness_formats == ("md",) and cfg.pending_kinds == ("topical",)
-    assert report.pending == len(collections.pending_queries(c, cfg))
+    assert cfg.layout == "as-is" and cfg.witness_formats == ("md",) and cfg.pending_kinds == ()
+    assert report.pending == len(collections.pending_queries(c, cfg)) == 0
     scored = collections.scored_collection(c, cfg)
-    assert all(q.groups["kind"] == "known-item" for q in scored.queries.values())
-    assert all(max(scored.judgments[q].values()) == 2 for q in scored.queries)
+    assert {q.groups["kind"] for q in scored.queries.values()} == {"known-item", "topical"}
+    assert all(max(scored.judgments[q].values()) == 2 for q in scored.queries
+               if scored.queries[q].groups["kind"] == "known-item")
+    assert all(max(scored.judgments[q].values()) == 1 for q in scored.queries
+               if scored.queries[q].groups["kind"] == "topical")
 
 
 def test_in_cluster_allocation_moves_shortfall_to_strata_with_spare_clusters():
