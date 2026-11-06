@@ -66,3 +66,14 @@ negatives are preservation/strengthening
 checks; hosted acquisition and recovery evidence is still required for real Windows claims.
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1b150-24e1-7741-9de5-49f21c4f6946",
+  "verdict": "accept",
+  "digest": "sha256:558d977cd767061e2f45d86fd126e64379e4c959c5bd876bc684019079cdd4bf",
+  "note": "Baseline-before-diff independent review accepts input-location and cleanup adaptation; original oracles retained. Linux5pass; Windows execution pending."
+}
+```

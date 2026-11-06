@@ -251,3 +251,14 @@ identity, and Windows fail-before remain pending. Compilation, static checks, No
 and Linux platform skips cannot satisfy that boundary evidence requirement.
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1b150-24e1-7741-9de5-49f21c4f6946",
+  "verdict": "reject",
+  "digest": "sha256:2bc882b6f576b374c7cee7ab2bf49e93d71f93a2b78db069e75de1c06b0205c2",
+  "note": "Formal source/oracle review: entries1,2,4,5 accept; entry3 new Windows oracle requires New/repaired and generated Windows assertion fail-before/pass-after. Retain rejection; Windows pending."
+}
+```
