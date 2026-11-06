@@ -126,3 +126,13 @@ These are Lucene boundary checks, not a running Engine acceptance claim.
   "digest": "sha256:3c1b342b03a8ae1932c0705e8b0ab50d9363717803fe42d7c52171d1f44f5428"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "agent-verifier-kw_3wc3o",
+  "verdict": "accept",
+  "digest": "sha256:7b0977e088f59544bac3515ea41a6b66b5a0dd45776b808e447afd2b2bb5d076"
+}
+```
