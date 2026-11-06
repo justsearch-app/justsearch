@@ -603,11 +603,7 @@ adapters apply.
         "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts",
         "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts"
       ],
-      "class": "Adaptation",
-      "moved": [
-        "input re-encoding"
-      ],
-      "whatMoved": "Existing positive completion examples now provide or observe 60 seconds of active work. The component tests offset Date.now while leaving real timers running. All existing assertions remain unchanged; the routing fixture adds the duration now required for a long completion. Every check in both edited files is rerun in shell-s3d-duration-preserved.json.",
+      "class": "Obsolete",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -617,6 +613,36 @@ adapters apply.
           "choice": "Finished work may notify only after at least 60 seconds of observed active work, measured separately for each indexing or transition episode, install, and operation. A shorter completion stays in the pill and Earlier; an unknown duration stays inside. Failures notify at any duration, subject to the existing focus, setting and replay rules.",
           "label": "agent choice"
         }
+      ],
+      "removedChecks": "In StatusPill.notices.test.ts, 'DE5 long work finishing notifies once, by its row', 'DE5 long work a witnessed transition settling notifies; a first load in the settled state does not', and 'DE5 long work an AI install completing or failing notifies; finding one already online does not': the positive completion expectations without 60 seconds of observed active work are retired. In noticePolicy.test.ts, the work-finished cases of both 'DE5 routeDesktopNotice' parameterized checks and the completion example in 'DE5 words finished and failed work is found by its row, or by its words when it has none' no longer use an unknown-duration completion as their input. Adding 60 seconds changes these preconditions, even where assertions stay the same. The following New entry records the replacement examples; the earlier New duration entries record the short/unknown-duration regressions and failure/replay checks.",
+      "conflictSearch": "decision records searched for a conflict (docs/decisions/*.md; notification, notice, long work, duration, 60 seconds): none requires completions with short or unknown observed duration to notify."
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "The existing positive completion examples now require 60 seconds of observed active work for operations, transitions and installs. The work-finished routing cases and the words example supply that duration explicitly. Component checks offset Date.now while real timers run. Their notification, focus, setting, replay and row assertions remain, with current event ids. This is a change of duration preconditions, not an Adaptation. The cited preservation evidence records execution and passing assertions, with no assertion fail-before claim against the duration baseline 32149108492c1f93c6d9227774ef49a975b44390.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "design decisions of the frame build, within the canonical design",
+          "choice": "Finished work may notify only after at least 60 seconds of observed active work, measured separately for each indexing or transition episode, install, and operation. A shorter completion stays in the pill and Earlier; an unknown duration stays inside. Failures notify at any duration, subject to the existing focus, setting and replay rules.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": false,
+      "evidence": "gates/test-intent/evidence/shell-s3d-duration-preserved.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 long work finishing notifies once, by its row",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 long work a witnessed transition settling notifies; a first load in the settled state does not",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 long work an AI install completing or failing notifies; finding one already online does not",
+        "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts#DE5 routeDesktopNotice work-finished: a focused window keeps it in the app, in every setting",
+        "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts#DE5 routeDesktopNotice work-finished: in the background Off is silent, On has no sound, On with sound has it",
+        "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts#DE5 words finished and failed work is found by its row, or by its words when it has none"
       ]
     },
     {
@@ -1236,11 +1262,7 @@ adapters apply.
         "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts",
         "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts"
       ],
-      "class": "Adaptation",
-      "moved": [
-        "signature"
-      ],
-      "whatMoved": "workFinishedNotice and workFailedNotice now require the event's id, where they defaulted to the words, which is what let two events share one. The policy checks pass an id, and the words-based assertion in the policy file now expects that id. Three component checks provide the engine's time and expect the exact new id in place of the old words; each still pins the whole notification. No other assertion changes. Every check in both files is rerun.",
+      "class": "Obsolete",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -1250,17 +1272,41 @@ adapters apply.
           "choice": "Each real event has its own id, the same in every window that sees it: an agent request or operation by its own key, an install by the engine's start time, and search settling by the time the engine's indexing state last changed plus a count of settlings at that time. The shell's dedupe only collapses one event seen from two windows.",
           "label": "agent choice"
         }
+      ],
+      "removedChecks": "In noticePolicy.test.ts, 'DE5 words finished and failed work is found by its row, or by its words when it has none': the assertion that a completion without a row uses the bare words 'Search is up to date' as its id is retired. In StatusPill.notices.test.ts, 'DE5 long work a witnessed transition settling notifies; a first load in the settled state does not', 'DE5 short work stays inside 59 seconds stays in the pill and Earlier; a later 60 second run notifies once', and 'DE5 short work stays inside indexing durations reset between runs, so repeated short runs stay silent': the exact bare-words id expectations are retired, and their replacement inputs supply the engine's indexing-state time. The following New entry records the time-bearing id expectations. Passing explicit ids to the policy functions accompanies this change; it does not preserve the old words-based id oracle.",
+      "conflictSearch": "decision records searched for a conflict (docs/decisions/*.md; notification, notice, event id, dedup, indexing): none requires different events with the same words to share an id or a bare-words id for a completion without a row."
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "A completion without a row carries its event id rather than using its words alone: the policy words check expects the supplied time-bearing id, and the three component checks expect Search is up to date@2026-11-06T10:00:00Z#0 after supplying the engine time. Their other notification and duration assertions remain. Every replacement check passed in the cited evidence, which has no fail-before run against the event baseline 67cd75a1533d174c9facd7770991bacbe3996244; these replacements are not marked repaired. Separate New entries cover distinct events and row lookup with their own evidence.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "design decisions of the frame build, within the canonical design",
+          "choice": "Each real event has its own id, the same in every window that sees it: an agent request or operation by its own key, an install by the engine's start time, and search settling by the time the engine's indexing state last changed plus a count of settlings at that time. The shell's dedupe only collapses one event seen from two windows.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": false,
+      "evidence": "gates/test-intent/evidence/shell-s3d-duration-preserved.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts#DE5 words finished and failed work is found by its row, or by its words when it has none",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 long work a witnessed transition settling notifies; a first load in the settled state does not",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 short work stays inside 59 seconds stays in the pill and Earlier; a later 60 second run notifies once",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 short work stays inside indexing durations reset between runs, so repeated short runs stay silent"
       ]
     },
     {
       "items": [
         "modules/shell/src-tauri/src/notices.rs#cfg(test)"
       ],
-      "class": "Adaptation",
-      "moved": [
-        "signature"
-      ],
-      "whatMoved": "NoticeLedger::claim no longer takes the time, because the ledger is bounded by count. The two checks that pass it now call it without, with their assertions unchanged. The check that let a claim expire is replaced: its repeat after 60 seconds contradicted once per event, and its small-ledger half is kept by the bound check.",
+      "class": "Obsolete",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -1270,7 +1316,9 @@ adapters apply.
           "choice": "The same event id never delivers twice while the ledger remembers it. The ledger is bounded by count, not by time: it keeps the latest 500 ids and forgets the oldest.",
           "label": "agent choice"
         }
-      ]
+      ],
+      "removedChecks": "In notices.rs, 'notices::tests::a_claim_expires_so_later_work_can_notify_and_the_ledger_stays_small': the expectation that finished:search can be claimed again at CLAIM_WINDOW (60 seconds), with an expired ledger entry pruned so its size is one, is retired. The replacement New entries are 'notices::tests::an_event_never_shows_twice_while_the_ledger_remembers_it' (shell-s3d-events-repaired.json, assertion fail-before on 67cd75a1533d174c9facd7770991bacbe3996244) and 'notices::tests::the_ledger_stays_small_by_forgetting_the_oldest_event' (shell-s3d-events-preserved.json, not repaired). The explicit clock inputs also leave 'notices::tests::an_event_reported_by_two_windows_shows_once' (including the second claim at now + 5 ms) and 'notices::tests::different_events_each_show'; their current successive-claim expectations are covered by the existing New shell-ledger entry and shell-s3d-preserved.json, not by a claim that the old temporal preconditions survive. NoticeLedger::claim dropping its time parameter accompanies a replacement of the time-expiry oracle with a count-bounded ledger.",
+      "conflictSearch": "decision records searched for a conflict (docs/decisions/*.md; notification, notice, ledger, dedup, expiry, event id, 60 seconds): none requires a notification claim to expire after 60 seconds or a ledger bounded by time rather than the latest 500 event ids."
     }
   ]
 }
