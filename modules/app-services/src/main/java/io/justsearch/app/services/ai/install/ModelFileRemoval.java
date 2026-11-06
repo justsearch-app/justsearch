@@ -8,6 +8,7 @@ import io.justsearch.app.api.OperationAdmissionClosedException;
 import io.justsearch.app.api.OperationLeaseHandle;
 import io.justsearch.app.api.OperationLeaseService;
 import io.justsearch.app.api.UiSettings;
+import io.justsearch.configuration.PlatformPaths;
 import io.justsearch.configuration.model.CapabilityTier;
 import io.justsearch.configuration.model.InstallContract;
 import io.justsearch.configuration.model.InstallPlanner;
@@ -48,7 +49,6 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -531,7 +531,7 @@ final class ModelFileRemoval {
       BasicFileAttributes attrs =
           Files.readAttributes(dir, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
       if (!attrs.isDirectory() || attrs.isSymbolicLink() || attrs.isOther()) return false;
-      if (isWindows()) WindowsOwnerOnlyDirectory.requireNonReparsePoint(dir);
+      if (PlatformPaths.isWindows()) WindowsOwnerOnlyDirectory.requireNonReparsePoint(dir);
       return true;
     } catch (IOException | RuntimeException unreadable) {
       return false;
@@ -560,7 +560,7 @@ final class ModelFileRemoval {
       BasicFileAttributes attrs =
           Files.readAttributes(p, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
       if (attrs.isSymbolicLink() || attrs.isOther()) return true;
-      if (isWindows()) WindowsOwnerOnlyDirectory.requireNonReparsePoint(p);
+      if (PlatformPaths.isWindows()) WindowsOwnerOnlyDirectory.requireNonReparsePoint(p);
       return !p.toRealPath().startsWith(root.toRealPath());
     } catch (IOException | RuntimeException unreadable) {
       return true;
@@ -573,7 +573,7 @@ final class ModelFileRemoval {
       if (p.getFileSystem().supportedFileAttributeViews().contains("unix")) {
         return ((Number) Files.getAttribute(p, "unix:nlink", LinkOption.NOFOLLOW_LINKS)).longValue() == 1;
       }
-      if (isWindows()) {
+      if (PlatformPaths.isWindows()) {
         WindowsOwnerOnlyDirectory.requireSingleLink(p);
         return true;
       }
@@ -581,10 +581,6 @@ final class ModelFileRemoval {
     } catch (IOException | RuntimeException unknown) {
       return false;
     }
-  }
-
-  private static boolean isWindows() {
-    return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
   }
 
   static String digest(String packageId, List<Found> found) {
@@ -974,7 +970,7 @@ final class ModelFileRemoval {
       if (t.expected().partial()) return null;
       if (t.expected().size() > 0 && attrs.size() != t.expected().size()) return KEPT_NOT_VERIFIED;
       // On Windows the hash is computed through the one handle that also deletes the file.
-      if (isWindows()) return t.expected().sha256() == null ? KEPT_NOT_VERIFIED : null;
+      if (PlatformPaths.isWindows()) return t.expected().sha256() == null ? KEPT_NOT_VERIFIED : null;
       String sha = sha256(staged);
       return t.expected().sha256() != null && t.expected().sha256().equalsIgnoreCase(sha)
           ? null : KEPT_NOT_VERIFIED;
@@ -1002,7 +998,7 @@ final class ModelFileRemoval {
    */
   private String deleteCaptured(PrivateFolder folder, Path staged, Target t) throws IOException {
     requireStillPrivate(folder);
-    if (isWindows()) return deleteThroughHandle(staged, t);
+    if (PlatformPaths.isWindows()) return deleteThroughHandle(staged, t);
     if (!t.identity().equals(identity(staged))) return KEPT_CHANGED;
     try (DirectoryStream<Path> models = Files.newDirectoryStream(root)) {
       if (!(models instanceof SecureDirectoryStream<Path> modelsHandle)) {
@@ -1173,11 +1169,11 @@ final class ModelFileRemoval {
     if (!attrs.isDirectory() || attrs.isSymbolicLink() || attrs.isOther()) {
       throw new IOException("not a plain folder");
     }
-    if (isWindows()) WindowsOwnerOnlyDirectory.requireNonReparsePoint(folder);
+    if (PlatformPaths.isWindows()) WindowsOwnerOnlyDirectory.requireNonReparsePoint(folder);
     // A folder's change times move with every entry: its identity is its file key, on Windows its
     // NTFS file index, elsewhere its creation time.
     Object identity = attrs.fileKey() != null ? attrs.fileKey()
-        : isWindows() ? WindowsOwnerOnlyDirectory.fileIdentity(folder)
+        : PlatformPaths.isWindows() ? WindowsOwnerOnlyDirectory.fileIdentity(folder)
         : attrs.creationTime().toMillis();
     if (expected != null && !expected.equals(identity)) throw new IOException("replaced");
     EngineAccount engine = engineAccount();
@@ -1246,7 +1242,7 @@ final class ModelFileRemoval {
           Files.readAttributes(p, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
       Object key = attrs.fileKey();
       if (key != null) return key;
-      if (isWindows()) return WindowsOwnerOnlyDirectory.fileIdentity(p);
+      if (PlatformPaths.isWindows()) return WindowsOwnerOnlyDirectory.fileIdentity(p);
       return List.of(attrs.size(), attrs.creationTime().toMillis(), attrs.lastModifiedTime().toMillis());
     } catch (IOException | RuntimeException unreadable) {
       return null;

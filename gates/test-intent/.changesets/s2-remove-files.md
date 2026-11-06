@@ -1354,6 +1354,14 @@ The brief's adopted scenarios are quoted below; choices the scenarios leave open
         "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalRefreshTest.java#theRefreshRunsOnceTheFilesAreGoneWhileTheRemovalStillHoldsTheLockAndReportsRunning",
         "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/ModelFileRemovalRefreshTest.java#aRefreshThatFailsLeavesTheRemovalReportedAsItHappened"
       ]
+    },
+    {
+      "items": [
+        "modules/app-launcher/archunit_store/fbfdda09-fb1d-494e-a2a6-e593ce75d5a6"
+      ],
+      "class": "Structural rule kept",
+      "rule": "UnreferencedCodeTest#no_unreferenced_non_public_methods: Private/package-private methods should be referenced by other code (potential dead code).",
+      "whySurvives": "The frozen production-method predicate and store guards are unchanged. Three lines are added to the store for test-only seams of the removal owner that the removal tests drive (AiInstallService.removalForTest, AiInstallService.setManifestForTest, ModelFileRemoval.setCheckpointHookForTest): the checkpoint hook is how the deterministic crash, replacement and interleaving checks reach each destructive step, and no production caller exists by design. The rule still fails on any other new unreferenced method."
     }
   ]
 }
