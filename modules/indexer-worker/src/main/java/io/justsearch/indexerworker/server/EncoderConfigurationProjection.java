@@ -165,7 +165,7 @@ final class EncoderConfigurationProjection {
         new EmbeddingConfig(embeddingDir != null, embeddingDir, e.backend(), e.gpuEnabled(),
             e.gpuDeviceId(), e.gpuMemLimitBytes(), e.contextLength(), e.lateChunkingEnabled(),
             e.lateChunkingContextLength()),
-        new SpladeConfig(spladeDir != null, spladeDir, s.maxSequenceLength(), s.gpuEnabled(),
+        new SpladeConfig(spladeDir != null && s.enabled(), spladeDir, s.maxSequenceLength(), s.gpuEnabled(),
             s.gpuDeviceId(), s.gpuMemLimitBytes(), s.queryMode(), s.activation()),
         new NerConfig(nerDir != null, nerDir, n.maxSequenceLength(), n.confidenceThreshold(),
             n.gpuEnabled(), n.gpuDeviceId(), n.gpuMemLimitBytes()),

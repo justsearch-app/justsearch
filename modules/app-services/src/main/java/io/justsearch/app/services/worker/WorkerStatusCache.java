@@ -204,6 +204,7 @@ private static final Logger log = LoggerFactory.getLogger(WorkerStatusCache.clas
 
     // 366: Doc-level enrichment coverage for MCP status (agent discoverability)
     extras.put("embeddingCoveragePercent", s.getEnrichment().getEmbedding().getCoveragePercent());
+    extras.put("spladeEnabled", s.getEnrichment().getSpladeEnabled());
     extras.put("spladeCoveragePercent", s.getEnrichment().getSplade().getCoveragePercent());
     extras.put("completenessKnown", !s.getEnrichment().hasCompletenessKnown() || s.getEnrichment().getCompletenessKnown());
     extras.put("pendingNerCount", s.getEnrichment().getPendingNerCount());

@@ -68,6 +68,7 @@ final class SpladeOnlyBoundaryFallbackTest {
   private KnowledgeSearchController controller;
   private final ObservedLatch loading = new ObservedLatch();
   private SearchRequest captured;
+  private KnowledgeClient workerClient;
 
   @BeforeEach
   void setup() throws Exception {
@@ -98,6 +99,7 @@ final class SpladeOnlyBoundaryFallbackTest {
     worker.setEmbeddingCompatController(compat);
     worker.setModelReadyLatchSupplier(() -> loading);
     var client = mock(KnowledgeClient.class);
+    workerClient = client;
     when(client.requestDeadlineMs()).thenReturn(10_000L);
     when(client.getStatus(any(EngineContext.class))).thenReturn(StatusResponse.getDefaultInstance());
     when(client.search(any(SearchRequest.class), any(EngineContext.class))).thenAnswer(invocation -> {
@@ -171,6 +173,28 @@ final class SpladeOnlyBoundaryFallbackTest {
     assertTrue(json.path("coverage").path("totalHits").asLong() >= 1, json.toString());
     assertEquals("TEXT", json.path("searchTrace").path("effectiveMode").asText());
     assertSpladeOnlyMapping();
+  }
+
+  @Test
+  void disabledSpladeDoesNotHintAtPendingWorkOrLatchDemand() {
+    loading.countDown();
+    for (double coverage : new double[] {0, 100}) {
+      when(workerClient.getStatus(any(EngineContext.class))).thenReturn(
+          StatusResponse.newBuilder().setEnrichment(io.justsearch.ipc.EnrichmentCoverage.newBuilder()
+              .setSpladeEnabled(false)
+              .setEmbedding(io.justsearch.ipc.FeatureCoverage.newBuilder().setCoveragePercent(100))
+              .setSplade(io.justsearch.ipc.FeatureCoverage.newBuilder().setCoveragePercent(coverage)))
+              .build());
+      var surface = new McpToolSurface(List.of(OperationCatalog.of("core", List.of())),
+          mock(OperationDispatcher.class), () -> controller, () -> null,
+          Clock.fixed(java.time.Instant.parse("2026-11-05T12:00:00Z"), java.time.ZoneOffset.UTC));
+      var result = surface.callTool("justsearch_search", Map.of("query", "Hello", "mode", "splade"),
+          "off", TestRequestContexts.mcp("off"));
+      String text = McpSemanticBudgetNoteTest.textOf(result);
+      assertFalse(text.contains("Enrichment in progress"), text);
+      assertNull(ConfigStore.global().get().ai().splade().enabled(), "S4: reads do not latch permission");
+      assertSpladeOnlyMapping();
+    }
   }
 
   private void assertSpladeOnlyMapping() {

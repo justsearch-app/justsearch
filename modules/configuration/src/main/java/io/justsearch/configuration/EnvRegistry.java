@@ -602,7 +602,7 @@ public enum EnvRegistry {
 
     // ==================== SPLADE Configuration ====================
 
-    /** Enable SPLADE sparse retrieval (auto if model found). */
+    /** Enable SPLADE sparse retrieval (opt-in; explicit false vetoes chunk demand). */
     SPLADE_ENABLED("justsearch.splade.enabled", "JUSTSEARCH_SPLADE_ENABLED", LifecycleStage.PERMANENT),
 
     /** Explicit path to SPLADE model directory. */

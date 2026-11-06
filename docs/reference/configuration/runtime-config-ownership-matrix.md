@@ -270,7 +270,7 @@ The declaration, environment and constant names below retain their pre-merge spe
 | EnvRegistry.SERVER_PORT | permanent | - | JUSTSEARCH_SERVER_PORT | justsearch.server.port | SERVER_PORT | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.SPARSE_MODEL | permanent | - | JUSTSEARCH_SPARSE_MODEL | justsearch.sparse_model | SPARSE_MODEL | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.SPLADE_ACTIVATION | permanent | - | JUSTSEARCH_SPLADE_ACTIVATION | justsearch.splade.activation | SPLADE_ACTIVATION | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
-| EnvRegistry.SPLADE_ENABLED | permanent | - | JUSTSEARCH_SPLADE_ENABLED | justsearch.splade.enabled | SPLADE_ENABLED | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
+| EnvRegistry.SPLADE_ENABLED | permanent | - | JUSTSEARCH_SPLADE_ENABLED | justsearch.splade.enabled | SPLADE_ENABLED | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default (off unless chunk SPLADE requests it; explicit false wins; next start) |
 | EnvRegistry.SPLADE_EVIDENCE_PATH | permanent | - | JUSTSEARCH_SPLADE_EVIDENCE_PATH | justsearch.splade.evidence_path | SPLADE_EVIDENCE_PATH | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.SPLADE_GPU_DEVICE_ID | permanent | - | JUSTSEARCH_SPLADE_GPU_DEVICE_ID | justsearch.splade.gpu_device_id | SPLADE_GPU_DEVICE_ID | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.SPLADE_GPU_ENABLED | permanent | - | JUSTSEARCH_SPLADE_GPU_ENABLED | justsearch.splade.gpu_enabled | SPLADE_GPU_ENABLED | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |

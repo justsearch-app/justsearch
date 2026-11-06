@@ -542,6 +542,13 @@ public final class IndexingDocumentOps {
 
   public static ParentIndexMetadata deriveParentMetadata(
       Path filePath, ExtractionResult extraction, SpladeEncoder spladeEncoder, Logger log) {
+    return deriveParentMetadataWithTokenCounter(filePath, extraction,
+        spladeEncoder == null ? null : spladeEncoder::tokenCount, log);
+  }
+
+  public static ParentIndexMetadata deriveParentMetadataWithTokenCounter(
+      Path filePath, ExtractionResult extraction,
+      java.util.function.ToLongFunction<String> tokenCounter, Logger log) {
     String mime = extraction.mimeType();
     String mimeBase = normalizeMimeBase(mime);
     String fileKind = classifyFileKind(filePath, mimeBase);
@@ -549,9 +556,9 @@ public final class IndexingDocumentOps {
     String language = resolveLanguage(contentPreview(extraction.content(), isMarkdown));
 
     Long parentTokenCount = null;
-    if (spladeEncoder != null) {
+    if (tokenCounter != null) {
       try {
-        parentTokenCount = spladeEncoder.tokenCount(extraction.content());
+        parentTokenCount = tokenCounter.applyAsLong(extraction.content());
       } catch (RuntimeException e) {
         if (log != null) {
           log.debug(
@@ -562,14 +569,8 @@ public final class IndexingDocumentOps {
       }
     }
     if (parentTokenCount == null) {
-      // Tempdoc 717: the SPLADE encoder loads asynchronously, so on a fresh build a small corpus can
-      // be fully indexed before it is ready — leaving parent_token_count null. The corpus-profile
-      // short/long classifier (CorpusProfile) then sees median 0, mis-classifies a long corpus as
-      // "short", and the chunk_merge search leg is silently skipped (intermittent quality halving).
-      // Fall back to a cheap, always-available character-based estimate so the field is NEVER null
-      // and never race-dependent; the exact SPLADE count is still used whenever the encoder is
-      // ready. The corpus-profile buckets are coarse (256/512/1024/…), so a ~4-chars/token estimate
-      // is sufficient to classify long-vs-short correctly.
+      // Keep the existing nonfatal estimate when the selected tokenizer is missing or fails.
+      // Corpus classification must always have a count, even before inference is available.
       parentTokenCount = estimateTokenCount(extraction.content());
     }
 

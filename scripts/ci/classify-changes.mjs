@@ -15,6 +15,7 @@ export const RULES = [
   [/^scripts\/dev\/prepush-excluded-tests\.tsv$/, LANES],
   // Documentation consumed by scoped code is an input, even though ordinary docs are cheap.
   [/^docs\/reference\/legal\/ai-runtime-and-model-redistribution\.md$/, ['license']],
+  [/^docs\/reference\/(?:configuration\/(?:environment-variables|runtime-config-ownership-matrix)|performance\/indexing-throughput)\.md$/, ['search']],
   // The advisory axe sweep consumes Vite, the Python capture/gate and its fixtures,
   // the shared register, schema/token data and the surface catalog its fixtures serve.
   // It has its own selector so a Java closure alone does not start a browser sweep.

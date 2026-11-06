@@ -239,6 +239,8 @@ final class ActivationPhysicalEncoderCapsTest {
       property("justsearch.context.size", "32768");
       property("justsearch.server.exe", null);
       property("justsearch.server.exe.source", null);
+      // E4d: this three-role physical-cap fixture explicitly requests SPLADE.
+      property("justsearch.splade.enabled", "true");
       property("justsearch.ner.enabled", "false");
       property("justsearch.bgem3.enabled", "false");
       property("justsearch.citation.scorer.enabled", "false");
