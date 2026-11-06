@@ -6,7 +6,8 @@
  * test-intent changesets each commit added or modified, and counts: entries per class, references to
  * test-efficacy changesets, rejections (records with verdict `reject`; acceptors append records and
  * never delete them), audited PRs, audit disagreements, third-reviewer tie-breaks, and new checks per
- * PR. It flags the reconsider rule the orchestrator acts on: tie-breaks above one in ten audited PRs.
+ * PR. It flags the reconsider rule the orchestrator acts on: disagreements or tie-breaks on more
+ * than one in ten audited PRs.
  *
  *   node scripts/governance/gates/test-intent/weekly-report.mjs [--ref origin/main] [--days 28]
  *        [--out-md <file>] [--out-json <file>]
@@ -64,15 +65,14 @@ export function collectHistory({ repoRoot, ref, sinceIso }) {
 export const RECONSIDER_RATE = 0.1;
 
 /**
- * The reconsider rule: third-reviewer tie-breaks per audited PR or, before any tie-break has
- * happened, two-reviewer disagreements per audited PR, above one in ten. With no audited PR in the
+ * The reconsider rule: audited PRs with a reviewer disagreement or third-reviewer tie-break,
+ * counted once per PR, above one in ten audited PRs. With no audited PR in the
  * window, any tie-break or disagreement counts as above (there is nothing to divide by, and the
  * warning is advisory).
  */
-export function reconsiderRate({ audited, tieBreaks, auditDisagreements }) {
-  const useTieBreaks = tieBreaks > 0;
-  const count = useTieBreaks ? tieBreaks : auditDisagreements;
-  const basis = useTieBreaks ? 'third-reviewer tie-breaks' : 'two-reviewer disagreements (no tie-break yet)';
+export function reconsiderRate({ audited, prs }) {
+  const count = prs.filter((p) => (audited === 0 || p.audited) && (p.disagreement || p.tieBreak)).length;
+  const basis = 'PRs with a reviewer disagreement or third-reviewer tie-break';
   const rate = audited > 0 ? count / audited : count > 0 ? Infinity : 0;
   return { basis, count, audited, rate, above: rate > RECONSIDER_RATE };
 }
@@ -136,15 +136,18 @@ export function buildReport({ commits, ref, sinceIso, untilIso }) {
         if (Array.isArray(e?.newChecks)) prNewChecks += e.newChecks.length;
       }
       rejections += parsed.records.filter((r) => r?.verdict === 'reject').length;
-      const acc = parsed.records.filter((r) => (r?.kind ?? 'acceptance') === 'acceptance');
-      const aud = parsed.records.filter((r) => r?.kind === 'audit');
-      if (aud.length && acc.length && aud[aud.length - 1].verdict !== acc[acc.length - 1].verdict) prDisagree = true;
-      if (acc.some((r) => r.verdict !== acc[acc.length - 1].verdict)) prDisagree = true;
+      const reviews = parsed.records.filter((r) =>
+        ['acceptance', 'audit'].includes(r?.kind ?? 'acceptance') &&
+        ['accept', 'reject'].includes(r?.verdict) &&
+        typeof r?.digest === 'string' && r.digest.trim() &&
+        typeof r?.session === 'string' && r.session.trim());
+      if (reviews.some((r) => reviews.some((other) =>
+        r.digest === other.digest && r.session !== other.session && r.verdict !== other.verdict))) prDisagree = true;
       if (parsed.records.some((r) => r?.kind === 'tie-break')) prTieBreak = true;
     }
     const isAudited = entries > 0 && isAuditSelected(c.pr);
     if (isAudited) audited += 1;
-    if (prDisagree) auditDisagreements += 1;
+    if (isAudited && prDisagree) auditDisagreements += 1;
     if (prTieBreak) tieBreaks += 1;
     newChecks += prNewChecks;
     prs.push({ pr: c.pr, sha: c.sha.slice(0, 12), date: c.date, entries, classes: [...classes], newChecks: prNewChecks, audited: isAudited, disagreement: prDisagree, tieBreak: prTieBreak });
@@ -152,7 +155,7 @@ export function buildReport({ commits, ref, sinceIso, untilIso }) {
   const merged = commits.length;
   const withEntries = prs.filter((p) => p.entries > 0).length;
   const findings = [];
-  const rate = reconsiderRate({ audited, tieBreaks, auditDisagreements });
+  const rate = reconsiderRate({ audited, prs });
   if (rate.above) findings.push(reconsiderMessage(rate, days(sinceIso, untilIso), ref));
   if (unparseable > 0) findings.push(`${unparseable} merged changeset(s) could not be parsed.`);
   return {

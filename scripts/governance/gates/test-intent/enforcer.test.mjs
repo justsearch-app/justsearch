@@ -37,17 +37,25 @@ for (const mode of ['report', 'report-error', 'base-error']) {
       git('config', 'commit.gpgsign', 'false');
       const dir = path.join(repoRoot, 'gates/test-intent/.changesets');
       fs.mkdirSync(dir, { recursive: true });
-      let text = changesetText({ entries: [{ items: ['a'], class: 'New', newChecks: ['a#x'] }] });
-      for (const record of [
-        { kind: 'acceptance', session: 'v', verdict: 'accept' },
-        { kind: 'audit', session: 'a', verdict: 'reject' },
-        { kind: 'tie-break', session: 't', verdict: 'accept' },
-      ]) text = appendRecord(text, { role: 'verifier', digest: 'd', ...record });
-      fs.writeFileSync(path.join(dir, 'a.md'), text);
-      git('add', '-A');
-      git('commit', '-q', '-m', 'Add a check (#15)');
+      for (let i = 0; i < 10; i++) {
+        let text = changesetText({ entries: [{ items: ['a'], class: 'New', newChecks: ['a#x'] }] });
+        const records = [
+          { kind: 'acceptance', session: 'v', verdict: 'accept' },
+          { kind: 'audit', session: 'a', verdict: i < 2 ? 'reject' : 'accept' },
+        ];
+        if (i === 0) records.push({ kind: 'tie-break', session: 't', verdict: 'accept' });
+        if (i === 1) records.push(
+          { kind: 'acceptance', session: 'v', verdict: 'accept', digest: 'repaired' },
+          { kind: 'audit', session: 'a', verdict: 'accept', digest: 'repaired' },
+        );
+        for (const record of records) text = appendRecord(text, { role: 'verifier', digest: 'd', ...record });
+        fs.writeFileSync(path.join(dir, `${i}.md`), text);
+        git('add', '-A');
+        git('commit', '-q', '-m', `Add a check (#${15 + i * 5})`);
+      }
       const report = reportFor({ repoRoot, ref: 'main', days: ROLLING_DAYS, now: new Date(NOW) });
-      assert.equal(report.totals.audited, 1);
+      assert.equal(report.totals.audited, 10);
+      assert.equal(report.totals.auditDisagreements, 2);
       assert.equal(report.totals.tieBreaks, 1);
       assert.equal(report.findings.length, 1);
 
@@ -84,6 +92,7 @@ for (const mode of ['report', 'report-error', 'base-error']) {
           assert.equal(result.verdict, 'pass', 'reconsider warning remains advisory');
           assert.equal(warning.level, 'warning');
           assert.equal(warning.message, report.findings[0]);
+          assert.match(warning.message, /PRs with a reviewer disagreement or third-reviewer tie-break were 2 of 10 audited PRs \(20\.0%\)/);
           assert.match(output.join('\n'), /WARNING test-intent\/reconsider-rate \(does not fail the gate\)/);
         }
       }
