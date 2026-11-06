@@ -381,7 +381,7 @@ def estimate(c, request, models, runs, declaration):
         observed.sort(key=lambda row: row[0])
         expected = observed[-1][3]
         matching = [row for row in observed if row[3] == expected]
-        times = [row[1] for row in matching if row[1] is not None][-5:]
+        times = [row[1] for row in matching[-5:] if row[1] is not None]
         per_query = max(times)*1.25 if times else 15
         startup = max(row[2] for row in matching[-5:])*1.25
         confirmations = [row[4] for row in matching[-5:] if row[4] is not None]
