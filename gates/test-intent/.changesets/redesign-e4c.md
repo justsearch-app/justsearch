@@ -22,7 +22,7 @@ keeps the per-stage "Enrichment dispositions" log formerly emitted by the combin
 The verification compatibility patch adds only constructor forwarding overloads to HEAD. It
 restores no diagnostic or behavior, and lets the same transferred tests compile against the
 original production operations in a shared clone with its own build folders. Preservation runs
-must pass on both sides; the diagnostic repair must fail before by assertion. The builder leaves
+must pass on both sides; diagnostic repairs and restored materialization-prefix outcomes must fail before by assertion. The materialization repair baseline is e0e897e5da0ed798038451ed8901fa7323dd1387 (HEAD at repair round 2 start). The builder leaves
 evidence JSON and acceptance records to the independent verifier, as requested.
 
 ```json
@@ -68,7 +68,7 @@ evidence JSON and acceptance records to the independent verifier, as requested.
         "instrumentation",
         "input re-encoding"
       ],
-      "whatMoved": "The surviving assertions run the production processDenseUnit, processParentBackfill/processChunkBackfill, and processNerUnit operations. Test-only fixtures retain their input maps and state between native turns, take immutable copies of submitted updates before scratch maps are cleared, and supply explicit pending status/chunk metadata. Source-replacement hooks run at getEnrichmentInputPage or at the retained fallback native call, rather than at a retired batch call. Assertions on stored fields, retry limits, receipts, unavailable providers, no stale/excluded publication, reconstructed text, pooling, and hard stops are retained. Separate native turns and an explicit reader refresh observe unaffected siblings. The separate Obsolete entries below account for the exact retired contracts; no such assertion is claimed as an adaptation.",
+      "whatMoved": "The surviving assertions run the production processDenseUnit, processParentBackfill/processChunkBackfill, and processNerUnit operations. Test-only fixtures retain their input maps and state between native turns, take immutable copies of submitted updates before scratch maps are cleared, and supply explicit pending status/chunk metadata. Source-replacement hooks run at getEnrichmentInputPage or at the retained fallback native call, rather than at a retired batch call. Assertions on stored fields, retry limits, receipts, unavailable providers, no stale/excluded publication, reconstructed text, pooling, and hard stops are retained. Separate native turns and an explicit reader refresh observe unaffected siblings. The original same-batch lazy-result fault in spladeSliceFailurePreservesItsSuccessfulPrefixAndDoesNotChargeTheTail is restored: a successful first row must publish COMPLETED with retry zero even when reading the second result throws, and the unselected tail remains uncharged. First- and last-result faults retain that outcome. The dense parent/chunk kernel had the same prefix-loss gap; it now materializes aligned results row by row, publishes the read prefix, and retains only the unread suffix for a later fallback unit without charging it. NER reads one result per native unit and already isolates a read failure to that document; first/middle/last failing units retain other publications and leave the unselected tail uncharged. These are restored production outcomes required by repair round 2, tracked in the additional New entry below rather than claimed as a pure test adaptation. The separate Obsolete entries below account for the exact retired contracts; no such assertion is claimed as an adaptation.",
       "sources": [
         {
           "kind": "owner-words",
@@ -225,6 +225,27 @@ evidence JSON and acceptance records to the independent verifier, as requested.
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentLaneTracingTest.java#nerNativeWorkInheritsTheEnrichmentSpan"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentFailureAccountingTest.java"
+      ],
+      "class": "New",
+      "behaviour": "SPLADE preserves and publishes the successfully materialized prefix of one batch when reading a later result fails, and does not charge an unselected tail. Dense parent/chunk units preserve the same prefix and defer the unread suffix to their existing fallback route without retry charges. First, middle and last result failures are covered; NER already isolates each one-row result read and needs no production repair.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "location": "task redesign-e4c request",
+          "quote": "restore the original same-batch fault in the test, and make the production SPLADE lane keep the outcome: rows read successfully before the failure are published COMPLETED, the tail is not charged."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/redesign-e4c-materialization.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentFailureAccountingTest.java#spladeSliceFailurePreservesItsSuccessfulPrefixAndDoesNotChargeTheTail",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentFailureAccountingTest.java#spladeMaterializationFailureAtEitherEndPreservesOnlyItsPrefix",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentFailureAccountingTest.java#denseMaterializationFailurePreservesItsPrefixAndDefersUnreadRows"
+      ],
+      "repaired": true
     }
   ]
 }
@@ -342,6 +363,21 @@ env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot node scripts/governance/gates/t
   --before-patch gates/test-intent/.changesets/redesign-e4c-before.patch
 ```
 
+## Repair round 2 verification command
+
+The independent verifier can produce the restored-outcome evidence with the command below.
+The builder runs the checks directly in a shared baseline clone and the candidate, without
+writing evidence JSON. NER is a preservation check, so it stays out of this fail-before command.
+
+```bash
+env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot node scripts/governance/gates/test-intent/run-evidence.mjs \
+  --out gates/test-intent/evidence/redesign-e4c-materialization.json \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentFailureAccountingTest.java#spladeSliceFailurePreservesItsSuccessfulPrefixAndDoesNotChargeTheTail \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentFailureAccountingTest.java#spladeMaterializationFailureAtEitherEndPreservesOnlyItsPrefix \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentFailureAccountingTest.java#denseMaterializationFailurePreservesItsPrefixAndDefersUnreadRows \
+  --before e0e897e5da0ed798038451ed8901fa7323dd1387
+```
+
 ## Builder check observations
 
 The focused command selects `io.justsearch.indexerworker.loop.ops.*`,
@@ -372,5 +408,34 @@ Checks used the shared Gradle cache and slot, separate build folders in the shar
 and test-owned temporary resources. No shared dev stack was started; no `.agents/preflight`
 exists. The work is uncommitted: this worktree's Git metadata is outside the writable sandbox.
 No evidence JSON was written; acceptance is left to the independent verifier.
+
+## Repair round 2 builder observations
+
+The baseline is `e0e897e5da0ed798038451ed8901fa7323dd1387`, checked out in a shared
+clone at `$TMPDIR/before` with its own build directories. With only the candidate test file
+copied in, the failure-accounting class ran 29 checks: 21 passed and eight failed by assertion.
+Those failures were the restored same-batch SPLADE fault, its last-element neighbour, and all
+six dense parent/chunk first/middle/last cases. All three NER cases passed before the repair.
+NER reads one result per native unit and already isolates materialization failures; no NER
+production change was needed.
+
+The final focused command described above passed all 1,078 checks, with no failures or skips.
+An earlier candidate exposed 18 retirement-accounting assertion failures; retaining the original
+SPLADE computed/retirement order while changing only result materialization resolved them.
+The complete `:modules:worker-services:test -PskipWebBuild=true --continue` run reported
+4,254 checks, four failures and 23 skips in 7m30s. The failures were exactly the known
+`LinuxRootMountInfoTest#missingDanglingAndAmbiguousUuidMappingsAreUnknown` and the three
+`WatcherUnavailabilityScopeTest` environment failures; no skip is claimed as a pass.
+
+`env -u DISPLAY -u WAYLAND_DISPLAY node scripts/dev/java-prepush.mjs --unreferenced`
+passed in 7m27s, using the script's `js-gradle-slot ./gradlew` invocation. PMD, the
+unreferenced-code check and selected app-services/UI integration tasks completed successfully;
+configured skips remain skips. The final test-intent gate reports only the missing
+materialization evidence file and independent acceptance. No `.agents/preflight` exists.
+
+Checks used the shared Gradle cache and admission slots, checkout-owned build folders and
+test-owned resources. No shared dev stack or system-tests integration task was started,
+and the owner's `~/.justsearch` was left alone. Git metadata is outside the writable sandbox,
+so the repair remains uncommitted. No evidence JSON was written.
 
 ## Acceptance records

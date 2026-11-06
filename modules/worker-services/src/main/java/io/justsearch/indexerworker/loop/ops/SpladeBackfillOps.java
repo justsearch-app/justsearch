@@ -210,7 +210,8 @@ public final class SpladeBackfillOps {
             accounting.computed(batchDocIds.get(i), EnrichmentAccounting.Stage.SPLADE);
           }
           if (batch.retired(unavailable, EnrichmentAccounting.Stage.SPLADE)) break;
-          sparseVecs.addAll(sliceVecs);
+          // Materialize one row at a time so fallback retains a successfully read prefix.
+          for (int i = 0; i < sliceVecs.size(); i++) sparseVecs.add(sliceVecs.get(i));
         }
       } catch (Exception e) {
         if (batch.retired(unavailable, EnrichmentAccounting.Stage.SPLADE)) {

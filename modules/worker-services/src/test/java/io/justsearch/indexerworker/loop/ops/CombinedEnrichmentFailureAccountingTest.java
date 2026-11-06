@@ -13,6 +13,7 @@ import io.justsearch.adapters.lucene.runtime.IndexingCoordinator;
 import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.BatchUpdateResult;
 import io.justsearch.indexerworker.embed.EmbeddingProvider;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
+import io.justsearch.indexerworker.ner.NerResult;
 import io.justsearch.indexerworker.ner.NerService;
 import io.justsearch.indexerworker.splade.SpladeEncoder;
 import io.justsearch.indexing.SchemaFields;
@@ -23,6 +24,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.slf4j.LoggerFactory;
 
 class CombinedEnrichmentFailureAccountingTest {
@@ -162,14 +164,116 @@ class CombinedEnrichmentFailureAccountingTest {
   @Test
   void spladeSliceFailurePreservesItsSuccessfulPrefixAndDoesNotChargeTheTail() throws Exception {
     for (String id : List.of("a", "b", "later")) seed(id, SchemaFields.SPLADE_STATUS);
-    when(splade.encodeBatch(anyList())).thenReturn(List.of(Map.of("good", 1f)))
-        .thenThrow(new IllegalArgumentException("bad input in the next unit"));
-    LaneBackfillTestSupport.runLanes(sparseContext(1));
-    LaneBackfillTestSupport.runLanes(sparseContext(1));
+    when(splade.encodeBatch(anyList())).thenReturn(new AbstractList<Map<String, Float>>() {
+      @Override public int size() { return 2; }
+      @Override public Map<String, Float> get(int position) {
+        if (position == 0) return Map.of("good", 1f);
+        throw new IllegalArgumentException("failed materializing second result");
+      }
+    });
+    LaneBackfillTestSupport.runLanes(sparseContext());
     assertEquals("COMPLETED", index.get("a").get(SchemaFields.SPLADE_STATUS));
     assertEquals("0", index.get("a").get(SchemaFields.SPLADE_RETRY_COUNT));
     assertEquals("1", index.get("b").get(SchemaFields.SPLADE_RETRY_COUNT));
     assertFalse(index.get("later").containsKey(SchemaFields.SPLADE_RETRY_COUNT));
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {0, 2})
+  void spladeMaterializationFailureAtEitherEndPreservesOnlyItsPrefix(int failedPosition) throws Exception {
+    for (String id : List.of("a", "b", "c", "later")) seed(id, SchemaFields.SPLADE_STATUS);
+    when(splade.encodeBatch(anyList())).thenReturn(new AbstractList<Map<String, Float>>() {
+      @Override public int size() { return 3; }
+      @Override public Map<String, Float> get(int position) {
+        if (position >= failedPosition) throw new IllegalArgumentException("failed materializing result");
+        return Map.of("good", 1f);
+      }
+    });
+    var outcome = LaneBackfillTestSupport.runLanes(sparseContext(3));
+    assertEquals(failedPosition, outcome.spladeProcessed());
+    for (int i = 0; i < 3; i++) {
+      var row = index.get(List.of("a", "b", "c").get(i));
+      assertEquals(i < failedPosition ? "COMPLETED" : "PENDING", row.get(SchemaFields.SPLADE_STATUS));
+      assertEquals(i < failedPosition ? "0" : "1", row.get(SchemaFields.SPLADE_RETRY_COUNT));
+      if (i < failedPosition) assertEquals(Map.of("good", 1f), row.get(SchemaFields.SPLADE));
+      else assertFalse(row.containsKey(SchemaFields.SPLADE));
+    }
+    assertEquals("PENDING", index.get("later").get(SchemaFields.SPLADE_STATUS));
+    assertFalse(index.get("later").containsKey(SchemaFields.SPLADE_RETRY_COUNT));
+    verify(splade, never()).encode(eq("later"), any());
+    verify(splade, times(1)).encodeBatch(anyList());
+  }
+
+  @ParameterizedTest
+  @CsvSource({"false, 0", "false, 1", "false, 2", "true, 0", "true, 1", "true, 2"})
+  void denseMaterializationFailurePreservesItsPrefixAndDefersUnreadRows(boolean chunks, int failedPosition) {
+    useSplade = false;
+    chunkVectors = chunks;
+    String status = chunks ? SchemaFields.CHUNK_EMBEDDING_STATUS : SchemaFields.EMBEDDING_STATUS;
+    String retry = chunks ? SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT : SchemaFields.EMBEDDING_RETRY_COUNT;
+    String vector = chunks ? SchemaFields.CHUNK_VECTOR : SchemaFields.VECTOR;
+    for (String id : List.of("a", "b", "c")) {
+      seed(id, status);
+      if (chunks) index.get(id).put(SchemaFields.IS_CHUNK, "true");
+    }
+    when(embedding.embedDocumentBatch(anyList())).thenReturn(new AbstractList<float[]>() {
+      @Override public int size() { return 3; }
+      @Override public float[] get(int position) {
+        if (position >= failedPosition) throw new IllegalArgumentException("failed materializing result");
+        return new float[] {1, 0};
+      }
+    });
+    var lane = context();
+    var outcome = CombinedEnrichmentBackfillOps.processDenseUnit(
+        LaneBackfillTestSupport.denseContext(lane), new EnrichmentSelection(),
+        chunks ? EnrichmentAccounting.Stage.CHUNK_EMBED : EnrichmentAccounting.Stage.EMBED);
+    assertEquals(failedPosition, outcome.docsProcessed());
+    for (int i = 0; i < 3; i++) {
+      var row = index.get(List.of("a", "b", "c").get(i));
+      assertEquals(i < failedPosition ? "COMPLETED" : "PENDING", row.get(status));
+      if (i < failedPosition) {
+        assertEquals("0", row.get(retry));
+        assertArrayEquals(new float[] {1, 0}, (float[]) row.get(vector));
+      } else {
+        assertFalse(row.containsKey(retry));
+        assertFalse(row.containsKey(vector));
+        String id = List.of("a", "b", "c").get(i);
+        assertEquals(WindowedEmbedProgress.Route.FALLBACK, lane.windowedEmbedProgress().route(id, id));
+      }
+    }
+    verify(embedding, never()).embedDocument(anyString(), any());
+    verify(embedding, times(1)).embedDocumentBatch(anyList());
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {0, 1, 2})
+  void nerMaterializationFailureKeepsEarlierDocumentsAndDoesNotChargeTheTail(int failedPosition) throws Exception {
+    when(ner.isAvailable()).thenReturn(true);
+    for (String id : List.of("a", "b", "c", "later")) seed(id, SchemaFields.NER_STATUS);
+    String failedId = List.of("a", "b", "c").get(failedPosition);
+    when(ner.extractEntitiesBatch(anyList())).thenAnswer(call -> {
+      List<String> texts = call.getArgument(0);
+      assertEquals(1, texts.size());
+      return new AbstractList<NerResult>() {
+        @Override public int size() { return 1; }
+        @Override public NerResult get(int position) {
+          if (texts.getFirst().equals(failedId)) throw new IllegalArgumentException("failed materializing result");
+          return new NerResult(List.of("Ada"), List.of(), List.of());
+        }
+      };
+    });
+    var nerContext = new NerBackfillOps.BackfillContext(fields, coordinator, IndexingPacing.unthrottled(),
+        () -> ner, () -> true, 3, log, () -> true);
+    LaneBackfillTestSupport.runNer(nerContext);
+    for (String id : List.of("a", "b", "c")) {
+      var row = index.get(id);
+      assertEquals(id.equals(failedId) ? "PENDING" : "COMPLETED", row.get(SchemaFields.NER_STATUS));
+      assertEquals(id.equals(failedId) ? "1" : "0", row.get(SchemaFields.NER_RETRY_COUNT));
+      if (!id.equals(failedId)) assertEquals(List.of("Ada"), row.get(SchemaFields.ENTITY_PERSONS_RAW));
+    }
+    assertEquals("PENDING", index.get("later").get(SchemaFields.NER_STATUS));
+    assertFalse(index.get("later").containsKey(SchemaFields.NER_RETRY_COUNT));
+    verify(ner, never()).extractEntitiesBatch(List.of("later"));
   }
 
   @Test

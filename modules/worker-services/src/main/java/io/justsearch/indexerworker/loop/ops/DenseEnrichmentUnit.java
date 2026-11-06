@@ -545,7 +545,7 @@ final class DenseEnrichmentUnit {
                         ? EnrichmentAccounting.Stage.CHUNK_EMBED
                         : EnrichmentAccounting.Stage.EMBED);
               List<String> sliceTexts = embedContents.subList(sliceStart, sliceEnd);
-              vectors =
+              List<float[]> batchVectors =
                   batch
                       .inferenceCancellation(
                           () ->
@@ -554,6 +554,11 @@ final class DenseEnrichmentUnit {
                           () -> !ready(context, accounting, provider))
                       .call(() -> provider.embedDocumentBatch(sliceTexts));
               accounting.acquired(provider);
+              if (batchVectors != null && batchVectors.size() == sliceDocIds.size()) {
+                vectors = new ArrayList<>(sliceDocIds.size());
+                // Retain each read result even if a later row fails to materialize.
+                for (int i = 0; i < sliceDocIds.size(); i++) vectors.add(batchVectors.get(i));
+              }
             } catch (Exception failure) {
               if (batch.retired(
                   () -> !ready(context, accounting, provider),
@@ -575,15 +580,14 @@ final class DenseEnrichmentUnit {
                 priorityTurnEndedNormally = false;
                 break;
               }
-              vectors = null;
             } finally {
               pacer.afterUnit(sliceDocIds.size());
               if (embedTurn == 0) unitsDone++;
             }
             if (embedTurn == 1) unitsDone++;
           }
-          if (vectors != null && vectors.size() == sliceDocIds.size()) {
-            for (int i = 0; i < sliceDocIds.size(); i++) {
+          if (vectors != null) {
+            for (int i = 0; i < vectors.size(); i++) {
               float[] vector = vectors.get(i);
               if (vector != null && vector.length > 0) {
                 String id = sliceDocIds.get(i);
@@ -600,11 +604,13 @@ final class DenseEnrichmentUnit {
             break;
           }
           boolean fallback = vectors == null || vectors.size() != sliceDocIds.size();
+          int materialized = vectors == null ? 0 : vectors.size();
           if (fallback) {
-            vectors = new ArrayList<>(java.util.Collections.nCopies(sliceDocIds.size(), null));
-            // One-unit callers resume fallback next turn instead of repeatedly paying for a bad
-            // batch.
-            for (int i = sliceStart; i < sliceEnd; i++)
+            if (vectors == null) vectors = new ArrayList<>(sliceDocIds.size());
+            for (int i = materialized; i < sliceDocIds.size(); i++) vectors.add(null);
+            // One-unit callers resume only the unread suffix next turn instead of repeatedly
+            // paying for a bad batch or re-encoding its successful prefix.
+            for (int i = sliceStart + materialized; i < sliceEnd; i++)
               context
                   .windowedEmbedProgress()
                   .route(
@@ -618,7 +624,7 @@ final class DenseEnrichmentUnit {
               priorityTurnEndedNormally = false;
               break;
             }
-            if (fallback) {
+            if (fallback && i >= materialized) {
               // A fallback attempt is a new unit and must respect the same stops.
               pacer.beforeUnit(1);
               if (stopRequested(context, epochAtSelection, authority)
