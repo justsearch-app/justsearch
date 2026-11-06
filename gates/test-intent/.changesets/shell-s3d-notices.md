@@ -1325,3 +1325,14 @@ adapters apply.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1aeea-7908-73c2-bad0-394b9f52416e",
+  "verdict": "accept",
+  "digest": "sha256:bf69474e4573c7c7fa238b077fef7d57c855a305d10a2bac04acc2d68240c484",
+  "note": "Round 4: replaced expectations recorded as Obsolete with sources and conflict searches; replacements New with passing evidence; repaired checks fail before by assertion. Earlier rounds accepted or rejected this changeset as product repairs proceeded (01a1adf4-a4eb-72a1-9814-5a066c10294d accept, 01a1ae3c-a32b-7d42-9fd9-a7afa4e79ce8 reject, 01a1ae99-bda4-74a3-98f2-1387202e1373 reject). Transcribed by the orchestrator from the verifier's answer (Codex sandbox)."
+}
+```
