@@ -116,3 +116,13 @@ These are Lucene boundary checks, not a running Engine acceptance claim.
 | S11 | P.broadMetadataAndDateCostOnTenThousandParents: eight timed runs, 9,999/10,000 broad metadata/date matches. Warm medians (last six of eight runs): metadata 32.156 ms, modified-date 30.245 ms. Not a latency gate. One parent resolver per leg is retained, uncached; Engine Ask measurements remain. |
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "agent-verifier-i1fywiey",
+  "verdict": "accept",
+  "digest": "sha256:3c1b342b03a8ae1932c0705e8b0ab50d9363717803fe42d7c52171d1f44f5428"
+}
+```
