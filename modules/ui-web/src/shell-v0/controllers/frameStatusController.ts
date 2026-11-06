@@ -23,11 +23,15 @@ import { withdrawAuthorization, withdrawnAuthorizations } from '../operations/au
 import type { PluginErrorEventDetail } from '../state/pluginLoadEvents.js';
 import { presentationForSeverity } from '../state/messageClasses.js';
 import { isWindowFocused } from '../../utils/windowFocus.js';
+import { onWindowFocusChange } from '../../utils/windowFocusChange.js';
 import { presentVerdict, type VerdictPresentation } from '../state/verdict.js';
 import { presentAiEngineVerdict, type AiEngineVerdictPresentation } from '../state/aiVerdict.js';
 import { isIndexingObservation } from '../state/readinessNotice.js';
 import { resolvePathLazy } from '../hooks/resolvePathLazy.js';
 import { needsTypedConfirm } from '../components/acceptPendingEffect.js';
+import { agentRequestNotice, endEventId, needsYouCount, routeDesktopNotice, workFailedNotice, workFinishedNotice, type DesktopNotice } from '../state/noticePolicy.js';
+import { getNotifications } from '../state/notificationsState.js';
+import { setTaskbarBadge } from '../../utils/taskbarBadge.js';
 
 /** Which observation a needs-you row comes from (C6: only an observed source can announce an arrival). */
 function needsSource(id: string): string {
@@ -68,7 +72,8 @@ export class FrameStatusController implements ReactiveController {
   private contactLostAt: number | null = null;
   private finished: { title: string; at: number } | null = null;
   private activeWork: FrameStatus | null = null;
-  private installing = false;
+  private activeWorkSince: number | null = null;
+  private installingSince: number | null = null;
   private sawTransitioning = false;
   private needsKey: Set<string> | null = null;
   private transientUntil = 0;
@@ -80,7 +85,7 @@ export class FrameStatusController implements ReactiveController {
   private store: AdvisoryStore | null = null;
   private stopActivity: (() => void) | undefined;
   private activity: readonly UnifiedActionEntry[] = [];
-  private operations = new Map<string, DurableStatusOperation>();
+  private operations = new Map<string, DurableStatusOperation & { activeSince?: number; seenAtGap?: number }>();
   private roots: readonly IndexedRootView[] = [];
   private rootsLive = false;
   private readonly rootPaths = new Map<string, string>();
@@ -95,6 +100,22 @@ export class FrameStatusController implements ReactiveController {
   private readonly announced = new Set<string>();
   /** Sources observed in the previous refresh; only these can announce a needs-you arrival. */
   private observedSources = new Set<string>();
+  /** The count last given to the taskbar; null until this controller has observed one. */
+  private badge: number | null = null;
+  /**
+   * C6 — grows with every moment the engine was not observed. Work records the value when last
+   * seen active: an older value at its end means it ended across a gap, so no desktop notice.
+   */
+  private gaps = 0;
+  private workSeenAtGap = 0;
+  private installSeenAtGap = 0;
+  /** The AI engine state an unobserved install end left: stays unsaid until the state moves on (C6). */
+  private unsaidEngineKind: string | null = null;
+  /** The engine's time of the last settling seen here, and how many settlings have shared it. */
+  private settled: { readonly since: string; readonly repeat: number } | null = null;
+  /** Grows with every focus change, so a focus read that began before one is known to be old. */
+  private focusChanges = 0;
+  private stopFocusWatch: (() => void) | undefined;
 
   constructor(private readonly host: StatusHost) {
     this.model = deriveFrameStatus({ ai: null, now: Date.now(), contactLostAt: null });
@@ -117,6 +138,7 @@ export class FrameStatusController implements ReactiveController {
       subscribeConsent(() => this.refresh()), subscribeAppUpdate(() => this.refresh()),
       onStatusBarChange(() => this.host.requestUpdate())];
     this.timer = setInterval(() => this.refresh(), 1_000);
+    this.stopFocusWatch = onWindowFocusChange(() => { this.focusChanges++; });
     document.addEventListener('jf-plugin-load-error', this.pluginError);
     document.addEventListener('jf-plugin-loaded', this.pluginLoaded);
     queueMicrotask(() => { if (this.connected) this.refresh(); });
@@ -124,12 +146,14 @@ export class FrameStatusController implements ReactiveController {
   hostDisconnected(): void {
     this.connected = false;
     this.lifecycle++;
+    this.gaps++;
+    this.stopFocusWatch?.(); this.stopFocusWatch = undefined;
     this.remoteAbort?.abort(); this.remoteAbort = null;
     this.stopActivity?.(); this.stopActivity = undefined;
     for (const stop of this.unsubs) stop();
     this.unsubs = [];
     this.stopStore?.(); this.stopStore = undefined;
-    this.activeWork = null; this.installing = false; this.sawTransitioning = false; this.needsKey = null;
+    this.activeWork = null; this.activeWorkSince = null; this.installingSince = null; this.sawTransitioning = false; this.needsKey = null;
     this.observedSources = new Set();
     clearInterval(this.timer);
     document.removeEventListener('jf-plugin-load-error', this.pluginError);
@@ -148,6 +172,7 @@ export class FrameStatusController implements ReactiveController {
           if (this.paused) this.transientQueue.push(record.key);
           else this.showTransient(record.key);
           const presentation = presentationForSeverity(record.event.severity);
+          if (record.toast?.silent) continue;
           if (presentation.live === 'alert') { this.assertive = record.toast?.message ?? ''; this.assertiveKey = record.key; }
           else { this.polite = record.toast?.message ?? ''; this.politeKey = record.key; }
         }
@@ -156,6 +181,31 @@ export class FrameStatusController implements ReactiveController {
       initial = false;
       this.refresh();
     });
+  }
+  /**
+   * DE5 — a live event leaves the app only when the policy says so. The decision uses the focus at
+   * send time: a read that a focus change overtook is read again, and a detach cancels it (C10).
+   */
+  private async notifyDesktop(notice: DesktopNotice): Promise<void> {
+    const lifecycle = this.lifecycle;
+    let focused: boolean; let changes: number;
+    do {
+      changes = this.focusChanges;
+      focused = await isWindowFocused();
+      if (lifecycle !== this.lifecycle) return;
+    } while (changes !== this.focusChanges);
+    const route = routeDesktopNotice(notice, { notifications: getNotifications(), focused });
+    if (route) void sendDesktopNotification({ id: notice.id, title: notice.title, ...(notice.body ? { body: notice.body } : {}), ...route });
+  }
+  /**
+   * Search settling has no id of its own. The time the engine's indexing state last changed is the
+   * same in every window; a settling that changed nothing there, such as a restart, repeats that time,
+   * so each window also counts the settlings it has seen at it.
+   */
+  private settledEventId(now: number): string {
+    const since = this.ai?.status?.operating?.indexing?.since ?? String(now);
+    this.settled = { since, repeat: this.settled?.since === since ? this.settled.repeat + 1 : 0 };
+    return endEventId('Search is up to date', `${since}#${this.settled.repeat}`);
   }
   private showTransient(key: string): void {
     this.transientKey = key;
@@ -223,17 +273,23 @@ export class FrameStatusController implements ReactiveController {
         if (!response.ok) throw new Error('Operation observation unavailable');
         const outcome = operationOutcomeViewSchema.parse(await response.json());
         if (!current() || this.operations.get(key) !== operation) continue;
-        this.operations.set(key, { ...operation, outcome, fresh: true });
+        const activeSince = ['accepted', 'running'].includes(outcome.state) && outcome.phase !== 'awaiting_acceptance'
+          ? operation.activeSince ?? Date.now() : undefined;
+        this.operations.set(key, { ...operation, outcome, fresh: true, activeSince, seenAtGap: this.gaps });
         // ST6 — the invocation task finishes with the durable operation, never on invocation return.
         if (operation.invocationTaskId && outcome.phase !== 'awaiting_acceptance' && ['complete', 'failed'].includes(outcome.state)) {
           completeTask(operation.invocationTaskId, outcome.state === 'complete' ? 'succeeded' : 'failed');
         }
         // Initial snapshots and late-discovered terminal receipts never announce a completion.
-        if (operation.outcome && ['accepted', 'running'].includes(operation.outcome.state)
-          && operation.outcome.phase !== 'awaiting_acceptance' && outcome.state === 'complete' && outcome.phase !== 'awaiting_acceptance') {
+        const wasRunning = operation.outcome && ['accepted', 'running'].includes(operation.outcome.state)
+          && operation.outcome.phase !== 'awaiting_acceptance' && outcome.phase !== 'awaiting_acceptance';
+        const endSeenLive = operation.fresh === true && operation.seenAtGap === this.gaps;
+        if (wasRunning && outcome.state === 'complete') {
           this.finished = { title: `${operation.label} finished`, at: Date.now() };
-          emitEphemeralToast({ message: this.finished.title, classId: 'core.verdict.settled' });
-        }
+          emitEphemeralToast({ message: this.finished.title, classId: 'core.verdict.settled', silent: !endSeenLive });
+          void this.notifyDesktop(workFinishedNotice(this.finished.title, endSeenLive, `operation:${key}`,
+            operation.activeSince === undefined ? undefined : Date.now() - operation.activeSince));
+        } else if (wasRunning && outcome.state === 'failed') void this.notifyDesktop(workFailedNotice(`${operation.label} failed`, endSeenLive, `operation:${key}`));
       } catch {
         if (current() && this.operations.get(key) === operation) this.operations.set(key, { ...operation, fresh: false });
       }
@@ -276,6 +332,10 @@ export class FrameStatusController implements ReactiveController {
     const now = Date.now();
     if (this.ai?.connection.reachable) this.contactLostAt = null;
     else this.contactLostAt ??= now;
+    // A gap is lost contact. A lagging poll with contact held is not one: timers are throttled in the
+    // minimised window a notification is for, so counting it would silence real completions.
+    const observing = !!this.ai?.connection.reachable && this.ai.snapshotLive;
+    if (!observing) this.gaps++;
     const migration = this.ai?.status?.worker?.migration;
     const generation = migration?.buildingGenerationId ?? '';
     if (['MIGRATING', 'SWITCHING', 'AWAITING_ACCEPTANCE'].includes(migration?.migrationState ?? '')
@@ -307,35 +367,54 @@ export class FrameStatusController implements ReactiveController {
     let next = derive();
     const finishedBefore = this.finished;
     const p = next.progress;
-    if (p.activity.confirmed && ['indexing', 'enriching'].includes(p.phase)) this.activeWork = next;
+    if (p.activity.confirmed && ['indexing', 'enriching'].includes(p.phase)) {
+      this.activeWork = next;
+      this.activeWorkSince ??= now;
+      if (observing) this.workSeenAtGap = this.gaps;
+    }
     // 595 §15.3 N1 — a witnessed transition (rebuild, schema switch, indexing) completes once on
     // reaching operational, even through an intermediate checking/degraded stop. First load and
-    // reconnects never saw a transition and stay silent; one completion is announced once.
+    // reconnects never saw a transition and stay silent; one completion is announced once. A
+    // transition that ended unobserved still shows in the pill and Earlier, but leaves no notice (C6).
     const verdictKind = this.ai?.phase === 'connected' ? this.ai.verdict.kind : null;
-    if (verdictKind === 'transitioning') this.sawTransitioning = true;
+    if (verdictKind === 'transitioning') { this.sawTransitioning = true; this.activeWorkSince ??= now; if (observing) this.workSeenAtGap = this.gaps; }
     const settled = verdictKind === 'operational' && this.sawTransitioning;
     if (verdictKind === 'operational') this.sawTransitioning = false;
     if (completedLongWork(this.activeWork, next) || settled) {
-      this.activeWork = null;
+      const activeDurationMs = this.activeWorkSince === null ? undefined : now - this.activeWorkSince;
+      const workEndSeenLive = this.workSeenAtGap === this.gaps;
+      this.activeWork = null; this.activeWorkSince = null;
       if (!this.finished || this.finished.title !== 'Search is up to date' || now - this.finished.at >= FINISHED_DWELL_MS) {
         this.finished = { title: 'Search is up to date', at: now };
-        emitEphemeralToast({ message: this.finished.title, classId: 'core.verdict.settled' });
+        emitEphemeralToast({ message: this.finished.title, classId: 'core.verdict.settled', silent: !workEndSeenLive });
+        void this.notifyDesktop(workFinishedNotice(this.finished.title, workEndSeenLive, this.settledEventId(now), activeDurationMs));
       }
     }
-    if (this.ai?.snapshotLive && this.ai.aiEngine.kind === 'installing') this.installing = true;
-    if (this.installing && this.ai?.snapshotLive && ['online', 'install_failed'].includes(this.ai.aiEngine.kind)) {
-      this.installing = false;
+    if (this.ai?.snapshotLive && this.ai.aiEngine.kind === 'installing') { this.installingSince ??= now; if (observing) this.installSeenAtGap = this.gaps; }
+    if (this.installingSince !== null && this.ai?.snapshotLive && ['online', 'install_failed'].includes(this.ai.aiEngine.kind)) {
+      const activeDurationMs = now - this.installingSince;
+      const installEndSeenLive = this.installSeenAtGap === this.gaps;
+      // One install, one start: the engine's time for it, the same in every window.
+      const installStart = this.ai.installStatus?.startedAtEpochMs || now;
+      this.installingSince = null;
+      if (!installEndSeenLive) this.unsaidEngineKind = this.ai.aiEngine.kind;
       if (this.ai.aiEngine.kind === 'online') {
         this.finished = { title: 'AI install complete', at: now };
-        emitEphemeralToast({ message: 'AI install complete', classId: 'core.ai-engine.settled' });
-      } else emitEphemeralToast({ message: 'AI install failed', classId: 'core.ai-engine.failed' });
+        emitEphemeralToast({ message: 'AI install complete', classId: 'core.ai-engine.settled', silent: !installEndSeenLive });
+        void this.notifyDesktop(workFinishedNotice('AI install complete', installEndSeenLive, endEventId('AI install complete', installStart), activeDurationMs));
+      } else {
+        emitEphemeralToast({ message: 'AI install failed', classId: 'core.ai-engine.failed', silent: !installEndSeenLive });
+        void this.notifyDesktop(workFailedNotice('AI install failed', installEndSeenLive, endEventId('AI install failed', installStart)));
+      }
     }
     // 595 §15.1 — one verdict announcer and its AI-engine sibling, moved from the retired status
     // bar into this always-mounted owner. Indexing transitions speak through the indexing announcer.
     const verdict = this.ai ? presentVerdict(this.ai.verdict).announce : null;
     this.indexingTransition = this.ai?.verdict.kind === 'transitioning' && this.ai.verdict.reasons.some(isIndexingObservation);
     this.verdictAnnouncement = verdict && !this.indexingTransition ? verdict : null;
-    this.aiEngineAnnouncement = this.ai && this.ai.aiEngine.kind !== 'indexing' ? presentAiEngineVerdict(this.ai.aiEngine).announce : null;
+    if (this.ai?.aiEngine.kind !== this.unsaidEngineKind) this.unsaidEngineKind = null;
+    this.aiEngineAnnouncement = this.ai && this.ai.aiEngine.kind !== 'indexing' && this.unsaidEngineKind === null
+      ? presentAiEngineVerdict(this.ai.aiEngine).announce : null;
     const activityAnnouncement = [this.indexingTransition && p.activity.confirmed
       ? verdict?.text ?? p.activity.summary : p.activity.summary, p.activity.detail].filter(Boolean).join(' — ');
     if (p.activity.confirmed) {
@@ -378,12 +457,11 @@ export class FrameStatusController implements ReactiveController {
     if (arrivals.length) {
       this.assertive = arrivals.length === 1 ? `Needs you: ${arrivals[0]!.title}.` : `${arrivals.length} agent requests need you.`;
       this.assertiveKey = arrivals.map(row => row.id).join('|');
-      const first = arrivals[0]!;
-      void isWindowFocused().then(focused => {
-        if (!focused && this.connected) void sendDesktopNotification(first.title, first.detail);
-      });
+      for (const row of arrivals) void this.notifyDesktop(agentRequestNotice(row, true));
     }
     this.needsKey = needsKey;
+    const count = needsYouCount(next);
+    if (count !== this.badge) { this.badge = count; void setTaskbarBadge(count); }
     // R1 — while a more urgent state holds the pill, a hover or focus pause cannot extend a notice
     // past its window; an engine wait notice ends at once while the engine is unreachable.
     const placement = (key: string | null): ReturnType<typeof transientPlacement> => transientPlacement(next.pill,

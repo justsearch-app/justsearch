@@ -66,9 +66,19 @@ libc = "0.2"
 [target.'cfg(target_os = "linux")'.dependencies]
 # Already used by Tauri; present bypasses Tao's stale hidden/minimized focus guard.
 gtk = "0.18"
+# Already used by Tao; hands a notification click's activation token to the Wayland display.
+gdkwayland-sys = "0.18"
+# Already used through the notification plugin, whose desktop path hides the click and its token.
+zbus = "5"
+
+[target.'cfg(target_os = "linux")'.dev-dependencies]
+# The token path's tests run a notification server on a private connection.
+zbus = { version = "5", features = ["p2p"] }
 
 [target.'cfg(windows)'.dependencies]
 dunce = "1"
+# Already used by the notification plugin, whose desktop path hides the click.
+tauri-winrt-notification = "0.7"
 windows-sys = { version = "0.61", features = [
     "Win32_Foundation",
     "Win32_NetworkManagement_IpHelper",

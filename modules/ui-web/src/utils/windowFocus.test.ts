@@ -5,7 +5,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 const mocks = vi.hoisted(() => ({
   isTauriRuntime: vi.fn(() => false),
   isFocused: vi.fn(async () => true),
-  getCurrentWindow: vi.fn(() => ({ isFocused: mocks.isFocused })),
+  isVisible: vi.fn(async () => true),
+  isMinimized: vi.fn(async () => false),
+  getCurrentWindow: vi.fn(() => ({ isFocused: mocks.isFocused, isVisible: mocks.isVisible, isMinimized: mocks.isMinimized })),
 }));
 
 vi.mock('./tauriRuntime', () => ({
@@ -20,6 +22,8 @@ describe('isWindowFocused', () => {
   beforeEach(() => {
     mocks.isTauriRuntime.mockReturnValue(false);
     mocks.isFocused.mockReset().mockResolvedValue(true);
+    mocks.isVisible.mockReset().mockResolvedValue(true);
+    mocks.isMinimized.mockReset().mockResolvedValue(false);
     vi.resetModules();
   });
 
@@ -36,6 +40,22 @@ describe('isWindowFocused', () => {
     expect(hasFocusSpy).toHaveBeenCalled();
     expect(mocks.getCurrentWindow).not.toHaveBeenCalled();
     hasFocusSpy.mockRestore();
+  });
+
+  it('DE5 inside Tauri, a window hidden to the tray is in the background even if it kept its focus flag', async () => {
+    mocks.isTauriRuntime.mockReturnValue(true);
+    mocks.isVisible.mockResolvedValue(false);
+    const { isWindowFocused } = await import('./windowFocus.js');
+
+    await expect(isWindowFocused()).resolves.toBe(false);
+  });
+
+  it('DE5 inside Tauri, a minimised window is in the background even if it kept its focus flag', async () => {
+    mocks.isTauriRuntime.mockReturnValue(true);
+    mocks.isMinimized.mockResolvedValue(true);
+    const { isWindowFocused } = await import('./windowFocus.js');
+
+    await expect(isWindowFocused()).resolves.toBe(false);
   });
 
   it('outside Tauri, reflects document.hasFocus() === false', async () => {

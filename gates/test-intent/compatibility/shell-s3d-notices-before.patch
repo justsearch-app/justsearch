@@ -1,0 +1,18 @@
+diff --git a/modules/ui-web/src/shell-v0/state/notificationsState.ts b/modules/ui-web/src/shell-v0/state/notificationsState.ts
+new file mode 100644
+index 0000000..e61ed52
+--- /dev/null
++++ b/modules/ui-web/src/shell-v0/state/notificationsState.ts
+@@ -0,0 +1,3 @@
++// SPDX-License-Identifier: Apache-2.0
++// Compatibility only: lets the DE5 checks load on the before-state. No behaviour.
++export function setNotifications(_choice: string): void {}
+diff --git a/modules/ui-web/src/utils/taskbarBadge.ts b/modules/ui-web/src/utils/taskbarBadge.ts
+new file mode 100644
+index 0000000..18cc183
+--- /dev/null
++++ b/modules/ui-web/src/utils/taskbarBadge.ts
+@@ -0,0 +1,3 @@
++// SPDX-License-Identifier: Apache-2.0
++// Compatibility only: lets the DE5 checks load on the before-state. No behaviour.
++export async function setTaskbarBadge(_count: number): Promise<void> {}

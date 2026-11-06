@@ -1,0 +1,268 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-06T02:00:09.066Z",
+  "revision": "67cd75a1533d174c9facd7770991bacbe3996244",
+  "tree": "4e673d91d19faef39333a600dfe6aa2d4dce4789",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"notices::tests::two_failures_of_the_same_kind_are_two_events\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3348
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"notices::tests::the_ledger_stays_small_by_forgetting_the_oldest_event\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2338
+    },
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.noticeClick.test.ts\" \"src/shell-v0/components/StatusPill.notices.test.ts\" \"src/shell-v0/state/UserStateDocument.multiWindow.test.ts\" \"src/shell-v0/state/noticePolicy.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/l_9dy34b/tmp/test-intent-vitest-49271-1793930405859.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 3202
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.noticeClick.test.ts#DE5 a notification clicked with Settings open moving to another area still closes the panel",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.noticeClick.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b489fe27c7d405d83b5abf6d8ccb0e70a6e8cf176cc2d859e351bad2a90b8dc4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 a notification clicked with Settings open moving to another area still closes the panel",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification a row that is there says nothing about it having gone",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6eb4498d1678f1d2a49b05f8a61d70ed47d6315726f3bcbe9d819b42849254cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 clicking a notification a row that is there says nothing about it having gone",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification while a dialog is open C10 a detach forgets the click",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6eb4498d1678f1d2a49b05f8a61d70ed47d6315726f3bcbe9d819b42849254cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 clicking a notification while a dialog is open C10 a detach forgets the click",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification while a dialog is open with a review open, the review moves to the request clicked",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6eb4498d1678f1d2a49b05f8a61d70ed47d6315726f3bcbe9d819b42849254cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 clicking a notification while a dialog is open with a review open, the review moves to the request clicked",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification while a dialog is open a dialog the person started is not an agent request's: it stays, and the target waits for it",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6eb4498d1678f1d2a49b05f8a61d70ed47d6315726f3bcbe9d819b42849254cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 clicking a notification while a dialog is open a dialog the person started is not an agent request's: it stays, and the target waits for it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification while a dialog is open clicking the request whose dialog is open keeps that dialog",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6eb4498d1678f1d2a49b05f8a61d70ed47d6315726f3bcbe9d819b42849254cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 clicking a notification while a dialog is open clicking the request whose dialog is open keeps that dialog",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 live regions follow the same rule as notifications the engine state speaks again once it moves on from the unsaid end",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6eb4498d1678f1d2a49b05f8a61d70ed47d6315726f3bcbe9d819b42849254cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C6 live regions follow the same rule as notifications the engine state speaks again once it moves on from the unsaid end",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 live regions follow the same rule as notifications an end observed live is still announced",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6eb4498d1678f1d2a49b05f8a61d70ed47d6315726f3bcbe9d819b42849254cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C6 live regions follow the same rule as notifications an end observed live is still announced",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 overlapping saves an edit the other window's save made pointless stays one, and writes nothing over it",
+      "file": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5ea52be13a3c2ea8b7af904d1a38ac364c57532ff117b120117bb617b8be7449",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C11 overlapping saves an edit the other window's save made pointless stays one, and writes nothing over it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 overlapping saves a window that never stops saving cannot hold an edit forever: the edit lands",
+      "file": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5ea52be13a3c2ea8b7af904d1a38ac364c57532ff117b120117bb617b8be7449",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C11 overlapping saves a window that never stops saving cannot hold an edit forever: the edit lands",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts#DE5 the id of an end listed by its words each event has its own: the same words at another time are another id",
+      "file": "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:50e5aee44bfe8708ecd5d8510a173c812912314259787ee1dbbb5be8ced6c799",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 the id of an end listed by its words each event has its own: the same words at another time are another id",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts#DE5 the id of an end listed by its words the same event has the same one, and it finds the row by its words",
+      "file": "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:50e5aee44bfe8708ecd5d8510a173c812912314259787ee1dbbb5be8ced6c799",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 the id of an end listed by its words the same event has the same one, and it finds the row by its words",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts#DE5 the id of an end listed by its words an id without a time is its own words",
+      "file": "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:50e5aee44bfe8708ecd5d8510a173c812912314259787ee1dbbb5be8ced6c799",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 the id of an end listed by its words an id without a time is its own words",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/notices.rs#notices::tests::two_failures_of_the_same_kind_are_two_events",
+      "file": "modules/shell/src-tauri/src/notices.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:69b4bee2981b3a34c48aa662cf77450682d471dc23c1b6fcba937c2df7a5b736",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "notices::tests::two_failures_of_the_same_kind_are_two_events",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/notices.rs#notices::tests::the_ledger_stays_small_by_forgetting_the_oldest_event",
+      "file": "modules/shell/src-tauri/src/notices.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:69b4bee2981b3a34c48aa662cf77450682d471dc23c1b6fcba937c2df7a5b736",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "notices::tests::the_ledger_stays_small_by_forgetting_the_oldest_event",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:2aaf8679a4b680fac0c99961ad0147a801ba660973b15de2f94ce8805e2694dc"
+}

@@ -9,7 +9,7 @@ import { cancelTask } from '../substrates/tasks/index.js';
 import { listPending, rejectPending } from '../substrates/pending-effects/index.js';
 import { needsTypedConfirm, acceptPendingNow, acceptPendingWithConsent } from './acceptPendingEffect.js';
 import { requestAuthorization } from '../operations/authorizationBroker.js';
-import { modalOwnsFocus } from '../primitives/modality.js';
+import { modalOwnsFocus, onModalsClosed } from '../primitives/modality.js';
 import { deepActiveElement, isTypingTarget, shouldIgnoreKeyEvent } from '../utils/keyboardHandler.js';
 import { listStatusBarItems } from '../commands/StatusBarRegistry.js';
 import { openRetrospectiveAt } from '../state/retrospectiveDrawer.js';
@@ -21,7 +21,9 @@ import { emitEphemeralToast } from './advisory/ephemeralToast.js';
 import type { MultiplexedStream } from '../streaming/MultiplexedStream.js';
 import './StatusBadge.js';
 import './SystemNotice.js';
+import { installNoticeActivationBridge } from '../router/tauriBridge.js';
 import { transientPlacement, toastActionAvailable, folderName, STATUS_REVIEW_EVENT, type StatusAction } from '../state/frameStatus.js';
+import { noticeRowWords } from '../state/noticePolicy.js';
 import type { AdvisoryStore, AdvisoryRecord } from './advisory/AdvisoryStore.js';
 import type { AuthorizationHost } from './AuthorizationHost.js';
 import './StatusPanel.js';
@@ -136,6 +138,9 @@ export class StatusPill extends JfElement {
     connectedPill = this;
     document.addEventListener('keydown', this.keydown);
     document.addEventListener(STATUS_REVIEW_EVENT, this.reviewRequest);
+    this.stopNoticeActivation = installNoticeActivationBridge(this.noticeActivated);
+    // A task later, so a dialog that follows the closed one in the same turn is seen as still blocking.
+    this.stopModalWatch = onModalsClosed(() => { setTimeout(this.openClickedNotice); });
     this.status.setMultiplex(this.multiplex);
     window.addEventListener('blur', this.windowBlur);
     document.addEventListener('visibilitychange', this.visibility);
@@ -149,6 +154,9 @@ export class StatusPill extends JfElement {
     if (connectedPill === this) connectedPill = null;
     document.removeEventListener('keydown', this.keydown);
     document.removeEventListener(STATUS_REVIEW_EVENT, this.reviewRequest);
+    this.stopNoticeActivation?.(); this.stopNoticeActivation = undefined;
+    this.stopModalWatch?.(); this.stopModalWatch = undefined;
+    this.clickedNotice = null;
     window.removeEventListener('blur', this.windowBlur);
     document.removeEventListener('visibilitychange', this.visibility);
     this.narrowQuery?.removeEventListener('change', this.narrowChange);
@@ -224,7 +232,7 @@ export class StatusPill extends JfElement {
     if (!this.open) return;
     this.open = false;
     const panel = this.shadowRoot?.querySelector<StatusPanel>('jf-status-panel');
-    if (panel) { panel.reviewing = null; panel.gone = false; }
+    if (panel) { panel.reviewing = null; panel.gone = false; panel.noticeGone = false; }
     if (restoreFocus) this.shadowRoot?.querySelector<HTMLButtonElement>('.trigger')?.focus({ preventScroll: true });
   }
   /**
@@ -239,19 +247,50 @@ export class StatusPill extends JfElement {
     if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 's'
       && !isTypingTarget(deepActiveElement())) { event.preventDefault(); this.toggle(); }
   };
-  /** Open the panel on one Needs-you row's review (a waiting run's Review); a typed one opens its dialog. */
+  /** A waiting run's Review: nothing happens under a dialog, which the person can see is open. */
   private readonly reviewRequest = (event: Event): void => {
-    const id = (event as CustomEvent<string>).detail;
-    const row = this.status.model.sections.needs.find(fact => fact.id === id);
-    if (modalOwnsFocus()) return;
+    if (!modalOwnsFocus()) this.openRow((event as CustomEvent<string>).detail);
+  };
+  /**
+   * DE5 — the shell has brought the app forward on a clicked desktop notification. An agent request's
+   * open dialog gives way to the one clicked; another dialog stays, and the target waits for it to
+   * close. The latest click is the one that counts.
+   */
+  private readonly noticeActivated = (id: string): void => {
+    this.authorizationHost?.()?.yieldDialogTo(id);
+    this.clickedNotice = id;
+    this.openClickedNotice();
+  };
+  private readonly openClickedNotice = (): void => {
+    const id = this.clickedNotice;
+    if (id === null || modalOwnsFocus()) return;
+    this.clickedNotice = null;
+    // It may have waited a while: what is true now decides.
+    this.status.refresh();
+    this.openRow(id, true);
+  };
+  /**
+   * Open the panel on one row: a Needs-you row's review, a typed one's dialog, or any other row in its
+   * place. A clicked notification whose row has left the panel opens nothing and says so.
+   */
+  private openRow(id: string, fromNotice = false): void {
+    const rows = Object.values(this.status.model.sections).flat();
+    const row = rows.find(fact => fact.id === id) ?? rows.find(fact => fact.title === noticeRowWords(id));
     const typed = row?.review?.typed ? row.actions?.find(action => action.kind === 'authorization') : undefined;
     if (typed) { void this.act(typed); return; }
     this.open = true;
     void this.updateComplete.then(() => {
       const panel = this.shadowRoot?.querySelector<StatusPanel>('jf-status-panel');
-      if (row?.review && this.open) panel?.openReview(row);
+      if (!panel || !this.open) return;
+      panel.noticeGone = fromNotice && !row;
+      if (row?.review) panel.openReview(row);
+      else if (row) panel.revealRow(row.id);
     });
-  };
+  }
+  private stopNoticeActivation: (() => void) | undefined;
+  private stopModalWatch: (() => void) | undefined;
+  /** The target of the last clicked notification, until nothing blocks it. */
+  private clickedNotice: string | null = null;
   private readonly executing = new Set<string>();
   private async act(action: StatusAction): Promise<void> {
     if (action.kind === 'background-runs') { this.close(); openRetrospectiveAt('inbox'); return; }
