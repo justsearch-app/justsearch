@@ -2,7 +2,7 @@
 schema: test-intent.v1
 task: t-20261102-redesign
 author-role: builder
-author-session: 01a1b0d6-88cd-7253-a959-c700eed710f4
+author-session: 01a1b1c2-8540-7993-931e-3d0713b59388
 ---
 
 # Retry failed root-volume initialization in the original Engine
@@ -95,14 +95,22 @@ The Windows boundary harness is New/repaired; its generated Windows execution ev
           "delegationScope": "The reported Windows root-volume initialization write failure, recovery of its original accepted operation in the same Engine, and preservation of settled R1-R8 and RP1-RP4 refusal/authority cases only.",
           "choice": "Add a dedicated two-document scenario and JUnit lock holder, retaining existing fixture ownership, cleanup and 180/330/420-second bounds. Observe at least one actually admitted original path PENDING/ROOT_UNAVAILABLE before unlocking: RecordedIngestionCoordinator drives roots serially, so the later child need not exist yet. Require both expected documents at completion. Counterexamples reject missing fault, missing job refusal, restart, failed operation, nonzero failures and partial search.",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed",
+          "delegationLocation": "task t-20261102-redesign user turn 3, accepting the immediately preceding five-part Codex-only proposal",
+          "delegationScope": "Correct Windows test lookup and prove the existing root-volume initialization repair after the real lock; no production change or stronger cleanup/freshness guarantee.",
+          "choice": "Observe canonical queue keys using the existing absolute/normalized, Windows-only lowercase contract in SQL and Java proof membership. Model stored canonical keys in private SQLite fixtures and retain original paths, receipt, operation key and raw refusal rows.",
+          "label": "agent choice"
         }
       ],
       "assessment": {
         "purpose": "Windows-only installed/supervised Engine boundary check for boot pending-ledger IOException under a real FileChannel lock, followed by recovery of the same accepted operation without resubmission or restart. The referenced stock-generated before/after execution evidence is pending hosted Windows execution.",
         "callersAndStateOwners": "RootVolumeInitializationRetryE2ETest invokes EngineSupervisedRecoveryE2ETest.runScenario. JUnit owns the private lock and release acknowledgment; the installed Engine owns jobs.db, root-volume files and the operation history. RecordedIngestionCoordinator drives the two submitted file roots serially, so only the deferred first child may have reached jobs.db before release.",
-        "indirectBehaviours": "Require the actual boot write-failure log and absent ledger/pending publication while the lock is held; prove an admitted original path PENDING/ROOT_UNAVAILABLE before release; submit once; correlate the original operation via /api/operation-history/{operationKey} because OperationOutcomeView has no operationKey field; reject Engine identity changes; require complete/SUCCESS, unitsFailed=0, both expected paths searchable and healthy HTTP within the unchanged bound. Existing owner cleanup and port-closure proof remain in force.",
-        "evidence": "Current completion checks pass: compileIntegrationTestJava, pmdIntegrationTest and spotlessJavaSourcesCheck; dedicated Node orchestration selftests 8/8 and classifier tests 57/57. These selftests cover serial first-child-only admission and refusal counterexamples with private SQLite fixtures; they can reject bad orchestration but cannot prove a Windows lock or real Engine recovery. No local execution of this Windows-only Java check is claimed; Linux skip is not execution evidence.",
-        "unresolvedRisks": "Hosted Windows execution remains pending, including proof of the real boot IOException/OS lock, original-operation recovery and unchanged process identity. Windows fail-before on the unfixed product is also missing and pending. Independent verification and generated run-evidence/acceptance remain outstanding."
+        "indirectBehaviours": "Require the actual boot write-failure log and absent ledger/pending publication while the lock is held; prove an admitted original path PENDING/ROOT_UNAVAILABLE before release; submit once; correlate the original operation via /api/operation-history/{operationKey} because OperationOutcomeView has no operationKey field; reject Engine identity changes; require complete/SUCCESS, unitsFailed=0, both expected paths searchable and healthy HTTP within the unchanged bound. Existing owner cleanup and port-closure proof remain in force. Both refusal readers compare canonical queue keys while preserving original submitted identities; non-Windows path case remains significant.",
+        "evidence": "The previous failed stock Windows D4 artifact is retained unchanged and becomes stale for this repaired Java source. Current scoped compilation, PMD, formatting and observer fail-before/pass-after checks are recorded separately; Node fixtures and direct Java proof probes exercise readers only. They cannot establish a Windows lock or running-Engine recovery; Linux skip is not execution evidence.",
+        "unresolvedRisks": "Fresh stock Windows D4 evidence and independent final acceptance remain pending, including original45 post-release behavioral failure and current unretried pass. Existing early handle-close exception cleanup and unchanged stale-file freshness limitations are unchanged; portsClosed does not establish complete historical process accounting."
       },
       "repaired": true,
       "behaviour": "Windows-only installed/supervised Engine boundary check for boot pending-ledger IOException under a real FileChannel lock, followed by recovery of the same accepted operation without resubmission or restart. Require the actual boot write-failure log and absent ledger/pending publication while the lock is held; prove an admitted original path PENDING/ROOT_UNAVAILABLE before release; submit once; correlate the original operation via /api/operation-history/{operationKey} because OperationOutcomeView has no operationKey field; reject Engine identity changes; require complete/SUCCESS, unitsFailed=0, both expected paths searchable and healthy HTTP within the unchanged bound. Existing owner cleanup and port-closure proof remain in force.",
@@ -268,3 +276,6 @@ and Linux platform skips cannot satisfy that boundary evidence requirement.
   "note": "Formal source/oracle review: entries1,2,4,5 accept; entry3 new Windows oracle requires New/repaired and generated Windows assertion fail-before/pass-after. Retain rejection; Windows pending."
 }
 ```
+
+The observation repair leaves production admission, normalization, queue, ledger and runtime APIs unchanged.
+The historical failed Windows artifact and rejection above remain preserved; neither is a pass for the repaired source.

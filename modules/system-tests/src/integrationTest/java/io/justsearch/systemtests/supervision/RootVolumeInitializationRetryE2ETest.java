@@ -3,6 +3,7 @@ package io.justsearch.systemtests.supervision;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import io.justsearch.indexerworker.util.PathNormalizer;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
@@ -79,8 +80,8 @@ final class RootVolumeInitializationRetryE2ETest {
     assertEquals(exactTarget, proof.path("locked").asText(), output);
     assertEquals(exactTarget, Files.readString(work.resolve("root-volume-lock-held")), output);
     var expectedPaths = java.util.Set.of(
-        work.resolve("root-volume-corpus/seed-retry-0.txt").toString(),
-        work.resolve("root-volume-corpus/seed-retry-1.txt").toString());
+        PathNormalizer.normalizeKey(work.resolve("root-volume-corpus/seed-retry-0.txt")),
+        PathNormalizer.normalizeKey(work.resolve("root-volume-corpus/seed-retry-1.txt")));
     assertFalse(proof.path("refused").isEmpty(), output);
     for (var row : proof.path("refused")) {
       assertTrue(expectedPaths.contains(row.path("path").asText()), output);

@@ -37,6 +37,12 @@ export async function exerciseRootVolumeInitialization(c) {
     fs.writeFileSync(file, `rootvolumeretrymarker original accepted content ${i}\n`);
     return file;
   });
+  // Match PathNormalizer.normalizeKey: absolute/normalized, lowercase only on Windows.
+  const pathKey = file => {
+    const absolute = path.resolve(file);
+    return process.platform === 'win32' ? absolute.toLowerCase() : absolute;
+  };
+  const expected = new Set(paths.map(pathKey));
   const operationKey = createOperationKey();
   const receiptResponse = await post(apiPort, '/api/knowledge/ingest', { paths, idempotencyKey: operationKey });
   const receipt = requireOperationSuccess(receiptResponse, 'root-volume initialization retry ingest');
@@ -45,13 +51,13 @@ export async function exerciseRootVolumeInitialization(c) {
     const database = new DatabaseSync(path.join(data, 'jobs.db'), { readOnly: true });
     try {
       const rows = database.prepare('SELECT path, state, last_reason_code FROM jobs WHERE path IN (?, ?)')
-        .all(...paths).filter(row => row.state === 'PENDING'
+        .all(...expected).filter(row => row.state === 'PENDING'
           && row.last_reason_code === 'ROOT_UNAVAILABLE');
       // The coordinator drives roots serially; a deferred first child can precede the second job.
       return rows.length > 0 ? rows : null;
     } finally { database.close(); }
   });
-  console.log('ROOT_VOLUME_INITIALIZATION_REFUSED', JSON.stringify({ operationKey, locked, initialFailure, refused, first }));
+  console.log('ROOT_VOLUME_INITIALIZATION_REFUSED', JSON.stringify({ operationKey, paths, receipt, locked, initialFailure, refused, first }));
   fs.writeFileSync(path.join(work, 'root-volume-lock-release'), 'release after actual initialization and job refusal');
   await waitFor('JUnit releases the exact lock without restarting', 10000,
     () => fs.existsSync(path.join(work, 'root-volume-lock-released')));
@@ -79,13 +85,12 @@ export async function exerciseRootVolumeInitialization(c) {
         query: 'rootvolumeretrymarker', limit: paths.length, mode: 'text',
       });
       if (search.status !== 200) return null;
-      const expected = new Set(paths.map(file => path.resolve(file).toLowerCase()));
       const matched = new Set((JSON.parse(search.text).results ?? [])
-        .map(hit => String(hit.fields?.path ?? '').toLowerCase()).filter(file => expected.has(file)));
-      return matched.size === expected.size ? { outcome, matchedCount: matched.size } : null;
+        .map(hit => pathKey(String(hit.fields?.path ?? ''))).filter(file => expected.has(file)));
+      return matched.size === expected.size ? { outcome, matchedCount: matched.size, matchedPaths: [...matched] } : null;
     });
   requireThat(Date.now() <= deadline, 'same-Engine recovery must fit the existing 180-second bound');
   requireThat((await request(apiPort, '/api/health')).status === 200, 'recovered Engine must be healthy');
-  console.log('ROOT_VOLUME_INITIALIZATION_RETRY_PASS', JSON.stringify({ operationKey,
+  console.log('ROOT_VOLUME_INITIALIZATION_RETRY_PASS', JSON.stringify({ operationKey, paths, receipt,
     submitted: first, recovered: identity(), outcomeEndpoint, ...result, initialFailure, refused, locked }));
 }
