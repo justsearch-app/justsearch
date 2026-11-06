@@ -86,8 +86,13 @@ final class EnrichmentRevisionRaceTest extends LuceneExecutorTestBase {
             "a stale failure cannot spend C1's budget");
         commit(runtime);
         assertPersistedPending(target, status);
-        if (!fail && stage != Stage.CHUNK) assertEquals("COMPLETED",
-            runtime.documentFieldOps().getDocumentField("stable", status), "mixed batch keeps its winning item");
+        if (!fail && stage != Stage.CHUNK) {
+          // A separate lane unit serves the unaffected sibling after the stale unit returns.
+          run(stage, runtime, () -> {}, false, false);
+          commit(runtime);
+          assertEquals("COMPLETED", runtime.documentFieldOps().getDocumentField("stable", status),
+              "unaffected work remains runnable after the stale unit");
+        }
         if (stage == Stage.CHUNK) seedChunk(runtime, NEW);
         commit(runtime);
         run(stage, runtime, () -> {}, false, false);
@@ -114,7 +119,7 @@ final class EnrichmentRevisionRaceTest extends LuceneExecutorTestBase {
       var fields=mock(DocumentFieldOps.class,withSettings().spiedInstance(runtime.documentFieldOps())
           .defaultAnswer(call -> {
             Object value=call.callRealMethod();
-            if (Set.of("getEnrichmentInputs","getDocumentContentBatch","getDocumentContent").contains(call.getMethod().getName())
+            if (Set.of("getEnrichmentInputPage","getEnrichmentInputs","getDocumentContentBatch","getDocumentContent").contains(call.getMethod().getName())
                 && once.compareAndSet(false,true)) { seed(runtime,"parent",NEW);commit(runtime); }
             return value;
           }));
@@ -269,14 +274,14 @@ final class EnrichmentRevisionRaceTest extends LuceneExecutorTestBase {
 
   @ParameterizedTest(name="legacyProofRaceCannotPublishFailure({0},{1})")
   @org.junit.jupiter.params.provider.CsvSource({"CHUNK,geometry", "CHUNK,revision", "SPLADE,geometry", "SPLADE,revision",
-      "COMBINED,geometry", "COMBINED,revision", "BGE_M3,geometry", "BGE_M3,revision"})
+      "BGE_M3,geometry", "BGE_M3,revision"})
   void legacyProofRaceCannotPublishFailure(Stage stage, String race) throws Exception {
     try (var runtime = open()) {
       seedLegacy(runtime);
       var once = new java.util.concurrent.atomic.AtomicBoolean();
       var fields = mock(DocumentFieldOps.class, withSettings().spiedInstance(runtime.documentFieldOps()).defaultAnswer(call -> {
         Object captured = call.callRealMethod();
-        if (call.getMethod().getName().equals("getEnrichmentInputs") && once.compareAndSet(false, true)) {
+        if (Set.of("getEnrichmentInputs", "getEnrichmentInputPage").contains(call.getMethod().getName()) && once.compareAndSet(false, true)) {
           if (race.equals("geometry")) {
             assertTrue(runtime.indexingCoordinator().updateDocument("bad-0", Map.of(
                 SchemaFields.CHUNK_END_CHAR, 3656, SchemaFields.CHUNK_CONTENT, LEGACY.substring(1731, 3656))));
@@ -482,7 +487,7 @@ final class EnrichmentRevisionRaceTest extends LuceneExecutorTestBase {
     var embedding = mock(EmbeddingProvider.class);
     when(embedding.isAvailable()).thenReturn(true);
     when(embedding.embedDocumentBatch(anyList())).thenAnswer(call -> {
-      List<String> texts = call.getArgument(0); if (legacy) safeEncoderInputs(texts); entered.run();
+      List<String> texts = call.getArgument(0); if (legacy) safeEncoderInputs(texts); if (!fallback) entered.run();
       return fallback ? List.of() : texts.stream().map(text -> fail ? null : new float[]{1,0,0,0}).toList();
     });
     when(embedding.embedDocument(anyString(),any(InferenceRequest.class))).thenAnswer(call -> {
@@ -518,20 +523,51 @@ final class EnrichmentRevisionRaceTest extends LuceneExecutorTestBase {
     });
     var fields=inputFields; var coordinator=runtime.indexingCoordinator(); var commits=runtime.commitOps();
     var log=LoggerFactory.getLogger(getClass()); var pace=IndexingPacing.unthrottled();
-    var embedContext=new EmbeddingBackfillOps.BackfillContext(fields,coordinator,commits,
-        mock(WorkerSignalBus.class),pace,()->embedding,()->true,()->true,batchSize,log);
+    var embedContext=new LaneBackfillTestSupport.EmbeddingContext(fields,
+        coordinator,
+        pace,
+        ()->embedding,
+        ()->true,
+        ()->true,
+        batchSize,
+        log);
     return switch(stage) {
-      case EMBEDDING -> EmbeddingBackfillOps.processEmbeddingBackfill(embedContext).docsProcessed() > 0;
-      case CHUNK -> EmbeddingBackfillOps.processChunkEmbeddingBackfill(embedContext).docsProcessed() > 0;
-      case SPLADE -> SpladeBackfillOps.processSpladeBackfill(new SpladeBackfillOps.BackfillContext(
-          fields,coordinator,commits,pace,()->sparse,()->true,batchSize,true,legacy,log)).docsProcessed() > 0;
-      case NER -> NerBackfillOps.processNerBackfill(new NerBackfillOps.BackfillContext(
-          fields,coordinator,commits,pace,()->ner,()->true,batchSize,log)).docsProcessed() > 0;
+      case EMBEDDING -> LaneBackfillTestSupport.runDenseParent(embedContext).docsProcessed() > 0;
+      case CHUNK -> LaneBackfillTestSupport.runDenseChunk(embedContext).docsProcessed() > 0;
+      case SPLADE -> LaneBackfillTestSupport.runSparse(new SpladeBackfillOps.BackfillContext(fields,
+        coordinator,
+        pace,
+        ()->sparse,
+        ()->true,
+        batchSize,
+        legacy,
+        log, () -> true)).docsProcessed() > 0;
+      case NER -> LaneBackfillTestSupport.runNer(new NerBackfillOps.BackfillContext(fields,
+        coordinator,
+        pace,
+        ()->ner,
+        ()->true,
+        batchSize,
+        log, () -> true)).docsProcessed() > 0;
       case BGE_M3 -> BgeM3BackfillOps.processBgeM3Backfill(new BgeM3BackfillOps.BackfillContext(
           fields,coordinator,commits,mock(WorkerSignalBus.class),()->bge,()->true,batchSize,true,legacy,log)).docsProcessed() > 0;
-      case COMBINED, COMBINED_LATE -> CombinedEnrichmentBackfillOps.processCombinedBackfill(new CombinedEnrichmentBackfillOps.BackfillContext(
-          fields,coordinator,commits,pace,()->embedding,()->sparse,()->ner,()->true,()->true,batchSize,log,
-          legacy,legacy,stage==Stage.COMBINED_LATE,legacy ? 1 : 50,new ArrayDeque<>(),new ArrayDeque<>(),new int[]{0},()->false,()->false,()->false,new WindowedEmbedProgress())).progressed();
+      case COMBINED, COMBINED_LATE -> LaneBackfillTestSupport.runLanes(new LaneBackfillTestSupport.BackfillContext(fields,
+        coordinator,
+        pace,
+        ()->embedding,
+        ()->sparse,
+        ()->ner,
+        ()->true,
+        ()->true,
+        batchSize,
+        log,
+        legacy,
+        legacy,
+        stage==Stage.COMBINED_LATE,
+        legacy ? 1 : 50,
+        ()->false,
+        ()->false,
+        new WindowedEmbedProgress())).wroteAnything();
     };
   }
 }

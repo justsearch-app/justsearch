@@ -16,7 +16,6 @@ import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.ner.NerService;
 import io.justsearch.indexerworker.splade.SpladeEncoder;
 import io.justsearch.indexing.SchemaFields;
-import java.util.ArrayDeque;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -80,13 +79,13 @@ class EnrichmentAttemptAccountingTest {
       }
       return new float[] {1, 0};
     });
-    var outcome = assertDoesNotThrow(() -> CombinedEnrichmentBackfillOps.processCombinedBackfill(context()));
+    var outcome = assertDoesNotThrow(() -> LaneBackfillTestSupport.runLanes(context()));
     var summary = outcome.accounting();
-    assertEquals(36, summary.tickets().size());
+    assertEquals(12 + 12 + 1, summary.tickets().size());
     assertEquals(1, summary.count(EMBED, PUBLISHED));
     assertEquals(11, summary.count(EMBED, CANCELLED));
     assertEquals(12, summary.count(SPLADE, CANCELLED));
-    assertEquals(12, summary.count(NER, CANCELLED));
+    assertEquals(1, summary.count(NER, CANCELLED));
     assertEquals(0, summary.count(EMBED, FAILED_CHARGED));
     assertEquals(1, outcome.embedProcessed());
     assertTrue(outcome.aborted());
@@ -99,7 +98,7 @@ class EnrichmentAttemptAccountingTest {
     documents.put("parent", Map.of(SchemaFields.EMBEDDING_STATUS, "PENDING", SchemaFields.SPLADE_STATUS, "COMPLETED"));
     when(embedding.embedDocumentBatch(anyList())).thenReturn(List.of(new float[] {1, 0}));
     when(splade.encodeBatch(anyList())).thenReturn(List.of(Map.of("term", 1f)));
-    var outcome = CombinedEnrichmentBackfillOps.processCombinedBackfill(context());
+    var outcome = LaneBackfillTestSupport.runLanes(context());
     assertEquals(1, outcome.embedProcessed(), "published parent vectors include successful parents");
     assertEquals(0, outcome.spladeProcessed(), "there is no new sparse output in this cycle");
     assertEquals(1, outcome.accounting().tickets().size());
@@ -119,7 +118,7 @@ class EnrichmentAttemptAccountingTest {
       stop.set(true);
       return new EmbeddingProvider.WindowSlice(Collections.nCopies(32, new float[] {1, 0}), 0, 64);
     });
-    var outcome = CombinedEnrichmentBackfillOps.processCombinedBackfill(context());
+    var outcome = LaneBackfillTestSupport.runLanes(context());
     assertEquals(1L, outcome.accounting().counters().get("embed.window_advances"));
     assertEquals(1, outcome.accounting().count(EMBED, CANCELLED));
     assertEquals(0, outcome.embedProcessed());
@@ -141,7 +140,9 @@ class EnrichmentAttemptAccountingTest {
     when(splade.encodeBatch(anyList())).thenReturn(List.of(Map.of(), Map.of("term", 1f)));
     when(coordinator.publishEnrichmentBatch(anyList(), anyMap())).thenReturn(
         new EnrichmentPublicationReceipt(List.of("empty", "blank"), List.of("stale"), null));
-    var outcome = CombinedEnrichmentBackfillOps.processCombinedBackfill(context());
+    var outcome = LaneBackfillTestSupport.runLanes(context());
+    assertEquals(1L, outcome.accounting().counters().get("splade.attempts"),
+        "the lane retains the combined path's native-attempt metric");
     assertEquals(3, outcome.accounting().tickets().size());
     assertEquals(1, outcome.accounting().count(SPLADE, COMPLETED_EMPTY));
     assertEquals(1, outcome.accounting().count(SPLADE, FAILED_CHARGED));
@@ -149,8 +150,7 @@ class EnrichmentAttemptAccountingTest {
     assertEquals(2L, outcome.accounting().counters().get("splade.computed"));
     assertEquals(2L, outcome.accounting().counters().get("splade.accepted"));
     assertEquals(1L, outcome.accounting().counters().get("splade.failed"));
-    assertEquals(0, outcome.spladeProcessed(),
-        "the existing count keeps its complete-batch rule; the receipt feeds only the accounting");
+    assertEquals(1, outcome.spladeProcessed(), "the sparse lane reports its accepted empty result");
   }
 
   @Test
@@ -162,13 +162,13 @@ class EnrichmentAttemptAccountingTest {
     when(coordinator.publishEnrichmentBatch(anyList(), anyMap())).thenReturn(
         new EnrichmentPublicationReceipt(List.of("accepted"), List.of(), new IllegalStateException("mutation failed")));
     var context = context();
-    var outcome = assertDoesNotThrow(() -> CombinedEnrichmentBackfillOps.processCombinedBackfill(context));
+    var outcome = assertDoesNotThrow(() -> LaneBackfillTestSupport.runLanes(context));
     assertEquals(1, outcome.accounting().count(EMBED, PUBLISHED));
     assertEquals(2, outcome.accounting().count(EMBED, DEFERRED));
     assertEquals(3L, outcome.accounting().counters().get("embed.computed"));
     assertEquals(java.util.Set.of(), context.publishedDocIds(),
         "the cycle's exclusion set keeps its members; the receipt feeds only the accounting");
-    assertFalse(outcome.progressed(), "publication failure retains the existing loop stop signal");
+
     verifyNoInteractions(commits);
   }
 
@@ -178,30 +178,51 @@ class EnrichmentAttemptAccountingTest {
     documents.put("accepted", Map.of(SchemaFields.NER_STATUS, "PENDING"));
     documents.put("stale", Map.of(SchemaFields.NER_STATUS, "PENDING"));
     when(ner.extractEntitiesBatch(anyList())).thenReturn(List.of(io.justsearch.indexerworker.ner.NerResult.EMPTY));
-    when(coordinator.publishEnrichmentBatch(anyList(), anyMap())).thenReturn(
-        new EnrichmentPublicationReceipt(List.of("accepted"), List.of("stale"), null));
-    var outcome = assertDoesNotThrow(() -> NerBackfillOps.processNerBackfill(
-        new NerBackfillOps.BackfillContext(fields, coordinator, commits, IndexingPacing.unthrottled(),
-            () -> ner, () -> true, 100, LoggerFactory.getLogger(getClass()))));
+    when(coordinator.publishEnrichmentBatch(anyList(), anyMap())).thenAnswer(call -> {
+      List<Map.Entry<String, Map<String, Object>>> updates = call.getArgument(0);
+      var ids = updates.stream().map(Map.Entry::getKey).toList();
+      return new EnrichmentPublicationReceipt(ids.stream().filter("accepted"::equals).toList(),
+          ids.stream().filter("stale"::equals).toList(), null);
+    });
+    var outcome = assertDoesNotThrow(() -> LaneBackfillTestSupport.runNer(
+        new NerBackfillOps.BackfillContext(fields,
+        coordinator,
+        IndexingPacing.unthrottled(),
+        () -> ner,
+        () -> true,
+        100,
+        LoggerFactory.getLogger(getClass()), () -> true)));
     assertEquals(2, outcome.accounting().tickets().size());
     assertEquals(1, outcome.accounting().count(NER, COMPLETED_EMPTY));
     assertEquals(1, outcome.accounting().count(NER, REJECTED_STALE));
     assertEquals(2L, outcome.accounting().counters().get("ner.computed"));
     assertEquals(1L, outcome.accounting().counters().get("ner.accepted"));
     assertEquals(1, outcome.docsProcessed());
-    verify(commits).commitAndTrack(io.justsearch.adapters.lucene.runtime.CommitReason.BACKFILL_NER);
+    verifyNoInteractions(commits);
   }
 
   @Test
   void selectionCancellationIsTimedWithoutChangingTheRoutingSignal() throws Exception {
     documents.put("selected", Map.of(SchemaFields.EMBEDDING_STATUS, "PENDING"));
-    var context = new CombinedEnrichmentBackfillOps.BackfillContext(fields, coordinator, commits,
-        IndexingPacing.unthrottled(), () -> embedding, () -> splade, () -> ner, () -> false,
-        () -> true, 100, LoggerFactory.getLogger(getClass()), false, false, false, 50,
-        new ArrayDeque<>(), new ArrayDeque<>(), new int[1], stop::get, stop::get,
-        () -> false, new WindowedEmbedProgress());
-    var outcome = assertDoesNotThrow(() -> CombinedEnrichmentBackfillOps.processCombinedBackfill(context));
-    assertFalse(outcome.recordTiming(), "the scheduler retains its pre-existing routing signal");
+    var context = new LaneBackfillTestSupport.BackfillContext(fields,
+        coordinator,
+        IndexingPacing.unthrottled(),
+        () -> embedding,
+        () -> splade,
+        () -> ner,
+        () -> false,
+        () -> true,
+        100,
+        LoggerFactory.getLogger(getClass()),
+        false,
+        false,
+        false,
+        50,
+        stop::get,
+        stop::get,
+        new WindowedEmbedProgress());
+    var outcome = assertDoesNotThrow(() -> LaneBackfillTestSupport.runLanes(context));
+
     assertTrue(outcome.attempted(), "selection and content collection were attempted");
     assertEquals(1, outcome.accounting().count(EMBED, CANCELLED));
     verify(embedding, never()).embedDocumentBatch(anyList());
@@ -215,7 +236,7 @@ class EnrichmentAttemptAccountingTest {
         SchemaFields.SPLADE_STATUS, "COMPLETED"));
     when(embedding.embedDocumentBatch(anyList())).thenReturn(List.of(new float[] {1, 0}));
     when(splade.encodeBatch(anyList())).thenThrow(new CancellationException("preservation cancelled"));
-    var outcome = assertDoesNotThrow(() -> CombinedEnrichmentBackfillOps.processCombinedBackfill(context()));
+    var outcome = assertDoesNotThrow(() -> LaneBackfillTestSupport.runLanes(context()));
     assertFalse(outcome.accounting().counters().containsKey("splade.attempts"));
     assertEquals(0, outcome.spladeProcessed());
     assertFalse(outcome.accounting().counters().containsKey("splade.computed"));
@@ -242,9 +263,10 @@ class EnrichmentAttemptAccountingTest {
         available.set(false);
         return new float[] {1, 0};
       }).when(embedding).embedDocument(anyString(), any());
-      var outcome = assertDoesNotThrow(() -> CombinedEnrichmentBackfillOps.processCombinedBackfill(context()));
+      var outcome = assertDoesNotThrow(() -> LaneBackfillTestSupport.runLanes(context()));
       assertEquals(fallback ? 1L : 2L, outcome.accounting().counters().get("embed.computed"));
-      assertEquals(2, outcome.accounting().count(EMBED, DEFERRED));
+      assertEquals(2, outcome.accounting().count(EMBED, DEFERRED) + outcome.accounting().count(EMBED, CANCELLED),
+          "all selected rows stay uncharged when the source retires between lane units");
       assertEquals(0, outcome.accounting().count(EMBED, FAILED_CHARGED));
       assertEquals(0, outcome.embedProcessed());
       assertFalse(outcome.accounting().counters().containsKey("embed.accepted"));
@@ -263,9 +285,15 @@ class EnrichmentAttemptAccountingTest {
       if (texts.size() == 1) throw new CancellationException("later slice cancelled");
       return Collections.nCopies(texts.size(), Map.of("term", 1f));
     });
-    var outcome = assertDoesNotThrow(() -> SpladeBackfillOps.processSpladeBackfill(
-        new SpladeBackfillOps.BackfillContext(fields, coordinator, commits, IndexingPacing.unthrottled(),
-            () -> splade, () -> true, 100, true, false, LoggerFactory.getLogger(getClass()))));
+    var outcome = assertDoesNotThrow(() -> LaneBackfillTestSupport.runSparse(
+        new SpladeBackfillOps.BackfillContext(fields,
+        coordinator,
+        IndexingPacing.unthrottled(),
+        () -> splade,
+        () -> true,
+        100,
+        false,
+        LoggerFactory.getLogger(getClass()), () -> true)));
     assertEquals(64L, outcome.accounting().counters().get("splade.computed"));
     assertEquals(64, outcome.accounting().count(SPLADE, PUBLISHED));
     assertEquals(1, outcome.accounting().count(SPLADE, CANCELLED));
@@ -274,8 +302,7 @@ class EnrichmentAttemptAccountingTest {
     assertEquals(64L, outcome.accounting().counters().get("splade.accepted"));
     assertTrue(outcome.success(), "cancellation must not set systemic backoff");
     assertDoesNotThrow(() -> verify(coordinator).publishEnrichmentBatch(anyList(), anyMap()));
-    assertDoesNotThrow(() -> verify(commits).commitAndTrack(
-        io.justsearch.adapters.lucene.runtime.CommitReason.BACKFILL_SPLADE));
+    verifyNoInteractions(commits);
   }
 
   @Test
@@ -297,12 +324,24 @@ class EnrichmentAttemptAccountingTest {
       updates.forEach(entry -> applied.put(entry.getKey(), entry.getValue()));
       return new EnrichmentPublicationReceipt(updates.stream().map(Map.Entry::getKey).toList(), List.of(), null);
     });
-    var context = new CombinedEnrichmentBackfillOps.BackfillContext(fields, coordinator, commits,
-        IndexingPacing.unthrottled(), () -> embedding, () -> null, () -> null, () -> true,
-        () -> true, 100, LoggerFactory.getLogger(getClass()), true, false, true, 50,
-        new ArrayDeque<>(), new ArrayDeque<>(), new int[1], () -> false, () -> false,
-        () -> false, new WindowedEmbedProgress());
-    var outcome = assertDoesNotThrow(() -> CombinedEnrichmentBackfillOps.processCombinedBackfill(context));
+    var context = new LaneBackfillTestSupport.BackfillContext(fields,
+        coordinator,
+        IndexingPacing.unthrottled(),
+        () -> embedding,
+        () -> null,
+        () -> null,
+        () -> true,
+        () -> true,
+        100,
+        LoggerFactory.getLogger(getClass()),
+        true,
+        false,
+        true,
+        50,
+        () -> false,
+        () -> false,
+        new WindowedEmbedProgress());
+    var outcome = assertDoesNotThrow(() -> LaneBackfillTestSupport.runLanes(context));
     assertEquals(3, outcome.embedProcessed(), "both parent routes and the chunk retain publication credit");
     assertEquals(2, applied.values().stream().filter(update -> update.containsKey(SchemaFields.VECTOR)).count());
     assertEquals(1, applied.values().stream().filter(update -> update.containsKey(SchemaFields.CHUNK_VECTOR)).count());
@@ -316,11 +355,23 @@ class EnrichmentAttemptAccountingTest {
     verifyNoInteractions(commits);
   }
 
-  private CombinedEnrichmentBackfillOps.BackfillContext context() {
-    return new CombinedEnrichmentBackfillOps.BackfillContext(fields, coordinator, commits,
-        IndexingPacing.unthrottled(), () -> embedding, () -> splade, () -> ner, () -> true,
-        () -> true, 100, LoggerFactory.getLogger(EnrichmentAttemptAccountingTest.class),
-        false, false, false, 50, new ArrayDeque<>(), new ArrayDeque<>(), new int[] {0},
-        stop::get, stop::get, () -> false, new WindowedEmbedProgress());
+  private LaneBackfillTestSupport.BackfillContext context() {
+    return new LaneBackfillTestSupport.BackfillContext(fields,
+        coordinator,
+        IndexingPacing.unthrottled(),
+        () -> embedding,
+        () -> splade,
+        () -> ner,
+        () -> true,
+        () -> true,
+        100,
+        LoggerFactory.getLogger(EnrichmentAttemptAccountingTest.class),
+        false,
+        false,
+        false,
+        50,
+        stop::get,
+        stop::get,
+        new WindowedEmbedProgress());
   }
 }

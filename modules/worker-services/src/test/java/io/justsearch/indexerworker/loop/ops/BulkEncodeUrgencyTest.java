@@ -73,7 +73,7 @@ class BulkEncodeUrgencyTest {
   private final WorkerSignalBus signalBus = mock(WorkerSignalBus.class);
 
   @org.junit.jupiter.api.BeforeEach void snapshots() {
-    BackfillSnapshotTestSupport.install(documentFieldOps,indexingCoordinator,false,Set.of(SchemaFields.IS_CHUNK));
+    BackfillSnapshotTestSupport.installLaneFixtures(documentFieldOps,indexingCoordinator,false,Set.of(SchemaFields.IS_CHUNK));
   }
 
   private void assertOnlyBackground() {
@@ -96,22 +96,27 @@ class BulkEncodeUrgencyTest {
     return EmbeddingService.createWithBackend(new OnnxEmbeddingBackend(encoder, 0, 512), config);
   }
 
-  private EmbeddingBackfillOps.BackfillContext embeddingContext(EmbeddingService service) {
-    return new EmbeddingBackfillOps.BackfillContext(
-        documentFieldOps, indexingCoordinator, commitOps, signalBus,
-        IndexingPacing.unthrottled(), () -> service, () -> true, () -> true, 100, LOG);
+  private LaneBackfillTestSupport.EmbeddingContext embeddingContext(EmbeddingService service) {
+    return new LaneBackfillTestSupport.EmbeddingContext(documentFieldOps,
+        indexingCoordinator,
+        IndexingPacing.unthrottled(),
+        () -> service,
+        () -> true,
+        () -> true,
+        100,
+        LOG);
   }
 
   @Test
   void parentEmbeddingBackfillFallbackAcquiresBackground() throws Exception {
-    BackfillSnapshotTestSupport.install(documentFieldOps,indexingCoordinator,true,Set.of());
+    BackfillSnapshotTestSupport.installLaneFixtures(documentFieldOps,indexingCoordinator,true,Set.of());
     EmbeddingService service = recordingEmbeddingService();
     when(documentFieldOps.queryDocIdsByField(
             eq(SchemaFields.EMBEDDING_STATUS), eq(SchemaFields.EMBEDDING_STATUS_PENDING), anyInt()))
         .thenReturn(List.of("doc1"));
     when(documentFieldOps.getDocumentContent("doc1")).thenReturn("parent content");
 
-    EmbeddingBackfillOps.processEmbeddingBackfill(embeddingContext(service));
+    LaneBackfillTestSupport.runDenseParent(embeddingContext(service));
 
     assertOnlyBackground();
   }
@@ -126,7 +131,7 @@ class BulkEncodeUrgencyTest {
     when(documentFieldOps.getDocumentContentBatch(List.of("chunk1")))
         .thenReturn(Map.of("chunk1", "chunk content"));
 
-    EmbeddingBackfillOps.processChunkEmbeddingBackfill(embeddingContext(service));
+    LaneBackfillTestSupport.runDenseChunk(embeddingContext(service));
 
     assertOnlyBackground();
   }
@@ -168,12 +173,19 @@ class BulkEncodeUrgencyTest {
     when(documentFieldOps.queryDocIdsByField(
             eq(SchemaFields.SPLADE_STATUS), eq(SchemaFields.SPLADE_STATUS_PENDING), anyInt()))
         .thenReturn(List.of("doc1"));
+    when(documentFieldOps.queryNonChunkDocIdsByField(
+        eq(SchemaFields.SPLADE_STATUS), eq(SchemaFields.SPLADE_STATUS_PENDING), anyInt())).thenReturn(List.of("doc1"));
     when(documentFieldOps.getDocumentContentBatch(List.of("doc1")))
         .thenReturn(Map.of("doc1", "sparse content"));
 
-    SpladeBackfillOps.processSpladeBackfill(new SpladeBackfillOps.BackfillContext(
-        documentFieldOps, indexingCoordinator, commitOps, IndexingPacing.unthrottled(),
-        () -> encoder, () -> true, 100, false, true, LOG));
+    LaneBackfillTestSupport.runSparse(new SpladeBackfillOps.BackfillContext(documentFieldOps,
+        indexingCoordinator,
+        IndexingPacing.unthrottled(),
+        () -> encoder,
+        () -> true,
+        100,
+        true,
+        LOG, () -> true));
 
     assertOnlyBackground();
   }
@@ -204,7 +216,7 @@ class BulkEncodeUrgencyTest {
 
   @Test
   void nerBackfillAcquiresBackground() throws Exception {
-    BackfillSnapshotTestSupport.install(documentFieldOps,indexingCoordinator,true,Set.of());
+    BackfillSnapshotTestSupport.installLaneFixtures(documentFieldOps,indexingCoordinator,true,Set.of());
     Encoding encoding = mock(Encoding.class);
     when(encoding.getIds()).thenReturn(new long[] {101, 7, 102});
     when(encoding.getAttentionMask()).thenReturn(new long[] {1, 1, 1});
@@ -227,9 +239,13 @@ class BulkEncodeUrgencyTest {
         .thenReturn(List.of("doc1"));
     when(documentFieldOps.getDocumentContent("doc1")).thenReturn("Alice met Bob in Paris.");
 
-    NerBackfillOps.processNerBackfill(new NerBackfillOps.BackfillContext(
-        documentFieldOps, indexingCoordinator, commitOps, IndexingPacing.unthrottled(),
-        () -> nerService, () -> true, 100, LOG));
+    LaneBackfillTestSupport.runNer(new NerBackfillOps.BackfillContext(documentFieldOps,
+        indexingCoordinator,
+        IndexingPacing.unthrottled(),
+        () -> nerService,
+        () -> true,
+        100,
+        LOG, () -> true));
 
     assertOnlyBackground();
   }

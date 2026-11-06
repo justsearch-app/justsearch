@@ -112,13 +112,24 @@ final class EnrichmentAuthorityRaceTest extends LuceneExecutorTestBase {
       for (int turn = 0; turn < 2; turn++) {
         if (turn == 1) lifecycle.setEmbeddingProvider(provider);
         units.set(0);
-        CombinedEnrichmentBackfillOps.processCombinedBackfill(
-            new CombinedEnrichmentBackfillOps.BackfillContext(runtime.documentFieldOps(),
-                runtime.indexingCoordinator(), runtime.commitOps(), IndexingPacing.unthrottled(),
-                lifecycle::embeddingProvider, () -> null, () -> null, () -> true, () -> true,
-                10, LoggerFactory.getLogger(getClass()), false, false, true, 0,
-                new ArrayDeque<>(), new ArrayDeque<>(), new int[] {0}, () -> units.get() >= 2,
-                () -> false, () -> false, progress));
+        LaneBackfillTestSupport.runLanes(
+            new LaneBackfillTestSupport.BackfillContext(runtime.documentFieldOps(),
+        runtime.indexingCoordinator(),
+        IndexingPacing.unthrottled(),
+        lifecycle::embeddingProvider,
+        () -> null,
+        () -> null,
+        () -> true,
+        () -> true,
+        10,
+        LoggerFactory.getLogger(getClass()),
+        false,
+        false,
+        true,
+        0,
+        () -> units.get() >= 2,
+        () -> false,
+        progress));
       }
       assertEquals(List.of(0, 0), starts, "a new publication cannot inherit a prior partial");
       assertDoesNotThrow(() -> verify(provider, times(2)).embedWithSpans(anyString(), any()));
@@ -368,30 +379,55 @@ final class EnrichmentAuthorityRaceTest extends LuceneExecutorTestBase {
     var log = LoggerFactory.getLogger(getClass());
     return switch (stage) {
       case EMBED, CHUNK -> {
-        var context = new EmbeddingBackfillOps.BackfillContext(runtime.documentFieldOps(), coordinator,
-            runtime.commitOps(), signals, pacing, lifecycle::embeddingProvider, () -> true,
-            () -> true, 10, log);
-        yield (stage == Stage.CHUNK ? EmbeddingBackfillOps.processChunkEmbeddingBackfill(context)
-            : EmbeddingBackfillOps.processEmbeddingBackfill(context)).accounting();
+        var context = new LaneBackfillTestSupport.EmbeddingContext(runtime.documentFieldOps(),
+        coordinator,
+        pacing,
+        lifecycle::embeddingProvider,
+        () -> true,
+        () -> true,
+        10,
+        log);
+        yield (stage == Stage.CHUNK ? LaneBackfillTestSupport.runDenseChunk(context)
+            : LaneBackfillTestSupport.runDenseParent(context)).accounting();
       }
-      case SPARSE, INTERLEAVED, SPARSE_CHUNK, INTERLEAVED_CHUNK -> SpladeBackfillOps.processSpladeBackfill(
-          new SpladeBackfillOps.BackfillContext(runtime.documentFieldOps(), coordinator,
-              runtime.commitOps(), pacing, () -> ready.getAsBoolean() ? sparse : null, () -> true, 10,
-              stage != Stage.INTERLEAVED && stage != Stage.INTERLEAVED_CHUNK,
-              stage.name().endsWith("_CHUNK"), log)).accounting();
+      case SPARSE, INTERLEAVED, SPARSE_CHUNK, INTERLEAVED_CHUNK -> LaneBackfillTestSupport.runSparse(
+          new SpladeBackfillOps.BackfillContext(runtime.documentFieldOps(),
+        coordinator,
+        pacing,
+        () -> ready.getAsBoolean() ? sparse : null,
+        () -> true,
+        10,
+        stage.name().endsWith("_CHUNK"),
+        log, () -> true)).accounting();
       case BGE, BGE_CHUNK -> BgeM3BackfillOps.processBgeM3Backfill(
           new BgeM3BackfillOps.BackfillContext(runtime.documentFieldOps(), coordinator, runtime.commitOps(),
               signals, () -> ready.getAsBoolean() ? bge : null, () -> true, 10, false,
               stage == Stage.BGE_CHUNK, log)).accounting();
-      case NER -> NerBackfillOps.processNerBackfill(new NerBackfillOps.BackfillContext(
-          runtime.documentFieldOps(), coordinator, runtime.commitOps(), pacing, () -> ner,
-          () -> true, 10, log)).accounting();
-      case COMBINED, SINGLE_PASS, WINDOW -> CombinedEnrichmentBackfillOps.processCombinedBackfill(
-          new CombinedEnrichmentBackfillOps.BackfillContext(runtime.documentFieldOps(), coordinator,
-              runtime.commitOps(), pacing, lifecycle::embeddingProvider, () -> null, () -> null,
-              () -> true, () -> true, 10, log, false, false, stage == Stage.SINGLE_PASS, 0,
-              new ArrayDeque<>(), new ArrayDeque<>(), new int[] {0}, () -> false, () -> false,
-              () -> false, new WindowedEmbedProgress())).accounting();
+      case NER -> LaneBackfillTestSupport.runNer(new NerBackfillOps.BackfillContext(runtime.documentFieldOps(),
+        coordinator,
+        pacing,
+        () -> ner,
+        () -> true,
+        10,
+        log, () -> true)).accounting();
+      case COMBINED, SINGLE_PASS, WINDOW -> LaneBackfillTestSupport.runLanes(
+          new LaneBackfillTestSupport.BackfillContext(runtime.documentFieldOps(),
+        coordinator,
+        pacing,
+        lifecycle::embeddingProvider,
+        () -> null,
+        () -> null,
+        () -> true,
+        () -> true,
+        10,
+        log,
+        false,
+        false,
+        stage == Stage.SINGLE_PASS,
+        0,
+        () -> false,
+        () -> false,
+        new WindowedEmbedProgress())).accounting();
     };
   }
 

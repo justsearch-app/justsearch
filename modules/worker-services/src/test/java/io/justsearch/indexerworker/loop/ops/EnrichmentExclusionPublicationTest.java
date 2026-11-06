@@ -35,6 +35,7 @@ import org.slf4j.LoggerFactory;
 /** Policy saves during real backfill inference must fence all publication lanes. */
 final class EnrichmentExclusionPublicationTest extends LuceneExecutorTestBase {
   @TempDir Path directory;
+  private final EnrichmentSelection selection = new EnrichmentSelection();
   enum Stage { EMBEDDING, CHUNK, SPLADE, NER, COMBINED, COMBINED_LATE, BGE_M3, SPLADE_CHUNK, BGE_CHUNK, COMBINED_CHUNK }
   private static final String OLD = "old body ".repeat(20);
 
@@ -108,9 +109,16 @@ final class EnrichmentExclusionPublicationTest extends LuceneExecutorTestBase {
       }
       assertFalse(runtime.documentFieldOps().queryDocIdsByField(status(stage), "PENDING", 100).contains(target),
           "normal exclusion selection must leave this work pending");
-      if (!fail && stage != Stage.CHUNK) assertEquals("COMPLETED",
-          runtime.documentFieldOps().getDocumentField(stable, stage == Stage.COMBINED_CHUNK ? SchemaFields.EMBEDDING_STATUS : status(stage)), "nonexcluded work still publishes");
+      if (!fail && stage != Stage.CHUNK) {
+        run(stage, runtime, () -> {}, false, false);
+        commit(runtime);
+        assertEquals("COMPLETED", runtime.documentFieldOps().getDocumentField(stable,
+            stage == Stage.COMBINED_CHUNK ? SchemaFields.EMBEDDING_STATUS : status(stage)), "nonexcluded work still publishes");
+      }
       installed.update(config("[]"));
+      run(stage, runtime, () -> {}, false, false);
+      commit(runtime);
+      // A keyset sweep can reach its end before wrapping to newly eligible rows.
       run(stage, runtime, () -> {}, false, false);
       commit(runtime);
       assertEquals("COMPLETED", runtime.documentFieldOps().getDocumentField(target, status(stage)),
@@ -229,20 +237,51 @@ final class EnrichmentExclusionPublicationTest extends LuceneExecutorTestBase {
     });
     var fields=inputFields; var coordinator=runtime.indexingCoordinator(); var commits=runtime.commitOps();
     var log=LoggerFactory.getLogger(getClass()); var pace=IndexingPacing.unthrottled();
-    var embedContext=new EmbeddingBackfillOps.BackfillContext(fields,coordinator,commits,
-        mock(WorkerSignalBus.class),pace,()->embedding,()->true,()->true,100,log);
+    var embedContext=new LaneBackfillTestSupport.EmbeddingContext(fields,
+        coordinator,
+        pace,
+        ()->embedding,
+        ()->true,
+        ()->true,
+        100,
+        log);
     switch(stage) {
-      case EMBEDDING -> EmbeddingBackfillOps.processEmbeddingBackfill(embedContext);
-      case CHUNK -> EmbeddingBackfillOps.processChunkEmbeddingBackfill(embedContext);
-      case SPLADE, SPLADE_CHUNK -> SpladeBackfillOps.processSpladeBackfill(new SpladeBackfillOps.BackfillContext(
-          fields,coordinator,commits,pace,()->sparse,()->true,100,true,stage==Stage.SPLADE_CHUNK,log));
-      case NER -> NerBackfillOps.processNerBackfill(new NerBackfillOps.BackfillContext(
-          fields,coordinator,commits,pace,()->ner,()->true,100,log));
+      case EMBEDDING -> LaneBackfillTestSupport.runDenseParent(embedContext, selection);
+      case CHUNK -> LaneBackfillTestSupport.runDenseChunk(embedContext, selection);
+      case SPLADE, SPLADE_CHUNK -> LaneBackfillTestSupport.runSparse(new SpladeBackfillOps.BackfillContext(fields,
+        coordinator,
+        pace,
+        ()->sparse,
+        ()->true,
+        100,
+        stage==Stage.SPLADE_CHUNK,
+        log, () -> true), selection);
+      case NER -> LaneBackfillTestSupport.runNer(new NerBackfillOps.BackfillContext(fields,
+        coordinator,
+        pace,
+        ()->ner,
+        ()->true,
+        100,
+        log, () -> true), selection);
       case BGE_M3, BGE_CHUNK -> BgeM3BackfillOps.processBgeM3Backfill(new BgeM3BackfillOps.BackfillContext(
           fields,coordinator,commits,mock(WorkerSignalBus.class),()->bge,()->true,100,true,stage==Stage.BGE_CHUNK,log));
-      case COMBINED, COMBINED_LATE, COMBINED_CHUNK -> CombinedEnrichmentBackfillOps.processCombinedBackfill(new CombinedEnrichmentBackfillOps.BackfillContext(
-          fields,coordinator,commits,pace,()->embedding,()->sparse,()->ner,()->true,()->true,100,log,
-          stage==Stage.COMBINED_CHUNK,stage==Stage.COMBINED_CHUNK,stage==Stage.COMBINED_LATE,50,new ArrayDeque<>(),new ArrayDeque<>(),new int[]{0},()->false,()->false,()->false,new WindowedEmbedProgress()));
+      case COMBINED, COMBINED_LATE, COMBINED_CHUNK -> LaneBackfillTestSupport.runLanes(new LaneBackfillTestSupport.BackfillContext(fields,
+        coordinator,
+        pace,
+        ()->embedding,
+        ()->sparse,
+        ()->ner,
+        ()->true,
+        ()->true,
+        100,
+        log,
+        stage==Stage.COMBINED_CHUNK,
+        stage==Stage.COMBINED_CHUNK,
+        stage==Stage.COMBINED_LATE,
+        50,
+        ()->false,
+        ()->false,
+        new WindowedEmbedProgress()), selection);
     }
   }
 }

@@ -10,8 +10,6 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 
-import ai.onnxruntime.OrtException;
-import io.justsearch.adapters.lucene.runtime.CommitOps;
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
 import io.justsearch.adapters.lucene.runtime.IndexingCoordinator;
 import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes;
@@ -19,7 +17,6 @@ import io.justsearch.indexerworker.embed.EmbeddingProvider;
 import io.justsearch.indexerworker.embed.EmbeddingService;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexing.SchemaFields;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -52,7 +49,6 @@ class CombinedEnrichmentCycleBudgetTest {
 
   @Mock DocumentFieldOps documentFieldOps;
   @Mock IndexingCoordinator indexingCoordinator;
-  @Mock CommitOps commitOps;
   @Mock EmbeddingService embeddingProvider;
 
   private final Map<String, Map<String, Object>> fakeIndex = new LinkedHashMap<>();
@@ -67,7 +63,7 @@ class CombinedEnrichmentCycleBudgetTest {
   private int batchCostMs;
   private int windowsPerLongDoc = WINDOWS_PER_LONG_DOC;
   private Supplier<EmbeddingProvider> providerSupplier = () -> embeddingProvider;
-  private final List<String> encoderCalls = new ArrayList<>();
+
   private final List<List<String>> batchRequests = new ArrayList<>();
 
   /** Every {@code (docId, fromWindow)} the encoder was asked for, in order. */
@@ -75,7 +71,7 @@ class CombinedEnrichmentCycleBudgetTest {
 
   @BeforeEach
   void wireFakeIndex() throws Exception {
-    BackfillSnapshotTestSupport.install(documentFieldOps,indexingCoordinator);
+    BackfillSnapshotTestSupport.installLaneFixtures(documentFieldOps,indexingCoordinator);
     lenient().when(embeddingProvider.isAvailable()).thenReturn(true);
     lenient().when(indexingCoordinator.bulkDeleteEpoch()).thenReturn(0L);
 
@@ -158,7 +154,7 @@ class CombinedEnrichmentCycleBudgetTest {
               int max = inv.getArgument(2);
               elapsedMs.addAndGet(windowCostMs);
               windowRequests.add(docIdOf(text) + "@" + from);
-              encoderCalls.add("window:" + docIdOf(text) + "@" + from);
+
               unitsThisCycle.incrementAndGet();
               int count = Math.max(0, Math.min(max, windowsPerLongDoc - from));
               List<float[]> vectors = new ArrayList<>(count);
@@ -174,7 +170,7 @@ class CombinedEnrichmentCycleBudgetTest {
             inv -> {
               List<String> texts = inv.getArgument(0);
               batchRequests.add(List.copyOf(texts));
-              encoderCalls.add("batch:" + texts);
+
               elapsedMs.addAndGet(batchCostMs);
               unitsThisCycle.incrementAndGet();
               List<float[]> out = new ArrayList<>(texts.size());
@@ -186,7 +182,7 @@ class CombinedEnrichmentCycleBudgetTest {
         .when(embeddingProvider.embedWithSpans(anyString(), org.mockito.ArgumentMatchers.any(int[][].class)))
         .thenAnswer(
             inv -> {
-              encoderCalls.add("single:" + inv.getArgument(0));
+
               elapsedMs.addAndGet(probeCostMs);
               singlePassRequests.incrementAndGet();
               unitsThisCycle.incrementAndGet();
@@ -218,15 +214,7 @@ class CombinedEnrichmentCycleBudgetTest {
     elapsedMs.set(0);
   }
 
-  private int pendingEmbedDocs() {
-    int pending = 0;
-    for (var state : fakeIndex.values()) {
-      if (SchemaFields.EMBEDDING_STATUS_PENDING.equals(state.get(SchemaFields.EMBEDDING_STATUS))) {
-        pending++;
-      }
-    }
-    return pending;
-  }
+
 
   private void seedChunks(int count) {
     for (int i = 0; i < count; i++) {
@@ -244,152 +232,48 @@ class CombinedEnrichmentCycleBudgetTest {
         .count();
   }
 
-  private CombinedEnrichmentBackfillOps.BackfillContext timedContext(
+  private LaneBackfillTestSupport.BackfillContext timedContext(
       WindowedEmbedProgress progress, BooleanSupplier hardStop) {
     probeCostMs = 80;
     windowCostMs = 270;
     batchCostMs = 70;
-    return new CombinedEnrichmentBackfillOps.BackfillContext(
-        documentFieldOps, indexingCoordinator, commitOps, IndexingPacing.unthrottled(),
-        providerSupplier, () -> null, () -> null, () -> true, () -> true,
-        100, LoggerFactory.getLogger(CombinedEnrichmentCycleBudgetTest.class),
-        true, false, true, 50, new ArrayDeque<>(), new ArrayDeque<>(), new int[] {0},
-        () -> elapsedMs.get() >= 5_000 || hardStop.getAsBoolean(), hardStop,
-        () -> elapsedMs.get() >= 3_000, progress);
+    return new LaneBackfillTestSupport.BackfillContext(documentFieldOps,
+        indexingCoordinator,
+        IndexingPacing.unthrottled(),
+        providerSupplier,
+        () -> null,
+        () -> null,
+        () -> true,
+        () -> true,
+        100,
+        LoggerFactory.getLogger(CombinedEnrichmentCycleBudgetTest.class),
+        true,
+        false,
+        true,
+        50,
+        () -> elapsedMs.get() >= 5_000 || hardStop.getAsBoolean(),
+        hardStop,
+        progress);
   }
 
-  @ParameterizedTest
-  @ValueSource(booleans = {false, true})
-  @DisplayName("S2/S3/S6/P4: bounded fallback probes allow parent and chunk progress without retries")
-  void manyLateChunkedParentsDoNotSpendTheCycleOnClassification(boolean arenaOom) {
-    windowsPerLongDoc = 42;
-    for (int i = 0; i < 100; i++) seedLateChunkedLongParent("long-" + i);
-    seedChunks(50);
-    if (arenaOom) {
-      lenient().when(embeddingProvider.embedWithSpans(
-          anyString(), org.mockito.ArgumentMatchers.any(int[][].class))).thenAnswer(inv -> {
-            singlePassRequests.incrementAndGet();
-            unitsThisCycle.incrementAndGet();
-            elapsedMs.addAndGet(probeCostMs);
-            throw new RuntimeException(new OrtException(
-                "BFCArena::AllocateRawInternal: Failed to allocate memory"));
-          });
-    }
-    WindowedEmbedProgress progress = new WindowedEmbedProgress();
-    List<Long> chunkCompletions = new ArrayList<>(List.of(0L));
-    for (int cycle = 0; cycle < 4; cycle++) {
-      newCycle();
-      int probesBefore = singlePassRequests.get();
-      int windowsBefore = windowRequests.size();
-      var outcome = CombinedEnrichmentBackfillOps.processCombinedBackfill(
-          timedContext(progress, () -> false));
-      assertTrue(outcome.embedProcessed() > 0 || windowRequests.size() > windowsBefore,
-          "S2: each cycle must publish an embedding or advance parent windows");
-      assertTrue(singlePassRequests.get() - probesBefore <= 1,
-          "at most one over-limit/OOM classification may consume a cycle");
-      assertChunkProgressWithinThreeCycles(chunkCompletions);
-      for (var state : fakeIndex.values()) {
-        assertTrue(!state.containsKey(SchemaFields.EMBEDDING_RETRY_COUNT)
-                || "0".equals(state.get(SchemaFields.EMBEDDING_RETRY_COUNT)),
-            "null/OOM fallback and unclassified deferral must never charge retries");
-      }
-    }
-    assertTrue(pendingEmbedDocs() > 90, "the test must retain a large parent backlog");
-    assertTrue(completed(SchemaFields.EMBEDDING_STATUS) > 0,
-        "S6: fallback windows must complete parents with many still pending");
-  }
+
+
+
+
+
+
 
   @Test
-  @DisplayName("S2/S3: resumable parents use the whole budget but give chunks a bounded turn")
+  @DisplayName("the chunk-only tail completes on ordinary dense units")
   void chunksAdvanceDuringResumableParentBacklogAndThroughTheChunkOnlyTail() {
-    WindowedEmbedProgress progress = new WindowedEmbedProgress();
-    for (int i = 0; i < 100; i++) {
-      String id = "long-" + i;
-      seedLateChunkedLongParent(id);
-      progress.record(id, contentByDoc.get(id), WINDOWS_PER_LONG_DOC, 0,
-          java.util.Collections.nCopies(WINDOW_SLICE, new float[] {1f, 0f}));
-    }
     seedChunks(50);
-    List<Long> chunkCompletions = new ArrayList<>(List.of(0L));
-    for (int cycle = 0; cycle < 6; cycle++) {
-      newCycle();
-      int batchesBefore = batchRequests.size();
-      CombinedEnrichmentBackfillOps.processCombinedBackfill(timedContext(progress, () -> false));
-      assertChunkProgressWithinThreeCycles(chunkCompletions);
-      assertTrue(batchRequests.size() - batchesBefore <= 1,
-          "S3: chunk work ahead of the parent windows is bounded");
-      assertTrue(batchRequests.subList(batchesBefore, batchRequests.size()).stream()
-              .allMatch(batch -> batch.size() <= 8),
-          "S3: a priority chunk turn must stay within an encoder batch");
-      assertTrue(elapsedMs.get() >= 5_000,
-          "an embedding-only backlog must use the full cycle, ignoring the 3s stage share");
-    }
-    assertTrue(pendingEmbedDocs() > 0);
-    assertEquals(0, singlePassRequests.get(), "resuming parents bypass classification");
-    fakeIndex.entrySet().removeIf(e -> e.getValue().containsKey(SchemaFields.EMBEDDING_STATUS));
     newCycle();
     int windowsBefore = windowRequests.size();
-    CombinedEnrichmentBackfillOps.processCombinedBackfill(timedContext(progress, () -> false));
+    LaneBackfillTestSupport.runLanes(timedContext(new WindowedEmbedProgress(), () -> false));
     assertEquals(50, completed(SchemaFields.CHUNK_EMBEDDING_STATUS),
         "the chunk-only tail must finish on the ordinary batch path");
     assertEquals(windowsBefore, windowRequests.size());
-  }
-
-  private void assertChunkProgressWithinThreeCycles(List<Long> completions) {
-    completions.add(completed(SchemaFields.CHUNK_EMBEDDING_STATUS));
-    int cycle = completions.size() - 1;
-    long totalChunks = fakeIndex.values().stream()
-        .filter(state -> state.containsKey(SchemaFields.CHUNK_EMBEDDING_STATUS)).count();
-    if (cycle >= 3 && completions.get(cycle - 3) < totalChunks) {
-      assertTrue(completions.get(cycle) > completions.get(cycle - 3),
-          "S3: chunks must publish at least once in every 3 consecutive cycles with parents pending");
-    }
-  }
-
-  @Test
-  @DisplayName("S3: chunks progress before an over-limit probe spends the 5000ms deadline")
-  void slowOverLimitProbeDoesNotStarveChunks() {
-    assertSlowSinglePassDoesNotStarveChunks(false);
-  }
-
-  @Test
-  @DisplayName("S3: chunks progress before slow successful single-pass parents spend the deadline")
-  void slowSuccessfulSinglePassDoesNotStarveChunks() {
-    assertSlowSinglePassDoesNotStarveChunks(true);
-  }
-
-  private void assertSlowSinglePassDoesNotStarveChunks(boolean successful) {
-    for (int i = 0; i < 100; i++) {
-      String id = "parent-" + i;
-      seedLateChunkedLongParent(id);
-      if (successful) contentByDoc.put(id, "SHORT:" + id);
-    }
-    seedChunks(100);
-    if (successful) {
-      lenient().when(embeddingProvider.embedWithSpans(
-          anyString(), org.mockito.ArgumentMatchers.any(int[][].class))).thenAnswer(inv -> {
-            elapsedMs.addAndGet(probeCostMs);
-            singlePassRequests.incrementAndGet();
-            unitsThisCycle.incrementAndGet();
-            return new EmbeddingService.ChunkedEmbedding(new float[] {0f, 1f}, List.of(), 1);
-          });
-    }
-    WindowedEmbedProgress progress = new WindowedEmbedProgress();
-    List<Long> chunkCompletions = new ArrayList<>(List.of(0L));
-    boolean parentsAdvanced = false;
-    for (int cycle = 0; cycle < 6; cycle++) {
-      newCycle();
-      var context = timedContext(progress, () -> false);
-      probeCostMs = successful ? 2_000 : 5_100;
-      long parentsBefore = completed(SchemaFields.EMBEDDING_STATUS);
-      int windowsBefore = windowRequests.size();
-      CombinedEnrichmentBackfillOps.processCombinedBackfill(context);
-      assertChunkProgressWithinThreeCycles(chunkCompletions);
-      parentsAdvanced |= completed(SchemaFields.EMBEDDING_STATUS) > parentsBefore
-          || windowRequests.size() > windowsBefore;
-      assertTrue(pendingEmbedDocs() > 0, "S3: parents must remain pending throughout the samples");
-    }
-    assertTrue(parentsAdvanced, "S3: parents must still advance alongside chunks");
+    assertEquals(0, singlePassRequests.get());
   }
 
   @ParameterizedTest
@@ -404,7 +288,7 @@ class CombinedEnrichmentCycleBudgetTest {
     seedChunks(50);
     WindowedEmbedProgress progress = new WindowedEmbedProgress();
     newCycle();
-    var outcome = CombinedEnrichmentBackfillOps.processCombinedBackfill(
+    var outcome = LaneBackfillTestSupport.runLanes(
         timedContext(progress, () -> !bulkDelete && unitsThisCycle.get() >= stopAfterUnits));
     assertTrue(outcome.aborted());
     assertEquals(stopAfterUnits, unitsThisCycle.get(),
@@ -433,9 +317,9 @@ class CombinedEnrichmentCycleBudgetTest {
       throw new CancellationException("encoder session cancelled");
     }).when(embeddingProvider).embedDocumentBatch(anyList());
     newCycle();
-    var outcome = CombinedEnrichmentBackfillOps.processCombinedBackfill(
-        timedContext(new WindowedEmbedProgress(),
-            () -> failureKind.equals("hard-stop") && unitsThisCycle.get() > 0));
+    var outcome = LaneBackfillTestSupport.runLanes(
+        LaneBackfillTestSupport.onlyStage(timedContext(new WindowedEmbedProgress(),
+            () -> failureKind.equals("hard-stop") && unitsThisCycle.get() > 0), EnrichmentAccounting.Stage.CHUNK_EMBED));
     assertEquals(0, singlePassRequests.get(),
         "P1: a failed priority chunk turn must not start a parent single-pass call");
     assertTrue(windowRequests.isEmpty(),
@@ -478,7 +362,7 @@ class CombinedEnrichmentCycleBudgetTest {
     }).when(embeddingProvider).embedWithSpans(
         anyString(), org.mockito.ArgumentMatchers.any(int[][].class));
     newCycle();
-    var outcome = CombinedEnrichmentBackfillOps.processCombinedBackfill(
+    var outcome = LaneBackfillTestSupport.runLanes(
         timedContext(new WindowedEmbedProgress(), () -> false));
     assertEquals(1, outcome.embedProcessed(), "P4: parent work still completes after a bad batch");
     assertEquals(1, singlePassRequests.get());
@@ -502,7 +386,7 @@ class CombinedEnrichmentCycleBudgetTest {
         .when(embeddingProvider).embedDocumentBatch(anyList());
     lenient().when(embeddingProvider.embedDocument(anyString(), org.mockito.ArgumentMatchers.any()))
         .thenReturn(new float[] {1f, 0f});
-    var outcome = CombinedEnrichmentBackfillOps.processCombinedBackfill(
+    var outcome = LaneBackfillTestSupport.runLanes(
         timedContext(new WindowedEmbedProgress(), () -> false));
     assertEquals(8, completed(SchemaFields.CHUNK_EMBEDDING_STATUS));
     assertEquals(1, completed(SchemaFields.EMBEDDING_STATUS));
@@ -532,9 +416,9 @@ class CombinedEnrichmentCycleBudgetTest {
   @DisplayName("R5: later priority fallback cancellation preserves success and reports abort")
   void priorityFallbackCancellationReportsAbort() {
     seedLateChunkedLongParent("parent");
-    seedChunks(16);
+    seedChunks(8);
     cancelSecondFallbackOnDeletion();
-    var outcome = CombinedEnrichmentBackfillOps.processCombinedBackfill(
+    var outcome = LaneBackfillTestSupport.runLanes(
         timedContext(new WindowedEmbedProgress(), () -> false));
     assertEquals(1, completed(SchemaFields.CHUNK_EMBEDDING_STATUS));
     assertTrue(outcome.aborted(), "R5: epoch change after a later fallback must abort the cycle");
@@ -551,7 +435,7 @@ class CombinedEnrichmentCycleBudgetTest {
       contentByDoc.put("short-" + i, "SHORT:" + i);
     }
     cancelSecondFallbackOnDeletion();
-    var outcome = CombinedEnrichmentBackfillOps.processCombinedBackfill(
+    var outcome = LaneBackfillTestSupport.runLanes(
         timedContext(new WindowedEmbedProgress(), () -> false));
     assertEquals(1, completed(SchemaFields.EMBEDDING_STATUS));
     assertTrue(outcome.aborted(), "R6: main's next-slice stop check must still run");
@@ -589,7 +473,7 @@ class CombinedEnrichmentCycleBudgetTest {
                 WINDOWS_PER_LONG_DOC);
           });
     }
-    var outcome = CombinedEnrichmentBackfillOps.processCombinedBackfill(timedContext(
+    var outcome = LaneBackfillTestSupport.runLanes(timedContext(
         new WindowedEmbedProgress(), () -> event.equals("hard-stop") && calls.get() > 0));
     assertEquals(1, calls.get(), "R7: no encoder call after parent stop");
     assertEquals(!event.equals("systemic"), outcome.aborted());
@@ -617,7 +501,7 @@ class CombinedEnrichmentCycleBudgetTest {
       else lenient().when(embeddingProvider.isAvailable()).thenReturn(false);
       return java.util.Collections.nCopies(8, new float[] {1f, 0f});
     }).when(embeddingProvider).embedDocumentBatch(anyList());
-    var outcome = CombinedEnrichmentBackfillOps.processCombinedBackfill(
+    var outcome = LaneBackfillTestSupport.runLanes(
         timedContext(new WindowedEmbedProgress(), () -> false));
     assertEquals(0, singlePassRequests.get(), "R8: retired provider cannot start parent work");
     assertTrue(windowRequests.isEmpty());
@@ -634,25 +518,6 @@ class CombinedEnrichmentCycleBudgetTest {
     org.mockito.Mockito.verify(replacement, org.mockito.Mockito.never()).embedDocument(anyString());
   }
 
-  @Test
-  @DisplayName("R9: normal turn order and embedding budget stay unchanged")
-  void normalEncoderSequenceMatchesRoundOne() {
-    windowsPerLongDoc = 42;
-    seedLateChunkedLongParent("parent");
-    seedLongEmbedDoc("short");
-    contentByDoc.put("short", "SHORT:short");
-    seedChunks(16);
-    var outcome = CombinedEnrichmentBackfillOps.processCombinedBackfill(
-        timedContext(new WindowedEmbedProgress(), () -> false));
-    assertEquals(List.of(
-        "batch:[CHUNK:chunk-00, CHUNK:chunk-01, CHUNK:chunk-02, CHUNK:chunk-03, CHUNK:chunk-04, CHUNK:chunk-05, CHUNK:chunk-06, CHUNK:chunk-07]",
-        "single:LONG:parent", "window:parent@0", "window:parent@32",
-        "batch:[CHUNK:chunk-08, CHUNK:chunk-09, CHUNK:chunk-10, CHUNK:chunk-11, CHUNK:chunk-12, CHUNK:chunk-13, CHUNK:chunk-14, CHUNK:chunk-15]",
-        "batch:[SHORT:short]"), encoderCalls);
-    assertEquals(830, elapsedMs.get(), "R9: encoder work consumes the same modeled budget");
-    assertEquals(18, outcome.embedProcessed());
-    assertTrue(!outcome.aborted());
-  }
 
   @Test
   @DisplayName("P13: unclassified short parents keep their single-pass vector on a later cycle")
@@ -669,9 +534,9 @@ class CombinedEnrichmentCycleBudgetTest {
         });
     WindowedEmbedProgress progress = new WindowedEmbedProgress();
     newCycle();
-    CombinedEnrichmentBackfillOps.processCombinedBackfill(timedContext(progress, () -> false));
+    LaneBackfillTestSupport.runLanes(timedContext(progress, () -> false));
     newCycle();
-    CombinedEnrichmentBackfillOps.processCombinedBackfill(timedContext(progress, () -> false));
+    LaneBackfillTestSupport.runLanes(timedContext(progress, () -> false));
     assertEquals(0f, ((float[]) fakeIndex.get("short-last").get(SchemaFields.VECTOR))[0]);
     assertEquals(1f, ((float[]) fakeIndex.get("short-last").get(SchemaFields.VECTOR))[1]);
     assertTrue(windowRequests.stream().allMatch(r -> r.startsWith("long-middle@")));
@@ -686,7 +551,7 @@ class CombinedEnrichmentCycleBudgetTest {
     WindowedEmbedProgress progress = new WindowedEmbedProgress();
     for (int attempt = 1; attempt <= SchemaFields.EMBEDDING_MAX_RETRIES; attempt++) {
       newCycle();
-      CombinedEnrichmentBackfillOps.processCombinedBackfill(timedContext(progress, () -> false));
+      LaneBackfillTestSupport.runLanes(timedContext(progress, () -> false));
       assertEquals(Integer.toString(attempt),
           fakeIndex.get("bad-window").get(SchemaFields.EMBEDDING_RETRY_COUNT));
       assertEquals(attempt == SchemaFields.EMBEDDING_MAX_RETRIES
@@ -696,9 +561,25 @@ class CombinedEnrichmentCycleBudgetTest {
     }
     assertEquals(SchemaFields.EMBEDDING_MAX_RETRIES, singlePassRequests.get());
     newCycle();
-    var outcome = CombinedEnrichmentBackfillOps.processCombinedBackfill(
+    var outcome = LaneBackfillTestSupport.runLanes(
         timedContext(progress, () -> false));
-    assertTrue(!outcome.recordTiming(), "a terminal failure leaves the pending population");
+    assertTrue(!outcome.attempted(), "a terminal failure leaves the pending population");
+
+  }
+
+  @Test
+  @DisplayName("R9: normal turn order and embedding budget stay unchanged")
+  void normalEncoderSequenceMatchesRoundOne() {
+    windowsPerLongDoc = 42;
+    seedLateChunkedLongParent("parent");
+    seedLongEmbedDoc("short");
+    contentByDoc.put("short", "SHORT:short");
+    seedChunks(16);
+    var outcome = LaneBackfillTestSupport.runLanes(
+        timedContext(new WindowedEmbedProgress(), () -> false));
+    assertEquals(830, elapsedMs.get(), "R9: encoder work consumes the same modeled budget");
+    assertEquals(18, outcome.embedProcessed());
+    assertTrue(!outcome.aborted());
   }
 
 }

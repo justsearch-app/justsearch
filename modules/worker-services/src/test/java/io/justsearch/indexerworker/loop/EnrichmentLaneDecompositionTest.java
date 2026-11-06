@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.loop;
 
+import io.justsearch.indexerworker.loop.ops.LaneBackfillTestSupport;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -155,18 +156,15 @@ class EnrichmentLaneDecompositionTest extends LuceneExecutorTestBase {
       Harness h, EnrichmentSelection selection, boolean chunks, BooleanSupplier allowed)
       throws Exception {
     var context =
-        new SpladeBackfillOps.BackfillContext(
-            h.runtime.documentFieldOps(),
-            h.runtime.indexingCoordinator(),
-            h.runtime.commitOps(),
-            IndexingPacing.unthrottled(),
-            () -> h.sparse,
-            () -> true,
-            70,
-            true,
-            true,
-            LoggerFactory.getLogger(getClass()),
-            allowed);
+        new SpladeBackfillOps.BackfillContext(h.runtime.documentFieldOps(),
+        h.runtime.indexingCoordinator(),
+        IndexingPacing.unthrottled(),
+        () -> h.sparse,
+        () -> true,
+        70,
+        true,
+        LoggerFactory.getLogger(getClass()),
+        allowed);
     try {
       var method =
           SpladeBackfillOps.class.getMethod(
@@ -175,7 +173,7 @@ class EnrichmentLaneDecompositionTest extends LuceneExecutorTestBase {
               EnrichmentSelection.class);
       method.invoke(null, context, selection);
     } catch (NoSuchMethodException before) {
-      SpladeBackfillOps.processSpladeBackfill(context, selection);
+      LaneBackfillTestSupport.runSparse(context, selection);
     }
   }
 
@@ -504,40 +502,25 @@ class EnrichmentLaneDecompositionTest extends LuceneExecutorTestBase {
       int turns = route.equals("windows") ? 4 : 3;
       for (int turn = 0; turn < turns; turn++) {
         var context =
-            new CombinedEnrichmentBackfillOps.BackfillContext(
-                h.runtime.documentFieldOps(),
-                h.runtime.indexingCoordinator(),
-                h.runtime.commitOps(),
-                IndexingPacing.unthrottled(),
-                () -> h.dense,
-                () -> null,
-                () -> null,
-                () -> true,
-                () -> true,
-                10,
-                LoggerFactory.getLogger(getClass()),
-                true,
-                false,
-                h.config.ai().embedding().lateChunkingEnabled(),
-                10,
-                new ArrayDeque<>(),
-                new ArrayDeque<>(),
-                new int[] {0},
-                () -> false,
-                () -> false,
-                () -> false,
-                progress);
-        try {
-          var method =
-              CombinedEnrichmentBackfillOps.class.getMethod(
-                  "processDenseUnit",
-                  CombinedEnrichmentBackfillOps.BackfillContext.class,
-                  EnrichmentSelection.class,
-                  EnrichmentAccounting.Stage.class);
-          method.invoke(null, context, selection, EnrichmentAccounting.Stage.EMBED);
-        } catch (NoSuchMethodException before) {
-          CombinedEnrichmentBackfillOps.processCombinedBackfill(context, selection);
-        }
+            new LaneBackfillTestSupport.BackfillContext(h.runtime.documentFieldOps(),
+        h.runtime.indexingCoordinator(),
+        IndexingPacing.unthrottled(),
+        () -> h.dense,
+        () -> null,
+        () -> null,
+        () -> true,
+        () -> true,
+        10,
+        LoggerFactory.getLogger(getClass()),
+        true,
+        false,
+        h.config.ai().embedding().lateChunkingEnabled(),
+        10,
+        () -> false,
+        () -> false,
+        progress);
+        CombinedEnrichmentBackfillOps.processDenseUnit(LaneBackfillTestSupport.denseContext(context),
+            selection, EnrichmentAccounting.Stage.EMBED);
         h.refresh();
         assertEquals(turn + 1, nativeCalls.get(), "a turn admits exactly one native operation");
         if (turn == 0) {
@@ -570,15 +553,13 @@ class EnrichmentLaneDecompositionTest extends LuceneExecutorTestBase {
       var selection = new EnrichmentSelection();
       for (int turn = 0; turn < 3; turn++) {
         var context =
-            new NerBackfillOps.BackfillContext(
-                h.runtime.documentFieldOps(),
-                h.runtime.indexingCoordinator(),
-                h.runtime.commitOps(),
-                IndexingPacing.unthrottled(),
-                () -> h.ner,
-                () -> true,
-                10,
-                LoggerFactory.getLogger(getClass()));
+            new NerBackfillOps.BackfillContext(h.runtime.documentFieldOps(),
+        h.runtime.indexingCoordinator(),
+        IndexingPacing.unthrottled(),
+        () -> h.ner,
+        () -> true,
+        10,
+        LoggerFactory.getLogger(getClass()), () -> true);
         try {
           var method =
               NerBackfillOps.class.getMethod(
@@ -587,7 +568,7 @@ class EnrichmentLaneDecompositionTest extends LuceneExecutorTestBase {
                   EnrichmentSelection.class);
           method.invoke(null, context, selection);
         } catch (NoSuchMethodException before) {
-          NerBackfillOps.processNerBackfill(context, selection);
+          LaneBackfillTestSupport.runNer(context, selection);
         }
         h.refresh();
         assertEquals(turn + 1, h.calls.get());

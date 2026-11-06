@@ -69,7 +69,6 @@ final class DenseEnrichmentUnit {
       int windowUnitsDone,
       int windowDocsCompleted,
       int windowDocsResumable,
-      int embedDeferredForOtherStages,
       int singlePassDeferred,
       int embedPopulation) {}
 
@@ -79,7 +78,6 @@ final class DenseEnrichmentUnit {
       IndexingCoordinator.EnrichmentAuthority authority,
       EmbeddingProvider selectedEmbeddingProvider,
       boolean embedAvailable,
-      boolean otherStagesHaveWork,
       boolean retainedParentRoute,
       EnrichmentBatch batch,
       EnrichmentAccounting accounting,
@@ -91,11 +89,8 @@ final class DenseEnrichmentUnit {
       Set<String> directWindowedDocIds,
       Set<String> chunkIdsInBatch,
       Map<String, Map<String, String>> batchedFields,
-      Map<String, Map<String, Object>> updatesByDocId,
-      Set<String> stageAdvancedDocIds,
-      boolean publishFallback,
-      int maxUnits) {
-    var budget = new UnitBudget(maxUnits);
+      Map<String, Map<String, Object>> updatesByDocId) {
+    var budget = new UnitBudget();
     boolean aborted = false;
     int unitsDone = 0;
     int embedFailed = 0;
@@ -106,7 +101,6 @@ final class DenseEnrichmentUnit {
     int windowUnitsDone = 0;
     int windowDocsCompleted = 0;
     int windowDocsResumable = 0;
-    int embedDeferredForOtherStages = 0;
     int singlePassDeferred = 0;
     int embedPopulation = embedDocIds.size() + lateChunkingDocIds.size();
 
@@ -198,10 +192,7 @@ final class DenseEnrichmentUnit {
         for (int i = 0; i < lateChunkingDocIds.size(); i++) {
           // One whole-document forward pass per iteration — already the atomic unit, so the
           // checkpoint costs nothing but a volatile read (tempdoc 809 finding 3).
-          if (embedShareSpent(context, otherStagesHaveWork)) {
-            embedDeferredForOtherStages += lateChunkingDocIds.size() - i;
-            break;
-          }
+
           if (!ready(context, accounting, lateChunkingProvider)) break;
           String lcDocId = lateChunkingDocIds.get(i);
           String lcContent = lateChunkingContents.get(i);
@@ -237,7 +228,7 @@ final class DenseEnrichmentUnit {
               updates.put(SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_COMPLETED);
               updates.put(SchemaFields.EMBEDDING_RETRY_COUNT, "0");
               singlePassProcessed++;
-              stageAdvancedDocIds.add(lcDocId);
+
             } else {
               // Retain the route even if classification consumed this turn's deadline.
               boolean windows = EmbeddingProvider.exposesDocumentWindows(lateChunkingProvider);
@@ -330,7 +321,7 @@ final class DenseEnrichmentUnit {
                   .get(lcDocId)
                   .putAll(EmbeddingBackfillOps.computeEmbeddingFailureUpdate(currentRetryCount));
               embedFailed++;
-              stageAdvancedDocIds.add(lcDocId);
+
             }
           }
           pacer.afterUnit(1);
@@ -347,10 +338,7 @@ final class DenseEnrichmentUnit {
         WindowedEmbedProgress progress = context.windowedEmbedProgress();
         for (int i = 0; i < windowedDocIds.size(); i++) {
           String docId = windowedDocIds.get(i);
-          if (embedShareSpent(context, otherStagesHaveWork)) {
-            embedDeferredForOtherStages += windowedDocIds.size() - i;
-            break;
-          }
+
           if (!ready(context, accounting, provider)) break;
           String content = windowedContents.get(i);
           boolean isChunk = chunkIdsInBatch.contains(docId);
@@ -358,7 +346,7 @@ final class DenseEnrichmentUnit {
           // may already have set it), so reading it to decide whether the windowed lane stopped
           // would end the lane on a stale flag and mis-report every remaining document as skipped.
           boolean stoppedOnThisDocument = false;
-          boolean abortedOnThisDocument = false;
+
           boolean rejectedSlice = false;
           try {
             int nextWindow = progress.nextWindow(docId, content);
@@ -374,7 +362,7 @@ final class DenseEnrichmentUnit {
                   || !ready(context, accounting, provider)) {
                 aborted = true;
                 stoppedOnThisDocument = true;
-                abortedOnThisDocument = true;
+
                 break;
               }
               if (!context.unitAllowed().test(provider.isUsingGpu())) break;
@@ -443,10 +431,7 @@ final class DenseEnrichmentUnit {
               if (nextWindow >= slice.totalWindows()) {
                 break;
               }
-              if (embedShareSpent(context, otherStagesHaveWork)) {
-                stoppedOnThisDocument = true;
-                break;
-              }
+
             }
             if (progress.isComplete(docId)) {
               float[] vector = progress.complete(docId);
@@ -461,7 +446,7 @@ final class DenseEnrichmentUnit {
                       : SchemaFields.EMBEDDING_RETRY_COUNT,
                   "0");
               windowDocsCompleted++;
-              stageAdvancedDocIds.add(docId);
+
             } else {
               // Interrupted part-way. The document stays PENDING with no update of any kind — a
               // partial mean-pool is NOT this document's embedding and must never be written — but
@@ -507,13 +492,9 @@ final class DenseEnrichmentUnit {
                         ? EmbeddingBackfillOps.computeChunkEmbeddingFailureUpdate(currentRetryCount)
                         : EmbeddingBackfillOps.computeEmbeddingFailureUpdate(currentRetryCount));
             embedFailed++;
-            stageAdvancedDocIds.add(docId);
+
           }
           if (stoppedOnThisDocument) {
-            int remaining = windowedDocIds.size() - i - 1;
-            if (!abortedOnThisDocument) {
-              embedDeferredForOtherStages += remaining;
-            }
             break;
           }
         }
@@ -528,10 +509,7 @@ final class DenseEnrichmentUnit {
         // rather than aspirational.
         int sliceLimit = embedTurn == 0 ? priorityChunkEnd : embedDocIds.size();
         for (; sliceStart < sliceLimit; ) {
-          if (embedShareSpent(context, otherStagesHaveWork)) {
-            embedDeferredForOtherStages += embedDocIds.size() - sliceStart;
-            break;
-          }
+
           boolean retainedFallback =
               context
                       .windowedEmbedProgress()
@@ -567,7 +545,7 @@ final class DenseEnrichmentUnit {
                         ? EnrichmentAccounting.Stage.CHUNK_EMBED
                         : EnrichmentAccounting.Stage.EMBED);
               List<String> sliceTexts = embedContents.subList(sliceStart, sliceEnd);
-              vectors =
+              List<float[]> batchVectors =
                   batch
                       .inferenceCancellation(
                           () ->
@@ -576,6 +554,11 @@ final class DenseEnrichmentUnit {
                           () -> !ready(context, accounting, provider))
                       .call(() -> provider.embedDocumentBatch(sliceTexts));
               accounting.acquired(provider);
+              if (batchVectors != null && batchVectors.size() == sliceDocIds.size()) {
+                vectors = new ArrayList<>(sliceDocIds.size());
+                // Retain each read result even if a later row fails to materialize.
+                for (int i = 0; i < sliceDocIds.size(); i++) vectors.add(batchVectors.get(i));
+              }
             } catch (Exception failure) {
               if (batch.retired(
                   () -> !ready(context, accounting, provider),
@@ -597,15 +580,14 @@ final class DenseEnrichmentUnit {
                 priorityTurnEndedNormally = false;
                 break;
               }
-              vectors = null;
             } finally {
               pacer.afterUnit(sliceDocIds.size());
               if (embedTurn == 0) unitsDone++;
             }
             if (embedTurn == 1) unitsDone++;
           }
-          if (vectors != null && vectors.size() == sliceDocIds.size()) {
-            for (int i = 0; i < sliceDocIds.size(); i++) {
+          if (vectors != null) {
+            for (int i = 0; i < vectors.size(); i++) {
               float[] vector = vectors.get(i);
               if (vector != null && vector.length > 0) {
                 String id = sliceDocIds.get(i);
@@ -622,26 +604,27 @@ final class DenseEnrichmentUnit {
             break;
           }
           boolean fallback = vectors == null || vectors.size() != sliceDocIds.size();
+          int materialized = vectors == null ? 0 : vectors.size();
           if (fallback) {
-            vectors = new ArrayList<>(java.util.Collections.nCopies(sliceDocIds.size(), null));
-            // One-unit callers resume fallback next turn instead of repeatedly paying for a bad
-            // batch.
-            if (maxUnits != Integer.MAX_VALUE) {
-              for (int i = sliceStart; i < sliceEnd; i++)
-                context
-                    .windowedEmbedProgress()
-                    .route(
-                        embedDocIds.get(i),
-                        embedContents.get(i),
-                        WindowedEmbedProgress.Route.FALLBACK);
-            }
+            if (vectors == null) vectors = new ArrayList<>(sliceDocIds.size());
+            for (int i = materialized; i < sliceDocIds.size(); i++) vectors.add(null);
+            // One-unit callers resume only the unread suffix next turn instead of repeatedly
+            // paying for a bad batch or re-encoding its successful prefix.
+            for (int i = sliceStart + materialized; i < sliceEnd; i++)
+              context
+                  .windowedEmbedProgress()
+                  .route(
+                      embedDocIds.get(i),
+                      embedContents.get(i),
+                      WindowedEmbedProgress.Route.FALLBACK);
+
           }
           for (int i = 0; i < sliceDocIds.size(); i++) {
             if (!ready(context, accounting, provider)) {
               priorityTurnEndedNormally = false;
               break;
             }
-            if (fallback) {
+            if (fallback && i >= materialized) {
               // A fallback attempt is a new unit and must respect the same stops.
               pacer.beforeUnit(1);
               if (stopRequested(context, epochAtSelection, authority)
@@ -726,8 +709,8 @@ final class DenseEnrichmentUnit {
                       ? SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT
                       : SchemaFields.EMBEDDING_RETRY_COUNT,
                   "0");
-              stageAdvancedDocIds.add(eid);
-              if (publishFallback && fallback) {
+
+              if (fallback) {
                 try {
                   batch.update(eid, updates);
                 } finally {
@@ -755,7 +738,7 @@ final class DenseEnrichmentUnit {
                       ? EmbeddingBackfillOps.computeChunkEmbeddingFailureUpdate(currentRetryCount)
                       : EmbeddingBackfillOps.computeEmbeddingFailureUpdate(currentRetryCount));
               embedFailed++;
-              stageAdvancedDocIds.add(eid);
+
             }
           }
           sliceStart = sliceEnd;
@@ -772,21 +755,15 @@ final class DenseEnrichmentUnit {
         windowUnitsDone,
         windowDocsCompleted,
         windowDocsResumable,
-        embedDeferredForOtherStages,
         singlePassDeferred,
         embedPopulation);
   }
 
   private static final class UnitBudget {
-    private final int limit;
     private int admitted;
 
-    UnitBudget(int limit) {
-      this.limit = limit;
-    }
-
     boolean admit() {
-      return admitted++ < limit;
+      return admitted++ < 1;
     }
   }
 

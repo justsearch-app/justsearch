@@ -20,7 +20,6 @@ import io.justsearch.indexerworker.ner.NerService;
 import io.justsearch.indexerworker.splade.SpladeEncoder;
 import io.justsearch.indexing.SchemaFields;
 import io.justsearch.indexing.api.IndexDocument;
-import java.util.ArrayDeque;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -76,7 +75,7 @@ class CombinedEnrichmentRmwIntegrationTest extends io.justsearch.adapters.lucene
             SchemaFields.SPLADE,
             Map.of("old", 2.0f)));
 
-    CombinedEnrichmentBackfillOps.processCombinedBackfill(
+    LaneBackfillTestSupport.runLanes(
         context(embedding, splade, null));
     refresh();
 
@@ -108,7 +107,7 @@ class CombinedEnrichmentRmwIntegrationTest extends io.justsearch.adapters.lucene
         SchemaFields.SPLADE, Map.of("old", 2.0f),
         SchemaFields.NER_STATUS, SchemaFields.NER_STATUS_PENDING));
 
-    CombinedEnrichmentBackfillOps.processCombinedBackfill(
+    LaneBackfillTestSupport.runLanes(
         context(null, splade, ner));
     refresh();
 
@@ -139,7 +138,7 @@ class CombinedEnrichmentRmwIntegrationTest extends io.justsearch.adapters.lucene
         SchemaFields.SPLADE, Map.of("old", 2.0f)));
     assertTrue(hasSparseHit("old", docId), "the seed must contain real sparse postings");
 
-    CombinedEnrichmentBackfillOps.processCombinedBackfill(context(embedding, null, null));
+    LaneBackfillTestSupport.runLanes(context(embedding, null, null));
     refresh();
 
     assertEquals(SchemaFields.EMBEDDING_STATUS_COMPLETED,
@@ -161,7 +160,7 @@ class CombinedEnrichmentRmwIntegrationTest extends io.justsearch.adapters.lucene
         SchemaFields.CONTENT, "content for NER", SchemaFields.NER_STATUS, "PENDING",
         SchemaFields.SPLADE_STATUS, "COMPLETED", SchemaFields.SPLADE_RETRY_COUNT, "2",
         SchemaFields.SPLADE, Map.of("old", 2f)));
-    CombinedEnrichmentBackfillOps.processCombinedBackfill(context(null, null, ner));
+    LaneBackfillTestSupport.runLanes(context(null, null, ner));
     refresh();
     assertEquals("COMPLETED", runtime.documentFieldOps().getDocumentField(docId, SchemaFields.SPLADE_STATUS));
     assertEquals("2", runtime.documentFieldOps().getDocumentField(docId, SchemaFields.SPLADE_RETRY_COUNT));
@@ -187,7 +186,7 @@ class CombinedEnrichmentRmwIntegrationTest extends io.justsearch.adapters.lucene
         SchemaFields.SPLADE, Map.of("old", 2.0f)));
     assertTrue(hasSparseHit("old", docId), "the seed must contain real sparse postings");
 
-    CombinedEnrichmentBackfillOps.processCombinedBackfill(context(embedding, splade, null));
+    LaneBackfillTestSupport.runLanes(context(embedding, splade, null));
     refresh();
 
     assertTrue(hasSparseHit("old", docId), "a failing encoder must not affect existing sparse work");
@@ -228,7 +227,7 @@ class CombinedEnrichmentRmwIntegrationTest extends io.justsearch.adapters.lucene
             Map.of("old", 2.0f)));
     assertTrue(hasSparseHit("old", docId), "the seed must contain real sparse postings");
 
-    CombinedEnrichmentBackfillOps.processCombinedBackfill(context(embedding, splade, null));
+    LaneBackfillTestSupport.runLanes(context(embedding, splade, null));
     refresh();
 
     verify(embedding, never()).embedDocumentBatch(anyList());
@@ -245,12 +244,10 @@ class CombinedEnrichmentRmwIntegrationTest extends io.justsearch.adapters.lucene
     assertTrue(hasSparseHit("old", docId), "embedding retry bookkeeping must retain sparse postings");
   }
 
-  private CombinedEnrichmentBackfillOps.BackfillContext context(
+  private LaneBackfillTestSupport.BackfillContext context(
       EmbeddingProvider embedding, SpladeEncoder splade, NerService ner) {
-    return new CombinedEnrichmentBackfillOps.BackfillContext(
-        runtime.documentFieldOps(),
+    return new LaneBackfillTestSupport.BackfillContext(runtime.documentFieldOps(),
         runtime.indexingCoordinator(),
-        runtime.commitOps(),
         IndexingPacing.unthrottled(),
         embedding == null ? () -> null : () -> embedding,
         () -> splade,
@@ -263,10 +260,6 @@ class CombinedEnrichmentRmwIntegrationTest extends io.justsearch.adapters.lucene
         false,
         false,
         0,
-        new ArrayDeque<>(),
-        new ArrayDeque<>(),
-        new int[] {0},
-        () -> false,
         () -> false,
         () -> false,
         new WindowedEmbedProgress());

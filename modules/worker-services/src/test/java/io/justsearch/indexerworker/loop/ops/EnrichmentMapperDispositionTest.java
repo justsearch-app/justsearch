@@ -10,7 +10,6 @@ import static org.mockito.Mockito.*;
 import io.justsearch.adapters.lucene.runtime.IndexSchema;
 import io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase;
 import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.EnrichmentPublicationReceipt;
-import io.justsearch.indexerworker.coordination.WorkerSignalBus;
 import io.justsearch.configuration.FieldCatalogDef;
 import io.justsearch.configuration.FieldCatalogDef.FieldDef;
 import io.justsearch.indexerworker.embed.EmbeddingProvider;
@@ -19,7 +18,6 @@ import io.justsearch.indexerworker.splade.SpladeEncoder;
 import io.justsearch.indexing.SchemaFields;
 import io.justsearch.indexing.api.IndexDocument;
 import java.nio.file.Path;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -56,13 +54,24 @@ class EnrichmentMapperDispositionTest extends LuceneExecutorTestBase {
         receipt.set(applied);
         return applied;
       }).when(coordinator).publishEnrichmentBatch(anyList(), anyMap(), any());
-      var outcome = assertDoesNotThrow(() -> CombinedEnrichmentBackfillOps.processCombinedBackfill(
-          new CombinedEnrichmentBackfillOps.BackfillContext(runtime.documentFieldOps(),
-              coordinator, runtime.commitOps(), IndexingPacing.unthrottled(),
-              () -> embedding, () -> sparse, () -> null, () -> true, () -> true, 1,
-              LoggerFactory.getLogger(getClass()), false, false, false, 0,
-              new ArrayDeque<>(), new ArrayDeque<>(), new int[1], () -> false, () -> false,
-              () -> false, new WindowedEmbedProgress())));
+      var outcome = assertDoesNotThrow(() -> LaneBackfillTestSupport.runLanes(
+          new LaneBackfillTestSupport.BackfillContext(runtime.documentFieldOps(),
+        coordinator,
+        IndexingPacing.unthrottled(),
+        () -> embedding,
+        () -> sparse,
+        () -> null,
+        () -> true,
+        () -> true,
+        1,
+        LoggerFactory.getLogger(getClass()),
+        false,
+        false,
+        false,
+        0,
+        () -> false,
+        () -> false,
+        new WindowedEmbedProgress())));
       runtime.commitOps().maybeRefreshBlocking();
       assertEquals("FAILED", runtime.documentFieldOps().getDocumentField("parent", SchemaFields.EMBEDDING_STATUS));
       assertEquals("0", runtime.documentFieldOps().getDocumentField("parent", SchemaFields.EMBEDDING_RETRY_COUNT));
@@ -103,16 +112,20 @@ class EnrichmentMapperDispositionTest extends LuceneExecutorTestBase {
       when(embedding.embedDocumentBatch(anyList())).thenReturn(null);
       when(embedding.embedDocument(anyString(), any())).thenReturn(new float[] {Float.NaN, 1});
       var commits = spy(runtime.commitOps());
-      var outcome = assertDoesNotThrow(() -> EmbeddingBackfillOps.processEmbeddingBackfill(
-          new EmbeddingBackfillOps.BackfillContext(runtime.documentFieldOps(),
-              runtime.indexingCoordinator(), commits, mock(WorkerSignalBus.class),
-              IndexingPacing.unthrottled(), () -> embedding, () -> true, () -> true, 1,
-              LoggerFactory.getLogger(getClass()))));
+      var outcome = assertDoesNotThrow(() -> LaneBackfillTestSupport.runDenseParent(
+          new LaneBackfillTestSupport.EmbeddingContext(runtime.documentFieldOps(),
+        runtime.indexingCoordinator(),
+        IndexingPacing.unthrottled(),
+        () -> embedding,
+        () -> true,
+        () -> true,
+        1,
+        LoggerFactory.getLogger(getClass()))));
       runtime.commitOps().maybeRefreshBlocking();
       assertEquals("FAILED", runtime.documentFieldOps().getDocumentField("parent", SchemaFields.EMBEDDING_STATUS));
       assertEquals("0", runtime.documentFieldOps().getDocumentField("parent", SchemaFields.EMBEDDING_RETRY_COUNT));
       assertTrue(outcome.success(), "preserve the existing routing signal");
-      verify(commits).commitAndTrack(io.justsearch.adapters.lucene.runtime.CommitReason.BACKFILL_EMBEDDING);
+      verifyNoInteractions(commits);
       assertEquals(1, outcome.docsProcessed(),
           "the existing completion count keeps its input; the correction is reported below");
       assertEquals(1, outcome.accounting().count(

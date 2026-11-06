@@ -62,9 +62,14 @@ final class EnrichmentPreservationTest extends LuceneExecutorTestBase {
       var provider=mock(EmbeddingProvider.class);
       when(provider.isAvailable()).thenReturn(true);
       when(provider.embedDocumentBatch(List.of(large))).thenReturn(List.of(new float[]{1,0,0,0}));
-      var result=EmbeddingBackfillOps.processEmbeddingBackfill(new EmbeddingBackfillOps.BackfillContext(
-          runtime.documentFieldOps(),runtime.indexingCoordinator(),runtime.commitOps(),mock(WorkerSignalBus.class),
-          IndexingPacing.unthrottled(),()->provider,()->true,()->true,100,LoggerFactory.getLogger(getClass())));
+      var result=LaneBackfillTestSupport.runDenseParent(new LaneBackfillTestSupport.EmbeddingContext(runtime.documentFieldOps(),
+        runtime.indexingCoordinator(),
+        IndexingPacing.unthrottled(),
+        ()->provider,
+        ()->true,
+        ()->true,
+        100,
+        LoggerFactory.getLogger(getClass())));
       assertEquals(1,result.docsProcessed());
       verify(provider).embedDocumentBatch(List.of(large));
       assertEquals("PENDING",runtime.documentFieldOps().getDocumentField("b-later",SchemaFields.EMBEDDING_STATUS));
@@ -135,7 +140,7 @@ final class EnrichmentPreservationTest extends LuceneExecutorTestBase {
     COMBINED_CHUNK, COMBINED_SPARSE_PARENT, COMBINED_SPARSE_CHUNK, COMBINED_NER, COMBINED_ALL }
 
   @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
-  @org.junit.jupiter.params.provider.EnumSource(Lane.class)
+  @org.junit.jupiter.params.provider.EnumSource(value = Lane.class, names = {"DENSE_PARENT", "DENSE_CHUNK", "SPARSE_PARENT", "SPARSE_CHUNK", "NER", "BGE"})
   void keysetTurnsPassPoisonSurviveRefreshDeletionAndIdleThenWrap(Lane lane) throws Exception {
     try (var runtime = openEnrichment()) {
       // Physical insertion order deliberately disagrees with the document-ID order.
@@ -148,10 +153,23 @@ final class EnrichmentPreservationTest extends LuceneExecutorTestBase {
       runTurn(runtime, lane, 1, selection, progress);
       assertEquals("1", runtime.documentFieldOps().getDocumentField("a-poison", retry(lane)));
       var idleProvider = mock(EmbeddingProvider.class);
-      CombinedEnrichmentBackfillOps.processCombinedBackfill(new CombinedEnrichmentBackfillOps.BackfillContext(
-          runtime.documentFieldOps(),runtime.indexingCoordinator(),runtime.commitOps(),IndexingPacing.unthrottled(),()->idleProvider,
-          ()->null,()->null,()->true,()->false,1,LoggerFactory.getLogger(getClass()),false,false,false,0,
-          new ArrayDeque<>(),new ArrayDeque<>(),new int[]{0},()->false,()->false,()->false,progress),selection);
+      LaneBackfillTestSupport.runLanes(new LaneBackfillTestSupport.BackfillContext(runtime.documentFieldOps(),
+        runtime.indexingCoordinator(),
+        IndexingPacing.unthrottled(),
+        ()->idleProvider,
+        ()->null,
+        ()->null,
+        ()->true,
+        ()->false,
+        1,
+        LoggerFactory.getLogger(getClass()),
+        false,
+        false,
+        false,
+        0,
+        ()->false,
+        ()->false,
+        progress),selection);
       runTurn(runtime, lane, 1, selection, progress);
       assertTrue(completed(runtime, "b-later", lane), "a retryable poison row must not pin the head");
       assertEquals("1", runtime.documentFieldOps().getDocumentField("a-poison", retry(lane)));
@@ -191,20 +209,26 @@ final class EnrichmentPreservationTest extends LuceneExecutorTestBase {
       if (excluded) doReturn(Set.of("a-ineligible")).when(fields).excludedProcessingIds(anyList());
       var provider = mock(EmbeddingProvider.class); when(provider.isAvailable()).thenReturn(true);
       when(provider.embedDocumentBatch(anyList())).thenReturn(List.of(new float[]{1,0,0,0}));
-      var context = new EmbeddingBackfillOps.BackfillContext(fields,runtime.indexingCoordinator(),runtime.commitOps(),
-          mock(WorkerSignalBus.class),IndexingPacing.unthrottled(),()->provider,()->true,()->true,1,LoggerFactory.getLogger(getClass()));
+      var context = new LaneBackfillTestSupport.EmbeddingContext(fields,
+        runtime.indexingCoordinator(),
+        IndexingPacing.unthrottled(),
+        ()->provider,
+        ()->true,
+        ()->true,
+        1,
+        LoggerFactory.getLogger(getClass()));
       var selection = new EnrichmentSelection();
-      EmbeddingBackfillOps.processEmbeddingBackfill(context,selection);
+      LaneBackfillTestSupport.runDenseParent(context,selection);
       assertDoesNotThrow(()->verify(provider,never()).embedDocumentBatch(anyList()),"an ineligible selection does not infer or spend a retry");
       assertEquals("0",real.getDocumentField("a-ineligible",SchemaFields.EMBEDDING_RETRY_COUNT));
-      EmbeddingBackfillOps.processEmbeddingBackfill(context,selection); commit(runtime);
+      LaneBackfillTestSupport.runDenseParent(context,selection); commit(runtime);
       assertEquals("COMPLETED",real.getDocumentField("b-pending",SchemaFields.EMBEDDING_STATUS));
       if (excluded) assertEquals("PENDING",real.getDocumentField("a-ineligible",SchemaFields.EMBEDDING_STATUS));
     }
   }
 
   @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
-  @org.junit.jupiter.params.provider.EnumSource(value = Lane.class, mode = org.junit.jupiter.params.provider.EnumSource.Mode.EXCLUDE, names = "DENSE_PARENT")
+  @org.junit.jupiter.params.provider.EnumSource(value = Lane.class, names = {"DENSE_CHUNK", "SPARSE_PARENT", "SPARSE_CHUNK", "NER", "BGE"})
   void budgetDeferredSuffixIsNextTurnWithoutBlankRetriesOrCharges(Lane lane) throws Exception {
     try (var runtime = openEnrichment()) {
       seedPending(runtime, "a", "a".repeat(300_000), lane);
@@ -273,10 +297,23 @@ final class EnrichmentPreservationTest extends LuceneExecutorTestBase {
       }
       commit(runtime);
       // No encoder work is available in this turn; cleanup must not require re-selection.
-      CombinedEnrichmentBackfillOps.processCombinedBackfill(new CombinedEnrichmentBackfillOps.BackfillContext(
-          runtime.documentFieldOps(),runtime.indexingCoordinator(),runtime.commitOps(),IndexingPacing.unthrottled(),()->provider,
-          ()->null,()->null,()->true,()->false,1,LoggerFactory.getLogger(getClass()),false,false,false,0,
-          new ArrayDeque<>(),new ArrayDeque<>(),new int[]{0},()->false,()->false,()->false,progress),new EnrichmentSelection());
+      LaneBackfillTestSupport.runLanes(new LaneBackfillTestSupport.BackfillContext(runtime.documentFieldOps(),
+        runtime.indexingCoordinator(),
+        IndexingPacing.unthrottled(),
+        ()->provider,
+        ()->null,
+        ()->null,
+        ()->true,
+        ()->false,
+        1,
+        LoggerFactory.getLogger(getClass()),
+        false,
+        false,
+        false,
+        0,
+        ()->false,
+        ()->false,
+        progress),new EnrichmentSelection());
       assertEquals(0,progress.nextWindow("retired","retired text"),"retired partial releases its slot next turn");
       assertNull(progress.route("retired","retired text"),"route-only owners also release their slot");
       if (routeOnly) assertEquals(WindowedEmbedProgress.Route.WINDOW,progress.route("stable","stable text"));
@@ -319,10 +356,23 @@ final class EnrichmentPreservationTest extends LuceneExecutorTestBase {
           progress.route(id,"retained text",WindowedEmbedProgress.Route.WINDOW);
         }
       }
-      CombinedEnrichmentBackfillOps.processCombinedBackfill(new CombinedEnrichmentBackfillOps.BackfillContext(
-          runtime.documentFieldOps(),runtime.indexingCoordinator(),runtime.commitOps(),IndexingPacing.unthrottled(),()->provider,
-          ()->null,()->null,()->true,()->true,1,LoggerFactory.getLogger(getClass()),fullWithWaitingChunk,false,false,fullWithWaitingChunk ? 1 : 0,
-          new ArrayDeque<>(),new ArrayDeque<>(),new int[]{0},()->false,()->false,()->false,progress),new EnrichmentSelection());
+      LaneBackfillTestSupport.runLanes(new LaneBackfillTestSupport.BackfillContext(runtime.documentFieldOps(),
+        runtime.indexingCoordinator(),
+        IndexingPacing.unthrottled(),
+        ()->provider,
+        ()->null,
+        ()->null,
+        ()->true,
+        ()->true,
+        1,
+        LoggerFactory.getLogger(getClass()),
+        fullWithWaitingChunk,
+        false,
+        false,
+        fullWithWaitingChunk ? 1 : 0,
+        ()->false,
+        ()->false,
+        progress),new EnrichmentSelection());
       commit(runtime);
       assertEquals("COMPLETED",runtime.documentFieldOps().getDocumentField("z-owner",SchemaFields.EMBEDDING_STATUS));
       assertEquals("PENDING",runtime.documentFieldOps().getDocumentField("a-new",fullWithWaitingChunk
@@ -366,10 +416,23 @@ final class EnrichmentPreservationTest extends LuceneExecutorTestBase {
       for (int cycle = 0; cycle < 3 && "PENDING".equals(runtime.documentFieldOps().getDocumentField(
           "b-chunk",SchemaFields.CHUNK_EMBEDDING_STATUS)); cycle++) {
         units.set(0);
-        CombinedEnrichmentBackfillOps.processCombinedBackfill(new CombinedEnrichmentBackfillOps.BackfillContext(
-            runtime.documentFieldOps(),runtime.indexingCoordinator(),runtime.commitOps(),IndexingPacing.unthrottled(),()->provider,
-            ()->null,()->null,()->true,()->true,100,LoggerFactory.getLogger(getClass()),true,false,false,1,
-            new ArrayDeque<>(),new ArrayDeque<>(),new int[]{0},()->units.get()>=1,()->false,()->false,progress),selection);
+        LaneBackfillTestSupport.runLanes(new LaneBackfillTestSupport.BackfillContext(runtime.documentFieldOps(),
+        runtime.indexingCoordinator(),
+        IndexingPacing.unthrottled(),
+        ()->provider,
+        ()->null,
+        ()->null,
+        ()->true,
+        ()->true,
+        100,
+        LoggerFactory.getLogger(getClass()),
+        true,
+        false,
+        false,
+        1,
+        ()->units.get()>=1,
+        ()->false,
+        progress),selection);
         commit(runtime);
       }
       assertEquals("COMPLETED",runtime.documentFieldOps().getDocumentField("b-chunk",SchemaFields.CHUNK_EMBEDDING_STATUS),
@@ -428,10 +491,11 @@ final class EnrichmentPreservationTest extends LuceneExecutorTestBase {
 
   private void runTurn(RunningRuntime runtime, Lane lane, int size, EnrichmentSelection selection,
       WindowedEmbedProgress progress) throws Exception {
+    selection.beginCycle();
     var dense = mock(EmbeddingProvider.class); when(dense.isAvailable()).thenReturn(true); when(dense.dimension()).thenReturn(4);
     when(dense.embedDocumentBatch(anyList())).thenAnswer(call -> {
       List<String> texts = call.getArgument(0);
-      if (texts.contains("poison")) return null;
+      if (texts.contains("poison")) return Collections.nCopies(texts.size(), null);
       return Collections.nCopies(texts.size(), new float[]{1,0,0,0});
     });
     when(dense.embedDocument(eq("poison"), any())).thenThrow(new IllegalArgumentException("poison row"));
@@ -447,24 +511,53 @@ final class EnrichmentPreservationTest extends LuceneExecutorTestBase {
     var log = LoggerFactory.getLogger(getClass()); var pacing = IndexingPacing.unthrottled();
     switch(lane) {
       case DENSE_PARENT, DENSE_CHUNK -> {
-        var context = new EmbeddingBackfillOps.BackfillContext(runtime.documentFieldOps(), runtime.indexingCoordinator(),runtime.commitOps(),
-            mock(WorkerSignalBus.class),pacing,()->dense,()->true,()->true,size,log);
-        if(lane==Lane.DENSE_CHUNK) EmbeddingBackfillOps.processChunkEmbeddingBackfill(context,selection);
-        else EmbeddingBackfillOps.processEmbeddingBackfill(context,selection);
+        var context = new LaneBackfillTestSupport.EmbeddingContext(runtime.documentFieldOps(),
+        runtime.indexingCoordinator(),
+        pacing,
+        ()->dense,
+        ()->true,
+        ()->true,
+        size,
+        log);
+        if(lane==Lane.DENSE_CHUNK) LaneBackfillTestSupport.runDenseChunk(context,selection);
+        else LaneBackfillTestSupport.runDenseParent(context,selection);
       }
-      case SPARSE_PARENT, SPARSE_CHUNK -> SpladeBackfillOps.processSpladeBackfill(new SpladeBackfillOps.BackfillContext(
-          runtime.documentFieldOps(),runtime.indexingCoordinator(),runtime.commitOps(),pacing,()->sparse,()->true,size,true,lane==Lane.SPARSE_CHUNK,log),selection);
-      case NER -> NerBackfillOps.processNerBackfill(new NerBackfillOps.BackfillContext(runtime.documentFieldOps(),runtime.indexingCoordinator(),
-          runtime.commitOps(),pacing,()->ner,()->true,size,log),selection);
+      case SPARSE_PARENT, SPARSE_CHUNK -> LaneBackfillTestSupport.runSparse(new SpladeBackfillOps.BackfillContext(runtime.documentFieldOps(),
+        runtime.indexingCoordinator(),
+        pacing,
+        ()->sparse,
+        ()->true,
+        size,
+        lane==Lane.SPARSE_CHUNK,
+        log, () -> true),selection);
+      case NER -> NerBackfillOps.processNerUnit(new NerBackfillOps.BackfillContext(runtime.documentFieldOps(),
+        runtime.indexingCoordinator(),
+        pacing,
+        ()->ner,
+        ()->true,
+        size,
+        log, () -> true),selection);
       case COMBINED, COMBINED_CHUNK, COMBINED_SPARSE_PARENT, COMBINED_SPARSE_CHUNK, COMBINED_NER, COMBINED_ALL -> {
         boolean denseEnabled = lane == Lane.COMBINED || lane == Lane.COMBINED_CHUNK || lane == Lane.COMBINED_ALL;
         boolean sparseEnabled = lane == Lane.COMBINED_SPARSE_PARENT || lane == Lane.COMBINED_SPARSE_CHUNK || lane == Lane.COMBINED_ALL;
         boolean nerEnabled = lane == Lane.COMBINED_NER || lane == Lane.COMBINED_ALL;
-        CombinedEnrichmentBackfillOps.processCombinedBackfill(new CombinedEnrichmentBackfillOps.BackfillContext(
-            runtime.documentFieldOps(),runtime.indexingCoordinator(),runtime.commitOps(),pacing,()->dense,
-            ()->sparseEnabled ? sparse : null,()->nerEnabled ? ner : null,()->true,()->denseEnabled,
-            size,log,lane==Lane.COMBINED_CHUNK,lane==Lane.COMBINED_SPARSE_CHUNK,false,lane==Lane.COMBINED_CHUNK ? size : 0,
-            new ArrayDeque<>(),new ArrayDeque<>(),new int[]{0},()->false,()->false,()->false,progress),selection);
+        LaneBackfillTestSupport.runLanes(new LaneBackfillTestSupport.BackfillContext(runtime.documentFieldOps(),
+        runtime.indexingCoordinator(),
+        pacing,
+        ()->dense,
+        ()->sparseEnabled ? sparse : null,
+        ()->nerEnabled ? ner : null,
+        ()->true,
+        ()->denseEnabled,
+        size,
+        log,
+        lane==Lane.COMBINED_CHUNK,
+        lane==Lane.COMBINED_SPARSE_CHUNK,
+        false,
+        lane==Lane.COMBINED_CHUNK ? size : 0,
+        ()->false,
+        ()->false,
+        progress),selection);
       }
       case BGE -> {
         var encoder = mock(io.justsearch.indexerworker.bgem3.BgeM3Encoder.class);

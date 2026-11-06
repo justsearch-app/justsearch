@@ -5,7 +5,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-import io.justsearch.adapters.lucene.runtime.CommitOps;
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
 import io.justsearch.adapters.lucene.runtime.IndexingCoordinator;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
@@ -24,22 +23,26 @@ final class NerLazyCreationRetryTest {
     IndexingCoordinator index = mock(IndexingCoordinator.class);
     NerService ner = mock(NerService.class);
     when(ner.isAvailable()).thenReturn(true);
-    BackfillSnapshotTestSupport.install(fields, index, true, Set.of());
+    BackfillSnapshotTestSupport.installLaneFixtures(fields, index, true, Set.of());
     when(fields.queryDocIdsByField(eq(SchemaFields.NER_STATUS), eq("PENDING"), anyInt()))
         .thenReturn(List.of("doc"));
     when(fields.getDocumentContent("doc")).thenReturn("Ada Lovelace in London");
     when(fields.getDocumentField("doc", SchemaFields.NER_RETRY_COUNT)).thenReturn("2");
     when(ner.extractEntitiesBatch(anyList())).thenThrow(
         new SessionTemporarilyUnavailableException("ner: CPU session creation failed"));
-    var context = new NerBackfillOps.BackfillContext(fields, index, mock(CommitOps.class),
-        IndexingPacing.unthrottled(), () -> ner, () -> true, 10,
-        LoggerFactory.getLogger(NerLazyCreationRetryTest.class));
+    var context = new NerBackfillOps.BackfillContext(fields,
+        index,
+        IndexingPacing.unthrottled(),
+        () -> ner,
+        () -> true,
+        10,
+        LoggerFactory.getLogger(NerLazyCreationRetryTest.class), () -> true);
     var publications = new java.util.concurrent.atomic.AtomicInteger();
     when(index.updateDocumentsBatch(anyList())).thenAnswer(call -> {
       publications.incrementAndGet();
       return new io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.BatchUpdateResult(1, 0);
     });
-    var outcome = assertDoesNotThrow(() -> NerBackfillOps.processNerBackfill(context));
+    var outcome = assertDoesNotThrow(() -> LaneBackfillTestSupport.runNer(context));
     assertEquals(0, publications.get(), "an unavailable lease never writes a row retry or terminal status");
     assertTrue(outcome.success());
     assertEquals(0, outcome.docsProcessed());
@@ -52,18 +55,21 @@ final class NerLazyCreationRetryTest {
   void rowFailuresFollowTheExistingDocumentRetryPolicy() throws Exception {
     DocumentFieldOps fields = mock(DocumentFieldOps.class);
     IndexingCoordinator index = mock(IndexingCoordinator.class);
-    CommitOps commits = mock(CommitOps.class);
     NerService ner = mock(NerService.class);
     when(ner.isAvailable()).thenReturn(true);
-    BackfillSnapshotTestSupport.install(fields, index, true, Set.of());
+    BackfillSnapshotTestSupport.installLaneFixtures(fields, index, true, Set.of());
     when(fields.queryDocIdsByField(eq(SchemaFields.NER_STATUS), eq(SchemaFields.NER_STATUS_PENDING), anyInt()))
         .thenReturn(List.of("doc"));
     when(fields.getDocumentContent("doc")).thenReturn("Ada Lovelace in London");
     when(ner.extractEntitiesBatch(anyList())).thenThrow(
         new IllegalArgumentException("invalid document input"));
-    var context = new NerBackfillOps.BackfillContext(fields, index, commits,
-        IndexingPacing.unthrottled(), () -> ner, () -> true, 10,
-        LoggerFactory.getLogger(NerLazyCreationRetryTest.class));
+    var context = new NerBackfillOps.BackfillContext(fields,
+        index,
+        IndexingPacing.unthrottled(),
+        () -> ner,
+        () -> true,
+        10,
+        LoggerFactory.getLogger(NerLazyCreationRetryTest.class), () -> true);
     List<Map<String, Object>> writes = new ArrayList<>();
     when(index.updateDocumentsBatch(anyList())).thenAnswer(call -> {
       List<Map.Entry<String, Map<String, Object>>> updates = call.getArgument(0);
@@ -74,7 +80,7 @@ final class NerLazyCreationRetryTest {
     });
     for (int attempt = 0; attempt < SchemaFields.NER_MAX_RETRIES; attempt++) {
       when(fields.getDocumentField("doc", SchemaFields.NER_RETRY_COUNT)).thenReturn(Integer.toString(attempt));
-      var outcome = assertDoesNotThrow(() -> NerBackfillOps.processNerBackfill(context));
+      var outcome = assertDoesNotThrow(() -> LaneBackfillTestSupport.runNer(context));
       assertTrue(outcome.success());
       assertEquals(0, outcome.docsProcessed());
       Map<String, Object> write = writes.get(attempt);

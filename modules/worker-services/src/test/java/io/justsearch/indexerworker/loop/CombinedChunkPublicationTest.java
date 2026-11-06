@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.loop;
 
+import io.justsearch.indexerworker.loop.ops.LaneBackfillTestSupport;
 import static org.mockito.ArgumentMatchers.any;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -15,14 +16,12 @@ import io.justsearch.adapters.lucene.runtime.IndexSchema;
 import io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase;
 import io.justsearch.configuration.FieldCatalogDef;
 import io.justsearch.indexerworker.embed.EmbeddingProvider;
-import io.justsearch.indexerworker.loop.ops.CombinedEnrichmentBackfillOps;
 import io.justsearch.indexerworker.loop.ops.WindowedEmbedProgress;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexing.SchemaFields;
 import io.justsearch.indexing.api.IndexDocument;
 import io.justsearch.indexing.chunking.ChunkParentRevision;
 import java.nio.file.Path;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -82,18 +81,30 @@ class CombinedChunkPublicationTest extends LuceneExecutorTestBase {
         if (refreshAfterPublication) runtime.commitOps().maybeRefreshBlocking();
         return result;
       }).when(coordinator).publishEnrichmentBatch(anyList(), anyMap(), any());
-      var context = new CombinedEnrichmentBackfillOps.BackfillContext(
-          runtime.documentFieldOps(), coordinator, runtime.commitOps(), IndexingPacing.unthrottled(),
-          () -> embedding, () -> null, () -> null, () -> true, () -> true, 100,
-          LoggerFactory.getLogger(CombinedChunkPublicationTest.class), true, false, false, 50,
-          new ArrayDeque<>(), new ArrayDeque<>(), new int[] {0}, () -> false, () -> false,
-          () -> false, new WindowedEmbedProgress());
+      var context = new LaneBackfillTestSupport.BackfillContext(runtime.documentFieldOps(),
+        coordinator,
+        IndexingPacing.unthrottled(),
+        () -> embedding,
+        () -> null,
+        () -> null,
+        () -> true,
+        () -> true,
+        100,
+        LoggerFactory.getLogger(CombinedChunkPublicationTest.class),
+        true,
+        false,
+        false,
+        50,
+        () -> false,
+        () -> false,
+        new WindowedEmbedProgress());
 
       for (int cycle = 0; cycle < 3; cycle++) {
-        CombinedEnrichmentBackfillOps.processCombinedBackfill(context);
+        LaneBackfillTestSupport.runLanes(context);
       }
       System.out.println("chunk publication: encoded=" + encoded + ", written=" + written);
-      assertEquals(List.of(50), written, "completed chunks must leave the next batch selection");
+      assertEquals(50, written.stream().mapToInt(Integer::intValue).sum(),
+          "completed chunks must leave subsequent lane selections");
       assertEquals(50, encoded.get(), "every encoded chunk must be published exactly once");
     }
   }
