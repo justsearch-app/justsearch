@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-05T19:41:23.991Z",
+  "revision": "1173ce93e13c7ebd8d3e9f4616504cc85ce4a3b1",
+  "tree": "a88298ba8b04b5e9ee62db1ba243f62e4103b411",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.ai.install.AnswersInstallCommitOutcomeTest.cancelAfterAProvenFailedReplacementIsAccepted\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 11246
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AnswersInstallCommitOutcomeTest.java#cancelAfterAProvenFailedReplacementIsAccepted",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AnswersInstallCommitOutcomeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8200225427490e3f23f3a1f1960bbf0288286fd58992cb29d4c2f7f272122bf4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "cancelAfterAProvenFailedReplacementIsAccepted(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:500175e219623f11313ebb65ed0432be83b85239875666f2dea83d3219825887"
+}

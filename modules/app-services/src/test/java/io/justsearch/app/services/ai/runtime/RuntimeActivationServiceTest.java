@@ -1133,7 +1133,7 @@ class RuntimeActivationServiceTest {
     }
 
     @Override
-    public void cancel() {
+    public boolean cancel() {
       throw new UnsupportedOperationException("not used by this test");
     }
 

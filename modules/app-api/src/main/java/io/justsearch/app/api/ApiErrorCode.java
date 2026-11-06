@@ -187,6 +187,12 @@ public enum ApiErrorCode {
     /** Generic AI installation error. */
     AI_INSTALL_ERROR(ErrorClass.PERMANENT),
 
+    /** A part's downloaded files are being removed; the request can be retried after it finishes. */
+    MODEL_FILES_REMOVING(ErrorClass.TRANSIENT),
+
+    /** "Remove files" refused with a plain reason; nothing was deleted. */
+    FILES_NOT_REMOVED(ErrorClass.TRANSIENT),
+
     /** Failed to create AI directories (disk/permissions). */
     INSTALL_IO_ERROR(ErrorClass.PERMANENT),
 

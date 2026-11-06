@@ -68,6 +68,11 @@ export interface InstallPlanPreview {
    * idle machine, so asking it "what components are there" would answer "none".
    */
   components?: InstallComponentEstimate[];
+  /**
+   * Download again previews only: the identity of exactly this plan and the settings it was read
+   * against. The accepted start sends it back; a changed plan is refused ("review it again").
+   */
+  planDigest?: string;
 }
 
 export interface AiRuntimeStatus {

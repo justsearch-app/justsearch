@@ -200,6 +200,10 @@ public final class OperationHandlerRegistrations {
         CoreOperationCatalog.REPAIR_AI_INSTALL,
         new RepairAiInstallHandler(brainInstallServiceSupplier));
     handlers.register(
+        CoreOperationCatalog.REMOVE_AI_FILES,
+        new io.justsearch.app.services.registry.operations.handlers.RemoveAiFilesHandler(
+            brainInstallServiceSupplier));
+    handlers.register(
         CoreOperationCatalog.CREATE_USER_POLICY,
         new CreateUserPolicyHandler(policyServiceSupplier));
     handlers.register(

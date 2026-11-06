@@ -74,6 +74,9 @@ final class QueryRoleSet implements AutoCloseable {
     }
   }
 
+  /** Design D4: whether this owner still holds a Best match first session (until its surface retires). */
+  boolean holdsReranker() { return surface.holdsReranker(); }
+
   boolean isClosed() {
     synchronized (monitor) { return closed; }
   }

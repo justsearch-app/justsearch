@@ -48,6 +48,7 @@ public final class UiSettings {
   // RuntimeSpec), matching today's autostart-default-false — a true default would surprise-start
   // engines at boot.
   private Boolean chatEnabled = null;
+  private long chatPreferenceRevision;
 
   // Nullable desired API listener port. Null leaves the canonical resolver's other sources in
   // charge; zero explicitly requests an ephemeral listener on the next process incarnation.
@@ -180,6 +181,17 @@ public final class UiSettings {
    */
   public Boolean getChatEnabled() {
     return chatEnabled;
+  }
+
+  /**
+   * Settings-owner witness of the last accepted answers choice, including a same-value choice made
+   * through the answers switch. Absent (0) in settings saved before it existed.
+   */
+  @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_DEFAULT)
+  public long getChatPreferenceRevision() { return chatPreferenceRevision; }
+  public void setChatPreferenceRevision(long revision) {
+    if (revision < 0) throw new IllegalArgumentException("Invalid answers preference revision");
+    chatPreferenceRevision = revision;
   }
 
   public void setChatEnabled(Boolean chatEnabled) {

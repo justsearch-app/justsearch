@@ -1,0 +1,87 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-05T17:19:19.980Z",
+  "revision": "8afb51c12b6439ac3f9d0eac79bd20edcf228a2e",
+  "tree": "93163098e3529b0a676253c78543e9c5dbff29f7",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-38-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.answers-completion.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/gpw1t40a/tmp/test-intent-vitest-9722-1793899153060.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1651
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.answers-completion.test.ts#the answers switch: accepting starts the download with the completion enable and switches nothing on now",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.answers-completion.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:412adaab3afb7691c7eb4edfc579650d53f3eb46543c7db77c73185399d3043a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "answers consented with a removed answer model are switched on when the download completes the answers switch: accepting starts the download with the completion enable and switches nothing on now",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.answers-completion.test.ts#Start answers: asks first, Cancel saves nothing, Accept starts the download without switching answers on",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.answers-completion.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:412adaab3afb7691c7eb4edfc579650d53f3eb46543c7db77c73185399d3043a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "answers consented with a removed answer model are switched on when the download completes Start answers: asks first, Cancel saves nothing, Accept starts the download without switching answers on",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "8afb51c12b",
+    "revision": "8afb51c12b6439ac3f9d0eac79bd20edcf228a2e",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.answers-completion.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/gpw1t40a/tmp/test-intent-vitest-9722-1793899158075.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1557,
+        "output": "JSON report written to /home/elias/.cache/am/gpw1t40a/tmp/test-intent-vitest-9722-1793899158075.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.answers-completion.test.ts#the answers switch: accepting starts the download with the completion enable and switches nothing on now",
+        "classification": "assertion",
+        "detail": "answers consented with a removed answer model are switched on when the download completes the answers switch: accepting starts the download with the completion enable and switches nothing on now:  AssertionError: expected [ { …(2) }, { …(2) } ] to deeply equal [ { …(2) } ]\n    at /home/elias/.cache/am/gpw1t40a/tmp/test-intent-before-LiNexA/modules/ui-web/src/shell-v0/views/BrainSurface.answers-completion.test.ts:109:24\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s2-remove/modul"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.answers-completion.test.ts#Start answers: asks first, Cancel saves nothing, Accept starts the download without switching answers on",
+        "classification": "assertion",
+        "detail": "answers consented with a removed answer model are switched on when the download completes Start answers: asks first, Cancel saves nothing, Accept starts the download without switching answers on:  AssertionError: expected [ { …(2) }, { …(2) } ] to deeply equal [ { …(2) } ]\n    at /home/elias/.cache/am/gpw1t40a/tmp/test-intent-before-LiNexA/modules/ui-web/src/shell-v0/views/BrainSurface.answers-completion.test.ts:130:24\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s2-remove/modul"
+      }
+    ]
+  },
+  "digest": "sha256:7be484c7cc15a690534a67e988f798b0d08c586775b09fadd91e7ef836808e65"
+}

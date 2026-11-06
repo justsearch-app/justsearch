@@ -3,6 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AiState, InstallStatus } from '../state/aiStateStore.js';
 import { createMockHostApi } from '../plugin-api/testHostApi.js';
+import { EPHEMERAL_TOAST_EVENT, type EphemeralToastSpec } from '../components/advisory/ephemeralToast.js';
 
 const store = vi.hoisted(() => ({ listeners: new Set<(state: AiState) => void>(), current: {} as AiState }));
 vi.mock('../state/aiStateStore.js', async original => ({
@@ -27,6 +28,7 @@ let operations: string[];
 let confirmations: string[];
 let dialogs: { destructive?: boolean; title?: string }[] = [];
 let repairReply: (() => Promise<InstallStatus>) | null;
+let cancelReply: (InstallStatus & { alreadyCompleted: boolean }) | null;
 
 async function settle(el: Brain) { await new Promise(resolve => setTimeout(resolve, 0)); await el.updateComplete; }
 function expectPlanning(el: Brain) {
@@ -43,6 +45,7 @@ async function mount() {
     data: { invokeOperation: async id => {
       operations.push(id);
       if (id === 'core.repair-ai-install' && repairReply) return { success: true, structuredData: await repairReply() };
+      if (id === 'core.cancel-ai-install' && cancelReply) return { success: true, structuredData: cancelReply };
       if (id === 'core.cancel-ai-install') run = { ...run, state: 'cancelled', resumableBytes: run.downloadedBytes };
       return { success: true, structuredData: run };
     } },
@@ -67,7 +70,7 @@ function notify(patch: Partial<AiState> = {}) {
 function emit(installStatus: InstallStatus) { notify({ installStatus }); }
 
 beforeEach(() => {
-  operations = []; confirmations = []; dialogs = []; repairReply = null; refreshInstall.mockClear();
+  operations = []; confirmations = []; dialogs = []; repairReply = null; cancelReply = null; refreshInstall.mockClear();
   run = {
     state: 'running', phase: 'download', installedFully: true, repairNeeded: true,
     startedAtEpochMs: 200, updatedAtEpochMs: Date.now(), downloadedBytes: 256, totalBytes: 1024,
@@ -96,6 +99,37 @@ beforeEach(() => {
 afterEach(() => { document.body.innerHTML = ''; store.listeners.clear(); vi.unstubAllGlobals(); });
 
 describe('Brain running repair controls (B2/B8)', () => {
+  it('Cancel says the download paused when it stopped, and shows the completed state when the install finished first', async () => {
+    const toasts: string[] = [];
+    const onToast = (event: Event) => toasts.push((event as CustomEvent<EphemeralToastSpec>).detail.message);
+    window.addEventListener(EPHEMERAL_TOAST_EVENT, onToast);
+    try {
+      notify({ installStatus: run });
+      const el = await mount();
+      await click(el, 'Cancel');
+      expect(toasts).toEqual([expect.stringContaining('Download paused')]);
+
+      toasts.length = 0;
+      run = { ...run, state: 'running', phase: 'download' };
+      emit(run); await settle(el);
+      const completed = { state: 'completed', installedFully: true, repairNeeded: false, startedAtEpochMs: 200, updatedAtEpochMs: Date.now() } as InstallStatus;
+      cancelReply = { ...completed, alreadyCompleted: true };
+      const refreshes = refreshInstall.mock.calls.length;
+      await click(el, 'Cancel');
+      expect(refreshInstall.mock.calls.length).toBe(refreshes + 1);
+      expect(toasts).toEqual([]);
+
+      notify({
+        installStatus: completed,
+        aiEngine: { kind: 'online', stability: { kind: 'settled' }, installFailure: null },
+        runtime: { mode: 'online', installed: { known: true, value: true } },
+      } as unknown as Partial<AiState>);
+      await settle(el);
+      expect(el.shadowRoot!.querySelector('[data-testid="brain-simple-action"][label="Cancel"]')).toBeNull();
+      expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe('AI is ready');
+    } finally { window.removeEventListener(EPHEMERAL_TOAST_EVENT, onToast); }
+  });
+
   it('Repair requests a read immediately and only store observations change progress, Pause, Resume and Cancel', async () => {
     run = { ...run, updatedAtEpochMs: Date.now() - 120_000, readyCapabilities: ['retrieval-core'],
       stages: [...run.stages!, { stage: 'answers', label: 'Answers', state: 'blocked', blockedReason: 'Not enough disk space.' }] };

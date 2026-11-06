@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.justsearch.app.services.ai.install.ModelFileRemovalWindowsTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-06T03:38:44.418Z" hostname="runnervmm7ud1" time="0.782">
+  <properties/>
+  <testcase name="aCapturedFileAnotherProgramOpensForWritingIsKeptBecauseItsHandleCannotBeTaken()" classname="io.justsearch.app.services.ai.install.ModelFileRemovalWindowsTest" time="0.172"/>
+  <testcase name="theCapturedNameCannotBeSwappedWhileTheVerifiedHandleDeletesIt()" classname="io.justsearch.app.services.ai.install.ModelFileRemovalWindowsTest" time="0.163"/>
+  <testcase name="aFileHeldOpenWithoutDeleteSharingIsKeptUntilItIsReleased()" classname="io.justsearch.app.services.ai.install.ModelFileRemovalWindowsTest" time="0.229"/>
+  <testcase name="aFileSwappedInUnderTheCapturedNameBeforeTheDeletingHandleOpensIsNotDeleted()" classname="io.justsearch.app.services.ai.install.ModelFileRemovalWindowsTest" time="0.216"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

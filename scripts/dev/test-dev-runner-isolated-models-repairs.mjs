@@ -201,6 +201,129 @@ test('S3: CI\'s JUSTSEARCH_PR_CI is allowed, but does not admit other inherited 
   conflict(() => isolated.validateOverrides(path.join(root, 'pr-ci-conflict'), { JUSTSEARCH_PR_CI: 'true', JUSTSEARCH_REPO_ROOT: repo }));
 });
 
+// What a stopped or killed Engine leaves: saved settings, install records and its own stores.
+function savedEngineState(data) {
+  const saved = {
+    'ui/settings.json': '{"settings":{"rerankerEnabled":false,"declinedAiPackages":["reranker"]}}',
+    'install-contract.v2.json': '{"modelsRoot":"isolated-models"}',
+    'agent-runs/run.json': '{}',
+    'watched_roots.json': '[]',
+    'isolated-models/onnx/reranker/model.onnx': 'private model',
+  };
+  for (const [relative, text] of Object.entries(saved)) save(path.join(data, relative), text);
+  return saved;
+}
+
+test('S4: reuse restarts a marked folder holding saved state and keeps it through the default clean', () => {
+  const f = fixture('reuse-kept');
+  const local = require(path.join(f.fake, 'scripts/dev/lib/isolated-models.cjs'));
+  local.prepare({ dataDir: f.data, env: {}, state: 'none', repoRoot: f.fake });
+  const saved = savedEngineState(f.data);
+  refused(f, {}, /foreign content/); // The seeded states keep refusing it: reuse is explicit.
+  reachedRuntime(start(f, { args: ['start', '--json', '--isolated-models=reuse', '--skip-build', '--api-port=0'] }));
+  for (const [relative, text] of Object.entries(saved)) {
+    assert.equal(fs.readFileSync(path.join(f.data, relative), 'utf8'), text, `${relative} was kept`);
+  }
+});
+
+test('S4: reuse seeds nothing and returns the private folders', () => {
+  const dataDir = path.join(root, 'reuse-paths');
+  prepare(dataDir);
+  savedEngineState(dataDir);
+  const before = fs.readdirSync(path.join(dataDir, 'isolated-models'));
+  const { env } = isolated.prepare({ dataDir, env: {}, state: 'reuse', repoRoot: repo });
+  assert.equal(env.JUSTSEARCH_MODELS_DIR, path.join(dataDir, 'isolated-models'));
+  assert.equal(env.JUSTSEARCH_ORT_OPTIMIZED_CACHE_DIR, path.join(dataDir, 'isolated-ort-cache'));
+  assert.deepEqual(fs.readdirSync(path.join(dataDir, 'isolated-models')), before);
+});
+
+test('S3: reuse refuses a folder without the marker: absent, empty, unmarked or wrongly marked', () => {
+  const reuse = (dataDir, env = {}) => isolated.prepare({ dataDir, env, state: 'reuse', repoRoot: repo });
+  const absent = path.join(root, 'reuse-absent');
+  conflict(() => reuse(absent));
+  assert.equal(fs.existsSync(absent), false, 'a refusal creates nothing');
+  const empty = path.join(root, 'reuse-empty');
+  fs.mkdirSync(empty);
+  conflict(() => reuse(empty));
+  assert.deepEqual(fs.readdirSync(empty), []);
+  const unmarked = path.join(root, 'reuse-unmarked');
+  save(path.join(unmarked, 'ui/settings.json'), '{}');
+  conflict(() => reuse(unmarked));
+  const wrong = path.join(root, 'reuse-wrong-marker');
+  prepare(wrong);
+  fs.writeFileSync(path.join(wrong, isolated.MARKER), '{"schema":"other"}\n');
+  conflict(() => reuse(wrong));
+});
+
+test('S3: reuse refuses links, shared overlap, inherited variables, config and models folders', () => {
+  const reuse = (dataDir, env = {}) => isolated.validateOverrides(dataDir, env, 'reuse');
+  const marked = name => {
+    const dataDir = path.join(root, name);
+    prepare(dataDir);
+    savedEngineState(dataDir);
+    return dataDir;
+  };
+  const outside = path.join(root, 'reuse-outside');
+  fs.mkdirSync(outside, { recursive: true });
+  const kind = process.platform === 'win32' ? 'junction' : 'dir';
+  const inModels = marked('reuse-link-models');
+  fs.symlinkSync(outside, path.join(inModels, 'isolated-models', 'escape'), kind);
+  conflict(() => reuse(inModels));
+  const inState = marked('reuse-link-state');
+  fs.symlinkSync(outside, path.join(inState, 'ui', 'escape'), kind);
+  conflict(() => reuse(inState));
+  const moved = marked('reuse-link-folder');
+  fs.rmSync(path.join(moved, 'isolated-models'), { recursive: true });
+  fs.symlinkSync(outside, path.join(moved, 'isolated-models'), kind);
+  conflict(() => reuse(moved));
+  conflict(() => reuse(path.join(repo, 'models', 'install-check')));
+  conflict(() => reuse(marked('reuse-env'), { JUSTSEARCH_CONFIG: 'config.yaml' }));
+  conflict(() => reuse(marked('reuse-jvm'), { JAVA_OPTS: '-Dfoo=bar' }));
+  for (const relative of ['config/application.yaml', 'models/shared.onnx']) {
+    const dataDir = marked(`reuse-${relative.split('/')[0]}`);
+    save(path.join(dataDir, relative), '{}');
+    assert.throws(() => reuse(dataDir), /foreign content/);
+  }
+  assert.doesNotThrow(() => reuse(marked('reuse-clean')), 'the same folder without any of these is accepted');
+});
+
+test('S3: reuse refuses saved state naming the shared models, so the Engine cannot follow it there', () => {
+  const reuse = dataDir => isolated.validateOverrides(dataDir, {}, 'reuse');
+  const shared = path.join(repo, 'models', 'onnx', 'model.onnx');
+  const settings = path.join(root, 'reuse-shared-settings');
+  prepare(settings);
+  savedEngineState(settings);
+  save(path.join(settings, 'ui/settings.json'),
+    JSON.stringify({ settings: { queryRoles: { chat: { modelPath: shared } } } }));
+  assert.throws(() => reuse(settings), /saved state in .*settings\.json names the shared/);
+  const contract = path.join(root, 'reuse-shared-contract');
+  prepare(contract);
+  savedEngineState(contract);
+  save(path.join(contract, 'install-contract.v2.json'), JSON.stringify({ modelsRoot: path.join(repo, 'models') }));
+  assert.throws(() => reuse(contract), /saved state in .*install-contract\.v2\.json names the shared/);
+  const elsewhere = path.join(root, 'reuse-private-path');
+  prepare(elsewhere);
+  savedEngineState(elsewhere);
+  save(path.join(elsewhere, 'ui/settings.json'),
+    JSON.stringify({ settings: { modelPath: path.join(elsewhere, 'isolated-models', 'chat.gguf') } }));
+  assert.doesNotThrow(() => reuse(elsewhere), 'a path inside the private folder is its own');
+  save(path.join(elsewhere, 'ui/settings.json'), '{ cut off by a killed Engine');
+  assert.doesNotThrow(() => reuse(elsewhere), 'the Engine quarantines settings it cannot read');
+});
+
+test('S4: reuse never cleans: the parser turns the default clean off and refuses a hard one', () => {
+  const f = fixture('reuse-clean-args');
+  const local = require(path.join(f.fake, 'scripts/dev/lib/isolated-models.cjs'));
+  local.prepare({ dataDir: f.data, env: {}, state: 'none', repoRoot: f.fake });
+  const saved = savedEngineState(f.data);
+  const result = start(f, { args: ['start', '--json', '--isolated-models=reuse', '--skip-build', '--clean=hard'] });
+  assert.equal(result.status, 1, result.stdout + result.stderr);
+  assert.match(result.stdout + result.stderr, /--clean hard would delete it/);
+  for (const [relative, text] of Object.entries(saved)) {
+    assert.equal(fs.readFileSync(path.join(f.data, relative), 'utf8'), text);
+  }
+});
+
 let failed = 0;
 try {
   for (const [name, run] of tests) {

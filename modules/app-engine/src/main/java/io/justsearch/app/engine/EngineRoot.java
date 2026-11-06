@@ -232,6 +232,18 @@ public final class EngineRoot implements WorkerHost {
     return services != null && services.heavyIndexing();
   }
 
+  /**
+   * Design D4 (Remove files): asked of the physical index half's query owners at the call. A
+   * closed index half is unknown, not free: removal then refuses.
+   */
+  @Override
+  public RerankerUse rerankerUse() {
+    KnowledgeServer current = server;
+    if (current == null) return RerankerUse.UNKNOWN;
+    return current.rerankerSessionHeld()
+        .map(held -> held ? RerankerUse.HELD : RerankerUse.FREE).orElse(RerankerUse.BUSY);
+  }
+
   // ---- device loss (Spec A step 10, Spec E step E8) ----
 
   /** The restart path the composition root binds; fail closed until then. */

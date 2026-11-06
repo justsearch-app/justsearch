@@ -13,8 +13,11 @@ Method io.justsearch.app.inference.InferenceLifecycleManager.updateFromPropsBest
 Method io.justsearch.app.inference.TransitionRunner.installViewForTest(io.justsearch.app.inference.InferenceRuntimeView) is never referenced
 Method io.justsearch.app.services.HeadAssembly.chooseFirstNonBlank([Ljava.lang.String;) is never referenced
 Method io.justsearch.app.services.ai.install.AiInstallService.knowledgeServerForTest() is never referenced
+Method io.justsearch.app.services.ai.install.AiInstallService.removalForTest() is never referenced
 Method io.justsearch.app.services.ai.install.AiInstallService.setFreeSpaceProbeForTest(io.justsearch.app.services.ai.install.FreeSpaceCheck$Probe) is never referenced
+Method io.justsearch.app.services.ai.install.AiInstallService.setManifestForTest(io.justsearch.configuration.model.ModelRegistry) is never referenced
 Method io.justsearch.app.services.ai.install.AiInstallService.setNanoClockForTest(java.util.function.LongSupplier) is never referenced
+Method io.justsearch.app.services.ai.install.ModelFileRemoval.setCheckpointHookForTest(java.util.function.Consumer) is never referenced
 Method io.justsearch.app.services.ai.install.TransportFaultInjector.resetWarningState() is never referenced
 Method io.justsearch.app.services.ai.runtime.RuntimeActivationService.setSelfTestOverrideForTest(java.util.function.BiFunction) is never referenced
 Method io.justsearch.app.services.feedback.NdjsonAppendStore.storeFile() is never referenced

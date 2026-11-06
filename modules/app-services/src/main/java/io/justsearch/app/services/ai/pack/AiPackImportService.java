@@ -161,6 +161,20 @@ public final class AiPackImportService implements io.justsearch.app.api.AiPackIm
 
   public Attempt startImport(Path packPath, boolean allowDowngrade) {
     Objects.requireNonNull(packPath, "packPath");
+    // A pack places model files: it registers with the removal lock for its whole run, so it cannot
+    // start while files are being removed, and a removal cannot begin while it runs (design D4).
+    var filesUser = io.justsearch.app.services.ai.install.ModelFileRemovalFence.enterIfBound(
+        settingsStore == null ? null : settingsStore.modelFileRemovalFence(), "An AI pack import");
+    try {
+      return startImportRun(packPath, allowDowngrade, filesUser);
+    } catch (RuntimeException | Error failure) {
+      filesUser.close();
+      throw failure;
+    }
+  }
+
+  private Attempt startImportRun(Path packPath, boolean allowDowngrade,
+      io.justsearch.app.services.ai.install.ModelFileRemovalFence.Ticket filesUser) {
     AiPackImportStatus started;
     synchronized (lock) {
       if (running.get()) throw new IllegalStateException("Pack import already running");
@@ -185,7 +199,13 @@ public final class AiPackImportService implements io.justsearch.app.api.AiPackIm
     }
     var completion = new CompletableFuture<AiPackImportStatus>();
     try {
-      Thread thread = new Thread(() -> completeImport(packPath, allowDowngrade, lease, completion), "ai-pack-import");
+      Thread thread = new Thread(() -> {
+        try {
+          completeImport(packPath, allowDowngrade, lease, completion);
+        } finally {
+          filesUser.close();
+        }
+      }, "ai-pack-import");
       thread.setDaemon(true);
       this.importThread = thread;
       thread.start();

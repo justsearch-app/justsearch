@@ -57,6 +57,26 @@ final class RecordedInstallerGenerationBootProjectionTest {
   @TempDir Path temp;
 
   @Test
+  void anOpenInstallerActivationIsReportedSoRemoveFilesRefuses() throws Exception {
+    try (Fixture fixture = new Fixture(temp.resolve("open-activation"))) {
+      var coordinator = new RecordedIngestionCoordinator(fixture.operations,
+          org.mockito.Mockito.mock(OperationAttemptRunner.class),
+          org.mockito.Mockito.mock(io.justsearch.app.api.EngineAdmissionService.class),
+          org.mockito.Mockito.mock(io.justsearch.app.services.bootstrap.OperationAuthority.class));
+
+      assertTrue(coordinator.installerActivationOpen(),
+          "an accepted activation continuing after a restart holds the files it was prepared from");
+    }
+    try (var none = new SqliteOperationStore(temp.resolve("none.db"))) {
+      var coordinator = new RecordedIngestionCoordinator(none,
+          org.mockito.Mockito.mock(OperationAttemptRunner.class),
+          org.mockito.Mockito.mock(io.justsearch.app.api.EngineAdmissionService.class),
+          org.mockito.Mockito.mock(io.justsearch.app.services.bootstrap.OperationAuthority.class));
+      org.junit.jupiter.api.Assertions.assertFalse(coordinator.installerActivationOpen());
+    }
+  }
+
+  @Test
   void pointerBeforeCommitLeavesAAndDoesNotInstallCandidateSettings() throws Exception {
     try (Fixture fixture = new Fixture(temp.resolve("before-pointer"))) {
       UiSettings returned = fixture.reconcile();

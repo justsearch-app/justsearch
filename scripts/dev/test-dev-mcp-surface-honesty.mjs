@@ -732,11 +732,14 @@ const provenanceWiringTests = [
     const defaults = { apiPort: 0, uiPort: 5173, clean: 'soft' };
     const ordinary = buildDevRunnerArgsStart({ ...defaults, ...StartInputSchema.parse({}) });
     assert.ok(!ordinary.some(arg => arg.startsWith('--isolated-models')));
-    for (const state of ['none', 'partial', 'truncated']) {
+    for (const state of ['none', 'partial', 'truncated', 'reuse']) {
       const input = StartInputSchema.parse({ isolatedModels: state });
       const args = buildDevRunnerArgsStart({ ...defaults, isolatedModels: input.isolatedModels });
       assert.equal(devRunnerModule.__test.parseArgs(args).isolatedModels, state);
     }
+    const reuse = buildDevRunnerArgsStart({ ...defaults, isolatedModels: 'reuse' });
+    assert.equal(devRunnerModule.__test.parseArgs(reuse).clean, 'none',
+      'the MCP default soft clean must not reach a folder kept for its saved state');
     for (const state of [true, '', 'installed']) {
       assert.equal(StartInputSchema.safeParse({ isolatedModels: state }).success, false);
     }

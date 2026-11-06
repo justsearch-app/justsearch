@@ -65,6 +65,42 @@ public interface BrainInstallService {
    * @return current install status as a serializable map
    * @throws Exception on cancel failure
    */
+  /**
+   * "Download again": the accepted install also downloads these previously declined parts, only
+   * while the plan is still the one the consent showed ({@code planDigest}).
+   */
+  default AiInstallService.Attempt startInstall(boolean acceptTerms, boolean enableRerankerOnCompletion,
+      boolean enablePictureReadingOnCompletion, java.util.Set<String> includePackages,
+      String planDigest) throws Exception {
+    if (includePackages != null && !includePackages.isEmpty()) {
+      throw new UnsupportedOperationException("Download again is unavailable");
+    }
+    return startInstall(acceptTerms, enableRerankerOnCompletion, enablePictureReadingOnCompletion);
+  }
+
+  /** Also carries the consented answers enable to the install's completion. */
+  default AiInstallService.Attempt startInstall(boolean acceptTerms, boolean enableRerankerOnCompletion,
+      boolean enablePictureReadingOnCompletion, boolean enableChatOnCompletion,
+      java.util.Set<String> includePackages, String planDigest) throws Exception {
+    if (enableChatOnCompletion) {
+      throw new UnsupportedOperationException("Answers install intent unavailable");
+    }
+    return startInstall(acceptTerms, enableRerankerOnCompletion, enablePictureReadingOnCompletion,
+        includePackages, planDigest);
+  }
+
+  /** Removes one part's downloaded files when nothing uses them; refuses with a plain reason. */
+  default AiInstallService.RemovalAttempt removeFiles(String packageId, String previewDigest) {
+    throw new UnsupportedOperationException("Removing files is unavailable");
+  }
+
+  /** Refuses ({@link IllegalStateException}) while a part's files are being removed. */
+  default void refuseWhileRemovingFiles() {}
+
+  /** Status key present (true) when the install had already completed and nothing was cancelled. */
+  String ALREADY_COMPLETED_KEY = "alreadyCompleted";
+
+  /** Install status after the request; carries {@link #ALREADY_COMPLETED_KEY} when it was refused. */
   Map<String, Object> cancelInstall() throws Exception;
 
   /**
