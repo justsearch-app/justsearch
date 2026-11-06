@@ -1360,3 +1360,14 @@ The brief's adopted scenarios are quoted below; choices the scenarios leave open
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-s2x-acc4",
+  "verdict": "accept",
+  "digest": "sha256:f83bb9a1537f1d8b1a6107d3b1a8cc7ceabcc1b0cb8e0e9e2c33675a354e9419",
+  "note": "Acceptance by independent verifier session verifier-s2x-acc4 (Codex): accept, no must-fix. Transcribed by the orchestrator."
+}
+```
