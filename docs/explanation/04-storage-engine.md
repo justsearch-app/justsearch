@@ -244,12 +244,34 @@ Chunk-level vector retrieval uses **field separation**:
 
 This prevents doc/chunk mixing and keeps filter parity safe across TEXT/VECTOR/HYBRID query paths.
 
+### Passage eligibility from parent metadata
+
+Ordinary search applies entity (person, organization, location), source, author, category,
+publication date, modified date and size predicates to parent documents before retrieving passage
+candidates. Each passage leg and retry resolves matching parent IDs once, uncached, on its own
+searcher, then restricts passage paths with `TermInSetQuery`. This applies to BM25, dense and sparse
+retrieval, including rescue retrieval; excluded parents cannot enter the fused candidate union.
+Missing parent metadata cannot satisfy an active predicate, and no matching parents means no
+passage hits. Refresh and reopen follow the parents visible to each searcher; legs do not share a
+pinned snapshot. No index rebuild or duplicated chunk metadata is required.
+
+A parent predicate is active when a list has at least one nonblank value, a date/publication endpoint
+is greater than zero, or either size endpoint is present (including zero). Empty and all-blank
+lists add no restriction. Without an active parent predicate, passage retrieval does no parent
+resolution, so orphan chunks retain their previous eligibility. Other scopes still intersect.
+Ask keeps its parent prefilter and passes the original predicates onward, resolving parents again
+in passage retrieval, as for date and size. Facet aggregation keeps its existing behavior.
+
 ### Large docId-set filters (scale guardrail)
 Some query paths (especially RAG retrieval) need to search within a **set of specific documents** (e.g., “only these docIds selected in the UI”).
 
 Naively implementing that as a `BooleanQuery` with one `TermQuery` clause per docId can hit Lucene’s `maxClauseCount` (default 1024) and throw `TooManyClauses`.
 
-Current implementation uses `TermInSetQuery` for these "ID set" filters to avoid clause explosion:
+`QueryFilterBuilder` uses one `TermInSetQuery` per list filter for ordinary text, dense, hybrid
+and passage retrieval, including selections of 10,000 paths. Values within a list are ORed;
+different filters intersect. Null and blank values are ignored, duplicates preserve meaning, and
+nonblank strings match exactly. An all-blank list adds no filter. The RAG ID-set paths also use
+`TermInSetQuery` to avoid clause explosion:
 
 - Worker search runtime ops: `ReadPathOps` (read), `WritePathOps`+`CommitOps` (write/commit), `RunningRuntime`+`RuntimeSession` (lifecycle) in `modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/`
 
@@ -274,6 +296,10 @@ For large result sets, TEXT mode supports:
 - **Cursor-based pagination** using Lucene `searchAfter`.
 
 The cursor token is intentionally opaque and short-lived: index mutations (especially reindex) can invalidate it.
+Relevance cursor scores must be finite floats: NaN, either infinity and float overflow (such as
+`1e100`) receive the same HTTP 400 invalid-score outcome as non-numeric scores. They cannot
+restart pagination as page one. Finite zero remains valid; non-relevance cursors keep the `_`
+score placeholder.
 
 ### Validation Strategies
 1.  **Startup Check:** `IndexSchema.validateIndexableFields(...)` ensures the loaded catalog matches the constant `SchemaFields.INDEXABLE_FIELDS`. This prevents "silent failures" where code writes to a field that doesn't exist in the schema.
