@@ -117,7 +117,8 @@ def cmd_score(ctx, collection: str, run: Path, store_baseline: Path | None) -> N
     c, _cfg, _ka = _checked_collection(ctx, collection)
     record, problems = qcmp.load_run_or_reason(run, "run")
     if record is not None:
-        problems = qcmp.validate_run(c, record, {c.version}, "run")
+        problems = qcmp.validate_run(c, record, {c.version}, "run",
+                                     sensitivity=record.header.run_kind == "sensitivity" and not store_baseline)
     if problems:
         _invalid(ctx, f"{c.name}: " + "; ".join(problems))
     try:
@@ -127,8 +128,12 @@ def cmd_score(ctx, collection: str, run: Path, store_baseline: Path | None) -> N
     unj, slots, _pairs = scoring.unjudged_top(c.judgments, record.results)
     if store_baseline:
         qcmp.write_baseline(run, c, store_baseline)
-    click.echo(report.score_line(c, scoring.aggregate(per_query), unj / max(1, slots),
-                                 len(per_query)))
+    line = report.score_line(c, scoring.aggregate(per_query), unj / max(1, slots),
+                             len(per_query), record.results)
+    if record.header.run_kind == "sensitivity":
+        click.echo(line.replace("VALID ", "SENSITIVITY ", 1))
+        ctx.exit(Outcome.SENSITIVITY.exit_code)
+    click.echo(line)
 
 
 def _head_commit() -> str | None:
@@ -215,10 +220,11 @@ def _run_options(command=None, *, full_suite=False):
 def _execute_quality(ctx, action, **kwargs):
     from ..quality.run import execute, RunRefused
     from ..quality.index import IndexRefused
+    from ..quality.sensitivity import SensitivityRefused
     refs = kwargs.pop('collections')
     try:
         outcome, line = execute(action, refs, **kwargs)
-    except (RunRefused, IndexRefused, qcmp.BaselineError, qcoll.CollectionError,
+    except (RunRefused, IndexRefused, SensitivityRefused, qcmp.BaselineError, qcoll.CollectionError,
             known_answers.KnownAnswerFailure) as e:
         _invalid(ctx, str(e))
     click.echo(line)
@@ -241,6 +247,20 @@ def cmd_check(ctx, **kwargs):
 def cmd_full_suite(ctx, **kwargs):
     """Check the full suite, including MIRACL fr, in an explicitly set window."""
     _execute_quality(ctx, 'check', full_suite=True, **kwargs)
+
+
+@quality_group.command('sensitivity')
+@_run_options
+@click.option('--set', 'sets', multiple=True, metavar='NAME=VALUE',
+              help='Explicit allowlisted query-time setting; never changes the prepared index key.')
+@click.option('--cpus', metavar='LIST', help='Pin scoring and its descendants, e.g. 0-3 or 2,4,6,8.')
+@click.option('--sample', type=click.IntRange(min=1), help='Deterministic subset of scored queries.')
+@click.option('--seed', type=int, default=0, show_default=True, help='Seed for --sample selection.')
+@click.pass_context
+@_never_crash
+def cmd_sensitivity(ctx, **kwargs):
+    """Score an already prepared index with labelled scoring-only settings (exit 3)."""
+    _execute_quality(ctx, 'sensitivity', **kwargs)
 
 
 @quality_group.command('baseline')

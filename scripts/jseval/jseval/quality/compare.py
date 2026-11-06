@@ -112,7 +112,10 @@ def load_baseline(path: str | os.PathLike) -> tuple[RunRecord, dict]:
         raise BaselineError(f"{p}: {type(e).__name__}: {e}") from None
     if sha256_text(text) != recorded:
         raise BaselineError(f"{p}: its run file {run_path} changed after the baseline was stored")
-    return RunRecord.loads(text, str(run_path)), doc
+    record = RunRecord.loads(text, str(run_path))
+    if record.header.run_kind == "sensitivity":
+        raise BaselineError(f"{p}: sensitivity run cannot be a baseline")
+    return record, doc
 
 
 # --------------------------------------------------------------------------- validity
@@ -144,10 +147,13 @@ def syntax_refused(result: QueryResult) -> bool:
             and result.served == Served((), "skipped", SYNTAX_REFUSAL))
 
 
-def validate_run(c: Collection, run: RunRecord, label_versions: set[str], arm: str) -> list[str]:
+def validate_run(c: Collection, run: RunRecord, label_versions: set[str], arm: str,
+                 *, sensitivity: bool = False) -> list[str]:
     """Every reason this run is not a complete, valid result for collection ``c``."""
     h = run.header
     out = []
+    if h.run_kind == "sensitivity" and not sensitivity:
+        out.append(f"{arm}: sensitivity run cannot be baseline or comparison evidence")
     if h.collection != c.name:
         out.append(f"{arm}: run is for collection {h.collection!r}, not {c.name!r}")
     if h.collection_version not in label_versions:
@@ -174,8 +180,18 @@ def validate_run(c: Collection, run: RunRecord, label_versions: set[str], arm: s
     for r in run.results:
         seen[r.qid] = seen.get(r.qid, 0) + 1
     dup = sorted(q for q, n in seen.items() if n > 1)
-    missing = sorted(set(c.queries) - set(seen))
-    extra = sorted(set(seen) - set(c.queries))
+    expected_queries = set(c.queries)
+    if sensitivity and h.run_kind == "sensitivity":
+        from .sensitivity import query_ids
+        try:
+            chosen = query_ids(c, h.sensitivity.get("sample_size"), h.sensitivity.get("seed"))
+            expected_queries = set(chosen)
+            if h.sensitivity.get("queries") != {q: c.queries[q].sha256 for q in chosen}:
+                out.append(f"{arm}: sensitivity sample declaration differs from chosen queries")
+        except ValueError as e:
+            out.append(f"{arm}: invalid sensitivity sample: {e}")
+    missing = sorted(expected_queries - set(seen))
+    extra = sorted(set(seen) - expected_queries)
     for label, ids in (("duplicate", dup), ("missing", missing), ("unknown", extra)):
         if ids:
             out.append(f"{arm}: {len(ids)} {label} query ids ({', '.join(ids[:5])})")
@@ -206,7 +222,9 @@ def validate_run(c: Collection, run: RunRecord, label_versions: set[str], arm: s
     drops = [r for r in run.results if r.error is None
              and not syntax_refused(r)
              and r.served.reranker == "skipped"
-             and r.served.reason not in BY_DESIGN_RERANK_SKIPS]
+             and r.served.reason not in (BY_DESIGN_RERANK_SKIPS |
+                 ({"DISABLED", "DEADLINE_EXCEEDED", "SEARCH_DEADLINE_EXCEEDED"}
+                  if sensitivity and h.run_kind == "sensitivity" else set()))]
     if drops:
         out.append(f"{arm}: reranker dropped for {len(drops)} queries: " + "; ".join(
             f"{r.qid}: {r.served.reason or 'missing reason'}" for r in drops))
