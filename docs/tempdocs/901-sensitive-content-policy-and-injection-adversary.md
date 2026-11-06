@@ -1,7 +1,7 @@
 ---
 title: "Sensitive-content policy and the malicious-document adversary: what JustSearch must never index or serve by default, and how retrieved content is kept from steering the agent"
 type: tempdocs
-status: "DESIGN SETTLED (2026-09-02, fable) — decisions D1-D9 / E1-E8 made; parallel L4 audit (session 'L4', alt design parked at .claude/worktrees/887-improvement-landscape/tmp/901-alt-content-admission-and-origin-discipline.md) folded in 2026-09-02: 7 deltas, 6 accepted, 1 (egress filter) replaced by extraction-time span masking — see §B15-B20, D1, D5, E4, E7, E8, §G; K1-K4 decided 2026-09-02 (§K); ready for opus takeover, C1 first; six chunks in §J, none started"
+status: "C1 partially implemented (2026-11-05): always-on protected names, hidden-directory boundaries, credential-store ancestors and app-data exclusion; versioned background removal of indexed copies. C6 partially implemented: MCP history-scope and data-folder refusals; packaged-app HTTP history reads require the window credential. UI controls, content scanning and per-root agent visibility remain unimplemented."
 created: 2026-09-02
 updated: 2026-09-02
 lane: 887 L4 (items 3.1 sensitive-content policy, 3.4 threat-model injection adversary)

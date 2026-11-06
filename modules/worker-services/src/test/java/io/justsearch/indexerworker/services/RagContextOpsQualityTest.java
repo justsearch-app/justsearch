@@ -350,6 +350,8 @@ final class RagContextOpsQualityTest
         .thenReturn(result);
     when(stubRuntime.chunkSearchOps().searchChunksForDocs(anyString(), anySet(), anyInt()))
         .thenReturn(result);
+    when(stubRuntime.documentFieldOps().readableDocumentIds(anyCollection(), eq(false)))
+        .thenAnswer(call -> Set.copyOf(call.<java.util.Collection<String>>getArgument(0)));
     when(stubRuntime.documentFieldOps().getDocumentFieldsBatch(anyList(), anySet()))
         .thenReturn(Map.of());
 

@@ -34,6 +34,212 @@ public final class ExcludesServiceImpl implements ExcludesService {
     this.maxWalkEntries = maxWalkEntries;
   }
 
+  /** Versioned upgrade removal uses index ownership, so missing disks cannot hide old sources.
+   * The caller supplies the existing history submission path for legacy untagged transcripts. */
+  public boolean removeProtectedSources(Path dataDirectory, EngineContext context,
+      java.util.function.Consumer<Path> reconcileHistory) throws IOException {
+    var version = io.justsearch.configuration.ProtectedContentPolicy.VERSION;
+    Path marker = dataDirectory.resolve(".protected-content-version");
+    Files.createDirectories(dataDirectory);
+    try (var abandoned = Files.newDirectoryStream(dataDirectory, ".protected-content-*.scan")) {
+      for (Path scan : abandoned) Files.deleteIfExists(scan);
+    }
+    if (Files.exists(marker) && version.equals(Files.readString(marker).trim())) return true;
+    var indexing = Objects.requireNonNull(indexingServiceSupplier.get(), "Indexing service unavailable");
+    var store = ConfigStore.globalOrNull();
+    var help = store == null ? null : store.get().collections().bundledHelp();
+    var policy = new io.justsearch.configuration.ProtectedContentPolicy(dataDirectory,
+        help == null ? dataDirectory.resolve("help") : help.path());
+    var roots = indexing.getWatchedRoots(context);
+    long removed = 0, failed = 0;
+    // Finish the reader/Worker call before issuing deletes. Spooling bounds heap independently of
+    // corpus size and avoids recursive calls into the same bounded Worker executor. Sort on disk
+    // so parents and chunks have adjacent identities even when the reader emits them far apart.
+    long unchecked;
+    try (var spool = new SourceSpool(dataDirectory)) {
+      unchecked = indexing.forEachIndexedSourceWithCollection(source -> {
+        try { spool.add(source); }
+        catch (IOException failure) { throw new java.io.UncheckedIOException(failure); }
+      }, context);
+      var scan = spool.finish();
+      if (scan != null) try (var in = SourceSpool.open(scan.path())) {
+        String lastPath = null;
+        String lastCollection = null;
+        for (long row = 0; row < scan.rows(); row++) {
+          if (Thread.currentThread().isInterrupted()) throw new IOException("Protected removal interrupted");
+          String path = in.readUTF();
+          String collection = in.readBoolean() ? in.readUTF() : null;
+          if (path.equals(lastPath) && Objects.equals(collection, lastCollection)) continue;
+          lastPath = path; lastCollection = collection;
+          int result = removeProtectedSource(indexing, policy, roots, path, collection,
+              dataDirectory, context, reconcileHistory);
+          if (result > 0) removed++;
+          else if (result < 0) failed++;
+        }
+      }
+    }
+    org.slf4j.LoggerFactory.getLogger(ExcludesServiceImpl.class).info(
+        "Protected content upgrade: {} confirmed source removals, {} failed, {} unchecked",
+        removed, failed, unchecked);
+    if (unchecked != 0 || failed != 0 || Thread.currentThread().isInterrupted()) return false;
+    Files.createDirectories(dataDirectory);
+    Path pending = marker.resolveSibling(marker.getFileName() + ".tmp");
+    Files.writeString(pending, version);
+    try { Files.move(pending, marker, java.nio.file.StandardCopyOption.ATOMIC_MOVE,
+        java.nio.file.StandardCopyOption.REPLACE_EXISTING); }
+    catch (java.nio.file.AtomicMoveNotSupportedException unsupported) {
+      Files.move(pending, marker, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+    }
+    return true;
+  }
+
+  /** External merge sort: at most one fixed batch and two merge heads are held in heap.
+   * Binary carry keeps at most 64 run identities, even for a long-sized source count. */
+  private static final class SourceSpool implements java.io.Closeable {
+    private static final int BATCH_SIZE = 4096;
+    private static final java.util.Comparator<IndexingService.IndexedSource> ORDER =
+        java.util.Comparator.comparing(IndexingService.IndexedSource::path)
+            .thenComparing(IndexingService.IndexedSource::collection,
+                java.util.Comparator.nullsFirst(java.util.Comparator.naturalOrder()));
+    private record Run(Path path, long rows) {}
+    private final Path directory;
+    private final List<IndexingService.IndexedSource> batch = new ArrayList<>(BATCH_SIZE);
+    private final Run[] runs = new Run[Long.SIZE];
+    private final java.util.Set<Path> files = new java.util.HashSet<>();
+
+    SourceSpool(Path directory) { this.directory = directory; }
+
+    void add(IndexingService.IndexedSource source) throws IOException {
+      batch.add(source);
+      if (batch.size() == BATCH_SIZE) flush();
+    }
+
+    private Path create() throws IOException {
+      Path path = Files.createTempFile(directory, ".protected-content-", ".scan");
+      files.add(path);
+      return path;
+    }
+
+    private void flush() throws IOException {
+      if (batch.isEmpty()) return;
+      batch.sort(ORDER);
+      Run run = new Run(create(), batch.size());
+      try (var out = output(run.path())) {
+        for (var source : batch) write(out, source);
+      }
+      batch.clear();
+      int level = 0;
+      while (runs[level] != null) {
+        run = merge(runs[level], run);
+        runs[level++] = null;
+      }
+      runs[level] = run;
+    }
+
+    Run finish() throws IOException {
+      flush();
+      Run result = null;
+      for (Run run : runs) {
+        if (run != null) result = result == null ? run : merge(result, run);
+      }
+      return result;
+    }
+
+    private Run merge(Run left, Run right) throws IOException {
+      Run merged = new Run(create(), left.rows() + right.rows());
+      try (var a = open(left.path()); var b = open(right.path()); var out = output(merged.path())) {
+        long remainingA = left.rows(), remainingB = right.rows();
+        var headA = remainingA > 0 ? read(a) : null;
+        var headB = remainingB > 0 ? read(b) : null;
+        while (headA != null || headB != null) {
+          if (Thread.currentThread().isInterrupted()) throw new IOException("Protected removal interrupted");
+          if (headB == null || (headA != null && ORDER.compare(headA, headB) <= 0)) {
+            write(out, headA);
+            headA = --remainingA > 0 ? read(a) : null;
+          } else {
+            write(out, headB);
+            headB = --remainingB > 0 ? read(b) : null;
+          }
+        }
+      }
+      Files.delete(left.path()); files.remove(left.path());
+      Files.delete(right.path()); files.remove(right.path());
+      return merged;
+    }
+
+    static java.io.DataInputStream open(Path path) throws IOException {
+      return new java.io.DataInputStream(new java.io.BufferedInputStream(Files.newInputStream(path)));
+    }
+
+    private static java.io.DataOutputStream output(Path path) throws IOException {
+      return new java.io.DataOutputStream(new java.io.BufferedOutputStream(Files.newOutputStream(path)));
+    }
+
+    private static IndexingService.IndexedSource read(java.io.DataInputStream in) throws IOException {
+      return new IndexingService.IndexedSource(in.readUTF(), in.readBoolean() ? in.readUTF() : null);
+    }
+
+    private static void write(java.io.DataOutputStream out, IndexingService.IndexedSource source) throws IOException {
+      out.writeUTF(source.path());
+      out.writeBoolean(source.collection() != null);
+      if (source.collection() != null) out.writeUTF(source.collection());
+    }
+
+    @Override public void close() throws IOException {
+      IOException failure = null;
+      for (Path path : files) {
+        try { Files.deleteIfExists(path); }
+        catch (IOException problem) {
+          if (failure == null) failure = problem;
+          else failure.addSuppressed(problem);
+        }
+      }
+      if (failure != null) throw failure;
+    }
+  }
+
+  private static int removeProtectedSource(IndexingService indexing,
+      io.justsearch.configuration.ProtectedContentPolicy policy,
+      List<IndexingService.WatchedRoot> roots, String path, String collection, Path dataDirectory,
+      EngineContext context, java.util.function.Consumer<Path> reconcileHistory) {
+    Path file;
+    try { file = Path.of(path).normalize(); }
+    catch (RuntimeException invalid) { return -1; }
+    if (!file.isAbsolute()) return 0; // No-file projections have no filesystem admission policy.
+    Path boundary = roots.stream().filter(root -> root != null && root.path() != null
+            && (!io.justsearch.configuration.InternalCollections.isReserved(collection)
+                || Objects.equals(normalizeCollection(root.collection()), normalizeCollection(collection)))
+            && file.startsWith(root.path().toAbsolutePath().normalize()))
+        .map(root -> root.path().toAbsolutePath().normalize())
+        .max(java.util.Comparator.comparingInt(Path::getNameCount)).orElse(file);
+    var protection = policy.classify(file, boundary, collection);
+    if (protection.verdict() == io.justsearch.configuration.ProtectedContentPolicy.Verdict.UNCERTAIN) return -1;
+    if (protection.verdict() != io.justsearch.configuration.ProtectedContentPolicy.Verdict.PROTECTED) return 0;
+    try {
+      Path resolved = protection.source();
+      Path history = dataDirectory.toAbsolutePath().normalize().resolve("agent-history");
+      boolean transcript = resolved.startsWith(history) && Files.isRegularFile(resolved)
+          && resolved.toString().endsWith(".md")
+          && !policy.protectedPath(resolved, resolved, io.justsearch.configuration.InternalCollections.AGENT_HISTORY);
+      Path pending = resolved.resolveSibling(resolved.getFileName() + ".pending");
+      // Use the history indexer's existing durable reconciliation obligation BEFORE deleting.
+      // A crash between deletion and resubmission must not strand a healthy transcript.
+      if (transcript) Files.writeString(pending, "pending");
+      var outcome = indexing.deleteDocByIdWithOutcome(file.toString(), context);
+      if (outcome == null || !outcome.confirmed()) return -1;
+      if (transcript) {
+        reconcileHistory.accept(resolved);
+        Files.deleteIfExists(pending);
+      }
+      return 1;
+    } catch (IOException | RuntimeException failure) { return -1; }
+  }
+
+  private static String normalizeCollection(String collection) {
+    return collection == null || collection.isBlank()
+        ? io.justsearch.app.api.knowledge.IngestCollectionPolicy.DEFAULT_COLLECTION : collection;
+  }
+
   @Override
   public ExcludesPolicy effectivePolicy() {
     return capturePolicy().projection();

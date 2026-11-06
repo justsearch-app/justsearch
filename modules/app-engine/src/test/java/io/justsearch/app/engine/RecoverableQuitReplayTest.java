@@ -35,8 +35,9 @@ import tools.jackson.databind.json.JsonMapper;
 @Timeout(180)
 final class RecoverableQuitReplayTest {
   @Test
-  void configuredUnitReplaysOnceWithoutDuplicateChunks(@TempDir Path data) throws Exception {
-    Path root = Files.createDirectories(data.resolve("documents"));
+  void configuredUnitReplaysOnceWithoutDuplicateChunks(@TempDir Path temp) throws Exception {
+    Path data = Files.createDirectory(temp.resolve("data"));
+    Path root = Files.createDirectories(data.resolveSibling(data.getFileName() + "-documents"));
     Path file = root.resolve("chaos-hang.txt");
     Files.writeString(file, EngineTestHarness.chunkedContent("durablequitreplay"), StandardCharsets.UTF_8);
     Files.writeString(data.resolve("watched_roots.json"), JsonMapper.builder().build().writeValueAsString(
@@ -196,7 +197,7 @@ final class RecoverableQuitReplayTest {
         });
         var generation = new IndexGenerationManager(data.resolve("index")).initializeOrLoad().activeGenerationId();
         var plan = new RecordedRootPlan(generation, List.of(new RecordedRootPlan.Root(
-            data.resolve("documents/chaos-hang.txt"), "documents", true, true, List.of(), List.of())));
+            data.resolveSibling(data.getFileName() + "-documents").resolve("chaos-hang.txt"), "documents", true, true, List.of(), List.of())));
         var context = EngineProvenance.context(EngineContext.ClientKind.INTERNAL, "quit-replay",
             Optional.empty(), Optional.of(new OperationAuthorizationBasis.StructuralAuto().encode()),
             TransportTag.SYSTEM_INTERNAL, EngineContext.Survival.DURABLE, EngineContext.Urgency.BACKGROUND);

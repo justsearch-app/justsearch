@@ -48,7 +48,8 @@ import tools.jackson.databind.ObjectMapper;
 @Timeout(600)
 final class EngineFrozenCollectionAdmissionTest {
   @Test
-  void unseenLiveFileUsesFrozenDefaultUntilCutoverThenScanRelabels(@TempDir Path data) throws Exception {
+  void unseenLiveFileUsesFrozenDefaultUntilCutoverThenScanRelabels(@TempDir Path temp) throws Exception {
+    Path data = Files.createDirectory(temp.resolve("data"));
     String previousData = System.getProperty("justsearch.data.dir");
     String previousHome = System.getProperty("user.home");
     var previousConfig = ConfigStore.globalOrNull();
@@ -59,7 +60,7 @@ final class EngineFrozenCollectionAdmissionTest {
     try {
       System.setProperty("justsearch.data.dir", data.toString());
       System.setProperty("user.home", data.resolve("home").toString());
-      Path folder = Files.createDirectory(data.resolve("source"));
+      Path folder = Files.createDirectory(data.resolveSibling(data.getFileName() + "-source"));
       AtomicFileWrites.replace(data.resolve("watched_roots.json"), new ObjectMapper().writeValueAsBytes(
           Map.of("schemaVersion", 1, "roots", List.of(Map.of("path", folder.toString())))));
       Path models = Files.createDirectory(data.resolve("empty-models"));

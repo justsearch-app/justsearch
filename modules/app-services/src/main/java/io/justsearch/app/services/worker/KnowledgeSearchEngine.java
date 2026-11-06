@@ -668,6 +668,11 @@ final class KnowledgeSearchEngine {
 
   KnowledgeHttpApiAdapter.SearchSession openSearch(
       KnowledgeSearchRequest req, EngineContext engineContext) {
+    return openSearch(req, false, engineContext);
+  }
+
+  KnowledgeHttpApiAdapter.SearchSession openSearch(
+      KnowledgeSearchRequest req, boolean includePrivateData, EngineContext engineContext) {
     Objects.requireNonNull(req, "req");
     // Spec D §1.2: the request's deadline D is fixed once, here, and spans every worker call.
     long openedNs = System.nanoTime();
@@ -685,7 +690,7 @@ final class KnowledgeSearchEngine {
       captured = captureSearch();
       SearchCapture active = captured;
       KnowledgeSearchResponse resp = active.lease().withClient(client ->
-          doSearch(req, searchSpan, engineContext, client, active.config(),
+          doSearch(req, searchSpan, engineContext, client, includePrivateData, active.config(),
               headDeadline(openedNs, client.requestDeadlineMs(), HeadSearchDeadline.current())));
       // 553 Phase 4a: project the canonical trace onto the root span (telemetry = a projection).
       searchSpan.setAllAttributes(SearchTraceSpanProjection.attributesOf(resp.searchTrace()));
@@ -755,7 +760,7 @@ final class KnowledgeSearchEngine {
 
   private KnowledgeSearchResponse doSearch(
       KnowledgeSearchRequest req, Span searchSpan, EngineContext engineContext,
-      KnowledgeClient client, io.justsearch.configuration.resolved.ResolvedConfig capturedConfig,
+      KnowledgeClient client, boolean includePrivateData, io.justsearch.configuration.resolved.ResolvedConfig capturedConfig,
       OptionalLong head) {
     long doSearchStartNs = System.nanoTime();
     RerankerConfig rerankConfig = RerankerConfig.fromEnv();
@@ -996,8 +1001,9 @@ final class KnowledgeSearchEngine {
       // Gate: any query mentioning 2+ sources benefits from balanced per-source retrieval,
       // not just COMPARISON queries (FeB4RAG research). Answer type remains a separate hint.
       if (!advancedSearch && structuredAnalysis.detectedSources().size() >= 2) {
-        resp = withinHead(head, () -> perSourceSearch.execute(
-            client, baseReq, structuredAnalysis.detectedSources(), searchLimit, engineContext));
+        resp = withinHead(head, () -> includePrivateData
+            ? perSourceSearch.execute(client, baseReq, structuredAnalysis.detectedSources(), searchLimit, true, engineContext)
+            : perSourceSearch.execute(client, baseReq, structuredAnalysis.detectedSources(), searchLimit, engineContext));
       } else {
         // Single-source: inject detected sources as boost if no boost already set
         if (!advancedSearch && !structuredAnalysis.detectedSources().isEmpty() && !b.hasBoostFilters()) {
@@ -1006,9 +1012,9 @@ final class KnowledgeSearchEngine {
             srcBoost.addMetaSource(src.toLowerCase(Locale.ROOT));
           }
           SearchRequest boosted = baseReq.toBuilder().setBoostFilters(srcBoost.build()).build();
-          resp = withinHead(head, () -> client.search(boosted, engineContext));
+          resp = withinHead(head, () -> (includePrivateData ? client.search(boosted, true, engineContext) : client.search(boosted, engineContext)));
         } else {
-          resp = withinHead(head, () -> client.search(baseReq, engineContext));
+          resp = withinHead(head, () -> (includePrivateData ? client.search(baseReq, true, engineContext) : client.search(baseReq, engineContext)));
         }
       }
 
@@ -1038,7 +1044,7 @@ final class KnowledgeSearchEngine {
                 expansionSkipReason = "TIMEOUT";
               } else {
                 SearchResponse expanded = HeadSearchDeadline.within(
-                    reSearchDeadline, () -> client.search(expandedReq, engineContext));
+                    reSearchDeadline, () -> (includePrivateData ? client.search(expandedReq, true, engineContext) : client.search(expandedReq, engineContext)));
                 if (newSemanticBudgetMiss(resp, expanded)) {
                   // The shorter budget cost the re-search a semantic leg the base search had: the
                   // expansion did not fit, so the base results stand.

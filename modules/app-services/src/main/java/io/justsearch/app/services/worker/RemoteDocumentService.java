@@ -325,11 +325,18 @@ public final class RemoteDocumentService implements DocumentService {
 
   @Override
   public CompletionStage<DocumentIdPage> listAllDocumentIds(int offset, int limit, EngineContext engineContext) {
+    return listAllDocumentIds(offset, limit, true, engineContext);
+  }
+
+  @Override
+  public CompletionStage<DocumentIdPage> listAllDocumentIds(
+      int offset, int limit, boolean includePrivateData, EngineContext engineContext) {
     return supplyWithCapturedClient(
         engineContext,
         client -> {
           try {
-            var response = client.listAllDocumentIds(offset, limit, engineContext);
+            var response = includePrivateData ? client.listAllDocumentIds(offset, limit, engineContext)
+                : client.listAllDocumentIds(offset, limit, false, engineContext);
             return new DocumentIdPage(
                 response.getDocIdsList(), response.getTotalCount(), response.getTookMs());
           } catch (Exception e) {
@@ -433,7 +440,7 @@ public final class RemoteDocumentService implements DocumentService {
         // Record fallback counter
         recordRagFallback();
         // Fall back to default implementation (concatenate full docs)
-        return retrieveContextFallback(docIds, engineContext, client);
+        return retrieveContextFallback(docIds, engineContext, client, false);
       }
     });
   }
@@ -441,6 +448,12 @@ public final class RemoteDocumentService implements DocumentService {
   @Override
   public CompletionStage<ContextResult> retrieveContext(
       io.justsearch.app.api.RetrieveContextParams params, EngineContext engineContext) {
+    return retrieveContext(params, io.justsearch.configuration.InternalCollections.includesHistory(params.collection()), engineContext);
+  }
+
+  @Override
+  public CompletionStage<ContextResult> retrieveContext(
+      io.justsearch.app.api.RetrieveContextParams params, boolean includePrivateData, EngineContext engineContext) {
     if (params.question() == null || params.question().isBlank()) {
       return CompletableFuture.completedFuture(new ContextResult("", 0, 0, 0, List.of(),
           "", "EMPTY_REQUEST", false, List.of()));
@@ -476,12 +489,13 @@ public final class RemoteDocumentService implements DocumentService {
           response =
               HeadSearchDeadline.within(
                   answerDeadline,
-                  () -> preSearch.semanticLoading()
-                      ? client.retrieveContextAfterLoadingModels(retrieval, engineContext)
+                  () -> includePrivateData ? client.retrieveContext(retrieval, preSearch.semanticLoading(), true, engineContext)
+                      : preSearch.semanticLoading() ? client.retrieveContextAfterLoadingModels(retrieval, engineContext)
                       : client.retrieveContext(retrieval, engineContext));
         } else {
           logRichRetrieval(effectiveParams);
-          response = client.retrieveContext(effectiveParams, engineContext);
+          response = includePrivateData ? client.retrieveContext(effectiveParams, false, true, engineContext)
+              : client.retrieveContext(effectiveParams, engineContext);
         }
         return mapRetrieveContextResponse(response);
       } catch (Exception e) {
@@ -494,7 +508,8 @@ public final class RemoteDocumentService implements DocumentService {
         }
         log.error("Failed to retrieve context from the index half (rich params), falling back", e);
         recordRagFallback();
-        return retrieveContextFallback(effectiveParams.docIds(), engineContext, client);
+        return retrieveContextFallback(effectiveParams.docIds(), engineContext, client,
+            includePrivateData);
       }
     });
   }
@@ -723,16 +738,20 @@ public final class RemoteDocumentService implements DocumentService {
    * @return ContextResult with chunksUsed=0 to indicate fallback was used
    */
   private ContextResult retrieveContextFallback(
-      Set<String> docIds, EngineContext engineContext, KnowledgeClient client) {
+      Set<String> docIds, EngineContext engineContext, KnowledgeClient client, boolean includeHistory) {
     if (docIds.isEmpty()) return failedContextResult();
+    var ownership = new io.justsearch.configuration.ReadOwnership();
     try {
       Map<String, DocumentRecord> docs =
           BoundedDocumentFetch.fetchAll(
                   ids -> client.fetchDocuments(ids, engineContext), List.copyOf(docIds))
           .getDocumentsList().stream()
+          .filter(DocumentContent::getFound)
+          .filter(doc -> includeHistory || !io.justsearch.configuration.ReadOwnership.hiddenFromDefault(
+              ownership.owner(doc.getDocId(), doc.getMetadataMap(), null)))
           .collect(java.util.stream.Collectors.toMap(
               DocumentContent::getDocId,
-              doc -> new DocumentRecord(doc.getDocId(), doc.getContent(), Map.of()),
+              doc -> new DocumentRecord(doc.getDocId(), doc.getContent(), new HashMap<>(doc.getMetadataMap())),
               (a, b) -> a,
               LinkedHashMap::new));
 

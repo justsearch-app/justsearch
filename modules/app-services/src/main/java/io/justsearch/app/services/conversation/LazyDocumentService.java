@@ -111,6 +111,12 @@ public final class LazyDocumentService implements DocumentService {
   }
 
   @Override
+  public CompletionStage<DocumentIdPage> listAllDocumentIds(
+      int offset, int limit, boolean includePrivateData, EngineContext engineContext) {
+    return resolve(engineContext, d -> d.listAllDocumentIds(offset, limit, includePrivateData, engineContext));
+  }
+
+  @Override
   public CompletionStage<ContextResult> retrieveContextWithMeta(
       String question, Set<String> docIds, int topK, EngineContext engineContext) {
     return resolve(engineContext, d -> d.retrieveContextWithMeta(question, docIds, topK, engineContext));
@@ -122,6 +128,12 @@ public final class LazyDocumentService implements DocumentService {
     return resolve(
         engineContext,
         d -> d.retrieveContextWithMeta(question, docIds, topK, maxContextTokens, engineContext));
+  }
+
+  @Override
+  public CompletionStage<ContextResult> retrieveContext(
+      RetrieveContextParams params, boolean includePrivateData, EngineContext engineContext) {
+    return resolve(engineContext, d -> d.retrieveContext(params, includePrivateData, engineContext));
   }
 
   @Override

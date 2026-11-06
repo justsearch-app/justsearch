@@ -103,6 +103,7 @@ public final class ResolvePathHashHandler implements OperationHandler {
         if (hashed.equalsIgnoreCase(pathHash)) {
           Map<String, Object> hit = new java.util.LinkedHashMap<>();
           hit.put("found", true);
+          if (root.collection() != null) hit.put("collection", root.collection());
           hit.put("path", root.path().toString());
           hit.put(
               "lastSeenAtMs",

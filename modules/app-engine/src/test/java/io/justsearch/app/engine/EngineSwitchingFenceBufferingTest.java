@@ -64,7 +64,7 @@ final class EngineSwitchingFenceBufferingTest {
   @DisplayName("mutations during SWITCHING are buffered and replayed onto the new generation")
   void mutationsDuringSwitchingAreBufferedAndReplayed(@TempDir Path tempDir) throws Exception {
     Path dataDir = tempDir.resolve("data");
-    Path watchedRoot = dataDir.resolve("switching-root");
+    Path watchedRoot = tempDir.resolve("switching-root");
     Files.createDirectories(watchedRoot);
 
     String blueMarker = "BM" + UUID.randomUUID().toString().replace("-", "");
@@ -78,7 +78,7 @@ final class EngineSwitchingFenceBufferingTest {
     engine = EngineTestHarness.start(dataDir);
     engine.addRootAsThePerson(watchedRoot);
     // The SYNC_ROOT below syncs a folder the person added before the migration started.
-    Path syncRoot = dataDir.resolve("switching-sync-root");
+    Path syncRoot = tempDir.resolve("switching-sync-root");
     Files.createDirectories(syncRoot);
     engine.addRootAsThePerson(syncRoot);
 
@@ -122,7 +122,7 @@ final class EngineSwitchingFenceBufferingTest {
 
     // UPSERT.
     String greenMarker = "GM" + UUID.randomUUID().toString().replace("-", "");
-    Path greenFile = dataDir.resolve("switching-newfile.txt");
+    Path greenFile = tempDir.resolve("switching-newfile.txt");
     Files.writeString(greenFile, "hello " + greenMarker);
     assertEquals(
         1,

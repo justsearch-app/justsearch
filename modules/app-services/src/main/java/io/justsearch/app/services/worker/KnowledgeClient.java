@@ -519,6 +519,10 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
         return searchRpcOps.search(request, engineContext);
     }
 
+    public SearchResponse search(SearchRequest request, boolean includePrivateData, EngineContext engineContext) {
+        return searchRpcOps.search(request, includePrivateData, engineContext);
+    }
+
     public SearchResponse searchVector(List<Float> queryVector, int limit, EngineContext engineContext) {
         return searchRpcOps.searchVector(queryVector, limit, engineContext);
     }
@@ -551,6 +555,11 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
 
     public RetrieveContextResponse retrieveContext(io.justsearch.app.api.RetrieveContextParams params, EngineContext engineContext) {
         return searchRpcOps.retrieveContext(params, engineContext);
+    }
+
+    public RetrieveContextResponse retrieveContext(io.justsearch.app.api.RetrieveContextParams params,
+            boolean semanticLoadingObserved, boolean includePrivateData, EngineContext engineContext) {
+        return searchRpcOps.retrieveContext(params, semanticLoadingObserved, includePrivateData, engineContext);
     }
 
     /**
@@ -586,12 +595,12 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
     }
 
     public ListFoldersResponse listFolders(String parentPath, int maxFolders, EngineContext engineContext) {
-        return searchRpcOps.listFolders(parentPath, maxFolders, engineContext);
+        return searchRpcOps.listFolders(parentPath, maxFolders, false, engineContext);
     }
 
     public ListFolderFilesResponse listFolderFiles(
         String folderPath, int limit, List<String> projection, EngineContext engineContext) {
-        return searchRpcOps.listFolderFiles(folderPath, limit, projection, engineContext);
+        return searchRpcOps.listFolderFiles(folderPath, limit, projection, false, engineContext);
     }
 
     /**
@@ -608,6 +617,12 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
         return searchRpcOps.listAllDocumentIds(offset, limit, engineContext);
     }
 
+    /** The HTTP front supplies authority independently of request JSON and caller hints. */
+    public io.justsearch.ipc.ListAllDocumentIdsResponse listAllDocumentIds(
+            int offset, int limit, boolean includePrivateData, EngineContext engineContext) {
+        return searchRpcOps.listAllDocumentIds(offset, limit, "", includePrivateData, engineContext);
+    }
+
     /** Continues document-ID pagination against the immutable snapshot from the first page. */
     public io.justsearch.ipc.ListAllDocumentIdsResponse listAllDocumentIds(
             int offset, int limit, String snapshotToken, EngineContext engineContext) {
@@ -618,6 +633,24 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
     public long forEachIndexedSource(java.util.function.Consumer<String> consumer, EngineContext engineContext) {
         return executeIngestRpc("scanIndexedSources", RpcDeadlineCategory.LONG_RUNNING,
                 stub -> stub.scanIndexedSources(consumer), engineContext);
+    }
+
+    @Override
+    public long forEachIndexedSourceWithCollection(
+            java.util.function.Consumer<IndexingService.IndexedSource> consumer, EngineContext engineContext) {
+        return executeIngestRpc("scanIndexedSourcesWithCollection", RpcDeadlineCategory.LONG_RUNNING,
+                stub -> stub.scanIndexedSourcesWithCollection(consumer), engineContext);
+    }
+
+
+    public ListFoldersResponse listFolders(String parentPath, int maxFolders, boolean includePrivateData,
+            EngineContext engineContext) {
+        return searchRpcOps.listFolders(parentPath, maxFolders, includePrivateData, engineContext);
+    }
+
+    public ListFolderFilesResponse listFolderFiles(String folderPath, int limit, List<String> projection,
+            boolean includePrivateData, EngineContext engineContext) {
+        return searchRpcOps.listFolderFiles(folderPath, limit, projection, includePrivateData, engineContext);
     }
 
     // ========== Ingest Service ==========
@@ -696,8 +729,11 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
 
     /** Conversation deletion requires an applied delete, not a buffered migration operation. */
     public DeleteByIdResponse deleteHistoryTranscript(Path transcript, EngineContext engineContext) {
-        var request = DeleteByIdRequest.newBuilder()
-            .setDocId(transcript.toAbsolutePath().normalize().toString()).setRequireSettled(true).build();
+        return deleteByIdSettled(transcript.toAbsolutePath().normalize().toString(), engineContext);
+    }
+
+    private DeleteByIdResponse deleteByIdSettled(String docId, EngineContext engineContext) {
+        var request = DeleteByIdRequest.newBuilder().setDocId(docId).setRequireSettled(true).build();
         return executeIngestRpc("deleteById", RpcDeadlineCategory.STANDARD,
             stub -> stub.deleteById(request), engineContext);
     }
@@ -1136,7 +1172,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
 
     @Override
     public IndexingService.DeletionOutcome deleteDocByIdWithOutcome(String docId, EngineContext engineContext) {
-        return rootLifecycleOps.deleteDocByIdWithOutcome(docId, engineContext);
+        return rootLifecycleOps.deleteDocByIdWithOutcome(docId, engineContext, this::deleteByIdSettled);
     }
 
     /**
@@ -1672,6 +1708,10 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
         row.put("found", resp.getFound());
         if (resp.getFound()) {
             row.put("path", resp.getPath());
+            var facts = fetchDocumentSlice(resp.getPath(), 0, 1, engineContext).getMetadataMap();
+            var owner = new io.justsearch.configuration.ReadOwnership()
+                .owner(resp.getPath(), facts, null);
+            row.put(io.justsearch.configuration.ReadOwnership.METADATA, owner.name());
             row.put("lastSeenAtMs", resp.getLastSeenAtMs());
             row.put("removedAtMs", resp.getRemovedAtMs());
         }

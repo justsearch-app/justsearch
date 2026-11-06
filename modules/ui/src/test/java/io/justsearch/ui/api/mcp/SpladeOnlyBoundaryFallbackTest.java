@@ -102,6 +102,8 @@ final class SpladeOnlyBoundaryFallbackTest {
     workerClient = client;
     when(client.requestDeadlineMs()).thenReturn(10_000L);
     when(client.getStatus(any(EngineContext.class))).thenReturn(StatusResponse.getDefaultInstance());
+    when(client.search(any(SearchRequest.class), anyBoolean(), any(EngineContext.class)))
+        .thenAnswer(call -> client.search((SearchRequest) call.getArgument(0), (EngineContext) call.getArgument(2)));
     when(client.search(any(SearchRequest.class), any(EngineContext.class))).thenAnswer(invocation -> {
       SearchRequest request = invocation.getArgument(0);
       EngineContext context = invocation.getArgument(1);

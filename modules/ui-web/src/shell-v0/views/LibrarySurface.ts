@@ -189,6 +189,7 @@ function rebuildGapReason(code: string): string {
     EXTRACTION_DROPOUT_PENDING_FALLBACK: 'The file still needs another reading method.',
     RECOVERY_REFUSED: 'The document could not be recovered after an interruption.',
     SKIPPED_TEMP_OR_SYSTEM: 'The source is a temporary or system file.',
+    SKIPPED_PROTECTED: 'The source holds passwords or keys, or is in a protected folder.',
     RETRY_EXHAUSTED: 'The file could not be processed after repeated attempts.',
   };
   return reasons[code] ?? 'The document could not be included. The support code is available in the tooltip.';

@@ -114,7 +114,7 @@ final class Bm25OnlyCursorHttpTest {
       SearchResponse response = (SearchResponse) call.callRealMethod();
       responses.add(response);
       return response;
-    }).when(worker).search(any(SearchRequest.class), any(CallContext.class));
+    }).when(worker).search(any(SearchRequest.class), anyBoolean(), any(CallContext.class));
     // Record Head eligibility while keeping native inference out of this fixture.
     doReturn(RerankResponse.newBuilder().setSkipped(true).setSkipReason("MODEL_NOT_LOADED").build())
         .when(worker).rerank(any(), any());

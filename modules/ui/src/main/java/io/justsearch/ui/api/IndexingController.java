@@ -1127,6 +1127,7 @@ public class IndexingController {
       }
       IndexingService indexing = indexingService();
       Map<String, Object> result = indexing.resolvePathHash((String) hashValue, RequestEngineContext.get(ctx));
+      if (!WindowAuthority.allowDocumentRead(ctx, null, result)) return;
       ctx.json(result);
     } catch (Exception e) {
       if (ApiErrorHandler.writeExecutorRefusal(ctx, e, telemetry)) return;
@@ -1160,6 +1161,7 @@ public class IndexingController {
             result.message(), telemetry, ApiErrorHandler.routeOf(ctx)));
         return;
       }
+      if (!WindowAuthority.allowDocumentRead(ctx, null, result.structuredData())) return;
       ctx.json(result.structuredData());
     } catch (Exception e) {
       if (ApiErrorHandler.writeExecutorRefusal(ctx, e, telemetry)) return;

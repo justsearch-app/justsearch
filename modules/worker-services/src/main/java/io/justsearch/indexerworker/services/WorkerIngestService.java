@@ -745,33 +745,51 @@ public final class WorkerIngestService {
     Objects.requireNonNull(firstRemoval, "firstRemoval");
     Path pruneRoot = pruneRootFor(pathPrefix);
     Set<String> removed = new java.util.LinkedHashSet<>();
+    var owners = new HashMap<String, String>();
+    var authority = pruneGuard(pruneRoot);
+    var guard = new io.justsearch.adapters.lucene.runtime.PruneOps.PresenceGuard() {
+      @Override public boolean rootCurrent() { return authority.rootCurrent(); }
+      @Override public io.justsearch.adapters.lucene.runtime.PathPresence presence(Path file) {
+        var presence = authority.presence(file);
+        if (presence == io.justsearch.adapters.lucene.runtime.PathPresence.ABSENT) {
+          // Capture ownership before pruning removes the parent. Internal transcripts must retain
+          // their reserved collection if recreated between the absence check and commit.
+          try {
+            owners.put(file.toString(), target.documentFieldOps()
+                .getDocumentFieldOrThrow(file.toString(), SchemaFields.COLLECTION));
+          } catch (IOException unreadableOwnership) {
+            throw new java.io.UncheckedIOException(unreadableOwnership);
+          }
+        }
+        return presence;
+      }
+    };
     var result = target.pruneOps().pruneByPathPrefix(
         pathPrefix,
         () -> false,
         100,
-        pruneGuard(pruneRoot),
+        guard,
         path -> {
           if (removed.isEmpty()) firstRemoval.run();
           removed.add(path);
         },
         pruneWriterFence);
-    List<JobQueue.EnqueueEntry> reappeared = new ArrayList<>();
+    int queued = 0;
     for (String path : removed) {
       Path file = Path.of(path);
+      var binding = rootWatcherRegistry.subscription(pruneRoot);
+      String indexedCollection = owners.get(path);
+      String collection = io.justsearch.configuration.InternalCollections.isReserved(indexedCollection)
+          || binding == null ? indexedCollection : binding.collection();
       if (io.justsearch.adapters.lucene.runtime.PathPresence.probe(file)
               == io.justsearch.adapters.lucene.runtime.PathPresence.PRESENT
           && file.toAbsolutePath().normalize().startsWith(pruneRoot)
-          && !io.justsearch.indexerworker.ingest.IngestionSkipPolicy
-              .shouldSkipWithinRoot(file, pruneRoot)) {
-        reappeared.add(JobQueue.EnqueueEntry.stat(file).withinRoot(pruneRoot));
+          && !admissionExcluded(file, pruneRoot, collection)
+          && jobQueue.enqueueReappearedFile(JobQueue.EnqueueEntry.stat(file).withinRoot(pruneRoot), collection)) {
+        queued++;
       }
     }
-    int queued = 0;
-    if (!reappeared.isEmpty()) {
-      queued = jobQueue.enqueueEntries(reappeared);
-      log.info("Replayed prune of {}: {} removed files were present again, {} queued for indexing",
-          pathPrefix, reappeared.size(), queued);
-    }
+    if (queued > 0) log.info("Replayed prune of {}: {} recreated files queued for indexing", pathPrefix, queued);
     return new ReplayedPrune(result, queued);
   }
 
@@ -851,7 +869,7 @@ public final class WorkerIngestService {
         if (!Files.isRegularFile(file, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
           return BufferedDeleteReplay.UNCERTAIN;
         }
-        if (!io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(file, root)) {
+        if (!admissionExcluded(file, root, collection)) {
           var entry = JobQueue.EnqueueEntry.stat(file);
           // Originless rows did not retain an admitting root. Preserve any existing job's root
           // rather than replacing it with an inferred parent; a live binding is authoritative.
@@ -947,8 +965,7 @@ public final class WorkerIngestService {
     Objects.requireNonNull(witness, "witness");
     try (var ignoredMutation = mutationLease()) {
       requireWatcherRootCurrent(witness);
-      if (io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(
-          path, witness.root()) || isUserExcluded(path, witness.root())) return;
+      if (admissionExcluded(path, witness.root(), collection)) return;
       if (!unchangedWatcherSource(collection, path, witness.root())) {
         acceptWatcherUpsertUnderLease(collection, path, witness.root());
       }
@@ -971,7 +988,7 @@ public final class WorkerIngestService {
       if (SyncDirectoryOps.isCloudPlaceholder(path) || !Files.isReadable(path)) return true;
       String storedHash = fields.getDocumentFieldOrThrow(key, SchemaFields.SOURCE_SHA256);
       if (storedHash == null
-          || !storedHash.equals(io.justsearch.indexerworker.loop.SourceContentHash.admissionIdentity(path, root))) return false;
+          || !storedHash.equals(io.justsearch.indexerworker.loop.SourceContentHash.admissionIdentity(path, root, collection))) return false;
       return source.validateNow()
           == io.justsearch.indexerworker.loop.FileFreshnessSnapshot.SourceValidationResult.FRESH;
     } catch (IOException unreadable) {
@@ -981,8 +998,7 @@ public final class WorkerIngestService {
 
   private boolean acceptWatcherUpsertUnderLease(String collection, Path path, Path root) {
     if (!prefixScope(root.toString()).contains(path.toAbsolutePath().normalize().toString())) return false;
-    if (io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(path, root)
-        || isUserExcluded(path, root)) {
+    if (admissionExcluded(path, root, collection)) {
       return false;
     }
     if (SyncDirectoryOps.isCloudPlaceholder(path)) {
@@ -1990,6 +2006,20 @@ public final class WorkerIngestService {
     }
   }
 
+  /** The complete destination decision shared by queue admission, replay and fenced moves. */
+  private enum Admission { ALLOW, SECURITY_REJECTION, POLICY_REJECTION }
+
+  private Admission admissionDecision(Path file, Path root, String collection) {
+    if (!io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(file, root, collection)
+        && !isUserExcluded(file, root)) return Admission.ALLOW;
+    return io.justsearch.indexerworker.ingest.IngestionSkipPolicy.isSecurityExcluded(file, root, collection)
+        ? Admission.SECURITY_REJECTION : Admission.POLICY_REJECTION;
+  }
+
+  private boolean admissionExcluded(Path file, Path root, String collection) {
+    return admissionDecision(file, root, collection) != Admission.ALLOW;
+  }
+
   /** Current user policy, including saved roots not yet registered with a native watcher. */
   public boolean isUserExcluded(Path file, Path root) {
     var patterns = io.justsearch.configuration.excludes.ExclusionPatterns.current();
@@ -2228,7 +2258,7 @@ public final class WorkerIngestService {
           Path sanitized = sanitizePath(pathStr);
           if (sanitized == null) {
             rejected++;
-          } else if (!isUserExcluded(sanitized, sanitized)) {
+          } else if (!admissionExcluded(sanitized, sanitized, collection)) {
             validPaths.add(sanitized);
           }
         }
@@ -2831,11 +2861,7 @@ public final class WorkerIngestService {
       }
 
       return withFileMutationFence(() -> {
-        journalAndProjectDeleteToServing(normalizedId, CommitReason.GRPC_DELETE_BY_ID);
-        ingestLifecycle.indexingCoordinator().deleteByIdAndChunks(normalizedId);
-        if (jobQueue.deleteByExactPath(normalizedId) < 0) {
-          throw new IllegalStateException("Could not remove pending ingestion for deleted document");
-        }
+        deleteSourceUnderFence(normalizedId);
         ingestLifecycle.commitOps().commitAndTrack(CommitReason.GRPC_DELETE_BY_ID);
         if (request.getRequireSettled()) {
           ingestLifecycle.commitOps().maybeRefreshBlocking();
@@ -2858,6 +2884,150 @@ public final class WorkerIngestService {
     }
   }
 
+  /** The normal delete route, shared with protected rename retirement and candidate cleanup.
+   * Caller holds the publication fence and the mutation admission lease (or final cutover fence). */
+  private void deleteSourceUnderFence(String path) {
+    journalAndProjectDeleteToServing(path, CommitReason.GRPC_DELETE_BY_ID);
+    ingestLifecycle.indexingCoordinator().deleteByIdAndChunks(path);
+    if (jobQueue.deleteByExactPath(path) < 0) {
+      throw new IllegalStateException("Could not remove pending ingestion for deleted document");
+    }
+  }
+
+  private static Path protectionBoundary(Path path, String collection,
+      List<io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding> roots) {
+    var eligible = io.justsearch.configuration.InternalCollections.isReserved(collection)
+        ? roots.stream().filter(root -> Objects.equals(collection, root.collection())).toList() : roots;
+    var owner = io.justsearch.app.api.knowledge.IngestCollectionPolicy.owningRoot(path, eligible);
+    return owner == null ? path : owner.path();
+  }
+
+  /** Use the ordinary delete and reserved-history submission routes while the candidate writer
+   * can still drain. A durable pending marker retains reconciliation across an interrupted pass. */
+  public void removeProtectedCandidateSources() throws IOException {
+    removeProtectedCandidateSources(System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(30), () -> false);
+  }
+
+  public void removeProtectedCandidateSources(long deadlineNanos,
+      java.util.function.BooleanSupplier cancelled) throws IOException {
+    try (var ignoredMutation = mutationLease()) {
+      retryPendingCandidateHistory();
+      long removedRows = visitProtectedCandidateSources((path, source) -> {
+        boolean transcript = source.startsWith(io.justsearch.configuration.InternalCollections
+            .dataDirectory().resolve("agent-history")) && Files.isRegularFile(source)
+            && path.endsWith(".md") && !io.justsearch.indexerworker.ingest.IngestionSkipPolicy
+                .isProtected(source, source, io.justsearch.configuration.InternalCollections.AGENT_HISTORY);
+        Path pending = source.resolveSibling(source.getFileName() + ".pending");
+        try {
+          if (transcript) Files.writeString(pending, "pending", java.nio.file.LinkOption.NOFOLLOW_LINKS,
+              java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE,
+              java.nio.file.StandardOpenOption.TRUNCATE_EXISTING);
+          var deleted = deleteById(DeleteByIdRequest.newBuilder().setDocId(path)
+              .setRequireSettled(true).build(), CallContext.none());
+          if (!deleted.getSuccess()) throw new IOException("Protected candidate deletion was not confirmed");
+          if (transcript) submitCandidateHistory(source, pending);
+        } catch (IOException failure) { throw new java.io.UncheckedIOException(failure); }
+      }, deadlineNanos, cancelled);
+      log.info("Protected candidate cleanup: {} protected index rows removed", removedRows);
+    } catch (java.io.UncheckedIOException failure) { throw failure.getCause(); }
+  }
+
+  /** Reuse the history indexer's durable obligation if deletion preceded a failed submission. */
+  private void retryPendingCandidateHistory() throws IOException {
+    Path history = io.justsearch.configuration.InternalCollections.dataDirectory().resolve("agent-history");
+    if (Files.notExists(history)) return;
+    try (var paths = Files.walk(history)) {
+      var pendingFiles = paths.filter(path -> path.getFileName().toString().endsWith(".md.pending"))
+          .iterator();
+      while (pendingFiles.hasNext()) {
+        Path pending = pendingFiles.next();
+        String name = pending.getFileName().toString();
+        Path source = pending.resolveSibling(name.substring(0, name.length() - ".pending".length()));
+        submitCandidateHistory(source, pending);
+      }
+    }
+  }
+
+  private void submitCandidateHistory(Path source, Path pending) throws IOException {
+    if (!Files.isRegularFile(pending, java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+      throw new IOException("Candidate history obligation is not a regular file");
+    }
+    if (!Files.isRegularFile(source)) {
+      // A concurrent conversation deletion also owns its marker. Retire a surviving obligation
+      // only with the same real-volume absence proof as the ordinary source retirement route.
+      if (io.justsearch.indexerworker.loop.SourcePresence.classify(source, source, rootWitness)
+          == io.justsearch.indexerworker.loop.SourcePresence.Verdict.ABSENT) {
+        Files.deleteIfExists(pending);
+        return;
+      }
+      throw new IOException("Candidate history source is unavailable");
+    }
+    if (io.justsearch.indexerworker.ingest.IngestionSkipPolicy
+        .isProtected(source, source, io.justsearch.configuration.InternalCollections.AGENT_HISTORY)) {
+      throw new IOException("Candidate history source is unavailable or protected");
+    }
+    var accepted = submitBatch(BatchRequest.newBuilder().addFilePaths(source.toString())
+        .setForceReindex(true).setRootAdded(true)
+        .setTargetCollection(io.justsearch.configuration.InternalCollections.AGENT_HISTORY)
+        .build(), CallContext.none());
+    if (accepted.getAcceptedCount() != 1) throw new IOException("Candidate history reconciliation was not accepted");
+    Files.deleteIfExists(pending);
+  }
+
+  /** The final publication fence repeats the proof after replay and writer drain. */
+  public void requireProtectedCandidateClean() throws IOException {
+    requireProtectedCandidateClean(System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(30), () -> false);
+  }
+
+  public void requireProtectedCandidateClean(long deadlineNanos,
+      java.util.function.BooleanSupplier cancelled) throws IOException {
+    if (visitProtectedCandidateSources((path, source) -> {}, deadlineNanos, cancelled) != 0) {
+      throw new IOException("Protected content remains in the migration candidate");
+    }
+  }
+
+  /** Caller owns mutation admission or the final fence. Classification is once per source/owner,
+   * not once per chunk. An expired or uncertain proof never permits publication. */
+  private long visitProtectedCandidateSources(java.util.function.BiConsumer<String, Path> sourceAction,
+      long deadlineNanos, java.util.function.BooleanSupplier cancelled) throws IOException {
+    var roots = declaredCollectionRoots();
+    var classified = new java.util.HashSet<Map.Entry<String, String>>();
+    long[] matchedSources = {0};
+    requireProtectionBudget(deadlineNanos, cancelled);
+    ingestLifecycle.commitOps().maybeRefreshBlocking();
+    try {
+      long unchecked = ingestLifecycle.documentFieldOps().scanIndexedSources(256, batch -> {
+        for (var row : batch) {
+          try {
+            requireProtectionBudget(deadlineNanos, cancelled);
+            if (!classified.add(new java.util.AbstractMap.SimpleImmutableEntry<>(row.path(), row.collection()))) continue;
+            Path path = Path.of(row.path());
+            if (!path.isAbsolute()) continue;
+            var verdict = io.justsearch.indexerworker.ingest.IngestionSkipPolicy.active().classifyForUpgrade(
+                path, protectionBoundary(path, row.collection(), roots), row.collection(), deadlineNanos, cancelled);
+            if (verdict.verdict() == io.justsearch.configuration.ProtectedContentPolicy.Verdict.UNCERTAIN) {
+              throw new IOException("Candidate source identity is uncertain");
+            }
+            if (verdict.verdict() == io.justsearch.configuration.ProtectedContentPolicy.Verdict.PROTECTED) {
+              matchedSources[0]++;
+              sourceAction.accept(row.path(), verdict.source());
+            }
+          } catch (IOException failure) { throw new java.io.UncheckedIOException(failure); }
+        }
+      });
+      requireProtectionBudget(deadlineNanos, cancelled);
+      if (unchecked != 0) throw new IOException("Candidate protected-source scan was incomplete");
+      return matchedSources[0];
+    } catch (java.io.UncheckedIOException failure) { throw failure.getCause(); }
+  }
+
+  private static void requireProtectionBudget(long deadlineNanos,
+      java.util.function.BooleanSupplier cancelled) throws IOException {
+    if (Thread.currentThread().isInterrupted() || cancelled.getAsBoolean() || System.nanoTime() >= deadlineNanos) {
+      throw new IOException("Candidate protected-source scan cancelled or expired");
+    }
+  }
+
   /** Read-only ownership enumeration from the serving view used by Apply Excludes. */
   public long scanIndexedSources(java.util.function.Consumer<String> consumer, CallContext ctx) {
     Objects.requireNonNull(consumer, "consumer");
@@ -2871,6 +3041,31 @@ public final class WorkerIngestService {
           consumer.accept(row.path());
         }
       });
+    }
+  }
+
+  /** Upgrade enumeration never certifies a candidate it did not inspect. */
+  public long scanIndexedSourcesWithCollection(
+      java.util.function.Consumer<io.justsearch.app.api.IndexingService.IndexedSource> consumer,
+      CallContext ctx) {
+    Objects.requireNonNull(consumer, "consumer");
+    try (var ignored = openRequestMdc(ctx); var ignoredMutation = mutationLease()) {
+      var source = searchLifecycle != null ? searchLifecycle : ingestLifecycle;
+      if (source == null) throw WorkerServiceException.unavailable("Index runtime not available");
+      boolean candidate = switchBufferOps.buildingGenerationForFileAdmission() != null;
+      source.commitOps().maybeRefreshBlocking();
+      long unchecked = source.documentFieldOps().scanIndexedSources(256, batch -> {
+        for (var row : batch) {
+          if (ctx.cancelled()) throw WorkerServiceException.unavailable("Indexed source enumeration cancelled");
+          consumer.accept(new io.justsearch.app.api.IndexingService.IndexedSource(row.path(), row.collection()));
+        }
+      });
+      jobQueue.forEachSource((path, collection) -> {
+        if (ctx.cancelled()) throw WorkerServiceException.unavailable("Queue source enumeration cancelled");
+        String owner = source.documentFieldOps().getDocumentField(path, SchemaFields.COLLECTION);
+        consumer.accept(new io.justsearch.app.api.IndexingService.IndexedSource(path, owner == null ? collection : owner));
+      });
+      return unchecked + (candidate || switchBufferOps.buildingGenerationForFileAdmission() != null ? 1 : 0);
     }
   }
 
@@ -4029,14 +4224,9 @@ public final class WorkerIngestService {
           continue;
         }
         Path destination = Path.of(rawNewPath);
-        if (isUserExcluded(destination, destination)) {
-          failedPaths.add(rawOldPath);
-          continue;
-        }
         String oldPath = PathNormalizer.normalizeKey(Path.of(rawOldPath));
         String newPath = PathNormalizer.normalizeKey(Path.of(rawNewPath));
 
-        if (oldPath.equals(newPath)) { updatedCount++; continue; }
         String oldPathHash =
             io.justsearch.indexerworker.identity.DocumentIdentityStore.pathHash(oldPath);
         String newPathHash =
@@ -4048,7 +4238,15 @@ public final class WorkerIngestService {
           // returns. Never let that surviving old call recreate a path after a later forget.
           if (ctx.cancelled() || ctx != CallContext.none()
               && System.nanoTime() - ctx.deadlineNanos() >= 0) return false;
-          if (isUserExcluded(destination, destination)) return false;
+          Path boundary = protectionBoundary(destination, null, declaredCollectionRoots());
+          Admission admission = admissionDecision(destination, boundary, null);
+          if (admission == Admission.SECURITY_REJECTION) {
+            deleteSourceUnderFence(oldPath);
+            deleteSourceUnderFence(newPath);
+            return true;
+          }
+          if (admission == Admission.POLICY_REJECTION) return false;
+          if (oldPath.equals(newPath)) return true;
           var identityRekey = documentIdentityStore.rekey(
               oldPathHash, newPathHash, System.currentTimeMillis());
           boolean rowsSettled = moveRowsUnderFence(oldPath, newPath, storage);

@@ -46,7 +46,7 @@ final class RecoverableChunkCompletenessTest {
   }
 
   private static int runScenario(Path data, boolean interrupt) throws Exception {
-    Path root = Files.createDirectories(data.resolve("documents"));
+    Path root = Files.createDirectories(data.resolveSibling(data.getFileName() + "-documents"));
     Path file = root.resolve("large-replay.txt");
     Files.writeString(data.resolve("source.txt"), ("alpha beta gamma delta ".repeat(83) + "\n\n").repeat(5001), StandardCharsets.UTF_8);
     Files.writeString(data.resolve("watched_roots.json"), JsonMapper.builder().build().writeValueAsString(
@@ -223,7 +223,7 @@ final class RecoverableChunkCompletenessTest {
             try {
               var ids = runtime.documentFieldOps().queryDocIdsByFieldOrThrow(
                   io.justsearch.indexing.SchemaFields.PARENT_DOC_ID,
-                  io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(data.resolve("documents/large-replay.txt")), 10000);
+                  io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(data.resolveSibling(data.getFileName() + "-documents").resolve("large-replay.txt")), 10000);
               if (ids.isEmpty()) throw new AssertionError("no partial chunks persisted");
               String total = runtime.documentFieldOps().getDocumentFieldOrThrow(ids.getFirst(),
                   io.justsearch.indexing.SchemaFields.CHUNK_TOTAL);
@@ -235,10 +235,10 @@ final class RecoverableChunkCompletenessTest {
             Runtime.getRuntime().halt(EngineExit.FATAL_OR_UNCAUGHT);
           }
         });
-        Files.copy(data.resolve("source.txt"), data.resolve("documents/large-replay.txt"));
+        Files.copy(data.resolve("source.txt"), data.resolveSibling(data.getFileName() + "-documents").resolve("large-replay.txt"));
         var generation = new IndexGenerationManager(data.resolve("index")).initializeOrLoad().activeGenerationId();
         var plan = new RecordedRootPlan(generation, List.of(new RecordedRootPlan.Root(
-            data.resolve("documents/large-replay.txt"), "documents", false, true, List.of(), List.of())));
+            data.resolveSibling(data.getFileName() + "-documents").resolve("large-replay.txt"), "documents", false, true, List.of(), List.of())));
         var context = EngineProvenance.context(EngineContext.ClientKind.INTERNAL, "quit-replay",
             Optional.empty(), Optional.of(new OperationAuthorizationBasis.StructuralAuto().encode()),
             TransportTag.SYSTEM_INTERNAL, EngineContext.Survival.DURABLE, EngineContext.Urgency.BACKGROUND);

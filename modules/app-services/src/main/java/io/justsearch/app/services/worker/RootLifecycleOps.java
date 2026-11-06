@@ -570,12 +570,13 @@ final class RootLifecycleOps {
         }
     }
 
-    IndexingService.DeletionOutcome deleteDocByIdWithOutcome(String docId, EngineContext engineContext) {
+    IndexingService.DeletionOutcome deleteDocByIdWithOutcome(String docId, EngineContext engineContext,
+            java.util.function.BiFunction<String, EngineContext, DeleteByIdResponse> deleteSettled) {
         if (docId == null || docId.isBlank()) {
             return new IndexingService.DeletionOutcome(false, "Document path unavailable");
         }
         try {
-            DeleteByIdResponse response = deleteByIdFn.apply(docId, engineContext);
+            DeleteByIdResponse response = deleteSettled.apply(docId, engineContext);
             if (response == null) {
                 return new IndexingService.DeletionOutcome(false, "Worker deletion outcome unavailable");
             }

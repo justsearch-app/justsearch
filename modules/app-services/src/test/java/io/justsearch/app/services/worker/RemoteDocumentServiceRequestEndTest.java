@@ -79,7 +79,7 @@ final class RemoteDocumentServiceRequestEndTest {
     when(client.fetchDocuments(anyList(), any())).thenAnswer(ignored -> {
       if (fallback) throw failure;
       return FetchDocumentsResponse.newBuilder().addDocuments(
-          DocumentContent.newBuilder().setDocId("doc").setContent("whole document")).build();
+          DocumentContent.newBuilder().setDocId("doc").setFound(true).setContent("whole document")).build();
     });
     var service = new RemoteDocumentService(Runnable::run, Runnable::run, () -> client);
     var context = TestEngineContexts.internal();

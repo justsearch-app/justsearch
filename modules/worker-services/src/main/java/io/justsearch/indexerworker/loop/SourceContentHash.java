@@ -37,7 +37,17 @@ public final class SourceContentHash {
 
   /** Best-effort admission proof. Missing evidence never certifies unchanged content. */
   public static String admissionIdentity(Path path, Path root) {
-    if (root == null || io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(path, root)
+    return hashAdmittedSource(path, root, null);
+  }
+
+  public static String admissionIdentity(Path path, Path root, String collection) {
+    // Keep the ordinary admission interface, including its existing source-witness probes.
+    return io.justsearch.configuration.InternalCollections.isReserved(collection)
+        ? hashAdmittedSource(path, root, collection) : admissionIdentity(path, root);
+  }
+
+  private static String hashAdmittedSource(Path path, Path root, String collection) {
+    if (root == null || io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(path, root, collection)
         || isCloudPlaceholder(path)) return null;
     try {
       var before = FileFreshnessSnapshot.capture(path);
