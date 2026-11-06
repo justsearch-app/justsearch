@@ -169,6 +169,8 @@ class KnowledgeSearchControllerFeedbackObserverTest {
     var config = new ConfigStore(TestResolvedConfigHelper.fromEntries(Map.of(
         "justsearch.qu.enabled", "false", "justsearch.filter_norm.enabled", "false")));
     var client = mock(KnowledgeClient.class);
+    when(client.search(any(SearchRequest.class), anyBoolean(), any(EngineContext.class)))
+        .thenAnswer(call -> client.search((SearchRequest) call.getArgument(0), (EngineContext) call.getArgument(2)));
     when(client.search(any(SearchRequest.class), any(EngineContext.class)))
         .thenReturn(SearchResponse.getDefaultInstance());
     var bootstrap = mock(KnowledgeServerBootstrap.class);

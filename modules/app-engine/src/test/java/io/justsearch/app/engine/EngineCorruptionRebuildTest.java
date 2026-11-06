@@ -73,7 +73,7 @@ final class EngineCorruptionRebuildTest {
       + " rebuilt from source and searchable again")
   void corruptIndexRebuildsFromSourceAndIsSearchableAgain(@TempDir Path tempDir) throws Exception {
     Path dataDir = tempDir.resolve("data");
-    Path docsDir = dataDir.resolve("rebuild-docs");
+    Path docsDir = tempDir.resolve("rebuild-docs");
     Files.createDirectories(docsDir);
 
     String marker = "rebuildmarker" + System.nanoTime();

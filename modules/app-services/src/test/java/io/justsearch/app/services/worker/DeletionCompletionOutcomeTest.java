@@ -112,7 +112,7 @@ final class DeletionCompletionOutcomeTest {
 
   private static JsonNode outcome(RootLifecycleOps ops, String name) throws Exception {
     var method = java.util.Arrays.stream(RootLifecycleOps.class.getDeclaredMethods())
-        .filter(m -> m.getName().equals(name)).findFirst();
+        .filter(m -> m.getName().equals(name) && m.getParameterCount() == 2).findFirst();
     assertTrue(method.isPresent(), "Apply requires completion-aware deletion: " + name);
     Object path = name.startsWith("deleteDocs") ? Path.of("excluded") : "excluded";
     return new ObjectMapper().valueToTree(method.orElseThrow().invoke(ops, path, TestEngineContexts.internal()));

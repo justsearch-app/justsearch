@@ -112,6 +112,15 @@ public interface IndexingService {
     throw new UnsupportedOperationException("Indexed source enumeration is unavailable");
   }
 
+  record IndexedSource(String path, String collection) {}
+
+  /** Source identities and collection ownership; a nonzero result means unchecked rows or a
+   * migration candidate not covered by this serving snapshot. */
+  default long forEachIndexedSourceWithCollection(
+      java.util.function.Consumer<IndexedSource> consumer, EngineContext engineContext) {
+    throw new UnsupportedOperationException("Indexed collection enumeration is unavailable");
+  }
+
   /** Add a new watch root (primary collection). */
   void addWatchedPath(Path path, EngineContext engineContext);
 

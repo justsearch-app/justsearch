@@ -79,7 +79,7 @@ class WorkerUserExclusionsTest {
   }
 
   @Test
-  void EN1BuiltInSkipsAndExplicitExemptionsRemain() throws Exception {
+  void EN1BuiltInSkipsPreserveGitignoreAndProtectEnv() throws Exception {
     Path system = Files.writeString(root.resolve("Thumbs.db"), "system");
     Path compiled = Files.writeString(root.resolve("module.pyc"), "compiled");
     Path git = Files.writeString(Files.createDirectory(root.resolve(".git")).resolve("notes.txt"), "git");
@@ -88,7 +88,7 @@ class WorkerUserExclusionsTest {
     assertEquals(SourceAdmissionAction.SKIP_DONE, authority.admit(system, root).action());
     assertEquals(SourceAdmissionAction.SKIP_DONE, authority.admit(compiled, root).action());
     assertEquals(SourceAdmissionAction.SKIP_DONE, authority.admit(git, root).action());
-    assertEquals(SourceAdmissionAction.ADMIT, authority.admit(env, root).action());
+    assertEquals(SourceAdmissionAction.SKIP_DONE, authority.admit(env, root).action());
   }
 
   private static ResolvedConfig config(String patterns) {

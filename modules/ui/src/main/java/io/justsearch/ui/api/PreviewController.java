@@ -148,11 +148,13 @@ public final class PreviewController {
         return;
       }
 
-      DocumentService.DocumentIdPage page =
-          documentService()
-              .listAllDocumentIds((int) offsetLong, (int) limitLong, RequestEngineContext.get(ctx))
-              .toCompletableFuture()
-              .get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+      var context = RequestEngineContext.get(ctx);
+      var documents = documentService();
+      var enumeration = WindowAuthority.hasAuthority(ctx)
+          ? documents.listAllDocumentIds((int) offsetLong, (int) limitLong, context)
+          : documents.listAllDocumentIds((int) offsetLong, (int) limitLong, false, context);
+      DocumentService.DocumentIdPage page = enumeration.toCompletableFuture()
+          .get(timeout.toMillis(), TimeUnit.MILLISECONDS);
       if (page == null) {
         throw new DocumentService.UnavailableException("Worker returned no document ID page");
       }
@@ -231,6 +233,8 @@ public final class PreviewController {
         }
         requested.add(id.asText());
       }
+      if (!WindowAuthority.allowSelectedDocumentReads(ctx, requested, documentService())) return;
+
       Map<String, DocumentService.Presence> states = documentService()
           .checkPresence(java.util.List.copyOf(requested), RequestEngineContext.get(ctx))
           .toCompletableFuture().get(timeout.toMillis(), TimeUnit.MILLISECONDS);
@@ -296,6 +300,8 @@ public final class PreviewController {
               .fetchSlice(docId, offsetChars, maxChars, RequestEngineContext.get(ctx))
               .toCompletableFuture()
               .get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+
+      if (slice != null && !WindowAuthority.allowDocumentRead(ctx, docId, slice.metadata())) return;
 
       if (slice == null || !slice.found()) {
         Map<String, DocumentService.Presence> states = documents

@@ -97,8 +97,7 @@ public final class JobBatchWriter {
   private final FileMutationFence fileMutationFence;
   private io.justsearch.indexerworker.services.StorageObservationSnapshot storageSnapshot;
   private final BatchServiceFailures writeFailures = new BatchServiceFailures();
-  private java.util.function.BiPredicate<java.nio.file.Path, java.nio.file.Path> fileExclusions =
-      io.justsearch.indexerworker.ingest.IngestionSkipPolicy::shouldSkipWithinRoot;
+
 
   public JobBatchWriter(
       WorkerIngestionAuthority ingestionAuthority,
@@ -137,9 +136,6 @@ public final class JobBatchWriter {
     this.fileMutationFence = fileMutationFence;
   }
 
-  void useFileExclusions(java.util.function.BiPredicate<java.nio.file.Path, java.nio.file.Path> exclusions) {
-    fileExclusions = Objects.requireNonNull(exclusions, "exclusions");
-  }
 
   void beginBatch() {
     writeFailures.begin();
@@ -189,10 +185,12 @@ public final class JobBatchWriter {
         batchStats.recordSkipped();
         return;
       }
-      if (fileExclusions.test(ex.filePath(), ex.claim().ingestionRoot())) {
+      if (ingestionAuthority.excludes(ex.filePath(), ex.claim().ingestionRoot(), ex.collection())) {
         journal.recordOutcomeSafely(ex.filePath(), "EXCLUDED_BEFORE_WRITE",
             () -> jobQueue.markClaimDone(ex.claim(),
-                journal.skipped(IngestionReasonCodes.SKIPPED_TEMP_OR_SYSTEM),
+                journal.skipped(io.justsearch.indexerworker.ingest.IngestionSkipPolicy.isProtected(
+                    ex.filePath(), ex.claim().ingestionRoot(), ex.collection())
+                    ? IngestionReasonCodes.SKIPPED_PROTECTED : IngestionReasonCodes.SKIPPED_TEMP_OR_SYSTEM),
                 LedgerEntryFactory.forEnvelope(ex.envelope(), ex.collection(), ex.artifact(),
                     contentExtractor.extractionPolicy(), ex.provenance())));
         batchStats.recordSkipped();

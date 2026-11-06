@@ -293,7 +293,7 @@ public final class WatcherReplay implements AutoCloseable {
       throw new IOException("Watcher reconciliation source is unreadable or not regular: " + path);
     }
     if ((nativePolicy == null
-            ? io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(file, Path.of(debt.root()))
+            ? io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(file, Path.of(debt.root()), debt.collection())
             : !nativePolicy.allows(file, Path.of(debt.root()), debt.collection()))
         || SyncDirectoryOps.isCloudPlaceholder(file)) {
       throw new IOException("Watcher reconciliation cannot certify an ineligible source: " + path);

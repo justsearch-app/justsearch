@@ -27,16 +27,11 @@ public final class IngestionSkipPolicy {
   private static final Set<String> DEFAULT_SKIP_PATTERNS =
       Set.of("thumbs.db", ".ds_store", "desktop.ini", ".git", ".svn", "$recycle.bin");
 
-  /**
-   * File names that are explicitly preserved even when other rules would skip them.
-   * observations.md `#181` fix: the dot-prefix branch at the top of
-   * {@link #shouldSkipName} exempts {@code .gitignore} (and {@code .env}), but the
-   * trailing {@code skipPatterns.contains(name::contains)} substring check would
-   * subsequently re-skip {@code .gitignore} because the {@code .git} pattern is a
-   * substring of the file name. Centralizing the exempt set and short-circuiting
-   * before any skip rule fires makes the exemption authoritative.
-   */
-  private static final Set<String> EXEMPT_NAMES = Set.of(".env", ".gitignore");
+  /** `.gitignore` remains useful searchable user content. */
+  private static final Set<String> EXEMPT_NAMES = Set.of(".gitignore");
+
+  /** Bump the shared version when the always-on rules change. */
+  public static final String PROTECTED_RULES_VERSION = io.justsearch.configuration.ProtectedContentPolicy.VERSION;
 
   /** Default file extensions that mark a path as build/cache output. Lowercase, no leading dot. */
   private static final Set<String> DEFAULT_SKIP_EXTENSIONS =
@@ -65,6 +60,9 @@ public final class IngestionSkipPolicy {
 
   private static final AtomicReference<IngestionSkipPolicy> INSTANCE = new AtomicReference<>(DEFAULT);
 
+  private final Path dataDirectory;
+  private final Path helpDirectory;
+  private final io.justsearch.configuration.ProtectedContentPolicy protectedPolicy;
   private final Set<String> skipPatterns;
   private final Set<String> skipExtensions;
   private final Set<String> skipDirectoryNames;
@@ -78,9 +76,67 @@ public final class IngestionSkipPolicy {
       Set<String> skipPatterns,
       Set<String> skipExtensions,
       Set<String> skipDirectoryNames) {
+    this(skipPatterns, skipExtensions, skipDirectoryNames, null, null);
+  }
+
+  private IngestionSkipPolicy(Set<String> skipPatterns, Set<String> skipExtensions,
+      Set<String> skipDirectoryNames, Path dataDirectory, Path helpDirectory) {
+    this.dataDirectory = dataDirectory == null ? null : dataDirectory.toAbsolutePath().normalize();
+    this.helpDirectory = helpDirectory == null ? null : helpDirectory.toAbsolutePath().normalize();
+    this.protectedPolicy = new io.justsearch.configuration.ProtectedContentPolicy(this.dataDirectory, this.helpDirectory);
     this.skipPatterns = normalise(skipPatterns, DEFAULT_SKIP_PATTERNS);
     this.skipExtensions = normalise(skipExtensions, DEFAULT_SKIP_EXTENSIONS);
     this.skipDirectoryNames = normalise(skipDirectoryNames, DEFAULT_SKIP_DIRECTORY_NAMES);
+  }
+
+  /** Bind the application's resolved data path before starting ingestion. */
+  public IngestionSkipPolicy withDataDirectory(Path directory) {
+    Path normalized = directory == null ? null : directory.toAbsolutePath().normalize();
+    return withDataDirectory(directory, java.util.Objects.equals(normalized, dataDirectory)
+        && helpDirectory != null ? helpDirectory : normalized == null ? null : normalized.resolve("help"));
+  }
+
+  /** Bind the resolved bundled-help source too: packaged copies may be below data/SSOT/docs. */
+  public IngestionSkipPolicy withDataDirectory(Path directory, Path helpSource) {
+    return new IngestionSkipPolicy(skipPatterns, skipExtensions, skipDirectoryNames, directory, helpSource);
+  }
+
+  public static boolean isProtected(Path path, Path root, String collection) {
+    return INSTANCE.get().protectedPolicy.protectedLivePath(path, root, collection);
+  }
+
+  /** Bound filesystem identity work independently of the publication fence. A timed-out lookup
+   * owns no writer or queue and cannot publish after its caller refuses the candidate. */
+  public io.justsearch.configuration.ProtectedContentPolicy.Classification classifyForUpgrade(
+      Path path, Path root, String collection, long deadlineNanos,
+      java.util.function.BooleanSupplier cancelled) throws java.io.IOException {
+    if (cancelled.getAsBoolean() || Thread.currentThread().isInterrupted()
+        || System.nanoTime() >= deadlineNanos) throw new java.io.IOException("Protected-source proof cancelled or expired");
+    if (protectedPolicy.protectedPath(path, root, collection)) {
+      return new io.justsearch.configuration.ProtectedContentPolicy.Classification(
+          io.justsearch.configuration.ProtectedContentPolicy.Verdict.PROTECTED, path);
+    }
+    var lookup = new java.util.concurrent.FutureTask<>(() -> protectedPolicy.classify(path, root, collection));
+    Thread.ofVirtual().name("protected-source-identity").start(lookup);
+    try {
+      while (true) {
+        long remaining = deadlineNanos - System.nanoTime();
+        if (remaining <= 0 || cancelled.getAsBoolean()) throw new java.io.IOException("Protected-source proof cancelled or expired");
+        try { return lookup.get(Math.min(remaining, java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(50)),
+            java.util.concurrent.TimeUnit.NANOSECONDS); }
+        catch (java.util.concurrent.TimeoutException pending) { /* Recheck cancellation and deadline. */ }
+      }
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      throw new java.io.IOException("Protected-source proof interrupted", interrupted);
+    } catch (java.util.concurrent.ExecutionException failed) {
+      throw new java.io.IOException("Protected-source identity unavailable", failed.getCause());
+    } finally { lookup.cancel(true); }
+  }
+
+  /** No filesystem reads: offline sources use the same protection as live admissions. */
+  public boolean protectedPath(Path path, Path root, String collection) {
+    return protectedPolicy.protectedPath(path, root, collection);
   }
 
   /** The built-in default policy (pre-Slice-B behaviour). Useful for tests + as a base. */
@@ -108,12 +164,24 @@ public final class IngestionSkipPolicy {
    * The check is name-only — it does not stat the file or look at its parent directories.
    */
   public static boolean shouldSkip(Path path) {
-    return INSTANCE.get().shouldSkipName(path);
+    return protectedSkip(path, path, null) || INSTANCE.get().shouldSkipName(path);
   }
 
   /** Applies directory exclusions below the admitting root through the file's parent. */
   public static boolean shouldSkipWithinRoot(Path path, Path root) {
-    if (shouldSkip(path)) return true;
+    return shouldSkipWithinRoot(path, root, null);
+  }
+
+  /** Collection identity permits only the application's own data-folder projections. */
+  public static boolean isSecurityExcluded(Path path, Path root, String collection) {
+    if (isProtected(path, root, collection)) return true;
+    if (path == null || path.getFileName() == null) return false;
+    String name = path.getFileName().toString().toLowerCase(Locale.ROOT);
+    return name.startsWith(".") && !EXEMPT_NAMES.contains(name);
+  }
+
+  public static boolean shouldSkipWithinRoot(Path path, Path root, String collection) {
+    if (protectedSkip(path, root, collection) || INSTANCE.get().shouldSkipName(path)) return true;
     if (path == null || root == null) return false;
     Path absolute = path.toAbsolutePath().normalize();
     Path boundary = root.toAbsolutePath().normalize();
@@ -126,6 +194,14 @@ public final class IngestionSkipPolicy {
     }
     return io.justsearch.configuration.excludes.ExclusionPatterns.current()
         .isExcludedPath(boundary, absolute);
+  }
+
+  private static boolean protectedSkip(Path path, Path root, String collection) {
+    if (!isProtected(path, root, collection)) return false;
+    org.slf4j.LoggerFactory.getLogger(IngestionSkipPolicy.class).debug(
+        "Skipping protected credential or application data file: {} ({})", path,
+        IngestionReasonCodes.SKIPPED_PROTECTED);
+    return true;
   }
 
   /**
@@ -148,6 +224,7 @@ public final class IngestionSkipPolicy {
     // including the substring `skipPatterns` check below. Without this, `.gitignore`
     // would be exempt at the dot-prefix branch but re-skipped because `.git` is a
     // substring of the name.
+    if (io.justsearch.configuration.ProtectedContentPolicy.protectedName(name)) return true;
     if (EXEMPT_NAMES.contains(name)) {
       return false;
     }
@@ -169,7 +246,8 @@ public final class IngestionSkipPolicy {
     if (directoryName == null) {
       return false;
     }
-    return skipDirectoryNames.contains(directoryName.toLowerCase(Locale.ROOT));
+    String name = directoryName.toLowerCase(Locale.ROOT);
+    return name.startsWith(".") || io.justsearch.configuration.ProtectedContentPolicy.credentialDirectory(name) || skipDirectoryNames.contains(name);
   }
 
   /** Read-only view of the active skip-pattern set. */

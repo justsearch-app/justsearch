@@ -310,6 +310,7 @@ public class KnowledgeSearchController {
     long startNs = System.nanoTime();
     try {
       Map<?, ?> body = ctx.bodyAsClass(Map.class);
+      if (!WindowAuthority.allowKnowledgeRead(ctx, body)) return;
       if (body == null || body.size() != 1 || !(body.get("maxDocsScanned") instanceof Number cap)
           || cap.doubleValue() != cap.intValue() || cap.intValue() < 1) {
         ctx.status(400).json(ApiErrorHandler.toResponse(ApiErrorCode.INVALID_REQUEST,
@@ -345,6 +346,7 @@ public class KnowledgeSearchController {
 
       @SuppressWarnings("unchecked")
       Map<String, Object> body = (Map<String, Object>) ctx.bodyAsClass(Map.class);
+      if (!WindowAuthority.allowKnowledgeRead(ctx, body)) return;
       String query = (String) body.get("query");
       Integer limit = body.get("limit") instanceof Number n ? n.intValue() : 10;
       Object modeRaw = body.get("mode");
@@ -467,7 +469,7 @@ public class KnowledgeSearchController {
           new KnowledgeSearchRequest(
               query, limit, modeText, sortText, cursorText, workerProjection, filters, boostFilters,
               facets, querySyntaxText, includeExcerpts, debug, pipelineConfig);
-      KnowledgeSearchResponse response = adapter.search(req, engineContext);
+      KnowledgeSearchResponse response = adapter.search(req, WindowAuthority.hasAuthority(ctx), engineContext);
 
       // Tempdoc 580 §17 (Track C P1) — stable per-query join key. The FE echoes it back with a
       // result-disposition (P3) so "what came of a result" joins to the persisted ranking features
@@ -869,6 +871,7 @@ public class KnowledgeSearchController {
     try {
       @SuppressWarnings("unchecked")
       Map<String, Object> body = (Map<String, Object>) ctx.bodyAsClass(Map.class);
+      if (!WindowAuthority.allowKnowledgeRead(ctx, body)) return;
       String parentPath = body.get("parentPath") instanceof String s ? s : null;
       if (parentPath == null || parentPath.isBlank()) {
         ctx.status(400).json(ApiErrorHandler.toResponse(ApiErrorCode.INVALID_REQUEST, "parentPath is required", telemetry, ApiErrorHandler.routeOf(ctx)));
@@ -881,7 +884,7 @@ public class KnowledgeSearchController {
           redact(new SensitiveQuery(parentPath)), maxFolders);
 
       FolderBrowseRequest req = new FolderBrowseRequest(parentPath, maxFolders);
-      FolderBrowseResponse response = adapter.listFolders(req, engineContext);
+      FolderBrowseResponse response = adapter.listFolders(req, WindowAuthority.hasAuthority(ctx), engineContext);
       ctx.json(response);
 
     } catch (KnowledgeClientException e) {
@@ -905,6 +908,7 @@ public class KnowledgeSearchController {
     try {
       @SuppressWarnings("unchecked")
       Map<String, Object> body = (Map<String, Object>) ctx.bodyAsClass(Map.class);
+      if (!WindowAuthority.allowKnowledgeRead(ctx, body)) return;
       String folderPath = body.get("folderPath") instanceof String s ? s : null;
       if (folderPath == null || folderPath.isBlank()) {
         ctx.status(400).json(ApiErrorHandler.toResponse(ApiErrorCode.INVALID_REQUEST, "folderPath is required", telemetry, ApiErrorHandler.routeOf(ctx)));
@@ -922,7 +926,7 @@ public class KnowledgeSearchController {
           redact(new SensitiveQuery(folderPath)), limit);
 
       FolderFilesRequest req = new FolderFilesRequest(folderPath, limit, projection);
-      FolderFilesResponse response = adapter.listFolderFiles(req, engineContext);
+      FolderFilesResponse response = adapter.listFolderFiles(req, WindowAuthority.hasAuthority(ctx), engineContext);
       ctx.json(response);
 
     } catch (KnowledgeClientException e) {

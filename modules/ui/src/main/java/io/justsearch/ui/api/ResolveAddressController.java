@@ -51,6 +51,20 @@ public final class ResolveAddressController {
   public void handle(Context ctx) {
     var engineContext = RequestEngineContext.get(ctx);
     String docIdParam = ctx.pathParam("id");
+    if (!WindowAuthority.hasAuthority(ctx)) {
+      try {
+        var slice = documents.fetchSlice(docIdParam, 0, 1, engineContext).toCompletableFuture()
+            .get(FETCH_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+        if (slice == null) {
+          writeError(ctx, HttpStatus.SERVICE_UNAVAILABLE, "Document ownership unavailable", "UNAVAILABLE");
+          return;
+        }
+        if (!WindowAuthority.allowDocumentRead(ctx, docIdParam, slice.metadata())) return;
+      } catch (Exception unavailable) {
+        writeError(ctx, HttpStatus.SERVICE_UNAVAILABLE, "Document ownership unavailable", "UNAVAILABLE");
+        return;
+      }
+    }
     String body = ctx.body();
     DocumentAddress address;
     try {
@@ -68,7 +82,7 @@ public final class ResolveAddressController {
       return;
     }
     try {
-      DocumentAddress.Canonical resolved = resolve(address, engineContext);
+      DocumentAddress.Canonical resolved = resolve(address, engineContext, ctx);
       Map<String, Object> out = new LinkedHashMap<>();
       out.put("coords", "canonical");
       out.put("docId", resolved.docId());
@@ -77,13 +91,15 @@ public final class ResolveAddressController {
       ctx.json(out);
     } catch (UnresolvableAddressException e) {
       writeError(ctx, HttpStatus.BAD_REQUEST, e.getMessage(), "UNRESOLVABLE_ADDRESS");
+    } catch (io.javalin.http.HttpResponseException denied) {
+      throw denied;
     } catch (RuntimeException e) {
       LOG.warn("resolve-address: unexpected failure for {}", docIdParam, e);
       writeError(ctx, HttpStatus.INTERNAL_SERVER_ERROR, "Internal failure", "INTERNAL");
     }
   }
 
-  private DocumentAddress.Canonical resolve(DocumentAddress address, EngineContext engineContext) {
+  private DocumentAddress.Canonical resolve(DocumentAddress address, EngineContext engineContext, Context ctx) {
     return switch (address) {
       case DocumentAddress.Canonical c -> c;
       case DocumentAddress.Display d -> {
@@ -99,12 +115,12 @@ public final class ResolveAddressController {
         throw new UnresolvableAddressException(
             "Unsupported viewId without canonicalHint: " + d.viewId());
       }
-      case DocumentAddress.Lines l -> linesToCanonical(l, engineContext);
+      case DocumentAddress.Lines l -> linesToCanonical(l, engineContext, ctx);
     };
   }
 
-  private DocumentAddress.Canonical linesToCanonical(DocumentAddress.Lines l, EngineContext engineContext) {
-    String content = fetchContent(l.docId(), engineContext);
+  private DocumentAddress.Canonical linesToCanonical(DocumentAddress.Lines l, EngineContext engineContext, Context ctx) {
+    String content = fetchContent(l.docId(), engineContext, ctx);
     if (content == null) {
       throw new UnresolvableAddressException(
           "Cannot resolve lines for missing document: " + l.docId());
@@ -128,11 +144,17 @@ public final class ResolveAddressController {
     return new DocumentAddress.Canonical(l.docId(), startOffset, endOffset);
   }
 
-  private String fetchContent(String docId, EngineContext engineContext) {
+  private String fetchContent(String docId, EngineContext engineContext, Context ctx) {
     try {
       DocumentRecord r =
           documents.fetch(docId, engineContext).toCompletableFuture().get(FETCH_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+      if (r != null && !WindowAuthority.allowDocumentRead(ctx, docId, r.metadata())) {
+        throw new io.javalin.http.HttpResponseException(403, "Assistant history is private",
+            Map.of("errorCode", "ASSISTANT_HISTORY_PRIVATE"));
+      }
       return r == null ? null : r.content();
+    } catch (io.javalin.http.HttpResponseException denied) {
+      throw denied;
     } catch (Exception e) {
       LOG.info("resolve-address: fetch failed for {}: {}", docId, e.getMessage());
       return null;

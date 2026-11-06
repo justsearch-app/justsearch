@@ -175,6 +175,8 @@ final class KnowledgeSearchDuringChatDrainTest {
   @SuppressWarnings("unchecked")
   private static KnowledgeServerBootstrap bootstrap(List<SearchRequest> workerRequests) {
     KnowledgeClient client = mock(KnowledgeClient.class);
+    when(client.search(any(SearchRequest.class), org.mockito.ArgumentMatchers.anyBoolean(), any(EngineContext.class)))
+        .thenAnswer(call -> client.search((SearchRequest) call.getArgument(0), (EngineContext) call.getArgument(2)));
     when(client.search(any(SearchRequest.class), any(EngineContext.class)))
         .thenAnswer(invocation -> {
           workerRequests.add(invocation.getArgument(0));

@@ -52,6 +52,8 @@ final class KnowledgeSearchControllerConfigStoreTest {
                 "{\"query\":\"captured query\",\"meta_source\":[\"captured source\"]}"));
     KnowledgeClient client = mock(KnowledgeClient.class);
     List<SearchRequest> workerRequests = new ArrayList<>();
+    when(client.search(any(SearchRequest.class), org.mockito.ArgumentMatchers.anyBoolean(), any(EngineContext.class)))
+        .thenAnswer(call -> client.search((SearchRequest) call.getArgument(0), (EngineContext) call.getArgument(2)));
     when(client.search(any(SearchRequest.class), any(EngineContext.class)))
         .thenAnswer(
             invocation -> {

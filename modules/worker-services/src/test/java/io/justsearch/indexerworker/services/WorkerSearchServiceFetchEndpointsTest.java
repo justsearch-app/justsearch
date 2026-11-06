@@ -285,6 +285,25 @@ class WorkerSearchServiceFetchEndpointsTest extends io.justsearch.adapters.lucen
 
     private WorkerSearchService serviceWithDocumentFields(
         io.justsearch.adapters.lucene.runtime.DocumentFieldOps fields) {
+      // The production fetch now reads content and ownership from one immutable reader. Keep the
+      // existing payload/cancellation fixtures and assertions while adapting their field stubs.
+      org.mockito.Mockito.when(fields.getDocumentFieldsBatch(
+          org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.anySet()))
+          .thenAnswer(call -> {
+            List<String> ids = call.getArgument(0);
+            java.util.Set<String> names = call.getArgument(1);
+            Map<String, Map<String, String>> result = new java.util.LinkedHashMap<>();
+            for (String id : ids) {
+              Map<String, String> values = new java.util.HashMap<>();
+              for (String name : names) {
+                String value = SchemaFields.CONTENT.equals(name)
+                    ? fields.getDocumentContent(id) : fields.getDocumentField(id, name);
+                if (value != null) values.put(name, value);
+              }
+              result.put(id, values);
+            }
+            return result;
+          });
       var runtime = org.mockito.Mockito.spy(lifecycle);
       org.mockito.Mockito.doReturn(fields).when(runtime).documentFieldOps();
       return new WorkerSearchService(runtime);

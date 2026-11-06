@@ -85,7 +85,7 @@ final class EngineMigrationLifecycleTest {
   @DisplayName("live cutover retains Blue for a held view, then retires it after release")
   void cutoverSwapsTheGenerationPointerAndPreservesSearch(@TempDir Path tempDir) throws Exception {
     Path dataDir = tempDir.resolve("data");
-    Path docsDir = dataDir.resolve("migration-docs");
+    Path docsDir = tempDir.resolve("migration-docs");
     Files.createDirectories(docsDir);
 
     String marker = "migrationmarker" + System.nanoTime();
@@ -257,8 +257,8 @@ final class EngineMigrationLifecycleTest {
   void cutoverActivatesTheGenerationInProcess(@TempDir Path tempDir)
       throws Exception {
     Path dataDir = tempDir.resolve("data");
-    Path blueDocs = dataDir.resolve("blue-count-docs");
-    Path greenDocs = dataDir.resolve("green-count-docs");
+    Path blueDocs = tempDir.resolve("blue-count-docs");
+    Path greenDocs = tempDir.resolve("green-count-docs");
     Files.createDirectories(blueDocs);
     Files.createDirectories(greenDocs);
 
@@ -389,7 +389,7 @@ final class EngineMigrationLifecycleTest {
   @DisplayName("directory rollback is refused while the promoted generation keeps serving")
   void rollbackCannotRevertThePublishedGeneration(@TempDir Path tempDir) throws Exception {
     Path dataDir = tempDir.resolve("data");
-    Path docsDir = dataDir.resolve("rollback-root");
+    Path docsDir = tempDir.resolve("rollback-root");
     Files.createDirectories(docsDir);
 
     String marker = "rollbackmarker" + System.nanoTime();
@@ -440,7 +440,7 @@ final class EngineMigrationLifecycleTest {
   @DisplayName("pause holds the enumerator and the cutover; resume releases both")
   void pauseHoldsTheMigrationAndResumeReleasesIt(@TempDir Path tempDir) throws Exception {
     Path dataDir = tempDir.resolve("data");
-    Path watchedRoot = dataDir.resolve("pause-root");
+    Path watchedRoot = tempDir.resolve("pause-root");
     Files.createDirectories(watchedRoot);
 
     // The retired PauseResumeMigrationE2ETest wrote 1 200 files and paused mid-enumeration, then

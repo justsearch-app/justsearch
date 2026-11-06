@@ -35,6 +35,17 @@ final class WorkerSearchCalls implements SearchServiceCalls {
   }
 
   @Override
+  public io.justsearch.ipc.SearchResponse search(io.justsearch.ipc.SearchRequest request, boolean includePrivateData) {
+    return service.search(request, includePrivateData, ctx);
+  }
+
+  @Override
+  public io.justsearch.ipc.RetrieveContextResponse retrieveContext(
+      io.justsearch.ipc.RetrieveContextRequest request, boolean includePrivateData) {
+    return service.retrieveContext(request, includePrivateData, ctx);
+  }
+
+  @Override
   public io.justsearch.ipc.SuggestResponse suggest(io.justsearch.ipc.SuggestRequest request) {
     return service.suggest(request, ctx);
   }
@@ -70,8 +81,26 @@ final class WorkerSearchCalls implements SearchServiceCalls {
   }
 
   @Override
+  public io.justsearch.ipc.ListFoldersResponse listFolders(
+      io.justsearch.ipc.ListFoldersRequest request, boolean includePrivateData) {
+    return service.listFolders(request, includePrivateData, ctx);
+  }
+
+  @Override
+  public io.justsearch.ipc.ListFolderFilesResponse listFolderFiles(
+      io.justsearch.ipc.ListFolderFilesRequest request, boolean includePrivateData) {
+    return service.listFolderFiles(request, includePrivateData, ctx);
+  }
+
+  @Override
   public io.justsearch.ipc.ListAllDocumentIdsResponse listAllDocumentIds(io.justsearch.ipc.ListAllDocumentIdsRequest request) {
     return service.listAllDocumentIds(request, ctx);
+  }
+
+  @Override
+  public io.justsearch.ipc.ListAllDocumentIdsResponse listAllDocumentIds(
+      io.justsearch.ipc.ListAllDocumentIdsRequest request, boolean includePrivateData) {
+    return service.listAllDocumentIds(request, includePrivateData, ctx);
   }
 
   @Override

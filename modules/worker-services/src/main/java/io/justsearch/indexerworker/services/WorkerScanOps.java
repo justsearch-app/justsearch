@@ -280,7 +280,7 @@ final class WorkerScanOps {
             }
             counters[0]++; // walked
             try {
-              if (IngestionSkipPolicy.shouldSkipWithinRoot(file, root)
+              if (IngestionSkipPolicy.shouldSkipWithinRoot(file, root, collection)
                   || userExclusions.test(file, root)
                   || excludedByOwnership(request, file)
                   || matchesAny(excludes, root, file)) {
@@ -356,7 +356,7 @@ final class WorkerScanOps {
                     || (!file.equals(root) && file.getFileName() != null
                         && IngestionSkipPolicy.isSkippedDirectoryName(file.getFileName().toString()))))
                 || (Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)
-                    && (IngestionSkipPolicy.shouldSkipWithinRoot(file, root)
+                    && (IngestionSkipPolicy.shouldSkipWithinRoot(file, root, collection)
                         || userExclusions.test(file, root) || excludes.isExcludedPath(root, file)));
             if (!excluded) {
               if (request.recordedEpoch() != null) throw exc;

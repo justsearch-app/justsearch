@@ -273,12 +273,22 @@ final class VduRequestActivityTest {
       // The real search/suggest/preview controllers own their downstream ports, stubbed here.
       var readyBootstrap = spy(bootstrap);
       doReturn(true).when(readyBootstrap).isReady();
-      try (var adapter = mockConstruction(KnowledgeHttpApiAdapter.class, (mock, context) -> {
+      try (var adapter = mockConstruction(KnowledgeHttpApiAdapter.class,
+          withSettings().defaultAnswer(call -> {
+            // The same response fixtures serve both original and authority-carrying signatures.
+            if (call.getMethod().getName().equals("search")) {
+              return new io.justsearch.app.api.knowledge.KnowledgeSearchResponse(
+                  0, 0, 0, List.of(), null, Map.of(), false, Map.of(), null, null, null, null, null);
+            }
+            if (call.getMethod().getName().equals("listFolders")) {
+              return new io.justsearch.app.api.knowledge.FolderBrowseResponse(List.of(), 0, false);
+            }
+            if (call.getMethod().getName().equals("listFolderFiles")) {
+              return new io.justsearch.app.api.knowledge.FolderFilesResponse(List.of(), 0, 0);
+            }
+            return org.mockito.Answers.RETURNS_DEFAULTS.answer(call);
+          }), (mock, context) -> {
         when(mock.suggest(anyString(), anyInt(), any())).thenReturn(List.of("suggestion"));
-        when(mock.listFolders(any(), any())).thenReturn(
-            new io.justsearch.app.api.knowledge.FolderBrowseResponse(List.of(), 0, false));
-        when(mock.listFolderFiles(any(), any())).thenReturn(
-            new io.justsearch.app.api.knowledge.FolderFilesResponse(List.of(), 0, 0));
         when(mock.search(any(), any())).thenReturn(new io.justsearch.app.api.knowledge.KnowledgeSearchResponse(
             0, 0, 0, List.of(), null, Map.of(), false, Map.of(), null, null, null, null, null));
       })) {

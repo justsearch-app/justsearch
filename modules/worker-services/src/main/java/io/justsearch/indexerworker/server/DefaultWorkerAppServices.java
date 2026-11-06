@@ -592,7 +592,8 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     // ingestion path can call it. WorkerScanOps and WorkerIngestionAuthority fire during in-process port
     // handling that always happens after this constructor returns, so installing here is safe.
     io.justsearch.indexerworker.ingest.IngestionSkipPolicy.installResolved(
-        extractionConfiguration.ingestionSkipPolicy());
+        extractionConfiguration.ingestionSkipPolicy().withDataDirectory(resolvedConfig.paths().dataDir(),
+            resolvedConfig.collections().bundledHelp() == null ? null : resolvedConfig.collections().bundledHelp().path()));
 
     // 1. Content extractor + indexing loop. Tempdoc 417 Phase 2b: catalogs are constructed
     // here against the registry (worker-core can't import worker-services' catalog types).

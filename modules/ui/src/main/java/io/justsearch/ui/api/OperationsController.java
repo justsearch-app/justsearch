@@ -210,6 +210,11 @@ public final class OperationsController {
       return;
     }
 
+    // This operation resolves relative inputs inside the handler and records its returned page.
+    // Require the window before dispatch so neither resolution nor its durable receipt can expose
+    // private history through a second read route. Public document reads use /api/preview.
+    if (("core.read-document".equals(idValue) || "core.resolve-path-hash".equals(idValue))
+        && !WindowAuthority.require(ctx)) return;
     String argumentsJson;
     try {
       argumentsJson = MAPPER.writeValueAsString(request.args());

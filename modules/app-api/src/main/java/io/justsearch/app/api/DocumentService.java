@@ -90,6 +90,14 @@ public interface DocumentService {
         new UnsupportedOperationException("Document ID enumeration is not configured"));
   }
 
+  /** Caller authority is carried by the front; a legacy adapter cannot grant a public ID scope. */
+  default CompletionStage<DocumentIdPage> listAllDocumentIds(
+      int offset, int limit, boolean includePrivateData, EngineContext engineContext) {
+    if (includePrivateData) return listAllDocumentIds(offset, limit, engineContext);
+    return CompletableFuture.failedFuture(
+        new UnsupportedOperationException("Public document ID enumeration is not configured"));
+  }
+
   /**
    * Fetch multiple documents by their identifiers in a single batch operation.
    *
@@ -314,6 +322,12 @@ public interface DocumentService {
    * @param params retrieval parameters
    * @return result containing context string, chunk metadata, and quality signals
    */
+  /** Authority comes from the HTTP front, independently of client attribution. */
+  default CompletionStage<ContextResult> retrieveContext(
+      RetrieveContextParams params, boolean includePrivateData, EngineContext engineContext) {
+    return retrieveContext(params, engineContext);
+  }
+
   default CompletionStage<ContextResult> retrieveContext(RetrieveContextParams params, EngineContext engineContext) {
     if (params.hasRestrictions()) {
       return CompletableFuture.failedFuture(

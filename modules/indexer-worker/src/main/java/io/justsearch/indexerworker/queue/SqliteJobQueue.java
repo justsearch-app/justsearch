@@ -284,7 +284,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   public int enqueueRecordedEntries(String operationKey, long epoch,
       List<EnqueueEntry> entries, String collection) {
     if (!hasSufficientDiskSpace()) throw new IllegalStateException("Recorded queue admission is unavailable");
-    var sources = observeAdmissionSources(entries, operationKey);
+    var sources = observeAdmissionSources(entries, operationKey, collection);
     return accessRecordedWalk(() -> SqliteIngestionWalkOps.enqueueRecorded(
         connection, operationKey, epoch, entries, collection, System.currentTimeMillis(), sources), true);
   }
@@ -1714,13 +1714,13 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
             || !intent.scope().contains(path) || !Objects.equals(boundary,row.ingestionRoot())
             || row.walkEpoch() != null || correctionHasRecordedOwner(path,watcherRowLocked(path))
             || row.plannedHash() != null
-            || io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(Path.of(path),Path.of(boundary))
+            || io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(Path.of(path),Path.of(boundary),row.collection())
             || !row.revision().split(":",-1)[4].equals(SwitchBufferCapableQueue.rootMemberDigest(
                 path,row.collection(),row.originator(),row.transport(),row.ingestionRoot(),row.plannedHash()))) return -1;
         return order;
       }
       if (intent.collection() == null || !intent.scope().contains(path) || !Objects.equals(boundary, row.ingestionRoot())
-          || io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(Path.of(path), Path.of(boundary))
+          || io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(Path.of(path), Path.of(boundary), row.collection())
           || !Objects.equals(provenance == null ? null : provenance.originator(), row.originator())
           || !Objects.equals(provenance == null ? null : provenance.transport(), row.transport())
           || !Objects.equals(normalizedRetirementCollection(intent.collection()), normalizedRetirementCollection(row.collection()))
@@ -1779,7 +1779,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           || !Objects.equals(PathNormalizer.normalizeKey(Path.of(intent.scope().prefix())),
               PathNormalizer.normalizeKey(scope.ingestionRoot()))
           || io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(
-              Path.of(scope.path()),scope.ingestionRoot())) return -1;
+              Path.of(scope.path()),scope.ingestionRoot(),scope.collection())) return -1;
       return owner.acceptedOrder();
     }
     if (owner != null && "DELETE".equals(owner.op()))
@@ -1970,6 +1970,30 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     } catch (SQLException invalid) {
       throw new IllegalStateException("Retirement Q collection removal failed", invalid);
     } finally { unlockAfterChanges(); }
+  }
+
+  @Override
+  public void forEachSource(java.util.function.BiConsumer<String, String> consumer) {
+    String cursor = "";
+    while (true) {
+      var page = new ArrayList<Map.Entry<String, String>>();
+      lockTimed();
+      try {
+        ensureOpen();
+        try (var query = connection.prepareStatement(
+            "SELECT path,collection FROM jobs WHERE path>? ORDER BY path LIMIT 256")) {
+          query.setString(1, cursor);
+          try (var rows = query.executeQuery()) {
+            while (rows.next()) page.add(new java.util.AbstractMap.SimpleImmutableEntry<>(rows.getString(1), rows.getString(2)));
+          }
+        }
+      } catch (SQLException failure) {
+        throw new IllegalStateException("Could not enumerate queue sources", failure);
+      } finally { unlockAfterChanges(); }
+      if (page.isEmpty()) return;
+      cursor = page.getLast().getKey();
+      page.forEach(row -> consumer.accept(row.getKey(), row.getValue()));
+    }
   }
 
   public record RootMember(String path,String unit,String collection,String boundary,String state,String hash,
@@ -2671,7 +2695,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
     var declared = !exactCollection && unitRevision == null && (collection == null || collection.isBlank())
         ? declaredCollectionRoots.get() : List.<IngestCollectionPolicy.RootBinding>of();
-    var sources = unitRevision == null ? observeAdmissionSources(entries, null) : Map.<JobQueue.EnqueueEntry, AdmissionSource>of();
+    var sources = unitRevision == null ? observeAdmissionSources(entries, null, collection) : Map.<JobQueue.EnqueueEntry, AdmissionSource>of();
     lockTimed();
     try {
       ensureOpen();
@@ -2934,7 +2958,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     if (!hasSufficientDiskSpace()) throw new IllegalStateException("Insufficient sync disk space");
     var declared = collection == null || collection.isBlank()
         ? declaredCollectionRoots.get() : List.<IngestCollectionPolicy.RootBinding>of();
-    var sources = observeAdmissionSources(entries, null);
+    var sources = observeAdmissionSources(entries, null, collection);
     lockTimed();
     try {
       ensureOpen();
@@ -3062,7 +3086,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                 && Objects.equals(PathNormalizer.normalizeKey(Path.of(intent.scope().prefix())),
                     PathNormalizer.normalizeKey(entry.ingestionRoot()));
             // Replay already observed its correction witness; never spend a second source read.
-            var observation = !replay && withinIntent ? observeAdmissionSource(entry, null) : null;
+            var observation = !replay && withinIntent ? observeAdmissionSource(entry, null, effective) : null;
             var sources = observation == null ? Map.<JobQueue.EnqueueEntry,AdmissionSource>of() : Map.of(entry,observation);
             if (maintenance && withinIntent && preservesRetirementMaintenanceWork(entry, effective, true,
                 observation, orders, deletes)) {covered++;continue;}
@@ -3250,6 +3274,10 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   }
 
   private AdmissionSource observeAdmissionSource(JobQueue.EnqueueEntry entry, String operationKey) {
+    return observeAdmissionSource(entry, operationKey, null);
+  }
+
+  private AdmissionSource observeAdmissionSource(JobQueue.EnqueueEntry entry, String operationKey, String collection) {
     if (entry == null || entry.path() == null || entry.plannedSourceSha256() != null) return null;
     try {
       requireSourceAccess(entry);
@@ -3257,7 +3285,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       if (!before.regularFile()) return null;
       allowsIngestionBoundary(IngestionBoundary.HASHING, operationKey, null);
       String hash = io.justsearch.indexerworker.loop.SourceContentHash.admissionIdentity(
-          entry.path(), entry.ingestionRoot());
+          entry.path(), entry.ingestionRoot(), collection);
       if (hash == null) return null;
       var source = new AdmissionSource(before, hash, entry.ingestionRoot());
       return source.stillCurrent(entry.path()) ? source : null;
@@ -3267,10 +3295,11 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   }
 
   private Map<JobQueue.EnqueueEntry, AdmissionSource> observeAdmissionSources(
-      List<JobQueue.EnqueueEntry> entries, String operationKey) {
+      List<JobQueue.EnqueueEntry> entries, String operationKey, String collection) {
     Map<JobQueue.EnqueueEntry, AdmissionSource> sources = new HashMap<>();
     for (var entry : entries) {
-      var source = observeAdmissionSource(entry, operationKey);
+      var source = collection == null ? observeAdmissionSource(entry, operationKey)
+          : observeAdmissionSource(entry, operationKey, collection);
       if (source != null) sources.put(entry, source);
     }
     return sources;
@@ -3527,7 +3556,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           allowsIngestionBoundary(IngestionBoundary.HASHING, scanId, null);
           observedHash = entry.plannedSourceSha256() == null
               ? io.justsearch.indexerworker.loop.SourceContentHash.sha256WithinRoot(sourcePath, sourceRoot)
-              : io.justsearch.indexerworker.loop.SourceContentHash.admissionIdentity(entry.path(), entry.ingestionRoot());
+              : io.justsearch.indexerworker.loop.SourceContentHash.admissionIdentity(entry.path(), entry.ingestionRoot(), collection);
         } catch (IOException unavailable) {
           if (entry.plannedSourceSha256() == null) throw unavailable;
         }
@@ -4487,7 +4516,10 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       log.warn("Refusing to re-enqueue {}: insufficient free disk space", entry.path());
       return new JobQueue.ReenqueueResult(0, null);
     }
-    var source = observeAdmissionSource(entry, null);
+    var prior = watcherReconciliationRow(normalizePath(entry.path()));
+    var sourceEntry = entry.ingestionRoot() == null && prior != null && prior.get("ingestion_root") != null
+        ? entry.withinRoot(Path.of(prior.get("ingestion_root"))) : entry;
+    var source = observeAdmissionSource(sourceEntry, null, prior == null ? null : prior.get("collection"));
     lockTimed();
     try {
       ensureOpen();
@@ -6930,7 +6962,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   public boolean enqueueReappearedFile(JobQueue.EnqueueEntry entry, String collection) {
     var declared = collection == null || collection.isBlank()
         ? declaredCollectionRoots.get() : List.<IngestCollectionPolicy.RootBinding>of();
-    var sources = observeAdmissionSources(List.of(entry), null);
+    var sources = observeAdmissionSources(List.of(entry), null, collection);
     lock.lock();
     try {
       ensureOpen();

@@ -66,6 +66,7 @@ final class RetrievalRequestEndProjectionTest {
     boolean deadline = isDeadline(kind);
     String expected = deadline ? "TIMEOUT" : "SERVICE_UNAVAILABLE";
     var docs = mock(DocumentService.class);
+    doCallRealMethod().when(docs).retrieveContext(any(), anyBoolean(), any());
     when(docs.retrieveContext(any(), any())).thenReturn(CompletableFuture.failedFuture(failure(kind, wrapper)));
     var controller = new RetrieveContextController(null, docs, OnlineAiService.unavailable(), () -> "");
     var ctx = mock(Context.class);
@@ -91,6 +92,7 @@ final class RetrievalRequestEndProjectionTest {
   void mcpReportsRequestEndRatherThanEvidence(String kind, String wrapper) {
     String expected = isDeadline(kind) ? "TIMEOUT" : "SERVICE_UNAVAILABLE";
     var docs = mock(DocumentService.class);
+    doCallRealMethod().when(docs).retrieveContext(any(), anyBoolean(), any());
     when(docs.retrieveContext(any(), any())).thenReturn(CompletableFuture.failedFuture(failure(kind, wrapper)));
     var facade = mock(HeadAssembly.class);
     McpAnswerCaptureFixture.bind(facade, docs);

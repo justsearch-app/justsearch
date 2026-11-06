@@ -3,6 +3,7 @@ package io.justsearch.indexerworker.ingest;
 
 /** Stable reason-code constants for typed ingestion outcomes. */
 public final class IngestionReasonCodes {
+  public static final String SKIPPED_PROTECTED = "SKIPPED_PROTECTED";
   public static final String SUCCESS = "SUCCESS";
 
   /**
