@@ -1614,6 +1614,28 @@ existing expectation changed only in the three places the Obsolete entry names.
         "modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts#X1 the reader’s quiet highlight in forced colours, Rendered view, the passage keeps the ink around it",
         "modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts#X1 the reader’s quiet highlight in forced colours, Source view, the passage keeps the ink around it"
       ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/detailsPane/DetailsPane.frame-lockdown.test.ts"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "In forced colours the selected source tab's number can be read: the digit differs from what is behind it in real pixels, on dark and light palettes (the browser's backplate behind forced-colours text hid it).",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "X1",
+          "quote": "Dark, light and Windows high contrast for every frame component; contrast ≥ 4.5:1 for text; colour never the only signal; reduced motion respected; no new hard-coded colours, sizes or z-indexes (ui-web gates).",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s4-forced-number.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/detailsPane/DetailsPane.frame-lockdown.test.ts#X1 the selected source number is readable in forced colours on a dark palette",
+        "modules/ui-web/src/shell-v0/components/detailsPane/DetailsPane.frame-lockdown.test.ts#X1 the selected source number is readable in forced colours on a light palette"
+      ]
     }
   ]
 }

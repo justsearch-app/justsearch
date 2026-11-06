@@ -375,7 +375,8 @@ export class DetailsPane extends JfElement {
       .tab[aria-selected='true'] { border-block-end-color: Highlight; color: Highlight; }
       .number { border: var(--frame-hairline) solid CanvasText; }
       .edge.before, .edge.after { background: Canvas; color: CanvasText; }
-      .tab[aria-selected='true'] .number { background: Highlight; color: HighlightText; }
+      /* The browser's text backplate would hide HighlightText on Highlight, so this pair opts out. */
+      .tab[aria-selected='true'] .number { forced-color-adjust: none; background: Highlight; color: HighlightText; }
       :host([overlay]) .surface { border-inline-start-color: CanvasText; }
     }
   `;

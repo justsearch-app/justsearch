@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-06T09:22:52.071Z",
-  "revision": "05d31c437ee6495bd2c2c1ed9af6b854469dfc84",
-  "tree": "cafb1d3a8b36dc820929f92b0f2db925a1c16226",
+  "createdAt": "2026-11-06T10:18:22.519Z",
+  "revision": "a7e61cab14f3fee4143633eb235cbc1f56fec7cf",
+  "tree": "a1011f057b1b0e04977084bb915c3bd24f4cd94f",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,16 +18,16 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/RetiredFrameElements.test.ts\" \"src/shell-v0/chrome/Shell.details.test.ts\" \"src/shell-v0/components/ContextInspectorPane.test.ts\" \"src/shell-v0/components/detailsPane/DetailsPane.test.ts\" \"src/shell-v0/components/detailsPane/WindowDetails.test.ts\" \"src/shell-v0/components/documentPane/DocumentPane.test.ts\" \"src/shell-v0/components/EffectAuditLog.test.ts\" \"src/shell-v0/components/FailedFilesList.folderSwitch.test.ts\" \"src/shell-v0/components/FailedFilesList.layout.test.ts\" \"src/shell-v0/components/FailedFilesList.test.ts\" \"src/shell-v0/components/RunActivity.test.ts\" \"src/shell-v0/controllers/AgentSessionController.test.ts\" \"src/shell-v0/state/detailsMemory.test.ts\" \"src/shell-v0/views/ActivitySurface.render.test.ts\" \"src/shell-v0/views/LibrarySurface.failedFiles.test.ts\" \"src/shell-v0/views/LibrarySurface.redesign.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.branch.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.context.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.pane.test.ts\" \"src/shell-v0/views/search-v3/Sv3AgentRuns.test.ts\" \"src/shell-v0/views/search-v3/sv3-boundaries.test.ts\" \"src/shell-v0/views/search-v3/Sv3Pane.test.ts\" \"src/shell-v0/views/search-v3/Sv3Results.preview.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/oebe5ixx/tmp/test-intent-vitest-36829-1793956946137.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/RetiredFrameElements.test.ts\" \"src/shell-v0/chrome/Shell.details.test.ts\" \"src/shell-v0/components/ContextInspectorPane.test.ts\" \"src/shell-v0/components/detailsPane/DetailsPane.test.ts\" \"src/shell-v0/components/detailsPane/WindowDetails.test.ts\" \"src/shell-v0/components/documentPane/DocumentPane.test.ts\" \"src/shell-v0/components/EffectAuditLog.test.ts\" \"src/shell-v0/components/FailedFilesList.folderSwitch.test.ts\" \"src/shell-v0/components/FailedFilesList.layout.test.ts\" \"src/shell-v0/components/FailedFilesList.test.ts\" \"src/shell-v0/components/RunActivity.test.ts\" \"src/shell-v0/controllers/AgentSessionController.test.ts\" \"src/shell-v0/state/detailsMemory.test.ts\" \"src/shell-v0/views/ActivitySurface.render.test.ts\" \"src/shell-v0/views/LibrarySurface.failedFiles.test.ts\" \"src/shell-v0/views/LibrarySurface.redesign.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.branch.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.context.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.pane.test.ts\" \"src/shell-v0/views/search-v3/Sv3AgentRuns.test.ts\" \"src/shell-v0/views/search-v3/sv3-boundaries.test.ts\" \"src/shell-v0/views/search-v3/Sv3Pane.test.ts\" \"src/shell-v0/views/search-v3/Sv3Results.preview.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-2604059-1793960274371.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 9179
+      "durationMs": 9949
     },
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/detailsPane/DetailsPane.frame-lockdown.test.ts\" \"src/shell-v0/views/LibrarySurface.bandFocus-lockdown.test.ts\" \"src/shell-v0/views/LibrarySurface.focusKeeper-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/oebe5ixx/tmp/test-intent-vitest-36829-1793956955317.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/detailsPane/DetailsPane.frame-lockdown.test.ts\" \"src/shell-v0/views/LibrarySurface.bandFocus-lockdown.test.ts\" \"src/shell-v0/views/LibrarySurface.focusKeeper-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/tmp/test-intent-vitest-2604059-1793960284321.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 16751
+      "durationMs": 18188
     }
   ],
   "checks": [
@@ -140,7 +140,7 @@
       "id": "modules/ui-web/src/shell-v0/components/detailsPane/DetailsPane.frame-lockdown.test.ts",
       "file": "modules/ui-web/src/shell-v0/components/detailsPane/DetailsPane.frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:385eb8dcb821787c209b16e8e8842333a4c67d16f3fe87d395add7f2d4521fb1",
+      "contentDigest": "sha256:24a7b1f10adb9cb864877c822f48f09afdedee6f11f6c76bec0e05a15140f8d5",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -175,6 +175,14 @@
         },
         {
           "name": "Search’s details pane arrow keys move through the tabs and the keyboard stays on the tab strip",
+          "status": "passed"
+        },
+        {
+          "name": "Search’s details pane X1 the selected source number is readable in forced colours on a dark palette",
+          "status": "passed"
+        },
+        {
+          "name": "Search’s details pane X1 the selected source number is readable in forced colours on a light palette",
           "status": "passed"
         },
         {
@@ -2931,5 +2939,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:bed38acfa98c0e769a47801b6e08ad3e0d747fbfb9970ec4ee282e19750b0024"
+  "digest": "sha256:b6cd5f0e397b40bcad12e7fe3667f1e1721b87ec24d1344039da9dda16d0b621"
 }

@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-06T09:10:29.981Z",
-  "revision": "05d31c437ee6495bd2c2c1ed9af6b854469dfc84",
-  "tree": "d0dfd481da007197ecbbeb67553cf6cd744c4dac",
+  "createdAt": "2026-11-06T10:24:34.123Z",
+  "revision": "a7e61cab14f3fee4143633eb235cbc1f56fec7cf",
+  "tree": "535f2b9d06f9fad80382ad3217754ee00d2be477",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,16 +18,16 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.details-lockdown.test.ts\" \"src/shell-v0/components/detailsPane/DetailsPane.frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/oebe5ixx/tmp/test-intent-vitest-28417-1793955865748.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.details-lockdown.test.ts\" \"src/shell-v0/components/detailsPane/DetailsPane.frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/tmp/test-intent-vitest-2606051-1793960306320.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 179562
+      "durationMs": 183006
     },
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/SearchV3View.pane.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/oebe5ixx/tmp/test-intent-vitest-28417-1793956045311.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/SearchV3View.pane.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-2606051-1793960489326.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 4796
+      "durationMs": 4835
     }
   ],
   "checks": [
@@ -335,7 +335,7 @@
       "id": "modules/ui-web/src/shell-v0/components/detailsPane/DetailsPane.frame-lockdown.test.ts#Search’s details pane is inline and within 360-560 px at 1280x800 , and tabs never push the close control out",
       "file": "modules/ui-web/src/shell-v0/components/detailsPane/DetailsPane.frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:385eb8dcb821787c209b16e8e8842333a4c67d16f3fe87d395add7f2d4521fb1",
+      "contentDigest": "sha256:24a7b1f10adb9cb864877c822f48f09afdedee6f11f6c76bec0e05a15140f8d5",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -350,7 +350,7 @@
       "id": "modules/ui-web/src/shell-v0/components/detailsPane/DetailsPane.frame-lockdown.test.ts#Search’s details pane is inline and within 360-560 px at 1280x800 ?wideFont, and tabs never push the close control out",
       "file": "modules/ui-web/src/shell-v0/components/detailsPane/DetailsPane.frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:385eb8dcb821787c209b16e8e8842333a4c67d16f3fe87d395add7f2d4521fb1",
+      "contentDigest": "sha256:24a7b1f10adb9cb864877c822f48f09afdedee6f11f6c76bec0e05a15140f8d5",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -414,135 +414,135 @@
     "patches": [],
     "runs": [
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.details-lockdown.test.ts\" \"src/shell-v0/components/detailsPane/DetailsPane.frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/oebe5ixx/tmp/test-intent-vitest-28417-1793956051420.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.details-lockdown.test.ts\" \"src/shell-v0/components/detailsPane/DetailsPane.frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/tmp/test-intent-vitest-2606051-1793960495400.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 173624,
-        "output": "JSON report written to /home/elias/.cache/am/oebe5ixx/tmp/test-intent-vitest-28417-1793956051420.json\n\n"
+        "durationMs": 173936,
+        "output": "JSON report written to /tmp/test-intent-vitest-2606051-1793960495400.json\n\n"
       },
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/SearchV3View.pane.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/oebe5ixx/tmp/test-intent-vitest-28417-1793956225045.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/SearchV3View.pane.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-2606051-1793960669336.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 4723,
-        "output": "JSON report written to /home/elias/.cache/am/oebe5ixx/tmp/test-intent-vitest-28417-1793956225045.json\n\n"
+        "durationMs": 4622,
+        "output": "JSON report written to /tmp/test-intent-vitest-2606051-1793960669336.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts#DP4 tabs with source numbers at 1280x800  six sources, Context and a plugin tab all fit, sources by number",
         "classification": "assertion",
-        "detail": "DP4 tabs with source numbers at 1280x800  six sources, Context and a plugin tab all fit, sources by number:  AssertionError: expected [ …(8) ] to deeply equal [ '1', '2', '3', '4', '5', '6', …(2) ]\n    at /home/elias/.cache/am/oebe5ixx/tmp/test-intent-before-CV6BxQ/modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts:438:25\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s4/mo"
+        "detail": "DP4 tabs with source numbers at 1280x800  six sources, Context and a plugin tab all fit, sources by number:  AssertionError: expected [ …(8) ] to deeply equal [ '1', '2', '3', '4', '5', '6', …(2) ]\n    at /tmp/test-intent-before-3LAaFI/modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts:438:25\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s4/modules/ui-web/node_modules/@vit"
       },
       {
         "id": "modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts#DP4 tabs with source numbers at 1280x800 ?wideFont six sources, Context and a plugin tab all fit, sources by number",
         "classification": "assertion",
-        "detail": "DP4 tabs with source numbers at 1280x800 ?wideFont six sources, Context and a plugin tab all fit, sources by number:  AssertionError: expected [ …(8) ] to deeply equal [ '1', '2', '3', '4', '5', '6', …(2) ]\n    at /home/elias/.cache/am/oebe5ixx/tmp/test-intent-before-CV6BxQ/modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts:438:25\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s4/mo"
+        "detail": "DP4 tabs with source numbers at 1280x800 ?wideFont six sources, Context and a plugin tab all fit, sources by number:  AssertionError: expected [ …(8) ] to deeply equal [ '1', '2', '3', '4', '5', '6', …(2) ]\n    at /tmp/test-intent-before-3LAaFI/modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts:438:25\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s4/modules/ui-web/node_modules/@vit"
       },
       {
         "id": "modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts#DP4 tabs with source numbers at 900x800  six sources, Context and a plugin tab all fit, sources by number",
         "classification": "assertion",
-        "detail": "DP4 tabs with source numbers at 900x800  six sources, Context and a plugin tab all fit, sources by number:  AssertionError: expected [ …(8) ] to deeply equal [ '1', '2', '3', '4', '5', '6', …(2) ]\n    at /home/elias/.cache/am/oebe5ixx/tmp/test-intent-before-CV6BxQ/modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts:438:25\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s4/mo"
+        "detail": "DP4 tabs with source numbers at 900x800  six sources, Context and a plugin tab all fit, sources by number:  AssertionError: expected [ …(8) ] to deeply equal [ '1', '2', '3', '4', '5', '6', …(2) ]\n    at /tmp/test-intent-before-3LAaFI/modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts:438:25\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s4/modules/ui-web/node_modules/@vit"
       },
       {
         "id": "modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts#DP4 tabs with source numbers at 900x800 ?wideFont six sources, Context and a plugin tab all fit, sources by number",
         "classification": "assertion",
-        "detail": "DP4 tabs with source numbers at 900x800 ?wideFont six sources, Context and a plugin tab all fit, sources by number:  AssertionError: expected [ …(8) ] to deeply equal [ '1', '2', '3', '4', '5', '6', …(2) ]\n    at /home/elias/.cache/am/oebe5ixx/tmp/test-intent-before-CV6BxQ/modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts:438:25\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s4/mo"
+        "detail": "DP4 tabs with source numbers at 900x800 ?wideFont six sources, Context and a plugin tab all fit, sources by number:  AssertionError: expected [ …(8) ] to deeply equal [ '1', '2', '3', '4', '5', '6', …(2) ]\n    at /tmp/test-intent-before-3LAaFI/modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts:438:25\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s4/modules/ui-web/node_modules/@vit"
       },
       {
         "id": "modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts#DP4 tabs with source numbers at 600x400  six sources, Context and a plugin tab all fit, sources by number",
         "classification": "assertion",
-        "detail": "DP4 tabs with source numbers at 600x400  six sources, Context and a plugin tab all fit, sources by number:  AssertionError: expected [ …(8) ] to deeply equal [ '1', '2', '3', '4', '5', '6', …(2) ]\n    at /home/elias/.cache/am/oebe5ixx/tmp/test-intent-before-CV6BxQ/modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts:438:25\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s4/mo"
+        "detail": "DP4 tabs with source numbers at 600x400  six sources, Context and a plugin tab all fit, sources by number:  AssertionError: expected [ …(8) ] to deeply equal [ '1', '2', '3', '4', '5', '6', …(2) ]\n    at /tmp/test-intent-before-3LAaFI/modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts:438:25\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s4/modules/ui-web/node_modules/@vit"
       },
       {
         "id": "modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts#DP4 tabs with source numbers at 600x400 ?wideFont six sources, Context and a plugin tab all fit, sources by number",
         "classification": "assertion",
-        "detail": "DP4 tabs with source numbers at 600x400 ?wideFont six sources, Context and a plugin tab all fit, sources by number:  AssertionError: expected [ …(8) ] to deeply equal [ '1', '2', '3', '4', '5', '6', …(2) ]\n    at /home/elias/.cache/am/oebe5ixx/tmp/test-intent-before-CV6BxQ/modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts:438:25\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s4/mo"
+        "detail": "DP4 tabs with source numbers at 600x400 ?wideFont six sources, Context and a plugin tab all fit, sources by number:  AssertionError: expected [ …(8) ] to deeply equal [ '1', '2', '3', '4', '5', '6', …(2) ]\n    at /tmp/test-intent-before-3LAaFI/modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts:438:25\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s4/modules/ui-web/node_modules/@vit"
       },
       {
         "id": "modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts#DP4 tabs with source numbers a source tab is named and tipped by its full name, and the header names the selected source ",
         "classification": "assertion",
-        "detail": "DP4 tabs with source numbers a source tab is named and tipped by its full name, and the header names the selected source :  AssertionError: C:/Docs/Source 0 with a name too long for one details tab.md: expected +0 to be 1 // Object.is equality\n    at /home/elias/.cache/am/oebe5ixx/tmp/test-intent-before-CV6BxQ/modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts:450:39\n    at file:///home/elias/dev/justsearc"
+        "detail": "DP4 tabs with source numbers a source tab is named and tipped by its full name, and the header names the selected source :  AssertionError: C:/Docs/Source 0 with a name too long for one details tab.md: expected +0 to be 1 // Object.is equality\n    at /tmp/test-intent-before-3LAaFI/modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts:450:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s4/m"
       },
       {
         "id": "modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts#DP4 tabs with source numbers a source tab is named and tipped by its full name, and the header names the selected source ?wideFont",
         "classification": "assertion",
-        "detail": "DP4 tabs with source numbers a source tab is named and tipped by its full name, and the header names the selected source ?wideFont:  AssertionError: C:/Docs/Source 0 with a name too long for one details tab.md: expected +0 to be 1 // Object.is equality\n    at /home/elias/.cache/am/oebe5ixx/tmp/test-intent-before-CV6BxQ/modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts:450:39\n    at file:///home/elias/dev/justsearc"
+        "detail": "DP4 tabs with source numbers a source tab is named and tipped by its full name, and the header names the selected source ?wideFont:  AssertionError: C:/Docs/Source 0 with a name too long for one details tab.md: expected +0 to be 1 // Object.is equality\n    at /tmp/test-intent-before-3LAaFI/modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts:450:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s4/m"
       },
       {
         "id": "modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts#DP4 tabs with source numbers past what fits the strip takes the wheel, shows its edges and keeps the selected tab clear of them ",
         "classification": "assertion",
-        "detail": "DP4 tabs with source numbers past what fits the strip takes the wheel, shows its edges and keeps the selected tab clear of them :  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/oebe5ixx/tmp/test-intent-before-CV6BxQ/modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts:473:37\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s4/modules/ui-web/node_modules"
+        "detail": "DP4 tabs with source numbers past what fits the strip takes the wheel, shows its edges and keeps the selected tab clear of them :  AssertionError: expected false to be true // Object.is equality\n    at /tmp/test-intent-before-3LAaFI/modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts:473:37\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s4/modules/ui-web/node_modules/@vitest/runner/dist/chunk-art"
       },
       {
         "id": "modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts#DP4 tabs with source numbers past what fits the strip takes the wheel, shows its edges and keeps the selected tab clear of them ?wideFont",
         "classification": "assertion",
-        "detail": "DP4 tabs with source numbers past what fits the strip takes the wheel, shows its edges and keeps the selected tab clear of them ?wideFont:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/oebe5ixx/tmp/test-intent-before-CV6BxQ/modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts:473:37\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s4/modules/ui-web/node_modules"
+        "detail": "DP4 tabs with source numbers past what fits the strip takes the wheel, shows its edges and keeps the selected tab clear of them ?wideFont:  AssertionError: expected false to be true // Object.is equality\n    at /tmp/test-intent-before-3LAaFI/modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts:473:37\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s4/modules/ui-web/node_modules/@vitest/runner/dist/chunk-art"
       },
       {
         "id": "modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts#DP4 the keyboard stays on the selected tab in Search, from a citation opened with Enter",
         "classification": "assertion",
-        "detail": "DP4 the keyboard stays on the selected tab in Search, from a citation opened with Enter:  AssertionError: expected 'source:0' to be 'source:1' // Object.is equality\n    at walk (/home/elias/.cache/am/oebe5ixx/tmp/test-intent-before-CV6BxQ/modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts:509:38)\n    at /home/elias/.cache/am/oebe5ixx/tmp/test-intent-before-CV6BxQ/modules/u"
+        "detail": "DP4 the keyboard stays on the selected tab in Search, from a citation opened with Enter:  AssertionError: expected 'source:0' to be 'source:1' // Object.is equality\n    at walk (/tmp/test-intent-before-3LAaFI/modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts:509:38)\n    at /tmp/test-intent-before-3LAaFI/modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts:528"
       },
       {
         "id": "modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts#DP4 the keyboard stays on the selected tab in Library’s pane",
         "classification": "assertion",
-        "detail": "DP4 the keyboard stays on the selected tab in Library’s pane:  AssertionError: expected 'document' to be 'plugin:acme.Entities' // Object.is equality\n    at walk (/home/elias/.cache/am/oebe5ixx/tmp/test-intent-before-CV6BxQ/modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts:509:38)\n    at /home/elias/.cache/am/oebe5ixx/tmp/test-intent-before-CV6B"
+        "detail": "DP4 the keyboard stays on the selected tab in Library’s pane:  AssertionError: expected 'document' to be 'plugin:acme.Entities' // Object.is equality\n    at walk (/tmp/test-intent-before-3LAaFI/modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts:509:38)\n    at /tmp/test-intent-before-3LAaFI/modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown"
       },
       {
         "id": "modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts#C4 a late hide belongs to its own conversation a response released in B leaves B’s Hide alone, and A has it when the reader returns",
         "classification": "assertion",
-        "detail": "C4 a late hide belongs to its own conversation a response released in B leaves B’s Hide alone, and A has it when the reader returns:  AssertionError: expected '\\n        \\n        \\n        Restore…' to contain 'Hide'\n    at /home/elias/.cache/am/oebe5ixx/tmp/test-intent-before-CV6BxQ/modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts:559:46\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s4/modules"
+        "detail": "C4 a late hide belongs to its own conversation a response released in B leaves B’s Hide alone, and A has it when the reader returns:  AssertionError: expected '\\n        \\n        \\n        Restore…' to contain 'Hide'\n    at /tmp/test-intent-before-3LAaFI/modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts:559:46\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s4/modules/ui-web/node_modules/@vitest/r"
       },
       {
         "id": "modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts#DP1 a citation opens from the mouse at every width at 1280x800 the preview sits under the mark and the click reaches it",
         "classification": "assertion",
-        "detail": "DP1 a citation opens from the mouse at every width at 1280x800 the preview sits under the mark and the click reaches it:  AssertionError: expected +0 to be 1 // Object.is equality\n    at /home/elias/.cache/am/oebe5ixx/tmp/test-intent-before-CV6BxQ/modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts:582:38\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s4/modules/ui-web/node_modules/@vite"
+        "detail": "DP1 a citation opens from the mouse at every width at 1280x800 the preview sits under the mark and the click reaches it:  AssertionError: expected +0 to be 1 // Object.is equality\n    at /tmp/test-intent-before-3LAaFI/modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts:582:38\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s4/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact."
       },
       {
         "id": "modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts#DP1 a citation opens from the mouse at every width at 900x800 the preview sits under the mark and the click reaches it",
         "classification": "assertion",
-        "detail": "DP1 a citation opens from the mouse at every width at 900x800 the preview sits under the mark and the click reaches it:  AssertionError: expected +0 to be 1 // Object.is equality\n    at /home/elias/.cache/am/oebe5ixx/tmp/test-intent-before-CV6BxQ/modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts:582:38\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s4/modules/ui-web/node_modules/@vite"
+        "detail": "DP1 a citation opens from the mouse at every width at 900x800 the preview sits under the mark and the click reaches it:  AssertionError: expected +0 to be 1 // Object.is equality\n    at /tmp/test-intent-before-3LAaFI/modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts:582:38\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s4/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact."
       },
       {
         "id": "modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts#DP1 a citation opens from the mouse at every width at 600x800 the preview sits under the mark and the click reaches it",
         "classification": "assertion",
-        "detail": "DP1 a citation opens from the mouse at every width at 600x800 the preview sits under the mark and the click reaches it:  AssertionError: expected +0 to be 1 // Object.is equality\n    at /home/elias/.cache/am/oebe5ixx/tmp/test-intent-before-CV6BxQ/modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts:582:38\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s4/modules/ui-web/node_modules/@vite"
+        "detail": "DP1 a citation opens from the mouse at every width at 600x800 the preview sits under the mark and the click reaches it:  AssertionError: expected +0 to be 1 // Object.is equality\n    at /tmp/test-intent-before-3LAaFI/modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts:582:38\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s4/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact."
       },
       {
         "id": "modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts#DP5 the reader on a search result has no citation notice: a result is not a citation",
         "classification": "assertion",
-        "detail": "DP5 the reader on a search result has no citation notice: a result is not a citation:  AssertionError: expected [ Array(1) ] to deeply equal []\n    at /home/elias/.cache/am/oebe5ixx/tmp/test-intent-before-CV6BxQ/modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts:595:84\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s4/modules/ui-web/node_modules/@vites"
+        "detail": "DP5 the reader on a search result has no citation notice: a result is not a citation:  AssertionError: expected [ Array(1) ] to deeply equal []\n    at /tmp/test-intent-before-3LAaFI/modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts:595:84\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s4/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact.j"
       },
       {
         "id": "modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts#X1 the reader’s quiet highlight reads at 4.5:1 in the light theme, Source view",
         "classification": "assertion",
-        "detail": "X1 the reader’s quiet highlight reads at 4.5:1 in the light theme, Source view:  AssertionError: expected 4.197429400908897 to be greater than or equal to 4.5\n    at /home/elias/.cache/am/oebe5ixx/tmp/test-intent-before-CV6BxQ/modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts:639:53\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s4/modules/ui-we"
+        "detail": "X1 the reader’s quiet highlight reads at 4.5:1 in the light theme, Source view:  AssertionError: expected 4.197429400908897 to be greater than or equal to 4.5\n    at /tmp/test-intent-before-3LAaFI/modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts:639:53\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s4/modules/ui-web/node_modules/@vitest/runner/"
       },
       {
         "id": "modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts#X1 a tab’s number is sized from the scale its least width is the token",
         "classification": "assertion",
-        "detail": "X1 a tab’s number is sized from the scale its least width is the token:  AssertionError: expected '15px' to be '40px' // Object.is equality\n    at /home/elias/.cache/am/oebe5ixx/tmp/test-intent-before-CV6BxQ/modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts:657:152\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s4/modules/ui-web/node_mod"
+        "detail": "X1 a tab’s number is sized from the scale its least width is the token:  AssertionError: expected '15px' to be '40px' // Object.is equality\n    at /tmp/test-intent-before-3LAaFI/modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts:657:152\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s4/modules/ui-web/node_modules/@vitest/runner/dist/chunk"
       },
       {
         "id": "modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts#DP3 a failed file’s actions wear the shared button styling",
         "classification": "assertion",
-        "detail": "DP3 a failed file’s actions wear the shared button styling:  AssertionError: expected [ 'rgba(0, 0, 0, 0)', '1px', …(4) ] to deeply equal [ 'rgba(255, 255, 255, 0.1)', …(5) ]\n    at /home/elias/.cache/am/oebe5ixx/tmp/test-intent-before-CV6BxQ/modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts:851:17\n    at file:///home/elias/dev/justsearch/.cla"
+        "detail": "DP3 a failed file’s actions wear the shared button styling:  AssertionError: expected [ 'rgba(0, 0, 0, 0)', '1px', …(4) ] to deeply equal [ 'rgba(255, 255, 255, 0.1)', …(5) ]\n    at /tmp/test-intent-before-3LAaFI/modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts:851:17\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s4/modules"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/detailsPane/DetailsPane.frame-lockdown.test.ts#Search’s details pane is inline and within 360-560 px at 1280x800 , and tabs never push the close control out",
         "classification": "assertion",
-        "detail": "Search’s details pane is inline and within 360-560 px at 1280x800 , and tabs never push the close control out:  AssertionError: expected +0 to be 1 // Object.is equality\n    at /home/elias/.cache/am/oebe5ixx/tmp/test-intent-before-CV6BxQ/modules/ui-web/src/shell-v0/components/detailsPane/DetailsPane.frame-lockdown.test.ts:170:79\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s4/modules/ui-we"
+        "detail": "Search’s details pane is inline and within 360-560 px at 1280x800 , and tabs never push the close control out:  AssertionError: expected +0 to be 1 // Object.is equality\n    at /tmp/test-intent-before-3LAaFI/modules/ui-web/src/shell-v0/components/detailsPane/DetailsPane.frame-lockdown.test.ts:170:79\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s4/modules/ui-web/node_modules/@vitest/runner/"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/detailsPane/DetailsPane.frame-lockdown.test.ts#Search’s details pane is inline and within 360-560 px at 1280x800 ?wideFont, and tabs never push the close control out",
         "classification": "assertion",
-        "detail": "Search’s details pane is inline and within 360-560 px at 1280x800 ?wideFont, and tabs never push the close control out:  AssertionError: expected +0 to be 1 // Object.is equality\n    at /home/elias/.cache/am/oebe5ixx/tmp/test-intent-before-CV6BxQ/modules/ui-web/src/shell-v0/components/detailsPane/DetailsPane.frame-lockdown.test.ts:170:79\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s4/modules/ui-we"
+        "detail": "Search’s details pane is inline and within 360-560 px at 1280x800 ?wideFont, and tabs never push the close control out:  AssertionError: expected +0 to be 1 // Object.is equality\n    at /tmp/test-intent-before-3LAaFI/modules/ui-web/src/shell-v0/components/detailsPane/DetailsPane.frame-lockdown.test.ts:170:79\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s4/modules/ui-web/node_modules/@vitest/runner/"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.pane.test.ts#DP1 the details pane shows tabs per cited source plus Context offers a tab per cited source, numbered, then Context",
         "classification": "assertion",
-        "detail": "DP1 the details pane shows tabs per cited source plus Context offers a tab per cited source, numbered, then Context:  AssertionError: expected [ '1 note-0.md', '2 heating.md', …(1) ] to deeply equal [ '1', '2', 'Context' ]\n    at /home/elias/.cache/am/oebe5ixx/tmp/test-intent-before-CV6BxQ/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.pane.test.ts:1240:30\n    at file:///home/elias/dev/justsearch/.claude/"
+        "detail": "DP1 the details pane shows tabs per cited source plus Context offers a tab per cited source, numbered, then Context:  AssertionError: expected [ '1 note-0.md', '2 heating.md', …(1) ] to deeply equal [ '1', '2', 'Context' ]\n    at /tmp/test-intent-before-3LAaFI/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.pane.test.ts:1240:30\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s4/modules/ui-"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.pane.test.ts#DP1 the details pane shows tabs per cited source plus Context a citation the answer did not cite still gets its own tab, and a result gets a plain one",
@@ -552,9 +552,9 @@
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.pane.test.ts#DP4 plugin inspector tabs are details-pane tabs appear after Context, receive the document on show, and leave without stranding the pane",
         "classification": "assertion",
-        "detail": "DP4 plugin inspector tabs are details-pane tabs appear after Context, receive the document on show, and leave without stranding the pane:  AssertionError: expected [ '1 note-0.md', 'Context', 'Notes' ] to deeply equal [ '1', 'Context', 'Notes' ]\n    at /home/elias/.cache/am/oebe5ixx/tmp/test-intent-before-CV6BxQ/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.pane.test.ts:1526:44\n    at file:///home/elias/dev/justsearch/.claud"
+        "detail": "DP4 plugin inspector tabs are details-pane tabs appear after Context, receive the document on show, and leave without stranding the pane:  AssertionError: expected [ '1 note-0.md', 'Context', 'Notes' ] to deeply equal [ '1', 'Context', 'Notes' ]\n    at /tmp/test-intent-before-3LAaFI/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.pane.test.ts:1526:44\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s4/modules/u"
       }
     ]
   },
-  "digest": "sha256:2df482c0556151523a77b1919bd190028fac823b627ace479e0ff497d0b20c8d"
+  "digest": "sha256:a021a5723b18661e87b01e2dcf4deaafbea4c89a424db6df81241b5b416a3045"
 }

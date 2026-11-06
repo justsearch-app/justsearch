@@ -240,6 +240,44 @@ describe('Search\u2019s details pane', () => {
     await expect.poll(() => page.locator('[data-testid="context-inspector"]').count()).toBe(1);
   }, 60_000);
 
+  /**
+   * X1: colour is never the only signal and text stays readable. In forced colours the selected
+   * source tab's digit must differ from the block behind it, read from real pixels: computed colours
+   * do not show what the browser forces.
+   */
+  it.each(['dark', 'light'] as const)('X1 the selected source number is readable in forced colours on a %s palette', async (scheme) => {
+    const page = await open(1280, 800);
+    await page.emulateMedia({ forcedColors: 'active', colorScheme: scheme });
+    await openPane(page);
+    const number = page.locator('[role="tab"][aria-selected="true"] .number');
+    await expect.poll(() => number.count()).toBe(1);
+    const shot = (await number.screenshot()).toString('base64');
+    const colours = await page.evaluate(async (png) => {
+      const image = new Image();
+      image.src = `data:image/png;base64,${png}`;
+      await image.decode();
+      const canvas = document.createElement('canvas');
+      canvas.width = image.width;
+      canvas.height = image.height;
+      const context2d = canvas.getContext('2d')!;
+      context2d.drawImage(image, 0, 0);
+      const { data } = context2d.getImageData(0, 0, canvas.width, canvas.height);
+      const inner: number[][] = [];
+      // Only the digit's column: the browser's backplate behind forced-colours text fills it, so the
+      // block around it says nothing about whether the digit can be seen.
+      const middle = Math.floor(canvas.width / 2);
+      for (let y = 3; y < canvas.height - 3; y += 1) {
+        for (let x = middle - 2; x <= middle + 2; x += 1) {
+          const at = (y * canvas.width + x) * 4;
+          inner.push([data[at]!, data[at + 1]!, data[at + 2]!]);
+        }
+      }
+      const luminance = inner.map(([r, g, b]) => 0.2126 * r! + 0.7152 * g! + 0.0722 * b!);
+      return { low: Math.min(...luminance), high: Math.max(...luminance) };
+    }, shot);
+    expect(colours.high - colours.low, 'digit against its block').toBeGreaterThan(100);
+  }, 60_000);
+
   it('F6-style order holds: the tab strip comes before the reader, and Tab reaches Open file', async () => {
     const page = await open(1280, 800);
     await openPane(page);
