@@ -1424,3 +1424,25 @@ The brief's adopted scenarios are quoted below; choices the scenarios leave open
   "note": "Audit by independent reviewer session reviewer-63 (Codex): accept, no must-fix. Transcribed by the orchestrator."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-s2x-acc8",
+  "verdict": "accept",
+  "digest": "sha256:90e6ae5fa3ccdfb506450b22e20adcff56cf5e487a68224d56fa24dabbf5d5ac",
+  "note": "Acceptance by independent verifier session verifier-s2x-acc8 (Codex): accept, no must-fix. Transcribed by the orchestrator."
+}
+```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "reviewer-64",
+  "verdict": "accept",
+  "digest": "sha256:90e6ae5fa3ccdfb506450b22e20adcff56cf5e487a68224d56fa24dabbf5d5ac",
+  "note": "Audit by independent reviewer session reviewer-64 (Codex): accept, no must-fix. Transcribed by the orchestrator."
+}
+```
