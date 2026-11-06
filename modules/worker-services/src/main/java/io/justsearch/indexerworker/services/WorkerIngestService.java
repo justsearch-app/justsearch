@@ -140,6 +140,9 @@ public final class WorkerIngestService {
   private final IndexGenerationManager indexGenerationManager;
   /** Volume each root was first pruned from, kept across restarts (#758). */
   private final RootVolumeLedger rootVolumes;
+  private final Object rootVolumeSeedingLock = new Object();
+  private boolean rootVolumeInitializationPending;
+  private List<Path> configuredEnrollmentPending = List.of();
   /** #758: the root-identity check every deletion decision asks. */
   private final RootWitness rootWitness;
   private final boolean ingestIsServing;
@@ -1386,51 +1389,82 @@ public final class WorkerIngestService {
     for (Path root : declared) {
       roots.add(root.toAbsolutePath().normalize());
     }
-    bootExclusionRoots = List.copyOf(roots);
-    try {
-      if (rootVolumes.beginUpgradeSeeding(roots)) {
-        log.info("Upgrade: the volume of {} declared roots is confirmed on evidence", roots.size());
+    synchronized (rootVolumeSeedingLock) {
+      bootExclusionRoots = List.copyOf(roots);
+      try {
+        rootVolumes.beginUpgradeSeeding(currentBootSeedingRoots());
+        rootVolumeInitializationPending = false;
+      } catch (IOException notStarted) {
+        rootVolumeInitializationPending = true;
+        log.warn("Upgrade seeding of root volumes could not start; roots stay unconfirmed ({})",
+            notStarted.getMessage());
+        return;
       }
-    } catch (IOException notStarted) {
-      log.warn("Upgrade seeding of root volumes could not start; roots stay unconfirmed ({})",
-          notStarted.getMessage());
-      return;
-    }
-    for (Path root : roots) {
-      seedRootAfterUpgrade(root);
+      for (Path root : currentBootSeedingRoots()) seedPendingRootVolume(root);
     }
   }
 
-  /**
-   * Round 8b (decision 3): a configured collection root (and the bundled help folder) is the
-   * person's configuration, not a declared root, so no add ever records its volume. Each one with
-   * nothing recorded at or above it is seeded once by the upgrade evidence rule; one whose drive is
-   * not confirmed records nothing, reads unavailable with {@link #ROOT_UNCONFIRMED_AFTER_UPGRADE}
-   * and keeps awaiting, so a later boot or migration adopts its returning drive. Nothing is
-   * deleted either way. Runs after the declared roots' upgrade seeding has begun.
-   */
+  /** Configured roots use the same one-time evidence rule, including roots outside watches. */
   public void seedConfiguredRoots(java.util.Collection<Path> configured) {
-    List<Path> roots = new ArrayList<>();
-    for (Path root : configured) {
-      if (root != null) {
-        roots.add(root.toAbsolutePath().normalize());
+    synchronized (rootVolumeSeedingLock) {
+      configuredRecoveryRoots = configured.stream().filter(Objects::nonNull)
+          .map(root -> root.toAbsolutePath().normalize()).distinct().toList();
+      configuredEnrollmentPending = List.copyOf(configuredRecoveryRoots);
+      retryRootVolumeSeeding();
+    }
+  }
+
+  /** Retry unfinished boot work through the existing periodic recovery producer. */
+  public void retryRootVolumeSeeding() {
+    synchronized (rootVolumeSeedingLock) {
+      if (!retryRootVolumeEnrollment()) return;
+      for (Path root : currentBootSeedingRoots()) seedPendingRootVolume(root);
+      for (Path root : configuredRecoveryRoots) seedPendingRootVolume(root);
+    }
+  }
+
+  private List<Path> currentBootSeedingRoots() {
+    var current = exclusionRoots.get().stream()
+        .map(root -> root.toAbsolutePath().normalize()).toList();
+    return bootExclusionRoots.stream().filter(current::contains).toList();
+  }
+
+  private boolean retryRootVolumeEnrollment() {
+    if (rootVolumeInitializationPending) {
+      try {
+        var roots = currentBootSeedingRoots();
+        if (!rootVolumes.beginUpgradeSeeding(roots)) {
+          // An independent deliberate add may have created the ledger after our failed boot write.
+          // Only the still-unrecorded captured startup inputs need enrollment in that case.
+          rootVolumes.awaitSeedingUnlessRecorded(roots);
+        }
+        rootVolumeInitializationPending = false;
+      } catch (IOException notStarted) {
+        log.warn("Upgrade seeding of root volumes could not start; roots stay unconfirmed ({})",
+            notStarted.getMessage());
+        return false;
       }
     }
-    configuredRecoveryRoots = List.copyOf(roots);
-    List<Path> awaiting;
-    try {
-      awaiting = rootVolumes.awaitSeedingUnlessRecorded(roots);
-    } catch (IOException notStarted) {
-      log.warn("Seeding of configured collection roots could not start; they stay unconfirmed ({})",
-          notStarted.getMessage());
-      return;
+    if (!configuredEnrollmentPending.isEmpty()) {
+      try {
+        var awaiting = rootVolumes.awaitSeedingUnlessRecorded(configuredEnrollmentPending);
+        configuredEnrollmentPending = List.of();
+        for (Path root : awaiting) seedPendingRootVolume(root);
+      } catch (IOException notStarted) {
+        log.warn("Seeding of configured collection roots could not start; they stay unconfirmed ({})",
+            notStarted.getMessage());
+      }
     }
-    for (Path root : awaiting) {
-      seedRootAfterUpgrade(root);
-    }
+    return true;
   }
 
   private void seedRootAfterUpgrade(Path root) {
+    synchronized (rootVolumeSeedingLock) {
+      if (retryRootVolumeEnrollment()) seedPendingRootVolume(root);
+    }
+  }
+
+  private void seedPendingRootVolume(Path root) {
     if (rootWitness.awaitsUpgradeSeeding(root)) {
       rootWitness.seedAfterUpgrade(root, this::indexedFilesOnDrive);
     }
@@ -4856,8 +4890,12 @@ public final class WorkerIngestService {
     }
     boolean removed = rootWatcherRegistry.unwatch(rootPath);
     Path removedRoot = Path.of(rootPath).toAbsolutePath().normalize();
-    bootExclusionRoots = bootExclusionRoots.stream().filter(root -> !root.equals(removedRoot)).toList();
-    forgetRemovedRoot(rootPath);
+    synchronized (rootVolumeSeedingLock) {
+      bootExclusionRoots = bootExclusionRoots.stream().filter(root -> !root.equals(removedRoot)).toList();
+      configuredRecoveryRoots = configuredRecoveryRoots.stream().filter(root -> !root.equals(removedRoot)).toList();
+      configuredEnrollmentPending = configuredEnrollmentPending.stream().filter(root -> !root.equals(removedRoot)).toList();
+      forgetRemovedRoot(rootPath);
+    }
     if (jobQueue instanceof SwitchBufferCapableQueue journal) {
       String key = "watcher-reconcile:" + Path.of(rootPath).toAbsolutePath().normalize();
       var obsolete = journal.listSwitchBufferOpsStrict().stream()
