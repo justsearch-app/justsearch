@@ -38,7 +38,9 @@ LABELLED_DEFAULTS = ('real-use',)
 
 def default_collections(full_suite: bool = False) -> tuple[str, ...]:
     base = FULL_COLLECTIONS if full_suite else DEFAULT_COLLECTIONS
-    return base + tuple(a for a in LABELLED_DEFAULTS if not collections.load_config(a).pending_kinds)
+    labelled = tuple(a for a in LABELLED_DEFAULTS if not collections.load_config(a).pending_kinds)
+    # Keep short Enron last so its startup overlaps the preceding collection's scoring.
+    return base[:-1] + labelled + base[-1:]
 CLEANUP_SECONDS = 45
 GPU_MARGIN_MIB = 2048
 
