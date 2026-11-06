@@ -40,7 +40,7 @@ No acceptance record is written by this builder.
         {
           "kind": "delegated-choice",
           "delegationQuote": "you can work autonomously, no need to ask me for these type of thigns",
-          "delegationLocation": "user preferences, decide operational and fix-or-defer questions yourself (2026-10-19); applies to fixing a found defect now versus later",
+          "delegationLocation": "task t-20261018-6108b0 request; owner turns, 2026-10-18 and 2026-10-19; recorded in the user preferences as deciding fix-or-defer, including fixing a found defect now versus later",
           "delegationScope": "Fixing a defect found in autonomous work. The defect is established by the no-leak safeguard; the owner-agreed product goal puts accuracy of finding first; the API accepts these filters as restrictions on ordinary search.",
           "choice": "Replace expectations that entity and metadata predicates are ignored with parent eligibility, preserve collection inclusion across TermInSetQuery rendering, and retain direct chunk scope clauses.",
           "label": "agent choice"
@@ -73,7 +73,7 @@ No acceptance record is written by this builder.
         {
           "kind": "delegated-choice",
           "delegationQuote": "you can work autonomously, no need to ask me for these type of thigns",
-          "delegationLocation": "user preferences, decide operational and fix-or-defer questions yourself (2026-10-19); applies to fixing a found defect now versus later",
+          "delegationLocation": "task t-20261018-6108b0 request; owner turns, 2026-10-18 and 2026-10-19; recorded in the user preferences as deciding fix-or-defer, including fixing a found defect now versus later",
           "delegationScope": "Fixing a defect found in autonomous work, including adapting existing tests that inspect the old query shape.",
           "choice": "Retain positive collection inclusion and default exclusion checks across TermInSetQuery rendering.",
           "label": "agent choice"
