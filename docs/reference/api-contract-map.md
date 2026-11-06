@@ -917,6 +917,18 @@ Source: tempdoc 500, ADR-0015, tempdoc 366.
 - `filters` (`mime`, `mimeBase`, `fileKind`, `language`, `pathPrefix`, `includeChunks`, `modifiedAt`, `sizeBytes`)
 - Entity filter fields: `entityPersons`, `entityOrganizations`, `entityLocations` (repeated string) (362)
 - Metadata filter fields: `metaSource`, `metaAuthor`, `metaCategory` (repeated string), `metaPublishedAt` (long range) (362)
+- Ordinary passage retrieval enforces these entity and metadata predicates against parents before
+  candidate budgets, across BM25, dense, sparse, fusion, retries and recall rescue. Unknown parent
+  values do not match active predicates; no matching parent gives the normal empty result.
+  Predicates intersect with folder, date, size and selected files. Parent resolution runs once per
+  passage leg/retry on its searcher, uncached; refresh/reopen follow that searcher's parent state.
+  No effective parent predicate adds no parent resolution. Lists activate only with a nonblank
+  value, publication endpoints only above zero; a present size endpoint includes zero.
+- List filters use within-list OR and between-filter intersection, accepting 1,024 and 10,000
+  selected paths without Boolean-clause limits on text, dense, hybrid and passage paths. Null and
+  blank elements are ignored; all-blank lists add no restriction. Duplicates and exact nonblank
+  values keep their meaning. Search facet counts keep their existing behavior. Ask retains its
+  prefilter and original filters, so it resolves parents again for passage retrieval.
 - `doc_ids` (repeated string, TermInSetQuery on PATH field — scopes search to specific documents) (366)
 - `boostFilters` (soft boost clauses, same fields as filters — additive SHOULD clauses) (363/366)
 - `facets` (`include`, `maxDocsScanned`, `fields[]`)
@@ -993,7 +1005,10 @@ Response fields (additive/optional-by-presence):
 - `nextCursor` (TEXT mode pagination)
 - `cursor`/`nextCursor` use the current stateless `searchAfter` request path. A cursor does not
   pin a Lucene reader or generation across requests; D2's proposed pinned-reader lifetime and
-  `cursor expired` eviction contract are not shipped.
+  `cursor expired` eviction contract are not shipped. Relevance scores must be finite floats:
+  `NaN`, `Infinity`, `-Infinity` and overflow such as `1e100` receive the same HTTP **400**
+  invalid-score outcome as non-numeric input, without restarting at page one. Finite zero and
+  non-relevance `_` score placeholders remain valid.
 - `facets`, `facetsTruncated`
 - `entityFacetVariants`
 - `queryUnderstanding` (object: `appliedBoosts` map, `latencyMs`) — present when QU is enabled (363/366)

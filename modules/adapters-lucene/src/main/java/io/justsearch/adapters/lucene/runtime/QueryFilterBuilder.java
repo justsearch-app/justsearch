@@ -105,7 +105,7 @@ public final class QueryFilterBuilder {
   /**
    * Adds an OR filter for a list of term values to the query builder.
    *
-   * <p>Builds a disjunction (OR) of TermQueries for each non-blank value in the list
+   * <p>Uses one TermInSetQuery for the non-blank values, avoiding Boolean clause limits,
    * and adds it as a FILTER clause to the builder.
    *
    * @param qb the query builder to add the filter to
@@ -118,17 +118,17 @@ public final class QueryFilterBuilder {
     if (values == null || values.isEmpty()) {
       return false;
     }
-    BooleanQuery.Builder or = new BooleanQuery.Builder();
-    for (String v : values) {
-      if (v == null || v.isBlank()) continue;
-      or.add(new TermQuery(new Term(fieldName, v)), BooleanClause.Occur.SHOULD);
-    }
-    BooleanQuery q = or.build();
-    if (q.clauses().isEmpty()) {
+    List<BytesRef> terms = values.stream()
+        .filter(v -> v != null && !v.isBlank()).map(BytesRef::new).toList();
+    if (terms.isEmpty()) {
       return false;
     }
-    qb.add(q, BooleanClause.Occur.FILTER);
+    qb.add(new TermInSetQuery(fieldName, terms), BooleanClause.Occur.FILTER);
     return true;
+  }
+
+  private static boolean hasTermValues(List<String> values) {
+    return values != null && values.stream().anyMatch(v -> v != null && !v.isBlank());
   }
 
   /**
@@ -347,9 +347,11 @@ public final class QueryFilterBuilder {
    * two PATH-keyed scopes. ({@code IndexCountOps#queryRootCoverageCounts} relies on the same
    * chunk-PATH-is-parent-path fact for per-root coverage counting — tempdoc 813.)
    *
-   * <p>Still skipped, because chunk documents genuinely do not carry these fields: IS_CHUNK
-   * exclusion (chunks are the target), metaPublishedAt ranges, entity filters, and
-   * metadata filters. Date and size are resolved against parents on the query snapshot.
+   * <p>Entity and metadata filters (including publication date), modified date and size are
+   * resolved against parents on the query's searcher snapshot before chunk candidate budgets.
+   * Missing parent metadata cannot satisfy an active predicate. With no effective parent
+   * predicate, no parent resolution runs. IS_CHUNK exclusion is skipped because chunks are the
+   * target. See docs/explanation/04-storage-engine.md and ADR-0020.
    *
    * @param raw optional structured filters (null == the default scope, see {@link #NO_FILTERS})
    * @return filter query for chunk search, or null if no applicable filters exist
@@ -381,9 +383,17 @@ public final class QueryFilterBuilder {
 
     if ((filters.modifiedFromMs() != null && filters.modifiedFromMs() > 0)
         || (filters.modifiedToMs() != null && filters.modifiedToMs() > 0)
-        || filters.sizeFromBytes() != null || filters.sizeToBytes() != null) {
-      // D2: parent eligibility intersects the bounds with every supplied scope/facet. Resolve on
-      // this query's snapshot, before any chunk budget; retain standalone legacy facet behavior.
+        || filters.sizeFromBytes() != null || filters.sizeToBytes() != null
+        || hasTermValues(filters.entityPersons())
+        || hasTermValues(filters.entityOrganizations())
+        || hasTermValues(filters.entityLocations())
+        || hasTermValues(filters.metaSource())
+        || hasTermValues(filters.metaAuthor())
+        || hasTermValues(filters.metaCategory())
+        || (filters.metaPublishedFromMs() != null && filters.metaPublishedFromMs() > 0)
+        || (filters.metaPublishedToMs() != null && filters.metaPublishedToMs() > 0)) {
+      // ADR-0020: intersect parent predicates with every supplied scope before chunk budgets.
+      // Resolve on this searcher's snapshot; facet aggregation keeps its separate behavior.
       qb.add(new ParentMetadataQuery(buildFilterQueryOnly(filters.withIncludeChunks(false))),
           BooleanClause.Occur.FILTER);
       hasClause = true;
