@@ -163,28 +163,54 @@ final class EnrichmentHardStopRepairTest extends LuceneExecutorTestBase {
     BooleanSupplier active = () -> running.get() && !hold.get();
     return switch (route) {
       case INDIVIDUAL_DENSE, INDIVIDUAL_CHUNK -> {
-        var context = new EmbeddingBackfillOps.BackfillContext(fields, coordinator, owned.commitOps(),
-            signals, IndexingPacing.unthrottled(), lifecycle::embeddingProvider, active, () -> true, 100, log);
-        yield (route == Route.INDIVIDUAL_CHUNK ? EmbeddingBackfillOps.processChunkEmbeddingBackfill(context)
-            : EmbeddingBackfillOps.processEmbeddingBackfill(context)).accounting();
+        var context = new LaneBackfillTestSupport.EmbeddingContext(fields,
+        coordinator,
+        IndexingPacing.unthrottled(),
+        lifecycle::embeddingProvider,
+        active,
+        () -> true,
+        100,
+        log);
+        yield (route == Route.INDIVIDUAL_CHUNK ? LaneBackfillTestSupport.runDenseChunk(context)
+            : LaneBackfillTestSupport.runDenseParent(context)).accounting();
       }
       case INDIVIDUAL_SPARSE, INTERLEAVED_SPARSE, INDIVIDUAL_SPARSE_CHUNK, INTERLEAVED_SPARSE_CHUNK ->
-          SpladeBackfillOps.processSpladeBackfill(new SpladeBackfillOps.BackfillContext(fields, coordinator,
-              owned.commitOps(), IndexingPacing.unthrottled(), () -> available.get() ? sparse : null,
-              active, 100, !route.name().startsWith("INTERLEAVED"), route.name().contains("CHUNK"), log)).accounting();
-      case INDIVIDUAL_NER -> NerBackfillOps.processNerBackfill(new NerBackfillOps.BackfillContext(fields,
-          coordinator, owned.commitOps(), IndexingPacing.unthrottled(), () -> ner, active, 100, log)).accounting();
+          LaneBackfillTestSupport.runSparse(new SpladeBackfillOps.BackfillContext(fields,
+        coordinator,
+        IndexingPacing.unthrottled(),
+        () -> available.get() ? sparse : null,
+        active,
+        100,
+        route.name().contains("CHUNK"),
+        log, () -> true)).accounting();
+      case INDIVIDUAL_NER -> LaneBackfillTestSupport.runNer(new NerBackfillOps.BackfillContext(fields,
+        coordinator,
+        IndexingPacing.unthrottled(),
+        () -> ner,
+        active,
+        100,
+        log, () -> true)).accounting();
       case BGE, BGE_CHUNK -> BgeM3BackfillOps.processBgeM3Backfill(new BgeM3BackfillOps.BackfillContext(fields,
           coordinator, owned.commitOps(), signals, () -> available.get() ? bge : null,
           active, 100, false, route == Route.BGE_CHUNK, log)).accounting();
-      default -> CombinedEnrichmentBackfillOps.processCombinedBackfill(
-          new CombinedEnrichmentBackfillOps.BackfillContext(fields, coordinator, owned.commitOps(),
-              IndexingPacing.unthrottled(), lifecycle::embeddingProvider,
-              () -> route.name().contains("SPARSE") && available.get() ? sparse : null,
-              () -> route == Route.NER ? ner : null, active, () -> true, 100, log,
-              route == Route.CHUNK, route == Route.SPARSE_CHUNK, route == Route.SINGLE_PASS, 100,
-              new ArrayDeque<>(), new ArrayDeque<>(), new int[] {0}, () -> false, () -> hold.get(),
-              () -> false, new WindowedEmbedProgress())).accounting();
+      default -> LaneBackfillTestSupport.runLanes(
+          new LaneBackfillTestSupport.BackfillContext(fields,
+        coordinator,
+        IndexingPacing.unthrottled(),
+        lifecycle::embeddingProvider,
+        () -> route.name().contains("SPARSE") && available.get() ? sparse : null,
+        () -> route == Route.NER ? ner : null,
+        active,
+        () -> true,
+        100,
+        log,
+        route == Route.CHUNK,
+        route == Route.SPARSE_CHUNK,
+        route == Route.SINGLE_PASS,
+        100,
+        () -> false,
+        () -> hold.get(),
+        new WindowedEmbedProgress())).accounting();
     };
   }
 

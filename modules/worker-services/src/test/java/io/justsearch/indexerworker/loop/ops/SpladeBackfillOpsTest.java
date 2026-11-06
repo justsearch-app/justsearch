@@ -3,7 +3,8 @@ package io.justsearch.indexerworker.loop.ops;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
@@ -11,7 +12,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import io.justsearch.adapters.lucene.runtime.CommitOps;
 import io.justsearch.adapters.lucene.runtime.CommitReason;
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
 import io.justsearch.adapters.lucene.runtime.IndexSchema;
@@ -52,12 +52,11 @@ class SpladeBackfillOpsTest extends LuceneExecutorTestBase {
   @TempDir Path tempDir;
 
   @org.junit.jupiter.api.BeforeEach void snapshots() throws Exception {
-    BackfillSnapshotTestSupport.install(documentFieldOps, indexingCoordinator, false, java.util.Set.of());
+    BackfillSnapshotTestSupport.install(documentFieldOps, indexingCoordinator, false, java.util.Set.of(SchemaFields.SPLADE_STATUS, SchemaFields.IS_CHUNK));
   }
 
   @Mock DocumentFieldOps documentFieldOps;
   @Mock IndexingCoordinator indexingCoordinator;
-  @Mock CommitOps commitOps;
   @Mock SpladeEncoder encoder;
 
   @Test
@@ -87,11 +86,15 @@ class SpladeBackfillOpsTest extends LuceneExecutorTestBase {
       when(encoder.encodeBatch(List.of("parent body")))
           .thenReturn(new ArrayList<>(List.of(Map.of("token", 1.0f))));
 
-      StageOutcome outcome = SpladeBackfillOps.processSpladeBackfill(
-          new SpladeBackfillOps.BackfillContext(
-              runtime.documentFieldOps(), runtime.indexingCoordinator(), runtime.commitOps(),
-              IndexingPacing.unthrottled(), () -> encoder, () -> true, 100, false, false,
-              LoggerFactory.getLogger(SpladeBackfillOpsTest.class)));
+      StageOutcome outcome = LaneBackfillTestSupport.runSparse(
+          new SpladeBackfillOps.BackfillContext(runtime.documentFieldOps(),
+        runtime.indexingCoordinator(),
+        IndexingPacing.unthrottled(),
+        () -> encoder,
+        () -> true,
+        100,
+        false,
+        LoggerFactory.getLogger(SpladeBackfillOpsTest.class), () -> true));
       assertTrue(outcome.success());
       assertEquals(1, outcome.docsProcessed());
       assertEquals(1L, runtime.runtimeGaugesSnapshot().commitCount(), "interleaved backfill must not commit itself");
@@ -135,7 +138,9 @@ class SpladeBackfillOpsTest extends LuceneExecutorTestBase {
     when(indexingCoordinator.updateDocumentsBatch(anyList()))
         .thenReturn(new LuceneRuntimeTypes.BatchUpdateResult(1, 0));
 
-    StageOutcome outcome = SpladeBackfillOps.processSpladeBackfill(context());
+    when(documentFieldOps.getDocumentFieldsBatch(anyList(), anySet())).thenReturn(Map.of("chunk-1",
+        Map.of(SchemaFields.SPLADE_STATUS, "PENDING", SchemaFields.IS_CHUNK, "true")));
+    StageOutcome outcome = LaneBackfillTestSupport.runSparse(context());
 
     assertTrue(outcome.success());
     assertEquals(1, outcome.docsProcessed());
@@ -171,7 +176,9 @@ class SpladeBackfillOpsTest extends LuceneExecutorTestBase {
     when(indexingCoordinator.updateDocumentsBatch(anyList()))
         .thenReturn(new LuceneRuntimeTypes.BatchUpdateResult(1, 0));
 
-    StageOutcome outcome = SpladeBackfillOps.processSpladeBackfill(context(false));
+    when(documentFieldOps.getDocumentFieldsBatch(anyList(), anySet())).thenReturn(Map.of("parent-1",
+        Map.of(SchemaFields.SPLADE_STATUS, "PENDING")));
+    StageOutcome outcome = LaneBackfillTestSupport.runSparse(context(false));
 
     assertEquals(1, outcome.docsProcessed());
     verify(documentFieldOps, never())
@@ -179,21 +186,81 @@ class SpladeBackfillOpsTest extends LuceneExecutorTestBase {
             eq(SchemaFields.SPLADE_STATUS), eq(SchemaFields.SPLADE_STATUS_PENDING), anyInt());
   }
 
+  @Test
+  void terminalSpladeWarningRequiresPublication() throws Exception {
+    String id = "terminal";
+    var log = (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(getClass());
+    var appender = new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();
+    appender.start();
+    log.addAppender(appender);
+    when(documentFieldOps.queryNonChunkDocIdsByField(anyString(), anyString(), anyInt())).thenReturn(List.of(id));
+    when(documentFieldOps.getEnrichmentInputs(anyList(), anyLong())).thenReturn(Map.of(id,
+        new DocumentFieldOps.EnrichmentInput("bad input", Map.of(SchemaFields.SPLADE_STATUS, "PENDING",
+            SchemaFields.SPLADE_RETRY_COUNT, Integer.toString(SchemaFields.SPLADE_MAX_RETRIES - 1)), null, Map.of())));
+    when(encoder.encodeBatch(anyList())).thenThrow(new IllegalArgumentException("bad input"));
+    when(encoder.encode(anyString(), any())).thenThrow(new IllegalArgumentException("bad input"));
+    var context = new SpladeBackfillOps.BackfillContext(documentFieldOps,
+        indexingCoordinator,
+        IndexingPacing.unthrottled(),
+        () -> encoder,
+        () -> true,
+        1,
+        false,
+        log, () -> true);
+    try {
+      org.mockito.Mockito.doReturn(new LuceneRuntimeTypes.BatchUpdateResult(0, 1))
+          .when(indexingCoordinator).updateDocumentsBatchIf(anyList(), anyMap());
+      SpladeBackfillOps.processParentBackfill(context, new EnrichmentSelection());
+      assertEquals(0, appender.list.stream().filter(event -> event.getFormattedMessage().contains("reached terminal SPLADE FAILED")).count());
+      org.mockito.Mockito.doAnswer(call -> {
+        assertEquals(0, appender.list.stream().filter(event -> event.getFormattedMessage().contains("reached terminal SPLADE FAILED")).count(),
+            "the diagnostic must follow accepted publication");
+        return new LuceneRuntimeTypes.BatchUpdateResult(1, 0);
+      }).when(indexingCoordinator).updateDocumentsBatchIf(anyList(), anyMap());
+      SpladeBackfillOps.processParentBackfill(context, new EnrichmentSelection());
+      assertEquals(1, appender.list.stream().filter(event -> event.getFormattedMessage().contains("reached terminal SPLADE FAILED")).count());
+      appender.list.clear();
+      org.mockito.Mockito.doReturn(new LuceneRuntimeTypes.EnrichmentPublicationReceipt(List.of(id), List.of(),
+          new IllegalStateException("publication accepted before a later failure")))
+          .when(indexingCoordinator).publishEnrichmentBatch(anyList(), anyMap());
+      SpladeBackfillOps.processParentBackfill(context, new EnrichmentSelection());
+      assertEquals(1, appender.list.stream().filter(event -> event.getFormattedMessage().contains("reached terminal SPLADE FAILED")).count(),
+          "an accepted failure is diagnosed once even if result delivery throws");
+      appender.list.clear();
+      when(documentFieldOps.queryNonChunkDocIdsByField(anyString(), anyString(), anyInt())).thenReturn(List.of(id, "peer"));
+      var input = new DocumentFieldOps.EnrichmentInput("bad input", Map.of(SchemaFields.SPLADE_STATUS, "PENDING",
+          SchemaFields.SPLADE_RETRY_COUNT, Integer.toString(SchemaFields.SPLADE_MAX_RETRIES - 1)), null, Map.of());
+      when(documentFieldOps.getEnrichmentInputs(anyList(), anyLong())).thenReturn(Map.of(id, input, "peer", input));
+      org.mockito.Mockito.doAnswer(call -> {
+        assertEquals(0, appender.list.stream().filter(event -> event.getFormattedMessage().contains("reached terminal SPLADE FAILED")).count());
+        List<Map.Entry<String, Map<String, Object>>> updates = call.getArgument(0);
+        return new LuceneRuntimeTypes.EnrichmentPublicationReceipt(updates.stream().map(Map.Entry::getKey).toList(), List.of(), null);
+      }).when(indexingCoordinator).publishEnrichmentBatch(anyList(), anyMap());
+      SpladeBackfillOps.processParentBackfill(new SpladeBackfillOps.BackfillContext(documentFieldOps,
+          indexingCoordinator, IndexingPacing.unthrottled(), () -> encoder, () -> true, 2, false, log, () -> true), new EnrichmentSelection());
+      var warnings = appender.list.stream().filter(event -> event.getFormattedMessage().contains("reached terminal SPLADE FAILED")).toList();
+      assertEquals(1, warnings.size(), "one lane operation emits one terminal warning");
+      assertTrue(warnings.getFirst().getFormattedMessage().contains("2 document(s)"));
+      assertTrue(warnings.getFirst().getFormattedMessage().contains(id));
+      assertTrue(warnings.getFirst().getFormattedMessage().contains("peer"));
+    } finally {
+      log.detachAppender(appender);
+      appender.stop();
+    }
+  }
+
   private SpladeBackfillOps.BackfillContext context() {
     return context(true);
   }
 
   private SpladeBackfillOps.BackfillContext context(boolean chunkSpladeEnabled) {
-    return new SpladeBackfillOps.BackfillContext(
-        documentFieldOps,
+    return new SpladeBackfillOps.BackfillContext(documentFieldOps,
         indexingCoordinator,
-        commitOps,
         IndexingPacing.unthrottled(),
         () -> encoder,
         () -> true,
         100,
-        false,
         chunkSpladeEnabled,
-        LoggerFactory.getLogger(SpladeBackfillOpsTest.class));
+        LoggerFactory.getLogger(SpladeBackfillOpsTest.class), () -> true);
   }
 }

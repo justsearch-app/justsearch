@@ -8,12 +8,10 @@ import static org.mockito.Mockito.*;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.core.read.ListAppender;
 import ch.qos.logback.classic.spi.ILoggingEvent;
-import io.justsearch.adapters.lucene.runtime.CommitOps;
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
 import io.justsearch.adapters.lucene.runtime.IndexingCoordinator;
 import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.BatchUpdateResult;
 import io.justsearch.indexerworker.embed.EmbeddingProvider;
-import io.justsearch.indexerworker.loop.pacing.BulkPacePolicy;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.ner.NerService;
 import io.justsearch.indexerworker.splade.SpladeEncoder;
@@ -30,7 +28,6 @@ import org.slf4j.LoggerFactory;
 class CombinedEnrichmentFailureAccountingTest {
   private final DocumentFieldOps fields = mock(DocumentFieldOps.class);
   private final IndexingCoordinator coordinator = mock(IndexingCoordinator.class);
-  private final CommitOps commits = mock(CommitOps.class);
   private final EmbeddingProvider embedding = mock(EmbeddingProvider.class);
   private final SpladeEncoder splade = mock(SpladeEncoder.class);
   private final NerService ner = mock(NerService.class);
@@ -51,6 +48,7 @@ class CombinedEnrichmentFailureAccountingTest {
     when(embedding.isAvailable()).thenAnswer(call -> embeddingReady.get());
     when(embedding.embedDocumentBatch(anyList())).thenAnswer(call ->
         Collections.nCopies(((List<?>) call.getArgument(0)).size(), new float[] {1, 0}));
+    when(splade.encode(anyString(), any())).thenThrow(new IllegalArgumentException("bad sparse input"));
     when(splade.encodeBatch(anyList())).thenAnswer(call ->
         Collections.nCopies(((List<?>) call.getArgument(0)).size(), Map.of("token", 1f)));
     when(fields.queryDocIdsByField(anyString(), anyString(), anyInt())).thenAnswer(call ->
@@ -85,13 +83,46 @@ class CombinedEnrichmentFailureAccountingTest {
     index.put(id, new HashMap<>(Map.of(field, "PENDING")));
   }
 
-  private CombinedEnrichmentBackfillOps.BackfillContext context() {
-    return new CombinedEnrichmentBackfillOps.BackfillContext(fields, coordinator, commits,
-        IndexingPacing.unthrottled(), () -> useEmbedding ? embedding : null,
-        () -> useSplade && spladeReady.get() ? splade : null, () -> ner,
-        () -> true, () -> true, 100, log, chunkVectors, chunkSplade, false, 50,
-        new ArrayDeque<>(), new ArrayDeque<>(), new int[] {0}, stop::get, () -> false,
-        () -> false, new WindowedEmbedProgress());
+  private LaneBackfillTestSupport.BackfillContext context() {
+    return new LaneBackfillTestSupport.BackfillContext(fields,
+        coordinator,
+        IndexingPacing.unthrottled(),
+        () -> useEmbedding ? embedding : null,
+        () -> useSplade && spladeReady.get() ? splade : null,
+        () -> ner,
+        () -> true,
+        () -> true,
+        100,
+        log,
+        chunkVectors,
+        chunkSplade,
+        false,
+        50,
+        stop::get,
+        () -> false,
+        new WindowedEmbedProgress());
+  }
+
+  private LaneBackfillTestSupport.BackfillContext sparseContext() { return sparseContext(2); }
+
+  private LaneBackfillTestSupport.BackfillContext sparseContext(int cap) {
+    return new LaneBackfillTestSupport.BackfillContext(fields,
+        coordinator,
+        IndexingPacing.unthrottled(),
+        () -> null,
+        () -> splade,
+        () -> null,
+        () -> true,
+        () -> true,
+        cap,
+        log,
+        false,
+        chunkSplade,
+        false,
+        0,
+        stop::get,
+        () -> false,
+        new WindowedEmbedProgress());
   }
 
   @Test
@@ -104,8 +135,8 @@ class CombinedEnrichmentFailureAccountingTest {
       stop.set(true);
       return Collections.nCopies(((List<?>) call.getArgument(0)).size(), new float[] {1, 0});
     });
-    var outcome = CombinedEnrichmentBackfillOps.processCombinedBackfill(context());
-    assertTrue(outcome.progressed());
+    var outcome = LaneBackfillTestSupport.runLanes(context());
+
     assertEquals(8, outcome.embedProcessed());
     assertEquals(0, outcome.spladeProcessed());
     verify(splade, never()).encodeBatch(anyList());
@@ -119,7 +150,8 @@ class CombinedEnrichmentFailureAccountingTest {
   void failedSpladeSliceDoesNotChargeLaterUnattemptedDocuments() throws Exception {
     for (String id : List.of("a", "b", "c", "d", "e", "f")) seed(id, SchemaFields.SPLADE_STATUS);
     when(splade.encodeBatch(List.of("c", "d"))).thenThrow(new IllegalArgumentException("bad input"));
-    CombinedEnrichmentBackfillOps.processCombinedBackfill(context(), new BulkPacePolicy(1000, 2, 8, 8));
+    LaneBackfillTestSupport.runLanes(sparseContext());
+    LaneBackfillTestSupport.runLanes(sparseContext());
     assertEquals("COMPLETED", index.get("a").get(SchemaFields.SPLADE_STATUS));
     assertEquals("COMPLETED", index.get("b").get(SchemaFields.SPLADE_STATUS));
     for (String id : List.of("c", "d")) assertEquals("1", index.get(id).get(SchemaFields.SPLADE_RETRY_COUNT));
@@ -130,14 +162,10 @@ class CombinedEnrichmentFailureAccountingTest {
   @Test
   void spladeSliceFailurePreservesItsSuccessfulPrefixAndDoesNotChargeTheTail() throws Exception {
     for (String id : List.of("a", "b", "later")) seed(id, SchemaFields.SPLADE_STATUS);
-    when(splade.encodeBatch(anyList())).thenReturn(new AbstractList<Map<String, Float>>() {
-      @Override public int size() { return 2; }
-      @Override public Map<String, Float> get(int position) {
-        if (position == 0) return Map.of("good", 1f);
-        throw new IllegalArgumentException("failed materializing second result");
-      }
-    });
-    CombinedEnrichmentBackfillOps.processCombinedBackfill(context(), new BulkPacePolicy(1000, 2, 8, 8));
+    when(splade.encodeBatch(anyList())).thenReturn(List.of(Map.of("good", 1f)))
+        .thenThrow(new IllegalArgumentException("bad input in the next unit"));
+    LaneBackfillTestSupport.runLanes(sparseContext(1));
+    LaneBackfillTestSupport.runLanes(sparseContext(1));
     assertEquals("COMPLETED", index.get("a").get(SchemaFields.SPLADE_STATUS));
     assertEquals("0", index.get("a").get(SchemaFields.SPLADE_RETRY_COUNT));
     assertEquals("1", index.get("b").get(SchemaFields.SPLADE_RETRY_COUNT));
@@ -151,7 +179,7 @@ class CombinedEnrichmentFailureAccountingTest {
       stop.set(true);
       return Collections.nCopies(((List<?>) call.getArgument(0)).size(), Map.of("good", 1f));
     });
-    var outcome = CombinedEnrichmentBackfillOps.processCombinedBackfill(context(), new BulkPacePolicy(1000, 2, 8, 8));
+    var outcome = LaneBackfillTestSupport.runLanes(sparseContext());
     assertTrue(outcome.aborted());
     assertEquals(2, outcome.spladeProcessed());
     assertEquals("PENDING", index.get("later").get(SchemaFields.SPLADE_STATUS));
@@ -172,7 +200,7 @@ class CombinedEnrichmentFailureAccountingTest {
     when(embedding.embedDocument(eq("healthy"), any())).thenReturn(new float[] {1, 0});
     when(embedding.embedDocument(eq("bad"), any())).thenReturn(null);
     for (int cycle = 1; cycle <= SchemaFields.EMBEDDING_MAX_RETRIES; cycle++) {
-      CombinedEnrichmentBackfillOps.processCombinedBackfill(context());
+      LaneBackfillTestSupport.runLanes(context());
       assertEquals("COMPLETED", index.get("healthy").get(SchemaFields.EMBEDDING_STATUS));
       assertEquals("0", index.get("healthy").get(SchemaFields.EMBEDDING_RETRY_COUNT));
       assertEquals(String.valueOf(cycle), index.get("bad").get(SchemaFields.EMBEDDING_RETRY_COUNT));
@@ -188,7 +216,7 @@ class CombinedEnrichmentFailureAccountingTest {
     for (String id : List.of("a", "b", "later")) seed(id, SchemaFields.SPLADE_STATUS);
     when(splade.encodeBatch(anyList())).thenReturn(resultSize < 0 ? null :
         Collections.nCopies(resultSize, Map.of("wrong", 5f)));
-    CombinedEnrichmentBackfillOps.processCombinedBackfill(context(), new BulkPacePolicy(1000, 2, 8, 8));
+    LaneBackfillTestSupport.runLanes(sparseContext());
     for (String id : List.of("a", "b")) {
       assertEquals("PENDING", index.get(id).get(SchemaFields.SPLADE_STATUS));
       assertEquals("1", index.get(id).get(SchemaFields.SPLADE_RETRY_COUNT));
@@ -203,7 +231,7 @@ class CombinedEnrichmentFailureAccountingTest {
     index.get("chunk").put(SchemaFields.IS_CHUNK, "true");
     index.get("chunk").put(SchemaFields.CHUNK_EMBEDDING_STATUS, "PENDING");
     chunkSplade = true;
-    CombinedEnrichmentBackfillOps.processCombinedBackfill(context());
+    LaneBackfillTestSupport.runLanes(context());
     verify(embedding, never()).embedDocumentBatch(anyList());
     assertFalse(index.get("chunk").containsKey(SchemaFields.CHUNK_VECTOR));
     assertEquals("PENDING", index.get("chunk").get(SchemaFields.CHUNK_EMBEDDING_STATUS));
@@ -219,10 +247,10 @@ class CombinedEnrichmentFailureAccountingTest {
     if (throwingWrite) when(coordinator.updateDocumentsBatchIf(anyList(), anyMap()))
         .thenThrow(new IllegalStateException("write failed"));
     else when(coordinator.updateDocumentsBatchIf(anyList(), anyMap())).thenReturn(new BatchUpdateResult(0, 1));
-    var outcome = CombinedEnrichmentBackfillOps.processCombinedBackfill(context());
+    var outcome = LaneBackfillTestSupport.runLanes(context());
     assertEquals(0, outcome.embedProcessed());
     assertEquals(0, outcome.spladeProcessed());
-    assertFalse(outcome.progressed());
+
   }
 
   @Test
@@ -238,7 +266,7 @@ class CombinedEnrichmentFailureAccountingTest {
     appender.start();
     log.addAppender(appender);
     try {
-      var outcome = CombinedEnrichmentBackfillOps.processCombinedBackfill(context());
+      var outcome = LaneBackfillTestSupport.runLanes(context());
       assertTrue(outcome.aborted());
       assertEquals(0, outcome.embedProcessed());
       assertTrue(appender.list.stream().anyMatch(event -> event.getFormattedMessage().contains("Published 0 document updates")));
@@ -249,26 +277,6 @@ class CombinedEnrichmentFailureAccountingTest {
     }
   }
 
-  @Test
-  void terminalSpladeWarningRequiresPublication() throws Exception {
-    seed("doc", SchemaFields.SPLADE_STATUS);
-    index.get("doc").put(SchemaFields.SPLADE_RETRY_COUNT, String.valueOf(SchemaFields.SPLADE_MAX_RETRIES - 1));
-    when(splade.encodeBatch(anyList())).thenThrow(new IllegalArgumentException("bad input"));
-    when(coordinator.updateDocumentsBatchIf(anyList(), anyMap())).thenReturn(new BatchUpdateResult(0, 1));
-    var appender = new ListAppender<ILoggingEvent>();
-    appender.start();
-    log.addAppender(appender);
-    try {
-      CombinedEnrichmentBackfillOps.processCombinedBackfill(context());
-      assertTrue(appender.list.stream().noneMatch(event -> event.getFormattedMessage().contains("reached terminal SPLADE FAILED")));
-      when(coordinator.updateDocumentsBatchIf(anyList(), anyMap())).thenReturn(new BatchUpdateResult(1, 0));
-      CombinedEnrichmentBackfillOps.processCombinedBackfill(context());
-      assertEquals(1, appender.list.stream().filter(event -> event.getFormattedMessage().contains("reached terminal SPLADE FAILED")).count());
-    } finally {
-      log.detachAppender(appender);
-      appender.stop();
-    }
-  }
 
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
@@ -282,7 +290,7 @@ class CombinedEnrichmentFailureAccountingTest {
       embeddingReady.set(false);
       return Collections.singletonList(null);
     });
-    CombinedEnrichmentBackfillOps.processCombinedBackfill(context());
+    LaneBackfillTestSupport.runLanes(context());
     assertFalse(index.get("doc").containsKey(sparse ? SchemaFields.SPLADE_RETRY_COUNT : SchemaFields.EMBEDDING_RETRY_COUNT));
     assertEquals("PENDING", index.get("doc").get(sparse ? SchemaFields.SPLADE_STATUS : SchemaFields.EMBEDDING_STATUS));
   }

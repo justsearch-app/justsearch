@@ -22,11 +22,6 @@ final class EnrichmentBatch {
   private final Map<String, DocumentFieldOps.EnrichmentInput> inputs;
   private final java.util.Set<String> acceptedIds = new java.util.HashSet<>();
 
-  EnrichmentBatch(DocumentFieldOps fields, IndexingCoordinator coordinator, List<String> ids)
-      throws IOException {
-    this(fields, coordinator, ids, coordinator.enrichmentAuthority(), null, java.util.Set.of());
-  }
-
   EnrichmentBatch(DocumentFieldOps fields, IndexingCoordinator coordinator, List<String> ids,
       IndexingCoordinator.EnrichmentAuthority authority, EnrichmentSelection selection,
       java.util.Set<String> excluded) throws IOException {
@@ -52,8 +47,6 @@ final class EnrichmentBatch {
   }
 
   java.util.Set<String> acceptedIds() { return acceptedIds; }
-
-  boolean storageFailed() { return accounting != null && accounting.storageFailed(); }
 
   EnrichmentBatch accounting(EnrichmentAccounting accounting) {
     this.accounting = accounting;
@@ -142,18 +135,10 @@ final class EnrichmentBatch {
     if (accounting != null) ids.forEach(id -> accounting.started(id, stage));
   }
 
-  void retired(EnrichmentAccounting.Stage stage) {
-    if (accounting != null) accounting.retired(stage);
-  }
-
   void rejectRetiredOutcomes() {
     if (accounting != null && coordinator.enrichmentAuthority() != authority) {
       accounting.rejectedRetiredOutcomes();
     }
-  }
-
-  boolean cancelled(EnrichmentAccounting.Stage stage, Throwable failure) {
-    return accounting != null && accounting.cancelled(stage, failure);
   }
 
   private void examined(String id, Map<String, Object> updates) {
@@ -191,20 +176,6 @@ final class EnrichmentBatch {
     var updates = failureUpdate(id, retryField, compute);
     boolean applied = update(id, updates);
     return applied && updates.keySet().stream().anyMatch(key -> key.endsWith("_status")) ? 1 : 0;
-  }
-
-  /** Publishes retry and terminal failures in batches, retaining the actual terminal-write count. */
-  int failures(List<String> ids, String retryField, IntFunction<Map<String, Object>> compute) {
-    var retryUpdates = new java.util.ArrayList<Map.Entry<String, Map<String, Object>>>();
-    var terminalUpdates = new java.util.ArrayList<Map.Entry<String, Map<String, Object>>>();
-    for (String id : ids) {
-      var updates = failureUpdate(id, retryField, compute);
-      var target = updates.keySet().stream().anyMatch(key -> key.endsWith("_status"))
-          ? terminalUpdates : retryUpdates;
-      target.add(Map.entry(id, updates));
-    }
-    if (!retryUpdates.isEmpty()) updateBatch(retryUpdates);
-    return terminalUpdates.isEmpty() ? 0 : updateBatch(terminalUpdates).updatedCount();
   }
 
   private Map<String, Object> failureUpdate(String id, String retryField,

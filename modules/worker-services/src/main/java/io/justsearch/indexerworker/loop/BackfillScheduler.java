@@ -25,7 +25,6 @@ import io.justsearch.indexerworker.metrics.OperationalMetrics;
 import io.justsearch.indexerworker.ner.NerService;
 import io.justsearch.indexerworker.splade.SpladeEncoder;
 import io.justsearch.indexing.SchemaFields;
-import java.util.ArrayDeque;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.HashSet;
@@ -653,28 +652,36 @@ public final class BackfillScheduler {
     return switch (lane) {
       case DENSE_PARENT, DENSE_CHUNK -> CombinedEnrichmentBackfillOps.processDenseUnit(
           new CombinedEnrichmentBackfillOps.BackfillContext(documentFieldOps, indexingCoordinator,
-              commitOps, indexingPacing, embeddingLifecycle::embeddingProvider, () -> null, () -> null,
+              indexingPacing, embeddingLifecycle::embeddingProvider,
               () -> !hardStopBackfillWork(), embeddingLifecycle::allowEmbeddingWrites, cap, log,
-              resolvedConfigSupplier.get().rag().chunkVectorsEnabled(), false,
+              resolvedConfigSupplier.get().rag().chunkVectorsEnabled(),
               resolvedConfigSupplier.get().ai().embedding().lateChunkingEnabled(),
-              busy ? cap : pacing().chunkSlotsPerBatch(), new ArrayDeque<>(), new ArrayDeque<>(),
-              new int[] {0}, () -> hardStopBackfillWork() || monotonicNanos.getAsLong() >= deadline,
-              this::hardStopBackfillWork, () -> false, windowedEmbedProgress, densePublished,
-              () -> false, success -> {}, this::unitAllowed, this::stageAllowed),
+              busy ? cap : pacing().chunkSlotsPerBatch(), () -> hardStopBackfillWork() || monotonicNanos.getAsLong() >= deadline,
+              this::hardStopBackfillWork, windowedEmbedProgress, densePublished,
+              this::unitAllowed, this::stageAllowed),
           enrichmentSelection, lane == Lane.DENSE_PARENT ? Stage.EMBED : Stage.CHUNK_EMBED);
       case SPARSE_PARENT, SPARSE_CHUNK -> {
-        var context = new SpladeBackfillOps.BackfillContext(documentFieldOps, indexingCoordinator,
-            commitOps, indexingPacing, spladeEncoderSupplier, () -> !hardStopBackfillWork(),
-            busy ? cap : pacing().spladeBackfillBatchSize(), false, chunkSpladeEnabled(), log,
-            () -> monotonicNanos.getAsLong() < deadline && sparseUnitAllowed());
+        var context = new SpladeBackfillOps.BackfillContext(documentFieldOps,
+        indexingCoordinator,
+        indexingPacing,
+        spladeEncoderSupplier,
+        () -> !hardStopBackfillWork(),
+        busy ? cap : pacing().spladeBackfillBatchSize(),
+        chunkSpladeEnabled(),
+        log,
+        () -> monotonicNanos.getAsLong() < deadline && sparseUnitAllowed());
         yield lane == Lane.SPARSE_PARENT
             ? SpladeBackfillOps.processParentBackfill(context, enrichmentSelection)
             : SpladeBackfillOps.processChunkBackfill(context, enrichmentSelection);
       }
-      case NER -> NerBackfillOps.processNerUnit(new NerBackfillOps.BackfillContext(
-          documentFieldOps, indexingCoordinator, commitOps, indexingPacing, nerServiceSupplier,
-          () -> !hardStopBackfillWork(), 1, log,
-          () -> monotonicNanos.getAsLong() < deadline && unitAllowed(nerServiceSupplier.get() != null
+      case NER -> NerBackfillOps.processNerUnit(new NerBackfillOps.BackfillContext(documentFieldOps,
+        indexingCoordinator,
+        indexingPacing,
+        nerServiceSupplier,
+        () -> !hardStopBackfillWork(),
+        1,
+        log,
+        () -> monotonicNanos.getAsLong() < deadline && unitAllowed(nerServiceSupplier.get() != null
               && LoopPacingPolicy.requiresGpu(nerServiceSupplier.get().isGpuAvailable(),
                   nerServiceSupplier.get().getOrtCudaStatus()))), enrichmentSelection);
       case BGE_M3 -> BgeM3BackfillOps.processBgeM3Backfill(new BgeM3BackfillOps.BackfillContext(

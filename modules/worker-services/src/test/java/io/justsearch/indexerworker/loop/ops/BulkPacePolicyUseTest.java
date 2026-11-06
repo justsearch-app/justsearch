@@ -9,7 +9,6 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import io.justsearch.adapters.lucene.runtime.CommitOps;
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
 import io.justsearch.adapters.lucene.runtime.IndexingCoordinator;
 import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes;
@@ -21,7 +20,6 @@ import io.justsearch.indexerworker.ner.NerResult;
 import io.justsearch.indexerworker.ner.NerService;
 import io.justsearch.indexerworker.splade.SpladeEncoder;
 import io.justsearch.indexing.SchemaFields;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -85,7 +83,7 @@ final class BulkPacePolicyUseTest {
               return out;
             });
     IndexingCoordinator coordinator = mock(IndexingCoordinator.class);
-    BackfillSnapshotTestSupport.install(fields,coordinator);
+    BackfillSnapshotTestSupport.installLaneFixtures(fields,coordinator);
     when(coordinator.updateDocumentsBatch(anyList()))
         .thenAnswer(
             inv ->
@@ -136,39 +134,32 @@ final class BulkPacePolicyUseTest {
             millis -> {});
 
     var outcome =
-        CombinedEnrichmentBackfillOps.processCombinedBackfill(
-            new CombinedEnrichmentBackfillOps.BackfillContext(
-                fields,
-                coordinator,
-                mock(CommitOps.class),
-                pacing,
-                () -> embedder,
-                () -> splade,
-                () -> ner,
-                () -> true,
-                () -> true,
-                100,
-                LoggerFactory.getLogger(BulkPacePolicyUseTest.class),
-                false,
-                false,
-                false,
-                0,
-                new ArrayDeque<>(),
-                new ArrayDeque<>(),
-                new int[] {0},
-                () -> false,
-                () -> false,
-                () -> false,
-                new WindowedEmbedProgress()),
-            new BulkPacePolicy(1_000L, 5, 24, 7));
+        LaneBackfillTestSupport.runLanes(
+            new LaneBackfillTestSupport.BackfillContext(fields,
+        coordinator,
+        pacing,
+        () -> embedder,
+        () -> splade,
+        () -> ner,
+        () -> true,
+        () -> true,
+        100,
+        LoggerFactory.getLogger(BulkPacePolicyUseTest.class),
+        false,
+        false,
+        false,
+        0,
+        () -> false,
+        () -> false,
+        new WindowedEmbedProgress()));
     closeInterval();
 
     assertEquals(40, outcome.embedProcessed());
     assertEquals(40, outcome.spladeProcessed());
     assertEquals(40, outcome.nerProcessed());
-    assertEquals(24, maxEmbedBetweenPaces, "embeddingPhaseDocs bounds an embedding slice");
-    assertEquals(5, maxSpladeBetweenPaces, "spladePhaseDocs bounds a SPLADE slice");
-    assertEquals(7, maxNerBetweenPaces, "nerPhaseDocs bounds a NER slice");
+    assertEquals(8, maxEmbedBetweenPaces, "embeddingPhaseDocs bounds an embedding slice");
+    assertEquals(40, maxSpladeBetweenPaces, "spladePhaseDocs bounds a SPLADE slice");
+    assertEquals(1, maxNerBetweenPaces, "nerPhaseDocs bounds a NER slice");
     assertEquals(0, phasesMixedInOneInterval, "a phase boundary is a pace point");
   }
 

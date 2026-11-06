@@ -1,13 +1,15 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.loop.ops;
 
-import io.justsearch.adapters.lucene.runtime.CommitOps;
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
 import io.justsearch.adapters.lucene.runtime.IndexingCoordinator;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.ner.NerResult;
 import io.justsearch.indexerworker.ner.NerService;
 import io.justsearch.indexing.SchemaFields;
+import io.justsearch.indexerworker.metrics.EncoderOrtRunSpans;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.context.Scope;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -19,7 +21,7 @@ import org.slf4j.Logger;
 /**
  * NER entity extraction backfill for documents with {@code ner_status=PENDING}.
  *
- * <p>Runs after embedding backfill is complete (NER facets are supplementary). Resource admission
+ * <p>Resource admission
  * is checked per document independently of hard cancellation inside inference.
  */
 public final class NerBackfillOps {
@@ -28,50 +30,29 @@ public final class NerBackfillOps {
   public record BackfillContext(
       DocumentFieldOps documentFieldOps,
       IndexingCoordinator indexingCoordinator,
-      CommitOps commitOps,
       IndexingPacing pacing,
       Supplier<NerService> nerServiceSupplier,
       BooleanSupplier runningSupplier,
       int batchSize,
       Logger log,
       BooleanSupplier unitAllowed) {
-    public BackfillContext(
-        DocumentFieldOps documentFieldOps,
-        IndexingCoordinator indexingCoordinator,
-        CommitOps commitOps,
-        IndexingPacing pacing,
-        Supplier<NerService> nerServiceSupplier,
-        BooleanSupplier runningSupplier,
-        int batchSize,
-        Logger log) {
-      this(documentFieldOps, indexingCoordinator, commitOps, pacing, nerServiceSupplier, runningSupplier, batchSize, log, () -> true);
-    }
+
   }
 
   /** One document is the NER native unit; the selection cursor is shared with the batch caller. */
   public static StageOutcome processNerUnit(BackfillContext source, EnrichmentSelection selection) {
-    return processNerBackfill(new BackfillContext(source.documentFieldOps(), source.indexingCoordinator(),
-        source.commitOps(), source.pacing(), source.nerServiceSupplier(), source.runningSupplier(),
-        1, source.log(), source.unitAllowed()), selection, false);
-  }
-
-  /**
-   * Processes one batch of NER backfill.
-   *
-   * @return the batch outcome (tempdoc 710 Move 2 item 4) — {@link BackfillScheduler} records
-   *     per-stage timing/counts from this instead of relying on a metrics call inside the op.
-   */
-  public static StageOutcome processNerBackfill(BackfillContext context) {
-    return processNerBackfill(context, null);
-  }
-
-  public static StageOutcome processNerBackfill(
-      BackfillContext context, EnrichmentSelection selection) {
-    return processNerBackfill(context, selection, true);
+    return processNerBackfill(new BackfillContext(source.documentFieldOps(),
+        source.indexingCoordinator(),
+        source.pacing(),
+        source.nerServiceSupplier(),
+        source.runningSupplier(),
+        1,
+        source.log(),
+        source.unitAllowed()), selection);
   }
 
   private static StageOutcome processNerBackfill(BackfillContext context,
-      EnrichmentSelection selection, boolean commit) {
+      EnrichmentSelection selection) {
     if (selection != null) selection.begin();
     var authority = context.indexingCoordinator().enrichmentAuthority();
     NerService selectedService = context.nerServiceSupplier().get();
@@ -82,6 +63,8 @@ public final class NerBackfillOps {
             context.indexingCoordinator(), cancellationEpoch, authority)
             || selectedService == null || !selectedService.isAvailable()
             || context.nerServiceSupplier().get() != selectedService);
+    Span enrichmentSpan = EncoderOrtRunSpans.maybeEnrichmentBatch();
+    try (Scope _ = enrichmentSpan.makeCurrent()) {
     try {
       List<String> pendingIds =
           EnrichmentSelection.page(selection, context.documentFieldOps(),
@@ -193,9 +176,6 @@ public final class NerBackfillOps {
 
       batch.rejectRetiredOutcomes();
       if (processed > 0 || failed > 0) {
-        if (commit) context
-            .commitOps()
-            .commitAndTrack(io.justsearch.adapters.lucene.runtime.CommitReason.BACKFILL_NER);
         context
             .log()
             .info(
@@ -213,15 +193,16 @@ public final class NerBackfillOps {
       accounting.cancelled(EnrichmentAccounting.Stage.NER, e);
       context.log().error("Error during NER backfill", e);
       return StageOutcome.observed(false, 0, methodStart, accounting);
+    } finally {
+      context.log().info("Enrichment dispositions: {}", accounting.snapshot().counters());
+    }
+    } finally {
+      enrichmentSpan.end();
     }
   }
 
-
-
   /**
-   * Pure computation of the retry-count/status update for a NER failure — no I/O. Shared by the snapshot-bound individual and combined enrichment paths (merges the
-   * result into its own single batched write), so the two stay in escalation-parity by
-   * construction (tempdoc 700).
+   * Pure computation of the retry-count/status update for a NER lane failure — no I/O.
    *
    * @param currentRetryCount the doc's retry count *before* this failure
    * @return field updates: always {@code NER_RETRY_COUNT}; additionally {@code
@@ -239,8 +220,7 @@ public final class NerBackfillOps {
 
   /**
    * Pure derivation of the multi-valued {@code ENTITY_*_RAW} facet/filter updates from a {@link
-   * NerResult} — no I/O. Shared by {@link #processNerBackfill} and the combined enrichment path so
-   * both preserve the exact entity lists. Mutates {@code updates} in place to match both callers.
+   * NerResult}. Mutates the lane's update map in place and preserves the exact entity lists.
    *
    * @param updates the batch-update map to populate in place; a no-op if {@code result} is empty
    * @param result the NER extraction result
@@ -259,6 +239,5 @@ public final class NerBackfillOps {
       updates.put(SchemaFields.ENTITY_LOCATIONS_RAW, new ArrayList<>(result.locations()));
     }
   }
-
 
 }

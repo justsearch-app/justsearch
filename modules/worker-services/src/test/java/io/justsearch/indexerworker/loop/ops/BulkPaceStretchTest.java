@@ -10,7 +10,6 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import io.justsearch.adapters.lucene.runtime.CommitOps;
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
 import io.justsearch.adapters.lucene.runtime.IndexingCoordinator;
 import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes;
@@ -21,7 +20,6 @@ import io.justsearch.indexerworker.ner.NerResult;
 import io.justsearch.indexerworker.ner.NerService;
 import io.justsearch.indexerworker.splade.SpladeEncoder;
 import io.justsearch.indexing.SchemaFields;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -121,30 +119,24 @@ final class BulkPaceStretchTest {
             });
 
     var outcome =
-        CombinedEnrichmentBackfillOps.processCombinedBackfill(
-            new CombinedEnrichmentBackfillOps.BackfillContext(
-                fields,
-                coordinator,
-                mock(CommitOps.class),
-                recordingPacing(),
-                () -> embedder,
-                () -> splade,
-                () -> ner,
-                () -> true,
-                () -> true,
-                100,
-                LOG,
-                /* chunkVectorsEnabled= */ true,
-                /* chunkSpladeEnabled= */ false,
-                /* lateChunkingEnabled= */ false,
-                50,
-                new ArrayDeque<>(),
-                new ArrayDeque<>(),
-                new int[] {0},
-                () -> false,
-                () -> false,
-                () -> false,
-                new WindowedEmbedProgress()));
+        LaneBackfillTestSupport.runLanes(
+            new LaneBackfillTestSupport.BackfillContext(fields,
+        coordinator,
+        recordingPacing(),
+        () -> embedder,
+        () -> splade,
+        () -> ner,
+        () -> true,
+        () -> true,
+        100,
+        LOG,
+        /* chunkVectorsEnabled= */ true,
+        /* chunkSpladeEnabled= */ false,
+        /* lateChunkingEnabled= */ false,
+        50,
+        () -> false,
+        () -> false,
+        new WindowedEmbedProgress()));
 
     assertEquals(150, outcome.embedProcessed(), "every parent and chunk was embedded");
     assertEquals(100, outcome.spladeProcessed(), "every parent was SPLADE-encoded");
@@ -168,22 +160,24 @@ final class BulkPaceStretchTest {
     DocumentFieldOps fields = mock(DocumentFieldOps.class);
     when(fields.queryNonChunkDocIdsByField(anyString(), anyString(), anyInt())).thenReturn(docs);
     when(fields.getDocumentContentBatch(anyList())).thenAnswer(inv -> contents(inv.getArgument(0)));
+    when(fields.getDocumentFieldsBatch(anyList(), anySet())).thenAnswer(call -> {
+      var metadata = new HashMap<String, Map<String, String>>();
+      for (String id : (List<String>) call.getArgument(0)) metadata.put(id, Map.of(SchemaFields.SPLADE_STATUS, "PENDING"));
+      return metadata;
+    });
     IndexingCoordinator coordinator = writingCoordinator(fields);
     SpladeEncoder splade = spladeEncoder();
 
     var outcome =
-        SpladeBackfillOps.processSpladeBackfill(
-            new SpladeBackfillOps.BackfillContext(
-                fields,
-                coordinator,
-                mock(CommitOps.class),
-                recordingPacing(),
-                () -> splade,
-                () -> true,
-                200,
-                /* commitAfterBatch= */ false,
-                /* chunkSpladeEnabled= */ false,
-                LOG));
+        LaneBackfillTestSupport.runSparse(
+            new SpladeBackfillOps.BackfillContext(fields,
+        coordinator,
+        recordingPacing(),
+        () -> splade,
+        () -> true,
+        200,
+        /* chunkSpladeEnabled= */ false,
+        LOG, () -> true));
 
     assertTrue(outcome.success());
     assertEquals(200, outcome.docsProcessed(), "every document was encoded and written");
@@ -229,7 +223,7 @@ final class BulkPaceStretchTest {
 
   private static IndexingCoordinator writingCoordinator(DocumentFieldOps fields) {
     IndexingCoordinator coordinator = mock(IndexingCoordinator.class);
-    BackfillSnapshotTestSupport.install(fields,coordinator);
+    BackfillSnapshotTestSupport.installLaneFixtures(fields,coordinator);
     when(coordinator.updateDocumentsBatch(anyList()))
         .thenAnswer(
             inv ->

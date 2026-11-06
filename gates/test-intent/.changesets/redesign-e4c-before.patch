@@ -1,0 +1,79 @@
+--- a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOps.java
++++ b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOps.java
+@@ -130,6 +130,29 @@
+       Consumer<Boolean> spladeBackfillResult,
+       java.util.function.Predicate<Boolean> unitAllowed,
+       java.util.function.Predicate<EnrichmentAccounting.Stage> stageAllowed) {
++
++    // E4c before-check compatibility: signature forwarding only, with lane-inert fields.
++    public BackfillContext(
++        DocumentFieldOps documentFieldOps,
++        IndexingCoordinator indexingCoordinator,
++        IndexingPacing pacing,
++        Supplier<EmbeddingProvider> embeddingProviderSupplier,
++        BooleanSupplier runningSupplier,
++        BooleanSupplier allowEmbeddingWritesSupplier,
++        int batchSize,
++        Logger log,
++        boolean chunkVectorsEnabled,
++        boolean lateChunkingEnabled,
++        int chunkSlotsPerBatch,
++        BooleanSupplier stopRequestedSupplier,
++        BooleanSupplier hardStopRequestedSupplier,
++        WindowedEmbedProgress windowedEmbedProgress,
++        Set<String> publishedDocIds,
++        java.util.function.Predicate<Boolean> unitAllowed,
++        java.util.function.Predicate<EnrichmentAccounting.Stage> stageAllowed) {
++      this(documentFieldOps, indexingCoordinator, null, pacing, embeddingProviderSupplier, () -> null, () -> null, runningSupplier, allowEmbeddingWritesSupplier, batchSize, log, chunkVectorsEnabled, false, lateChunkingEnabled, chunkSlotsPerBatch, new java.util.ArrayDeque<>(), new java.util.ArrayDeque<>(), new int[1], stopRequestedSupplier, hardStopRequestedSupplier, () -> false, windowedEmbedProgress, publishedDocIds, () -> false, success -> {}, unitAllowed, stageAllowed);
++    }
++
+     public BackfillContext(
+         DocumentFieldOps documentFieldOps, IndexingCoordinator indexingCoordinator,
+         CommitOps commitOps, IndexingPacing pacing,
+--- a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/SpladeBackfillOps.java
++++ b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/SpladeBackfillOps.java
+@@ -46,6 +46,21 @@
+       boolean chunkSpladeEnabled,
+       Logger log,
+       BooleanSupplier unitAllowed) {
++
++    // E4c before-check compatibility: signature forwarding only, with lane-inert fields.
++    public BackfillContext(
++        DocumentFieldOps documentFieldOps,
++        IndexingCoordinator indexingCoordinator,
++        IndexingPacing pacing,
++        Supplier<SpladeEncoder> spladeEncoderSupplier,
++        BooleanSupplier runningSupplier,
++        int batchSize,
++        boolean chunkSpladeEnabled,
++        Logger log,
++        BooleanSupplier unitAllowed) {
++      this(documentFieldOps, indexingCoordinator, null, pacing, spladeEncoderSupplier, runningSupplier, batchSize, false, chunkSpladeEnabled, log, unitAllowed);
++    }
++
+     public BackfillContext(
+         DocumentFieldOps documentFieldOps,
+         IndexingCoordinator indexingCoordinator,
+--- a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/NerBackfillOps.java
++++ b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/NerBackfillOps.java
+@@ -35,6 +35,20 @@
+       int batchSize,
+       Logger log,
+       BooleanSupplier unitAllowed) {
++
++    // E4c before-check compatibility: signature forwarding only, with lane-inert fields.
++    public BackfillContext(
++        DocumentFieldOps documentFieldOps,
++        IndexingCoordinator indexingCoordinator,
++        IndexingPacing pacing,
++        Supplier<NerService> nerServiceSupplier,
++        BooleanSupplier runningSupplier,
++        int batchSize,
++        Logger log,
++        BooleanSupplier unitAllowed) {
++      this(documentFieldOps, indexingCoordinator, null, pacing, nerServiceSupplier, runningSupplier, batchSize, log, unitAllowed);
++    }
++
+     public BackfillContext(
+         DocumentFieldOps documentFieldOps,
+         IndexingCoordinator indexingCoordinator,

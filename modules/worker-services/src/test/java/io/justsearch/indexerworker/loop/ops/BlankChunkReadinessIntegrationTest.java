@@ -9,14 +9,12 @@ import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
 import io.justsearch.adapters.lucene.runtime.IndexSchema;
 import io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase;
 import io.justsearch.configuration.FieldCatalogDef;
-import io.justsearch.indexerworker.coordination.WorkerSignalBus;
 import io.justsearch.indexerworker.embed.EmbeddingProvider;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexing.SchemaFields;
 import io.justsearch.indexing.api.IndexDocument;
 import io.justsearch.indexing.chunking.ChunkParentRevision;
 import java.nio.file.Path;
-import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -76,7 +74,7 @@ class BlankChunkReadinessIntegrationTest extends LuceneExecutorTestBase {
       doAnswer(call -> {
         var result = call.callRealMethod();
         var input = assertInstanceOf(DocumentFieldOps.EnrichmentInput.class,
-            assertInstanceOf(Map.class, result).get("chunk"));
+            assertInstanceOf(DocumentFieldOps.EnrichmentInputPage.class, result).inputs().get("chunk"));
         assertEquals(text, input.content(), "the real snapshot must reconstruct the whitespace slice");
         snapshotRead.set(true);
         switch (change) {
@@ -86,20 +84,37 @@ class BlankChunkReadinessIntegrationTest extends LuceneExecutorTestBase {
           case NONE -> { }
         }
         return result;
-      }).when(fields).getEnrichmentInputs(anyList(), anyLong());
+      }).when(fields).getEnrichmentInputPage(anyList(), anyLong());
       var log = LoggerFactory.getLogger(BlankChunkReadinessIntegrationTest.class);
       if (combined) {
-        var context = new CombinedEnrichmentBackfillOps.BackfillContext(
-            fields, runtime.indexingCoordinator(), runtime.commitOps(), IndexingPacing.unthrottled(),
-            selected::get, () -> null, () -> null, () -> true, writesAllowed::get, 10, log,
-            true, false, false, 10, new ArrayDeque<>(), new ArrayDeque<>(), new int[] {0},
-            () -> false, () -> false, () -> false, new WindowedEmbedProgress());
-        CombinedEnrichmentBackfillOps.processCombinedBackfill(context);
+        var context = new LaneBackfillTestSupport.BackfillContext(fields,
+        runtime.indexingCoordinator(),
+        IndexingPacing.unthrottled(),
+        selected::get,
+        () -> null,
+        () -> null,
+        () -> true,
+        writesAllowed::get,
+        10,
+        log,
+        true,
+        false,
+        false,
+        10,
+        () -> false,
+        () -> false,
+        new WindowedEmbedProgress());
+        LaneBackfillTestSupport.runLanes(context);
       } else {
-        var context = new EmbeddingBackfillOps.BackfillContext(
-            fields, runtime.indexingCoordinator(), runtime.commitOps(), mock(WorkerSignalBus.class),
-            IndexingPacing.unthrottled(), selected::get, () -> true, writesAllowed::get, 10, log);
-        EmbeddingBackfillOps.processChunkEmbeddingBackfill(context);
+        var context = new LaneBackfillTestSupport.EmbeddingContext(fields,
+        runtime.indexingCoordinator(),
+        IndexingPacing.unthrottled(),
+        selected::get,
+        () -> true,
+        writesAllowed::get,
+        10,
+        log);
+        LaneBackfillTestSupport.runDenseChunk(context);
       }
       runtime.commitOps().maybeRefreshBlocking();
 
