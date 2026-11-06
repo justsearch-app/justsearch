@@ -344,7 +344,6 @@ env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot node scripts/governance/gates/t
   --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentQuarantineProgressTest.java \
   --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentRevisionRaceTest.java \
   --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java \
-  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/NerBackfillOpsTest.java \
   --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/NerLazyCreationRetryTest.java \
   --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/SpladeBackfillOpsTest.java \
   --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/SpladeOptInResumeTest.java
@@ -405,6 +404,9 @@ env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot node scripts/governance/gates/t
   --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentMaterializationTest.java \
   --before 55d37227187f113f06cb6e55b13b3167da30942a
 ```
+
+NerBackfillOpsTest is display-named and nested, so the evidence runner cannot select it; it runs in
+`:modules:worker-services:test`.
 
 ## Builder check observations
 
