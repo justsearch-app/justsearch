@@ -1,31 +1,22 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * jf-sv3-pane — the Search v3 window's citation-inspection pane (tempdoc 822 Phase F8).
+ * jf-sv3-pane — Search's details pane (tempdoc 822 Phase F8; design system §7).
  *
  * Derived from a third-party design system (MIT) — see THIRD-PARTY-NOTICES.md in this directory.
  *
- * A REGION, not a reader. Everything a document needs to be read — the fetch, the rendered/source
- * modes, the provenance header, the close control, and the land-strong-then-settle decay on the cited
- * passage — belongs to the product's ONE reading surface, `components/documentPane/DocumentPane.ts`,
- * which this element mounts by side-effect import (`:112-168`). What is added here is only what the
- * design spec's right panel adds around its own reader: the window-anchored frame, the two
- * presentations the spec's 980px switch chooses between, and the boundary the reader can move.
+ * A REGION, not a reader. The frame — tabs, close, the two presentations — is the shared
+ * `components/detailsPane/DetailsPane.ts`; everything a document needs to be read is the product's ONE
+ * reading surface, `components/documentPane/DocumentPane.ts`. What is added here is what Search puts
+ * in that frame: a tab per cited source, Context (what the assistant sees) and plugin tabs.
  *
- *  - **No second emphasis.** The pane's `HIGHLIGHT_DECAY_MS` (`DocumentPane.ts:95,145,226-244`) is
- *    already the citation landing — re-render-safe and reduced-motion-aware. A highlight of this
- *    window's own would be a fork of an authority that exists.
- *  - **Cited documents only** (F8 scope guard, standing owner directive: search integration is
- *    deferred indefinitely). `docPath` is `attribute: false` — there is no markup, deeplink or
- *    attribute route into this element, and the window's ONE writer of it is the citation handler in
- *    `SearchV3View`. Opening an arbitrary search result, a browse row or a path the reader types is
- *    the DEFERRED boundary, and it stays outside this element: nothing here takes a path from
- *    anywhere but a citation, and the chrome carries no search affordance.
- *  - **Window-scoped, never document-fixed** (the palette's containment precedent): in the narrow
- *    presentation the backdrop dims THIS WINDOW's box and nothing of the shipped shell's chrome.
+ *  - **No second emphasis.** The reader's `HIGHLIGHT_DECAY_MS` is already the citation landing.
+ *  - **`docPath` is `attribute: false`** — no markup, deeplink or attribute route reaches this
+ *    element; the window's ONE writer of it is `SearchV3View.openPane`.
+ *  - **Window-scoped, never document-fixed**: the sheet dims THIS WINDOW's box and nothing of the
+ *    frame's chrome.
  *
- * The shared `pane-close` is stopped here and re-raised as this window's own `sv3-pane-close`, for
- * the same reason the citation event is stopped in `Sv3Main`: a `composed` event from a shared
- * component travels the whole way to the Shell, and this window answers its own regions.
+ * The frame's events are stopped here and re-raised as this window's own, for the reason the citation
+ * event is stopped in `Sv3Main`: this window answers its own regions.
  *
  * Side-effect registers <jf-sv3-pane>.
  */
@@ -37,21 +28,41 @@ import { sv3Shared } from './sv3-shared-styles.js';
 // registration would render an unknown element whenever it was reached first.
 import '../../components/documentPane/DocumentPane.js';
 import type { DocumentCitationAnchor, DocumentLineRange } from '../../components/documentPane/DocumentPane.js';
+import '../../components/detailsPane/DetailsPane.js';
+import type { DetailsPane, DetailsTab } from '../../components/detailsPane/DetailsPane.js';
+import '../../components/detailsPane/DetailsPluginTab.js';
+import { pluginContributionFor } from '../../components/detailsPane/DetailsPluginTab.js';
+import { detailsDocumentActions } from '../../components/detailsPane/detailsDocumentActions.js';
+import '../../components/ContextInspectorPane.js';
+import type { InspectorView } from '../../components/ContextInspectorPane.js';
+import '../../components/Button.js';
 import type { CitationHeader } from '../../components/chat/evidenceProjection.js';
 import { PANE_LABEL } from './fixtures.js';
+import { SV3_PANE_CONTEXT_TAB } from './sv3-details.js';
 
 /** Raised when the pane's own close control is used; the window decides what closing means. */
 export const SV3_PANE_CLOSE = 'sv3-pane-close';
+/** A tab was chosen; `detail.id` is its id. */
+const SV3_PANE_TAB = 'sv3-pane-tab';
+/** Hide or restore the source the pane is showing, in the assistant's context. */
+const SV3_PANE_TOGGLE_HIDDEN = 'sv3-pane-toggle-hidden';
+
+/** The hide/restore control's words for the source on show, or null when it offers none. */
+export interface Sv3PaneSourceControl {
+  readonly label: string;
+  readonly hidden: boolean;
+}
 
 export class Sv3Pane extends JfElement {
   static styles = [
     sv3Shared,
     css`
       /* ── The INLINE presentation (>= 980px) ──────────────────────────────────
-         A flex item of the window grid whose width the host sets from --pane-width; the pane draws
-         only its own edge. Right-anchored by DOM order (last child), so border-inline-start is the
-         boundary between it and the main column — the spec's border-l border-border on
-         bg-background, on our tokens. */
+         A flex item of the window grid whose width the host sets from --pane-width. The neutral
+         surface/text/edge tokens the shared frame and reader read are re-pointed at this window's
+         palette here, so the frame does not enclose a panel wearing the shipped theme. The
+         --accent-tint* family is deliberately NOT re-pointed — those tokens ARE the cited passage's
+         land-strong-then-settle emphasis, whose authority is the reader's own. */
       :host {
         display: block;
         min-inline-size: 0;
@@ -60,25 +71,6 @@ export class Sv3Pane extends JfElement {
         background: var(--background);
         color: var(--foreground);
         font-family: var(--font-sans);
-      }
-      .surface {
-        display: flex;
-        flex-direction: column;
-        block-size: 100%;
-        min-block-size: 0;
-        overflow: hidden;
-        border-inline-start: 1px solid var(--border);
-        background: var(--background);
-      }
-      /* The CLOTHES, and only the clothes (Sv3Main's precedent for the shared markdown block and
-         citations panel): the shared reader's neutral surface/text/edge tokens are re-pointed at this
-         window's palette so the frame does not enclose a panel wearing the shipped theme. The
-         --accent-tint* family is deliberately NOT re-pointed — those tokens ARE the cited passage's
-         land-strong-then-settle emphasis, whose authority is the pane's own. */
-      jf-document-pane {
-        flex: 1 1 auto;
-        min-block-size: 0;
-        overflow: hidden;
         --surface-1: var(--background);
         --surface-2: var(--muted);
         --surface-hover: var(--accent-surface);
@@ -92,74 +84,39 @@ export class Sv3Pane extends JfElement {
         --duration-slow: var(--duration-sv3-layout);
         --ease-standard: var(--ease-sv3-enter);
       }
-      /* Not rendered at all in the inline presentation: a dim over the window is the narrow
-         presentation's own device, and an inert copy of it would still be a node in the flow. */
-      .backdrop {
+      /* Below 980 px the frame positions itself against the WINDOW's box, so this element leaves the
+         box tree. The presentation stays an attribute the window sets from its own measurement, not
+         a @container query: container-type on the window host would make it the containing block
+         for the fixed-position citation hover card (views/unifiedChatStyles.ts records the trap). */
+      :host([overlay]) {
+        display: contents;
+      }
+      .tab-body {
+        flex: 1 1 auto;
+        min-block-size: 0;
+        display: flex;
+        flex-direction: column;
+      }
+      .tab-body[hidden] {
         display: none;
       }
-
-      /* ── The NARROW presentation (< 980px → Sheet) ───────────────────────────
-         WINDOW-SCOPED, not document-fixed — the palette's containment precedent: absolutely
-         positioned against the window host's box, so the dim reaches the window region and nothing of
-         the shipped shell's rail, topbar or status bar.
-
-         Driven by an ATTRIBUTE the window sets from its own measurement, NOT by a @container query,
-         and the reason is recorded rather than worked around: a container query needs
-         container-type on an ancestor, the only ancestor here is the window host, and
-         container-type implies layout containment — which makes the host a containing block for
-         FIXED-position descendants. F7's <jf-citation-hover-card> is exactly that (it is positioned
-         from viewport coordinates, components/chat/CitationHoverCard.ts:45), so declaring the
-         container would silently re-anchor and mis-place every citation preview in the window. This
-         is the trap views/unifiedChatStyles.ts:207-212 already recorded for the same reason. The
-         breakpoint therefore lives ONCE, in sv3-boundaries.ts, where the sidebar's clamp reads the
-         same number — which a duplicated CSS literal could not have guaranteed anyway. */
-      :host([overlay]) {
-        position: absolute;
-        inset: 0;
-        z-index: var(--z-overlay);
-        overflow: visible;
-        background: transparent;
+      jf-document-pane,
+      jf-context-inspector-pane,
+      jf-details-plugin-tab {
+        flex: 1 1 auto;
+        min-block-size: 0;
+        overflow: hidden;
       }
-      :host([overlay]) .backdrop {
-        display: block;
-        position: absolute;
-        inset: 0;
-        border: 0;
-        padding: 0;
-        background: var(--dialog-backdrop);
-        cursor: default;
+      .footer {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-2);
       }
-      :host([overlay]) .surface {
-        position: absolute;
-        inset-block: 0;
-        inset-inline-end: 0;
-        /* The spec's sheet box (w-[min(42vw,28rem)] min-w-80
-           max-w-[28rem]), re-expressed against the WINDOW box: the element spans the host, so 42%
-           here IS the spec's 42vw of the region this window owns. The chosen inline width does not
-           apply — a sheet is not the boundary the reader dragged, which is also why the grip is not
-           rendered in this presentation. */
-        inline-size: min(100%, max(min(42%, 28rem), 20rem));
-        box-shadow: var(--dialog-shadow);
-        /* The spec's 200ms opacity/translate sheet budget. An ENTRY animation
-           rather than a transition, because the pane is mounted only while a document is open — a
-           transition has no "before" to run from. */
-        animation: sv3-pane-in var(--duration-sv3-layout) var(--ease-sv3-enter);
-      }
-      @keyframes sv3-pane-in {
-        from {
-          opacity: 0;
-          transform: translateX(var(--space-8));
-        }
-        to {
-          opacity: 1;
-          transform: translateX(0);
-        }
-      }
-
-      @media (prefers-reduced-motion: reduce) {
-        :host([overlay]) .surface {
-          animation: none;
-        }
+      .no-document {
+        margin: 0;
+        padding: var(--space-6);
+        color: var(--muted-foreground);
+        font-size: var(--font-size-sv3-sm);
       }
     `,
   ];
@@ -171,36 +128,36 @@ export class Sv3Pane extends JfElement {
     citationHeader: { attribute: false },
     apiBase: { type: String, attribute: 'api-base' },
     overlay: { type: Boolean, reflect: true },
+    tabs: { attribute: false },
+    activeTab: { attribute: false },
+    contextView: { attribute: false },
+    selectedItem: { attribute: false },
+    sourceControl: { attribute: false },
   };
 
   /**
-   * The cited document's path. `attribute: false` is the scope guard's structural half: the only way
-   * a path reaches this pane is a property write from the window's citation handler.
+   * The document's path. `attribute: false` is the scope guard's structural half: the only way a path
+   * reaches this pane is a property write from the window.
    */
   declare docPath: string | null;
   /**
    * The cited passage, addressed by the CHARACTER offsets its producer computed (tempdoc 849 §3).
    * Null when the citation carried no span. The reader derives its own line coordinates from this;
-   * nothing here converts, clamps or interprets it — a coordinate conversion in a region element
-   * would be exactly the extra hop the char anchor exists to remove.
+   * nothing here converts, clamps or interprets it.
    */
   declare citation: DocumentCitationAnchor | null;
   declare highlightRange: DocumentLineRange | null;
-  /**
-   * Tempdoc 849 §7 — the citation header, forwarded VERBATIM. This region derives no part of it: the
-   * facts are joined from the turn's own evidence record in `SearchV3View` and worded by
-   * `evidenceProjection.ts`, so a label cannot be re-authored on the way through a frame element.
-   */
+  /** Tempdoc 849 §7 — the citation header, forwarded VERBATIM: this region derives no part of it. */
   declare citationHeader: CitationHeader | null;
   declare apiBase: string;
-  /**
-   * The narrow presentation, decided by the window from its own box (see the styles above for why it
-   * is an attribute and not a container query). NOT forwarded to the shared reader: that component's
-   * own `overlay` attribute sizes it against the browser VIEWPORT (`DocumentPane.ts:433-441` —
-   * `100vh`/`92vw`, for the Shell's document-level right drawer), which is precisely the reach this
-   * window-scoped overlay must not have.
-   */
+  /** The sheet presentation, decided by the window from its own box. */
   declare overlay: boolean;
+  declare tabs: readonly DetailsTab[];
+  /** The active tab's id; null is a closed pane. */
+  declare activeTab: string | null;
+  declare contextView: InspectorView | null;
+  declare selectedItem: unknown;
+  declare sourceControl: Sv3PaneSourceControl | null;
 
   constructor() {
     super();
@@ -210,34 +167,79 @@ export class Sv3Pane extends JfElement {
     this.citationHeader = null;
     this.apiBase = '';
     this.overlay = false;
+    this.tabs = [];
+    this.activeTab = null;
+    this.contextView = null;
+    this.selectedItem = null;
+    this.sourceControl = null;
   }
 
-  private readonly onPaneClose = (event: Event): void => {
+  /** Put the keyboard in the pane. */
+  focusPane(): void {
+    this.renderRoot.querySelector<DetailsPane>('jf-details-pane')?.focusActiveTab();
+  }
+
+  private raise<T>(name: string, detail?: T): void {
+    this.dispatchEvent(new CustomEvent(name, { detail, bubbles: true, composed: true }));
+  }
+
+  private readonly onClose = (event: Event): void => {
     event.stopPropagation();
-    this.dispatchEvent(new CustomEvent(SV3_PANE_CLOSE, { bubbles: true, composed: true }));
+    this.raise(SV3_PANE_CLOSE);
   };
 
+  private readonly onTab = (event: Event): void => {
+    event.stopPropagation();
+    this.raise(SV3_PANE_TAB, (event as CustomEvent<{ id: string }>).detail);
+  };
+
+  private footer(): TemplateResult | typeof nothing {
+    const control = this.sourceControl;
+    if (this.docPath === null || this.activeTab === SV3_PANE_CONTEXT_TAB
+      || pluginContributionFor(this.activeTab ?? '') !== null) return nothing;
+    return html`<div slot="actions" class="footer">
+      ${detailsDocumentActions(this.docPath)}
+      ${control === null ? nothing : html`<jf-button variant="ghost" size="sm" label=${control.label}
+        data-testid="sv3-pane-toggle-hidden" .onActivate=${() => this.raise(SV3_PANE_TOGGLE_HIDDEN)}
+        >${control.hidden ? 'Restore' : 'Hide'}</jf-button>`}
+    </div>`;
+  }
+
   render(): TemplateResult | typeof nothing {
-    if (this.docPath === null) return nothing;
+    const tab = this.activeTab;
+    if (tab === null) return nothing;
+    const plugin = pluginContributionFor(tab);
+    const reading = tab !== SV3_PANE_CONTEXT_TAB && plugin === null;
     return html`
-      <button
-        type="button"
-        class="backdrop"
-        data-testid="sv3-pane-backdrop"
-        aria-label=${PANE_LABEL.dismiss}
-        @click=${this.onPaneClose}
-      ></button>
-      <aside class="surface" data-testid="sv3-pane-surface" aria-label=${PANE_LABEL.region}>
-        <jf-document-pane
-          data-testid="sv3-pane-document"
-          .docPath=${this.docPath}
-          .highlightRange=${this.highlightRange}
-          .citation=${this.citation}
-          .citationHeader=${this.citationHeader}
-          api-base=${this.apiBase}
-          @pane-close=${this.onPaneClose}
-        ></jf-document-pane>
-      </aside>
+      <jf-details-pane
+        ?overlay=${this.overlay}
+        region-label=${PANE_LABEL.region}
+        close-label=${PANE_LABEL.dismiss}
+        .tabs=${this.tabs}
+        .activeTab=${tab}
+        @details-close=${this.onClose}
+        @details-tab-select=${this.onTab}
+      >
+        ${this.docPath === null
+          ? reading ? html`<p class="no-document">Choose a citation in the answer to read it here.</p>` : nothing
+          : html`<div class="tab-body" ?hidden=${!reading}>
+              <jf-document-pane
+                data-testid="sv3-pane-document"
+                .docPath=${this.docPath}
+                .highlightRange=${this.highlightRange}
+                .citation=${this.citation}
+                .citationHeader=${this.citationHeader}
+                api-base=${this.apiBase}
+              ></jf-document-pane>
+            </div>`}
+        ${tab === SV3_PANE_CONTEXT_TAB
+          ? html`<jf-context-inspector-pane data-testid="sv3-pane-context" .view=${this.contextView}></jf-context-inspector-pane>`
+          : nothing}
+        ${plugin === null
+          ? nothing
+          : html`<jf-details-plugin-tab data-testid="sv3-pane-plugin" .contribution=${plugin} .selectedItem=${this.selectedItem}></jf-details-plugin-tab>`}
+        ${this.footer()}
+      </jf-details-pane>
     `;
   }
 }

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "574 §22.F + §23.B — the transient-arbitration register (Move 4). Single-open across the `transient` AND `right-drawer` layers is arbitrated BY CONSTRUCTION: every transient overlay / right-drawer drawer composes the ONE `TransientController` primitive, which bundles the register/closeOthers/unregister triad into the host lifecycle. Because a governed adopter routes its single-open through the controller, the hand-rolled manual triad for that overlay does not exist to drift (the §13 'generation, not grep, is the anti-drift' shape). This gate locks the catalog's POSITIVE coverage: every `adopters` entry must actually compose `TransientController`. A NEW transient is a discovery step — add it to `adopters` + compose the primitive. (`HoverPreviewHost` is intentionally NOT listed: it is timer-driven, not click-opened, so it does not contend for single-open.)",
+  "description": "574 §22.F + §23.B — the transient-arbitration register (Move 4). Single-open across the `transient` layer is arbitrated BY CONSTRUCTION: every transient overlay composes the ONE `TransientController` primitive, which bundles the register/closeOthers/unregister triad into the host lifecycle. Because a governed adopter routes its single-open through the controller, the hand-rolled manual triad for that overlay does not exist to drift (the §13 'generation, not grep, is the anti-drift' shape). This gate locks the catalog's POSITIVE coverage: every `adopters` entry must actually compose `TransientController`. A NEW transient is a discovery step — add it to `adopters` + compose the primitive. (`HoverPreviewHost` is intentionally NOT listed: it is timer-driven, not click-opened, so it does not contend for single-open.)",
   "primitive": {
     "module": "modules/ui-web/src/shell-v0/primitives/transientController.ts",
     "symbol": "TransientController"
@@ -9,9 +9,6 @@
     "modules/ui-web/src/shell-v0/components/ContextMenu.ts",
     "modules/ui-web/src/shell-v0/components/Peek.ts",
     "modules/ui-web/src/shell-v0/chrome/TopBar.ts",
-    "modules/ui-web/src/shell-v0/components/StatusPill.ts",
-    "modules/ui-web/src/shell-v0/components/RetrospectivePanel.ts",
-    "modules/ui-web/src/shell-v0/components/SourcesPane.ts",
-    "modules/ui-web/src/shell-v0/components/FailedJobsDrawer.ts"
+    "modules/ui-web/src/shell-v0/components/StatusPill.ts"
   ]
 }

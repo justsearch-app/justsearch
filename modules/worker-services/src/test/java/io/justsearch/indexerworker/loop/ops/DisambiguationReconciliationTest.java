@@ -236,16 +236,31 @@ class DisambiguationReconciliationTest extends LuceneExecutorTestBase {
       }).when(publisher).publishEnrichmentBatch(anyList(), anyMap(), any());
     }
     if (combined) {
-      CombinedEnrichmentBackfillOps.processCombinedBackfill(new CombinedEnrichmentBackfillOps.BackfillContext(
-          runtime.documentFieldOps(), publisher, runtime.commitOps(), pacing,
-          () -> null, () -> null, () -> ner, () -> true, () -> true, 100,
-          LoggerFactory.getLogger(getClass()), false, false, false, 50,
-          new ArrayDeque<>(), new ArrayDeque<>(), new int[1], () -> false, () -> false,
-          () -> false, new WindowedEmbedProgress()));
+      LaneBackfillTestSupport.runLanes(new LaneBackfillTestSupport.BackfillContext(runtime.documentFieldOps(),
+        publisher,
+        pacing,
+        () -> null,
+        () -> null,
+        () -> ner,
+        () -> true,
+        () -> true,
+        100,
+        LoggerFactory.getLogger(getClass()),
+        false,
+        false,
+        false,
+        50,
+        () -> false,
+        () -> false,
+        new WindowedEmbedProgress()));
     } else {
-      NerBackfillOps.processNerBackfill(new NerBackfillOps.BackfillContext(runtime.documentFieldOps(),
-          publisher, runtime.commitOps(), pacing, () -> ner, () -> true, 100,
-          LoggerFactory.getLogger(getClass())));
+      LaneBackfillTestSupport.runNer(new NerBackfillOps.BackfillContext(runtime.documentFieldOps(),
+        publisher,
+        pacing,
+        () -> ner,
+        () -> true,
+        100,
+        LoggerFactory.getLogger(getClass()), () -> true));
     }
     refresh();
     assertEquals(1, runtime.indexCountOps().countByField(SchemaFields.NER_STATUS, "COMPLETED"));

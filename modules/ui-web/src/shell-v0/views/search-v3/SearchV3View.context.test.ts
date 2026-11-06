@@ -57,6 +57,8 @@ vi.mock('../../state/agentSessionStore.js', () => ({
 }));
 
 import './SearchV3View.js';
+import { __resetUserStateForTest } from '../../state/UserStateDocument.js';
+import type { InspectorView } from '../../components/ContextInspectorPane.js';
 import type { SearchV3View } from './SearchV3View.js';
 import { resetSearchState } from '../../state/searchState.js';
 import {
@@ -68,11 +70,6 @@ import type { StatusSnapshot } from '../../utils/statusPoll.js';
 import { __resetConversationListForTest } from '../../state/conversationListStore.js';
 import { __resetDraftProvidersForTest } from '../../controllers/draftPersistence.js';
 import { __resetDraftKeptForTest } from '../../controllers/draftKeptHint.js';
-import {
-  __resetContextInspectorDrawer,
-  getContextInspectorView,
-  isContextInspectorOpen,
-} from '../../state/contextInspectorDrawer.js';
 import { EPHEMERAL_TOAST_EVENT } from '../../components/advisory/ephemeralToast.js';
 import {
   CONTEXT_COMPACT_FAILED,
@@ -346,11 +343,11 @@ function aiOnline(): void {
 beforeEach(() => {
   sessionStorage.clear();
   localStorage.clear();
+  __resetUserStateForTest();
   __resetConversationListForTest();
   __resetDraftProvidersForTest();
   __resetDraftKeptForTest();
   __resetAiStateForTest();
-  __resetContextInspectorDrawer();
   ctrlExists = false;
   clock = 0;
   backend = {
@@ -381,10 +378,13 @@ afterEach(() => {
   for (const el of [...document.querySelectorAll('jf-context-menu')]) el.remove();
   resetSearchState();
   __resetAiStateForTest();
-  __resetContextInspectorDrawer();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
+
+/** What the details pane's Context tab was given. */
+const contextTabView = (el: HTMLElement): InspectorView | null =>
+  el.shadowRoot?.querySelector('jf-sv3-pane')?.contextView ?? null;
 
 async function settle(el: Mounted): Promise<void> {
   for (let turn = 0; turn < 10; turn += 1) {
@@ -1048,8 +1048,8 @@ describe('how full the context is, and what is in it', () => {
     await press(bar.shadowRoot?.querySelector('[data-testid="sv3-context-meter"]'));
     await settle(el);
 
-    expect(isContextInspectorOpen()).toBe(true);
-    const view = getContextInspectorView();
+    expect(el.paneTab).toBe('context');
+    const view = contextTabView(el);
     const conversation = view?.phases.find((p) => p.name === 'Conversation');
     const texts = conversation?.segments.map((s) => s.text) ?? [];
     // The first turn is above the floor, so the inspector lists the SUMMARY that stands in for it —
@@ -1375,7 +1375,7 @@ describe('a follow-up ask is sent WITH the conversation (S2.0)', () => {
     const bar = await region(el, 'jf-sv3-context-bar');
     await press(bar.shadowRoot?.querySelector('[data-testid="sv3-context-meter"]'));
     await settle(el);
-    const conversation = getContextInspectorView()?.phases.find((p) => p.name === 'Conversation');
+    const conversation = contextTabView(el)?.phases.find((p) => p.name === 'Conversation');
     expect(conversation?.segments.map((s) => s.text)).toEqual([
       'why did the renewal fail?',
       'and the second one?',

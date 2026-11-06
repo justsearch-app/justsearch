@@ -123,7 +123,7 @@ overlay needs; the broken state can't be expressed:
   arbitration (register / closeOthers / unregister over `transientLayerArbiter`)
   + an opt-in outside-click/Escape dismiss (`managesDismiss`, with an optional
   `dismissExclude` predicate for an external opener like a rail badge). Adopters
-  (menus, popovers, **and the right-drawer drawers**) in
+  (menus and popovers) in
   `governance/transients.v1.json`, enforced by `check-transient-arbitration.mjs`.
 
 ## Adding a new presentation concept

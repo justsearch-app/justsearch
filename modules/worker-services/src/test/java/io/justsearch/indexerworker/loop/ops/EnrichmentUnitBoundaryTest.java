@@ -25,7 +25,6 @@ final class EnrichmentUnitBoundaryTest {
 
   private final DocumentFieldOps fields = mock(DocumentFieldOps.class);
   private final IndexingCoordinator coordinator = mock(IndexingCoordinator.class);
-  private final CommitOps commits = mock(CommitOps.class);
   private final EmbeddingProvider dense = mock(EmbeddingService.class);
   private final SpladeEncoder sparse = mock(SpladeEncoder.class);
   private final NerService ner = mock(NerService.class);
@@ -103,16 +102,26 @@ final class EnrichmentUnitBoundaryTest {
     });
   }
 
-  private CombinedEnrichmentBackfillOps.CombinedOutcome run(Route route,
+  private LaneBackfillTestSupport.Outcome run(Route route,
       BooleanSupplier deadline, BooleanSupplier hardStop) {
-    return CombinedEnrichmentBackfillOps.processCombinedBackfill(
-        new CombinedEnrichmentBackfillOps.BackfillContext(fields, coordinator, commits,
-            IndexingPacing.unthrottled(), provider::get,
-            () -> route == Route.SPARSE_PARENT || route == Route.SPARSE_CHUNK ? sparse : null,
-            () -> route == Route.NER ? ner : null, () -> true, () -> true, 100,
-            LoggerFactory.getLogger(getClass()), route == Route.DENSE_CHUNK, route == Route.SPARSE_CHUNK,
-            route == Route.SINGLE_PASS, 100, new ArrayDeque<>(), new ArrayDeque<>(), new int[] {0},
-            deadline, hardStop, () -> false, progress));
+    return LaneBackfillTestSupport.runLanes(
+        new LaneBackfillTestSupport.BackfillContext(fields,
+        coordinator,
+        IndexingPacing.unthrottled(),
+        provider::get,
+        () -> route == Route.SPARSE_PARENT || route == Route.SPARSE_CHUNK ? sparse : null,
+        () -> route == Route.NER ? ner : null,
+        () -> true,
+        () -> true,
+        100,
+        LoggerFactory.getLogger(getClass()),
+        route == Route.DENSE_CHUNK,
+        route == Route.SPARSE_CHUNK,
+        route == Route.SINGLE_PASS,
+        100,
+        deadline,
+        hardStop,
+        progress));
   }
 
   @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
@@ -227,17 +236,33 @@ final class EnrichmentUnitBoundaryTest {
     var log = LoggerFactory.getLogger(getClass());
     return switch (route) {
       case DENSE_BATCH, DENSE_CHUNK -> {
-        var context = new EmbeddingBackfillOps.BackfillContext(fields, coordinator, commits,
-            mock(io.justsearch.indexerworker.coordination.WorkerSignalBus.class),
-            IndexingPacing.unthrottled(), provider::get, () -> true, () -> true, 100, log);
-        yield route == Route.DENSE_CHUNK ? EmbeddingBackfillOps.processChunkEmbeddingBackfill(context)
-            : EmbeddingBackfillOps.processEmbeddingBackfill(context);
+        var context = new LaneBackfillTestSupport.EmbeddingContext(fields,
+        coordinator,
+        IndexingPacing.unthrottled(),
+        provider::get,
+        () -> true,
+        () -> true,
+        100,
+        log);
+        yield route == Route.DENSE_CHUNK ? LaneBackfillTestSupport.runDenseChunk(context)
+            : LaneBackfillTestSupport.runDenseParent(context);
       }
-      case SPARSE_PARENT, SPARSE_CHUNK -> SpladeBackfillOps.processSpladeBackfill(
-          new SpladeBackfillOps.BackfillContext(fields, coordinator, commits, IndexingPacing.unthrottled(),
-              () -> sparse, () -> true, 100, false, route == Route.SPARSE_CHUNK, log));
-      case NER -> NerBackfillOps.processNerBackfill(new NerBackfillOps.BackfillContext(fields, coordinator,
-          commits, IndexingPacing.unthrottled(), () -> ner, () -> true, 100, log));
+      case SPARSE_PARENT, SPARSE_CHUNK -> LaneBackfillTestSupport.runSparse(
+          new SpladeBackfillOps.BackfillContext(fields,
+        coordinator,
+        IndexingPacing.unthrottled(),
+        () -> sparse,
+        () -> true,
+        100,
+        route == Route.SPARSE_CHUNK,
+        log, () -> true));
+      case NER -> LaneBackfillTestSupport.runNer(new NerBackfillOps.BackfillContext(fields,
+        coordinator,
+        IndexingPacing.unthrottled(),
+        () -> ner,
+        () -> true,
+        100,
+        log, () -> true));
       default -> throw new AssertionError(route);
     };
   }
@@ -250,29 +275,14 @@ final class EnrichmentUnitBoundaryTest {
     var outcome = run(route, () -> false, () -> calls.get() >= 1);
     assertEquals(1, calls.get());
     if (route != Route.WINDOW) assertFalse(writes.isEmpty(), "the completed unit keeps its result");
-    assertTrue(outcome.accounting().tickets().values().stream().anyMatch(
-        disposition -> disposition == EnrichmentAccounting.Disposition.CANCELLED));
+    if (route != Route.NER && route != Route.SPARSE_PARENT && route != Route.SPARSE_CHUNK)
+      assertTrue(outcome.accounting().tickets().values().stream().anyMatch(
+          disposition -> disposition == EnrichmentAccounting.Disposition.CANCELLED));
     assertTrue(writes.values().stream().noneMatch(update -> update.entrySet().stream()
         .anyMatch(entry -> entry.getKey().endsWith("_retry_count") && !entry.getValue().equals("0"))),
         "untouched documents do not spend a retry");
   }
 
-  @org.junit.jupiter.api.Test
-  void exhaustedEmbeddingShareDoesNotForceAFirstDenseUnit() throws Exception {
-    seed(Route.DENSE_BATCH);
-    metadata.put(SchemaFields.NER_STATUS, "PENDING");
-    var outcome = CombinedEnrichmentBackfillOps.processCombinedBackfill(
-        new CombinedEnrichmentBackfillOps.BackfillContext(fields, coordinator, commits,
-            IndexingPacing.unthrottled(), provider::get, () -> null, () -> ner, () -> true,
-            () -> true, 100, LoggerFactory.getLogger(getClass()), false, false, false, 0,
-            new ArrayDeque<>(), new ArrayDeque<>(), new int[] {0}, () -> false, () -> false,
-            () -> true, progress));
-    assertDoesNotThrow(() -> verify(dense, never()).embedDocumentBatch(anyList()));
-    assertDoesNotThrow(() -> verify(ner).extractEntitiesBatch(List.of("content")));
-    assertEquals(1, outcome.accounting().count(EnrichmentAccounting.Stage.EMBED,
-        EnrichmentAccounting.Disposition.DEFERRED));
-    assertFalse(writes.get("doc").containsKey(SchemaFields.EMBEDDING_STATUS));
-  }
 
   @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})

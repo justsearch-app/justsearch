@@ -59,7 +59,7 @@ import { Sv3ComposerPort } from './Sv3ComposerPort.js';
 import { flushPendingNavigationWrite, refreshProjection } from '../../router/URLProjector.js';
 import { registerViewFactory, getViewFactory } from '../../router/viewFactoryRegistry.js';
 import { CORE_INTERACTION_SHAPES, ONE_WINDOW_MOUNT_TAG } from '../../plugin-api/coreInteractionShapes.js';
-import { subscribeInspector, setOpen as setInspectorOpen } from '../../state/inspectorState.js';
+import { subscribeInspector, setOpen as setInspectorOpen, getInspectorState } from '../../state/inspectorState.js';
 import type { DocumentLineRange } from '../../components/documentPane/DocumentPane.js';
 import { peekSearchV3Handoff, takeSearchV3Handoff } from '../../utils/compose.js';
 import { html, css, nothing, type TemplateResult } from 'lit';
@@ -212,14 +212,8 @@ import {
 } from '../../state/conversationListStore.js';
 // The product's ONE confirm dialog. Cascade-delete asks a second question — "and its branches?" —
 // and asking it in a second dialect would be a second dismiss rule for the same gesture.
-// Tempdoc 610 §K — the SHELL-mounted context inspector. The window pushes the projection and opens
-// the drawer; the drawer is the product's one "what did the assistant actually see" surface and is
-// not re-implemented here.
-import {
-  isContextInspectorOpen,
-  setContextInspectorView,
-  toggleContextInspector,
-} from '../../state/contextInspectorDrawer.js';
+import { Sv3DetailsDomain } from './sv3-details-domain.js';
+import { SV3_PANE_CONTEXT_TAB, SV3_PANE_DOCUMENT_TAB, sv3SourceTab } from './sv3-details.js';
 // The product's ONE overflow-menu primitive (slice 458). A window-local menu would be a second
 // keyboard model and a second dismiss rule for the same gesture.
 import { openContextMenu } from '../../components/ContextMenu.js';
@@ -260,16 +254,9 @@ import {
   type Sv3RunView,
 } from './sv3-run.js';
 import { type Sv3CitationOpen, type Sv3RunDecision, type Sv3StopState } from './Sv3Main.js';
-import {
-  sameCitationHeader,
-  type CitationHeader,
-} from '../../components/chat/evidenceProjection.js';
+import type { CitationHeader } from '../../components/chat/evidenceProjection.js';
 import type { DocumentCitationAnchor } from '../../components/documentPane/DocumentPane.js';
-import {
-  sv3CitationHeader,
-  sv3MatchedSentence,
-  SV3_SOURCE_INDEX_ABSENT,
-} from './sv3-citation-anchor.js';
+import { SV3_SOURCE_INDEX_ABSENT } from './sv3-citation-anchor.js';
 import { setAiActivity, subscribeAiState, type AiState } from '../../state/aiStateStore.js';
 import { selectIndexingProgress } from '../../state/indexingProgress.js';
 import '../../components/IndexingControls.js';
@@ -365,6 +352,13 @@ const openControlMenuInPath = (event: KeyboardEvent): boolean =>
     // control row", not "the effort menu is open" — a mode menu that Escape closed by falling
     // through to the window would take the composer back to hero with it.
     return el.effortMenuOpen === true || el.tierMenuOpen === true;
+  });
+
+/** Is the keystroke coming out of a result list whose Space preview is open? It closes itself first. */
+const previewOpenInPath = (event: KeyboardEvent): boolean =>
+  event.composedPath().some((node) => {
+    const el = node as Element & { previewOpen?: unknown };
+    return el.localName === 'jf-sv3-results' && el.previewOpen === true;
   });
 
 export class SearchV3View extends JfElement {
@@ -742,6 +736,7 @@ export class SearchV3View extends JfElement {
     shapeId: { type: String, attribute: 'shape-id' },
     paneHighlight: { state: true },
     paneDocPath: { state: true },
+    paneTab: { state: true },
     paneCitation: { state: true },
     paneCitationHeader: { state: true },
     paneSource: { state: true },
@@ -810,6 +805,8 @@ export class SearchV3View extends JfElement {
   private inspectorUnsubscribe: (() => void) | null = null;
   private readonly draftPersistence: DraftPersistence;
   declare paneDocPath: string | null;
+  /** The details pane's active tab; null is a closed pane. Context needs no document, so this is what says open. */
+  declare paneTab: string | null;
   /**
    * The cited passage in CHARACTER coordinates, handed to the reader as its anchor (tempdoc 849 §3).
    * The reader derives its own lines from it; this window converts nothing.
@@ -976,6 +973,20 @@ export class SearchV3View extends JfElement {
   }, this.composerDraft);
   private readonly draftController = new Sv3DraftController(this, this.draftDomain);
 
+  private readonly details: Sv3DetailsDomain = new Sv3DetailsDomain({
+    sessions: () => this.sessions,
+    pane: () => this,
+    sharedInspector: () => this.sharedInspectorPath !== null,
+    openPane: detail => this.openPane(detail),
+    preparePaneBox: () => this.preparePaneBox(),
+    dismissPane: () => this.dismissPane(),
+    owns: node => this.ownsNode(node),
+    paneElement: () => this.shadowRoot?.querySelector('jf-sv3-pane') ?? null,
+    focusComposer: () => void this.focusComposer(),
+    whenUpdated: () => this.updateComplete,
+    requestUpdate: () => this.requestUpdate(),
+  });
+
   private readonly contextDomain: Sv3ContextDomain = new Sv3ContextDomain({
     activeConversationId: () => this.sessions.activeId,
     session: id => sessionById(this.sessions, id),
@@ -994,7 +1005,7 @@ export class SearchV3View extends JfElement {
     retryRecords: () => this.runDomain.retryRecords(),
     noteRefusedWhileLocked: () => this.noteRefusedWhileLocked(),
     revokeHumanTask: () => this.draftDomain.revokeHumanTask(),
-    openContextInspector: () => this.openContextInspector(),
+    openContextInspector: () => this.details.openContext(),
     announceWarning: message => emitEphemeralToast({ message, severity: 'warning' }),
     requestUpdate: () => this.requestUpdate(),
   }, {
@@ -1109,7 +1120,11 @@ export class SearchV3View extends JfElement {
     forgetCompletionOwner: () => this.forgetCompletionOwner,
     paneDocPath: () => this.paneDocPath,
     closePane: () => this.closePane(),
-    openResult: docPath => this.openPane({ docPath, anchor: null, turnId: '', sourceIndex: SV3_SOURCE_INDEX_ABSENT }),
+    openResult: docPath => {
+      this.details.rememberOpener();
+      this.openPane({ docPath, anchor: null, turnId: '', sourceIndex: SV3_SOURCE_INDEX_ABSENT });
+      if (this.paneOverlay) this.details.focusPane();
+    },
     announceWarning: message => emitEphemeralToast({ message, severity: 'warning' }),
     confirmForget,
     publishForgetCompletion: detail => publishForgetCompletion(this, detail.apiBase, detail.outcome, detail.owner),
@@ -1134,6 +1149,8 @@ export class SearchV3View extends JfElement {
     revealRecoveryOutcome: () => this.revealRecoveryOutcome(),
     invalidateForkReads: (loading, changed) => this.branchDomain.invalidateForkReads(loading, changed),
     resetProfilePresentation: () => {
+      // What was on show belonged to the profile left behind (C4).
+      this.clearPane();
       this.composer?.closeRecents();
       resetSearchState();
       clearFilters();
@@ -1193,6 +1210,7 @@ export class SearchV3View extends JfElement {
     this.sidebarNarrow = false;
     this.resizing = false;
     this.paneDocPath = null;
+    this.paneTab = null;
     this.paneHighlight = null;
     this.paneCitation = null;
     this.paneSource = null;
@@ -1267,8 +1285,13 @@ export class SearchV3View extends JfElement {
     this.draftDomain.settleMountDraft();
     this.draftController.connect();
     this.inspectorUnsubscribe = subscribeInspector(state => {
+      // Another window's selection stays in that window's details (C4).
+      if (state.owner !== null && state.owner !== SV3_SURFACE_KEY) return;
       if (state.isOpen && state.selected?.path) {
+        const opening = this.paneTab === null;
+        if (opening) this.details.rememberOpener();
         this.openPane({ docPath: state.selected.path, turnId: '', sourceIndex: SV3_SOURCE_INDEX_ABSENT, anchor: null });
+        if (opening && this.paneOverlay) this.details.focusPane();
         this.paneSource = null;
         this.paneCitationHeader = null;
         this.sharedInspectorPath = state.selected.path;
@@ -1291,7 +1314,9 @@ export class SearchV3View extends JfElement {
     // here by construction — there is no "is the focus inside?" test to get wrong. Capture phase so
     // the palette's own field cannot swallow the chord before the window sees it.
     this.addEventListener('keydown', this.onHostKeydown, true);
+    this.addEventListener('click', this.details.onHostClick, true);
     this.addEventListener('focusout', this.onHostFocusOut);
+    this.details.connect();
     // Tempdoc 864 Layer 1(c2), PR B — Ctrl+L / '/' dispatch `jf-focus-composer` on `window`
     // (`chrome/Shell.ts`, `shell.focus-composer`); `UnifiedChatView` is the only other listener
     // (`views/UnifiedChatView.ts` connectedCallback). Routed through the SAME `focusComposer()` as
@@ -1387,6 +1412,8 @@ export class SearchV3View extends JfElement {
     this.observedDock = null;
     this.observedRecentList = null;
     this.removeEventListener('keydown', this.onHostKeydown, true);
+    this.removeEventListener('click', this.details.onHostClick, true);
+    this.details.disconnect();
     this.removeEventListener('focusout', this.onHostFocusOut);
     window.removeEventListener('jf-focus-composer', this.onFocusComposerEvent);
     window.removeEventListener('sv3-handoff', this.draftDomain.receiveHandoff);
@@ -1546,9 +1573,10 @@ export class SearchV3View extends JfElement {
   protected override willUpdate(changed: Map<string, unknown>): void {
     const previousSessions = changed.get('sessions') as Sv3SessionList | undefined;
     if (previousSessions && previousSessions.activeId !== this.sessions.activeId) this.search.leaveForgetPlacement();
-    if (changed.has('sessions')) { this.upgradeOpenPaneAnchor(); }
+    if (changed.has('sessions')) { this.details.upgradeOpenPaneAnchor(); this.details.syncConversation(); }
+    if (changed.has('paneOverlay') && this.paneOverlay) this.details.keepKeyboardInSheet();
     this.branchController.update();
-    if (changed.has('sidebarWidthPx') || changed.has('paneWidthPx') || changed.has('paneDocPath')) {
+    if (changed.has('sidebarWidthPx') || changed.has('paneWidthPx') || changed.has('paneTab')) {
       this.reflowSidebar();
     }
     // Here rather than in the store's callback: by now a first connect has also restored the saved
@@ -1577,10 +1605,6 @@ export class SearchV3View extends JfElement {
     // The restored draft reaches the composer on the first update that produced one. Once only: a
     // later re-application would clobber what the reader has typed since.
     this.composerDraft.flushSeed();
-    // Tempdoc 610 §K — keep the OPEN inspector current. Its subject is "what the last turn sent", so
-    // a new turn, a moved floor or a hidden turn changes it; a drawer left showing the previous
-    // answer's prompt would be the stalest possible answer to the one question it exists to answer.
-    if (isContextInspectorOpen()) setContextInspectorView(this.contextDomain.buildContextInspectorView());
   }
 
   private revealRecoveryOutcome(): void {
@@ -1688,16 +1712,6 @@ export class SearchV3View extends JfElement {
   }
 
   /**
-   * Tempdoc 610 §K — open the shared inspector on what the last completed turn actually sent. The
-   * projection is pushed rather than subscribed to, the same way the shipped window does it, and it
-   * is re-pushed on every update while the drawer is open so a new turn does not leave it stale.
-   */
-  private openContextInspector(): void {
-    setContextInspectorView(this.contextDomain.buildContextInspectorView());
-    toggleContextInspector();
-  }
-
-  /**
    * D3 — the COLD-LOAD half of run recovery. F3 closed the same-instance half (presence adopts a run
    * the shared controller still holds); this closes the half a full page load opens, where the
    * controller singleton is gone with the tab that made it. What survives a page load is the run
@@ -1792,7 +1806,7 @@ export class SearchV3View extends JfElement {
   }
 
   private paneOccupiedWidth(available: number): number {
-    return sv3PaneOccupiedWidth(this.paneDocPath === null ? null : this.paneWidthPx, available);
+    return sv3PaneOccupiedWidth(this.paneTab === null ? null : this.paneWidthPx, available);
   }
 
   /**
@@ -2051,71 +2065,30 @@ export class SearchV3View extends JfElement {
   private onCitationOpen(event: Event): void {
     const detail = (event as CustomEvent<Sv3CitationOpen>).detail;
     if (!detail?.docPath) return;
+    this.details.rememberOpener();
     this.openPane(detail);
+    this.details.focusPane();
   }
 
-  private openPane(detail: Sv3CitationOpen): void {
-    this.sharedInspectorPath = null;
+  /** The box the pane opens into: re-clamped on every open, since the window or sidebar may have moved. */
+  private preparePaneBox(): void {
     const available = this.availableWidth();
     this.paneOverlay = !sv3PaneIsInline(available);
     this.paneWidthPx = clampSv3PaneWidth(this.paneWidthPx, available, this.sidebarOccupiedWidth());
     this.applyPaneWidth(this.paneWidthPx);
+  }
+
+  private openPane(detail: Sv3CitationOpen): void {
+    this.sharedInspectorPath = null;
+    this.preparePaneBox();
     this.paneDocPath = detail.docPath;
+    this.paneTab = detail.sourceIndex === SV3_SOURCE_INDEX_ABSENT ? SV3_PANE_DOCUMENT_TAB : sv3SourceTab(detail.sourceIndex);
     this.paneHighlight = null;
     this.paneCitation = detail.anchor ?? null;
     this.paneSource = { turnId: detail.turnId, sourceIndex: detail.sourceIndex,
       ...(detail.sourceUnavailable ? { sourceUnavailable: detail.sourceUnavailable } : {}) };
-    this.paneCitationHeader = this.headerFor(detail.turnId, detail.sourceIndex, this.paneCitation);
-  }
-
-  /**
-   * Tempdoc 849 §7 — the citation header for the turn/source the pane is showing. One helper, two
-   * callers, for the same reason `sv3CitationAnchor` has two: the header is resolved when the
-   * citation is followed and AGAIN when a late claim match changes what may be said about it, and
-   * the two answers must be produced by the same join.
-   */
-  private headerFor(
-    turnId: string,
-    sourceIndex: number,
-    anchor: DocumentCitationAnchor | null,
-  ): CitationHeader | null {
-    const turn = activeTurns(this.sessions).find((candidate) => candidate.id === turnId) ?? null;
-    return sv3CitationHeader(turn, sourceIndex, anchor);
-  }
-
-  /**
-   * Tempdoc 849 §4 — the late claim match. A citation followed while the answer is still streaming
-   * has a retrieved chunk and no matched sentence, so the pane opens tinting the passage; when
-   * `rag.citation_matches` lands, the open pane gains its sentence and lands the strong emphasis.
-   *
-   * Only the OPEN pane's own source is upgraded, and only from `null` — a match for a different
-   * source does not touch it, and a pane that already has its sentence is not re-anchored by a later
-   * projection of the same turn. The reader's `armedHighlightKey` guard does the rest: the new,
-   * distinct range arms the strong phase exactly once.
-   */
-  private upgradeOpenPaneAnchor(): void {
-    const source = this.paneSource;
-    if (source === null || source.sourceIndex === SV3_SOURCE_INDEX_ABSENT) return;
-    const anchor = this.paneCitation;
-
-    // The ANCHOR upgrade, which needs an anchor to upgrade and a sentence it does not yet have.
-    if (anchor !== null && anchor.sentenceText === null) {
-      const turn = activeTurns(this.sessions).find((c) => c.id === source.turnId) ?? null;
-      const sentence = sv3MatchedSentence(turn, source.sourceIndex);
-      if (sentence !== null) this.paneCitation = { ...anchor, sentenceText: sentence };
-    }
-
-    // The HEADER refresh, which needs neither (review LOW-5). The two used to share one early
-    // return, so a pane opened on an UNUSABLE span — `citation === null`, exactly the S10 case this
-    // slice added — was excluded from the header refresh forever: its grounding line stayed frozen
-    // at "Retrieved · not cited" no matter what the matcher later found. A citation with no usable
-    // position is still a citation whose source can be grounded, and the header is the only thing
-    // that can say so.
-    const next = this.headerFor(source.turnId, source.sourceIndex, this.paneCitation);
-    // Written only on a real change: this runs on every `sessions` update, i.e. every streamed
-    // chunk, and a fresh object each time would re-render the reader continuously for a header
-    // whose words never moved.
-    if (!sameCitationHeader(this.paneCitationHeader, next)) this.paneCitationHeader = next;
+    this.paneCitationHeader = this.details.headerFor(detail.turnId, detail.sourceIndex, this.paneCitation);
+    this.details.remember(true);
   }
 
   /** A place change retires its own citation, while a shared inspector belongs to its caller. */
@@ -2125,14 +2098,27 @@ export class SearchV3View extends JfElement {
 
   /** Explicit dismissal closes both the visible reader and the shared inspector projection. */
   private dismissPane(): void {
+    this.details.remember(false);
+    const giveBack = this.details.takeFocusReturn();
     this.clearPane();
-    setInspectorOpen(false);
+    // A document another window holds stays open there (C4).
+    const { owner } = getInspectorState();
+    if (owner === null || owner === SV3_SURFACE_KEY) setInspectorOpen(false);
+    void this.updateComplete.then(giveBack);
+  }
+
+  /** Close from outside the window (Escape with the keyboard on the page). False when none is open. */
+  closeDetails(): boolean {
+    if (this.paneTab === null) return false;
+    this.dismissPane();
+    return true;
   }
 
   private clearPane(): void {
     this.sharedInspectorPath = null;
     this.paneHighlight = null;
     this.paneDocPath = null;
+    this.paneTab = null;
     this.paneCitation = null;
     this.paneSource = null;
     this.paneCitationHeader = null;
@@ -2158,7 +2144,8 @@ export class SearchV3View extends JfElement {
     // transient the reader is inside, it closes itself (`Sv3Composer.onMenuKeydown`), and without
     // this yield the same keystroke would close the PANE behind it (F9's DEFECT-7, one control on).
     if (event.key === 'Escape' && openControlMenuInPath(event)) return;
-    if (event.key === 'Escape' && this.paneDocPath !== null) {
+    if (event.key === 'Escape' && previewOpenInPath(event)) return;
+    if (event.key === 'Escape' && !event.isComposing && this.paneTab !== null) {
       event.preventDefault();
       event.stopPropagation();
       this.dismissPane();
@@ -2675,7 +2662,7 @@ export class SearchV3View extends JfElement {
    * and a second reader of the api base.
    */
   private pane(): TemplateResult | typeof nothing {
-    if (this.paneDocPath === null) return nothing;
+    if (this.paneTab === null) return nothing;
     // The grip is not rendered at all in the overlay presentation, rather than hidden: an overlaid
     // sheet has no boundary to move, and a `display: none` button would still be a control the
     // element tree carries around (and a tab stop the moment a rule stopped applying).
@@ -2699,9 +2686,16 @@ export class SearchV3View extends JfElement {
         .highlightRange=${this.paneHighlight}
         .citation=${this.paneCitation}
         .citationHeader=${this.paneCitationHeader}
+        .tabs=${this.details.tabs()}
+        .activeTab=${this.paneTab}
+        .contextView=${this.paneTab === SV3_PANE_CONTEXT_TAB ? this.contextDomain.buildContextInspectorView() : null}
+        .selectedItem=${this.details.selection()}
+        .sourceControl=${this.details.sourceControl()}
         ?overlay=${this.paneOverlay}
         api-base=${this.apiBase}
         @sv3-pane-close=${this.dismissPane}
+        @sv3-pane-tab=${this.details.onPaneTab}
+        @sv3-pane-toggle-hidden=${() => void this.details.toggleHidden()}
       ></jf-sv3-pane>`)}
     `;
   }
@@ -2748,6 +2742,8 @@ export class SearchV3View extends JfElement {
         .groups=${sessionGroups}
         .renamingId=${this.renamingId}
         ?collapsed=${this.sidebarCollapsed}
+        api-base=${this.apiBase}
+        ?inert=${this.paneOverlay && this.paneTab !== null}
         data-testid="sv3-sidebar"
         @sv3-session-select=${this.onSessionSelect}
         @sv3-session-export=${this.exportActiveConversation}
@@ -2771,6 +2767,7 @@ export class SearchV3View extends JfElement {
       <div
         class="column"
         data-testid="sv3-column"
+        ?inert=${this.paneOverlay && this.paneTab !== null}
         @sv3-composer-assignment=${this.draftDomain.onHumanAssignment}
         @sv3-composer-state-request=${this.onStateRequest}
         @sv3-schema-change=${(event: CustomEvent<{ text: string }>) => this.draftDomain.changeSchema(event.detail.text)}

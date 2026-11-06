@@ -1,0 +1,4004 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-06T09:16:02.342Z",
+  "revision": "97d636c16ca300ec7dc94b52a38ff208ec63e720",
+  "tree": "d1dc9690b87e8b15e7d60c7428884180230d778e",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.CombinedChunkPublicationTest\" --tests \"io.justsearch.indexerworker.loop.EnrichmentLaneDecompositionTest\" --tests \"io.justsearch.indexerworker.loop.ops.BlankChunkReadinessIntegrationTest\" --tests \"io.justsearch.indexerworker.loop.ops.BulkEncodeUrgencyTest\" --tests \"io.justsearch.indexerworker.loop.ops.BulkPacePolicyUseTest\" --tests \"io.justsearch.indexerworker.loop.ops.BulkPaceStretchTest\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentBackfillOpsTest\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentCycleBudgetTest\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentFailureAccountingTest\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentLongDocumentTest\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentRmwIntegrationTest\" --tests \"io.justsearch.indexerworker.loop.ops.DisambiguationReconciliationTest\" --tests \"io.justsearch.indexerworker.loop.ops.EmbeddingBackfillOpsTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentAttemptAccountingTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentAuthorityRaceTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentExclusionPublicationTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentHardStopRepairTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentInternalStopTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentMapperDispositionTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentPreservationTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentPublicationBenchmarkTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentQuarantineProgressTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentRevisionRaceTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest\" --tests \"io.justsearch.indexerworker.loop.ops.NerLazyCreationRetryTest\" --tests \"io.justsearch.indexerworker.loop.ops.SpladeBackfillOpsTest\" --tests \"io.justsearch.indexerworker.loop.ops.SpladeOptInResumeTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 77971
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/CombinedChunkPublicationTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/CombinedChunkPublicationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4dab1fbd57010aea173db170abed579b532f3cd31b4a0edf29ea0a745240aa7e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "refresh after publication = false",
+          "status": "passed"
+        },
+        {
+          "name": "refresh after publication = true",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/EnrichmentLaneDecompositionTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/EnrichmentLaneDecompositionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:245cd908764b5afeaf211609234ec9c1cdc45137fcd335fa61187c79aefd2150",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "sparseLanesKeepIndependentCursorsThroughArrivalsRefreshAndDeferredSuffixes()",
+          "status": "passed"
+        },
+        {
+          "name": "boundedNerUnitPublishesOneDocumentAndKeepsItsCursor()",
+          "status": "passed"
+        },
+        {
+          "name": "individualNativeUnitKeepsItsExistingIngestionCancellationPolicy()",
+          "status": "passed"
+        },
+        {
+          "name": "boundedDenseUnitsRetainTheNextNativeOperation(String) [1] windows",
+          "status": "passed"
+        },
+        {
+          "name": "boundedDenseUnitsRetainTheNextNativeOperation(String) [2] fallback",
+          "status": "passed"
+        },
+        {
+          "name": "acquisitionFailureHoldsProviderWithoutRetryChargeAndPeersContinue(String, boolean, String) [1] dense, false, batch",
+          "status": "passed"
+        },
+        {
+          "name": "acquisitionFailureHoldsProviderWithoutRetryChargeAndPeersContinue(String, boolean, String) [2] dense, true, batch",
+          "status": "passed"
+        },
+        {
+          "name": "acquisitionFailureHoldsProviderWithoutRetryChargeAndPeersContinue(String, boolean, String) [3] ner, false, batch",
+          "status": "passed"
+        },
+        {
+          "name": "acquisitionFailureHoldsProviderWithoutRetryChargeAndPeersContinue(String, boolean, String) [4] ner, true, batch",
+          "status": "passed"
+        },
+        {
+          "name": "acquisitionFailureHoldsProviderWithoutRetryChargeAndPeersContinue(String, boolean, String) [5] bge, false, batch",
+          "status": "passed"
+        },
+        {
+          "name": "acquisitionFailureHoldsProviderWithoutRetryChargeAndPeersContinue(String, boolean, String) [6] dense, false, window",
+          "status": "passed"
+        },
+        {
+          "name": "acquisitionFailureHoldsProviderWithoutRetryChargeAndPeersContinue(String, boolean, String) [7] dense, true, window",
+          "status": "passed"
+        },
+        {
+          "name": "acquisitionFailureHoldsProviderWithoutRetryChargeAndPeersContinue(String, boolean, String) [8] dense, false, single",
+          "status": "passed"
+        },
+        {
+          "name": "acquisitionFailureHoldsProviderWithoutRetryChargeAndPeersContinue(String, boolean, String) [9] dense, true, single",
+          "status": "passed"
+        },
+        {
+          "name": "acquisitionFailureHoldsProviderWithoutRetryChargeAndPeersContinue(String, boolean, String) [10] dense, false, fallback",
+          "status": "passed"
+        },
+        {
+          "name": "acquisitionFailureHoldsProviderWithoutRetryChargeAndPeersContinue(String, boolean, String) [11] dense, true, fallback",
+          "status": "passed"
+        },
+        {
+          "name": "combinedDenseRetainsClassificationAndWindowOffsetsThroughIdleCycles()",
+          "status": "passed"
+        },
+        {
+          "name": "bothDenseCallersPublishReferencePoolingAndPreserveSparsePayload(boolean, boolean) [1] false, false",
+          "status": "passed"
+        },
+        {
+          "name": "bothDenseCallersPublishReferencePoolingAndPreserveSparsePayload(boolean, boolean) [2] false, true",
+          "status": "passed"
+        },
+        {
+          "name": "bothDenseCallersPublishReferencePoolingAndPreserveSparsePayload(boolean, boolean) [3] true, false",
+          "status": "passed"
+        },
+        {
+          "name": "bothDenseCallersPublishReferencePoolingAndPreserveSparsePayload(boolean, boolean) [4] true, true",
+          "status": "passed"
+        },
+        {
+          "name": "individualDenseUsesTheSameRetainedRoutesAndWindowKernel()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/BlankChunkReadinessIntegrationTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/BlankChunkReadinessIntegrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7f79ffef67642b0d0da8e5cd4e25c24572d9d5d0f4975dc1230c42042b58180f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "blankChunkChargesRetryOnlyWhileSelectedProviderRemainsReady(boolean, ReadinessChange) [1] false, NONE",
+          "status": "passed"
+        },
+        {
+          "name": "blankChunkChargesRetryOnlyWhileSelectedProviderRemainsReady(boolean, ReadinessChange) [2] false, RETIRED",
+          "status": "passed"
+        },
+        {
+          "name": "blankChunkChargesRetryOnlyWhileSelectedProviderRemainsReady(boolean, ReadinessChange) [3] false, REPLACED",
+          "status": "passed"
+        },
+        {
+          "name": "blankChunkChargesRetryOnlyWhileSelectedProviderRemainsReady(boolean, ReadinessChange) [4] false, WRITES_BLOCKED",
+          "status": "passed"
+        },
+        {
+          "name": "blankChunkChargesRetryOnlyWhileSelectedProviderRemainsReady(boolean, ReadinessChange) [5] true, NONE",
+          "status": "passed"
+        },
+        {
+          "name": "blankChunkChargesRetryOnlyWhileSelectedProviderRemainsReady(boolean, ReadinessChange) [6] true, RETIRED",
+          "status": "passed"
+        },
+        {
+          "name": "blankChunkChargesRetryOnlyWhileSelectedProviderRemainsReady(boolean, ReadinessChange) [7] true, REPLACED",
+          "status": "passed"
+        },
+        {
+          "name": "blankChunkChargesRetryOnlyWhileSelectedProviderRemainsReady(boolean, ReadinessChange) [8] true, WRITES_BLOCKED",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/BulkEncodeUrgencyTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/BulkEncodeUrgencyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8ef064535d719f2fb547623e5551e0d9a59f8bf84b336fca834156a7f9cbdacd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "parentEmbeddingBackfillFallbackAcquiresBackground()",
+          "status": "passed"
+        },
+        {
+          "name": "inlineDocumentEmbeddingAcquiresBackground(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "bgeM3BackfillFallbackAcquiresBackground()",
+          "status": "passed"
+        },
+        {
+          "name": "spladeBackfillFallbackAcquiresBackground()",
+          "status": "passed"
+        },
+        {
+          "name": "nerBackfillAcquiresBackground()",
+          "status": "passed"
+        },
+        {
+          "name": "chunkEmbeddingBackfillFallbackAcquiresBackground()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/BulkPacePolicyUseTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/BulkPacePolicyUseTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:466800590ade2a81b2168d0c40a21561e3c471eaa49edf8911d2646613a9a177",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "eachPhaseIsSlicedAtTheSizeThePolicyNames()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/BulkPaceStretchTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/BulkPaceStretchTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7ecf7bcb6e6fa09ee6c87e0fa7a4d4298146fa700ba3015c1fd307df180badd1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "spladeBackfillPacesAtLeastEverySecondOfGpuWork()",
+          "status": "passed"
+        },
+        {
+          "name": "combinedBackfillPacesAtLeastEverySecondOfGpuWork()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOpsTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOpsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:80d559c70e2b9ad263fa899e56172bcd0e91cdb74debb54846ab494472aa43eb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "NER failure increments retry count then reaches FAILED at NER_MAX_RETRIES",
+          "status": "passed"
+        },
+        {
+          "name": "late-chunking flag ON: embedWithSpans returns null (content exceeds the raised single-pass limit) — folds INLINE into resumable document windows, still ONE bundled write for the parent",
+          "status": "passed"
+        },
+        {
+          "name": "all three encoders in one cycle: an embedding failure for a doc does not clobber that same doc's successful SPLADE/NER writes, and everything flushes in one batched write",
+          "status": "passed"
+        },
+        {
+          "name": "tempdoc 717 (P1): a persistently blank-content chunk reaches FAILED at max retries and stops being reselected",
+          "status": "passed"
+        },
+        {
+          "name": "blank-content escalation: writes every cycle, but progressed() is false until the terminal FAILED step (tempdoc 798 F2)",
+          "status": "passed"
+        },
+        {
+          "name": "tempdoc 717 (P1): a blank-content chunk is escalated (retry), never marked COMPLETED without a vector",
+          "status": "passed"
+        },
+        {
+          "name": "acceptedPartialPublicationReleasesOnlyItsOwnerBesideWithheldPeer()",
+          "status": "passed"
+        },
+        {
+          "name": "completedParentSplade_deadlineAfterEmbedding_preservesAndPublishes()",
+          "status": "passed"
+        },
+        {
+          "name": "chunk-SPLADE flag ON, parent-lane pickup (splade-status query): a splade-PENDING chunk doc is encoded from its reconstructed parent slice and completed in ONE bundled write",
+          "status": "passed"
+        },
+        {
+          "name": "late-chunking flag OFF: strict no-op vs today — combined pass embeds a chunked parent via the ordinary windowed batch, embedWithSpans is never called",
+          "status": "passed"
+        },
+        {
+          "name": "chunk-SPLADE flag OFF: a chunk's splade_status must not consume a batch slot the parent backlog needs — the splade-pending selection excludes chunk documents",
+          "status": "passed"
+        },
+        {
+          "name": "chunkSpladeOn_chunkLane_preservesCompletedSpladeWithoutReencoding()",
+          "status": "passed"
+        },
+        {
+          "name": "mixed batch: one doc succeeds and one fails, each gets the right per-doc update, in a single batched write",
+          "status": "passed"
+        },
+        {
+          "name": "embedding failure increments retry count on the batched write (no status change)",
+          "status": "passed"
+        },
+        {
+          "name": "embedding success path is unchanged: vector written, retry count reset to 0",
+          "status": "passed"
+        },
+        {
+          "name": "SPLADE failure increments retry count then reaches FAILED at SPLADE_MAX_RETRIES",
+          "status": "passed"
+        },
+        {
+          "name": "realPendingSpladeAllowsDeferralButNeverWritesThePreservationOnlyUpdate()",
+          "status": "passed"
+        },
+        {
+          "name": "spladeBatchPartialResult_escalatesOnlyTheAttemptedSlice()",
+          "status": "passed"
+        },
+        {
+          "name": "chunk-SPLADE flag ON: a splade-FAILED chunk doc is NOT resurrected — dense enrichment proceeds, sparse is left alone (poison-pill respected)",
+          "status": "passed"
+        },
+        {
+          "name": "completedParentSplade_withPendingNer_isPreservedWithoutReencoding()",
+          "status": "passed"
+        },
+        {
+          "name": "completedParentSplade_encoderFailure_doesNotChargeRetryOrReplaceArtifact()",
+          "status": "passed"
+        },
+        {
+          "name": "completedWindowPublishesWithoutPreservationInference()",
+          "status": "passed"
+        },
+        {
+          "name": "late-chunking flag ON: GPU arena-OOM (wrapped RuntimeException) on the single-pass call — folds INLINE into the windowed batch same as the over-limit null case",
+          "status": "passed"
+        },
+        {
+          "name": "late-chunking flag ON: embedWithSpans throws a non-arena-OOM exception — PARENT ONLY gets retry-count escalation (tempdoc 700 parity), not marked complete; SPLADE still succeeds independently in the same bundled write",
+          "status": "passed"
+        },
+        {
+          "name": "embedBatchSizeMismatch_fallsBackToIndividualAttempts()",
+          "status": "passed"
+        },
+        {
+          "name": "chunk-SPLADE flag OFF: a BLANK-content chunk escalates only the stage that was attempted — its chunk embedding, never the SPLADE stage the flag turned off",
+          "status": "passed"
+        },
+        {
+          "name": "late-chunking flag ON: a chunkless parent (no PARENT_DOC_ID-matching chunk docs) uses the normal windowed batch — embedWithSpans is never called for it",
+          "status": "passed"
+        },
+        {
+          "name": "completedParentPreservationDoesNotDeferItsOwnPendingEmbedding()",
+          "status": "passed"
+        },
+        {
+          "name": "chunk-SPLADE flag OFF: repeating the cycle past SPLADE_MAX_RETRIES never drives a chunk to terminal FAILED and never reports progress — the non-converging loop of tempdoc 931",
+          "status": "passed"
+        },
+        {
+          "name": "chunk-SPLADE flag OFF (default): a splade-PENDING chunk doc is not selected, not enrolled and not rewritten — the pass converges on the first cycle (tempdoc 931)",
+          "status": "passed"
+        },
+        {
+          "name": "absent, FAILED, and COMPLETED_EMPTY SPLADE states are never falsely encoded",
+          "status": "passed"
+        },
+        {
+          "name": "embedding failure reaches FAILED at EMBEDDING_MAX_RETRIES and stops being re-selected",
+          "status": "passed"
+        },
+        {
+          "name": "an encode that produced no materialisable weight writes COMPLETED_EMPTY, not COMPLETED — COMPLETED would be a data-less claim the write-time contract rejects and the RMW reset lane would bounce back to PENDING forever",
+          "status": "passed"
+        },
+        {
+          "name": "late-chunking flag ON: chunked parent's VECTOR comes from embedWithSpans (whole doc, empty span array) and lands in the SAME per-doc update map as its SPLADE/NER results — one bundled write, embedDocumentBatch never called for this doc's content",
+          "status": "passed"
+        },
+        {
+          "name": "completedParentSplade_preservationFollowsNerOutcome()",
+          "status": "passed"
+        },
+        {
+          "name": "a chunk doc pulled in by the splade-status query must not have EMBEDDING_STATUS or NER_STATUS manufactured for it — an ABSENT status means the stage does not apply",
+          "status": "passed"
+        },
+        {
+          "name": "completedParentSplade_withPendingEmbedding_isPreservedWithoutReencoding()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentCycleBudgetTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentCycleBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f94183c23ccc4ab08aab87227608e395e013fd1a22dec8eba9e0e5dc00f53327",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] 1, false",
+          "status": "passed"
+        },
+        {
+          "name": "[2] 2, false",
+          "status": "passed"
+        },
+        {
+          "name": "[3] 3, false",
+          "status": "passed"
+        },
+        {
+          "name": "[4] 1, true",
+          "status": "passed"
+        },
+        {
+          "name": "[5] 2, true",
+          "status": "passed"
+        },
+        {
+          "name": "[6] 3, true",
+          "status": "passed"
+        },
+        {
+          "name": "R6: ordinary remainder retains main's fallback cancellation stop accounting",
+          "status": "passed"
+        },
+        {
+          "name": "P13: unclassified short parents keep their single-pass vector on a later cycle",
+          "status": "passed"
+        },
+        {
+          "name": "R4: successful individual fallbacks allow the parent turn",
+          "status": "passed"
+        },
+        {
+          "name": "[1] false",
+          "status": "passed"
+        },
+        {
+          "name": "[2] true",
+          "status": "passed"
+        },
+        {
+          "name": "P4/P10: non-systemic priority batch failures retain individual retry accounting",
+          "status": "passed"
+        },
+        {
+          "name": "R5: later priority fallback cancellation preserves success and reports abort",
+          "status": "passed"
+        },
+        {
+          "name": "R9: normal turn order and embedding budget stay unchanged",
+          "status": "passed"
+        },
+        {
+          "name": "the chunk-only tail completes on ordinary dense units",
+          "status": "passed"
+        },
+        {
+          "name": "[1] single, hard-stop",
+          "status": "passed"
+        },
+        {
+          "name": "[2] single, bulk-delete",
+          "status": "passed"
+        },
+        {
+          "name": "[3] single, systemic",
+          "status": "passed"
+        },
+        {
+          "name": "[4] window, hard-stop",
+          "status": "passed"
+        },
+        {
+          "name": "[5] window, bulk-delete",
+          "status": "passed"
+        },
+        {
+          "name": "[6] window, systemic",
+          "status": "passed"
+        },
+        {
+          "name": "P4: real window failures still consume one retry and reach FAILED",
+          "status": "passed"
+        },
+        {
+          "name": "[1] systemic",
+          "status": "passed"
+        },
+        {
+          "name": "[2] hard-stop",
+          "status": "passed"
+        },
+        {
+          "name": "[3] bulk-delete",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentFailureAccountingTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentFailureAccountingTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fd2c1e5cde1d86a5ab31d1064d8a0f8c59db6290b241aaf721ad4298637b3756",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] false",
+          "status": "passed"
+        },
+        {
+          "name": "[2] true",
+          "status": "passed"
+        },
+        {
+          "name": "[1] -1",
+          "status": "passed"
+        },
+        {
+          "name": "[2] 0",
+          "status": "passed"
+        },
+        {
+          "name": "[3] 1",
+          "status": "passed"
+        },
+        {
+          "name": "[4] 3",
+          "status": "passed"
+        },
+        {
+          "name": "failedSpladeSliceDoesNotChargeLaterUnattemptedDocuments()",
+          "status": "passed"
+        },
+        {
+          "name": "completedSparseIsNotEncodedOrCountedAsNewWork()",
+          "status": "passed"
+        },
+        {
+          "name": "sparseChunkSelectionCannotEnrollDisabledDenseStage()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] -1",
+          "status": "passed"
+        },
+        {
+          "name": "[2] 0",
+          "status": "passed"
+        },
+        {
+          "name": "[3] 1",
+          "status": "passed"
+        },
+        {
+          "name": "[4] 3",
+          "status": "passed"
+        },
+        {
+          "name": "[1] false",
+          "status": "passed"
+        },
+        {
+          "name": "[2] true",
+          "status": "passed"
+        },
+        {
+          "name": "pendingSpladeChecksForYieldBetweenSlices()",
+          "status": "passed"
+        },
+        {
+          "name": "interruptedRejectedBatchReportsPublishedCount()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] 0",
+          "status": "passed"
+        },
+        {
+          "name": "[2] 1",
+          "status": "passed"
+        },
+        {
+          "name": "[3] 2",
+          "status": "passed"
+        },
+        {
+          "name": "[1] false, 0",
+          "status": "passed"
+        },
+        {
+          "name": "[2] false, 1",
+          "status": "passed"
+        },
+        {
+          "name": "[3] false, 2",
+          "status": "passed"
+        },
+        {
+          "name": "[4] true, 0",
+          "status": "passed"
+        },
+        {
+          "name": "[5] true, 1",
+          "status": "passed"
+        },
+        {
+          "name": "[6] true, 2",
+          "status": "passed"
+        },
+        {
+          "name": "[1] 0",
+          "status": "passed"
+        },
+        {
+          "name": "[2] 2",
+          "status": "passed"
+        },
+        {
+          "name": "spladeSliceFailurePreservesItsSuccessfulPrefixAndDoesNotChargeTheTail()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentLongDocumentTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentLongDocumentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ad37de90e908f0ad9bec2970303f449dd6d3d72e8d9c24037b25a0aaac07aa64",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "lateChunkNullFallbackRecordsAndResumesAWindowAfterTheProbeSpentTheDeadline()",
+          "status": "passed"
+        },
+        {
+          "name": "an embed-only backlog keeps the whole cycle — the reservation does not misfire",
+          "status": "passed"
+        },
+        {
+          "name": "in-flight partials are tracked and cleared",
+          "status": "passed"
+        },
+        {
+          "name": "CONTROL: without cross-cycle window progress the same documents never complete",
+          "status": "passed"
+        },
+        {
+          "name": "hard preemption after a late-chunk probe still prevents the fallback window",
+          "status": "passed"
+        },
+        {
+          "name": "an out-of-order slice is rejected rather than double-counted",
+          "status": "passed"
+        },
+        {
+          "name": "windows accumulated across cycles pool to the same unit vector",
+          "status": "passed"
+        },
+        {
+          "name": "a long document resumes at its next window across cycles and the work-set drains",
+          "status": "passed"
+        },
+        {
+          "name": "mixedPartialAndRouteOwnersRefuseThe257thWithoutEvictingProgress()",
+          "status": "passed"
+        },
+        {
+          "name": "changed content invalidates a partial instead of blending two revisions",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentRmwIntegrationTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentRmwIntegrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5edf6e1a7f1ee9a53c5378589e534db0c59c8605c0093c5f41714fbf71678400",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "absentSpladeEncoderPublishesEmbeddingAndRetainsCompletedSplade()",
+          "status": "passed"
+        },
+        {
+          "name": "absentSpladeEncoderPublishesNerAndRetainsCompletedSplade()",
+          "status": "passed"
+        },
+        {
+          "name": "failingSpladeEncoderIsNotCalledAndEmbeddingPublishes()",
+          "status": "passed"
+        },
+        {
+          "name": "pendingNer_preservesCompletedParentSplade_withoutEncoderCall()",
+          "status": "passed"
+        },
+        {
+          "name": "pendingEmbedding_preservesCompletedParentSplade_withoutEncoderCall()",
+          "status": "passed"
+        },
+        {
+          "name": "blankContent_skipsEncoderAndRetainsIndependentCompletedSplade()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/DisambiguationReconciliationTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/DisambiguationReconciliationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:cd36fd1f2acc2a8ad8f6ab857f5e4c10b856a3623c7f967aeb889c45adfd50a9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "canonicalAndRawSearchFiltersAndFacetsFollowRetirement()",
+          "status": "passed"
+        },
+        {
+          "name": "openServiceRemainsAvailableAcrossRepeatedProfilingResets()",
+          "status": "passed"
+        },
+        {
+          "name": "legacySidecarIsRebuiltFromLiveSourcesAndSurvivesRestart()",
+          "status": "passed"
+        },
+        {
+          "name": "holdWhenClusteringStartsLeavesPageRetryable()",
+          "status": "passed"
+        },
+        {
+          "name": "failedPassRetriesWithoutCountChanges()",
+          "status": "passed"
+        },
+        {
+          "name": "mutationBetweenBatchesRestartsPhysicalCursor()",
+          "status": "passed"
+        },
+        {
+          "name": "sharedOwnershipSurvivesUntilFinalSourceAndEmptyCorpusRetiresEverything()",
+          "status": "passed"
+        },
+        {
+          "name": "equalCountNerPublicationsInvalidateCompletedPass(boolean, boolean, boolean) [1] false, false, false",
+          "status": "passed"
+        },
+        {
+          "name": "equalCountNerPublicationsInvalidateCompletedPass(boolean, boolean, boolean) [2] false, true, false",
+          "status": "passed"
+        },
+        {
+          "name": "equalCountNerPublicationsInvalidateCompletedPass(boolean, boolean, boolean) [3] true, false, false",
+          "status": "passed"
+        },
+        {
+          "name": "equalCountNerPublicationsInvalidateCompletedPass(boolean, boolean, boolean) [4] true, true, false",
+          "status": "passed"
+        },
+        {
+          "name": "equalCountNerPublicationsInvalidateCompletedPass(boolean, boolean, boolean) [5] false, false, true",
+          "status": "passed"
+        },
+        {
+          "name": "equalCountNerPublicationsInvalidateCompletedPass(boolean, boolean, boolean) [6] false, true, true",
+          "status": "passed"
+        },
+        {
+          "name": "excludedHeadsDoNotStarveEligibleTailAndTypesRemainSeparate()",
+          "status": "passed"
+        },
+        {
+          "name": "holdDuringPageDoesNotRetireUnseenSourcesAndResumes()",
+          "status": "passed"
+        },
+        {
+          "name": "replacementServiceReconcilesUnchangedCountsAfterPartialPass()",
+          "status": "passed"
+        },
+        {
+          "name": "requestRetainsOneSnapshotWhenPublicationChangesDuringCapture()",
+          "status": "passed"
+        },
+        {
+          "name": "wholeCorpusAndSuccessfulQuiescence(int) [1] 0",
+          "status": "passed"
+        },
+        {
+          "name": "wholeCorpusAndSuccessfulQuiescence(int) [2] 500",
+          "status": "passed"
+        },
+        {
+          "name": "wholeCorpusAndSuccessfulQuiescence(int) [3] 501",
+          "status": "passed"
+        },
+        {
+          "name": "wholeCorpusAndSuccessfulQuiescence(int) [4] 1001",
+          "status": "passed"
+        },
+        {
+          "name": "completedEmptyAdditionDoesNotTriggerAnotherPass()",
+          "status": "passed"
+        },
+        {
+          "name": "publicResetRestartsAttachedServiceAndCleanupFailureCanBeRetried()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EmbeddingBackfillOpsTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EmbeddingBackfillOpsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:66c24dbdd09a4a9fd5584ed903a2b21040a3c5b5453ea47b028c64117a4ee55f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "fallbackOutageDoesNotChargeDocumentsAndRecovers(boolean, String) [1] false, retired",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackOutageDoesNotChargeDocumentsAndRecovers(boolean, String) [2] false, replaced",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackOutageDoesNotChargeDocumentsAndRecovers(boolean, String) [3] false, writesBlocked",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackOutageDoesNotChargeDocumentsAndRecovers(boolean, String) [4] false, sessionUnavailable",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackOutageDoesNotChargeDocumentsAndRecovers(boolean, String) [5] true, retired",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackOutageDoesNotChargeDocumentsAndRecovers(boolean, String) [6] true, replaced",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackOutageDoesNotChargeDocumentsAndRecovers(boolean, String) [7] true, writesBlocked",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackOutageDoesNotChargeDocumentsAndRecovers(boolean, String) [8] true, sessionUnavailable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAttemptAccountingTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAttemptAccountingTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:43b4c87b8d6b6a4026175d8dde51a83560eafd77bb6951c082ddc6256c278928",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "cancelledFallbackPartitionsEverySelectedStageOnce()",
+          "status": "passed"
+        },
+        {
+          "name": "publicationFailureStillReportsTheAcceptedPrefix()",
+          "status": "passed"
+        },
+        {
+          "name": "selectionCancellationIsTimedWithoutChangingTheRoutingSignal()",
+          "status": "passed"
+        },
+        {
+          "name": "individualSpladeRetainsComputedPrefixWhenALaterSliceIsCancelled()",
+          "status": "passed"
+        },
+        {
+          "name": "untouchedSparseWorkIsNeitherComputedNorPublishedAgain()",
+          "status": "passed"
+        },
+        {
+          "name": "partialWindowsAdvanceWithoutCompletingAnEmbedding()",
+          "status": "passed"
+        },
+        {
+          "name": "unusedFailingSparseEncoderDoesNotCreateAnAttemptOrWithholdEmbedding()",
+          "status": "passed"
+        },
+        {
+          "name": "parentPublicationCreditIncludesLateAndSinglePassParentsAlongsideChunks()",
+          "status": "passed"
+        },
+        {
+          "name": "receiptSeparatesComputedAcceptedEmptyFailedAndStale()",
+          "status": "passed"
+        },
+        {
+          "name": "individualNerReportsAcceptedEmptyAndRejectedComputedOutput()",
+          "status": "passed"
+        },
+        {
+          "name": "computedOutputsSurviveProviderRetirementInBatchAndIndividualFallback()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAuthorityRaceTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAuthorityRaceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2c8189c3037fb6535988d5b5b89a0550769490c2132cd0f077df09b7fa222fc8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "republishingTheSameProviderRestartsItsRetainedWindows()",
+          "status": "passed"
+        },
+        {
+          "name": "unavailableProviderCannotPublishItsSuccessfulFinalDenseResult(Stage) [1] SINGLE_PASS",
+          "status": "passed"
+        },
+        {
+          "name": "unavailableProviderCannotPublishItsSuccessfulFinalDenseResult(Stage) [2] WINDOW",
+          "status": "passed"
+        },
+        {
+          "name": "completedPublicationKeepsItsDispositionAcrossLaterReplacement(String) [1] source-stale",
+          "status": "passed"
+        },
+        {
+          "name": "completedPublicationKeepsItsDispositionAcrossLaterReplacement(String) [2] corrected-output",
+          "status": "passed"
+        },
+        {
+          "name": "completedPublicationKeepsItsDispositionAcrossLaterReplacement(String) [3] published",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [1] EMBED, false",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [2] EMBED, true",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [3] CHUNK, false",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [4] CHUNK, true",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [5] SPARSE, false",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [6] SPARSE, true",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [7] INTERLEAVED, false",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [8] INTERLEAVED, true",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [9] NER, false",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [10] NER, true",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [11] COMBINED, false",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [12] COMBINED, true",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [13] SINGLE_PASS, false",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [14] SINGLE_PASS, true",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [15] WINDOW, false",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementWhilePublicationWaitsForMutationLockIsAtomic(Stage, boolean) [16] WINDOW, true",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementDuringInferencePreservesExistingRejection(Stage, boolean) [1] EMBED, false",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementDuringInferencePreservesExistingRejection(Stage, boolean) [2] EMBED, true",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementDuringInferencePreservesExistingRejection(Stage, boolean) [3] CHUNK, false",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementDuringInferencePreservesExistingRejection(Stage, boolean) [4] CHUNK, true",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementDuringInferencePreservesExistingRejection(Stage, boolean) [5] COMBINED, false",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementDuringInferencePreservesExistingRejection(Stage, boolean) [6] COMBINED, true",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementDuringInferencePreservesExistingRejection(Stage, boolean) [7] SINGLE_PASS, true",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementDuringInferencePreservesExistingRejection(Stage, boolean) [8] WINDOW, true",
+          "status": "passed"
+        },
+        {
+          "name": "replacedProviderCancellationStaysDeferredThroughTheRealWriter(Stage) [1] SPARSE",
+          "status": "passed"
+        },
+        {
+          "name": "replacedProviderCancellationStaysDeferredThroughTheRealWriter(Stage) [2] INTERLEAVED",
+          "status": "passed"
+        },
+        {
+          "name": "replacedProviderCancellationStaysDeferredThroughTheRealWriter(Stage) [3] SPARSE_CHUNK",
+          "status": "passed"
+        },
+        {
+          "name": "replacedProviderCancellationStaysDeferredThroughTheRealWriter(Stage) [4] INTERLEAVED_CHUNK",
+          "status": "passed"
+        },
+        {
+          "name": "unavailableProviderDefersFailureAndCancellationThroughTheRealWriter(Stage, boolean) [1] EMBED, false",
+          "status": "passed"
+        },
+        {
+          "name": "unavailableProviderDefersFailureAndCancellationThroughTheRealWriter(Stage, boolean) [2] EMBED, true",
+          "status": "passed"
+        },
+        {
+          "name": "unavailableProviderDefersFailureAndCancellationThroughTheRealWriter(Stage, boolean) [3] CHUNK, false",
+          "status": "passed"
+        },
+        {
+          "name": "unavailableProviderDefersFailureAndCancellationThroughTheRealWriter(Stage, boolean) [4] CHUNK, true",
+          "status": "passed"
+        },
+        {
+          "name": "unavailableProviderDefersFailureAndCancellationThroughTheRealWriter(Stage, boolean) [5] COMBINED, false",
+          "status": "passed"
+        },
+        {
+          "name": "unavailableProviderDefersFailureAndCancellationThroughTheRealWriter(Stage, boolean) [6] COMBINED, true",
+          "status": "passed"
+        },
+        {
+          "name": "unavailableProviderDefersFailureAndCancellationThroughTheRealWriter(Stage, boolean) [7] SINGLE_PASS, false",
+          "status": "passed"
+        },
+        {
+          "name": "unavailableProviderDefersFailureAndCancellationThroughTheRealWriter(Stage, boolean) [8] SINGLE_PASS, true",
+          "status": "passed"
+        },
+        {
+          "name": "unavailableProviderDefersFailureAndCancellationThroughTheRealWriter(Stage, boolean) [9] WINDOW, false",
+          "status": "passed"
+        },
+        {
+          "name": "unavailableProviderDefersFailureAndCancellationThroughTheRealWriter(Stage, boolean) [10] WINDOW, true",
+          "status": "passed"
+        },
+        {
+          "name": "unavailableProviderDefersFailureAndCancellationThroughTheRealWriter(Stage, boolean) [11] NER, false",
+          "status": "passed"
+        },
+        {
+          "name": "unavailableProviderDefersFailureAndCancellationThroughTheRealWriter(Stage, boolean) [12] NER, true",
+          "status": "passed"
+        },
+        {
+          "name": "unavailableProviderDefersFailureAndCancellationThroughTheRealWriter(Stage, boolean) [13] SPARSE, false",
+          "status": "passed"
+        },
+        {
+          "name": "unavailableProviderDefersFailureAndCancellationThroughTheRealWriter(Stage, boolean) [14] SPARSE, true",
+          "status": "passed"
+        },
+        {
+          "name": "unavailableProviderDefersFailureAndCancellationThroughTheRealWriter(Stage, boolean) [15] INTERLEAVED, false",
+          "status": "passed"
+        },
+        {
+          "name": "unavailableProviderDefersFailureAndCancellationThroughTheRealWriter(Stage, boolean) [16] INTERLEAVED, true",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [1] EMBED, false",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [2] EMBED, true",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [3] CHUNK, false",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [4] CHUNK, true",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [5] SPARSE, false",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [6] SPARSE, true",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [7] INTERLEAVED, false",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [8] INTERLEAVED, true",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [9] NER, false",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [10] NER, true",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [11] COMBINED, false",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [12] COMBINED, true",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [13] SINGLE_PASS, false",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [14] SINGLE_PASS, true",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [15] WINDOW, false",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementAtCoordinatorBoundaryRevokesTheComputedOutcome(Stage, boolean) [16] WINDOW, true",
+          "status": "passed"
+        },
+        {
+          "name": "retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) [1] BGE, false, success",
+          "status": "passed"
+        },
+        {
+          "name": "retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) [2] BGE, false, failure",
+          "status": "passed"
+        },
+        {
+          "name": "retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) [3] BGE, false, cancellation",
+          "status": "passed"
+        },
+        {
+          "name": "retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) [4] BGE, true, success",
+          "status": "passed"
+        },
+        {
+          "name": "retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) [5] BGE, true, failure",
+          "status": "passed"
+        },
+        {
+          "name": "retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) [6] BGE, true, cancellation",
+          "status": "passed"
+        },
+        {
+          "name": "retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) [7] BGE_CHUNK, false, success",
+          "status": "passed"
+        },
+        {
+          "name": "retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) [8] BGE_CHUNK, false, failure",
+          "status": "passed"
+        },
+        {
+          "name": "retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) [9] BGE_CHUNK, false, cancellation",
+          "status": "passed"
+        },
+        {
+          "name": "retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) [10] BGE_CHUNK, true, success",
+          "status": "passed"
+        },
+        {
+          "name": "retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) [11] BGE_CHUNK, true, failure",
+          "status": "passed"
+        },
+        {
+          "name": "retiredBgeCannotPublishAnyFinalOutcomeThroughTheRealWriter(Stage, boolean, String) [12] BGE_CHUNK, true, cancellation",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementDuringInferenceRevokesSuccessAndFailure(Stage, boolean) [1] SPARSE, false",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementDuringInferenceRevokesSuccessAndFailure(Stage, boolean) [2] SPARSE, true",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementDuringInferenceRevokesSuccessAndFailure(Stage, boolean) [3] INTERLEAVED, false",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementDuringInferenceRevokesSuccessAndFailure(Stage, boolean) [4] INTERLEAVED, true",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementDuringInferenceRevokesSuccessAndFailure(Stage, boolean) [5] NER, false",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementDuringInferenceRevokesSuccessAndFailure(Stage, boolean) [6] NER, true",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementDuringInferenceRevokesSuccessAndFailure(Stage, boolean) [7] SINGLE_PASS, false",
+          "status": "passed"
+        },
+        {
+          "name": "providerReplacementDuringInferenceRevokesSuccessAndFailure(Stage, boolean) [8] WINDOW, false",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentExclusionPublicationTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentExclusionPublicationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:54cc24d56eddda3492425d2fef9b907467ab4082bc1a58e00c9bc9b8f49e4733",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "exclusionSavedDuringInferencePublishesNothing(EMBEDDING)",
+          "status": "passed"
+        },
+        {
+          "name": "exclusionSavedDuringInferencePublishesNothing(CHUNK)",
+          "status": "passed"
+        },
+        {
+          "name": "exclusionSavedDuringInferencePublishesNothing(SPLADE)",
+          "status": "passed"
+        },
+        {
+          "name": "exclusionSavedDuringInferencePublishesNothing(NER)",
+          "status": "passed"
+        },
+        {
+          "name": "exclusionSavedDuringInferencePublishesNothing(COMBINED)",
+          "status": "passed"
+        },
+        {
+          "name": "exclusionSavedDuringInferencePublishesNothing(COMBINED_LATE)",
+          "status": "passed"
+        },
+        {
+          "name": "exclusionSavedDuringInferencePublishesNothing(BGE_M3)",
+          "status": "passed"
+        },
+        {
+          "name": "exclusionSavedDuringInferencePublishesNothing(SPLADE_CHUNK)",
+          "status": "passed"
+        },
+        {
+          "name": "exclusionSavedDuringInferencePublishesNothing(BGE_CHUNK)",
+          "status": "passed"
+        },
+        {
+          "name": "exclusionSavedDuringInferencePublishesNothing(COMBINED_CHUNK)",
+          "status": "passed"
+        },
+        {
+          "name": "sourcePathDifferentFromDocumentIdIsExcluded(EMBEDDING)",
+          "status": "passed"
+        },
+        {
+          "name": "sourcePathDifferentFromDocumentIdIsExcluded(COMBINED_CHUNK)",
+          "status": "passed"
+        },
+        {
+          "name": "excludedInferenceFailureCannotSpendRetries(EMBEDDING)",
+          "status": "passed"
+        },
+        {
+          "name": "excludedInferenceFailureCannotSpendRetries(CHUNK)",
+          "status": "passed"
+        },
+        {
+          "name": "excludedInferenceFailureCannotSpendRetries(SPLADE)",
+          "status": "passed"
+        },
+        {
+          "name": "excludedInferenceFailureCannotSpendRetries(NER)",
+          "status": "passed"
+        },
+        {
+          "name": "excludedInferenceFailureCannotSpendRetries(COMBINED)",
+          "status": "passed"
+        },
+        {
+          "name": "excludedInferenceFailureCannotSpendRetries(COMBINED_LATE)",
+          "status": "passed"
+        },
+        {
+          "name": "excludedInferenceFailureCannotSpendRetries(BGE_M3)",
+          "status": "passed"
+        },
+        {
+          "name": "excludedInferenceFailureCannotSpendRetries(SPLADE_CHUNK)",
+          "status": "passed"
+        },
+        {
+          "name": "excludedInferenceFailureCannotSpendRetries(BGE_CHUNK)",
+          "status": "passed"
+        },
+        {
+          "name": "excludedInferenceFailureCannotSpendRetries(COMBINED_CHUNK)",
+          "status": "passed"
+        },
+        {
+          "name": "excludedFallbackCannotPublish(EMBEDDING)",
+          "status": "passed"
+        },
+        {
+          "name": "excludedFallbackCannotPublish(CHUNK)",
+          "status": "passed"
+        },
+        {
+          "name": "excludedFallbackCannotPublish(SPLADE)",
+          "status": "passed"
+        },
+        {
+          "name": "excludedFallbackCannotPublish(BGE_M3)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d0050a0eb5a67e7e85723197788bb59ab98fccd4a2f8d32fd959ea1249354e26",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [1] DENSE, TOKEN, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [2] DENSE, TOKEN, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [3] DENSE, TOKEN, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [4] DENSE, UNAVAILABLE, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [5] DENSE, UNAVAILABLE, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [6] DENSE, UNAVAILABLE, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [7] INDIVIDUAL_DENSE, TOKEN, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [8] INDIVIDUAL_DENSE, TOKEN, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [9] INDIVIDUAL_DENSE, TOKEN, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [10] INDIVIDUAL_DENSE, UNAVAILABLE, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [11] INDIVIDUAL_DENSE, UNAVAILABLE, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [12] INDIVIDUAL_DENSE, UNAVAILABLE, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [13] SINGLE_PASS, TOKEN, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [14] SINGLE_PASS, TOKEN, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [15] SINGLE_PASS, TOKEN, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [16] SINGLE_PASS, UNAVAILABLE, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [17] SINGLE_PASS, UNAVAILABLE, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [18] SINGLE_PASS, UNAVAILABLE, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [19] WINDOW, TOKEN, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [20] WINDOW, TOKEN, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [21] WINDOW, TOKEN, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [22] WINDOW, UNAVAILABLE, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [23] WINDOW, UNAVAILABLE, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [24] WINDOW, UNAVAILABLE, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [25] CHUNK, TOKEN, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [26] CHUNK, TOKEN, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [27] CHUNK, TOKEN, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [28] CHUNK, UNAVAILABLE, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [29] CHUNK, UNAVAILABLE, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [30] CHUNK, UNAVAILABLE, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [31] INDIVIDUAL_CHUNK, TOKEN, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [32] INDIVIDUAL_CHUNK, TOKEN, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [33] INDIVIDUAL_CHUNK, TOKEN, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [34] INDIVIDUAL_CHUNK, UNAVAILABLE, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [35] INDIVIDUAL_CHUNK, UNAVAILABLE, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [36] INDIVIDUAL_CHUNK, UNAVAILABLE, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [37] SPARSE, TOKEN, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [38] SPARSE, TOKEN, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [39] SPARSE, TOKEN, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [40] SPARSE, UNAVAILABLE, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [41] SPARSE, UNAVAILABLE, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [42] SPARSE, UNAVAILABLE, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [43] SPARSE_CHUNK, TOKEN, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [44] SPARSE_CHUNK, TOKEN, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [45] SPARSE_CHUNK, TOKEN, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [46] SPARSE_CHUNK, UNAVAILABLE, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [47] SPARSE_CHUNK, UNAVAILABLE, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [48] SPARSE_CHUNK, UNAVAILABLE, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [49] INDIVIDUAL_SPARSE, TOKEN, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [50] INDIVIDUAL_SPARSE, TOKEN, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [51] INDIVIDUAL_SPARSE, TOKEN, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [52] INDIVIDUAL_SPARSE, UNAVAILABLE, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [53] INDIVIDUAL_SPARSE, UNAVAILABLE, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [54] INDIVIDUAL_SPARSE, UNAVAILABLE, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [55] INTERLEAVED_SPARSE, TOKEN, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [56] INTERLEAVED_SPARSE, TOKEN, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [57] INTERLEAVED_SPARSE, TOKEN, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [58] INTERLEAVED_SPARSE, UNAVAILABLE, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [59] INTERLEAVED_SPARSE, UNAVAILABLE, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [60] INTERLEAVED_SPARSE, UNAVAILABLE, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [61] INDIVIDUAL_SPARSE_CHUNK, TOKEN, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [62] INDIVIDUAL_SPARSE_CHUNK, TOKEN, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [63] INDIVIDUAL_SPARSE_CHUNK, TOKEN, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [64] INDIVIDUAL_SPARSE_CHUNK, UNAVAILABLE, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [65] INDIVIDUAL_SPARSE_CHUNK, UNAVAILABLE, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [66] INDIVIDUAL_SPARSE_CHUNK, UNAVAILABLE, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [67] INTERLEAVED_SPARSE_CHUNK, TOKEN, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [68] INTERLEAVED_SPARSE_CHUNK, TOKEN, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [69] INTERLEAVED_SPARSE_CHUNK, TOKEN, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [70] INTERLEAVED_SPARSE_CHUNK, UNAVAILABLE, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [71] INTERLEAVED_SPARSE_CHUNK, UNAVAILABLE, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [72] INTERLEAVED_SPARSE_CHUNK, UNAVAILABLE, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [73] NER, TOKEN, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [74] NER, TOKEN, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [75] NER, TOKEN, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [76] NER, UNAVAILABLE, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [77] NER, UNAVAILABLE, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [78] NER, UNAVAILABLE, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [79] INDIVIDUAL_NER, TOKEN, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [80] INDIVIDUAL_NER, TOKEN, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [81] INDIVIDUAL_NER, TOKEN, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [82] INDIVIDUAL_NER, UNAVAILABLE, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [83] INDIVIDUAL_NER, UNAVAILABLE, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [84] INDIVIDUAL_NER, UNAVAILABLE, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [85] BGE, TOKEN, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [86] BGE, TOKEN, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [87] BGE, TOKEN, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [88] BGE, UNAVAILABLE, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [89] BGE, UNAVAILABLE, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [90] BGE, UNAVAILABLE, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [91] BGE_CHUNK, TOKEN, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [92] BGE_CHUNK, TOKEN, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [93] BGE_CHUNK, TOKEN, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [94] BGE_CHUNK, UNAVAILABLE, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [95] BGE_CHUNK, UNAVAILABLE, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "retirementDefersSuccessFailureAndCancellationOnEveryRoute(Route, Stop, Result) [96] BGE_CHUNK, UNAVAILABLE, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "combinedNerRejectsEveryOutcomeWhenTheServiceBecomesUnavailable(Result) [1] SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "combinedNerRejectsEveryOutcomeWhenTheServiceBecomesUnavailable(Result) [2] FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "combinedNerRejectsEveryOutcomeWhenTheServiceBecomesUnavailable(Result) [3] CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "bgeSourceInvalidationAndInterruptionPreventTheFirstBatch(Route, Stop) [1] BGE, SOURCE",
+          "status": "passed"
+        },
+        {
+          "name": "bgeSourceInvalidationAndInterruptionPreventTheFirstBatch(Route, Stop) [2] BGE, INTERRUPTION",
+          "status": "passed"
+        },
+        {
+          "name": "bgeSourceInvalidationAndInterruptionPreventTheFirstBatch(Route, Stop) [3] BGE_CHUNK, SOURCE",
+          "status": "passed"
+        },
+        {
+          "name": "bgeSourceInvalidationAndInterruptionPreventTheFirstBatch(Route, Stop) [4] BGE_CHUNK, INTERRUPTION",
+          "status": "passed"
+        },
+        {
+          "name": "individualDenseFallbackUnavailabilityWinsOverCancellation(Route) [1] INDIVIDUAL_DENSE",
+          "status": "passed"
+        },
+        {
+          "name": "individualDenseFallbackUnavailabilityWinsOverCancellation(Route) [2] INDIVIDUAL_CHUNK",
+          "status": "passed"
+        },
+        {
+          "name": "bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) [1] BGE, SHUTDOWN",
+          "status": "passed"
+        },
+        {
+          "name": "bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) [2] BGE, INTERRUPTION",
+          "status": "passed"
+        },
+        {
+          "name": "bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) [3] BGE, HOLD",
+          "status": "passed"
+        },
+        {
+          "name": "bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) [4] BGE, SOURCE",
+          "status": "passed"
+        },
+        {
+          "name": "bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) [5] BGE, TOKEN",
+          "status": "passed"
+        },
+        {
+          "name": "bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) [6] BGE, UNAVAILABLE",
+          "status": "passed"
+        },
+        {
+          "name": "bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) [7] BGE_CHUNK, SHUTDOWN",
+          "status": "passed"
+        },
+        {
+          "name": "bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) [8] BGE_CHUNK, INTERRUPTION",
+          "status": "passed"
+        },
+        {
+          "name": "bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) [9] BGE_CHUNK, HOLD",
+          "status": "passed"
+        },
+        {
+          "name": "bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) [10] BGE_CHUNK, SOURCE",
+          "status": "passed"
+        },
+        {
+          "name": "bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) [11] BGE_CHUNK, TOKEN",
+          "status": "passed"
+        },
+        {
+          "name": "bgeFallbackCannotStartAnotherUnitAfterAHardStop(Route, Stop) [12] BGE_CHUNK, UNAVAILABLE",
+          "status": "passed"
+        },
+        {
+          "name": "individualNerUnavailabilityBoundsEveryDocument(boolean) [1] false",
+          "status": "passed"
+        },
+        {
+          "name": "individualNerUnavailabilityBoundsEveryDocument(boolean) [2] true",
+          "status": "passed"
+        },
+        {
+          "name": "individualDenseBatchUnavailabilityWinsOverCancellation(Route) [1] INDIVIDUAL_DENSE",
+          "status": "passed"
+        },
+        {
+          "name": "individualDenseBatchUnavailabilityWinsOverCancellation(Route) [2] INDIVIDUAL_CHUNK",
+          "status": "passed"
+        },
+        {
+          "name": "sparseRetirementWinsOverCancellation(Route) [1] INDIVIDUAL_SPARSE",
+          "status": "passed"
+        },
+        {
+          "name": "sparseRetirementWinsOverCancellation(Route) [2] INTERLEAVED_SPARSE",
+          "status": "passed"
+        },
+        {
+          "name": "sparseRetirementWinsOverCancellation(Route) [3] INDIVIDUAL_SPARSE_CHUNK",
+          "status": "passed"
+        },
+        {
+          "name": "sparseRetirementWinsOverCancellation(Route) [4] INTERLEAVED_SPARSE_CHUNK",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [1] DENSE, SHUTDOWN, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [2] DENSE, SHUTDOWN, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [3] DENSE, INTERRUPTION, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [4] DENSE, INTERRUPTION, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [5] DENSE, HOLD, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [6] DENSE, HOLD, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [7] DENSE, SOURCE, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [8] DENSE, SOURCE, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [9] DENSE, TOKEN, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [10] DENSE, TOKEN, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [11] DENSE, UNAVAILABLE, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [12] DENSE, UNAVAILABLE, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [13] INDIVIDUAL_DENSE, SHUTDOWN, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [14] INDIVIDUAL_DENSE, SHUTDOWN, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [15] INDIVIDUAL_DENSE, INTERRUPTION, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [16] INDIVIDUAL_DENSE, INTERRUPTION, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [17] INDIVIDUAL_DENSE, HOLD, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [18] INDIVIDUAL_DENSE, HOLD, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [19] INDIVIDUAL_DENSE, SOURCE, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [20] INDIVIDUAL_DENSE, SOURCE, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [21] INDIVIDUAL_DENSE, TOKEN, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [22] INDIVIDUAL_DENSE, TOKEN, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [23] INDIVIDUAL_DENSE, UNAVAILABLE, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [24] INDIVIDUAL_DENSE, UNAVAILABLE, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [25] SINGLE_PASS, SHUTDOWN, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [26] SINGLE_PASS, SHUTDOWN, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [27] SINGLE_PASS, INTERRUPTION, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [28] SINGLE_PASS, INTERRUPTION, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [29] SINGLE_PASS, HOLD, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [30] SINGLE_PASS, HOLD, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [31] SINGLE_PASS, SOURCE, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [32] SINGLE_PASS, SOURCE, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [33] SINGLE_PASS, TOKEN, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [34] SINGLE_PASS, TOKEN, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [35] SINGLE_PASS, UNAVAILABLE, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [36] SINGLE_PASS, UNAVAILABLE, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [37] WINDOW, SHUTDOWN, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [38] WINDOW, SHUTDOWN, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [39] WINDOW, INTERRUPTION, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [40] WINDOW, INTERRUPTION, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [41] WINDOW, HOLD, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [42] WINDOW, HOLD, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [43] WINDOW, SOURCE, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [44] WINDOW, SOURCE, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [45] WINDOW, TOKEN, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [46] WINDOW, TOKEN, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [47] WINDOW, UNAVAILABLE, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [48] WINDOW, UNAVAILABLE, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [49] CHUNK, SHUTDOWN, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [50] CHUNK, SHUTDOWN, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [51] CHUNK, INTERRUPTION, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [52] CHUNK, INTERRUPTION, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [53] CHUNK, HOLD, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [54] CHUNK, HOLD, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [55] CHUNK, SOURCE, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [56] CHUNK, SOURCE, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [57] CHUNK, TOKEN, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [58] CHUNK, TOKEN, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [59] CHUNK, UNAVAILABLE, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [60] CHUNK, UNAVAILABLE, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [61] INDIVIDUAL_CHUNK, SHUTDOWN, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [62] INDIVIDUAL_CHUNK, SHUTDOWN, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [63] INDIVIDUAL_CHUNK, INTERRUPTION, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [64] INDIVIDUAL_CHUNK, INTERRUPTION, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [65] INDIVIDUAL_CHUNK, HOLD, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [66] INDIVIDUAL_CHUNK, HOLD, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [67] INDIVIDUAL_CHUNK, SOURCE, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [68] INDIVIDUAL_CHUNK, SOURCE, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [69] INDIVIDUAL_CHUNK, TOKEN, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [70] INDIVIDUAL_CHUNK, TOKEN, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [71] INDIVIDUAL_CHUNK, UNAVAILABLE, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [72] INDIVIDUAL_CHUNK, UNAVAILABLE, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [73] SPARSE, SHUTDOWN, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [74] SPARSE, SHUTDOWN, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [75] SPARSE, INTERRUPTION, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [76] SPARSE, INTERRUPTION, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [77] SPARSE, HOLD, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [78] SPARSE, HOLD, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [79] SPARSE, SOURCE, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [80] SPARSE, SOURCE, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [81] SPARSE, TOKEN, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [82] SPARSE, TOKEN, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [83] SPARSE, UNAVAILABLE, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [84] SPARSE, UNAVAILABLE, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [85] SPARSE_CHUNK, SHUTDOWN, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [86] SPARSE_CHUNK, SHUTDOWN, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [87] SPARSE_CHUNK, INTERRUPTION, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [88] SPARSE_CHUNK, INTERRUPTION, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [89] SPARSE_CHUNK, HOLD, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [90] SPARSE_CHUNK, HOLD, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [91] SPARSE_CHUNK, SOURCE, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [92] SPARSE_CHUNK, SOURCE, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [93] SPARSE_CHUNK, TOKEN, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [94] SPARSE_CHUNK, TOKEN, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [95] SPARSE_CHUNK, UNAVAILABLE, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [96] SPARSE_CHUNK, UNAVAILABLE, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [97] INDIVIDUAL_SPARSE, SHUTDOWN, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [98] INDIVIDUAL_SPARSE, SHUTDOWN, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [99] INDIVIDUAL_SPARSE, INTERRUPTION, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [100] INDIVIDUAL_SPARSE, INTERRUPTION, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [101] INDIVIDUAL_SPARSE, HOLD, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [102] INDIVIDUAL_SPARSE, HOLD, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [103] INDIVIDUAL_SPARSE, SOURCE, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [104] INDIVIDUAL_SPARSE, SOURCE, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [105] INDIVIDUAL_SPARSE, TOKEN, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [106] INDIVIDUAL_SPARSE, TOKEN, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [107] INDIVIDUAL_SPARSE, UNAVAILABLE, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [108] INDIVIDUAL_SPARSE, UNAVAILABLE, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [109] INTERLEAVED_SPARSE, SHUTDOWN, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [110] INTERLEAVED_SPARSE, SHUTDOWN, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [111] INTERLEAVED_SPARSE, INTERRUPTION, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [112] INTERLEAVED_SPARSE, INTERRUPTION, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [113] INTERLEAVED_SPARSE, HOLD, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [114] INTERLEAVED_SPARSE, HOLD, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [115] INTERLEAVED_SPARSE, SOURCE, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [116] INTERLEAVED_SPARSE, SOURCE, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [117] INTERLEAVED_SPARSE, TOKEN, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [118] INTERLEAVED_SPARSE, TOKEN, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [119] INTERLEAVED_SPARSE, UNAVAILABLE, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [120] INTERLEAVED_SPARSE, UNAVAILABLE, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [121] INDIVIDUAL_SPARSE_CHUNK, SHUTDOWN, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [122] INDIVIDUAL_SPARSE_CHUNK, SHUTDOWN, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [123] INDIVIDUAL_SPARSE_CHUNK, INTERRUPTION, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [124] INDIVIDUAL_SPARSE_CHUNK, INTERRUPTION, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [125] INDIVIDUAL_SPARSE_CHUNK, HOLD, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [126] INDIVIDUAL_SPARSE_CHUNK, HOLD, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [127] INDIVIDUAL_SPARSE_CHUNK, SOURCE, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [128] INDIVIDUAL_SPARSE_CHUNK, SOURCE, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [129] INDIVIDUAL_SPARSE_CHUNK, TOKEN, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [130] INDIVIDUAL_SPARSE_CHUNK, TOKEN, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [131] INDIVIDUAL_SPARSE_CHUNK, UNAVAILABLE, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [132] INDIVIDUAL_SPARSE_CHUNK, UNAVAILABLE, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [133] INTERLEAVED_SPARSE_CHUNK, SHUTDOWN, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [134] INTERLEAVED_SPARSE_CHUNK, SHUTDOWN, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [135] INTERLEAVED_SPARSE_CHUNK, INTERRUPTION, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [136] INTERLEAVED_SPARSE_CHUNK, INTERRUPTION, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [137] INTERLEAVED_SPARSE_CHUNK, HOLD, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [138] INTERLEAVED_SPARSE_CHUNK, HOLD, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [139] INTERLEAVED_SPARSE_CHUNK, SOURCE, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [140] INTERLEAVED_SPARSE_CHUNK, SOURCE, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [141] INTERLEAVED_SPARSE_CHUNK, TOKEN, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [142] INTERLEAVED_SPARSE_CHUNK, TOKEN, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [143] INTERLEAVED_SPARSE_CHUNK, UNAVAILABLE, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [144] INTERLEAVED_SPARSE_CHUNK, UNAVAILABLE, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [145] NER, SHUTDOWN, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [146] NER, SHUTDOWN, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [147] NER, INTERRUPTION, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [148] NER, INTERRUPTION, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [149] NER, HOLD, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [150] NER, HOLD, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [151] NER, SOURCE, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [152] NER, SOURCE, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [153] NER, TOKEN, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [154] NER, TOKEN, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [155] NER, UNAVAILABLE, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [156] NER, UNAVAILABLE, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [157] INDIVIDUAL_NER, SHUTDOWN, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [158] INDIVIDUAL_NER, SHUTDOWN, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [159] INDIVIDUAL_NER, INTERRUPTION, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [160] INDIVIDUAL_NER, INTERRUPTION, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [161] INDIVIDUAL_NER, HOLD, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [162] INDIVIDUAL_NER, HOLD, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [163] INDIVIDUAL_NER, SOURCE, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [164] INDIVIDUAL_NER, SOURCE, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [165] INDIVIDUAL_NER, TOKEN, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [166] INDIVIDUAL_NER, TOKEN, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [167] INDIVIDUAL_NER, UNAVAILABLE, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [168] INDIVIDUAL_NER, UNAVAILABLE, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [169] BGE, SHUTDOWN, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [170] BGE, SHUTDOWN, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [171] BGE, INTERRUPTION, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [172] BGE, INTERRUPTION, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [173] BGE, HOLD, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [174] BGE, HOLD, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [175] BGE, SOURCE, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [176] BGE, SOURCE, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [177] BGE, TOKEN, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [178] BGE, TOKEN, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [179] BGE, UNAVAILABLE, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [180] BGE, UNAVAILABLE, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [181] BGE_CHUNK, SHUTDOWN, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [182] BGE_CHUNK, SHUTDOWN, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [183] BGE_CHUNK, INTERRUPTION, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [184] BGE_CHUNK, INTERRUPTION, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [185] BGE_CHUNK, HOLD, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [186] BGE_CHUNK, HOLD, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [187] BGE_CHUNK, SOURCE, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [188] BGE_CHUNK, SOURCE, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [189] BGE_CHUNK, TOKEN, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [190] BGE_CHUNK, TOKEN, true",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [191] BGE_CHUNK, UNAVAILABLE, false",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopBoundsEveryRoute(Route, Stop, boolean) [192] BGE_CHUNK, UNAVAILABLE, true",
+          "status": "passed"
+        },
+        {
+          "name": "bgeRetirementPreventsTheFirstBatch(Route, Stop) [1] BGE, TOKEN",
+          "status": "passed"
+        },
+        {
+          "name": "bgeRetirementPreventsTheFirstBatch(Route, Stop) [2] BGE, UNAVAILABLE",
+          "status": "passed"
+        },
+        {
+          "name": "bgeRetirementPreventsTheFirstBatch(Route, Stop) [3] BGE_CHUNK, TOKEN",
+          "status": "passed"
+        },
+        {
+          "name": "bgeRetirementPreventsTheFirstBatch(Route, Stop) [4] BGE_CHUNK, UNAVAILABLE",
+          "status": "passed"
+        },
+        {
+          "name": "successfulFinalDenseCallCannotPublishAfterUnavailability(Route) [1] SINGLE_PASS",
+          "status": "passed"
+        },
+        {
+          "name": "successfulFinalDenseCallCannotPublishAfterUnavailability(Route) [2] WINDOW",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [1] DENSE, TOKEN, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [2] DENSE, TOKEN, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [3] DENSE, TOKEN, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [4] DENSE, UNAVAILABLE, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [5] DENSE, UNAVAILABLE, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [6] DENSE, UNAVAILABLE, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [7] CHUNK, TOKEN, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [8] CHUNK, TOKEN, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [9] CHUNK, TOKEN, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [10] CHUNK, UNAVAILABLE, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [11] CHUNK, UNAVAILABLE, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [12] CHUNK, UNAVAILABLE, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [13] INDIVIDUAL_DENSE, TOKEN, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [14] INDIVIDUAL_DENSE, TOKEN, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [15] INDIVIDUAL_DENSE, TOKEN, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [16] INDIVIDUAL_DENSE, UNAVAILABLE, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [17] INDIVIDUAL_DENSE, UNAVAILABLE, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [18] INDIVIDUAL_DENSE, UNAVAILABLE, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [19] INDIVIDUAL_CHUNK, TOKEN, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [20] INDIVIDUAL_CHUNK, TOKEN, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [21] INDIVIDUAL_CHUNK, TOKEN, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [22] INDIVIDUAL_CHUNK, UNAVAILABLE, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [23] INDIVIDUAL_CHUNK, UNAVAILABLE, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [24] INDIVIDUAL_CHUNK, UNAVAILABLE, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [25] INDIVIDUAL_SPARSE, TOKEN, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [26] INDIVIDUAL_SPARSE, TOKEN, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [27] INDIVIDUAL_SPARSE, TOKEN, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [28] INDIVIDUAL_SPARSE, UNAVAILABLE, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [29] INDIVIDUAL_SPARSE, UNAVAILABLE, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [30] INDIVIDUAL_SPARSE, UNAVAILABLE, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [31] INTERLEAVED_SPARSE, TOKEN, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [32] INTERLEAVED_SPARSE, TOKEN, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [33] INTERLEAVED_SPARSE, TOKEN, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [34] INTERLEAVED_SPARSE, UNAVAILABLE, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [35] INTERLEAVED_SPARSE, UNAVAILABLE, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [36] INTERLEAVED_SPARSE, UNAVAILABLE, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [37] INDIVIDUAL_SPARSE_CHUNK, TOKEN, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [38] INDIVIDUAL_SPARSE_CHUNK, TOKEN, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [39] INDIVIDUAL_SPARSE_CHUNK, TOKEN, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [40] INDIVIDUAL_SPARSE_CHUNK, UNAVAILABLE, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [41] INDIVIDUAL_SPARSE_CHUNK, UNAVAILABLE, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [42] INDIVIDUAL_SPARSE_CHUNK, UNAVAILABLE, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [43] INTERLEAVED_SPARSE_CHUNK, TOKEN, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [44] INTERLEAVED_SPARSE_CHUNK, TOKEN, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [45] INTERLEAVED_SPARSE_CHUNK, TOKEN, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [46] INTERLEAVED_SPARSE_CHUNK, UNAVAILABLE, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [47] INTERLEAVED_SPARSE_CHUNK, UNAVAILABLE, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [48] INTERLEAVED_SPARSE_CHUNK, UNAVAILABLE, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [49] BGE, TOKEN, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [50] BGE, TOKEN, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [51] BGE, TOKEN, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [52] BGE, UNAVAILABLE, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [53] BGE, UNAVAILABLE, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [54] BGE, UNAVAILABLE, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [55] BGE_CHUNK, TOKEN, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [56] BGE_CHUNK, TOKEN, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [57] BGE_CHUNK, TOKEN, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [58] BGE_CHUNK, UNAVAILABLE, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [59] BGE_CHUNK, UNAVAILABLE, FAILURE",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackRetirementDefersEveryOutcome(Route, Stop, Result) [60] BGE_CHUNK, UNAVAILABLE, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) [1] SPARSE, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) [2] SPARSE, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) [3] SPARSE_CHUNK, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) [4] SPARSE_CHUNK, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) [5] INDIVIDUAL_SPARSE, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) [6] INDIVIDUAL_SPARSE, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) [7] INTERLEAVED_SPARSE, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) [8] INTERLEAVED_SPARSE, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) [9] INDIVIDUAL_SPARSE_CHUNK, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) [10] INDIVIDUAL_SPARSE_CHUNK, CANCELLATION",
+          "status": "passed"
+        },
+        {
+          "name": "sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) [11] INTERLEAVED_SPARSE_CHUNK, SUCCESS",
+          "status": "passed"
+        },
+        {
+          "name": "sparseUnavailabilityRejectsComputedSuccessAndCancellation(Route, Result) [12] INTERLEAVED_SPARSE_CHUNK, CANCELLATION",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentInternalStopTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentInternalStopTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ef29a4aae9f9c8fbc742b3f95809538e0768d989f2452f826d8b40669d3da6b3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "cancellationInErrorFallbackKeepsAnEarlierCompletedSparseSlice()",
+          "status": "passed"
+        },
+        {
+          "name": "anInternalDenseStopKeepsEarlierValidSlicesAndTheirActivePacingCredit()",
+          "status": "passed"
+        },
+        {
+          "name": "heldGpuRetainedOwnersCannotOccupyTheCpuSelection()",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [1] dense, hold",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [2] dense, shutdown",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [3] dense, source",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [4] dense, provider",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [5] dense, authority",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [6] window, hold",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [7] window, shutdown",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [8] window, source",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [9] window, provider",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [10] window, authority",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [11] ner, hold",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [12] ner, shutdown",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [13] ner, source",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [14] ner, provider",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [15] ner, authority",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [16] sparse, hold",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [17] sparse, shutdown",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [18] sparse, source",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [19] sparse, provider",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [20] sparse, authority",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [21] bge, hold",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [22] bge, shutdown",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [23] bge, source",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [24] bge, provider",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [25] bge, authority",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [26] combined-ner, hold",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [27] combined-ner, shutdown",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [28] combined-ner, source",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [29] combined-ner, provider",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [30] combined-ner, authority",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [31] combined-sparse, hold",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [32] combined-sparse, shutdown",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [33] combined-sparse, source",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [34] combined-sparse, provider",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [35] combined-sparse, authority",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [36] dense-fallback, hold",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [37] dense-fallback, shutdown",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [38] dense-fallback, source",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [39] dense-fallback, provider",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [40] dense-fallback, authority",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [41] sparse-fallback, hold",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [42] sparse-fallback, shutdown",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [43] sparse-fallback, source",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [44] sparse-fallback, provider",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [45] sparse-fallback, authority",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [46] bge-fallback, hold",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [47] bge-fallback, shutdown",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [48] bge-fallback, source",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [49] bge-fallback, provider",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [50] bge-fallback, authority",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [51] combined-dense-fallback, hold",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [52] combined-dense-fallback, shutdown",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [53] combined-dense-fallback, source",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [54] combined-dense-fallback, provider",
+          "status": "passed"
+        },
+        {
+          "name": "everyHardStopReachesInternalCallsWithoutPublishingOrChargingRetries(String, String) [55] combined-dense-fallback, authority",
+          "status": "passed"
+        },
+        {
+          "name": "cancellationPreservesCompletedSparseSlicesWithoutSettingBackoff()",
+          "status": "passed"
+        },
+        {
+          "name": "cycleDeadlineLetsTheCurrentOperationFinishAndBoundsTheNextUnit(String) [1] ner",
+          "status": "passed"
+        },
+        {
+          "name": "cycleDeadlineLetsTheCurrentOperationFinishAndBoundsTheNextUnit(String) [2] sparse",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentMapperDispositionTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentMapperDispositionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fc20d457f140934727329dd68382766d214000a5ef3796e7b71a2210a40282f3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "acceptedMutationWhoseVectorIsDroppedIsNotACompletedEmbedding()",
+          "status": "passed"
+        },
+        {
+          "name": "individualFallbackReportsRejectedOutputWithoutChangingCommitOrRetry()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentPreservationTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentPreservationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7d70ab3f6e7b990ef9d4bc74d53d9cf90e02358b4f8fe443a31aaf014310788f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "retainedOwnerIsServedBeforeNewAdmissions(boolean) [1] false",
+          "status": "passed"
+        },
+        {
+          "name": "retainedOwnerIsServedBeforeNewAdmissions(boolean) [2] true",
+          "status": "passed"
+        },
+        {
+          "name": "examinedIneligibleHeadDoesNotRunOrPinTheFollowingPage(boolean) [1] false",
+          "status": "passed"
+        },
+        {
+          "name": "examinedIneligibleHeadDoesNotRunOrPinTheFollowingPage(boolean) [2] true",
+          "status": "passed"
+        },
+        {
+          "name": "oversizedRetainedParentStillAllowsPendingChunkToAdvanceWithinThreeCycles()",
+          "status": "passed"
+        },
+        {
+          "name": "sameParentBatchKeepsDifferentRevisionExpectationsSeparate()",
+          "status": "passed"
+        },
+        {
+          "name": "batchSnapshotHashesEachLegacyParentOnce()",
+          "status": "passed"
+        },
+        {
+          "name": "chunkProofRetentionCountsDistinctParentsOnceAndAllowsOneOversizedOwner()",
+          "status": "passed"
+        },
+        {
+          "name": "nextTurnReleasesDeletedReplacedAndExternallyCompletedOwners(String, boolean) [1] deleted, false",
+          "status": "passed"
+        },
+        {
+          "name": "nextTurnReleasesDeletedReplacedAndExternallyCompletedOwners(String, boolean) [2] replaced, false",
+          "status": "passed"
+        },
+        {
+          "name": "nextTurnReleasesDeletedReplacedAndExternallyCompletedOwners(String, boolean) [3] completed, false",
+          "status": "passed"
+        },
+        {
+          "name": "nextTurnReleasesDeletedReplacedAndExternallyCompletedOwners(String, boolean) [4] deleted, true",
+          "status": "passed"
+        },
+        {
+          "name": "nextTurnReleasesDeletedReplacedAndExternallyCompletedOwners(String, boolean) [5] replaced, true",
+          "status": "passed"
+        },
+        {
+          "name": "nextTurnReleasesDeletedReplacedAndExternallyCompletedOwners(String, boolean) [6] completed, true",
+          "status": "passed"
+        },
+        {
+          "name": "budgetDeferredSuffixIsNextTurnWithoutBlankRetriesOrCharges(Lane) [1] DENSE_CHUNK",
+          "status": "passed"
+        },
+        {
+          "name": "budgetDeferredSuffixIsNextTurnWithoutBlankRetriesOrCharges(Lane) [2] SPARSE_PARENT",
+          "status": "passed"
+        },
+        {
+          "name": "budgetDeferredSuffixIsNextTurnWithoutBlankRetriesOrCharges(Lane) [3] SPARSE_CHUNK",
+          "status": "passed"
+        },
+        {
+          "name": "budgetDeferredSuffixIsNextTurnWithoutBlankRetriesOrCharges(Lane) [4] NER",
+          "status": "passed"
+        },
+        {
+          "name": "budgetDeferredSuffixIsNextTurnWithoutBlankRetriesOrCharges(Lane) [5] BGE",
+          "status": "passed"
+        },
+        {
+          "name": "keysetTurnsPassPoisonSurviveRefreshDeletionAndIdleThenWrap(Lane) [1] DENSE_PARENT",
+          "status": "passed"
+        },
+        {
+          "name": "keysetTurnsPassPoisonSurviveRefreshDeletionAndIdleThenWrap(Lane) [2] DENSE_CHUNK",
+          "status": "passed"
+        },
+        {
+          "name": "keysetTurnsPassPoisonSurviveRefreshDeletionAndIdleThenWrap(Lane) [3] SPARSE_PARENT",
+          "status": "passed"
+        },
+        {
+          "name": "keysetTurnsPassPoisonSurviveRefreshDeletionAndIdleThenWrap(Lane) [4] SPARSE_CHUNK",
+          "status": "passed"
+        },
+        {
+          "name": "keysetTurnsPassPoisonSurviveRefreshDeletionAndIdleThenWrap(Lane) [5] NER",
+          "status": "passed"
+        },
+        {
+          "name": "keysetTurnsPassPoisonSurviveRefreshDeletionAndIdleThenWrap(Lane) [6] BGE",
+          "status": "passed"
+        },
+        {
+          "name": "oneOversizedParentDoesNotPullFollowingParentsIntoTheInferenceBatch()",
+          "status": "passed"
+        },
+        {
+          "name": "explicitExpectationsMatchMismatchAndPreserveUnchangedContent()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentPublicationBenchmarkTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentPublicationBenchmarkTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:99d163e7557e32ff56ccfedb97c72ba904ab230ff102e52fba97e383da5ee4c8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "fixedBatchPublication()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentQuarantineProgressTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentQuarantineProgressTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:27d6b0554ad3f5e261d923cd5fe59dd5897736b8273fb26b9bedab9d7abf1a3d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] missing-parent-id, false",
+          "status": "passed"
+        },
+        {
+          "name": "[2] empty-span, false",
+          "status": "passed"
+        },
+        {
+          "name": "[3] missing-revision, false",
+          "status": "passed"
+        },
+        {
+          "name": "[4] wrong-revision, false",
+          "status": "passed"
+        },
+        {
+          "name": "[5] missing-parent, false",
+          "status": "passed"
+        },
+        {
+          "name": "[6] missing-offset, false",
+          "status": "passed"
+        },
+        {
+          "name": "[7] outside-offset, false",
+          "status": "passed"
+        },
+        {
+          "name": "[8] negative-offset, false",
+          "status": "passed"
+        },
+        {
+          "name": "[9] reversed-offset, false",
+          "status": "passed"
+        },
+        {
+          "name": "[10] missing-parent-id, true",
+          "status": "passed"
+        },
+        {
+          "name": "[11] empty-span, true",
+          "status": "passed"
+        },
+        {
+          "name": "[12] missing-revision, true",
+          "status": "passed"
+        },
+        {
+          "name": "[13] wrong-revision, true",
+          "status": "passed"
+        },
+        {
+          "name": "[14] missing-parent, true",
+          "status": "passed"
+        },
+        {
+          "name": "[15] missing-offset, true",
+          "status": "passed"
+        },
+        {
+          "name": "[16] outside-offset, true",
+          "status": "passed"
+        },
+        {
+          "name": "[17] negative-offset, true",
+          "status": "passed"
+        },
+        {
+          "name": "[18] reversed-offset, true",
+          "status": "passed"
+        },
+        {
+          "name": "terminalChunkFailureRemovesPriorVectorEvenWithoutParentProof()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentRevisionRaceTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentRevisionRaceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f34049f660d04142dbacd25487fd6eeaf35785be91e4e4c34de02f93f84f1a43",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "staleFailureCannotSpendReplacementRetries(EMBEDDING)",
+          "status": "passed"
+        },
+        {
+          "name": "staleFailureCannotSpendReplacementRetries(CHUNK)",
+          "status": "passed"
+        },
+        {
+          "name": "staleFailureCannotSpendReplacementRetries(SPLADE)",
+          "status": "passed"
+        },
+        {
+          "name": "staleFailureCannotSpendReplacementRetries(NER)",
+          "status": "passed"
+        },
+        {
+          "name": "staleFailureCannotSpendReplacementRetries(COMBINED)",
+          "status": "passed"
+        },
+        {
+          "name": "staleFailureCannotSpendReplacementRetries(COMBINED_LATE)",
+          "status": "passed"
+        },
+        {
+          "name": "staleFailureCannotSpendReplacementRetries(BGE_M3)",
+          "status": "passed"
+        },
+        {
+          "name": "legacyMatchingProofRmwAndRenamePreservePostingsAndRetireFailedDenseVector()",
+          "status": "passed"
+        },
+        {
+          "name": "blankCombinedInputStillDoesNotSpendReplacementRetries()",
+          "status": "passed"
+        },
+        {
+          "name": "completedCurrentWorkSurvivesAnOlderInFlightResult(EMBEDDING)",
+          "status": "passed"
+        },
+        {
+          "name": "completedCurrentWorkSurvivesAnOlderInFlightResult(NER)",
+          "status": "passed"
+        },
+        {
+          "name": "legacyFailuresDrainBadHeadsWithoutEncodingTheirText(CHUNK)",
+          "status": "passed"
+        },
+        {
+          "name": "legacyFailuresDrainBadHeadsWithoutEncodingTheirText(SPLADE)",
+          "status": "passed"
+        },
+        {
+          "name": "legacyFailuresDrainBadHeadsWithoutEncodingTheirText(COMBINED)",
+          "status": "passed"
+        },
+        {
+          "name": "legacyFailuresDrainBadHeadsWithoutEncodingTheirText(BGE_M3)",
+          "status": "passed"
+        },
+        {
+          "name": "legacyProofRaceCannotPublishFailure(CHUNK,geometry)",
+          "status": "passed"
+        },
+        {
+          "name": "legacyProofRaceCannotPublishFailure(CHUNK,revision)",
+          "status": "passed"
+        },
+        {
+          "name": "legacyProofRaceCannotPublishFailure(SPLADE,geometry)",
+          "status": "passed"
+        },
+        {
+          "name": "legacyProofRaceCannotPublishFailure(SPLADE,revision)",
+          "status": "passed"
+        },
+        {
+          "name": "legacyProofRaceCannotPublishFailure(BGE_M3,geometry)",
+          "status": "passed"
+        },
+        {
+          "name": "legacyProofRaceCannotPublishFailure(BGE_M3,revision)",
+          "status": "passed"
+        },
+        {
+          "name": "equalLengthJavaHashCollisionDoesNotResumeOldWindows()",
+          "status": "passed"
+        },
+        {
+          "name": "staleSuccessCannotCompleteReplacement(EMBEDDING)",
+          "status": "passed"
+        },
+        {
+          "name": "staleSuccessCannotCompleteReplacement(CHUNK)",
+          "status": "passed"
+        },
+        {
+          "name": "staleSuccessCannotCompleteReplacement(SPLADE)",
+          "status": "passed"
+        },
+        {
+          "name": "staleSuccessCannotCompleteReplacement(NER)",
+          "status": "passed"
+        },
+        {
+          "name": "staleSuccessCannotCompleteReplacement(COMBINED)",
+          "status": "passed"
+        },
+        {
+          "name": "staleSuccessCannotCompleteReplacement(COMBINED_LATE)",
+          "status": "passed"
+        },
+        {
+          "name": "staleSuccessCannotCompleteReplacement(BGE_M3)",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackCannotPublishOntoReplacement(EMBEDDING)",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackCannotPublishOntoReplacement(CHUNK)",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackCannotPublishOntoReplacement(SPLADE)",
+          "status": "passed"
+        },
+        {
+          "name": "fallbackCannotPublishOntoReplacement(BGE_M3)",
+          "status": "passed"
+        },
+        {
+          "name": "legacyReadOmissionPreservesSafeSiblingsAndSearchableArtifacts()",
+          "status": "passed"
+        },
+        {
+          "name": "blankInputFailureCannotSpendReplacementRetries(EMBEDDING)",
+          "status": "passed"
+        },
+        {
+          "name": "blankInputFailureCannotSpendReplacementRetries(SPLADE)",
+          "status": "passed"
+        },
+        {
+          "name": "blankInputFailureCannotSpendReplacementRetries(NER)",
+          "status": "passed"
+        },
+        {
+          "name": "blankInputFailureCannotSpendReplacementRetries(BGE_M3)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:42f4a80fcc36acd75435ad7e64f7a921d8076512cce8fe15b86fd93b4f4b3df0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "identicalTextWithChangedDenseIdentityRestartsWindows(String) [1] generation",
+          "status": "passed"
+        },
+        {
+          "name": "identicalTextWithChangedDenseIdentityRestartsWindows(String) [2] uid",
+          "status": "passed"
+        },
+        {
+          "name": "identicalTextWithChangedDenseIdentityRestartsWindows(String) [3] revision",
+          "status": "passed"
+        },
+        {
+          "name": "identicalTextWithChangedDenseIdentityRestartsWindows(String) [4] provider",
+          "status": "passed"
+        },
+        {
+          "name": "identicalTextWithChangedDenseIdentityRestartsWindows(String) [5] dimension",
+          "status": "passed"
+        },
+        {
+          "name": "interruptionPreventsTheFirstUnitAndCancelsTheSelection(Route) [1] DENSE_BATCH",
+          "status": "passed"
+        },
+        {
+          "name": "interruptionPreventsTheFirstUnitAndCancelsTheSelection(Route) [2] DENSE_CHUNK",
+          "status": "passed"
+        },
+        {
+          "name": "interruptionPreventsTheFirstUnitAndCancelsTheSelection(Route) [3] WINDOW",
+          "status": "passed"
+        },
+        {
+          "name": "interruptionPreventsTheFirstUnitAndCancelsTheSelection(Route) [4] SINGLE_PASS",
+          "status": "passed"
+        },
+        {
+          "name": "interruptionPreventsTheFirstUnitAndCancelsTheSelection(Route) [5] NER",
+          "status": "passed"
+        },
+        {
+          "name": "interruptionPreventsTheFirstUnitAndCancelsTheSelection(Route) [6] SPARSE_PARENT",
+          "status": "passed"
+        },
+        {
+          "name": "interruptionPreventsTheFirstUnitAndCancelsTheSelection(Route) [7] SPARSE_CHUNK",
+          "status": "passed"
+        },
+        {
+          "name": "hardStopPreventsTheFirstUnitAndCancelsTheSelection(Route) [1] DENSE_BATCH",
+          "status": "passed"
+        },
+        {
+          "name": "hardStopPreventsTheFirstUnitAndCancelsTheSelection(Route) [2] DENSE_CHUNK",
+          "status": "passed"
+        },
+        {
+          "name": "hardStopPreventsTheFirstUnitAndCancelsTheSelection(Route) [3] WINDOW",
+          "status": "passed"
+        },
+        {
+          "name": "hardStopPreventsTheFirstUnitAndCancelsTheSelection(Route) [4] SINGLE_PASS",
+          "status": "passed"
+        },
+        {
+          "name": "hardStopPreventsTheFirstUnitAndCancelsTheSelection(Route) [5] NER",
+          "status": "passed"
+        },
+        {
+          "name": "hardStopPreventsTheFirstUnitAndCancelsTheSelection(Route) [6] SPARSE_PARENT",
+          "status": "passed"
+        },
+        {
+          "name": "hardStopPreventsTheFirstUnitAndCancelsTheSelection(Route) [7] SPARSE_CHUNK",
+          "status": "passed"
+        },
+        {
+          "name": "rejectedSlicesUseTheExistingRetryLimit(String) [1] replay",
+          "status": "passed"
+        },
+        {
+          "name": "rejectedSlicesUseTheExistingRetryLimit(String) [2] skip",
+          "status": "passed"
+        },
+        {
+          "name": "sourceInvalidationDuringFetchPreventsTheFirstUnit(Route) [1] DENSE_BATCH",
+          "status": "passed"
+        },
+        {
+          "name": "sourceInvalidationDuringFetchPreventsTheFirstUnit(Route) [2] DENSE_CHUNK",
+          "status": "passed"
+        },
+        {
+          "name": "sourceInvalidationDuringFetchPreventsTheFirstUnit(Route) [3] WINDOW",
+          "status": "passed"
+        },
+        {
+          "name": "sourceInvalidationDuringFetchPreventsTheFirstUnit(Route) [4] SINGLE_PASS",
+          "status": "passed"
+        },
+        {
+          "name": "sourceInvalidationDuringFetchPreventsTheFirstUnit(Route) [5] NER",
+          "status": "passed"
+        },
+        {
+          "name": "sourceInvalidationDuringFetchPreventsTheFirstUnit(Route) [6] SPARSE_PARENT",
+          "status": "passed"
+        },
+        {
+          "name": "sourceInvalidationDuringFetchPreventsTheFirstUnit(Route) [7] SPARSE_CHUNK",
+          "status": "passed"
+        },
+        {
+          "name": "individualSourceInvalidationDuringFetchPreventsTheFirstUnit(Route) [1] DENSE_BATCH",
+          "status": "passed"
+        },
+        {
+          "name": "individualSourceInvalidationDuringFetchPreventsTheFirstUnit(Route) [2] DENSE_CHUNK",
+          "status": "passed"
+        },
+        {
+          "name": "individualSourceInvalidationDuringFetchPreventsTheFirstUnit(Route) [3] NER",
+          "status": "passed"
+        },
+        {
+          "name": "individualSourceInvalidationDuringFetchPreventsTheFirstUnit(Route) [4] SPARSE_PARENT",
+          "status": "passed"
+        },
+        {
+          "name": "individualSourceInvalidationDuringFetchPreventsTheFirstUnit(Route) [5] SPARSE_CHUNK",
+          "status": "passed"
+        },
+        {
+          "name": "expiredDeadlinePreventsTheFirstUnit(Route) [1] DENSE_BATCH",
+          "status": "passed"
+        },
+        {
+          "name": "expiredDeadlinePreventsTheFirstUnit(Route) [2] DENSE_CHUNK",
+          "status": "passed"
+        },
+        {
+          "name": "expiredDeadlinePreventsTheFirstUnit(Route) [3] WINDOW",
+          "status": "passed"
+        },
+        {
+          "name": "expiredDeadlinePreventsTheFirstUnit(Route) [4] SINGLE_PASS",
+          "status": "passed"
+        },
+        {
+          "name": "expiredDeadlinePreventsTheFirstUnit(Route) [5] NER",
+          "status": "passed"
+        },
+        {
+          "name": "expiredDeadlinePreventsTheFirstUnit(Route) [6] SPARSE_PARENT",
+          "status": "passed"
+        },
+        {
+          "name": "expiredDeadlinePreventsTheFirstUnit(Route) [7] SPARSE_CHUNK",
+          "status": "passed"
+        },
+        {
+          "name": "sourceInvalidationWhileTheSchedulerPacesPreventsTheFirstUnit(Route) [1] DENSE_BATCH",
+          "status": "passed"
+        },
+        {
+          "name": "sourceInvalidationWhileTheSchedulerPacesPreventsTheFirstUnit(Route) [2] DENSE_CHUNK",
+          "status": "passed"
+        },
+        {
+          "name": "sourceInvalidationWhileTheSchedulerPacesPreventsTheFirstUnit(Route) [3] WINDOW",
+          "status": "passed"
+        },
+        {
+          "name": "sourceInvalidationWhileTheSchedulerPacesPreventsTheFirstUnit(Route) [4] SINGLE_PASS",
+          "status": "passed"
+        },
+        {
+          "name": "sourceInvalidationWhileTheSchedulerPacesPreventsTheFirstUnit(Route) [5] NER",
+          "status": "passed"
+        },
+        {
+          "name": "sourceInvalidationWhileTheSchedulerPacesPreventsTheFirstUnit(Route) [6] SPARSE_PARENT",
+          "status": "passed"
+        },
+        {
+          "name": "sourceInvalidationWhileTheSchedulerPacesPreventsTheFirstUnit(Route) [7] SPARSE_CHUNK",
+          "status": "passed"
+        },
+        {
+          "name": "nullAndEmptySlicesKeepExistingRetryAccounting(String) [1] empty",
+          "status": "passed"
+        },
+        {
+          "name": "nullAndEmptySlicesKeepExistingRetryAccounting(String) [2] null",
+          "status": "passed"
+        },
+        {
+          "name": "individualStageInterruptionPreventsTheFirstUnit(Route) [1] DENSE_BATCH",
+          "status": "passed"
+        },
+        {
+          "name": "individualStageInterruptionPreventsTheFirstUnit(Route) [2] DENSE_CHUNK",
+          "status": "passed"
+        },
+        {
+          "name": "individualStageInterruptionPreventsTheFirstUnit(Route) [3] NER",
+          "status": "passed"
+        },
+        {
+          "name": "individualStageInterruptionPreventsTheFirstUnit(Route) [4] SPARSE_PARENT",
+          "status": "passed"
+        },
+        {
+          "name": "individualStageInterruptionPreventsTheFirstUnit(Route) [5] SPARSE_CHUNK",
+          "status": "passed"
+        },
+        {
+          "name": "batchOnlyLateParentCompletesWithoutWindowsOrRetry()",
+          "status": "passed"
+        },
+        {
+          "name": "hardStopAfterOneUnitPreservesItsResultAndLeavesTheRestCancelled(Route) [1] DENSE_BATCH",
+          "status": "passed"
+        },
+        {
+          "name": "hardStopAfterOneUnitPreservesItsResultAndLeavesTheRestCancelled(Route) [2] DENSE_CHUNK",
+          "status": "passed"
+        },
+        {
+          "name": "hardStopAfterOneUnitPreservesItsResultAndLeavesTheRestCancelled(Route) [3] WINDOW",
+          "status": "passed"
+        },
+        {
+          "name": "hardStopAfterOneUnitPreservesItsResultAndLeavesTheRestCancelled(Route) [4] SINGLE_PASS",
+          "status": "passed"
+        },
+        {
+          "name": "hardStopAfterOneUnitPreservesItsResultAndLeavesTheRestCancelled(Route) [5] NER",
+          "status": "passed"
+        },
+        {
+          "name": "hardStopAfterOneUnitPreservesItsResultAndLeavesTheRestCancelled(Route) [6] SPARSE_PARENT",
+          "status": "passed"
+        },
+        {
+          "name": "hardStopAfterOneUnitPreservesItsResultAndLeavesTheRestCancelled(Route) [7] SPARSE_CHUNK",
+          "status": "passed"
+        },
+        {
+          "name": "deadlineSpentByNullOrArenaOomClassificationRetainsItsRoute(boolean) [1] false",
+          "status": "passed"
+        },
+        {
+          "name": "deadlineSpentByNullOrArenaOomClassificationRetainsItsRoute(boolean) [2] true",
+          "status": "passed"
+        },
+        {
+          "name": "hardStopAfterClassificationRetainsItsRouteWithoutStartingWindows(boolean) [1] false",
+          "status": "passed"
+        },
+        {
+          "name": "hardStopAfterClassificationRetainsItsRouteWithoutStartingWindows(boolean) [2] true",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/NerLazyCreationRetryTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/NerLazyCreationRetryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:26f5c6a14eb138dd5011fab1ff93e0239c9e93436dbed5be387f9271eb6e9a00",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "acquisitionFailuresLeaveNonzeroRetriesPendingWithoutPublication()",
+          "status": "passed"
+        },
+        {
+          "name": "rowFailuresFollowTheExistingDocumentRetryPolicy()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/SpladeBackfillOpsTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/SpladeBackfillOpsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3e91f392600dd82b759d201590a02d35fd59d73e24ba1bf5edd06ff0fac743cd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "encodes reconstructed chunk text from the parent-aware batch reader",
+          "status": "passed"
+        },
+        {
+          "name": "chunk-SPLADE flag OFF: the lane selects whole documents only — it must not encode sparse data the configuration says not to produce (tempdoc 931)",
+          "status": "passed"
+        },
+        {
+          "name": "interleavedSpladeAfterFinalPrimaryCommitIsPersistedByTimer()",
+          "status": "passed"
+        },
+        {
+          "name": "terminalSpladeWarningRequiresPublication()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/SpladeOptInResumeTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/SpladeOptInResumeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:bd96a6619a01312cacac844350c266a56481fbd605d1d36b1044ede7e63a0f63",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "successfulCorpusReachesFullCoverageAndReusesCompletedEmpty()",
+          "status": "passed"
+        },
+        {
+          "name": "restartResumesPendingParentsAndRetainsTerminalStatesAndRetryBudgets()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:349a94276647466f84d9894418999b7d47a72cb71aebf444b3d505e29b7aef61"
+}

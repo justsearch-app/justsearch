@@ -9,11 +9,9 @@
  * component.
  *
  * Search Thread S6 (the Reading Stage) — `components/InspectorPane.ts` (the store's original, and
- * until S6 only, visual consumer: Preview/Context/Answer/Ask tabs) is RETIRED. `UnifiedChatView`
- * subscribes here instead and projects `selected`/`isOpen` onto its own `readingDocPath` @state,
- * rendering the passage in `<jf-document-pane>` (a no-tabs reading surface mounted in its own
- * conversation-zone column) — Context/Answer/Ask are superseded by the unified thread itself, the one
- * place Q&A already happens. `activeTab`/`ai` remain on this store's shape only for plugin-API
+ * until S6 only, visual consumer: Preview/Context/Answer/Ask tabs) is RETIRED. Each window's details
+ * pane subscribes here instead: Search's `jf-sv3-pane`, and `jf-window-details` for every other
+ * window. `activeTab`/`ai` remain on this store's shape only for plugin-API
  * (`host.getInspectorState()`/`subscribeInspector()`) back-compat and the `resetInspectorState()`
  * profile-switch consumer (`main.jsx`); no shipped code still reads them for rendering.
  *
@@ -65,6 +63,12 @@ export interface AiState {
 export interface InspectorState {
   isOpen: boolean;
   selected: SelectedItem | null;
+  /**
+   * The window whose details pane shows `selected`, by surface id; null when no frame placed it.
+   * Each window answers only its own selection, so a split layout's second window cannot show the
+   * first window's document (C4).
+   */
+  owner: string | null;
   activeTab: InspectorTab;
   ai: AiState;
 }
@@ -72,6 +76,7 @@ export interface InspectorState {
 let state: InspectorState = {
   isOpen: false,
   selected: null,
+  owner: null,
   activeTab: 'preview',
   ai: { loading: false, text: '', error: null },
 };
@@ -93,9 +98,17 @@ export function subscribeInspector(listener: (s: InspectorState) => void): () =>
   return () => listeners.delete(listener);
 }
 
+let resolveOwner: () => string | null = () => null;
+
+/** The frame says which window a new selection belongs to: the one the reader is in. */
+export function setInspectorOwnerResolver(resolver: () => string | null): void {
+  resolveOwner = resolver;
+}
+
 export function setSelected(item: SelectedItem | null): void {
   setInspectorState({
     selected: item,
+    owner: item !== null ? resolveOwner() : null,
     isOpen: item !== null ? true : state.isOpen,
     ai: { loading: false, text: '', error: null },
   });

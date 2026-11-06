@@ -78,15 +78,6 @@ async function flush(el: DocumentPane): Promise<void> {
   await el.updateComplete;
 }
 
-/** Click the native button inside a `<jf-button class="icon">`'s composed `<jf-control>`. */
-async function clickIconButton(host: Element): Promise<void> {
-  const jfButton = host.shadowRoot?.querySelector('jf-button.icon');
-  await (jfButton as unknown as { updateComplete: Promise<unknown> }).updateComplete;
-  const ctrl = jfButton!.shadowRoot!.querySelector('jf-control')!;
-  await (ctrl as unknown as { updateComplete: Promise<unknown> }).updateComplete;
-  (ctrl.shadowRoot!.querySelector('button') as HTMLButtonElement).click();
-}
-
 const MD_FIXTURE = ['# Title', '', 'Paragraph text here.', '', '- item a', '- item b'].join('\n');
 
 const CITATION_FIXTURE = {
@@ -674,19 +665,6 @@ describe('DocumentPane — a11y + events', () => {
     expect(pre?.getAttribute('aria-label')).toBeTruthy();
   });
 
-  it('emits pane-close when the header close action activates', async () => {
-    stubFetchOnce({ content: MD_FIXTURE });
-    const el = make();
-    el.docPath = 'notes/thread.md';
-    await flush(el);
-
-    let closed = false;
-    el.addEventListener('pane-close', () => {
-      closed = true;
-    });
-    await clickIconButton(el);
-    expect(closed).toBe(true);
-  });
 });
 
 /**

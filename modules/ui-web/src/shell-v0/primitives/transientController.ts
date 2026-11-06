@@ -21,7 +21,7 @@ import {
 } from '../state/transientLayerArbiter.js';
 
 export interface TransientOptions {
-  /** The arbiter layer (transients share `'transient'`; right-drawers use `'right-drawer'`). */
+  /** The arbiter layer (transients share `'transient'`). */
   layer: string;
   /** Stable id within the layer (e.g. `'peek'`, or a per-instance `context-menu-N`). */
   id: string;
@@ -53,8 +53,7 @@ export interface TransientOptions {
    * (which the UA light-dismisses on Escape / outside-click and closes when a peer auto-popover opens), and a
    * `toggle` listener syncs {@link close} back to the host when the UA closes it. The accessor returns the
    * popover element (typically a shadow-DOM panel), or null until rendered. The `transient` layer's overlays
-   * use this; the docked `right-drawer` drawers keep the arbiter path (no native popover equivalent for their
-   * cross-layer + `dismissExclude` + scroll-lock residue). Mutually exclusive with `managesDismiss`.
+   * use this. Mutually exclusive with `managesDismiss`.
    */
   popoverEl?: () => HTMLElement | null;
 }

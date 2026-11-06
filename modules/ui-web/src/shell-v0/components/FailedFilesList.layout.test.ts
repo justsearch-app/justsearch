@@ -9,15 +9,14 @@
 //   jf-row-actions     339px wide   (two non-shrinking full-label buttons)
 //   .row-info           22px wide x 585px tall   → one character per line, an 822px-tall row
 //
-// The row was a two-column flex line inside a 26rem drawer: `.row-info { flex: 1; min-inline-size: 0 }`
+// The row was a two-column flex line inside a 26rem panel: `.row-info { flex: 1; min-inline-size: 0 }`
 // shrinks, and a button strip does not. Pinning the intent structurally (the row STACKS, the strip
 // WRAPS) is what a headless test can assert; the live re-measure is in the tempdoc's report-back.
 
 import { describe, expect, it } from 'vitest';
-import './FailedJobsDrawer.js';
+import './FailedFilesList.js';
 import './RowActions.js';
-import type { FailedJobsDrawer } from './FailedJobsDrawer.js';
-import { openFailedJobs, __resetFailedJobsDrawer } from '../state/failedJobsDrawer.js';
+import type { FailedFilesList } from './FailedFilesList.js';
 
 function job(over: Partial<Record<string, unknown>> = {}): Record<string, unknown> {
   return {
@@ -44,7 +43,7 @@ async function pump(el: Element): Promise<void> {
   }
 }
 
-describe('FailedJobsDrawer — the row stacks so the path gets the width (914 D2)', () => {
+describe('FailedFilesList — the row stacks so the path gets the width (914 D2)', () => {
   it('.row is a COLUMN, so the path block is never squeezed by the action buttons', async () => {
     const origFetch = globalThis.fetch;
     globalThis.fetch = (async (url: unknown) => {
@@ -57,11 +56,11 @@ describe('FailedJobsDrawer — the row stacks so the path gets the width (914 D2
       return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } });
     }) as typeof fetch;
     try {
-      const el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
+      const el = document.createElement('jf-failed-files-list') as FailedFilesList;
       el.apiBase = 'http://x';
       document.body.appendChild(el);
       await settle(el);
-      openFailedJobs('folder-hash');
+      el.folderPathHash = 'folder-hash';
       await pump(el);
 
       const row = el.shadowRoot?.querySelector('.row') as HTMLElement;
@@ -79,7 +78,6 @@ describe('FailedJobsDrawer — the row stacks so the path gets the width (914 D2
       el.remove();
     } finally {
       globalThis.fetch = origFetch;
-      __resetFailedJobsDrawer();
     }
   });
 

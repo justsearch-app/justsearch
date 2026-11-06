@@ -156,7 +156,7 @@
       "name": "FailedIndexingJobsResponse",
       "schema": "SSOT/schemas/failed-indexing-jobs-response.v1.json",
       "outFile": "failed-indexing-jobs-response.ts",
-      "consumers": ["modules/ui-web/src/shell-v0/components/FailedJobsDrawer.ts"]
+      "consumers": ["modules/ui-web/src/shell-v0/components/FailedFilesList.ts"]
     },
     {
       "name": "ResourceWire",

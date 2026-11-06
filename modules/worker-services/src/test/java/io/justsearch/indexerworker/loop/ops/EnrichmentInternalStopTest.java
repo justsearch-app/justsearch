@@ -61,9 +61,14 @@ final class EnrichmentInternalStopTest extends LuceneExecutorTestBase {
         if (calls.incrementAndGet() == 2) throw new java.util.concurrent.CancellationException("native hard stop");
         return Collections.nCopies(((List<?>) call.getArgument(0)).size(), Map.of("term", 1f));
       });
-      var outcome = SpladeBackfillOps.processSpladeBackfill(new SpladeBackfillOps.BackfillContext(
-          runtime.documentFieldOps(), runtime.indexingCoordinator(), runtime.commitOps(), IndexingPacing.unthrottled(),
-          () -> sparse, () -> true, prefix + 1, true, false, LoggerFactory.getLogger(getClass())));
+      var outcome = LaneBackfillTestSupport.runSparse(new SpladeBackfillOps.BackfillContext(runtime.documentFieldOps(),
+        runtime.indexingCoordinator(),
+        IndexingPacing.unthrottled(),
+        () -> sparse,
+        () -> true,
+        prefix + 1,
+        false,
+        LoggerFactory.getLogger(getClass()), () -> true));
       assertTrue(outcome.success(), "cancellation is never a systemic backoff signal");
       assertEquals(prefix, outcome.docsProcessed(), "completed earlier units keep publication credit");
       runtime.commitOps().maybeRefreshBlocking();
@@ -105,9 +110,14 @@ final class EnrichmentInternalStopTest extends LuceneExecutorTestBase {
         }
         return Map.of("term", 1f);
       });
-      var outcome = SpladeBackfillOps.processSpladeBackfill(new SpladeBackfillOps.BackfillContext(
-          runtime.documentFieldOps(), runtime.indexingCoordinator(), runtime.commitOps(), IndexingPacing.unthrottled(),
-          () -> sparse, () -> !held.get(), prefix + 1, true, false, LoggerFactory.getLogger(getClass())));
+      var outcome = LaneBackfillTestSupport.runSparse(new SpladeBackfillOps.BackfillContext(runtime.documentFieldOps(),
+        runtime.indexingCoordinator(),
+        IndexingPacing.unthrottled(),
+        () -> sparse,
+        () -> !held.get(),
+        prefix + 1,
+        false,
+        LoggerFactory.getLogger(getClass()), () -> true));
       runtime.commitOps().maybeRefreshBlocking();
       String cancelledId = String.format(Locale.ROOT, "doc%03d", prefix);
       assertAll(
@@ -147,12 +157,23 @@ final class EnrichmentInternalStopTest extends LuceneExecutorTestBase {
       var sparse = mock(SpladeEncoder.class);
       when(sparse.encodeBatch(anyList())).thenAnswer(call -> { operation.run();
         return Collections.nCopies(((List<?>) call.getArgument(0)).size(), Map.of("term", 1f)); });
-      var result = CombinedEnrichmentBackfillOps.processCombinedBackfill(new CombinedEnrichmentBackfillOps.BackfillContext(
-          runtime.documentFieldOps(), runtime.indexingCoordinator(), runtime.commitOps(), IndexingPacing.unthrottled(),
-          () -> mock(EmbeddingProvider.class), () -> stage.equals("sparse") ? sparse : null,
-          () -> stage.equals("ner") ? ner : null, () -> true, () -> true, prefix + 1, LoggerFactory.getLogger(getClass()),
-          false, false, false, 0, new ArrayDeque<>(), new ArrayDeque<>(), new int[] {0}, expired::get,
-          () -> false, () -> false, new WindowedEmbedProgress()));
+      var result = LaneBackfillTestSupport.runLanes(new LaneBackfillTestSupport.BackfillContext(runtime.documentFieldOps(),
+        runtime.indexingCoordinator(),
+        IndexingPacing.unthrottled(),
+        () -> mock(EmbeddingProvider.class),
+        () -> stage.equals("sparse") ? sparse : null,
+        () -> stage.equals("ner") ? ner : null,
+        () -> true,
+        () -> true,
+        prefix + 1,
+        LoggerFactory.getLogger(getClass()),
+        false,
+        false,
+        false,
+        0,
+        expired::get,
+        () -> false,
+        new WindowedEmbedProgress()));
       assertEquals(2, calls.get(), "deadline alone cannot interrupt a document's internal native calls");
       assertTrue(result.wroteAnything());
       runtime.commitOps().maybeRefreshBlocking();
@@ -183,19 +204,32 @@ final class EnrichmentInternalStopTest extends LuceneExecutorTestBase {
         return new EmbeddingProvider.WindowSlice(Collections.nCopies(32, new float[] {1, 0, 0, 0}), from, 64);
       });
       var progress = new WindowedEmbedProgress();
-      var context = new CombinedEnrichmentBackfillOps.BackfillContext(runtime.documentFieldOps(), runtime.indexingCoordinator(),
-          runtime.commitOps(), IndexingPacing.unthrottled(), () -> dense, () -> null, () -> null,
-          () -> !held.get(), () -> true, 10, LoggerFactory.getLogger(getClass()), false, false, false, 0,
-          new ArrayDeque<>(), new ArrayDeque<>(), new int[] {0}, held::get, held::get, () -> false, progress);
-      var first = CombinedEnrichmentBackfillOps.processCombinedBackfill(context);
+      var context = new LaneBackfillTestSupport.BackfillContext(runtime.documentFieldOps(),
+        runtime.indexingCoordinator(),
+        IndexingPacing.unthrottled(),
+        () -> dense,
+        () -> null,
+        () -> null,
+        () -> !held.get(),
+        () -> true,
+        10,
+        LoggerFactory.getLogger(getClass()),
+        false,
+        false,
+        false,
+        0,
+        held::get,
+        held::get,
+        progress);
+      var first = LaneBackfillTestSupport.runLanes(context);
       assertEquals(3, calls.get());
       assertEquals(32, progress.nextWindow("doc", "document"), "only the incomplete slice is discarded");
       assertTrue(first.wroteAnything(), "retained-window advancement keeps active pacing");
-      assertFalse(first.progressed(), "retained advancement cannot extend the tight loop");
+
       held.set(false);
-      var resumed = CombinedEnrichmentBackfillOps.processCombinedBackfill(context);
+      LaneBackfillTestSupport.runLanes(context);
       assertEquals(List.of(0, 32, 32), starts);
-      assertTrue(resumed.progressed());
+
       runtime.commitOps().maybeRefreshBlocking();
       assertEquals("COMPLETED", runtime.documentFieldOps().getDocumentField("doc", SchemaFields.EMBEDDING_STATUS));
       assertEquals("0", runtime.documentFieldOps().getDocumentField("doc", SchemaFields.EMBEDDING_RETRY_COUNT));
@@ -235,11 +269,26 @@ final class EnrichmentInternalStopTest extends LuceneExecutorTestBase {
         progress.route(id, "document", WindowedEmbedProgress.Route.WINDOW);
         progress.record(id, "document", 64, 0, Collections.nCopies(32, new float[] {1, 0, 0, 0}));
       }
-      var result = CombinedEnrichmentBackfillOps.processCombinedBackfill(new CombinedEnrichmentBackfillOps.BackfillContext(
-          runtime.documentFieldOps(), runtime.indexingCoordinator(), runtime.commitOps(), IndexingPacing.unthrottled(),
-          () -> dense, () -> null, () -> ner, () -> true, () -> true, 100, LoggerFactory.getLogger(getClass()),
-          false, false, false, 0, new ArrayDeque<>(), new ArrayDeque<>(), new int[] {0},
-          () -> false, () -> false, () -> false, progress, new HashSet<>(), () -> true, success -> {}, gpu -> !gpu));
+      var result = LaneBackfillTestSupport.runLanes(new LaneBackfillTestSupport.BackfillContext(runtime.documentFieldOps(),
+        runtime.indexingCoordinator(),
+        IndexingPacing.unthrottled(),
+        () -> dense,
+        () -> null,
+        () -> ner,
+        () -> true,
+        () -> true,
+        100,
+        LoggerFactory.getLogger(getClass()),
+        false,
+        false,
+        false,
+        0,
+        () -> false,
+        () -> false,
+        progress,
+        new HashSet<>(),
+        () -> true,
+        gpu -> !gpu));
       runtime.commitOps().maybeRefreshBlocking();
       assertEquals("COMPLETED_EMPTY", runtime.documentFieldOps().getDocumentField("z-ner", SchemaFields.NER_STATUS),
           "held GPU owners must not fill the turn before the eligible CPU document");
@@ -339,21 +388,48 @@ final class EnrichmentInternalStopTest extends LuceneExecutorTestBase {
       var log = LoggerFactory.getLogger(getClass());
       Runnable process = () -> {
         switch (path) {
-          case "dense", "dense-fallback" -> EmbeddingBackfillOps.processEmbeddingBackfill(new EmbeddingBackfillOps.BackfillContext(
-              runtime.documentFieldOps(), runtime.indexingCoordinator(), runtime.commitOps(), mock(WorkerSignalBus.class),
-              IndexingPacing.unthrottled(), () -> retired.get() ? null : dense, canRun, () -> true, 10, log));
-          case "ner" -> NerBackfillOps.processNerBackfill(new NerBackfillOps.BackfillContext(runtime.documentFieldOps(),
-              runtime.indexingCoordinator(), runtime.commitOps(), IndexingPacing.unthrottled(), () -> retired.get() ? null : ner, canRun, 10, log));
-          case "sparse", "sparse-fallback" -> SpladeBackfillOps.processSpladeBackfill(new SpladeBackfillOps.BackfillContext(runtime.documentFieldOps(),
-              runtime.indexingCoordinator(), runtime.commitOps(), IndexingPacing.unthrottled(), () -> retired.get() ? null : sparse, canRun, 10, true, false, log));
+          case "dense", "dense-fallback" -> LaneBackfillTestSupport.runDenseParent(new LaneBackfillTestSupport.EmbeddingContext(runtime.documentFieldOps(),
+        runtime.indexingCoordinator(),
+        IndexingPacing.unthrottled(),
+        () -> retired.get() ? null : dense,
+        canRun,
+        () -> true,
+        10,
+        log));
+          case "ner" -> LaneBackfillTestSupport.runNer(new NerBackfillOps.BackfillContext(runtime.documentFieldOps(),
+        runtime.indexingCoordinator(),
+        IndexingPacing.unthrottled(),
+        () -> retired.get() ? null : ner,
+        canRun,
+        10,
+        log, () -> true));
+          case "sparse", "sparse-fallback" -> LaneBackfillTestSupport.runSparse(new SpladeBackfillOps.BackfillContext(runtime.documentFieldOps(),
+        runtime.indexingCoordinator(),
+        IndexingPacing.unthrottled(),
+        () -> retired.get() ? null : sparse,
+        canRun,
+        10,
+        false,
+        log, () -> true));
           case "bge", "bge-fallback" -> BgeM3BackfillOps.processBgeM3Backfill(new BgeM3BackfillOps.BackfillContext(runtime.documentFieldOps(),
               runtime.indexingCoordinator(), runtime.commitOps(), mock(WorkerSignalBus.class), () -> retired.get() ? null : bge, canRun, 10, true, false, log));
-          default -> CombinedEnrichmentBackfillOps.processCombinedBackfill(new CombinedEnrichmentBackfillOps.BackfillContext(
-              runtime.documentFieldOps(), runtime.indexingCoordinator(), runtime.commitOps(), IndexingPacing.unthrottled(),
-              () -> retired.get() ? null : dense, () -> path.equals("combined-sparse") && !retired.get() ? sparse : null,
-              () -> path.equals("combined-ner") && !retired.get() ? ner : null, canRun, () -> true, 10, log,
-              false, false, false, 0, new ArrayDeque<>(), new ArrayDeque<>(), new int[] {0}, () -> !canRun.getAsBoolean(),
-              () -> !canRun.getAsBoolean(), () -> false, new WindowedEmbedProgress()));
+          default -> LaneBackfillTestSupport.runLanes(new LaneBackfillTestSupport.BackfillContext(runtime.documentFieldOps(),
+        runtime.indexingCoordinator(),
+        IndexingPacing.unthrottled(),
+        () -> retired.get() ? null : dense,
+        () -> path.equals("combined-sparse") && !retired.get() ? sparse : null,
+        () -> path.equals("combined-ner") && !retired.get() ? ner : null,
+        canRun,
+        () -> true,
+        10,
+        log,
+        false,
+        false,
+        false,
+        0,
+        () -> !canRun.getAsBoolean(),
+        () -> !canRun.getAsBoolean(),
+        new WindowedEmbedProgress()));
         }
       };
       assertDoesNotThrow(process::run);

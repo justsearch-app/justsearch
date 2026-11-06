@@ -4,7 +4,8 @@
  *
  * Appears on hover over a citation superscript [n] in StreamingTextBlock.
  * Shows excerpt text, document name, and grounding score.
- * Positioned relative to the trigger element via absolute positioning.
+ * The card is translated by viewport coordinates, so its host sits at the viewport's origin. It is
+ * a preview with nothing to press: a click belongs to whatever is under it.
  */
 
 import { html, css, nothing, type TemplateResult } from 'lit';
@@ -44,6 +45,8 @@ export class CitationHoverCard extends JfElement {
   static styles = css`
     :host {
       position: fixed;
+      top: 0;
+      left: 0;
       z-index: var(--z-modal);
       pointer-events: none;
       opacity: 0;
@@ -51,7 +54,6 @@ export class CitationHoverCard extends JfElement {
     }
     :host([visible]) {
       opacity: 1;
-      pointer-events: auto;
     }
     .card {
       max-width: 320px;

@@ -1,21 +1,11 @@
 // @vitest-environment happy-dom
 //
-// Tempdoc 610 §K/§J — the context-inspector drawer: renders the whole-prompt projection (system +
+// Tempdoc 610 §K/§J — the details pane's Context tab: renders the whole-prompt projection (system +
 // conversation + documents) the last turn saw, with per-phase token estimates + the §L.1 position marker.
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import './ContextInspectorPane.js';
 import type { ContextInspectorPane, InspectorView } from './ContextInspectorPane.js';
-import {
-  isContextInspectorOpen,
-  toggleContextInspector,
-  setContextInspectorOpen,
-  __resetContextInspectorDrawer,
-} from '../state/contextInspectorDrawer.js';
-
-afterEach(() => {
-  __resetContextInspectorDrawer();
-});
 
 async function settle(el: Element): Promise<void> {
   await (el as unknown as { updateComplete: Promise<unknown> }).updateComplete;
@@ -43,22 +33,11 @@ const VIEW: InspectorView = {
   windowTokens: 4096,
 };
 
-describe('contextInspectorDrawer store', () => {
-  it('toggles open state', () => {
-    expect(isContextInspectorOpen()).toBe(false);
-    toggleContextInspector();
-    expect(isContextInspectorOpen()).toBe(true);
-    toggleContextInspector();
-    expect(isContextInspectorOpen()).toBe(false);
-  });
-});
-
 describe('ContextInspectorPane (610 §K)', () => {
   it('renders the phases, the system line, the position marker, and the real total', async () => {
     const el = document.createElement('jf-context-inspector-pane') as ContextInspectorPane;
     el.view = VIEW;
     document.body.appendChild(el);
-    setContextInspectorOpen(true);
     await settle(el);
 
     const text = el.shadowRoot?.textContent ?? '';
@@ -77,7 +56,6 @@ describe('ContextInspectorPane (610 §K)', () => {
     const el = document.createElement('jf-context-inspector-pane') as ContextInspectorPane;
     el.view = { systemTokens: null, phases: [], totalTokens: null, windowTokens: null };
     document.body.appendChild(el);
-    setContextInspectorOpen(true);
     await settle(el);
     expect(el.shadowRoot?.querySelector('.empty-state')).not.toBeNull();
     el.remove();

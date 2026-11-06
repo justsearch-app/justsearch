@@ -5,6 +5,8 @@ import { failedChipCopy } from '../state/folderStatus.js';
 import { unavailableBecause } from '../state/availability.js';
 import './Button.js';
 import './ConfirmBand.js';
+import './FailedFilesList.js';
+import type { PluginHostApi } from '../plugin-api/plugin-types.js';
 
 /** Additive projection: existing theme fields and intents remain supported. */
 export interface FolderRow {
@@ -19,6 +21,8 @@ export interface FolderRow {
   readonly walkError?: string;
   readonly failed?: number;
   readonly failedLastKnown?: boolean;
+  /** The backend the failed-files list under the row reads. */
+  readonly apiBase?: string;
   readonly removalBusy?: boolean;
   readonly filesFound?: string;
   readonly collection?: string;
@@ -39,6 +43,8 @@ export type FolderRowIntent = 'remove' | 'show-failed' | 'reveal' | 'reindex' | 
 interface RowActions {
   readonly expanded: boolean;
   readonly enabled: boolean;
+  /** The plugin host's data channel, when the row's host has one. */
+  readonly host?: PluginHostApi | undefined;
   toggle(): void;
   invoke(intent: FolderRowIntent): void;
 }
@@ -143,5 +149,8 @@ export function renderFolderRow(f: FolderRow, actions: RowActions): TemplateResu
     ${f.removeConfirm ? html`<jf-confirm-band heading=${f.removeConfirm.heading} consequence=${f.removeConfirm.consequence}
       action-label=${f.removeConfirm.actionLabel} ?busy=${disabled}
       @confirm-band-confirm=${() => actions.invoke('confirm-remove')} @confirm-band-cancel=${() => actions.invoke('keep')}></jf-confirm-band>` : nothing}
+    ${failed ? html`<jf-failed-files-list .folderPathHash=${f.pathHash ?? ''} .observedCount=${f.failed ?? 0}
+      .lastKnown=${f.failedLastKnown === true} .host_=${actions.host} api-base=${f.apiBase ?? ''}
+      .collapsed=${!actions.expanded} @failed-files-expand=${actions.toggle}></jf-failed-files-list>` : nothing}
   </div>`;
 }

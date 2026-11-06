@@ -1,0 +1,106 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-06T09:13:32.107Z",
+  "revision": "05d31c437ee6495bd2c2c1ed9af6b854469dfc84",
+  "tree": "8727637e1830b6dc8b4ec3a1617b81931d639986",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.details-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/oebe5ixx/tmp/test-intent-vitest-31767-1793956232874.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 179228
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts#X1 the reader’s quiet highlight reads at 4.5:1 in the light theme, Rendered view",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:802b8976fb9f5c507131daabadf44078608de45c0cf56e0e59de861e31bb3b4a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "X1 the reader’s quiet highlight reads at 4.5:1 in the light theme, Rendered view",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts#X1 the reader’s quiet highlight in dark colours, Rendered view, the passage keeps the ink around it",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:802b8976fb9f5c507131daabadf44078608de45c0cf56e0e59de861e31bb3b4a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "X1 the reader’s quiet highlight in dark colours, Rendered view, the passage keeps the ink around it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts#X1 the reader’s quiet highlight in dark colours, Source view, the passage keeps the ink around it",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:802b8976fb9f5c507131daabadf44078608de45c0cf56e0e59de861e31bb3b4a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "X1 the reader’s quiet highlight in dark colours, Source view, the passage keeps the ink around it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts#X1 the reader’s quiet highlight in forced colours, Rendered view, the passage keeps the ink around it",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:802b8976fb9f5c507131daabadf44078608de45c0cf56e0e59de861e31bb3b4a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "X1 the reader’s quiet highlight in forced colours, Rendered view, the passage keeps the ink around it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts#X1 the reader’s quiet highlight in forced colours, Source view, the passage keeps the ink around it",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:802b8976fb9f5c507131daabadf44078608de45c0cf56e0e59de861e31bb3b4a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "X1 the reader’s quiet highlight in forced colours, Source view, the passage keeps the ink around it",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:2a80bdc7086747b5dc8c2bc10e44b3e29931d32fc654dd3a7393cbb6192b280b"
+}

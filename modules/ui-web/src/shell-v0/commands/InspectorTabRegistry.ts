@@ -2,9 +2,8 @@
 /**
  * InspectorTabRegistry — Tempdoc 508 §4.2 — inspector tab contribution.
  *
- * The InspectorPane reads from this registry to render its tab list.
- * Core tabs are pre-registered; plugins append additional tabs via
- * PluginContribution.
+ * Each window's details pane reads this registry for the tabs it adds after its own;
+ * plugins contribute them via PluginContribution.
  *
  * Tempdoc 543 §28.W7 — uses the shared `createRegistry` primitive.
  */

@@ -7,7 +7,6 @@ import static org.mockito.ArgumentMatchers.*;
 
 import io.justsearch.adapters.lucene.runtime.*;
 import io.justsearch.configuration.FieldCatalogDef;
-import io.justsearch.indexerworker.coordination.WorkerSignalBus;
 import io.justsearch.indexerworker.embed.EmbeddingProvider;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexing.SchemaFields;
@@ -40,9 +39,14 @@ final class EnrichmentPublicationBenchmarkTest extends LuceneExecutorTestBase {
         List<String> contents = invocation.getArgument(0);
         return contents.stream().map(text -> { float[] vector = new float[384]; vector[0] = 1; return vector; }).toList();
       });
-      var context = new EmbeddingBackfillOps.BackfillContext(runtime.documentFieldOps(), coordinator,
-          runtime.commitOps(), mock(WorkerSignalBus.class), IndexingPacing.unthrottled(),
-          () -> provider, () -> true, () -> true, 128, LoggerFactory.getLogger(getClass()));
+      var context = new LaneBackfillTestSupport.EmbeddingContext(runtime.documentFieldOps(),
+        coordinator,
+        IndexingPacing.unthrottled(),
+        () -> provider,
+        () -> true,
+        () -> true,
+        128,
+        LoggerFactory.getLogger(getClass()));
       for (int pass = 0; pass < 16; pass++) {
         for (int i = 0; i < 128; i++) runtime.indexingCoordinator().indexSingle(new IndexDocument(Map.of(
             SchemaFields.DOC_ID, "fixture-" + i, SchemaFields.DOC_UID, "uid-" + i,
@@ -51,13 +55,13 @@ final class EnrichmentPublicationBenchmarkTest extends LuceneExecutorTestBase {
         runtime.commitOps().commitAndTrack(CommitReason.TIMER);
         runtime.commitOps().maybeRefreshBlocking();
         long batchStart = System.nanoTime();
-        var result = EmbeddingBackfillOps.processEmbeddingBackfill(context);
+        var result = LaneBackfillTestSupport.runDenseParent(context);
         endToEnd.add(System.nanoTime() - batchStart);
         assertEquals(128, result.docsProcessed());
       }
-      assertEquals(16, times.size());
-      var measured = times.subList(4, times.size()).stream().sorted().toList();
-      System.out.println("PUBLICATION_MEDIAN_NS=" + (measured.get(5) + measured.get(6)) / 2.0);
+      assertEquals(16 * 16, times.size());
+      var measured = times.subList(4 * 16, times.size()).stream().sorted().toList();
+      System.out.println("PUBLICATION_MEDIAN_NS=" + (measured.get(measured.size() / 2 - 1) + measured.get(measured.size() / 2)) / 2.0);
       System.out.println("PUBLICATION_SAMPLES_NS=" + measured);
       var batchTimes = endToEnd.subList(4, endToEnd.size()).stream().sorted().toList();
       System.out.println("END_TO_END_MEDIAN_NS=" + (batchTimes.get(5) + batchTimes.get(6)) / 2.0);

@@ -113,10 +113,14 @@ final class SpladeOptInResumeTest extends LuceneExecutorTestBase {
   }
 
   private static void process(RunningRuntime runtime, SpladeEncoder encoder) {
-    SpladeBackfillOps.processSpladeBackfill(new SpladeBackfillOps.BackfillContext(
-        runtime.documentFieldOps(), runtime.indexingCoordinator(), runtime.commitOps(),
-        IndexingPacing.unthrottled(), () -> encoder, () -> true, 100, true, false,
-        LoggerFactory.getLogger(SpladeOptInResumeTest.class)));
+    LaneBackfillTestSupport.runSparse(new SpladeBackfillOps.BackfillContext(runtime.documentFieldOps(),
+        runtime.indexingCoordinator(),
+        IndexingPacing.unthrottled(),
+        () -> encoder,
+        () -> true,
+        100,
+        false,
+        LoggerFactory.getLogger(SpladeOptInResumeTest.class), () -> true));
   }
 
   private static void commit(RunningRuntime runtime) {

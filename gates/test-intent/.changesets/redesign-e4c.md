@@ -1,0 +1,525 @@
+---
+schema: test-intent.v1
+task: redesign-e4c
+author-role: builder
+author-session: redesign-e4c-builder
+---
+
+# Test-intent entries
+
+Source location: task redesign-e4c request. This is E4c deletion and transfer.
+All production enrichment callers now use bounded lane operations. The combined sparse/NER
+phases, combined outcome/signature, full embedding batches, full-batch entry points, inert dense
+share supplier, ID caches, batch counter and per-operation commit fields are removed. Dense
+pooling, authority/revision guards, receipts and scheduler settings/metric names are unchanged.
+
+Settled E4b decisions quoted by the assignment: "The combined bundled write no longer exists
+for separate providers, so storage attribution is per lane write"; the dense-share supplier is
+inert because "the three-second dense reservation" is gone ("The dense reservation became a
+ledger assertion"). The third decision restores the terminal SPLADE diagnostic. The lane also
+keeps the per-stage "Enrichment dispositions" log formerly emitted by the combined path, and restores its `splade.attempts` observation immediately before native sparse work. Sparse/NER native work also inherits the existing `enrichment.batch` tracing scope formerly supplied by the combined path.
+
+The verification compatibility patch adds only constructor forwarding overloads to HEAD. It
+restores no diagnostic or behavior, and lets the same transferred tests compile against the
+original production operations in a shared clone with its own build folders. Preservation runs
+must pass on both sides; diagnostic repairs and restored materialization-prefix outcomes must fail before by assertion. The materialization repair baseline is e0e897e5da0ed798038451ed8901fa7323dd1387 (HEAD at repair round 2 start). The builder leaves
+evidence JSON and acceptance records to the independent verifier, as requested.
+
+```json
+{
+  "entries": [
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/CombinedChunkPublicationTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/EnrichmentLaneDecompositionTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/BackfillSnapshotTestSupport.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/BlankChunkReadinessIntegrationTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/BulkEncodeUrgencyTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/BulkPacePolicyUseTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/BulkPaceStretchTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOpsTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentCycleBudgetTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentFailureAccountingTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentLongDocumentTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentRmwIntegrationTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/DisambiguationReconciliationTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EmbeddingBackfillOpsTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAttemptAccountingTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAuthorityRaceTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentExclusionPublicationTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentInternalStopTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentMapperDispositionTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentPreservationTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentPublicationBenchmarkTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentQuarantineProgressTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentRevisionRaceTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/LaneBackfillTestSupport.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/NerBackfillOpsTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/NerLazyCreationRetryTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/SpladeBackfillOpsTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/SpladeOptInResumeTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "signature",
+        "split",
+        "instrumentation",
+        "input re-encoding"
+      ],
+      "whatMoved": "The surviving assertions run the production processDenseUnit, processParentBackfill/processChunkBackfill, and processNerUnit operations. Test-only fixtures retain their input maps and state between native turns, take immutable copies of submitted updates before scratch maps are cleared, and supply explicit pending status/chunk metadata. Source-replacement hooks run at getEnrichmentInputPage or at the retained fallback native call, rather than at a retired batch call. Assertions on stored fields, retry limits, receipts, unavailable providers, no stale/excluded publication, reconstructed text, pooling, and hard stops are retained. Separate native turns and an explicit reader refresh observe unaffected siblings. The original same-batch lazy-result fault in spladeSliceFailurePreservesItsSuccessfulPrefixAndDoesNotChargeTheTail is restored: a successful first row must publish COMPLETED with retry zero even when reading the second result throws, and the unselected tail remains uncharged. First- and last-result faults retain that outcome. The dense parent/chunk kernel had the same prefix-loss gap; it now materializes aligned results row by row, publishes the read prefix, and retains only the unread suffix for a later fallback unit without charging it. NER reads one result per native unit and already isolates a read failure to that document; first/middle/last failing units retain other publications and leave the unselected tail uncharged. These are restored production outcomes required by repair round 2, tracked in the additional New entry below rather than claimed as a pure test adaptation. The separate Obsolete entries below account for the exact retired contracts; no such assertion is claimed as an adaptation.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "location": "task redesign-e4c request",
+          "quote": "delete production code left with only test callers after the fair scheduler landed, and move its tests to the lane operations."
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOpsTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentFailureAccountingTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAttemptAccountingTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentInternalStopTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/CombinedChunkPublicationTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentPublicationBenchmarkTest.java"
+      ],
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "location": "task redesign-e4c request",
+          "quote": "an assertion on a contract only the combined op had (progressed(), bundling, share supplier) may be retired as Obsolete when the outcome it protects is kept in a lane test."
+        },
+        {
+          "kind": "removal",
+          "removed": [
+            "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOps.java#processCombinedBackfill",
+            "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOps.java#CombinedOutcome"
+          ]
+        }
+      ],
+      "conflictSearch": "decision records searched for a conflict: none. combined shape and continuation: Retired CombinedOutcome.progressed()/recordTiming() assertions, the complete-batch completion-count assertion, combined selection of the unadmitted NER tail, and single merged/bundled-write assertions. CombinedChunkPublicationTest still requires 50 accepted chunk writes in total and exactly 50 encodes with and without refresh; the benchmark measures all bounded unit writes after four warm-up passes. Blank-content retry counts, terminal FAILED, no reselection, accepted-prefix receipts, and retained owner release remain asserted on lanes. Native unit selection can leave an unstarted tail CANCELLED when a provider retires; all selected rows must remain uncharged and unpublished."
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentLongDocumentTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOpsTest.java"
+      ],
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "location": "task redesign-e4c request",
+          "quote": "an assertion on a contract only the combined op had (progressed(), bundling, share supplier) may be retired as Obsolete when the outcome it protects is kept in a lane test."
+        },
+        {
+          "kind": "removal",
+          "removed": [
+            "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOps.java#embedShareExhaustedSupplier"
+          ]
+        }
+      ],
+      "conflictSearch": "decision records searched for a conflict: none. dense reservation: Retired exhaustedEmbeddingShareDoesNotForceAFirstDenseUnit and the two reservation/starvation control methods in CombinedEnrichmentLongDocumentTest. The share supplier is inert because \"the three-second dense reservation\" is gone: \"The dense reservation became a ledger assertion\". Lane admission replaces the share supplier in realPendingSpladeAllowsDeferralButNeverWritesThePreservationOnlyUpdate; its sparse publication and unchanged withheld dense artifact remain asserted. Independent NER/peer service under dense holds is checked by EnrichmentLaneDecompositionTest#acquisitionFailureHoldsProviderWithoutRetryChargeAndPeersContinue and FairEnrichmentSchedulerTest#D5b_oneProviderHoldCoversEveryLaneItServesThroughBothCallers. FairEnrichmentSchedulerTest#D1_continuingIngestionServesEveryContinuouslyEligibleLane and #D3_unequalCostsShareChargedServiceNotTurnCounts protect the scheduling outcome."
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/BulkPacePolicyUseTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentCycleBudgetTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentPreservationTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentRevisionRaceTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java"
+      ],
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "location": "task redesign-e4c request",
+          "quote": "an assertion on a contract only the combined op had (progressed(), bundling, share supplier) may be retired as Obsolete when the outcome it protects is kept in a lane test."
+        },
+        {
+          "kind": "removal",
+          "removed": [
+            "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOps.java#processCombinedBackfill",
+            "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOps.java#CombinedOutcome"
+          ]
+        }
+      ],
+      "conflictSearch": "decision records searched for a conflict: none. per-batch scheduling and duplicate combined cases: Combined priority-chunk ordering and once-per-combined-call classification/phase limits no longer select service. manyLateChunkedParentsDoNotSpendTheCycleOnClassification, slowOverLimitProbeDoesNotStarveChunks, and slowSuccessfulSinglePassDoesNotStarveChunks are superseded by FairEnrichmentSchedulerTest#P1095_chunksAdvanceWithinThreeCyclesUnderTheOriginalLongDocumentCosts, with deadline/arena-OOM route retention also checked by EnrichmentUnitBoundaryTest#deadlineSpentByNullOrArenaOomClassificationRetainsItsRoute. The chunk-only tail stays in chunksAdvanceDuringResumableParentBacklogAndThroughTheChunkOnlyTail; normalEncoderSequenceMatchesRoundOne keeps its 830ms modeled work and 18 publications, retiring only the cross-lane order. Combined variants of EnrichmentPreservationTest keyset/budget cases duplicate their DENSE_PARENT, DENSE_CHUNK, SPARSE_PARENT, SPARSE_CHUNK and NER variants and are omitted; its poison batch returns aligned bad-row output so a bounded turn tests the same cursor oracle without inline fallback. COMBINED geometry/revision proof-race variants duplicate CHUNK and SPLADE in EnrichmentRevisionRaceTest#legacyProofRaceCannotPublishFailure. A completed unit need not have selected a later NER/sparse unit to cancel: call counts and absence of retry charges remain checked by EnrichmentUnitBoundaryTest#hardStopAfterOneUnitPreservesItsResultAndLeavesTheRestCancelled."
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAttemptAccountingTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentMapperDispositionTest.java"
+      ],
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "removal",
+          "removed": [
+            "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/EmbeddingBackfillOps.java#processEmbeddingBackfill",
+            "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/SpladeBackfillOps.java#commitAfterBatch",
+            "modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/ops/NerBackfillOps.java#commitOps"
+          ]
+        }
+      ],
+      "conflictSearch": "decision records searched for a conflict: none. Retired per-operation commit expectations together with the removed batch operations and inert commit fields. The lane unit assertions require no commit; FairEnrichmentSchedulerTest#D9_smallTurnsUseTheThresholdsRetryAFailedCommitAndDrainAtIdle retains scheduler-owned durability, threshold, retry and idle-drain outcomes."
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/SpladeBackfillOpsTest.java"
+      ],
+      "class": "New",
+      "behaviour": "One terminal SPLADE warning follows an accepted FAILED publication, including acceptance followed by result-delivery failure, and never a rejected write. It names the document and occurs only once in that operation.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "location": "task redesign-e4c request",
+          "quote": "Move the \"reached terminal SPLADE FAILED\" warning into the production SPLADE lane path, emitted once and only after the terminal failure is published, and keep terminalSpladeWarningRequiresPublication as a lane test."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/redesign-e4c-terminal-warning.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/SpladeBackfillOpsTest.java#terminalSpladeWarningRequiresPublication"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAttemptAccountingTest.java"
+      ],
+      "class": "New",
+      "behaviour": "The production sparse lane reports the existing splade.attempts observation when native sparse encoding is attempted; untouched completed sparse work still produces no sparse attempt.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "location": "task redesign-e4c request",
+          "quote": "A diagnostic, log or metric only the combined path had moves to the lane path the same way; a contract only the combined op had is retired under the earlier rule."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/redesign-e4c-native-attempt.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAttemptAccountingTest.java#receiptSeparatesComputedAcceptedEmptyFailedAndStale"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentLaneTracingTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Sparse and NER native work inherit the existing enrichment.batch tracing scope, and both lane operations restore their caller context after publication.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "location": "task redesign-e4c request",
+          "quote": "A diagnostic, log or metric only the combined path had moves to the lane path the same way; a contract only the combined op had is retired under the earlier rule."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/redesign-e4c-tracing.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentLaneTracingTest.java#sparseNativeWorkInheritsTheEnrichmentSpan",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentLaneTracingTest.java#nerNativeWorkInheritsTheEnrichmentSpan"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentFailureAccountingTest.java"
+      ],
+      "class": "New",
+      "behaviour": "SPLADE preserves and publishes the successfully materialized prefix of one batch when reading a later result fails, and does not charge an unselected tail. Dense parent/chunk units preserve the same prefix and defer the unread suffix to their existing fallback route without retry charges. First, middle and last result failures are covered; NER already isolates each one-row result read and needs no production repair.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "location": "task redesign-e4c request",
+          "quote": "restore the original same-batch fault in the test, and make the production SPLADE lane keep the outcome: rows read successfully before the failure are published COMPLETED, the tail is not charged."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/redesign-e4c-materialization.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentFailureAccountingTest.java"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentMaterializationTest.java"
+      ],
+      "class": "New",
+      "behaviour": "SPLADE parent and chunk batch reads publish no partial results on cancellation, interruption or provider hold. The caller interrupt survives, the Lucene writer remains usable, and the provider hold reaches the scheduler. All four SPLADE/dense parent/chunk lanes check first, middle and last faults, ordinary prefix completion with searchable artifacts, uncharged unselected tails, retirement and stale-row rejection.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "location": "task redesign-e4c request",
+          "quote": "Thread interrupted | Nothing publishes; rows stay PENDING; the interrupt is restored; the writer stays usable (same as commit e0e897e5da)"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/redesign-e4c-materialization-guards.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentMaterializationTest.java"
+      ],
+      "repaired": true
+    }
+  ]
+}
+```
+
+## Retired assertions and equivalent checks
+
+Each row is Obsolete; retained or equivalent checks are named explicitly. Test class names in
+this table are citations, not method selectors for the evidence runner.
+
+| Old assertion/check | Retained outcome / equivalent check |
+| --- | --- |
+| `CombinedEnrichmentBackfillOpsTest#blankContentEscalation_progressedOnlyOnTheTerminalCycle` | Only progressed() is retired. Retry count, terminal FAILED and no reselection remain in this lane check and CombinedEnrichmentCycleBudgetTest#realWindowFailureStillReachesTheRetryLimit. |
+| `CombinedEnrichmentBackfillOpsTest#embedBatchSizeMismatch_fallsBackToIndividualAttempts` | Combined continuation/routing signal; stored-state, retry and receipt assertions remain. |
+| `CombinedEnrichmentBackfillOpsTest#completedParentSplade_deadlineAfterEmbedding_preservesAndPublishes` | Combined continuation/routing signal; stored-state, retry and receipt assertions remain. |
+| `CombinedEnrichmentBackfillOpsTest#completedParentSplade_preservationFollowsNerOutcome` | Combined continuation/routing signal; stored-state, retry and receipt assertions remain. |
+| `CombinedEnrichmentBackfillOpsTest#completedParentPreservationDoesNotDeferItsOwnPendingEmbedding` | Combined continuation/routing signal; stored-state, retry and receipt assertions remain. |
+| `CombinedEnrichmentBackfillOpsTest#realPendingSpladeAllowsDeferralButNeverWritesThePreservationOnlyUpdate` | Combined continuation/routing signal; stored-state, retry and receipt assertions remain. |
+| `CombinedEnrichmentBackfillOpsTest#acceptedPartialPublicationReleasesOnlyItsOwnerBesideWithheldPeer` | Combined continuation/routing signal; stored-state, retry and receipt assertions remain. |
+| `CombinedEnrichmentBackfillOpsTest#completedWindowPublishesWithoutPreservationInference` | Combined continuation/routing signal; stored-state, retry and receipt assertions remain. |
+| `CombinedEnrichmentBackfillOpsTest#chunkSpladeOff_repeatedCycles_neverEscalateChunkToFailed` | Combined continuation/routing signal; stored-state, retry and receipt assertions remain. |
+| `CombinedEnrichmentFailureAccountingTest#completedSparseIsNotEncodedOrCountedAsNewWork` | Combined continuation/routing signal; stored-state, retry and receipt assertions remain. |
+| `CombinedEnrichmentFailureAccountingTest#completionCreditRequiresSuccessfulPublication` | Combined continuation/routing signal; stored-state, retry and receipt assertions remain. |
+| `EnrichmentAttemptAccountingTest#publicationFailureStillReportsTheAcceptedPrefix` | Combined continuation/routing signal; stored-state, retry and receipt assertions remain. |
+| `EnrichmentAttemptAccountingTest#selectionCancellationIsTimedWithoutChangingTheRoutingSignal` | Combined continuation/routing signal; stored-state, retry and receipt assertions remain. |
+| `EnrichmentInternalStopTest#anInternalDenseStopKeepsEarlierValidSlicesAndTheirActivePacingCredit` | Combined continuation/routing signal; stored-state, retry and receipt assertions remain. |
+| `CombinedEnrichmentCycleBudgetTest#realWindowFailureStillReachesTheRetryLimit` | Combined continuation/routing signal; stored-state, retry and receipt assertions remain. |
+| `CombinedEnrichmentBackfillOpsTest#allThreeEncoders_embeddingFailsOthersSucceed_singleMergedBatchedWrite` | One merged write retired; independent failed dense retry plus successful SPLADE/NER artifacts remain. |
+| `CombinedEnrichmentBackfillOpsTest#lateChunking_flagOn_chunkedParent_singlePassVectorBundledWithSpladeAndNer` | One merged vector/sparse/NER write retired; single-pass vector, all stage outputs and untouched chunks remain. |
+| `CombinedEnrichmentBackfillOpsTest#lateChunking_flagOn_embedWithSpansThrowsNonArenaOom_escalatesParentOnly_spladeStillBundled` | Cross-provider bundling retired; parent retry and independent sparse artifact remain. |
+| `CombinedChunkPublicationTest#completedChunksAreNotEncodedAgain` | One 50-row write retired; 50 accepted rows and 50 encodes remain with/without refresh. |
+| `EnrichmentUnitBoundaryTest#exhaustedEmbeddingShareDoesNotForceAFirstDenseUnit` | Obsolete share supplier; peer NER service under dense holds is covered by acquisitionFailureHoldsProviderWithoutRetryChargeAndPeersContinue and D5b_oneProviderHoldCoversEveryLaneItServesThroughBothCallers. |
+| `CombinedEnrichmentLongDocumentTest#embedStageCannotConsumeTheWholeCycleWhileSpladeAndNerHaveWork` | Obsolete reservation; D1_continuingIngestionServesEveryContinuouslyEligibleLane and D3_unequalCostsShareChargedServiceNotTurnCounts retain fairness. |
+| `CombinedEnrichmentLongDocumentTest#withoutTheReservationEmbedStarvesSpladeAndNer` | Obsolete absence-of-reservation control; same fair-scheduler lane checks retain nonstarvation. |
+| `CombinedEnrichmentCycleBudgetTest#manyLateChunkedParentsDoNotSpendTheCycleOnClassification` | Duplicate scheduling check: P1095_chunksAdvanceWithinThreeCyclesUnderTheOriginalLongDocumentCosts; deadlineSpentByNullOrArenaOomClassificationRetainsItsRoute keeps both fallback classifications. |
+| `CombinedEnrichmentCycleBudgetTest#slowOverLimitProbeDoesNotStarveChunks` | Duplicate: P1095_chunksAdvanceWithinThreeCyclesUnderTheOriginalLongDocumentCosts (4900,false). |
+| `CombinedEnrichmentCycleBudgetTest#slowSuccessfulSinglePassDoesNotStarveChunks` | Duplicate: P1095_chunksAdvanceWithinThreeCyclesUnderTheOriginalLongDocumentCosts (4900,true). |
+| `CombinedEnrichmentCycleBudgetTest#chunksAdvanceDuringResumableParentBacklogAndThroughTheChunkOnlyTail` | Mixed fixed-order priority limits retired/covered by P1095; the 50-chunk tail remains in this lane check. |
+| `CombinedEnrichmentCycleBudgetTest#normalEncoderSequenceMatchesRoundOne` | Fixed cross-lane order retired; 830ms modeled work, 18 published vectors and no abort remain. |
+| `BulkPacePolicyUseTest#eachPhaseIsSlicedAtTheSizeThePolicyNames` | Combined-only injected phase policy retired; production native-unit counts and phase separation remain. BulkPaceStretchTest keeps the one-second pacing bound on the surviving lanes. |
+| `EnrichmentAttemptAccountingTest#cancelledFallbackPartitionsEverySelectedStageOnce` | Combined NER-tail enrollment retired; cancellation partitions every row actually selected by dense/sparse units and the one-document NER unit, with no retry charge. |
+| `EnrichmentAttemptAccountingTest#computedOutputsSurviveProviderRetirementInBatchAndIndividualFallback` | Combined started-tail disposition contract retired; all selected rows remain deferred/cancelled, uncharged and unpublished, with computed output retained in accounting. |
+| `EnrichmentAttemptAccountingTest#individualNerReportsAcceptedEmptyAndRejectedComputedOutput` | Batch-owned commit retired; accepted-empty and stale receipts remain per NER unit; D9_smallTurnsUseTheThresholdsRetryAFailedCommitAndDrainAtIdle covers durability. |
+| `EnrichmentAttemptAccountingTest#individualSpladeRetainsComputedPrefixWhenALaterSliceIsCancelled` | Batch-owned commit retired; accepted prefix, cancellation and no systemic backoff remain; same D9 scheduler durability check. |
+| `EnrichmentMapperDispositionTest#individualFallbackReportsRejectedOutputWithoutChangingCommitOrRetry` | Batch-owned commit retired; rejected output, unchanged retry and no false completion remain; same D9 durability check. |
+| `EnrichmentUnitBoundaryTest#hardStopAfterOneUnitPreservesItsResultAndLeavesTheRestCancelled` | Unselected sparse/NER tail need not have cancellation tickets. One native call, published completed unit and no retry charge remain. |
+| `EnrichmentPreservationTest#keysetTurnsPassPoisonSurviveRefreshDeletionAndIdleThenWrap and #budgetDeferredSuffixIsNextTurnWithoutBlankRetriesOrCharges` | Duplicate COMBINED variants removed; identical named checks run on each actual dense/sparse/NER lane. |
+| `EnrichmentRevisionRaceTest#legacyProofRaceCannotPublishFailure` | Duplicate COMBINED proof-race variants removed; CHUNK and SPLADE variants retain geometry/revision race outcomes. |
+
+## Verification commands
+
+The slot wrapper also accepts scripts that launch Gradle; run these commands one at a time,
+in the background. Whole-class selectors cover display-named and parameterized checks.
+
+```bash
+env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot node scripts/governance/gates/test-intent/run-evidence.mjs \
+  --out gates/test-intent/evidence/redesign-e4c-preservation.json \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/CombinedChunkPublicationTest.java \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/EnrichmentLaneDecompositionTest.java \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/BlankChunkReadinessIntegrationTest.java \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/BulkEncodeUrgencyTest.java \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/BulkPacePolicyUseTest.java \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/BulkPaceStretchTest.java \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentBackfillOpsTest.java \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentCycleBudgetTest.java \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentFailureAccountingTest.java \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentLongDocumentTest.java \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentRmwIntegrationTest.java \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/DisambiguationReconciliationTest.java \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EmbeddingBackfillOpsTest.java \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAttemptAccountingTest.java \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAuthorityRaceTest.java \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentExclusionPublicationTest.java \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentHardStopRepairTest.java \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentInternalStopTest.java \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentMapperDispositionTest.java \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentPreservationTest.java \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentPublicationBenchmarkTest.java \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentQuarantineProgressTest.java \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentRevisionRaceTest.java \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentUnitBoundaryTest.java \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/NerLazyCreationRetryTest.java \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/SpladeBackfillOpsTest.java \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/SpladeOptInResumeTest.java
+```
+
+```bash
+env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot node scripts/governance/gates/test-intent/run-evidence.mjs \
+  --out gates/test-intent/evidence/redesign-e4c-terminal-warning.json \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/SpladeBackfillOpsTest.java#terminalSpladeWarningRequiresPublication \
+  --before cad41077bf813880cc36f2ed699b8fc3760c9af6 \
+  --overlay modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/LaneBackfillTestSupport.java \
+  --overlay modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/BackfillSnapshotTestSupport.java \
+  --before-patch gates/test-intent/.changesets/redesign-e4c-before.patch
+```
+
+```bash
+env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot node scripts/governance/gates/test-intent/run-evidence.mjs \
+  --out gates/test-intent/evidence/redesign-e4c-native-attempt.json \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentAttemptAccountingTest.java#receiptSeparatesComputedAcceptedEmptyFailedAndStale \
+  --before cad41077bf813880cc36f2ed699b8fc3760c9af6 \
+  --overlay modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/LaneBackfillTestSupport.java \
+  --overlay modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/BackfillSnapshotTestSupport.java \
+  --before-patch gates/test-intent/.changesets/redesign-e4c-before.patch
+```
+
+```bash
+env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot node scripts/governance/gates/test-intent/run-evidence.mjs \
+  --out gates/test-intent/evidence/redesign-e4c-tracing.json \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentLaneTracingTest.java#sparseNativeWorkInheritsTheEnrichmentSpan \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentLaneTracingTest.java#nerNativeWorkInheritsTheEnrichmentSpan \
+  --before cad41077bf813880cc36f2ed699b8fc3760c9af6 \
+  --overlay modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/BackfillSnapshotTestSupport.java \
+  --before-patch gates/test-intent/.changesets/redesign-e4c-before.patch
+```
+
+## Repair round 2 verification command
+
+The independent verifier can produce the restored-outcome evidence with the command below.
+The builder runs the checks directly in a shared baseline clone and the candidate, without
+writing evidence JSON. NER is a preservation check, so it stays out of this fail-before command.
+
+```bash
+env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot node scripts/governance/gates/test-intent/run-evidence.mjs \
+  --out gates/test-intent/evidence/redesign-e4c-materialization.json \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentFailureAccountingTest.java \
+  --before e0e897e5da0ed798038451ed8901fa7323dd1387
+```
+
+## Repair round 3 verification command
+
+The repair-round-3 starting HEAD is `55d37227187f113f06cb6e55b13b3167da30942a`.
+This class-level selector covers every parameterized case. The verifier may write the evidence;
+the builder runs shared-clone checks directly and writes no evidence JSON.
+
+```bash
+env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot node scripts/governance/gates/test-intent/run-evidence.mjs \
+  --out gates/test-intent/evidence/redesign-e4c-materialization-guards.json \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentMaterializationTest.java \
+  --before 55d37227187f113f06cb6e55b13b3167da30942a
+```
+
+NerBackfillOpsTest is display-named and nested, so the evidence runner cannot select it; it runs in
+`:modules:worker-services:test`.
+
+## Builder check observations
+
+The focused command selects `io.justsearch.indexerworker.loop.ops.*`,
+`*CombinedChunkPublicationTest`, `*EnrichmentLaneDecompositionTest`,
+`*FairEnrichmentSchedulerTest` and `*BackfillSchedulerModeRecordingTest` from
+`:modules:worker-services:test`, with `-PskipWebBuild=true --continue`.
+An early focused run exhausted the test JVM heap; after correcting the transfer fixtures,
+the final focused run completed: 1,067 checks passed, none failed or skipped. The identical
+checks on shared HEAD plus signature-only compatibility forwarding completed with 1,063 passes
+and exactly four assertion failures: terminalSpladeWarningRequiresPublication,
+receiptSeparatesComputedAcceptedEmptyFailedAndStale (splade.attempts), and the sparse/NER trace
+scope methods. These are the intended diagnostic repairs; all preservation checks passed before
+and after. The full three-module command completed:
+adapters-lucene had 1,019 checks with no failures (3 skipped), indexer-worker had 2,639 with
+no failures (39 skipped). Worker-services initially had nine failures: five transfer-fixture
+failures subsequently fixed and covered by the focused run, plus the known LinuxRootMountInfoTest
+and three WatcherUnavailabilityScopeTest environment failures. No skip is counted as a pass.
+
+The first pre-push run found an unused parameter and dangling links to retired tests; the next
+found three unnecessary qualifiers. These were corrected without suppressions or rule changes.
+The final `node scripts/dev/java-prepush.mjs --unreferenced` completed successfully in 6m48s,
+including PMD, the unreferenced-code check, app-services integration tests and UI integration
+tests (the UI suite retained its five configured skips).
+The test-intent gate reports only missing evidence/acceptance. Its nonblocking reconsider-rate
+finding is 26.1% (12 of 46 audited PRs), above 10%.
+
+Checks used the shared Gradle cache and slot, separate build folders in the shared before clone,
+and test-owned temporary resources. No shared dev stack was started; no `.agents/preflight`
+exists. The work is uncommitted: this worktree's Git metadata is outside the writable sandbox.
+No evidence JSON was written; acceptance is left to the independent verifier.
+
+## Repair round 2 builder observations
+
+The baseline is `e0e897e5da0ed798038451ed8901fa7323dd1387`, checked out in a shared
+clone at `$TMPDIR/before` with its own build directories. With only the candidate test file
+copied in, the failure-accounting class ran 29 checks: 21 passed and eight failed by assertion.
+Those failures were the restored same-batch SPLADE fault, its last-element neighbour, and all
+six dense parent/chunk first/middle/last cases. All three NER cases passed before the repair.
+NER reads one result per native unit and already isolates materialization failures; no NER
+production change was needed.
+
+The final focused command described above passed all 1,078 checks, with no failures or skips.
+An earlier candidate exposed 18 retirement-accounting assertion failures; retaining the original
+SPLADE computed/retirement order while changing only result materialization resolved them.
+The complete `:modules:worker-services:test -PskipWebBuild=true --continue` run reported
+4,254 checks, four failures and 23 skips in 7m30s. The failures were exactly the known
+`LinuxRootMountInfoTest#missingDanglingAndAmbiguousUuidMappingsAreUnknown` and the three
+`WatcherUnavailabilityScopeTest` environment failures; no skip is claimed as a pass.
+
+`env -u DISPLAY -u WAYLAND_DISPLAY node scripts/dev/java-prepush.mjs --unreferenced`
+passed in 7m27s, using the script's `js-gradle-slot ./gradlew` invocation. PMD, the
+unreferenced-code check and selected app-services/UI integration tasks completed successfully;
+configured skips remain skips. The final test-intent gate reports only the missing
+materialization evidence file and independent acceptance. No `.agents/preflight` exists.
+
+Checks used the shared Gradle cache and admission slots, checkout-owned build folders and
+test-owned resources. No shared dev stack or system-tests integration task was started,
+and the owner's `~/.justsearch` was left alone. Git metadata is outside the writable sandbox,
+so the repair remains uncommitted. No evidence JSON was written.
+
+## Repair round 3 builder observations
+
+The verifier's original real-Lucene probe reproduced eight assertion failures on starting
+HEAD `55d37227187f113f06cb6e55b13b3167da30942a` in `$TMPDIR/before` (44 cases).
+The final proper `EnrichmentMaterializationTest` checks all 72 lane/position/fault combinations.
+On that same HEAD it ran 72 cases, with 12 assertion failures: cancellation, interruption and
+provider hold after a partial SPLADE prefix, in both parent and chunk lanes. The other 60 passed.
+An initial focused run had two incorrect stale-row retry expectations, corrected to require zero
+for rejected stale writes; this was a test-oracle correction, with no production scope change.
+The production repair only prevents the SPLADE catch path from publishing on cancellation or
+provider hold. Dense production code is unchanged.
+
+The same 72 checks ran against `e0e897e5da0ed798038451ed8901fa7323dd1387` in
+`$TMPDIR/known-good`: 54 passed, 18 failed by assertion. Twelve failures were the ordinary/stale
+prefix loss repaired in round 2. The other six were dense lazy-read provider-hold reporting:
+that historical kernel did not propagate the hold from these lazy reads. This is not claimed
+as a known-good hold check; the current dense kernel already propagates it without modification.
+All historical interruption, cancellation and retirement cases passed. Each tree has its own
+build folders; only candidate test source was copied into the shared clones.
+
+The final focused command (all operation tests plus CombinedChunkPublicationTest,
+EnrichmentLaneDecompositionTest, FairEnrichmentSchedulerTest and BackfillSchedulerModeRecordingTest)
+passed all 1,150 cases, with zero failures or skips, in 1m29s. This includes all 72 new combinations.
+The full `:modules:worker-services:test -PskipWebBuild=true --continue` run completed in 6m03s:
+4,327 cases, four failures, 24 skips. The failures were exactly the known
+`LinuxRootMountInfoTest#missingDanglingAndAmbiguousUuidMappingsAreUnknown` and three
+`WatcherUnavailabilityScopeTest` environment failures; skips are not passes.
+
+`env -u DISPLAY -u WAYLAND_DISPLAY node scripts/dev/java-prepush.mjs --unreferenced`
+passed in 6m37s (247 actionable tasks: 18 executed, four from cache, 225 up-to-date), using
+its `js-gradle-slot ./gradlew` invocation. PMD and the unreferenced-code check passed;
+app-services integration was up-to-date, and UI integration completed successfully with its
+configured exclusions. No check was weakened or suppressed.
+The test-intent gate reports only missing guard evidence and independent acceptance. Its
+nonblocking reconsider-rate finding remains 26.1% (12 of 46 audited PRs), above 10%.
+
+No `.agents/preflight` exists. Every Gradle command cleared DISPLAY/WAYLAND_DISPLAY, used the
+shared slot and ran in the background, one command at a time. Checks touched the shared Gradle
+cache and slot, checkout-owned build folders and test-owned temporary resources. No shared dev
+stack or system-tests integration task was started; the owner's `~/.justsearch` was left alone.
+Git metadata is outside the writable sandbox, so all three changed files remain uncommitted.
+No evidence JSON was written, and acceptance remains empty for the independent verifier.
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1b026-7cbe-7d71-aad2-2e218ae6d08e",
+  "verdict": "accept",
+  "digest": "sha256:779a926cebd5ac329b686df6a9b20f2cdff9b64508cfb143655f640c69d06002",
+  "note": "Entries 1-10 accept. Transcribed from the verifier's result by the orchestrator."
+}
+```

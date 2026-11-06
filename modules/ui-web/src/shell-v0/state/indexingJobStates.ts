@@ -8,7 +8,7 @@
  *
  * ONE spelling, because three surfaces classify on it — the Activity ledger
  * (`operations/ActionLedgerClient.ts`), the tasks tray (`substrates/tasks/indexingJobsBridge.ts`)
- * and the failed-files drawer (`components/FailedJobsDrawer.ts`) — and the backend record that owns
+ * and the failed-files list (`components/FailedFilesList.ts`) — and the backend record that owns
  * the vocabulary says in as many words that "a projection that must classify a state cannot invent
  * its own spelling". Three literals is three chances to typo one into the silent `default` arm.
  *

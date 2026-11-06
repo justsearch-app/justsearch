@@ -11,7 +11,6 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
-import io.justsearch.adapters.lucene.runtime.CommitOps;
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
 import io.justsearch.adapters.lucene.runtime.IndexingCoordinator;
 import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes;
@@ -21,7 +20,6 @@ import io.justsearch.indexerworker.ner.NerResult;
 import io.justsearch.indexerworker.ner.NerService;
 import io.justsearch.indexerworker.splade.SpladeEncoder;
 import io.justsearch.indexing.SchemaFields;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -72,9 +70,8 @@ import org.slf4j.LoggerFactory;
  *       smaller than one document's windowing, the pre-fix pass never completes a single document.
  *       Its control ({@link #longDocumentWithoutCrossCycleProgressNeverCompletes()}) reproduces
  *       exactly that, using the same fixture with a per-cycle accumulator.
- *   <li>{@link #embedStageCannotConsumeTheWholeCycleWhileSpladeAndNerHaveWork()} — its control
- *       ({@link #withoutTheReservationEmbedStarvesSpladeAndNer()}) is the field's
- *       {@code splade=0ms(ok=0), ner=0ms(ok=0)}.
+ *   <li>Peer-stage service is now protected by the fair scheduler's ledger checks; the old
+ *       embed-share reservation controls are obsolete.
  * </ul>
  */
 @DisplayName("CombinedEnrichmentBackfillOps long-document scheduling (round-15 post-round finding)")
@@ -96,7 +93,6 @@ class CombinedEnrichmentLongDocumentTest {
 
   @Mock DocumentFieldOps documentFieldOps;
   @Mock IndexingCoordinator indexingCoordinator;
-  @Mock CommitOps commitOps;
   @Mock io.justsearch.indexerworker.embed.EmbeddingService embeddingProvider;
   @Mock SpladeEncoder spladeEncoder;
   @Mock NerService nerService;
@@ -113,7 +109,7 @@ class CombinedEnrichmentLongDocumentTest {
 
   @BeforeEach
   void wireFakeIndex() throws Exception {
-    BackfillSnapshotTestSupport.install(documentFieldOps,indexingCoordinator);
+    BackfillSnapshotTestSupport.installLaneFixtures(documentFieldOps,indexingCoordinator);
     lenient().when(embeddingProvider.isAvailable()).thenReturn(true);
     lenient().when(nerService.isAvailable()).thenReturn(true);
     lenient().when(indexingCoordinator.bulkDeleteEpoch()).thenReturn(0L);
@@ -285,39 +281,29 @@ class CombinedEnrichmentLongDocumentTest {
 
   /**
    * @param stopAfterUnits the cycle budget, in encoder units
-   * @param embedShareUnits the embed stage's reserved share, in encoder units ({@link
-   *     Integer#MAX_VALUE} = no reservation, i.e. the pre-fix behaviour)
    */
-  private CombinedEnrichmentBackfillOps.BackfillContext context(
-      WindowedEmbedProgress progress,
-      boolean spladeEnabled,
-      boolean nerEnabled,
-      int stopAfterUnits,
-      int embedShareUnits) {
-    return context(
-        progress,
+  private LaneBackfillTestSupport.BackfillContext context(WindowedEmbedProgress progress,
+        boolean spladeEnabled,
+        boolean nerEnabled,
+        int stopAfterUnits) {
+    return context(progress,
         spladeEnabled,
         nerEnabled,
         stopAfterUnits,
-        embedShareUnits,
         false,
         () -> false);
   }
 
-  private CombinedEnrichmentBackfillOps.BackfillContext context(
-      WindowedEmbedProgress progress,
-      boolean spladeEnabled,
-      boolean nerEnabled,
-      int stopAfterUnits,
-      int embedShareUnits,
-      boolean lateChunkingEnabled,
-      BooleanSupplier hardStop) {
+  private LaneBackfillTestSupport.BackfillContext context(WindowedEmbedProgress progress,
+        boolean spladeEnabled,
+        boolean nerEnabled,
+        int stopAfterUnits,
+        boolean lateChunkingEnabled,
+        BooleanSupplier hardStop) {
     BooleanSupplier stop = () -> unitsThisCycle.get() >= stopAfterUnits;
-    BooleanSupplier embedShare = () -> unitsThisCycle.get() >= embedShareUnits;
-    return new CombinedEnrichmentBackfillOps.BackfillContext(
-        documentFieldOps,
+
+    return new LaneBackfillTestSupport.BackfillContext(documentFieldOps,
         indexingCoordinator,
-        commitOps,
         IndexingPacing.unthrottled(),
         () -> embeddingProvider,
         spladeEnabled ? () -> spladeEncoder : () -> null,
@@ -330,12 +316,8 @@ class CombinedEnrichmentLongDocumentTest {
         false,
         lateChunkingEnabled,
         0,
-        new ArrayDeque<>(),
-        new ArrayDeque<>(),
-        new int[] {0},
         stop,
         hardStop,
-        embedShare,
         progress);
   }
 
@@ -345,8 +327,13 @@ class CombinedEnrichmentLongDocumentTest {
     WindowedEmbedProgress progress = new WindowedEmbedProgress();
 
     newCycle();
-    CombinedEnrichmentBackfillOps.processCombinedBackfill(
-        context(progress, false, false, 1, Integer.MAX_VALUE, true, () -> false));
+    LaneBackfillTestSupport.runLanes(
+        context(progress,
+        false,
+        false,
+        1,
+        true,
+        () -> false));
 
     assertEquals(1, singlePassRequests.get(), "the first cycle classifies through single-pass once");
     assertEquals(List.of(), windowRequests,
@@ -355,8 +342,13 @@ class CombinedEnrichmentLongDocumentTest {
         "retain the routing decision so the next turn does useful work");
 
     newCycle();
-    CombinedEnrichmentBackfillOps.processCombinedBackfill(
-        context(progress, false, false, 1, Integer.MAX_VALUE, true, () -> false));
+    LaneBackfillTestSupport.runLanes(
+        context(progress,
+        false,
+        false,
+        1,
+        true,
+        () -> false));
 
     assertEquals(1, singlePassRequests.get(), "a matching partial must bypass single-pass later");
     assertEquals(List.of("long-fallback@0"), windowRequests,
@@ -371,16 +363,14 @@ class CombinedEnrichmentLongDocumentTest {
     WindowedEmbedProgress progress = new WindowedEmbedProgress();
 
     newCycle();
-    CombinedEnrichmentBackfillOps.CombinedOutcome outcome =
-        CombinedEnrichmentBackfillOps.processCombinedBackfill(
-            context(
-                progress,
-                false,
-                false,
-                1,
-                Integer.MAX_VALUE,
-                true,
-                () -> unitsThisCycle.get() >= 1));
+    LaneBackfillTestSupport.Outcome outcome =
+        LaneBackfillTestSupport.runLanes(
+            context(progress,
+        false,
+        false,
+        1,
+        true,
+        () -> unitsThisCycle.get() >= 1));
 
     assertTrue(outcome.aborted(), "a hard stop must still abort after the classification probe");
     assertTrue(windowRequests.isEmpty(), "shutdown/yield/ingest preemption must prevent new GPU work");
@@ -417,8 +407,11 @@ class CombinedEnrichmentLongDocumentTest {
 
     for (int cycle = 0; cycle < 8 && pendingEmbedDocs() > 0; cycle++) {
       newCycle();
-      CombinedEnrichmentBackfillOps.processCombinedBackfill(
-          context(progress, true, true, UNITS_PER_CYCLE, Integer.MAX_VALUE));
+      LaneBackfillTestSupport.runLanes(
+          context(progress,
+        true,
+        true,
+        UNITS_PER_CYCLE));
       pendingPerCycle.add(pendingEmbedDocs());
     }
 
@@ -475,9 +468,12 @@ class CombinedEnrichmentLongDocumentTest {
 
     for (int cycle = 0; cycle < 8; cycle++) {
       newCycle();
-      CombinedEnrichmentBackfillOps.processCombinedBackfill(
+      LaneBackfillTestSupport.runLanes(
           // A FRESH accumulator per cycle == no cross-cycle memory == the pre-fix behaviour.
-          context(new WindowedEmbedProgress(), false, true, UNITS_PER_CYCLE, Integer.MAX_VALUE));
+          context(new WindowedEmbedProgress(),
+        false,
+        true,
+        UNITS_PER_CYCLE));
     }
 
     assertEquals(
@@ -504,62 +500,11 @@ class CombinedEnrichmentLongDocumentTest {
    * {@code splade=0ms(ok=0)}, {@code ner=0ms(ok=0)}, every cycle, which is what pinned SPLADE at
    * 1.05% coverage for the duration of the stall.
    */
-  @Test
-  @DisplayName("embed yields its reserved share so SPLADE and NER get non-zero work")
-  void embedStageCannotConsumeTheWholeCycleWhileSpladeAndNerHaveWork() {
-    for (int i = 0; i < 4; i++) {
-      seedLongEmbedDoc("long-" + i);
-      seedSpladeAndNerPending("long-" + i);
-    }
-
-    newCycle();
-    CombinedEnrichmentBackfillOps.CombinedOutcome outcome =
-        CombinedEnrichmentBackfillOps.processCombinedBackfill(
-            // Cycle budget 10 units; embed reserved 2 — the rest belongs to the other stages.
-            context(new WindowedEmbedProgress(), true, true, 10, 2));
-
-    assertTrue(
-        outcome.spladeProcessed() > 0,
-        "SPLADE must receive scheduling time while a long-document embed backlog exists; observed"
-            + " spladeProcessed="
-            + outcome.spladeProcessed());
-    assertTrue(
-        outcome.nerProcessed() > 0,
-        "NER must receive scheduling time while a long-document embed backlog exists; observed"
-            + " nerProcessed="
-            + outcome.nerProcessed());
-    assertTrue(
-        outcome.wroteAnything(),
-        "the batch must still write what it enriched before yielding the embed share");
-  }
 
   /**
    * CONTROL (red against the fix's absence): with no reservation the embed stage spends the whole
    * cycle and both later stages measure zero — the field's per-cycle log line verbatim.
    */
-  @Test
-  @DisplayName("CONTROL: without the reservation embed consumes the cycle and starves SPLADE/NER")
-  void withoutTheReservationEmbedStarvesSpladeAndNer() {
-    for (int i = 0; i < 4; i++) {
-      seedLongEmbedDoc("long-" + i);
-      seedSpladeAndNerPending("long-" + i);
-    }
-
-    newCycle();
-    CombinedEnrichmentBackfillOps.CombinedOutcome outcome =
-        CombinedEnrichmentBackfillOps.processCombinedBackfill(
-            context(new WindowedEmbedProgress(), true, true, 10, Integer.MAX_VALUE));
-
-    assertEquals(
-        0,
-        outcome.spladeProcessed(),
-        "this control must reproduce the starvation; a non-zero value means the fixture no longer"
-            + " creates an embed backlog that outlives the cycle and the sibling test is vacuous");
-    assertEquals(
-        0,
-        outcome.nerProcessed(),
-        "this control must reproduce the starvation (ner=0ms(ok=0) in the field log)");
-  }
 
   /**
    * PINS: the reservation does NOT apply to a pure-embed backlog.
@@ -576,8 +521,11 @@ class CombinedEnrichmentLongDocumentTest {
 
     newCycle();
     // Share exhausted from the very first unit; with no other stage pending it must be ignored.
-    CombinedEnrichmentBackfillOps.processCombinedBackfill(
-        context(new WindowedEmbedProgress(), false, false, 6, 0));
+    LaneBackfillTestSupport.runLanes(
+        context(new WindowedEmbedProgress(),
+        false,
+        false,
+        6));
 
     assertTrue(
         unitsThisCycle.get() >= 4,

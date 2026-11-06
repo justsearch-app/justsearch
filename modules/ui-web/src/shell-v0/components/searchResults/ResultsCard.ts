@@ -58,6 +58,8 @@ import {
 } from '../../utils/searchResultFormatters.js';
 import { ReceiptController } from '../../primitives/receiptController.js';
 import { openContextMenu } from '../ContextMenu.js';
+import { modalOwnsFocus } from '../../primitives/modality.js';
+import { deepActiveElement, isTypingTarget } from '../../utils/keyboardHandler.js';
 import { recordOpenDisposition } from '../../state/searchState.js';
 import { copyToClipboard } from '../../utils/clipboardCopy.js';
 import { formatRelative } from '../../utils/relativeTime.js';
@@ -279,6 +281,23 @@ export class ResultsCard extends JfElement {
 
   private emitCard<T>(name: string, detail: T): void {
     this.dispatchEvent(new CustomEvent(name, { detail, bubbles: true, composed: true }));
+  }
+
+  /**
+   * Space previews the row the keyboard is on, Enter does what a click does. Only a row that holds
+   * the keyboard itself: the keys belong to a control inside it, a field, a composition, a repeat or
+   * a modal otherwise (C8). A repeat still must not scroll the list from under the preview.
+   */
+  private onRowKey(hit: CardHit, e: KeyboardEvent): boolean {
+    const row = e.currentTarget as HTMLElement;
+    if (e.composedPath()[0] !== row || (e.key !== ' ' && e.key !== 'Enter')) return false;
+    if (e.isComposing || e.keyCode === 229 || e.ctrlKey || e.altKey || e.metaKey || modalOwnsFocus()
+      || isTypingTarget(deepActiveElement())) return false;
+    e.preventDefault();
+    if (e.repeat) return true;
+    if (e.key === ' ') this.emitCard('card-preview', { id: hit.id, row });
+    else this.emitCard('card-open', { id: hit.id });
+    return true;
   }
 
   /**
@@ -547,7 +566,7 @@ export class ResultsCard extends JfElement {
         data-kind=${view.kind}
         data-addressable-kind="search-result"
         data-addressable-id=${hit.id}
-        tabindex=${isLive && this.forgetAvailable ? 0 : nothing}
+        tabindex=${isLive ? 0 : nothing}
         @click=${(e: MouseEvent) => this.handleRowClick(hit, e)}
         @contextmenu=${(e: MouseEvent) => {
           if (!isLive) return;
@@ -558,6 +577,7 @@ export class ResultsCard extends JfElement {
             : { x: rect.left, y: rect.bottom }, row);
         }}
         @keydown=${(e: KeyboardEvent) => {
+          if (isLive && this.onRowKey(hit, e)) return;
           if (!isLive || !this.forgetAvailable || !(e.key === 'ContextMenu' || e.key === 'F10' && e.shiftKey)) return;
           e.preventDefault(); e.stopPropagation();
           const row = e.currentTarget as HTMLElement;

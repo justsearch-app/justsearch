@@ -53,8 +53,7 @@
  * surrounding context at a glance.
  *
  * `pane-visible-range` fires (debounced) on scroll with the first/last visible line, a hook a future
- * "reading spine" affordance can consume; `pane-close` fires on the header close action so the host
- * surface decides what closing means (this component has no opinion on layout/visibility).
+ * "reading spine" affordance can consume. Closing and layout belong to the details pane around it.
  *
  * a11y: the scroll region is `tabindex="0"` + `role="region"` (the measured axe
  * `scrollable-region-focusable` fix) so a keyboard user can focus-then-arrow/Page-scroll it. The
@@ -85,7 +84,6 @@ import { copyToClipboard } from '../../utils/clipboardCopy.js';
 import { revealLocalPath } from '../../plugin-api/capabilities/platform.js';
 import '../ErrorAlert.js';
 import '../Button.js';
-import { icon } from '../Icon.js';
 
 /** A 0-based, inclusive source line span (a passage, or its containing chunk). */
 export interface DocumentLineRange {
@@ -669,10 +667,6 @@ export class DocumentPane extends JfElement {
     });
   }
 
-  private handleClose = (): void => {
-    this.dispatchEvent(new CustomEvent('pane-close', { bubbles: true, composed: true }));
-  };
-
   private handleScroll = (): void => {
     if (this.scrollDebounceTimer) clearTimeout(this.scrollDebounceTimer);
     this.scrollDebounceTimer = setTimeout(() => {
@@ -792,15 +786,6 @@ export class DocumentPane extends JfElement {
    * so what the ramp actually reaches is the document body it was moved here for.
    */
   static styles = [markdownTypography, markdownCodeHighlight, css`
-    :host([overlay]) {
-      /* 687 R5b — sized for the OverlayHost right-drawer slot (narrow viewports). */
-      width: min(28rem, 92vw);
-      height: calc(100vh - 7.5rem);
-      box-shadow: var(--shadow-float);
-      border: 1px solid var(--border-subtle);
-      border-radius: 0.5rem;
-      background: var(--surface-1);
-    }
     :host {
       display: flex;
       flex-direction: column;
@@ -1001,6 +986,7 @@ export class DocumentPane extends JfElement {
     }
     .blocks .block.hl-weak {
       background: var(--accent-tint-08);
+      color: var(--text-highlight-weak);
       border-left: 2px solid var(--accent-tint-30);
       padding-left: 0.5rem;
       margin-left: -0.5rem;
@@ -1029,6 +1015,7 @@ export class DocumentPane extends JfElement {
     }
     pre.source span.hl-weak {
       background: var(--accent-tint-08);
+      color: var(--text-highlight-weak);
       border-left: 2px solid var(--accent-tint-30);
     }
     pre.source span.hl-strong {
@@ -1287,9 +1274,6 @@ export class DocumentPane extends JfElement {
                 (the full path stays reachable via the title tooltip in both). */ ''}
           ${isAdvancedMode() ? formatDisplayPath(this.docPath) : formatLocationBreadcrumb(this.docPath)}
         </div>
-        <jf-button class="icon" variant="ghost" size="icon" label="Close" .onActivate=${this.handleClose}
-          >${icon({ name: 'x', size: 14 })}</jf-button
-        >
       </div>
       ${this.renderToggle()} ${this.renderBody()}
     `;

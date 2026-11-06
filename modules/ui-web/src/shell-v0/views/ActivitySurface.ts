@@ -31,6 +31,10 @@ import '../components/ResourceView.js';
 // chronological, originator-attributed, LIVE stream over operations + navigations + gates + FE
 // effects). Side-effect import registers <jf-action-ledger>.
 import '../components/ActionLedgerView.js';
+import '../components/RunActivity.js';
+import type { RunActivity } from '../components/RunActivity.js';
+import '../components/EffectAuditLog.js';
+import { subscribeActivitySection, takeActivitySection } from '../state/activitySection.js';
 import '../components/Button.js';
 import '../components/EffectLine.js';
 import { listJournalByOriginator, previewUndoAllByOriginator, undoEntries, subscribeJournal,
@@ -50,6 +54,7 @@ export class ActivitySurface extends JfElement {
   declare undoPreview: readonly JournalEntry[];
   private stopJournal: (() => void) | undefined;
   private stopReversals: (() => void) | undefined;
+  private stopSection: (() => void) | undefined;
 
   constructor() {
     super();
@@ -61,10 +66,33 @@ export class ActivitySurface extends JfElement {
     super.connectedCallback();
     this.stopJournal = subscribeJournal(() => this.requestUpdate());
     this.stopReversals = subscribeReversals(() => this.requestUpdate());
+    this.stopSection = subscribeActivitySection(() => this.arriveAtSection());
+    this.arriveAtSection();
+  }
+
+  /** A pointer from elsewhere (the status panel, Ctrl+K) lands on the section it named. */
+  private arriveAtSection(): void {
+    if (!this.isConnected) return;
+    const section = takeActivitySection();
+    if (section === null) return;
+    void this.updateComplete.then(async () => {
+      if (section === 'background-runs') {
+        const runs = this.renderRoot.querySelector<RunActivity>('jf-run-activity');
+        await runs?.updateComplete;
+        runs?.revealBackgroundRuns();
+        return;
+      }
+      const journal = this.renderRoot.querySelector<HTMLElement & { updateComplete?: Promise<unknown> }>('jf-effect-audit-log');
+      await journal?.updateComplete;
+      const panel = journal?.shadowRoot?.querySelector<HTMLElement>('[data-testid="effect-audit-journal"]');
+      panel?.scrollIntoView?.({ block: 'start' });
+      panel?.focus();
+    });
   }
   override disconnectedCallback(): void {
     this.stopJournal?.(); this.stopJournal = undefined;
     this.stopReversals?.(); this.stopReversals = undefined;
+    this.stopSection?.(); this.stopSection = undefined;
     super.disconnectedCallback();
   }
 
@@ -164,6 +192,7 @@ export class ActivitySurface extends JfElement {
         <!-- Tempdoc 550 thesis II (Outcome read-view): the unified, LIVE action-ledger —
              one chronological, originator-attributed stream over operations + navigations +
              trust-gate firings + FE-local effects. This is the 550 Outcome face. -->
+        <jf-run-activity api-base=${this.apiBase} data-testid="activity-run-activity"></jf-run-activity>
         <div class="section-label">Unified activity (live)</div>
         <jf-action-ledger
           api-base=${this.apiBase}
@@ -182,6 +211,10 @@ export class ActivitySurface extends JfElement {
           api-base=${this.apiBase}
           data-testid="activity-surface-resource-view"
         ></jf-resource>
+
+        <!-- §25.δ2 — this window's effects, with their undo. -->
+        <div class="section-label">Effects in this window</div>
+        <jf-effect-audit-log data-testid="activity-effect-journal"></jf-effect-audit-log>
       </div>
     `;
   }

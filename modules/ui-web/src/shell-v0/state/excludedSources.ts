@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Tempdoc 610 §J.3 — the single FE source of truth for the active conversation's hidden retrieved
-// sources. Both the inline answer chips (UnifiedChatView) and the docked evidence rail (SourcesPane)
-// read + write this store, so hiding a source is consistent across the two views. A tiny pure store
-// mirroring the `contextInspectorDrawer` pattern; persistence rides `setSourceExcluded`.
+// sources. Search's details pane reads and writes it; persistence rides `setSourceExcluded`.
 
 import { setSourceExcluded } from './conversationListStore.js';
 
@@ -14,6 +12,8 @@ export function sourceExcludeKey(parentDocId: string, chunkIndex: number): strin
 }
 
 let _ids: Set<string> = new Set();
+/** The conversation {@link _ids} belongs to. */
+let _owner: string | null = null;
 const _subs = new Set<() => void>();
 
 function notify(): void {
@@ -31,14 +31,16 @@ export function getExcludedSources(): ReadonlySet<string> {
 }
 
 /** Replace the active conversation's hidden-source set (on resume / reset). */
-export function setExcludedSources(ids: Iterable<string>): void {
+export function setExcludedSources(ids: Iterable<string>, conversationId: string | null = _owner): void {
   _ids = new Set(ids);
+  _owner = conversationId;
   notify();
 }
 
 /**
  * Persist (via the conversation store endpoint) + update the active conversation's hidden-source set.
- * Returns true on success. The set is keyed to `sessionId`; callers pass the active conversation id.
+ * Returns true on success. A response that lands after the reader moved on stays out of the set:
+ * the change is saved for `sessionId`, which reads it back when it is next shown.
  */
 export async function toggleExcludedSource(
   sessionId: string,
@@ -47,6 +49,7 @@ export async function toggleExcludedSource(
 ): Promise<boolean> {
   const ok = await setSourceExcluded(sessionId, key, excluded);
   if (!ok) return false;
+  if (sessionId !== _owner) return true;
   const next = new Set(_ids);
   if (excluded) next.add(key);
   else next.delete(key);
@@ -58,10 +61,4 @@ export async function toggleExcludedSource(
 export function subscribeExcludedSources(listener: () => void): () => void {
   _subs.add(listener);
   return () => _subs.delete(listener);
-}
-
-/** Test-only reset. */
-export function __resetExcludedSources(): void {
-  _ids = new Set();
-  _subs.clear();
 }

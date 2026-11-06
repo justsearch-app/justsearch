@@ -75,7 +75,6 @@ import type { StatusSnapshot } from '../../utils/statusPoll.js';
 import { getConversationListState, restoreActiveConversation, setActiveConversation, subscribeConversationList, loadConversations, __resetConversationListForTest } from '../../state/conversationListStore.js';
 import { __resetDraftProvidersForTest } from '../../controllers/draftPersistence.js';
 import { __resetDraftKeptForTest } from '../../controllers/draftKeptHint.js';
-import { __resetContextInspectorDrawer } from '../../state/contextInspectorDrawer.js';
 import { EPHEMERAL_TOAST_EVENT } from '../../components/advisory/ephemeralToast.js';
 import { EMPTY_PREFIX_SENTINEL } from '../unifiedChatRequest.js';
 import {
@@ -370,7 +369,6 @@ beforeEach(() => {
   __resetDraftProvidersForTest();
   __resetDraftKeptForTest();
   __resetAiStateForTest();
-  __resetContextInspectorDrawer();
   ctrlExists = false;
   clock = 0;
   backend = {
@@ -399,7 +397,6 @@ afterEach(() => {
   for (const el of [...document.querySelectorAll('jf-confirm-dialog')]) el.remove();
   resetSearchState();
   __resetAiStateForTest();
-  __resetContextInspectorDrawer();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -644,10 +641,11 @@ describe('branching a conversation closes a citation pane open on the parent', (
     await openConversation(el);
 
     // The citation-OPEN mechanism is pane.test.ts's concern; here the pane's presence is set up
-    // directly on the same four fields `closePane()` nulls, so this case isolates the switch-guard
+    // directly on the same five fields `closePane()` nulls, so this case isolates the switch-guard
     // in `openBranch` (shared by the version pager and every branch/retry/edit act) rather than
     // re-proving the citation click already covered elsewhere.
     el.paneDocPath = 'f:/docs/note.md';
+    el.paneTab = 'source:0';
     el.paneCitation = { startChar: 0, endChar: 10, excerpt: 'x', sentenceText: null };
     el.paneSource = { turnId: storedId(1), sourceIndex: 0 };
     await el.updateComplete;

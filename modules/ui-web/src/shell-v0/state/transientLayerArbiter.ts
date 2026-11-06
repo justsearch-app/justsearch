@@ -1,15 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
  * transientLayerArbiter — tempdoc 574 Move 4: the generalized single-open arbiter for transient
- * overlay LAYERS (right-drawers, menus, popovers, tooltips).
+ * overlay LAYERS (menus, popovers, tooltips).
  *
- * §16 S10: the `right-drawer` slot coordinated only its own drawers; menus / popovers / the
- * dismiss-triad (ContextMenu, BookmarksPopover, SelectionActionsMenu, Peek) each hand-rolled an
+ * §16 S10: menus / popovers / the dismiss-triad (ContextMenu, BookmarksPopover, SelectionActionsMenu, Peek) each hand-rolled an
  * outside-click dismiss with NO shared arbiter, so two could be open at once. This is the ONE place
  * "at most one open per layer" lives — a component registers a close callback under a (layer, id) and
  * calls {@link closeOthersInLayer} on open, so opening one closes its peers by construction.
- * 574 §23.B: the right-drawer drawers (Advisory / AgentActivity / Retrospective / Sources) now compose
- * the `right-drawer`-layer TransientController directly — the old `rightDrawerArbiter` wrapper is retired.
  */
 type Closer = () => void;
 

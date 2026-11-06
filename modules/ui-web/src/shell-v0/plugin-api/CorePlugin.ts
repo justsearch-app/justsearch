@@ -77,7 +77,7 @@ const CORE_SURFACES: PluginSurfaceContribution[] = [
   {
     // Tempdoc 561 P-E — learned-memory (inspect / forget): the durable "what it knows" facts half.
     // Tempdoc 565 §26.D — the ACTIVITY half (presence inbox + run-in-background) folded into the one
-    // window (the retrospective drawer's Inbox tab + inline `background` run-segments); this surface
+    // window (Activity's Background runs + inline `background` run-segments); this surface
     // is now facts-only ("what it knows" ≠ "what it did").
     id: 'core.memory-surface',
     mountTag: 'jf-memory-surface',

@@ -13,6 +13,7 @@
  */
 
 import { describe, expect, it, afterEach, beforeAll, vi } from 'vitest';
+import { requestActivitySection, takeActivitySection } from '../state/activitySection.js';
 
 // Stub EventSource before ActivitySurface's transitive imports (ActionLedgerView,
 // jf-resource-view) try to open real streams against a non-existent backend.
@@ -83,5 +84,39 @@ describe('ActivitySurface (jf-activity-surface) — api-base forwarding (727 F-4
     const el = await mount('http://127.0.0.1:33221');
     const resource = el.shadowRoot?.querySelector('jf-resource');
     expect(resource?.getAttribute('resource-id')).toBe('core.operation-history');
+  });
+});
+
+describe('Activity holds what the frame drawers held (DP3)', () => {
+  it('shows background runs, this run and the effect journal, with the journal’s undo controls', async () => {
+    const el = document.createElement('jf-activity-surface') as ActivitySurface;
+    document.body.append(el);
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelector('jf-run-activity')).not.toBeNull();
+    const journal = el.shadowRoot!.querySelector('jf-effect-audit-log') as HTMLElement & { updateComplete: Promise<unknown> };
+    await journal.updateComplete;
+    expect(journal.shadowRoot!.querySelector('[data-testid="effect-audit-journal"]')).not.toBeNull();
+    expect(journal.shadowRoot!.querySelector('dialog')).toBeNull();
+    el.remove();
+  });
+
+  it.each([
+    ['background-runs', 'jf-run-activity', '[data-testid="activity-background-runs"]'],
+    ['effect-journal', 'jf-effect-audit-log', '[data-testid="effect-audit-journal"]'],
+  ] as const)('a pointer to %s lands on that section, whether Activity is up yet or not', async (section, owner, selector) => {
+    requestActivitySection(section);
+    const el = document.createElement('jf-activity-surface') as ActivitySurface;
+    document.body.append(el);
+    await el.updateComplete;
+    const child = el.shadowRoot!.querySelector(owner) as HTMLElement & { updateComplete: Promise<unknown> };
+    await child.updateComplete;
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(child.shadowRoot!.activeElement).toBe(child.shadowRoot!.querySelector(selector));
+    expect(takeActivitySection()).toBeNull();
+    (child.shadowRoot!.activeElement as HTMLElement).blur();
+    requestActivitySection(section);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(child.shadowRoot!.activeElement).toBe(child.shadowRoot!.querySelector(selector));
+    el.remove();
   });
 });

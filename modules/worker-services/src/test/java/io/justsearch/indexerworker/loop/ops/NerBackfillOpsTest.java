@@ -29,7 +29,7 @@ import org.slf4j.LoggerFactory;
 class NerBackfillOpsTest {
 
   @BeforeEach void snapshots() throws Exception {
-    BackfillSnapshotTestSupport.install(documentFieldOps, indexingCoordinator, true, Set.of());
+    BackfillSnapshotTestSupport.installLaneFixtures(documentFieldOps, indexingCoordinator, true, Set.of());
     lenient().when(nerService.isAvailable()).thenReturn(true);
   }
 
@@ -50,11 +50,15 @@ class NerBackfillOpsTest {
           .thenReturn(List.of());
 
       NerBackfillOps.BackfillContext context =
-          new NerBackfillOps.BackfillContext(
-              documentFieldOps, indexingCoordinator, commitOps, IndexingPacing.unthrottled(), () -> nerService, () -> true, 100,
-              LoggerFactory.getLogger(NerBackfillOpsTest.class));
+          new NerBackfillOps.BackfillContext(documentFieldOps,
+        indexingCoordinator,
+        IndexingPacing.unthrottled(),
+        () -> nerService,
+        () -> true,
+        100,
+        LoggerFactory.getLogger(NerBackfillOpsTest.class), () -> true);
 
-      NerBackfillOps.processNerBackfill(context);
+      LaneBackfillTestSupport.runNer(context);
 
       verify(indexingCoordinator, never()).updateDocumentsBatch(anyList());
       verify(commitOps, never()).commitAndTrack(any());
@@ -69,11 +73,15 @@ class NerBackfillOpsTest {
       when(documentFieldOps.getDocumentContent("doc1")).thenReturn("");
 
       NerBackfillOps.BackfillContext context =
-          new NerBackfillOps.BackfillContext(
-              documentFieldOps, indexingCoordinator, commitOps, IndexingPacing.unthrottled(), () -> nerService, () -> true, 100,
-              LoggerFactory.getLogger(NerBackfillOpsTest.class));
+          new NerBackfillOps.BackfillContext(documentFieldOps,
+        indexingCoordinator,
+        IndexingPacing.unthrottled(),
+        () -> nerService,
+        () -> true,
+        100,
+        LoggerFactory.getLogger(NerBackfillOpsTest.class), () -> true);
 
-      NerBackfillOps.processNerBackfill(context);
+      LaneBackfillTestSupport.runNer(context);
 
       // NER never ran, so nothing may claim COMPLETED: the doc takes the retry-count escalation.
       verify(indexingCoordinator)
@@ -101,11 +109,15 @@ class NerBackfillOpsTest {
           .thenReturn(new LuceneRuntimeTypes.BatchUpdateResult(1, 0));
 
       NerBackfillOps.BackfillContext context =
-          new NerBackfillOps.BackfillContext(
-              documentFieldOps, indexingCoordinator, commitOps, IndexingPacing.unthrottled(), () -> nerService, () -> true, 100,
-              LoggerFactory.getLogger(NerBackfillOpsTest.class));
+          new NerBackfillOps.BackfillContext(documentFieldOps,
+        indexingCoordinator,
+        IndexingPacing.unthrottled(),
+        () -> nerService,
+        () -> true,
+        100,
+        LoggerFactory.getLogger(NerBackfillOpsTest.class), () -> true);
 
-      NerBackfillOps.processNerBackfill(context);
+      LaneBackfillTestSupport.runNer(context);
 
       verify(indexingCoordinator)
           .updateDocumentsBatch(
@@ -130,11 +142,15 @@ class NerBackfillOpsTest {
           .thenReturn(new LuceneRuntimeTypes.BatchUpdateResult(1, 0));
 
       NerBackfillOps.BackfillContext context =
-          new NerBackfillOps.BackfillContext(
-              documentFieldOps, indexingCoordinator, commitOps, IndexingPacing.unthrottled(), () -> nerService, () -> true, 100,
-              LoggerFactory.getLogger(NerBackfillOpsTest.class));
+          new NerBackfillOps.BackfillContext(documentFieldOps,
+        indexingCoordinator,
+        IndexingPacing.unthrottled(),
+        () -> nerService,
+        () -> true,
+        100,
+        LoggerFactory.getLogger(NerBackfillOpsTest.class), () -> true);
 
-      NerBackfillOps.processNerBackfill(context);
+      LaneBackfillTestSupport.runNer(context);
 
       verify(indexingCoordinator)
           .updateDocumentsBatch(
@@ -154,12 +170,16 @@ class NerBackfillOpsTest {
       when(documentFieldOps.getDocumentContent("doc1")).thenReturn("Some content about Paris");
 
       NerBackfillOps.BackfillContext context =
-          new NerBackfillOps.BackfillContext(
-              documentFieldOps, indexingCoordinator, commitOps, IndexingPacing.unthrottled(), () -> null, () -> true, 100,
-              LoggerFactory.getLogger(NerBackfillOpsTest.class));
+          new NerBackfillOps.BackfillContext(documentFieldOps,
+        indexingCoordinator,
+        IndexingPacing.unthrottled(),
+        () -> null,
+        () -> true,
+        100,
+        LoggerFactory.getLogger(NerBackfillOpsTest.class), () -> true);
 
       // Should not throw NPE
-      NerBackfillOps.processNerBackfill(context);
+      LaneBackfillTestSupport.runNer(context);
 
       // No extraction should have happened
       verify(nerService, never()).extractEntities(anyString());
@@ -173,11 +193,15 @@ class NerBackfillOpsTest {
           .thenReturn(List.of("doc1", "doc2"));
       // runningSupplier returns false immediately — should break before processing any docs
       NerBackfillOps.BackfillContext context =
-          new NerBackfillOps.BackfillContext(
-              documentFieldOps, indexingCoordinator, commitOps, IndexingPacing.unthrottled(), () -> nerService, () -> false, 100,
-              LoggerFactory.getLogger(NerBackfillOpsTest.class));
+          new NerBackfillOps.BackfillContext(documentFieldOps,
+        indexingCoordinator,
+        IndexingPacing.unthrottled(),
+        () -> nerService,
+        () -> false,
+        100,
+        LoggerFactory.getLogger(NerBackfillOpsTest.class), () -> true);
 
-      NerBackfillOps.processNerBackfill(context);
+      LaneBackfillTestSupport.runNer(context);
 
       verify(documentFieldOps, never()).getDocumentContent(anyString());
     }
@@ -195,7 +219,8 @@ class NerBackfillOpsTest {
           .thenReturn(new LuceneRuntimeTypes.BatchUpdateResult(1, 0));
 
       int result =
-          assertDoesNotThrow(() -> new EnrichmentBatch(documentFieldOps,indexingCoordinator,List.of("doc1")).failure("doc1",SchemaFields.NER_RETRY_COUNT,NerBackfillOps::computeNerFailureUpdate));
+          assertDoesNotThrow(() -> new EnrichmentBatch(documentFieldOps,indexingCoordinator,List.of("doc1"),
+              indexingCoordinator.enrichmentAuthority(),null,Set.of()).failure("doc1",SchemaFields.NER_RETRY_COUNT,NerBackfillOps::computeNerFailureUpdate));
 
       assertEquals(0, result); // not permanently failed
       verify(indexingCoordinator)
@@ -216,7 +241,8 @@ class NerBackfillOpsTest {
           .thenReturn(new LuceneRuntimeTypes.BatchUpdateResult(1, 0));
 
       int result =
-          assertDoesNotThrow(() -> new EnrichmentBatch(documentFieldOps,indexingCoordinator,List.of("doc1")).failure("doc1",SchemaFields.NER_RETRY_COUNT,NerBackfillOps::computeNerFailureUpdate));
+          assertDoesNotThrow(() -> new EnrichmentBatch(documentFieldOps,indexingCoordinator,List.of("doc1"),
+              indexingCoordinator.enrichmentAuthority(),null,Set.of()).failure("doc1",SchemaFields.NER_RETRY_COUNT,NerBackfillOps::computeNerFailureUpdate));
 
       assertEquals(1, result); // permanently failed
       verify(indexingCoordinator)

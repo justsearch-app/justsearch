@@ -9,7 +9,6 @@ import io.justsearch.adapters.lucene.runtime.IndexSchema;
 import io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase;
 import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.configuration.FieldCatalogDef;
-import io.justsearch.indexerworker.coordination.WorkerSignalBus;
 import io.justsearch.indexerworker.embed.EmbeddingProvider;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.splade.SpladeEncoder;
@@ -79,9 +78,14 @@ final class EnrichmentQuarantineProgressTest extends LuceneExecutorTestBase {
       seed(runtime, "broken", "wrong-revision", true);
       runtime.commitOps().commitAndTrack(); runtime.commitOps().maybeRefreshBlocking();
       var embedding = mock(EmbeddingProvider.class); when(embedding.isAvailable()).thenReturn(true);
-      EmbeddingBackfillOps.processChunkEmbeddingBackfill(new EmbeddingBackfillOps.BackfillContext(
-          runtime.documentFieldOps(), runtime.indexingCoordinator(), runtime.commitOps(), mock(WorkerSignalBus.class),
-          IndexingPacing.unthrottled(), () -> embedding, () -> true, () -> true, 1, LoggerFactory.getLogger(getClass())));
+      LaneBackfillTestSupport.runDenseChunk(new LaneBackfillTestSupport.EmbeddingContext(runtime.documentFieldOps(),
+        runtime.indexingCoordinator(),
+        IndexingPacing.unthrottled(),
+        () -> embedding,
+        () -> true,
+        () -> true,
+        1,
+        LoggerFactory.getLogger(getClass())));
       runtime.commitOps().commitAndTrack(); runtime.commitOps().maybeRefreshBlocking();
       assertEquals("FAILED", runtime.documentFieldOps().getDocumentField("broken", SchemaFields.CHUNK_EMBEDDING_STATUS));
       assertEquals("3", runtime.documentFieldOps().getDocumentField("broken", SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT));
@@ -112,12 +116,22 @@ final class EnrichmentQuarantineProgressTest extends LuceneExecutorTestBase {
       when(embedding.embedDocumentBatch(anyList())).thenReturn(List.of(new float[] {1f, 0f}));
       var splade = mock(SpladeEncoder.class); when(splade.encodeBatch(anyList())).thenReturn(List.of(Map.of("alpha", 1f)));
       for (int pass = 0; pass < 2; pass++) {
-        if (sparse) SpladeBackfillOps.processSpladeBackfill(new SpladeBackfillOps.BackfillContext(
-            runtime.documentFieldOps(), runtime.indexingCoordinator(), runtime.commitOps(), IndexingPacing.unthrottled(),
-            () -> splade, () -> true, 2, true, true, LoggerFactory.getLogger(getClass())));
-        else EmbeddingBackfillOps.processChunkEmbeddingBackfill(new EmbeddingBackfillOps.BackfillContext(
-            runtime.documentFieldOps(), runtime.indexingCoordinator(), runtime.commitOps(), mock(WorkerSignalBus.class),
-            IndexingPacing.unthrottled(), () -> embedding, () -> true, () -> true, 2, LoggerFactory.getLogger(getClass())));
+        if (sparse) LaneBackfillTestSupport.runSparse(new SpladeBackfillOps.BackfillContext(runtime.documentFieldOps(),
+        runtime.indexingCoordinator(),
+        IndexingPacing.unthrottled(),
+        () -> splade,
+        () -> true,
+        2,
+        true,
+        LoggerFactory.getLogger(getClass()), () -> true));
+        else LaneBackfillTestSupport.runDenseChunk(new LaneBackfillTestSupport.EmbeddingContext(runtime.documentFieldOps(),
+        runtime.indexingCoordinator(),
+        IndexingPacing.unthrottled(),
+        () -> embedding,
+        () -> true,
+        () -> true,
+        2,
+        LoggerFactory.getLogger(getClass())));
         runtime.commitOps().maybeRefreshBlocking();
       }
       assertEquals("FAILED", runtime.documentFieldOps().getDocumentField("broken", SchemaFields.CHUNK_EMBEDDING_STATUS));

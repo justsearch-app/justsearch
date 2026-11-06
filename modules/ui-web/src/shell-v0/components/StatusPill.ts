@@ -12,7 +12,7 @@ import { requestAuthorization } from '../operations/authorizationBroker.js';
 import { modalOwnsFocus, onModalsClosed } from '../primitives/modality.js';
 import { deepActiveElement, isTypingTarget, shouldIgnoreKeyEvent } from '../utils/keyboardHandler.js';
 import { listStatusBarItems } from '../commands/StatusBarRegistry.js';
-import { openRetrospectiveAt } from '../state/retrospectiveDrawer.js';
+import { requestActivitySection } from '../state/activitySection.js';
 import { authorizedFetch } from '../api/authorizedFetch.js';
 import { refreshAiInstallNow } from '../utils/aiInstallPoll.js';
 import { aiInstallStatusSchema } from '../../api/generated/schema-types/ai-install-status.js';
@@ -293,7 +293,7 @@ export class StatusPill extends JfElement {
   private clickedNotice: string | null = null;
   private readonly executing = new Set<string>();
   private async act(action: StatusAction): Promise<void> {
-    if (action.kind === 'background-runs') { this.close(); openRetrospectiveAt('inbox'); return; }
+    if (action.kind === 'background-runs') { this.close(); requestActivitySection('background-runs'); requestSurfaceNavigation('core.activity-surface'); return; }
     if (action.kind === 'navigate') { this.close(); requestSurfaceNavigation(action.target); return; }
     if (action.kind === 'install-toggle') {
       if (this.executing.has('install')) return;

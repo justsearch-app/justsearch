@@ -1,21 +1,12 @@
 // @vitest-environment happy-dom
 //
-// Tempdoc 599 §16/B1 — the per-folder "failed files" drill-down drawer. A real FAILED indexing job
+// Tempdoc 599 §16/B1 — a folder's failed files, inline under the folder. A real FAILED indexing job
 // could not be manufactured live (read-deny / zero-byte files still extracted cleanly), so this drives
-// the drawer's load → render → retry path deterministically: the chip→drawer UI is covered here even
-// though the live chip could not be reproduced. Mirrors RetrospectivePanel.test.ts (same right-drawer
-// TransientController pattern).
+// the list's load → render → retry path deterministically.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import './FailedJobsDrawer.js';
-import type { FailedJobsDrawer } from './FailedJobsDrawer.js';
-import {
-  openFailedJobs,
-  closeFailedJobs,
-  isFailedJobsOpen,
-  failedJobsFolderPathHash,
-  __resetFailedJobsDrawer,
-} from '../state/failedJobsDrawer.js';
+import './FailedFilesList.js';
+import type { FailedFilesList } from './FailedFilesList.js';
 import { EPHEMERAL_TOAST_EVENT, type EphemeralToastSpec } from './advisory/ephemeralToast.js';
 import { isDevMode } from '../../api/devMode.js';
 import { readWireDrift } from '../../api/wireDriftTelemetry.js';
@@ -23,10 +14,6 @@ import { readWireDrift } from '../../api/wireDriftTelemetry.js';
 // The posture seam (tempdoc 683, mirrored from api/schemas.test.ts): parseWireContract THROWS in dev
 // (the vitest default) but DEGRADES in prod. The prod case has its own describe block at the bottom.
 vi.mock('../../api/devMode.js', { spy: true });
-
-afterEach(() => {
-  __resetFailedJobsDrawer();
-});
 
 /**
  * Tempdoc 911 (885 UL.9) — every fixture below is SCHEMA-SHAPED: the by-prefix wire is now the
@@ -65,19 +52,7 @@ async function pump(el: Element): Promise<void> {
   }
 }
 
-describe('failedJobsDrawer store', () => {
-  it('opens with a folder pathHash and closes', () => {
-    expect(isFailedJobsOpen()).toBe(false);
-    expect(failedJobsFolderPathHash()).toBeNull();
-    openFailedJobs('abc123');
-    expect(isFailedJobsOpen()).toBe(true);
-    expect(failedJobsFolderPathHash()).toBe('abc123');
-    closeFailedJobs();
-    expect(isFailedJobsOpen()).toBe(false);
-  });
-});
-
-describe('FailedJobsDrawer', () => {
+describe('FailedFilesList', () => {
   it('loads the folder-scoped failed jobs and renders one row per file with its error + Retry', async () => {
     const origFetch = globalThis.fetch;
     globalThis.fetch = (async (url: unknown) => {
@@ -94,12 +69,11 @@ describe('FailedJobsDrawer', () => {
       return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } });
     }) as typeof fetch;
     try {
-      const el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
+      const el = document.createElement('jf-failed-files-list') as FailedFilesList;
       el.apiBase = 'http://x';
       document.body.appendChild(el);
       await settle(el);
-      // Drive the REAL open path (subscribe → refresh fetch), not a direct `el.open = true`.
-      openFailedJobs('folder-hash');
+      el.folderPathHash = 'folder-hash';
       await pump(el);
 
       const rows = el.shadowRoot?.querySelectorAll('.row') ?? [];
@@ -107,7 +81,7 @@ describe('FailedJobsDrawer', () => {
       const text = (el.shadowRoot?.textContent ?? '').replace(/\s+/g, ' ');
       expect(text).toContain('parse error: unexpected EOF');
       expect(text).toContain('extraction timed out');
-      expect(text).toContain('Retry all'); // the header batch affordance appears when rows>0
+      expect(text).toContain('Try again'); // the batch affordance appears when rows>0
       // Tempdoc 599 §16.1 Move 1 / §17.2 — per-row actions REUSE the shared <jf-row-actions> over the
       // failed-jobs Resource (not a hand-rolled button), keyed by the row's pathHash.
       const rowActions = el.shadowRoot?.querySelectorAll('jf-row-actions') ?? [];
@@ -132,11 +106,11 @@ describe('FailedJobsDrawer', () => {
       return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } });
     }) as typeof fetch;
     try {
-      const el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
+      const el = document.createElement('jf-failed-files-list') as FailedFilesList;
       el.apiBase = 'http://x';
       document.body.appendChild(el);
       await settle(el);
-      openFailedJobs('empty-folder');
+      el.folderPathHash = 'empty-folder';
       await pump(el);
 
       const text = (el.shadowRoot?.textContent ?? '').replace(/\s+/g, ' ');
@@ -148,49 +122,6 @@ describe('FailedJobsDrawer', () => {
     }
   });
 
-  it('a per-row action success (from <jf-row-actions>) drops that row from the list', async () => {
-    const origFetch = globalThis.fetch;
-    globalThis.fetch = (async (url: unknown) => {
-      if (String(url).includes('/api/indexing-jobs/failed/by-prefix')) {
-        return new Response(
-          byPrefixBody([
-            job({ pathHash: 'h-one', errorMessage: 'boom' }),
-            job({ pathHash: 'h-two', errorMessage: 'bang' }),
-          ]),
-          { status: 200, headers: { 'Content-Type': 'application/json' } },
-        );
-      }
-      return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } });
-    }) as typeof fetch;
-    try {
-      const el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
-      el.apiBase = 'http://x';
-      document.body.appendChild(el);
-      await settle(el);
-      openFailedJobs('folder-hash');
-      await pump(el);
-      expect(el.shadowRoot?.querySelectorAll('.row').length).toBe(2);
-
-      // <jf-row-actions> emits a composed `row-action-success` with the rowKey after a successful
-      // Operation; the drawer drops that row. Emit it for h-one from the mounted row-actions element.
-      const ra = el.shadowRoot?.querySelector('jf-row-actions[row-key="h-one"]');
-      ra?.dispatchEvent(
-        new CustomEvent('row-action-success', {
-          detail: { operationId: 'core.retry-indexing-job', rowKey: 'h-one' },
-          bubbles: true,
-          composed: true,
-        }),
-      );
-      await pump(el);
-
-      const remaining = el.shadowRoot?.querySelectorAll('jf-row-actions') ?? [];
-      expect(remaining.length).toBe(1);
-      expect(remaining[0]?.getAttribute('row-key')).toBe('h-two');
-      el.remove();
-    } finally {
-      globalThis.fetch = origFetch;
-    }
-  });
 
   it('a RETRY_EXHAUSTED row reads as "gave up", a FAILED row does not (885 item 21b)', async () => {
     // The two terminal states arrive on the SAME listing and were previously indistinguishable:
@@ -219,11 +150,11 @@ describe('FailedJobsDrawer', () => {
       return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } });
     }) as typeof fetch;
     try {
-      const el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
+      const el = document.createElement('jf-failed-files-list') as FailedFilesList;
       el.apiBase = 'http://x';
       document.body.appendChild(el);
       await settle(el);
-      openFailedJobs('folder-hash');
+      el.folderPathHash = 'folder-hash';
       await pump(el);
 
       const rows = Array.from(el.shadowRoot?.querySelectorAll('.row') ?? []);
@@ -276,11 +207,11 @@ describe('FailedJobsDrawer', () => {
       return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } });
     }) as typeof fetch;
     try {
-      const el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
+      const el = document.createElement('jf-failed-files-list') as FailedFilesList;
       el.apiBase = 'http://x';
       document.body.appendChild(el);
       await settle(el);
-      openFailedJobs('folder-hash');
+      el.folderPathHash = 'folder-hash';
       await pump(el);
 
       const rows = Array.from(el.shadowRoot?.querySelectorAll('.row') ?? []);
@@ -327,11 +258,11 @@ describe('FailedJobsDrawer', () => {
       return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } });
     }) as typeof fetch;
     try {
-      const el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
+      const el = document.createElement('jf-failed-files-list') as FailedFilesList;
       el.apiBase = 'http://x';
       document.body.appendChild(el);
       await settle(el);
-      openFailedJobs('folder-hash');
+      el.folderPathHash = 'folder-hash';
       await pump(el);
 
       const rows = Array.from(el.shadowRoot?.querySelectorAll('.row') ?? []);
@@ -365,11 +296,11 @@ describe('FailedJobsDrawer', () => {
       return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } });
     }) as typeof fetch;
     try {
-      const el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
+      const el = document.createElement('jf-failed-files-list') as FailedFilesList;
       el.apiBase = 'http://x';
       document.body.appendChild(el);
       await settle(el);
-      openFailedJobs('folder-hash');
+      el.folderPathHash = 'folder-hash';
       await pump(el);
 
       const row = el.shadowRoot?.querySelector('.row');
@@ -399,11 +330,11 @@ describe('FailedJobsDrawer', () => {
       return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } });
     }) as typeof fetch;
     try {
-      const el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
+      const el = document.createElement('jf-failed-files-list') as FailedFilesList;
       el.apiBase = 'http://x';
       document.body.appendChild(el);
       await settle(el);
-      openFailedJobs('folder-hash');
+      el.folderPathHash = 'folder-hash';
       await pump(el);
 
       // No row is rendered, and the failure is surfaced — not swallowed into an empty list, which
@@ -419,12 +350,14 @@ describe('FailedJobsDrawer', () => {
     }
   });
 
-  it('"Retry all" invokes core.retry-indexing-job for every listed file and clears them', async () => {
+  it('"Try again" invokes core.retry-indexing-job for every listed file and reads the list again', async () => {
     const retried: string[] = [];
+    let listings = 0;
     const origFetch = globalThis.fetch;
     globalThis.fetch = (async (url: unknown, init?: RequestInit) => {
       const u = String(url);
       if (u.includes('/api/indexing-jobs/failed/by-prefix')) {
+        listings += 1;
         return new Response(
           byPrefixBody([
             job({ pathHash: 'h-one', errorMessage: 'boom' }),
@@ -443,26 +376,22 @@ describe('FailedJobsDrawer', () => {
       return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } });
     }) as typeof fetch;
     try {
-      const el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
+      const el = document.createElement('jf-failed-files-list') as FailedFilesList;
       el.apiBase = 'http://x';
       document.body.appendChild(el);
       await settle(el);
-      openFailedJobs('folder-hash');
+      el.folderPathHash = 'folder-hash';
       await pump(el);
       expect(el.shadowRoot?.querySelectorAll('.row').length).toBe(2);
 
-      // Activate the header "Retry all" (jf-button exposes onActivate).
-      const buttons = Array.from(el.shadowRoot?.querySelectorAll('jf-button') ?? []);
-      const retryAll = buttons.find((b) => (b.getAttribute('label') ?? '').includes('Retry all')) as
-        | (Element & { onActivate?: () => void })
-        | undefined;
-      retryAll?.onActivate?.();
+      const reads = listings;
+      inlineRetry(el).onActivate();
       await pump(el);
 
       // The retry Operation was invoked for both files (POST /api/operations/.../invoke), and the
-      // list cleared as each succeeded.
+      // list was read again rather than assumed.
       expect(retried.length).toBe(2);
-      expect(el.shadowRoot?.querySelectorAll('.row').length).toBe(0);
+      expect(listings).toBe(reads + 1);
       el.remove();
     } finally {
       globalThis.fetch = origFetch;
@@ -470,7 +399,7 @@ describe('FailedJobsDrawer', () => {
   });
 });
 
-describe('FailedJobsDrawer — PROD posture (drift degrades, it does not freeze the drawer)', () => {
+describe('FailedFilesList — PROD posture (drift degrades, it does not freeze the list)', () => {
   // Tempdoc 911 review S2-1. In prod `parseWireContract` logs, records the drift, and RETURNS THE
   // RAW BODY — so the typed contract buys nothing at render time. Dereferencing `state`/`pathHash`
   // on a drifted row would throw inside Lit's `performUpdate`, which is NOT inside `refresh()`'s
@@ -505,11 +434,11 @@ describe('FailedJobsDrawer — PROD posture (drift degrades, it does not freeze 
       return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } });
     }) as typeof fetch;
     try {
-      const el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
+      const el = document.createElement('jf-failed-files-list') as FailedFilesList;
       el.apiBase = 'http://x';
       document.body.appendChild(el);
       await settle(el);
-      openFailedJobs('folder-hash');
+      el.folderPathHash = 'folder-hash';
       await pump(el);
 
       // The row RENDERS (pre-PR behaviour preserved) — no TypeError escaped into performUpdate.
@@ -549,11 +478,11 @@ describe('FailedJobsDrawer — PROD posture (drift degrades, it does not freeze 
       return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } });
     }) as typeof fetch;
     try {
-      const el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
+      const el = document.createElement('jf-failed-files-list') as FailedFilesList;
       el.apiBase = 'http://x';
       document.body.appendChild(el);
       await settle(el);
-      openFailedJobs('folder-hash');
+      el.folderPathHash = 'folder-hash';
       await pump(el);
 
       expect(el.shadowRoot?.querySelectorAll('.row').length).toBe(1);
@@ -566,7 +495,7 @@ describe('FailedJobsDrawer — PROD posture (drift degrades, it does not freeze 
 });
 
 // L13: replacing a visible target must replace both evidence and retry identities.
-it('switches an open drawer from A to B and ignores A arriving late', async () => {
+it('switches a list from A to B and ignores A arriving late', async () => {
   let answerA!: (response: Response) => void;
   const oldFetch = globalThis.fetch;
   globalThis.fetch = vi.fn(async (url: unknown) => {
@@ -575,11 +504,11 @@ it('switches an open drawer from A to B and ignores A arriving late', async () =
     if (path.includes('by-prefix?pathHash=B')) return new Response(byPrefixBody([job({ pathHash: 'B-file', errorMessage: 'B reason' })]));
     return new Response('{}');
   }) as typeof fetch;
-  const el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
+  const el = document.createElement('jf-failed-files-list') as FailedFilesList;
   try {
     document.body.append(el); await pump(el);
-    openFailedJobs('A'); await pump(el);
-    openFailedJobs('B'); await pump(el);
+    el.folderPathHash = 'A'; await pump(el);
+    el.folderPathHash = 'B'; await pump(el);
     expect(el.rows.map(row => row.pathHash)).toEqual(['B-file']);
     expect(el.shadowRoot?.textContent).toContain('B reason');
     expect(el.shadowRoot?.querySelector('jf-row-actions')?.getAttribute('row-key')).toBe('B-file');
@@ -587,16 +516,16 @@ it('switches an open drawer from A to B and ignores A arriving late', async () =
     await pump(el);
     expect(el.rows.map(row => row.pathHash)).toEqual(['B-file']);
     expect(el.shadowRoot?.textContent).not.toContain('obsolete A');
-    closeFailedJobs(); openFailedJobs('B'); await pump(el);
+    el.remove(); document.body.append(el); await pump(el);
     expect(el.rows.map(row => row.pathHash)).toEqual(['B-file']);
   } finally { el.remove(); globalThis.fetch = oldFetch; }
 });
 
-it('loads the current target after a drawer is remounted while its store is open', async () => {
+it('loads its folder again after it is remounted', async () => {
   const oldFetch = globalThis.fetch;
   globalThis.fetch = vi.fn(async () => new Response(byPrefixBody([job({ pathHash: 'current-file' })]))) as typeof fetch;
-  openFailedJobs('current');
-  const el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
+  const el = document.createElement('jf-failed-files-list') as FailedFilesList;
+  el.folderPathHash = 'current';
   try {
     document.body.append(el); await pump(el);
     expect(el.rows.map(row => row.pathHash)).toEqual(['current-file']);
@@ -605,7 +534,7 @@ it('loads the current target after a drawer is remounted while its store is open
   } finally { el.remove(); globalThis.fetch = oldFetch; }
 });
 
-function inlineRetry(el: FailedJobsDrawer) {
+function inlineRetry(el: FailedFilesList) {
   return el.shadowRoot!.querySelector<HTMLElement & { onActivate(): void; disabled: boolean }>('jf-button[label="Try again"]')!;
 }
 
@@ -623,8 +552,8 @@ it.each(['empty', 'partial'])('R3d live %s refresh replaces the list during retr
     }
     return Response.json({});
   }) as typeof fetch;
-  const el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
-  el.inline = true; el.folderPathHash = 'folder'; el.observedCount = 2;
+  const el = document.createElement('jf-failed-files-list') as FailedFilesList;
+  el.folderPathHash = 'folder'; el.observedCount = 2;
   try {
     document.body.append(el); await pump(el);
     inlineRetry(el).onActivate(); await pump(el);
@@ -655,8 +584,8 @@ it('R3d a silent retry followed by a silent listing keeps Try again enabled and 
     if (String(url).includes('by-prefix') || String(url).includes('/invoke')) return new Promise<Response>(() => {});
     return Response.json({});
   }) as typeof fetch;
-  const el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
-  el.inline = true; el.folderPathHash = 'folder'; el.observedCount = 2;
+  const el = document.createElement('jf-failed-files-list') as FailedFilesList;
+  el.folderPathHash = 'folder'; el.observedCount = 2;
   try {
     document.body.append(el); await pump(el);
     inlineRetry(el).onActivate(); await pump(el);
@@ -684,8 +613,8 @@ it('R3d a second click while retry is pending retries every listed file again', 
     }
     return Response.json({});
   }) as typeof fetch;
-  const el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
-  el.inline = true; el.folderPathHash = 'folder';
+  const el = document.createElement('jf-failed-files-list') as FailedFilesList;
+  el.folderPathHash = 'folder';
   try {
     document.body.append(el); await pump(el);
     inlineRetry(el).onActivate(); await pump(el);
@@ -711,8 +640,8 @@ it('R3d a fresh failure list retries A again along with refused B and newly fail
     }
     return Response.json({});
   }) as typeof fetch;
-  const el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
-  el.inline = true; el.folderPathHash = 'folder'; el.observedCount = 2;
+  const el = document.createElement('jf-failed-files-list') as FailedFilesList;
+  el.folderPathHash = 'folder'; el.observedCount = 2;
   try {
     document.body.append(el); await pump(el);
     inlineRetry(el).onActivate(); await pump(el);
@@ -726,7 +655,7 @@ it('R3d a fresh failure list retries A again along with refused B and newly fail
   } finally { el.remove(); globalThis.fetch = oldFetch; }
 });
 
-it.each([true, false])('R3d late retry results cannot touch a switched target or remounted element (inline: %s)', async inline => {
+it('R3d late retry results cannot touch a switched target or remounted element', async () => {
   const releases = new Map<string, (response: Response) => void>();
   const retried: string[] = []; const reads: string[] = []; const oldFetch = globalThis.fetch;
   globalThis.fetch = vi.fn(async (url: unknown, init?: RequestInit) => {
@@ -741,13 +670,13 @@ it.each([true, false])('R3d late retry results cannot touch a switched target or
     }
     return Response.json({});
   }) as typeof fetch;
-  const el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
-  el.inline = inline; el.folderPathHash = 'A';
-  const retry = () => el.shadowRoot!.querySelector<HTMLElement & { onActivate(): void }>(inline ? 'jf-button[label="Try again"]' : 'jf-button[label="Retry all failed files"]')!.onActivate();
+  const el = document.createElement('jf-failed-files-list') as FailedFilesList;
+  el.folderPathHash = 'A';
+  const retry = () => el.shadowRoot!.querySelector<HTMLElement & { onActivate(): void }>('jf-button[label="Try again"]')!.onActivate();
   try {
-    document.body.append(el); if (!inline) openFailedJobs('A'); await pump(el);
+    document.body.append(el); await pump(el);
     retry(); await pump(el);
-    if (inline) el.folderPathHash = 'B'; else openFailedJobs('B');
+    el.folderPathHash = 'B';
     await pump(el); retry(); await pump(el);
     const readsBefore = reads.length;
     releases.get('A-file')!(Response.json({ success: true })); await pump(el);
@@ -775,10 +704,10 @@ it('R3d a second window and a reload or tab remount use fresh lists while an old
     }
     return Response.json({});
   }) as typeof fetch;
-  const first = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
-  const second = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
-  const reloaded = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
-  for (const el of [first, second, reloaded]) { el.inline = true; el.folderPathHash = 'folder'; }
+  const first = document.createElement('jf-failed-files-list') as FailedFilesList;
+  const second = document.createElement('jf-failed-files-list') as FailedFilesList;
+  const reloaded = document.createElement('jf-failed-files-list') as FailedFilesList;
+  for (const el of [first, second, reloaded]) { el.folderPathHash = 'folder'; }
   try {
     document.body.append(first); await pump(first); inlineRetry(first).onActivate(); await pump(first);
     listing = [job({ pathHash: 'new', errorMessage: 'New failure' })];
@@ -806,8 +735,8 @@ it('R3d a late listing cannot overwrite a newer count refresh', async () => {
     }
     return Response.json({});
   }) as typeof fetch;
-  const el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
-  el.inline = true; el.folderPathHash = 'folder'; el.observedCount = 1;
+  const el = document.createElement('jf-failed-files-list') as FailedFilesList;
+  el.folderPathHash = 'folder'; el.observedCount = 1;
   try {
     document.body.append(el); await pump(el);
     el.observedCount = 2; await pump(el);
@@ -828,8 +757,8 @@ it('R3d a failed refresh keeps the last-known inline rows visible beside the err
     }
     return Response.json({});
   }) as typeof fetch;
-  const el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
-  el.inline = true; el.folderPathHash = 'folder'; el.observedCount = 1; el.lastKnown = false;
+  const el = document.createElement('jf-failed-files-list') as FailedFilesList;
+  el.folderPathHash = 'folder'; el.observedCount = 1; el.lastKnown = false;
   try {
     document.body.append(el); await pump(el);
     for (const count of [2, 3]) {
@@ -843,25 +772,6 @@ it('R3d a failed refresh keeps the last-known inline rows visible beside the err
   } finally { el.remove(); globalThis.fetch = oldFetch; }
 });
 
-it('an inline list torn down never removes the open global drawer registration', async () => {
-  const { closeOthersInLayer, registerTransient, __resetTransientArbiter } = await import('../state/transientLayerArbiter.js');
-  __resetTransientArbiter();
-  const oldFetch = globalThis.fetch;
-  globalThis.fetch = vi.fn(async () => new Response(byPrefixBody([job({ pathHash: 'x' })]))) as typeof fetch;
-  const drawer = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
-  const inline = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
-  inline.inline = true; inline.folderPathHash = 'folder'; inline.observedCount = 1;
-  try {
-    document.body.append(drawer); openFailedJobs('folder'); await pump(drawer);
-    document.body.append(inline); await pump(inline);
-    inline.remove(); await pump(drawer);
-    expect(isFailedJobsOpen()).toBe(true);
-    // Opening another right drawer must still close the failed-files drawer through its registration.
-    registerTransient('right-drawer', 'other', () => {});
-    closeOthersInLayer('right-drawer', 'other');
-    expect(isFailedJobsOpen()).toBe(false);
-  } finally { drawer.remove(); inline.remove(); globalThis.fetch = oldFetch; __resetTransientArbiter(); }
-});
 
 it('R3d the real Try again button stays operable while a retry never answers', async () => {
   const retried: string[] = []; const oldFetch = globalThis.fetch;
@@ -870,8 +780,8 @@ it('R3d the real Try again button stays operable while a retry never answers', a
     if (String(url).includes('/invoke')) { retried.push(JSON.parse(String(init?.body)).args.pathHash); return new Promise<Response>(() => {}); }
     return Response.json({});
   }) as typeof fetch;
-  const el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
-  el.inline = true; el.folderPathHash = 'folder'; el.observedCount = 1;
+  const el = document.createElement('jf-failed-files-list') as FailedFilesList;
+  el.folderPathHash = 'folder'; el.observedCount = 1;
   try {
     document.body.append(el); await pump(el);
     const atom = inlineRetry(el); await settle(atom);
@@ -887,8 +797,8 @@ it('R3d the real Try again button stays operable while a retry never answers', a
 });
 
 /** Bulk retries retain failed rows and report through the existing local message channel. */
-describe('FailedJobsDrawer — retry failure feedback', () => {
-  let el: FailedJobsDrawer;
+describe('FailedFilesList — retry failure feedback', () => {
+  let el: FailedFilesList;
   let notices: EphemeralToastSpec[];
   const onNotice = (event: Event) => notices.push((event as CustomEvent).detail);
   let invoke: () => Promise<Response>;
@@ -904,10 +814,10 @@ describe('FailedJobsDrawer — retry failure feedback', () => {
       }
       return new Response('{}');
     }));
-    el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
+    el = document.createElement('jf-failed-files-list') as FailedFilesList;
     el.apiBase = 'http://retry-test';
     document.body.append(el);
-    openFailedJobs('retry-folder');
+    el.folderPathHash = 'retry-folder';
     await pump(el);
   });
   afterEach(() => {
@@ -916,7 +826,7 @@ describe('FailedJobsDrawer — retry failure feedback', () => {
     vi.unstubAllGlobals();
   });
   async function retry(): Promise<void> {
-    const button = el.shadowRoot!.querySelector('jf-button[label="Retry all failed files"]')!;
+    const button = el.shadowRoot!.querySelector('jf-button[label="Try again"]')!;
     await settle(button);
     const control = button.shadowRoot!.querySelector('jf-control')!;
     await settle(control);
@@ -937,25 +847,26 @@ describe('FailedJobsDrawer — retry failure feedback', () => {
     if (failure !== 'unknown') expect(notices[0]!.message).toContain(failure === 'refused' ? 'Retry denied by policy' : 'Connection lost');
     await pump(el);
     expect(el.shadowRoot!.querySelector('.row')!.textContent).toContain('Original parse error');
-    expect(el.shadowRoot!.querySelector('jf-button[label="Retry all failed files"]')).not.toBeNull();
+    expect(el.shadowRoot!.querySelector('jf-button[label="Try again"]')).not.toBeNull();
   });
 
-  it.each(['switch folder', 'close', 'remount'])('a late retry failure after %s does not affect the new target', async navigation => {
+  it.each(['switch folder', 'leave', 'remount'])('a late retry failure after %s does not affect the new target', async navigation => {
     let reject!: (reason: Error) => void;
     invoke = () => new Promise<Response>((_resolve, fail) => { reject = fail; });
     await retry();
-    if (navigation === 'switch folder') openFailedJobs('another-folder');
-    else if (navigation === 'close') closeFailedJobs();
+    if (navigation === 'switch folder') el.folderPathHash = 'another-folder';
+    else if (navigation === 'leave') el.remove();
     else {
       el.remove();
-      el = document.createElement('jf-failed-jobs-drawer') as FailedJobsDrawer;
+      el = document.createElement('jf-failed-files-list') as FailedFilesList;
       el.apiBase = 'http://retry-test';
+      el.folderPathHash = 'retry-folder';
       document.body.append(el);
     }
     await pump(el);
     reject(new Error('Old request failed'));
     await pump(el);
     expect(notices).toHaveLength(0);
-    if (navigation !== 'close') expect(el.shadowRoot!.querySelector('.row')!.textContent).toContain('Original parse error');
+    if (navigation !== 'leave') expect(el.shadowRoot!.querySelector('.row')!.textContent).toContain('Original parse error');
   });
 });

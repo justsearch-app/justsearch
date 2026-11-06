@@ -72,8 +72,7 @@ const ACTIVE_THEME_STYLE_ID = 'jf-active-theme';
  *
  * The fix: resolve `system` by actively querying `matchMedia` (mirroring what the inline script
  * already does) instead of delegating to CSS, and subscribe to the query's `change` event so a
- * live OS theme flip is honored without a reload — matching a singleton "one matchMedia, fanned
- * out" listener already established for viewport breakpoints (`responsiveState.ts`).
+ * live OS theme flip is honored without a reload, through one singleton matchMedia listener.
  */
 const SYSTEM_THEME_QUERY = '(prefers-color-scheme: dark)';
 let systemThemeMql: MediaQueryList | null = null;

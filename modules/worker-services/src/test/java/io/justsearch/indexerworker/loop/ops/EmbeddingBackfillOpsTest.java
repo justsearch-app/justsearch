@@ -4,11 +4,9 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-import io.justsearch.adapters.lucene.runtime.CommitOps;
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
 import io.justsearch.adapters.lucene.runtime.IndexingCoordinator;
 import io.justsearch.core.execution.InferenceRequest;
-import io.justsearch.indexerworker.coordination.WorkerSignalBus;
 import io.justsearch.indexerworker.embed.EmbeddingProvider;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexing.SchemaFields;
@@ -35,8 +33,6 @@ class EmbeddingBackfillOpsTest {
 
   @Mock DocumentFieldOps documentFieldOps;
   @Mock IndexingCoordinator indexingCoordinator;
-  @Mock CommitOps commitOps;
-  @Mock WorkerSignalBus signalBus;
   @Mock EmbeddingProvider embeddingProvider;
 
   @org.junit.jupiter.api.BeforeEach
@@ -44,12 +40,9 @@ class EmbeddingBackfillOpsTest {
     lenient().when(embeddingProvider.isAvailable()).thenReturn(true);
   }
 
-  private EmbeddingBackfillOps.BackfillContext context() {
-    return new EmbeddingBackfillOps.BackfillContext(
-        documentFieldOps,
+  private LaneBackfillTestSupport.EmbeddingContext context() {
+    return new LaneBackfillTestSupport.EmbeddingContext(documentFieldOps,
         indexingCoordinator,
-        commitOps,
-        signalBus,
         IndexingPacing.unthrottled(),
         () -> embeddingProvider,
         () -> true,
@@ -67,7 +60,7 @@ class EmbeddingBackfillOpsTest {
   @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.MethodSource("fallbackOutages")
   void fallbackOutageDoesNotChargeDocumentsAndRecovers(boolean chunk, String outage) throws Exception {
-    BackfillSnapshotTestSupport.install(documentFieldOps, indexingCoordinator, !chunk, java.util.Set.of());
+    BackfillSnapshotTestSupport.installLaneFixtures(documentFieldOps, indexingCoordinator, !chunk, java.util.Set.of());
     String status = chunk ? SchemaFields.CHUNK_EMBEDDING_STATUS : SchemaFields.EMBEDDING_STATUS;
     when(documentFieldOps.queryDocIdsByField(eq(status), eq("PENDING"), anyInt()))
         .thenReturn(List.of("first", "later"));
@@ -95,11 +88,16 @@ class EmbeddingBackfillOpsTest {
       }
       return null;
     });
-    var ctx = new EmbeddingBackfillOps.BackfillContext(documentFieldOps, indexingCoordinator,
-        commitOps, signalBus, IndexingPacing.unthrottled(), selected::get, () -> true,
-        writesAllowed::get, 100, LoggerFactory.getLogger(EmbeddingBackfillOpsTest.class));
-    if (chunk) EmbeddingBackfillOps.processChunkEmbeddingBackfill(ctx);
-    else EmbeddingBackfillOps.processEmbeddingBackfill(ctx);
+    var ctx = new LaneBackfillTestSupport.EmbeddingContext(documentFieldOps,
+        indexingCoordinator,
+        IndexingPacing.unthrottled(),
+        selected::get,
+        () -> true,
+        writesAllowed::get,
+        100,
+        LoggerFactory.getLogger(EmbeddingBackfillOpsTest.class));
+    if (chunk) LaneBackfillTestSupport.runDenseChunk(ctx);
+    else LaneBackfillTestSupport.runDenseParent(ctx);
     assertDoesNotThrow(() -> verify(indexingCoordinator, never()).publishEnrichmentBatch(
         anyList(), anyMap()));
     verify(embeddingProvider, never()).embedDocument(eq("later content"), any(InferenceRequest.class));
@@ -108,13 +106,13 @@ class EmbeddingBackfillOpsTest {
     ready.set(true);
     writesAllowed.set(true);
     selected.set(embeddingProvider);
-    StageOutcome recovered = chunk ? EmbeddingBackfillOps.processChunkEmbeddingBackfill(ctx)
-        : EmbeddingBackfillOps.processEmbeddingBackfill(ctx);
+    StageOutcome recovered = chunk ? LaneBackfillTestSupport.runDenseChunk(ctx)
+        : LaneBackfillTestSupport.runDenseParent(ctx);
     assertEquals(2, recovered.docsProcessed());
-    verify(indexingCoordinator).publishEnrichmentBatch(argThat(updates ->
+    verify(indexingCoordinator).updateDocumentsBatchIf(argThat(updates ->
         updates.size() == 1 && "first".equals(updates.get(0).getKey())
             && "COMPLETED".equals(updates.get(0).getValue().get(status))), anyMap());
-    verify(indexingCoordinator).publishEnrichmentBatch(argThat(updates ->
+    verify(indexingCoordinator).updateDocumentsBatchIf(argThat(updates ->
         updates.size() == 1 && "later".equals(updates.get(0).getKey())
             && "COMPLETED".equals(updates.get(0).getValue().get(status))), anyMap());
   }
@@ -123,7 +121,7 @@ class EmbeddingBackfillOpsTest {
   @DisplayName("processChunkEmbeddingBackfill()")
   class ProcessChunkEmbeddingBackfill {
     @org.junit.jupiter.api.BeforeEach void snapshots() throws Exception {
-      BackfillSnapshotTestSupport.install(documentFieldOps, indexingCoordinator, false, java.util.Set.of());
+      BackfillSnapshotTestSupport.installLaneFixtures(documentFieldOps, indexingCoordinator, false, java.util.Set.of());
     }
 
 
@@ -133,8 +131,7 @@ class EmbeddingBackfillOpsTest {
               eq(SchemaFields.EMBEDDING_STATUS_PENDING),
               anyInt()))
           .thenReturn(List.of("chunk1", "chunk2"));
-      when(signalBus.isMainGpuActive()).thenReturn(false);
-      when(documentFieldOps.getDocumentContentBatch(List.of("chunk1", "chunk2")))
+      when(documentFieldOps.getDocumentContentBatch(anyList()))
           .thenReturn(Map.of("chunk1", "content one", "chunk2", "content two"));
     }
 
@@ -148,13 +145,13 @@ class EmbeddingBackfillOpsTest {
       when(embeddingProvider.embedDocument(eq("content two"), any(InferenceRequest.class))).thenReturn(new float[] {3f, 4f});
 
       StageOutcome result =
-          assertDoesNotThrow(() -> EmbeddingBackfillOps.processChunkEmbeddingBackfill(context()));
+          assertDoesNotThrow(() -> LaneBackfillTestSupport.runDenseChunk(context()));
 
       assertTrue(result.success(), "should report work was done via the per-chunk fallback");
       verify(embeddingProvider).embedDocument(eq("content one"), any(InferenceRequest.class));
       verify(embeddingProvider).embedDocument(eq("content two"), any(InferenceRequest.class));
       verify(indexingCoordinator)
-          .publishEnrichmentBatch(
+          .updateDocumentsBatchIf(
               argThat(entries -> {
                 if (entries.size() != 1 || !"chunk1".equals(entries.get(0).getKey())) return false;
                 var m = entries.get(0).getValue();
@@ -162,7 +159,7 @@ class EmbeddingBackfillOpsTest {
                           m.get(SchemaFields.CHUNK_EMBEDDING_STATUS));
               }), anyMap());
       verify(indexingCoordinator)
-          .publishEnrichmentBatch(
+          .updateDocumentsBatchIf(
               argThat(entries -> {
                 if (entries.size() != 1 || !"chunk2".equals(entries.get(0).getKey())) return false;
                 var m = entries.get(0).getValue();
@@ -184,7 +181,7 @@ class EmbeddingBackfillOpsTest {
       when(embeddingProvider.embedDocument(eq("content two"), any(InferenceRequest.class))).thenReturn(new float[] {3f, 4f});
 
       StageOutcome result =
-          assertDoesNotThrow(() -> EmbeddingBackfillOps.processChunkEmbeddingBackfill(context()));
+          assertDoesNotThrow(() -> LaneBackfillTestSupport.runDenseChunk(context()));
 
       assertTrue(result.success());
       verify(embeddingProvider).embedDocument(eq("content one"), any(InferenceRequest.class));
@@ -201,7 +198,7 @@ class EmbeddingBackfillOpsTest {
       when(embeddingProvider.embedDocument(eq("content two"), any(InferenceRequest.class))).thenReturn(new float[] {3f, 4f});
 
       StageOutcome result =
-          assertDoesNotThrow(() -> EmbeddingBackfillOps.processChunkEmbeddingBackfill(context()));
+          assertDoesNotThrow(() -> LaneBackfillTestSupport.runDenseChunk(context()));
 
       assertTrue(result.success());
       verify(embeddingProvider).embedDocument(eq("content one"), any(InferenceRequest.class));
@@ -221,7 +218,7 @@ class EmbeddingBackfillOpsTest {
           .thenReturn(null);
 
       StageOutcome result =
-          assertDoesNotThrow(() -> EmbeddingBackfillOps.processChunkEmbeddingBackfill(context()));
+          assertDoesNotThrow(() -> LaneBackfillTestSupport.runDenseChunk(context()));
 
       assertTrue(result.success());
       verify(indexingCoordinator).updateDocumentsBatchIf(argThat(updates ->
@@ -235,7 +232,7 @@ class EmbeddingBackfillOpsTest {
   @DisplayName("processEmbeddingBackfill() (doc-level sibling)")
   class ProcessEmbeddingBackfill {
     @org.junit.jupiter.api.BeforeEach void snapshots() throws Exception {
-      BackfillSnapshotTestSupport.install(documentFieldOps, indexingCoordinator, true, java.util.Set.of());
+      BackfillSnapshotTestSupport.installLaneFixtures(documentFieldOps, indexingCoordinator, true, java.util.Set.of());
     }
 
 
@@ -243,7 +240,6 @@ class EmbeddingBackfillOpsTest {
       when(documentFieldOps.queryDocIdsByField(
               eq(SchemaFields.EMBEDDING_STATUS), eq(SchemaFields.EMBEDDING_STATUS_PENDING), anyInt()))
           .thenReturn(List.of("doc1", "doc2"));
-      when(signalBus.isMainGpuActive()).thenReturn(false);
       when(documentFieldOps.getDocumentContent("doc1")).thenReturn("content one");
       when(documentFieldOps.getDocumentContent("doc2")).thenReturn("content two");
     }
@@ -258,7 +254,7 @@ class EmbeddingBackfillOpsTest {
       when(embeddingProvider.embedDocumentBatch(List.of(large))).thenReturn(List.of());
       when(embeddingProvider.embedDocument(eq(large), any(InferenceRequest.class))).thenReturn(new float[] {1f});
 
-      EmbeddingBackfillOps.processEmbeddingBackfill(context());
+      LaneBackfillTestSupport.runDenseParent(context());
 
       verify(embeddingProvider).embedDocumentBatch(List.of(large));
       verify(documentFieldOps, never()).getDocumentContent("later");
@@ -277,7 +273,7 @@ class EmbeddingBackfillOpsTest {
       when(embeddingProvider.embedDocumentBatch(List.of(first))).thenReturn(List.of());
       when(embeddingProvider.embedDocument(eq(first), any(InferenceRequest.class))).thenReturn(new float[] {1f});
 
-      EmbeddingBackfillOps.processEmbeddingBackfill(context());
+      LaneBackfillTestSupport.runDenseParent(context());
 
       verify(embeddingProvider).embedDocumentBatch(List.of(first));
       verify(embeddingProvider, never()).embedDocument(eq(large), any(InferenceRequest.class));
@@ -295,9 +291,9 @@ class EmbeddingBackfillOpsTest {
       when(documentFieldOps.getDocumentContent("a-first")).thenReturn(half);
       when(documentFieldOps.getDocumentContent("b-second")).thenReturn(half);
       when(embeddingProvider.embedDocumentBatch(List.of(half, half))).thenReturn(List.of());
-      when(embeddingProvider.embedDocument(eq(half), any(InferenceRequest.class))).thenReturn(new float[] {1f});
 
-      EmbeddingBackfillOps.processEmbeddingBackfill(context());
+      CombinedEnrichmentBackfillOps.processDenseUnit(LaneBackfillTestSupport.denseContext(context()),
+          new EnrichmentSelection(), EnrichmentAccounting.Stage.EMBED);
 
       verify(embeddingProvider).embedDocumentBatch(List.of(half, half));
       verify(documentFieldOps, never()).getDocumentContent("c-later");
@@ -311,7 +307,7 @@ class EmbeddingBackfillOpsTest {
       when(embeddingProvider.embedDocument(eq("content one"), any(InferenceRequest.class))).thenReturn(new float[] {1f, 2f});
       when(embeddingProvider.embedDocument(eq("content two"), any(InferenceRequest.class))).thenReturn(new float[] {3f, 4f});
 
-      assertDoesNotThrow(() -> EmbeddingBackfillOps.processEmbeddingBackfill(context()));
+      assertDoesNotThrow(() -> LaneBackfillTestSupport.runDenseParent(context()));
 
       verify(embeddingProvider).embedDocument(eq("content one"), any(InferenceRequest.class));
       verify(embeddingProvider).embedDocument(eq("content two"), any(InferenceRequest.class));
@@ -326,7 +322,7 @@ class EmbeddingBackfillOpsTest {
       when(embeddingProvider.embedDocument(eq("content one"), any(InferenceRequest.class))).thenReturn(new float[] {1f, 2f});
       when(embeddingProvider.embedDocument(eq("content two"), any(InferenceRequest.class))).thenReturn(new float[] {3f, 4f});
 
-      assertDoesNotThrow(() -> EmbeddingBackfillOps.processEmbeddingBackfill(context()));
+      assertDoesNotThrow(() -> LaneBackfillTestSupport.runDenseParent(context()));
 
       verify(embeddingProvider).embedDocument(eq("content one"), any(InferenceRequest.class));
       verify(embeddingProvider).embedDocument(eq("content two"), any(InferenceRequest.class));
@@ -340,7 +336,7 @@ class EmbeddingBackfillOpsTest {
       when(embeddingProvider.embedDocument(eq("content one"), any(InferenceRequest.class))).thenReturn(new float[] {1f, 2f});
       when(embeddingProvider.embedDocument(eq("content two"), any(InferenceRequest.class))).thenReturn(new float[] {3f, 4f});
 
-      assertDoesNotThrow(() -> EmbeddingBackfillOps.processEmbeddingBackfill(context()));
+      assertDoesNotThrow(() -> LaneBackfillTestSupport.runDenseParent(context()));
 
       verify(embeddingProvider).embedDocument(eq("content one"), any(InferenceRequest.class));
       verify(embeddingProvider).embedDocument(eq("content two"), any(InferenceRequest.class));

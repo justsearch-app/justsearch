@@ -1,0 +1,2943 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-06T10:18:22.519Z",
+  "revision": "a7e61cab14f3fee4143633eb235cbc1f56fec7cf",
+  "tree": "a1011f057b1b0e04977084bb915c3bd24f4cd94f",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/RetiredFrameElements.test.ts\" \"src/shell-v0/chrome/Shell.details.test.ts\" \"src/shell-v0/components/ContextInspectorPane.test.ts\" \"src/shell-v0/components/detailsPane/DetailsPane.test.ts\" \"src/shell-v0/components/detailsPane/WindowDetails.test.ts\" \"src/shell-v0/components/documentPane/DocumentPane.test.ts\" \"src/shell-v0/components/EffectAuditLog.test.ts\" \"src/shell-v0/components/FailedFilesList.folderSwitch.test.ts\" \"src/shell-v0/components/FailedFilesList.layout.test.ts\" \"src/shell-v0/components/FailedFilesList.test.ts\" \"src/shell-v0/components/RunActivity.test.ts\" \"src/shell-v0/controllers/AgentSessionController.test.ts\" \"src/shell-v0/state/detailsMemory.test.ts\" \"src/shell-v0/views/ActivitySurface.render.test.ts\" \"src/shell-v0/views/LibrarySurface.failedFiles.test.ts\" \"src/shell-v0/views/LibrarySurface.redesign.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.branch.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.context.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.pane.test.ts\" \"src/shell-v0/views/search-v3/Sv3AgentRuns.test.ts\" \"src/shell-v0/views/search-v3/sv3-boundaries.test.ts\" \"src/shell-v0/views/search-v3/Sv3Pane.test.ts\" \"src/shell-v0/views/search-v3/Sv3Results.preview.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-2604059-1793960274371.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 9949
+    },
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/detailsPane/DetailsPane.frame-lockdown.test.ts\" \"src/shell-v0/views/LibrarySurface.bandFocus-lockdown.test.ts\" \"src/shell-v0/views/LibrarySurface.focusKeeper-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/tmp/test-intent-vitest-2604059-1793960284321.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 18188
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/RetiredFrameElements.test.ts",
+      "file": "modules/ui-web/src/shell-v0/chrome/RetiredFrameElements.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:37ce830cb2e2274bef34edf0c55095079cbd65e4f4bccf5c0af455cf5c2646e9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "frozen jf-rail is defined, in the vocabulary and inert without listeners",
+          "status": "passed"
+        },
+        {
+          "name": "frozen jf-recents-menu is defined, in the vocabulary and inert without listeners",
+          "status": "passed"
+        },
+        {
+          "name": "frozen jf-bookmarks-popover is defined, in the vocabulary and inert without listeners",
+          "status": "passed"
+        },
+        {
+          "name": "frozen jf-sources-pane is defined, in the vocabulary and inert without listeners",
+          "status": "passed"
+        },
+        {
+          "name": "frozen jf-interaction-retrospective-panel is defined, in the vocabulary and inert without listeners",
+          "status": "passed"
+        },
+        {
+          "name": "frozen jf-failed-jobs-drawer is defined, in the vocabulary and inert without listeners",
+          "status": "passed"
+        },
+        {
+          "name": "the top bar is reserved from authored presentations, like the shell and the status pill",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.details.test.ts",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.details.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1bd82df84cba73f4246d38483a4a881b722727914fcfc9a7859b881c8f20f801",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "no frame drawers the overlay host has no right-drawer slot, and the frame mounts no drawer",
+          "status": "passed"
+        },
+        {
+          "name": "every window has at most one details pane Search composes its own; any other window gets one beside it",
+          "status": "passed"
+        },
+        {
+          "name": "every window has at most one details pane host.ui.showInspector outside Search opens that window’s pane, with no navigation",
+          "status": "passed"
+        },
+        {
+          "name": "every window has at most one details pane a selection in Search belongs to Search",
+          "status": "passed"
+        },
+        {
+          "name": "every window has at most one details pane a window change closes what the window left behind",
+          "status": "passed"
+        },
+        {
+          "name": "C4 a split layout gives each window its own pane, and a selection goes to the window holding the keyboard",
+          "status": "passed"
+        },
+        {
+          "name": "C4 a split layout with the keyboard nowhere, it goes to the primary window",
+          "status": "passed"
+        },
+        {
+          "name": "what the drawers did besides drawing the shared agent controller has the frame’s host from the start, so a delegated run has its transport",
+          "status": "passed"
+        },
+        {
+          "name": "what opened a drawer goes to the new home Ctrl+K \"Show Effect Audit Log\" arrives at the journal in Activity",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ContextInspectorPane.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/ContextInspectorPane.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7c696dcc42b6f23dba4053e300c4f28e981d208e2af7ed5c61af81380e5c26ce",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ContextInspectorPane (610 §K) renders the phases, the system line, the position marker, and the real total",
+          "status": "passed"
+        },
+        {
+          "name": "ContextInspectorPane (610 §K) shows the empty state when no turn has completed",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/detailsPane/DetailsPane.frame-lockdown.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/detailsPane/DetailsPane.frame-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:24a7b1f10adb9cb864877c822f48f09afdedee6f11f6c76bec0e05a15140f8d5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Search’s details pane is inline and within 360-560 px at 1280x800 , and tabs never push the close control out",
+          "status": "passed"
+        },
+        {
+          "name": "Search’s details pane is inline and within 360-560 px at 1280x800 ?wideFont, and tabs never push the close control out",
+          "status": "passed"
+        },
+        {
+          "name": "Search’s details pane is a sheet at 900x800 , opened with the keyboard in it, and Escape returns it to the opener",
+          "status": "passed"
+        },
+        {
+          "name": "Search’s details pane is a sheet at 900x800 ?wideFont, opened with the keyboard in it, and Escape returns it to the opener",
+          "status": "passed"
+        },
+        {
+          "name": "Search’s details pane at the 600x400 minimum the sheet stays on screen with its actions reachable",
+          "status": "passed"
+        },
+        {
+          "name": "Search’s details pane a window narrowed while the pane is open becomes a sheet, keeps the keyboard, and Escape still works",
+          "status": "passed"
+        },
+        {
+          "name": "Search’s details pane the grip keeps the width inside the limits and the main column its 640",
+          "status": "passed"
+        },
+        {
+          "name": "Search’s details pane arrow keys move through the tabs and the keyboard stays on the tab strip",
+          "status": "passed"
+        },
+        {
+          "name": "Search’s details pane X1 the selected source number is readable in forced colours on a dark palette",
+          "status": "passed"
+        },
+        {
+          "name": "Search’s details pane X1 the selected source number is readable in forced colours on a light palette",
+          "status": "passed"
+        },
+        {
+          "name": "Search’s details pane F6-style order holds: the tab strip comes before the reader, and Tab reaches Open file",
+          "status": "passed"
+        },
+        {
+          "name": "another window’s details pane at 1280 px it is inline, and its close returns focus",
+          "status": "passed"
+        },
+        {
+          "name": "another window’s details pane at 900 px it is sheet, and its close returns focus",
+          "status": "passed"
+        },
+        {
+          "name": "the Space preview at 1280x800 it floats on screen and Space or Escape closes it ",
+          "status": "passed"
+        },
+        {
+          "name": "the Space preview at 600x400 it floats on screen and Space or Escape closes it ",
+          "status": "passed"
+        },
+        {
+          "name": "the Space preview at 600x400 it floats on screen and Space or Escape closes it &wideFont",
+          "status": "passed"
+        },
+        {
+          "name": "the Space preview holding Space opens it once rather than flickering, and does not scroll the list",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/detailsPane/DetailsPane.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/detailsPane/DetailsPane.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3be4dbb91968a34c932ce0dab914661d4a77b0f92a99c7158b2b8b7eb8f79450",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "jf-details-pane names the region and draws a tab list with one selected, roving tab",
+          "status": "passed"
+        },
+        {
+          "name": "jf-details-pane a click chooses a tab; the window decides, so the frame does not change on its own",
+          "status": "passed"
+        },
+        {
+          "name": "jf-details-pane ArrowRight moves to the expected tab",
+          "status": "passed"
+        },
+        {
+          "name": "jf-details-pane ArrowLeft moves to the expected tab",
+          "status": "passed"
+        },
+        {
+          "name": "jf-details-pane Home moves to the expected tab",
+          "status": "passed"
+        },
+        {
+          "name": "jf-details-pane End moves to the expected tab",
+          "status": "passed"
+        },
+        {
+          "name": "jf-details-pane close raises one event, and it does not leave the window",
+          "status": "passed"
+        },
+        {
+          "name": "jf-details-pane a sheet has a dim that closes it; inline has none",
+          "status": "passed"
+        },
+        {
+          "name": "jf-details-pane focusActiveTab puts the keyboard on the active tab",
+          "status": "passed"
+        },
+        {
+          "name": "details pane sizes (design system §2) holds 360-560 px",
+          "status": "passed"
+        },
+        {
+          "name": "details pane sizes (design system §2) is inline from 980 px of window width, a sheet below, and an unknown box is not a narrow one",
+          "status": "passed"
+        },
+        {
+          "name": "details pane sizes (design system §2) remembers a width, forgets it, and reads a stored non-number as no memory",
+          "status": "passed"
+        },
+        {
+          "name": "plugin inspector tabs (DP4) offers registered tabs in priority order, and honours a `when` that is false",
+          "status": "passed"
+        },
+        {
+          "name": "plugin inspector tabs (DP4) a string stays text: markup in it is never parsed",
+          "status": "passed"
+        },
+        {
+          "name": "plugin inspector tabs (DP4) mounts an element, and renders again when the selection changes",
+          "status": "passed"
+        },
+        {
+          "name": "plugin inspector tabs (DP4) a plugin that throws costs its tab alone, and says so",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/detailsPane/WindowDetails.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/detailsPane/WindowDetails.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a725d9dbcb47324b62497e25ed6c6ef3d4932b0a35d0faf7d6ac16d557186b4a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a window’s details pane opens what was selected in this window, with its passage",
+          "status": "passed"
+        },
+        {
+          "name": "a window’s details pane is a sheet below 980 px of window width, inline from 980, and only inline has a grip",
+          "status": "passed"
+        },
+        {
+          "name": "a window’s details pane closes from its control, closes the shared signal, and returns focus to what had it",
+          "status": "passed"
+        },
+        {
+          "name": "a window’s details pane Escape in the pane closes it; Escape during a composition does not",
+          "status": "passed"
+        },
+        {
+          "name": "a window’s details pane resizes within limits from the keyboard, and Home forgets the choice",
+          "status": "passed"
+        },
+        {
+          "name": "C4 each window shows its own selection a split layout: two windows keep their own documents",
+          "status": "passed"
+        },
+        {
+          "name": "C4 each window shows its own selection one window closing leaves the other open",
+          "status": "passed"
+        },
+        {
+          "name": "C4 each window shows its own selection rapid selection in one window lands on the last, and the other never sees any of it",
+          "status": "passed"
+        },
+        {
+          "name": "C4 each window shows its own selection a window reused for another surface does not bring the old document along",
+          "status": "passed"
+        },
+        {
+          "name": "C4 each window shows its own selection a profile change clears every window",
+          "status": "passed"
+        },
+        {
+          "name": "C4 each window shows its own selection closing and reopening shows the selection again in the same window only",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:52e02a67a10d6f0cd39bc222a7d287bc5746805c53e1414a1072ee7ef87eb9a8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DocumentPane — 849 citation header says which turn cited the document, where the passage sits, and what happened to it",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — 849 citation header labels its ONE score by what it MEASURES, and renders no retrieval band",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — 849 citation header a DROPPED passage shows the badge ALONE, with no grounding claim beside it",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — 849 citation header renders a SHORTER header when the producer said less — never a padded one",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — 849 citation header renders no header at all for the line-addressed mount sites",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — 849 citation header 849 S10 — a degenerate span is explained instead of opening in silence",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — 849 citation header 849 S10 — a citation WITH a usable span shows no such notice",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — empty state renders the no-document empty state when docPath is null",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — a document the index no longer has (WP1.1 S1.5) says the file is no longer in the index",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — a document the index no longer has (WP1.1 S1.5) shows any other failure as a failure, not as a missing file",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — load + render (markdown) fetches /api/preview for the docPath and renders the fixture as blocks in Rendered mode by default",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — load + render (markdown) toggles to Source mode and back to Rendered",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — load + render (markdown) a non-markdown docPath defaults to Source mode with Rendered disabled",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — highlightRange / chunkRange applies hl-strong to the covering block and scrolls it to block:center",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — highlightRange / chunkRange tints the rest of a wider chunkRange with hl-weak, leaving the exact range hl-strong",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — highlightRange / chunkRange applies hl-strong to the covering line span in Source mode",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — highlight decay (Search Thread Round-2 R1b) lands hl-strong, then decays to hl-weak after ~1.5s",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — highlight decay (Search Thread Round-2 R1b) honors prefers-reduced-motion: lands quiet immediately, never rendering hl-strong",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — highlight decay (Search Thread Round-2 R1b) a NEW highlightRange re-arms the strong phase even after a prior range decayed",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — highlight decay (Search Thread Round-2 R1b) the chunkRange tier never gets the strong phase, before or after decay",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — header path truncation (Search Thread Round-2 R5c) Detailed: renders a formatDisplayPath-truncated header text with the full path in title",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — header path truncation (Search Thread Round-2 R5c) Detailed: renders a short path verbatim (no truncation needed)",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — header path truncation (Search Thread Round-2 R5c) Simple (default): renders a humanized folder breadcrumb, not the raw path (Tempdoc 738 C4)",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — zero-content diagnostic (tempdoc 671 parity) shows the provenance diagnostic even when content is empty",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — VDU abstention-gate provenance (tempdoc 677) labels vdu_empty as VDU-ran-but-found-nothing, not the silent base-method fall-through",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — VDU abstention-gate provenance (tempdoc 677) labels vdu_rejected with the abstention-gate label and an explanatory tooltip",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — a11y + events the scroll region is keyboard-focusable (tabindex=0 + role=region)",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — a11y + events the ramp's own scroll containers are keyboard-reachable too (tempdoc 853 F-05)",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — char-anchored citations (tempdoc 849 §3) derives the highlighted line from startChar — the reader counts the line the citation names",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — char-anchored citations (tempdoc 849 §3) marks the claim-matched sentence strong INSIDE the tinted chunk",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — char-anchored citations (tempdoc 849 §3) with NO claim match, scrolls the tinted chunk into view (not the top of the document)",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — char-anchored citations (tempdoc 849 §3) a late claim match upgrades the OPEN pane to strong, once, without re-fetching",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — char-anchored citations (tempdoc 849 §3) reaches a citation past the old 5,000-character head window",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — char-anchored citations (tempdoc 849 §3) confirms the witness across a whitespace difference (the excerpt was re-wrapped)",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — char-anchored citations (tempdoc 849 §3) SUPPRESSES the highlight when the excerpt is not at the anchored offsets, and says why",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — char-anchored citations (tempdoc 849 §3) says so rather than guessing when the LOADED WINDOW does not reach the anchor",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — char-anchored citations (tempdoc 849 §3) anchors across a length-changing lowercase (U+0130) without desyncing the offset map",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — char-anchored citations (tempdoc 849 §3) a witness too SHORT to be evidence confirms rather than suppressing",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — char-anchored citations (tempdoc 849 §3) suppresses when the witness sits far INSIDE the span (text was inserted before it)",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — char-anchored citations (tempdoc 849 §3) names a SHRUNK document as changed, not as an under-loaded window",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — char-anchored citations (tempdoc 849 §3) an offset past the end of the document reads as shrunk, not as a blank window",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — char-anchored citations (tempdoc 849 §3) does not contradict itself: no window note beside a suppression notice",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — char-anchored citations (tempdoc 849 §3) a degenerate span says nothing at all — no highlight, and no notice blaming the document",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — char-anchored citations (tempdoc 849 §3) does not fire a second identical fetch for an anchor the in-flight request already covers",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — char-anchored citations (tempdoc 849 §3) anchors in a document with NO line breaks before the citation",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — char-anchored citations (tempdoc 849 §3) treats an UNBOUND citation property as no citation (Lit leaves it undefined, not null)",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — char-anchored citations (tempdoc 849 §3) leaves the line-addressed consumers alone: no citation, no window note, head window",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — anchored highlight decay (tempdoc 849 §4) re-arms the strong phase for a NEW anchored sentence after the previous one decayed",
+          "status": "passed"
+        },
+        {
+          "name": "DocumentPane — pane-visible-range (debounced scroll) emits the first/last visible source line after the scroll debounce settles",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/EffectAuditLog.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/EffectAuditLog.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0be1cef9997dcad1b9849aedd524877bd780f032beb642b5e3c0206f09b873b8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "<jf-effect-audit-log> causation chip (§32 R-E3) renders a \"↳ #N\" chip for causation-chained entries, none for the root",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-effect-audit-log> causation chip (§32 R-E3) 543-fwd #6 — a causation turn renders a collapsible header over its member rows",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-effect-audit-log> causation chip (§32 R-E3) 543-fwd #7 — \"undo turn\" reverses the whole causation group via a confirm",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-effect-audit-log> causation chip (§32 R-E3) 543-fwd #19 / 613 §6 — \"Export selected\" copies an archive and flashes an in-control RECEIPT, not a window toast",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-effect-audit-log> causation chip (§32 R-E3) 543-fwd #19 — \"Import archive\" replays a pasted archive as a macro",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-effect-audit-log> causation chip (§32 R-E3) 543-fwd #6 — clicking \"why?\" expands the bottom-up causation trace to the root",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-effect-audit-log> causation chip (§32 R-E3) 543-fwd #5 — \"restore to here\" stages a confirm of later actions, then reverses them",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-effect-audit-log> causation chip (§32 R-E3) DE6 — \"restore to here\" says what cannot be undone and reverses exactly the previewed actions",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-effect-audit-log> causation chip (§32 R-E3) §32 U2 — renders an Undo button for an undoable entry; click dispatches undo-operation",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-effect-audit-log> causation chip (§32 R-E3) 543-fwd #4 — \"Undo last AI action\" fires a labelled confirmation toast naming the reversed effect",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-effect-audit-log> causation chip (§32 R-E3) 543-fwd #8 — \"Undo all AI actions\" stages a confirm preview; no undo until confirmed",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-effect-audit-log> causation chip (§32 R-E3) 543-fwd #3 — AI-undo buttons soft-unavailable when no reversible agent entries; operable + counted otherwise",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-effect-audit-log> causation chip (§32 R-E3) 543-fwd #8 — Cancel dismisses the confirm without undoing",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-effect-audit-log> causation chip (§32 R-E3) §32 U2 — marking an entry undoable AFTER the log is open re-renders the Undo button",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-effect-audit-log> causation chip (§32 R-E3) 543-fwd FE-tail — a genuinely empty journal shows the \"nothing yet\" copy, not the filter copy",
+          "status": "passed"
+        },
+        {
+          "name": "<jf-effect-audit-log> causation chip (§32 R-E3) 543-fwd FE-tail — a filter that hides every entry shows the filter copy, not the \"nothing yet\" copy",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/FailedFilesList.folderSwitch.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/FailedFilesList.folderSwitch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6ffea06d94a23ab8914ab029929e88476bbacdd0cc05098c581d98f751275df2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the render after a folder switch already shows none of the previous folder",
+          "status": "passed"
+        },
+        {
+          "name": "an error for the previous folder does not stay under the new one",
+          "status": "passed"
+        },
+        {
+          "name": "a delayed response for folder A never fills folder B",
+          "status": "passed"
+        },
+        {
+          "name": "a delayed failure for folder A says nothing under folder B",
+          "status": "passed"
+        },
+        {
+          "name": "rapid switching settles on the last folder, whichever reply lands first",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/FailedFilesList.layout.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/FailedFilesList.layout.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3383bf3144d95cbc6088f2e688e356daf07a207347f9d34171cf5f064887fb5d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FailedFilesList — the row stacks so the path gets the width (914 D2) .row is a COLUMN, so the path block is never squeezed by the action buttons",
+          "status": "passed"
+        },
+        {
+          "name": "FailedFilesList — the row stacks so the path gets the width (914 D2) jf-row-actions wraps its buttons instead of overflowing a narrow host",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/FailedFilesList.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/FailedFilesList.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9946fa57a73bb948f77c678740e08cc83450dce8b5f968d825d77308ec0c7d6d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FailedFilesList loads the folder-scoped failed jobs and renders one row per file with its error + Retry",
+          "status": "passed"
+        },
+        {
+          "name": "FailedFilesList shows the empty state when the folder has no failed files",
+          "status": "passed"
+        },
+        {
+          "name": "FailedFilesList a RETRY_EXHAUSTED row reads as \"gave up\", a FAILED row does not (885 item 21b)",
+          "status": "passed"
+        },
+        {
+          "name": "FailedFilesList an indexed file whose source cannot be read reads as \"indexed, source unreadable\", not missing (t-20261013-ef3c41 S7)",
+          "status": "passed"
+        },
+        {
+          "name": "FailedFilesList renders the owning scan id per row, and omits the line for a row with no scan (941 F2)",
+          "status": "passed"
+        },
+        {
+          "name": "FailedFilesList a non-exhausted state renders WITHOUT the \"gave up\" line (only RETRY_EXHAUSTED opts in)",
+          "status": "passed"
+        },
+        {
+          "name": "FailedFilesList refuses a by-prefix body missing the required `state` field instead of rendering it",
+          "status": "passed"
+        },
+        {
+          "name": "FailedFilesList \"Try again\" invokes core.retry-indexing-job for every listed file and reads the list again",
+          "status": "passed"
+        },
+        {
+          "name": "FailedFilesList — PROD posture (drift degrades, it does not freeze the list) renders a state-less row instead of throwing, and records the drift",
+          "status": "passed"
+        },
+        {
+          "name": "FailedFilesList — PROD posture (drift degrades, it does not freeze the list) survives a jobs array of nulls (the worst degrade the raw body can carry)",
+          "status": "passed"
+        },
+        {
+          "name": "switches a list from A to B and ignores A arriving late",
+          "status": "passed"
+        },
+        {
+          "name": "loads its folder again after it is remounted",
+          "status": "passed"
+        },
+        {
+          "name": "R3d live empty refresh replaces the list during retry without dropping unattempted files",
+          "status": "passed"
+        },
+        {
+          "name": "R3d live partial refresh replaces the list during retry without dropping unattempted files",
+          "status": "passed"
+        },
+        {
+          "name": "R3d a silent retry followed by a silent listing keeps Try again enabled and rows visible",
+          "status": "passed"
+        },
+        {
+          "name": "R3d a second click while retry is pending retries every listed file again",
+          "status": "passed"
+        },
+        {
+          "name": "R3d a fresh failure list retries A again along with refused B and newly failed C",
+          "status": "passed"
+        },
+        {
+          "name": "R3d late retry results cannot touch a switched target or remounted element",
+          "status": "passed"
+        },
+        {
+          "name": "R3d a second window and a reload or tab remount use fresh lists while an old retry is pending",
+          "status": "passed"
+        },
+        {
+          "name": "R3d a late listing cannot overwrite a newer count refresh",
+          "status": "passed"
+        },
+        {
+          "name": "R3d a failed refresh keeps the last-known inline rows visible beside the error",
+          "status": "passed"
+        },
+        {
+          "name": "R3d the real Try again button stays operable while a retry never answers",
+          "status": "passed"
+        },
+        {
+          "name": "FailedFilesList — retry failure feedback reports a refused retry failure and keeps the row error",
+          "status": "passed"
+        },
+        {
+          "name": "FailedFilesList — retry failure feedback reports a network retry failure and keeps the row error",
+          "status": "passed"
+        },
+        {
+          "name": "FailedFilesList — retry failure feedback reports a unknown retry failure and keeps the row error",
+          "status": "passed"
+        },
+        {
+          "name": "FailedFilesList — retry failure feedback a late retry failure after switch folder does not affect the new target",
+          "status": "passed"
+        },
+        {
+          "name": "FailedFilesList — retry failure feedback a late retry failure after leave does not affect the new target",
+          "status": "passed"
+        },
+        {
+          "name": "FailedFilesList — retry failure feedback a late retry failure after remount does not affect the new target",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/RunActivity.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/RunActivity.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3dbb02cec694097fbef6e9a183cd7b58601c0942a85bb69d7ef438514bee61f0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "agentSessionStore — ONE shared controller (561 surface tier) returns the same controller instance to every consumer",
+          "status": "passed"
+        },
+        {
+          "name": "Background runs §33 — groups by the REAL LifecycleState vocabulary: merged, ranked, friendly",
+          "status": "passed"
+        },
+        {
+          "name": "Background runs 814 — says what record it answers from, and an empty list names what fills it",
+          "status": "passed"
+        },
+        {
+          "name": "Background runs 814 — the count is a legible zero once read, and never a false zero before",
+          "status": "passed"
+        },
+        {
+          "name": "Background runs a finished run opens for replay in Search; a running one is not a control",
+          "status": "passed"
+        },
+        {
+          "name": "Background runs launches a background run from the field, and only with something to run",
+          "status": "passed"
+        },
+        {
+          "name": "Background runs a failed first read says so instead of reading as empty, and Try again recovers",
+          "status": "passed"
+        },
+        {
+          "name": "Background runs a failed refresh keeps the rows and says when they were last seen",
+          "status": "passed"
+        },
+        {
+          "name": "This run 814 — says what record it answers from, and an empty list names what fills it",
+          "status": "passed"
+        },
+        {
+          "name": "This run a failed read says so instead of reading as empty, and old rows stay",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts",
+      "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:21eda11b44342c5aeb1894850c0c50316a844a864d110e127df2482feac1b899",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onSessionStarted sets sessionId",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onRunStarted is the identity frame: runId IS the sessionId",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onRunStarted does NOT move a controller already pinned to a conversation",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) session_started still sets identity — dual-read, never deleted (the persisted ledger reads it)",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onStateSnapshot reads the park and the run autonomy level, not just the active agent",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) 859 D1 — the gate facts are known WHILE the run is running starts as NOT-REPORTED, so nothing can render a step count as a confident zero",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) 859 D1 — the gate facts are known WHILE the run is running learns the step count from the run's own progress frames, before any terminal",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) 859 D1 — the gate facts are known WHILE the run is running never walks the count backwards, and never invents one from a malformed frame",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) 859 D1 — the gate facts are known WHILE the run is running a REATTACHING tab reads the step count off the primer, whose frames the ring may have evicted",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) 859 D1 — the gate facts are known WHILE the run is running a fresh dispatch forgets the previous run's counts rather than carrying them over",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) a snapshot-carried held call is renderable AND answerable after the ring evicted its frame",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) a snapshot approval the replay ring ALSO announces opens exactly one ceremony",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) a snapshot does NOT re-hold a call the run has already moved past",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onChunk appends text to streamingText (multiple chunks concatenate)",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onToolCallProposed adds a tool call with status=\"proposed\"",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onToolBatchProposed records the turn's proposed tool-call batch",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) clears currentToolBatch on done and on a new session (F2 — no stale plan)",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onToolCallPending adds a tool call with status=\"pending\" AND commits streamingText into a tool-call-group",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onToolCallProposed does NOT commit streamingText (only pending does)",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onToolCallApproved updates status to \"approved\" when toolCall exists",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onToolCallApproved is a no-op for unknown callIds",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onToolExecStarted commits streamingText when the call is NOT already grouped",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onToolExecStarted skips re-committing when the call is already grouped (pending → started)",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onToolExecStarted is a no-op for unknown callIds",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onToolExecCompleted sets status, success, output, executionId from result wrapper",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onToolExecCompleted falls back to flat fields when result wrapper is absent",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) accumulates each call’s grounding delta, in call order, without deduping",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) a call with no grounding key adds nothing — absent means \"established nothing\"",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) a delta from a NEW run starts the set over rather than appending to the previous run’s",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) groundingDeltaPaths joins groundingDeltas by `path`, live, on every access",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) journals a successful tool-call as an originator:agent invoke-operation entry + wires undo via executionId",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) does NOT journal a failed tool-call (no state change to undo/digest)",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) skips vop_ tools (they self-journal via the virtual path)",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) journals without an executionId → entry exists but carries no undoable mapping",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) chains tool-calls within a turn via causation; a new session starts a fresh chain",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onToolCallRejected sets status=\"rejected\" with rejectReason",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onDone commits streamingText, then appends assistant-text when finalResp differs",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onDone does NOT double-append when finalResp === streamingText.trim (dedup invariant)",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onDone with no finalResponse still commits streamingText + clears isStreaming",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) nextEntryId emits zero-padded ids so lexical order == temporal order past the 9->10 boundary",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onDone populates answerSources + answerCitations from the typed done payload",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onDone with absent grounding fields → empty answerSources/answerCitations (ungrounded run)",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onBudgetUpdate appends to budgetUpdates with default-zero filling",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onBudgetGate parks the run; a budget_update or new run clears it",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onError appends an error entry + clears isStreaming",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onError with no error field falls back to \"Unknown error\"",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onProgress appends a progress entry with message or falls back to phase",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onProgress carries the backend severity (undefined when absent)",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onHandoffProposed appends a handoff entry with from/to/reason in content",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onHandoffExecuted sets activeAgentId to toAgentId",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) onToolCallPending populates sessionId when it arrives in the event payload",
+          "status": "passed"
+        },
+        {
+          "name": "sessionLabel (561 #4 — human label, never the raw UUID) uses the backend first-user-message preview when present",
+          "status": "passed"
+        },
+        {
+          "name": "sessionLabel (561 #4 — human label, never the raw UUID) falls back to initialMessage, then a neutral label — never the UUID",
+          "status": "passed"
+        },
+        {
+          "name": "sessionLabel (561 #4 — human label, never the raw UUID) treats a blank preview as absent",
+          "status": "passed"
+        },
+        {
+          "name": "interruptedRunPresentation (834 §5.2 — the four honest rows) a terminal run is FINISHED, with no interruption marker, even if interruptedAt is stamped",
+          "status": "passed"
+        },
+        {
+          "name": "interruptedRunPresentation (834 §5.2 — the four honest rows) a non-terminal run with no interruptedAt is NOT_INTERRUPTED — the ordinary live/idle case",
+          "status": "passed"
+        },
+        {
+          "name": "interruptedRunPresentation (834 §5.2 — the four honest rows) mid-step states are RESUMABLE — \"Interrupted when the app closed. Resume.\"",
+          "status": "passed"
+        },
+        {
+          "name": "interruptedRunPresentation (834 §5.2 — the four honest rows) WAITING_APPROVAL is RESUMABLE_AT_APPROVAL — same offer, different copy",
+          "status": "passed"
+        },
+        {
+          "name": "interruptedRunPresentation (834 §5.2 — the four honest rows) the budget/context gates are FORK_ONLY — non-terminal but NOT resumable",
+          "status": "passed"
+        },
+        {
+          "name": "interruptedRunPresentation (834 §5.2 — the four honest rows) defensive branch: an interrupted non-terminal state the store did not mark resumable is FORK_ONLY",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods checkAvailability sets available=true and populates tools on 200",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods checkAvailability sets available=false on non-200",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods checkAvailability sets available=false on fetch error",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods send posts message and processes SSE events into state",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods send appends error entry on non-200 HTTP (via consumeShapeStream throw)",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods send does not double-append error when SSE error event fires + consumeShapeStream throws (D1)",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods reattaches to the live run when the stream DROPS mid-run (after session_started)",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods does NOT reattach when the initial send POST fails (no run established)",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods reattaches on load to a live run ANOTHER tab started (found by the enumeration)",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods does NOT reattach on load when this tab already owns/observes a run",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods does nothing on load when the enumeration reports no live run",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods reattaches when the live run conversation matches this tab",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods does NOT reattach when the live run belongs to a DIFFERENT conversation",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods does NOT adopt a live run of another SHAPE (a workflow run is not reattachable here)",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods takes the NEWEST agent run — the enumeration is already ordered, so the first row wins",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods degrades to \"no live run\" when the enumeration fails — discovery never throws into mount",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods falls back quietly to the record when the observed run answers the typed 404",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods approveCall sends POST with sessionId and callId",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods approveCall is a no-op when sessionId is null",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods rejectCall sends POST with sessionId, callId, and reason",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods steer sends POST to /api/chat/agent/steer with sessionId and text",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods steer is a no-op (returns false, no fetch) when there is no live session",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods onDirectiveAcknowledged appends a human-origin steer-directive entry",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods onDirectiveAcknowledged shows nothing for an acknowledgement without an id",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods steer surfaces a system note when the POST fails (404)",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods a queued direction becomes applied in place, one entry, keyed by its id",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods a not-applied direction keeps its reason, and a late queued report does not undo a final one",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods a final outcome reported after done reaches the live display of Search",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods after done, only direction reports still reach the display",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods a replayed old acknowledgement is not shown as Steered; a replayed applied direction still is",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods steer names a connection failure as such, not as a finished run, without claiming non-application",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods steer names an HTTP error other than 404 by its status, without claiming non-application",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods a lost answer to a direction the run took shows only the run report, in Search",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods a 5xx answer is settled by the run report that follows it, in Search",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods an unconfirmed send is not settled by an earlier direction with the same text",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods a blocked send keeps its note when an identical later send is reported, in Search",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods a blocked send is not settled by an earlier identical send reported after it failed, in Search",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods two unconfirmed identical sends are each settled only by their own report, in Search",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods another client's report without a request id never settles this window's blocked note, in Search",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods another client's report without a request id never settles this window's 5xx note, in Search",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods a 404 refusal of a direction still says the run already finished, in Search",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods steer before the run has a session says so instead of dropping the direction silently",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods runKind: defaults null, set on start, cleared on terminal",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods runKind: runWorkflow marks the run NOT steerable (workflow)",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods approveCall surfaces an error when the POST is not ok (no silent stuck-PENDING)",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods rejectCall surfaces an error when the POST is not ok",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods send issues a single-agent run request (empty agentProfiles, no initialAgentId)",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods cancelSession commits streaming text and sends DELETE for session",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods loadSessions populates sessions array",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods loadSessions maps the real backend field names (startedAt/state) onto startedAtEpochMs/status",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods loadSessions tolerates a payload already in the startedAtEpochMs/status shape",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods loadHistory projects agent operation rows from the one action ledger, filtered to the session",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods loadHistory is empty (no fetch) when there is no active session",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods resumeSession consumes SSE and sets session state",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods resumeSession appends error on non-200 HTTP",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods notify batches multiple synchronous mutations into one onUpdate call",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods destroy stops polling and aborts active stream",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods fork returns a shallow copy of conversation up to fromIndex",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods fork returns empty array when fromIndex is -1",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods fork returns full conversation when fromIndex exceeds length",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods loadForkedConversation resets state and retains referenced toolCalls",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods backend AUTO verdict: queues callId when sessionId is null, flushes (approves) on session_started",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods the backend verdict is the SOLE auto-approval authority: AUTO approves, non-AUTO does not",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods assist + LOW: calls approveCall immediately when sessionId is set",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods assist: does NOT auto-approve MEDIUM or HIGH",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods backend AUTO: auto-approves MEDIUM directly; backend typed_confirm HIGH routes to the ceremony host",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods watch: auto-approves NOTHING — routes even LOW through the ceremony host",
+          "status": "passed"
+        },
+        {
+          "name": "AgentSessionController interaction methods ceremony APPROVAL drives the unified approve endpoint (tempdoc 550 C3 / 565 §15.C)",
+          "status": "passed"
+        },
+        {
+          "name": "private live tool approval display uses the complete frozen server display and verdict before approving the owning run",
+          "status": "passed"
+        },
+        {
+          "name": "private live tool approval display DE3 the agent request waits in Needs you; its review reads the live gate again",
+          "status": "passed"
+        },
+        {
+          "name": "private live tool approval display C6 a held call restored by the reattach snapshot is listed without an announcement; a live frame announces",
+          "status": "passed"
+        },
+        {
+          "name": "private live tool approval display refuses unavailable or malformed live details (status 404) without raw fallback",
+          "status": "passed"
+        },
+        {
+          "name": "private live tool approval display refuses unavailable or malformed live details (status 500) without raw fallback",
+          "status": "passed"
+        },
+        {
+          "name": "private live tool approval display refuses unavailable or malformed live details (status 200) without raw fallback",
+          "status": "passed"
+        },
+        {
+          "name": "private live tool approval display refuses unavailable or malformed live details (status 0) without raw fallback",
+          "status": "passed"
+        },
+        {
+          "name": "private live tool approval display ignores a lookup that arrives after done",
+          "status": "passed"
+        },
+        {
+          "name": "private live tool approval display ignores a lookup that arrives after error",
+          "status": "passed"
+        },
+        {
+          "name": "private live tool approval display ignores a lookup that arrives after replacement",
+          "status": "passed"
+        },
+        {
+          "name": "private live tool approval display ignores a lookup that arrives after approved",
+          "status": "passed"
+        },
+        {
+          "name": "private live tool approval display ignores a lookup that arrives after destroy",
+          "status": "passed"
+        },
+        {
+          "name": "loadReplayFromExport (585 §D Phase 2 — D3 shareable replay) replays an exported transcript through the same handlers and enters replay mode",
+          "status": "passed"
+        },
+        {
+          "name": "loadReplayFromExport (585 §D Phase 2 — D3 shareable replay) returns false (and does not enter replay) for a transcript with no usable events",
+          "status": "passed"
+        },
+        {
+          "name": "605 — run identity + conclude-drain approveCall routes to the explicit owner run, not a later/stale this.sessionId (M2)",
+          "status": "passed"
+        },
+        {
+          "name": "605 — run identity + conclude-drain rejectCall routes to the explicit owner run too",
+          "status": "passed"
+        },
+        {
+          "name": "605 — run identity + conclude-drain onError (the abnormal terminal — the M1 trigger) drains the run and surfaces ONE notice when ≥1 was denied",
+          "status": "passed"
+        },
+        {
+          "name": "605 — run identity + conclude-drain cancelSession drains the halted run",
+          "status": "passed"
+        },
+        {
+          "name": "605 — run identity + conclude-drain a terminal with no open ceremony (0 denied) surfaces NO notice",
+          "status": "passed"
+        },
+        {
+          "name": "605 — run identity + conclude-drain a REPLAY terminal does NOT drain (replay is not a live run conclusion)",
+          "status": "passed"
+        },
+        {
+          "name": "the reasoning-region boundary rule (859 §A) C-4: a tool boundary closes the region INTO the conversation, in order",
+          "status": "passed"
+        },
+        {
+          "name": "the reasoning-region boundary rule (859 §A) C-5: a text chunk does NOT close the region — one entry, with the prose ordered BEFORE it",
+          "status": "passed"
+        },
+        {
+          "name": "the reasoning-region boundary rule (859 §A) C-6: the exempt set is EXACTLY these four names — every other event cuts",
+          "status": "passed"
+        },
+        {
+          "name": "the reasoning-region boundary rule (859 §A) C-6b: every dispatch name is classified — cut, transparent, or deliberately exempt",
+          "status": "passed"
+        },
+        {
+          "name": "the reasoning-region boundary rule (859 §A) C-7: budget_update CUTS the region — the highest-frequency real cut in a journal",
+          "status": "passed"
+        },
+        {
+          "name": "the reasoning-region boundary rule (859 §A) C-7b: slice D’s budget_raised progress note is a legitimate flush carrier",
+          "status": "passed"
+        },
+        {
+          "name": "the reasoning-region boundary rule (859 §A) C-7c: the durable/ephemeral split is RECORD-side — live, EVERY progress phase carries",
+          "status": "passed"
+        },
+        {
+          "name": "the reasoning-region boundary rule (859 §A) C-8: an AUTO-RUN tool (exec_started with no prior pending) closes the region too",
+          "status": "passed"
+        },
+        {
+          "name": "the reasoning-region boundary rule (859 §A) C-9: handoff_proposed closes on the PRODUCING agent’s side of the boundary",
+          "status": "passed"
+        },
+        {
+          "name": "the reasoning-region boundary rule (859 §A) C-10: onDone closes the open region BEFORE the terminal answer entry",
+          "status": "passed"
+        },
+        {
+          "name": "the reasoning-region boundary rule (859 §A) a mid-run cut that commits the prose does not make `done` render the answer twice",
+          "status": "passed"
+        },
+        {
+          "name": "the reasoning-region boundary rule (859 §A) F3: a NEW run does not inherit the previous run’s committed prose",
+          "status": "passed"
+        },
+        {
+          "name": "the reasoning-region boundary rule (859 §A) F3b: a FORK re-roll returning the same text still prints its answer",
+          "status": "passed"
+        },
+        {
+          "name": "the reasoning-region boundary rule (859 §A) an empty region produces no entry — a blank thought is not a thought",
+          "status": "passed"
+        },
+        {
+          "name": "the reasoning-region boundary rule (859 §A) the three primers do NOT cut — they describe or open the run rather than advance it",
+          "status": "passed"
+        },
+        {
+          "name": "keyed background scheduling captures one key and conversation across a token retry; a new action has a new key",
+          "status": "passed"
+        },
+        {
+          "name": "keyed background scheduling reports unconfirmed scheduling without starting presence polling (409)",
+          "status": "passed"
+        },
+        {
+          "name": "keyed background scheduling reports unconfirmed scheduling without starting presence polling (200)",
+          "status": "passed"
+        },
+        {
+          "name": "keyed background scheduling reports unconfirmed scheduling without starting presence polling (200)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/detailsMemory.test.ts",
+      "file": "modules/ui-web/src/shell-v0/state/detailsMemory.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:014134e218b2668c0508017d9ef6e5e0136da10749afdd698a39980b34163297",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "details memory holds each conversation apart, and replaces rather than appends",
+          "status": "passed"
+        },
+        {
+          "name": "details memory survives a reload",
+          "status": "passed"
+        },
+        {
+          "name": "details memory forgets the conversations written longest ago, past the cap",
+          "status": "passed"
+        },
+        {
+          "name": "details memory a conversation written again moves to the end of the queue",
+          "status": "passed"
+        },
+        {
+          "name": "details memory a malformed stored entry is dropped alone",
+          "status": "passed"
+        },
+        {
+          "name": "details memory a stored slice of the wrong shape reads as no memory",
+          "status": "passed"
+        },
+        {
+          "name": "C11 co-resident userState survives chat width, pins, keybindings and plugin settings stay through a details write and a reload",
+          "status": "passed"
+        },
+        {
+          "name": "C11 co-resident userState survives a later write of another slice keeps the details memory",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.render.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.render.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3e76a2e7944ab712a2c63ea58f0411bee9e1f47e38ea15b983d181559a2ed143",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ActivitySurface (jf-activity-surface) — api-base forwarding (727 F-4) passes its own api-base down to both the action-ledger and resource panels",
+          "status": "passed"
+        },
+        {
+          "name": "ActivitySurface (jf-activity-surface) — api-base forwarding (727 F-4) still declares resource-id=\"core.operation-history\" on the structured-operations panel",
+          "status": "passed"
+        },
+        {
+          "name": "Activity holds what the frame drawers held (DP3) shows background runs, this run and the effect journal, with the journal’s undo controls",
+          "status": "passed"
+        },
+        {
+          "name": "Activity holds what the frame drawers held (DP3) a pointer to background-runs lands on that section, whether Activity is up yet or not",
+          "status": "passed"
+        },
+        {
+          "name": "Activity holds what the frame drawers held (DP3) a pointer to effect-journal lands on that section, whether Activity is up yet or not",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.bandFocus-lockdown.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.bandFocus-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4bb520b1dabcbbb408d40a0c4764cb7ccd0ccbb032212f0c7cd9fb14006f61f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "folder band keeps its identity, keyboard answer and opener through status updates (themed=false)",
+          "status": "passed"
+        },
+        {
+          "name": "folder band keeps its identity, keyboard answer and opener through status updates (themed=true)",
+          "status": "passed"
+        },
+        {
+          "name": "collection band keeps its identity and answer when another source arrives and restores its opener on every close",
+          "status": "passed"
+        },
+        {
+          "name": "failed-file band stays with its file across refreshes and errors and restores its opener",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.failedFiles.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.failedFiles.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7090c40235d56afae45468806fffd4f1926552887e22de75afb27074330e88ce",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "failed files sit under their folder the list is in the folder’s own row, and each folder lists its own files",
+          "status": "passed"
+        },
+        {
+          "name": "failed files sit under their folder a folder with no failures has no list",
+          "status": "passed"
+        },
+        {
+          "name": "failed files sit under their folder there is no second list and no way to a frame drawer",
+          "status": "passed"
+        },
+        {
+          "name": "failed files sit under their folder the failed chip takes the reader to the list under its folder",
+          "status": "passed"
+        },
+        {
+          "name": "failed files sit under their folder the folder’s problem takes the reader there too",
+          "status": "passed"
+        },
+        {
+          "name": "failed files sit under their folder a list that cannot be read says so under its folder, and the other folder is unaffected",
+          "status": "passed"
+        },
+        {
+          "name": "failed files sit under their folder themed rows carry the list too, and the chip still reaches it",
+          "status": "passed"
+        },
+        {
+          "name": "failed files sit under their folder C4 a delayed reply for one folder never fills the other",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.focusKeeper-lockdown.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.focusKeeper-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a5dcae96d2b6ba64f89165cdcea845630317c386b56c5266132f48b35fd13d6e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L21 focus stays on its control when the folder rows reorder (themed=false)",
+          "status": "passed"
+        },
+        {
+          "name": "L21 focus stays on its control when the folder rows reorder (themed=true)",
+          "status": "passed"
+        },
+        {
+          "name": "L21 focus stays on a source's control when the sources reorder",
+          "status": "passed"
+        },
+        {
+          "name": "L21 a band whose folder another update removed hands focus to the next folder, never the page (themed=false)",
+          "status": "passed"
+        },
+        {
+          "name": "L21 a band whose folder another update removed hands focus to the next folder, never the page (themed=true)",
+          "status": "passed"
+        },
+        {
+          "name": "L18 a collection band closes for good when its source leaves; it opens again only on a press",
+          "status": "passed"
+        },
+        {
+          "name": "L21 a band whose source another update removed hands focus to the next source",
+          "status": "passed"
+        },
+        {
+          "name": "L21 a confirmed collection removal hands focus to the next source",
+          "status": "passed"
+        },
+        {
+          "name": "L21 a failed-files refresh keeps an open band for a file still listed, with focus; a file that leaves hands focus on",
+          "status": "passed"
+        },
+        {
+          "name": "L21 focus on folder a's \"Remove from library\" stays there through all 24 orders of four rows",
+          "status": "passed"
+        },
+        {
+          "name": "L21 focus on folder b's \"Remove from library\" stays there through all 24 orders of four rows",
+          "status": "passed"
+        },
+        {
+          "name": "L21 focus on folder c's \"Remove from library\" stays there through all 24 orders of four rows",
+          "status": "passed"
+        },
+        {
+          "name": "L21 focus on folder d's \"Remove from library\" stays there through all 24 orders of four rows",
+          "status": "passed"
+        },
+        {
+          "name": "L21 when a focused row leaves, focus moves to the next row's same control, else to \"Add folder\"",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.redesign.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a62a0ec00ee305270d7e52be5f9c3c1f24b4c99fef4f3e3a5d464a5b8c58d9f2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the headline uses observed searchable documents (undefined)",
+          "status": "passed"
+        },
+        {
+          "name": "the headline uses observed searchable documents (0)",
+          "status": "passed"
+        },
+        {
+          "name": "the headline uses observed searchable documents (20)",
+          "status": "passed"
+        },
+        {
+          "name": "counts a rebuild decision during recovery and counts a terminal outcome only once",
+          "status": "passed"
+        },
+        {
+          "name": "retains named last-known failures while a missing folder returns and jobs requeue, until settled",
+          "status": "passed"
+        },
+        {
+          "name": "fallback rows keep several disclosures open through status updates and expose full paths",
+          "status": "passed"
+        },
+        {
+          "name": "themed rows keep several disclosures open through status updates and expose full paths",
+          "status": "passed"
+        },
+        {
+          "name": "Explorer actions are absent in browsers and use each resolved path on desktop",
+          "status": "passed"
+        },
+        {
+          "name": "Explorer explains unresolved including changes after rendering",
+          "status": "passed"
+        },
+        {
+          "name": "Explorer explains removed including changes after rendering",
+          "status": "passed"
+        },
+        {
+          "name": "Explorer explains disconnected including changes after rendering",
+          "status": "passed"
+        },
+        {
+          "name": "Explorer explains native refusal including changes after rendering",
+          "status": "passed"
+        },
+        {
+          "name": "uses the existing native reveal bridge and surfaces its network/device refusal",
+          "status": "passed"
+        },
+        {
+          "name": "a second window receives live folder holds without overwriting a skip-rules draft",
+          "status": "passed"
+        },
+        {
+          "name": "A2 expanded facts replace the old metadata line",
+          "status": "passed"
+        },
+        {
+          "name": "A3 unconfirmed status is stated once through the real projection",
+          "status": "passed"
+        },
+        {
+          "name": "A5 energy_saver waits are stated once through the real projection",
+          "status": "passed"
+        },
+        {
+          "name": "A5 gpu_busy_external waits are stated once through the real projection",
+          "status": "passed"
+        },
+        {
+          "name": "V1 fallback disclosure retains focus on toggle and live refresh",
+          "status": "passed"
+        },
+        {
+          "name": "V1 themed disclosure retains focus on toggle and live refresh",
+          "status": "passed"
+        },
+        {
+          "name": "D1 keeps attention and retried files through 25 alternating unconfirmed polls and clears on a settled observation",
+          "status": "passed"
+        },
+        {
+          "name": "D1 never claims searchable during unconfirmed polls, including 42 seconds past the shared threshold",
+          "status": "passed"
+        },
+        {
+          "name": "L2 lost status contact never describes a rebuild (empty roots: false)",
+          "status": "passed"
+        },
+        {
+          "name": "L2 lost status contact never describes a rebuild (empty roots: true)",
+          "status": "passed"
+        },
+        {
+          "name": "L2 a confirmed migration still describes rebuilding",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d9e33829ab876c8697a266418b5c4ffaa69103021fcc65e23cddabd3aa9bef86",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "branching a conversation from a turn forks at the turn’s OWN answer, opens the branch, and loads both of its records",
+          "status": "passed"
+        },
+        {
+          "name": "branching a conversation from a turn says so and changes nothing when the store refuses the branch",
+          "status": "passed"
+        },
+        {
+          "name": "branching a conversation closes a citation pane open on the parent closes the pane once \"Branch\" claims the child conversation (route #4 -> openBranch)",
+          "status": "passed"
+        },
+        {
+          "name": "the version pager shows the base as version 1 of the fork and pages forward into the branch",
+          "status": "passed"
+        },
+        {
+          "name": "the version pager shows a branch as version 2 once it has a turn of its own",
+          "status": "passed"
+        },
+        {
+          "name": "the version pager re-edits a branch’s own question as a THIRD version of the base, not a branch of the branch",
+          "status": "passed"
+        },
+        {
+          "name": "the version pager renders NO pager on a root conversation nothing forked from",
+          "status": "passed"
+        },
+        {
+          "name": "the version pager refuses to step past the first version",
+          "status": "passed"
+        },
+        {
+          "name": "editing a question re-asks it in a branch forks BEFORE the question, not after its answer, and re-sends into the branch",
+          "status": "passed"
+        },
+        {
+          "name": "editing a question re-asks it in a branch forks a THIRD turn at the turn before it, not at the conversation’s first answer",
+          "status": "passed"
+        },
+        {
+          "name": "editing a question re-asks it in a branch forks the FIRST question at the empty-prefix sentinel",
+          "status": "passed"
+        },
+        {
+          "name": "editing a question re-asks it in a branch keeps the rewrite in the editor when the branch is refused",
+          "status": "passed"
+        },
+        {
+          "name": "editing a question re-asks it in a branch holds the rewrite and says why when a stream starts under the open editor",
+          "status": "passed"
+        },
+        {
+          "name": "editing a question re-asks it in a branch retries a turn by re-sending its ORIGINAL question from the same fork point",
+          "status": "passed"
+        },
+        {
+          "name": "a turn that names no store message offers no branch affordance offers neither Edit nor Retry on a turn whose fork point is a run-plane id",
+          "status": "passed"
+        },
+        {
+          "name": "Retry and Edit on a Delegate turn run the agent again, in a new version retries a tool-less Delegate turn as a Delegate, after reload, while the composer shows Ask",
+          "status": "passed"
+        },
+        {
+          "name": "Retry and Edit on a Delegate turn run the agent again, in a new version edits the FIRST question of a Delegate conversation at the empty-prefix sentinel",
+          "status": "passed"
+        },
+        {
+          "name": "Retry and Edit on a Delegate turn run the agent again, in a new version runs even when no documents are indexed — the Ask-only gate does not apply",
+          "status": "passed"
+        },
+        {
+          "name": "Retry and Edit on a Delegate turn run the agent again, in a new version re-edits a branch’s own Delegate turn as a SIBLING of that branch",
+          "status": "passed"
+        },
+        {
+          "name": "Retry and Edit on a Delegate turn run the agent again, in a new version re-edits a retry’s own first turn as a third version of the original, not a branch of the retry",
+          "status": "passed"
+        },
+        {
+          "name": "Retry and Edit on a Delegate turn run the agent again, in a new version DS1 unknown saved Ask refuses before fork even when the composer shows Delegate, preserving B",
+          "status": "passed"
+        },
+        {
+          "name": "Retry and Edit on a Delegate turn run the agent again, in a new version branches from a Delegate turn without running anything, and leaves the composer in Delegate",
+          "status": "passed"
+        },
+        {
+          "name": "when the agent cannot run, a Delegate Retry/Edit says why and never asks instead refuses while the model is unavailable, keeps the edited text, and forks nothing",
+          "status": "passed"
+        },
+        {
+          "name": "when the agent cannot run, a Delegate Retry/Edit says why and never asks instead keeps the edited text and says why when the agent becomes unavailable during the fork",
+          "status": "passed"
+        },
+        {
+          "name": "when the agent cannot run, a Delegate Retry/Edit says why and never asks instead refuses while another run is active, and says so",
+          "status": "passed"
+        },
+        {
+          "name": "when the agent cannot run, a Delegate Retry/Edit says why and never asks instead says the branch failed and runs nothing when the store refuses the fork",
+          "status": "passed"
+        },
+        {
+          "name": "when the agent cannot run, a Delegate Retry/Edit says why and never asks instead gives an INHERITED Delegate turn no Retry or Edit — it belongs to the parent",
+          "status": "passed"
+        },
+        {
+          "name": "deleting a conversation that has branches asks about the branches, names them, and deletes them with it on consent",
+          "status": "passed"
+        },
+        {
+          "name": "deleting a conversation that has branches TD1 TD2 TD9 confirms distinguishing facts and the complete nested tree",
+          "status": "passed"
+        },
+        {
+          "name": "deleting a conversation that has branches TD1 TD7 does not invent a creation date for an incomplete deletion record",
+          "status": "passed"
+        },
+        {
+          "name": "deleting a conversation that has branches leaves everything when the reader declines, and says nothing",
+          "status": "passed"
+        },
+        {
+          "name": "deleting a conversation that has branches reports which branch failed after a partially completed cascade",
+          "status": "passed"
+        },
+        {
+          "name": "deleting a conversation that has branches displays a refusal from another client without asking to delete branches",
+          "status": "passed"
+        },
+        {
+          "name": "deleting a conversation that has branches says so when the store refuses the delete outright",
+          "status": "passed"
+        },
+        {
+          "name": "two reloads of the same conversation cannot land out of order discards the SUPERSEDED /history answer however late it arrives",
+          "status": "passed"
+        },
+        {
+          "name": "CD3 confirmed conversation deletion forgets the open deleted child and cached turns when the next cascade child fails",
+          "status": "passed"
+        },
+        {
+          "name": "CD3 confirmed conversation deletion forgets a cached open conversation when a refreshed list confirms its deletion",
+          "status": "passed"
+        },
+        {
+          "name": "a deletion refresh clears this window without claiming another windows active conversation",
+          "status": "passed"
+        },
+        {
+          "name": "forgets cached turns after restart when the missing server row is confirmed absent",
+          "status": "passed"
+        },
+        {
+          "name": "WP1.4a branch discovery S16.1 discovers every old version on both sides after reload without enlarging recents",
+          "status": "passed"
+        },
+        {
+          "name": "WP1.4a branch discovery BF2a refreshes base and branch versions after existing list reads without typing reads",
+          "status": "passed"
+        },
+        {
+          "name": "WP1.4a branch discovery S16.2 hides counts while pending and failed and preserves typing",
+          "status": "passed"
+        },
+        {
+          "name": "WP1.4a branch discovery S16.2 refreshes old fork membership on creation and deletion",
+          "status": "passed"
+        },
+        {
+          "name": "WP1.4a branch discovery S16.3 S16.4 names the immediate parent and opens it through an accessible native control",
+          "status": "passed"
+        },
+        {
+          "name": "WP1.4a branch discovery S16.3 restores the neutral immediate-parent control for an old locked branch",
+          "status": "passed"
+        },
+        {
+          "name": "WP1.4a branch discovery S16.3 uses a neutral name for a hidden parent on an empty branch",
+          "status": "passed"
+        },
+        {
+          "name": "WP1.4a continuation and lineage boundaries S16.1 pages an empty continuation at the last answer from base and branch",
+          "status": "passed"
+        },
+        {
+          "name": "WP1.4a continuation and lineage boundaries S16.1 keeps the parent fork on the first own turn and own forks on later turns",
+          "status": "passed"
+        },
+        {
+          "name": "WP1.4a continuation and lineage boundaries S16.2 ignores a stale successful read after a newer deletion refresh",
+          "status": "passed"
+        },
+        {
+          "name": "S16.2 never labels a removed open branch as the base version while absence is unconfirmed",
+          "status": "passed"
+        },
+        {
+          "name": "BN1 S16.2 Retry sends while complete fork reads are still pending",
+          "status": "passed"
+        },
+        {
+          "name": "S16.1 S16.2 waits for branch lineage before presenting a fork count",
+          "status": "passed"
+        },
+        {
+          "name": "reserves and saves the rerun before POST and waits for the claimed child history before dispatch",
+          "status": "passed"
+        },
+        {
+          "name": "a unavailable rerun reservation leaves the rewrite and makes no branch POST",
+          "status": "passed"
+        },
+        {
+          "name": "a unacknowledged rerun reservation leaves the rewrite and makes no branch POST",
+          "status": "passed"
+        },
+        {
+          "name": "one reserved rerun excludes a concurrent Retry while its branch response is pending",
+          "status": "passed"
+        },
+        {
+          "name": "a rerun abandoned by leaving the screen cannot claim or resend its late fork after reload",
+          "status": "passed"
+        },
+        {
+          "name": "a unavailable first rerun save refuses the fork even when subsequent writes succeed",
+          "status": "passed"
+        },
+        {
+          "name": "a unacknowledged first rerun save refuses the fork even when subsequent writes succeed",
+          "status": "passed"
+        },
+        {
+          "name": "a rerun abandoned by disconnecting and reconnecting the same view cannot claim its late fork",
+          "status": "passed"
+        },
+        {
+          "name": "a rerun waits for the child thread response even after the child history response completes",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.context.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7bf5ed8b076f988430687373b1680b9825b2927cc8d877a090b0186d64556524",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the effective-context FLOOR round-trips against the store sets the floor on the turn’s own question, re-reads /history, and dims what is above",
+          "status": "passed"
+        },
+        {
+          "name": "the effective-context FLOOR round-trips against the store keeps the divider’s controls REACHABLE — separator is on the hairline, not the row",
+          "status": "passed"
+        },
+        {
+          "name": "the effective-context FLOOR round-trips against the store restores the full context from the divider’s own control",
+          "status": "passed"
+        },
+        {
+          "name": "the effective-context FLOOR round-trips against the store re-reads /history even when the write was REFUSED, and says which act failed",
+          "status": "passed"
+        },
+        {
+          "name": "COMPACTION and its summary compacts up to a turn, then discloses and EDITS the summary in place",
+          "status": "passed"
+        },
+        {
+          "name": "COMPACTION and its summary keeps a REFUSED summary edit open, with the reader’s correction still in it",
+          "status": "passed"
+        },
+        {
+          "name": "COMPACTION and its summary says the summarization did not happen when the compaction came back empty",
+          "status": "passed"
+        },
+        {
+          "name": "hiding a TURN from the next prompt excludes both of the turn’s messages, dims it, and counts it in the bar",
+          "status": "passed"
+        },
+        {
+          "name": "hiding a TURN from the next prompt offers INCLUDE for a turn already hidden, and puts it back",
+          "status": "passed"
+        },
+        {
+          "name": "hiding a TURN from the next prompt puts every hidden turn back in one act from the bar",
+          "status": "passed"
+        },
+        {
+          "name": "a turn the endpoints cannot address offers NO context affordance renders no ⋯ trigger on an agent turn, whose ids belong to the run plane",
+          "status": "passed"
+        },
+        {
+          "name": "a turn the endpoints cannot address offers NO context affordance withholds the trigger on SETTLED turns too while the window is streaming",
+          "status": "passed"
+        },
+        {
+          "name": "a turn the endpoints cannot address offers NO context affordance renders no ⋯ trigger on a LIVE turn — its handle is positional until the record speaks",
+          "status": "passed"
+        },
+        {
+          "name": "how full the context is, and what is in it keeps the previous occupancy when a later terminal omits usage and redraws against the current runtime window",
+          "status": "passed"
+        },
+        {
+          "name": "how full the context is, and what is in it renders no meter until a turn has reported an occupancy",
+          "status": "passed"
+        },
+        {
+          "name": "how full the context is, and what is in it reads the occupancy off the turn’s own terminal and draws it against n_ctx",
+          "status": "passed"
+        },
+        {
+          "name": "how full the context is, and what is in it leaves the meter behind when the reader claims another conversation",
+          "status": "passed"
+        },
+        {
+          "name": "how full the context is, and what is in it opens the shared inspector on a prompt that agrees with the transcript",
+          "status": "passed"
+        },
+        {
+          "name": "record and history transport preservation uses the current API base and encoded conversation ID for initial and later record and history reads",
+          "status": "passed"
+        },
+        {
+          "name": "record and history transport preservation keeps history HTTP 404 empty, uncertain or locked respectively",
+          "status": "passed"
+        },
+        {
+          "name": "record and history transport preservation keeps history HTTP 500 empty, uncertain or locked respectively",
+          "status": "passed"
+        },
+        {
+          "name": "record and history transport preservation keeps history HTTP 423 empty, uncertain or locked respectively",
+          "status": "passed"
+        },
+        {
+          "name": "a follow-up ask is sent WITH the conversation (S2.0) sends the earlier turns as context, oldest first, on the conversation’s own id",
+          "status": "passed"
+        },
+        {
+          "name": "a follow-up ask is sent WITH the conversation (S2.0) sends no context with the first question of a new conversation",
+          "status": "passed"
+        },
+        {
+          "name": "a follow-up ask is sent WITH the conversation (S2.0) leaves out excluded messages and everything above the floor, and leads with the summary",
+          "status": "passed"
+        },
+        {
+          "name": "a follow-up ask is sent WITH the conversation (S2.0) does not bring older turns back when the floor’s own message is excluded (S2.9)",
+          "status": "passed"
+        },
+        {
+          "name": "a follow-up ask is sent WITH the conversation (S2.0) places a floor that sits on a message not shown here by the saved order",
+          "status": "passed"
+        },
+        {
+          "name": "a follow-up ask is sent WITH the conversation (S2.0) leaves out a hidden message from INSIDE a combined answer, as the bar counts it",
+          "status": "passed"
+        },
+        {
+          "name": "a follow-up ask is sent WITH the conversation (S2.0) starts at a floor set INSIDE a combined answer, sending nothing saved before it",
+          "status": "passed"
+        },
+        {
+          "name": "a follow-up ask is sent WITH the conversation (S2.0) starts at a floor on the LAST message of a combined answer, sending only that message",
+          "status": "passed"
+        },
+        {
+          "name": "a follow-up ask is sent WITH the conversation (S2.0) does not send older turns before the conversation’s context settings have arrived",
+          "status": "passed"
+        },
+        {
+          "name": "a follow-up ask is sent WITH the conversation (S2.0) refuses the follow-up when the conversation’s context settings cannot be read",
+          "status": "passed"
+        },
+        {
+          "name": "a follow-up ask is sent WITH the conversation (S2.0) shows in the inspector exactly the messages it sends — one hidden answer, not its turn",
+          "status": "passed"
+        },
+        {
+          "name": "the \"Interpreted as\" note survives a cold reload (S2.1) shows each note on its own turn live, after the record refresh, and after a reload",
+          "status": "passed"
+        },
+        {
+          "name": "hidden context that is not on screen stays visible and reversible (S2.7 / S2.8) counts unique hidden messages not shown here beside the hidden turns on screen",
+          "status": "passed"
+        },
+        {
+          "name": "hidden context that is not on screen stays visible and reversible (S2.7 / S2.8) shows and undoes exclusions that are ALL off screen, without inventing a turn count",
+          "status": "passed"
+        },
+        {
+          "name": "hidden context that is not on screen stays visible and reversible (S2.7 / S2.8) clears every recorded exclusion once each, on screen and off",
+          "status": "passed"
+        },
+        {
+          "name": "hidden context that is not on screen stays visible and reversible (S2.7 / S2.8) says the context starts at a message not shown here, shows and edits its summary, and restores",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) reports a PARTIALLY refused Include all as a failure and shows what was really saved",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) does not wipe the bar when the reload after Include all fails",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) marks Include all unconfirmed when its reload failed",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) marks Restore unconfirmed when its reload failed",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) leaves the bar on the saved floor when Restore is refused AND its reload fails",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) queues the next write until the previous refresh has settled",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) still attempts the answer exclusion after a refused question and displays the saved partial result",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) keeps Exclude Restore Include in selection order through an overlapping open read and final confirmation",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) keeps uncertainty through an overlapping open read until the pending write confirms its own result",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) serializes 'R1' and confirms saved context before the next Ask after refresh failure",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) serializes 'R4' and confirms saved context before the next Ask after refresh failure",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) serializes 'R5' and confirms saved context before the next Ask after refresh failure",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) serializes 'R10' and confirms saved context before the next Ask after refresh failure",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) serializes 'include' and confirms saved context before the next Ask after refresh failure",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) serializes 'compact' and confirms saved context before the next Ask after refresh failure",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) serializes 'summary' and confirms saved context before the next Ask after refresh failure",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) marks a saved floor unconfirmed when refresh fails and blocks Ask without losing its draft",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) marks a saved compact unconfirmed when refresh fails and blocks Ask without losing its draft",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) marks a saved summary unconfirmed when refresh fails and blocks Ask without losing its draft",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) marks a saved restore unconfirmed when refresh fails and blocks Ask without losing its draft",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) marks a saved exclude unconfirmed when refresh fails and blocks Ask without losing its draft",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) marks a saved include unconfirmed when refresh fails and blocks Ask without losing its draft",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) marks a saved include-all unconfirmed when refresh fails and blocks Ask without losing its draft",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) keeps an honest refusal after context recovers and the composer becomes \"\" (X20)",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) keeps an honest refusal after context recovers and the composer becomes \"A different draft\" (X20)",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) requires explicit retirement before sending in another conversation while context waits (X28/RR15)",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) keeps the refused-send reason through failed background retries (X19)",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) keeps a refused question visible beside newer input through retry and recovery (X15)",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) re-reads interrupted first history on reattach after screen switch and retries failures (X14a)",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) re-reads interrupted first history on reattach after reparent and retries failures (X14a)",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) refuses follow-up after an interrupted first history read and a failed re-read (X14b)",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) confirms a lost write response by reading history before sending Ask",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) retries unconfirmed context on backoff and reconnect and cancels retries on disconnect",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) caps uncertain-history retries at thirty seconds and online resets the cadence without duplicate listeners",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) sends the submitted question after a context wait and keeps later input: A newer unsent question",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) sends the submitted question after a context wait and keeps later input: Submitted question",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) warns after a failed history read on load and refuses Ask with its draft kept",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) warns after a failed history read on reload and refuses Ask with its draft kept",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) refuses Ask when a load read is still pending and its confirmation read fails",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) recovers a failed load history read on backoff without another action",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) waits for queued context writes before Ask and sends the question once",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) Include all uses the exclusions saved by an earlier queued action after its failed refresh",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) automatically confirms saved context when a backoff retry succeeds",
+          "status": "passed"
+        },
+        {
+          "name": "the undo never leaves the bar showing a state that is not saved (S2.10) keeps the conversation the reader moved to on ITS saved state while the undo finishes",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.pane.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.pane.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a94e0a32f07fe5c72cf0fdee8112857433e4d496339ddc47760f4e4dc6bffecf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "an in-window citation opens the WINDOW pane and nothing else opens the pane at the cited range and leaves the shared inspector selection untouched",
+          "status": "passed"
+        },
+        {
+          "name": "an in-window citation opens the WINDOW pane and nothing else proves the probe has teeth — the same event from an UNGUARDED node does escape",
+          "status": "passed"
+        },
+        {
+          "name": "an in-window citation opens the WINDOW pane and nothing else follows an inline [n] mark through the same guarded handler",
+          "status": "passed"
+        },
+        {
+          "name": "the pane is mounted exactly while a cited document is open is absent before the first citation and after pane-close",
+          "status": "passed"
+        },
+        {
+          "name": "the pane is mounted exactly while a cited document is open closes when a new session starts — the citation belonged to the old conversation",
+          "status": "passed"
+        },
+        {
+          "name": "the pane is mounted exactly while a cited document is open does not let the inline track width outvote the overlay presentation",
+          "status": "passed"
+        },
+        {
+          "name": "the pane is mounted exactly while a cited document is open adds NO second emphasis of its own — the landing is the shared reader's decay",
+          "status": "passed"
+        },
+        {
+          "name": "the pane closes on a real conversation switch, and only a real one closes when a sidebar row-click switches to a different conversation",
+          "status": "passed"
+        },
+        {
+          "name": "the pane closes on a real conversation switch, and only a real one closes when the conversation it switches to left its pane closed",
+          "status": "passed"
+        },
+        {
+          "name": "the pane closes on a real conversation switch, and only a real one does NOT close when the already-active row is clicked again",
+          "status": "passed"
+        },
+        {
+          "name": "the pane closes on a real conversation switch, and only a real one does NOT close on a non-switching update (the late-match claim upgrade)",
+          "status": "passed"
+        },
+        {
+          "name": "the pane closes on a real conversation switch, and only a real one closes when the version pager selects a DIFFERENT session",
+          "status": "passed"
+        },
+        {
+          "name": "Escape closes the pane FIRST closes the pane and leaves an open palette open",
+          "status": "passed"
+        },
+        {
+          "name": "Escape closes the pane FIRST leaves the palette its Escape once the pane is closed",
+          "status": "passed"
+        },
+        {
+          "name": "Escape closes the pane FIRST yields to a rename in progress — the edit is the most local transient state",
+          "status": "passed"
+        },
+        {
+          "name": "Escape closes the pane FIRST does not eat Escape in the composer when no document is open",
+          "status": "passed"
+        },
+        {
+          "name": "Escape closes the pane FIRST 864: an Escape that is dismissing an IME candidate window does not flip to hero",
+          "status": "passed"
+        },
+        {
+          "name": "the two boundaries leave the main column its 640 clamps the SIDEBAR against the open pane, not against an empty window",
+          "status": "passed"
+        },
+        {
+          "name": "the two boundaries leave the main column its 640 clamps the PANE against the open sidebar",
+          "status": "passed"
+        },
+        {
+          "name": "the two boundaries leave the main column its 640 persists the chosen width on pointerUP, and reverts a cancelled gesture",
+          "status": "passed"
+        },
+        {
+          "name": "the two boundaries leave the main column its 640 lands the drag width on the fallback when the page stops delivering frames (860 P3)",
+          "status": "passed"
+        },
+        {
+          "name": "the two boundaries leave the main column its 640 moves and resets from the keyboard, and a double-click FORGETS",
+          "status": "passed"
+        },
+        {
+          "name": "the two boundaries leave the main column its 640 reopens at a remembered width the current box still allows",
+          "status": "passed"
+        },
+        {
+          "name": "below the spec 980 the pane is a window-scoped overlay overlays, dims, and hides the grip",
+          "status": "passed"
+        },
+        {
+          "name": "below the spec 980 the pane is a window-scoped overlay stays INLINE above the switch",
+          "status": "passed"
+        },
+        {
+          "name": "below the spec 980 the pane is a window-scoped overlay takes NO room from the sidebar while it is overlaid",
+          "status": "passed"
+        },
+        {
+          "name": "a claim match that arrives after the pane opened upgrades the OPEN pane with the sentence it grounded",
+          "status": "passed"
+        },
+        {
+          "name": "a claim match that arrives after the pane opened leaves the pane alone when the match belongs to a DIFFERENT TURN",
+          "status": "passed"
+        },
+        {
+          "name": "a claim match that arrives after the pane opened leaves the pane alone when the match belongs to a DIFFERENT source",
+          "status": "passed"
+        },
+        {
+          "name": "the pane is told what the citation that opened it can honestly say reads the header OFF THE RECORD, not off the event",
+          "status": "passed"
+        },
+        {
+          "name": "the pane is told what the citation that opened it can honestly say the header follows the LATE claim match onto the open pane",
+          "status": "passed"
+        },
+        {
+          "name": "the pane is told what the citation that opened it can honestly say a DROPPED source never gains a grounding claim, however the match lands",
+          "status": "passed"
+        },
+        {
+          "name": "the pane is told what the citation that opened it can honestly say refreshes the header of a SPAN-UNUSABLE pane when the match lands (review LOW-5)",
+          "status": "passed"
+        },
+        {
+          "name": "the pane is told what the citation that opened it can honestly say 849 S10 — a DEGENERATE span opens a pane that says so",
+          "status": "passed"
+        },
+        {
+          "name": "the pane reads CITED documents and nothing else has no attribute route into the document it shows",
+          "status": "passed"
+        },
+        {
+          "name": "the pane reads CITED documents and nothing else has exactly ONE writer of the open document in the window",
+          "status": "passed"
+        },
+        {
+          "name": "the pane reads CITED documents and nothing else imports the shared reader directly, never through another window",
+          "status": "passed"
+        },
+        {
+          "name": "DP1 the details pane shows tabs per cited source plus Context offers a tab per cited source, numbered, then Context",
+          "status": "passed"
+        },
+        {
+          "name": "DP1 the details pane shows tabs per cited source plus Context moves the reader to the chosen source and its passage, and marks it in the answer",
+          "status": "passed"
+        },
+        {
+          "name": "DP1 the details pane shows tabs per cited source plus Context keeps the reader mounted under Context, so coming back keeps its place",
+          "status": "passed"
+        },
+        {
+          "name": "DP1 the details pane shows tabs per cited source plus Context a citation the answer did not cite still gets its own tab, and a result gets a plain one",
+          "status": "passed"
+        },
+        {
+          "name": "DP1 Escape or close returns focus to what opened the pane Escape returns focus to the citation that opened it",
+          "status": "passed"
+        },
+        {
+          "name": "DP1 Escape or close returns focus to what opened the pane the close control returns focus the same way",
+          "status": "passed"
+        },
+        {
+          "name": "DP1 Escape or close returns focus to what opened the pane moving between tabs keeps the citation that opened the pane as what gets focus back",
+          "status": "passed"
+        },
+        {
+          "name": "DP1 Escape or close returns focus to what opened the pane an opener that has left falls back to the composer, never the page",
+          "status": "passed"
+        },
+        {
+          "name": "DP1 Escape or close returns focus to what opened the pane opens with the keyboard in the pane, and Escape during a composition stays with the composition",
+          "status": "passed"
+        },
+        {
+          "name": "DP1 the pane remembers each conversation returns to the tab and source each conversation last showed",
+          "status": "passed"
+        },
+        {
+          "name": "DP1 the pane remembers each conversation a reload comes back to the source being read, without taking the keyboard",
+          "status": "passed"
+        },
+        {
+          "name": "DP1 the pane remembers each conversation a pane closed by the reader stays closed on return",
+          "status": "passed"
+        },
+        {
+          "name": "DP1 the pane remembers each conversation a remembered source its record no longer holds opens nothing",
+          "status": "passed"
+        },
+        {
+          "name": "C4 the pane never shows another conversation, window or profile rapid selection lands on the last choice",
+          "status": "passed"
+        },
+        {
+          "name": "C4 the pane never shows another conversation, window or profile a late record for the conversation left behind restores nothing here",
+          "status": "passed"
+        },
+        {
+          "name": "C4 the pane never shows another conversation, window or profile answers a selection placed in this window, or by no frame, and ignores another window’s",
+          "status": "passed"
+        },
+        {
+          "name": "C4 the pane never shows another conversation, window or profile another window closing its selection leaves this window’s reader open",
+          "status": "passed"
+        },
+        {
+          "name": "C4 the pane never shows another conversation, window or profile a profile change closes the pane",
+          "status": "passed"
+        },
+        {
+          "name": "DP5 hiding a source from the assistant keeps working from the pane hides and restores the source on show, naming the channel the assistant got it by",
+          "status": "passed"
+        },
+        {
+          "name": "DP5 hiding a source from the assistant keeps working from the pane says so when the hide could not be saved, and the source stays as it was",
+          "status": "passed"
+        },
+        {
+          "name": "DP5 hiding a source from the assistant keeps working from the pane each conversation starts from its own hidden sources",
+          "status": "passed"
+        },
+        {
+          "name": "DP4 plugin inspector tabs are details-pane tabs appear after Context, receive the document on show, and leave without stranding the pane",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/Sv3AgentRuns.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/Sv3AgentRuns.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:300ea18a262c249bfab19b2d8c06f892dfdea38489293eab22632009ab3b2dd7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "agent runs in Search’s list a closed section asks the backend nothing",
+          "status": "passed"
+        },
+        {
+          "name": "agent runs in Search’s list renders Resume ONLY on resumable runs; finished ones offer Replay and Export",
+          "status": "passed"
+        },
+        {
+          "name": "agent runs in Search’s list renders the four interruption presentations, and only where one applies",
+          "status": "passed"
+        },
+        {
+          "name": "agent runs in Search’s list Resume goes through the control seam with the run’s own lifecycle, Replay through the replay primitive",
+          "status": "passed"
+        },
+        {
+          "name": "agent runs in Search’s list opening settles without looping",
+          "status": "passed"
+        },
+        {
+          "name": "agent runs in Search’s list an empty list names what fills it",
+          "status": "passed"
+        },
+        {
+          "name": "agent runs in Search’s list a failed first read says so instead of reading as empty, and Try again recovers",
+          "status": "passed"
+        },
+        {
+          "name": "agent runs in Search’s list a failed refresh keeps the rows and says when they were last seen",
+          "status": "passed"
+        },
+        {
+          "name": "agent runs in Search’s list a shared replay that is not a transcript is refused in words",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-boundaries.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-boundaries.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:392c06ce0e79c8caf2a07469cf0683c81edc6c482d0b0bb6783232de366bf831",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "sv3 boundaries — the spec numbers carries the spec constants exactly",
+          "status": "passed"
+        },
+        {
+          "name": "sv3 boundaries — the spec numbers nudges both grips by the repo step",
+          "status": "passed"
+        },
+        {
+          "name": "sv3 boundaries — the sidebar ceiling derives the ceiling from the MAIN pane minimum, not from the sidebar",
+          "status": "passed"
+        },
+        {
+          "name": "sv3 boundaries — the sidebar ceiling keeps the sidebar legible when the box cannot hold both minimums",
+          "status": "passed"
+        },
+        {
+          "name": "sv3 boundaries — the sidebar ceiling clamps a drag to the floor and to the ceiling",
+          "status": "passed"
+        },
+        {
+          "name": "sv3 boundaries — the sidebar ceiling opens at the default, at a remembered width, or at whatever the box allows",
+          "status": "passed"
+        },
+        {
+          "name": "sv3 boundaries — the pane ceiling stops at the details pane’s 560 on a box wide enough that the ceiling is the binding term",
+          "status": "passed"
+        },
+        {
+          "name": "sv3 boundaries — the pane ceiling clamps a drag to the spec floor and to the ceiling",
+          "status": "passed"
+        },
+        {
+          "name": "sv3 boundaries — the pane ceiling opens at the spec default, at a remembered width, or at whatever the box allows",
+          "status": "passed"
+        },
+        {
+          "name": "sv3 boundaries — the pane ceiling hands the pane the collapsed rail back",
+          "status": "passed"
+        },
+        {
+          "name": "sv3 boundaries — the pane ceiling keeps the pane legible when the box cannot hold every minimum",
+          "status": "passed"
+        },
+        {
+          "name": "sv3 boundaries — BOTH open (the F8 improvement the spec does not have) leaves the main column its 640 with the sidebar at its ceiling beside an open pane",
+          "status": "passed"
+        },
+        {
+          "name": "sv3 boundaries — BOTH open (the F8 improvement the spec does not have) leaves the main column its 640 with the pane at its ceiling beside an open sidebar",
+          "status": "passed"
+        },
+        {
+          "name": "sv3 boundaries — BOTH open (the F8 improvement the spec does not have) gives BOTH boundaries back their room when the other one is not in the flow",
+          "status": "passed"
+        },
+        {
+          "name": "sv3 boundaries — BOTH open (the F8 improvement the spec does not have) treats an unmeasured box as unknown rather than narrow",
+          "status": "passed"
+        },
+        {
+          "name": "sv3 boundaries — BOTH open (the F8 improvement the spec does not have) switches presentation at the spec 980",
+          "status": "passed"
+        },
+        {
+          "name": "sv3 boundaries — the remembered preferences remembers each width under its own key and reads it back",
+          "status": "passed"
+        },
+        {
+          "name": "sv3 boundaries — the remembered preferences FORGETS rather than storing the default (818 L13)",
+          "status": "passed"
+        },
+        {
+          "name": "sv3 boundaries — the remembered preferences treats an unparseable stored width as no memory at all",
+          "status": "passed"
+        },
+        {
+          "name": "sv3 boundaries — the remembered preferences remembers the collapsed rail beside the widths",
+          "status": "passed"
+        },
+        {
+          "name": "sv3 boundaries — the remembered preferences costs the memory, never the gesture, when storage throws",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Pane.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Pane.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ccb65dc7f97ba6accc4d8bf41ff4b436bc9d1c650894bef4470303cb4429fc21",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "jf-sv3-pane — the region forwards and derives nothing renders nothing at all while the pane is closed",
+          "status": "passed"
+        },
+        {
+          "name": "jf-sv3-pane — the region forwards and derives nothing hands the shared reader the citation header BY IDENTITY, not by a copy",
+          "status": "passed"
+        },
+        {
+          "name": "jf-sv3-pane — the region forwards and derives nothing forwards an ABSENT header as absent — it invents no default for a pre-849 citation",
+          "status": "passed"
+        },
+        {
+          "name": "jf-sv3-pane — the region forwards and derives nothing 849 S10 — an unusable span reaches the reader as a header, with no anchor",
+          "status": "passed"
+        },
+        {
+          "name": "jf-sv3-pane — the region forwards and derives nothing re-raises the shared frame’s close as the WINDOW’s own event",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Results.preview.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Results.preview.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:af15610e423ebb44cc0dc6fd8c406edb3ec9cba9e219230c6715d5a279b969fd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DP2 Space previews the focused result every live row takes the keyboard, whether or not forget is available",
+          "status": "passed"
+        },
+        {
+          "name": "DP2 Space previews the focused result Space opens the floating card on the focused row, and keeps the keyboard on the row",
+          "status": "passed"
+        },
+        {
+          "name": "DP2 Space previews the focused result Space again closes it",
+          "status": "passed"
+        },
+        {
+          "name": "DP2 Space previews the focused result Escape closes it, and goes no further",
+          "status": "passed"
+        },
+        {
+          "name": "DP2 Space previews the focused result Space on another row moves the card to it",
+          "status": "passed"
+        },
+        {
+          "name": "DP2 Space previews the focused result Enter opens the file and the arrow opens details, each closing the card",
+          "status": "passed"
+        },
+        {
+          "name": "DP2 Space previews the focused result Enter on a row with no preview does what a click does",
+          "status": "passed"
+        },
+        {
+          "name": "DP2 Space previews the focused result never outlives its result: new results without the row close it",
+          "status": "passed"
+        },
+        {
+          "name": "DP2 Space previews the focused result closes when the keyboard leaves the list",
+          "status": "passed"
+        },
+        {
+          "name": "C8 Space preview keeps to its owner never fires from a control inside the row",
+          "status": "passed"
+        },
+        {
+          "name": "C8 Space preview keeps to its owner never fires inside a text field, even one reached through the row",
+          "status": "passed"
+        },
+        {
+          "name": "C8 Space preview keeps to its owner never fires during IME composition",
+          "status": "passed"
+        },
+        {
+          "name": "C8 Space preview keeps to its owner never fires on key repeat, which also may not scroll the list away",
+          "status": "passed"
+        },
+        {
+          "name": "C8 Space preview keeps to its owner never fires with a modifier held",
+          "status": "passed"
+        },
+        {
+          "name": "C8 Space preview keeps to its owner never fires under a modal",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:b6cd5f0e397b40bcad12e7fe3667f1e1721b87ec24d1344039da9dda16d0b621"
+}

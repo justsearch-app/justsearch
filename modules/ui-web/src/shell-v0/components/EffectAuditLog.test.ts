@@ -33,7 +33,7 @@ import { CORE_PROVENANCE } from '../primitives/provenance.js';
 
 void EffectAuditLog;
 
-let host: HTMLElement & { open: boolean };
+let host: HTMLElement;
 
 beforeEach(() => {
   __resetPendingForTest();
@@ -41,9 +41,7 @@ beforeEach(() => {
   __resetElicitForTest();
   __resetMacrosForTest();
   __resetActionsForTest();
-  host = document.createElement('jf-effect-audit-log') as HTMLElement & {
-    open: boolean;
-  };
+  host = document.createElement('jf-effect-audit-log');
   document.body.appendChild(host);
 });
 
@@ -79,7 +77,6 @@ describe('<jf-effect-audit-log> causation chip (§32 R-E3)', () => {
       CORE_PROVENANCE,
     );
     acceptSequence(sequenceId, (e, p) => applyEffect(e, p));
-    host.open = true;
     await flush();
     // Two 'accepted'-outcome entries; only the 2nd is chained → one chip.
     const chips =
@@ -91,7 +88,6 @@ describe('<jf-effect-audit-log> causation chip (§32 R-E3)', () => {
   it('543-fwd #6 — a causation turn renders a collapsible header over its member rows', async () => {
     const a = recordEffect({ kind: 'open-pane', paneId: 'p' }, CORE_PROVENANCE, { originator: 'agent' });
     const b = recordEffect({ kind: 'open-modal', modalId: 'm' }, CORE_PROVENANCE, { originator: 'agent', causation: a.id });
-    host.open = true;
     await flush();
     const toggle = host.shadowRoot?.querySelector(
       `[data-testid="turn-toggle-${a.id}"]`,
@@ -113,7 +109,6 @@ describe('<jf-effect-audit-log> causation chip (§32 R-E3)', () => {
   it('543-fwd #7 — "undo turn" reverses the whole causation group via a confirm', async () => {
     const a = recordEffect({ kind: 'open-pane', paneId: 'a' }, CORE_PROVENANCE, { originator: 'agent' }); // root
     const b = recordEffect({ kind: 'open-modal', modalId: 'm' }, CORE_PROVENANCE, { originator: 'agent', causation: a.id });
-    host.open = true;
     await flush();
     const closes: string[] = [];
     const onPane = ((e: Event) => closes.push(`pane:${(e as CustomEvent).detail.paneId}`)) as EventListener;
@@ -138,7 +133,6 @@ describe('<jf-effect-audit-log> causation chip (§32 R-E3)', () => {
 
   it('543-fwd #19 / 613 §6 — "Export selected" copies an archive and flashes an in-control RECEIPT, not a window toast', async () => {
     const e = recordEffect({ kind: 'navigate', to: '#a' }, CORE_PROVENANCE, { originator: 'agent' });
-    host.open = true;
     (host as unknown as { selectedIds: Set<number> }).selectedIds = new Set([e.id]);
     await (host as unknown as { updateComplete: Promise<unknown> }).updateComplete;
     const toast = vi.fn();
@@ -162,7 +156,6 @@ describe('<jf-effect-audit-log> causation chip (§32 R-E3)', () => {
     const a = recordEffect({ kind: 'navigate', to: '#x' }, CORE_PROVENANCE, { originator: 'agent' });
     const b = recordEffect({ kind: 'open-pane', paneId: 'p' }, CORE_PROVENANCE, { originator: 'agent' });
     const archive = exportJournalArchive([a, b]);
-    host.open = true;
     await flush();
     await activateJfButton(host.shadowRoot?.querySelector('[data-testid="import-archive"]'));
     await flush();
@@ -180,7 +173,6 @@ describe('<jf-effect-audit-log> causation chip (§32 R-E3)', () => {
     const root = recordEffect({ kind: 'invoke-operation', operationId: 'core_search_index' }, CORE_PROVENANCE, { originator: 'agent' });
     const mid = recordEffect({ kind: 'invoke-operation', operationId: 'core_browse_folders' }, CORE_PROVENANCE, { originator: 'agent', causation: root.id });
     const leaf = recordEffect({ kind: 'open-pane', paneId: 'results' }, CORE_PROVENANCE, { originator: 'agent', causation: mid.id });
-    host.open = true;
     await flush();
     // No trace until "why?" is clicked.
     expect(host.shadowRoot?.querySelector(`[data-testid="trace-${leaf.id}"]`)).toBeNull();
@@ -198,7 +190,6 @@ describe('<jf-effect-audit-log> causation chip (§32 R-E3)', () => {
   it('543-fwd #5 — "restore to here" stages a confirm of later actions, then reverses them', async () => {
     const a = recordEffect({ kind: 'open-pane', paneId: 'a' }, CORE_PROVENANCE);
     recordEffect({ kind: 'open-modal', modalId: 'm' }, CORE_PROVENANCE); // after a → reversible
-    host.open = true;
     await flush();
     const closes: string[] = [];
     const onClose = ((e: Event) => closes.push((e as CustomEvent).detail.modalId)) as EventListener;
@@ -223,7 +214,6 @@ describe('<jf-effect-audit-log> causation chip (§32 R-E3)', () => {
     const a = recordEffect({ kind: 'open-pane', paneId: 'a' }, CORE_PROVENANCE);
     recordEffect({ kind: 'open-modal', modalId: 'm' }, CORE_PROVENANCE);
     recordEffect({ kind: 'toast', message: 'noted' }, CORE_PROVENANCE); // irreversible
-    host.open = true;
     await flush();
     const closes: string[] = [];
     const onClose = ((e: Event) => closes.push((e as CustomEvent).detail.modalId)) as EventListener;
@@ -251,7 +241,6 @@ describe('<jf-effect-audit-log> causation chip (§32 R-E3)', () => {
       { originator: 'agent' },
     );
     markUndoableOperation(entry.id, 'core.file-operations', 'exec-77');
-    (host as HTMLElement & { open: boolean }).open = true;
     await flush();
     const undoBtn = host.shadowRoot?.querySelector(
       `[data-testid="undo-op-${entry.id}"]`,
@@ -276,7 +265,6 @@ describe('<jf-effect-audit-log> causation chip (§32 R-E3)', () => {
     recordEffect({ kind: 'open-pane', paneId: 'knowledge' }, CORE_PROVENANCE, {
       originator: 'agent',
     });
-    host.open = true;
     await flush();
     const toast = vi.fn();
     document.addEventListener('jf-advisory-ephemeral', toast as EventListener);
@@ -298,7 +286,6 @@ describe('<jf-effect-audit-log> causation chip (§32 R-E3)', () => {
   it('543-fwd #8 — "Undo all AI actions" stages a confirm preview; no undo until confirmed', async () => {
     recordEffect({ kind: 'open-pane', paneId: 'a' }, CORE_PROVENANCE, { originator: 'agent' });
     recordEffect({ kind: 'open-modal', modalId: 'b' }, CORE_PROVENANCE, { originator: 'agent' });
-    host.open = true;
     await flush();
     const toast = vi.fn();
     document.addEventListener('jf-advisory-ephemeral', toast as EventListener);
@@ -324,17 +311,6 @@ describe('<jf-effect-audit-log> causation chip (§32 R-E3)', () => {
     }
   });
 
-  it('543-fwd P3 — Escape syncs open=false without relying on the dialog close event', async () => {
-    // Live-caught regression: some environments do not fire the native dialog
-    // `close` event, so we must sync `open` from an explicit Escape keydown.
-    host.open = true;
-    await flush();
-    const dlg = host.shadowRoot?.querySelector('dialog') as HTMLDialogElement;
-    expect(dlg).not.toBeNull();
-    dlg.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-    await flush();
-    expect(host.open).toBe(false);
-  });
 
   it('543-fwd #3 — AI-undo buttons soft-unavailable when no reversible agent entries; operable + counted otherwise', async () => {
     // Tempdoc 596 — the empty-state gate is now TYPED availability (aria-disabled + a reachable reason),
@@ -350,7 +326,6 @@ describe('<jf-effect-audit-log> causation chip (§32 R-E3)', () => {
       return c.shadowRoot!.querySelector('button')!.getAttribute('aria-disabled');
     };
     // Empty journal (reset in beforeEach): the AI has nothing to undo.
-    host.open = true;
     await flush();
     type JfBtn = HTMLElement & { updateComplete: Promise<unknown> };
     const undoAll = () => host.shadowRoot?.querySelector('[data-testid="undo-all-agent"]') as JfBtn;
@@ -368,7 +343,6 @@ describe('<jf-effect-audit-log> causation chip (§32 R-E3)', () => {
 
   it('543-fwd #8 — Cancel dismisses the confirm without undoing', async () => {
     recordEffect({ kind: 'open-pane', paneId: 'a' }, CORE_PROVENANCE, { originator: 'agent' });
-    host.open = true;
     await flush();
     const applied = vi.fn();
     document.addEventListener('jf-close-pane', applied as EventListener);
@@ -393,7 +367,6 @@ describe('<jf-effect-audit-log> causation chip (§32 R-E3)', () => {
       CORE_PROVENANCE,
       { originator: 'agent' },
     );
-    (host as HTMLElement & { open: boolean }).open = true;
     await flush();
     const sel = `[data-testid="undo-op-${entry.id}"]`;
     expect(host.shadowRoot?.querySelector(sel)).toBeNull(); // not yet undoable
@@ -404,7 +377,6 @@ describe('<jf-effect-audit-log> causation chip (§32 R-E3)', () => {
 
   it('543-fwd FE-tail — a genuinely empty journal shows the "nothing yet" copy, not the filter copy', async () => {
     // Journal reset in beforeEach → 0 entries, no filter active.
-    (host as HTMLElement & { open: boolean }).open = true;
     await flush();
     const empty = host.shadowRoot?.querySelector('.empty');
     expect(empty).not.toBeNull();
@@ -426,23 +398,4 @@ describe('<jf-effect-audit-log> causation chip (§32 R-E3)', () => {
     expect(empty?.textContent ?? '').not.toMatch(/No actions recorded yet/i);
   });
 
-  it('543-fwd residue #5 — restores focus to the pre-open element on close', async () => {
-    // Assert the wiring (the pre-open element's focus() is called on close)
-    // rather than reading document.activeElement, which is flaky across
-    // happy-dom dialog open/close cycles.
-    const sentinel = document.createElement('button');
-    document.body.appendChild(sentinel);
-    sentinel.focus(); // sentinel is active when the dialog opens → captured
-    const focusSpy = vi.spyOn(sentinel, 'focus');
-    const h = host as HTMLElement & { open: boolean } & {
-      updateComplete: Promise<unknown>;
-    };
-    h.open = true;
-    await h.updateComplete;
-    expect(focusSpy).not.toHaveBeenCalled(); // not restored while open
-    h.open = false;
-    await h.updateComplete;
-    expect(focusSpy).toHaveBeenCalled(); // restored on close
-    sentinel.remove();
-  });
 });

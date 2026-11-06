@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.loop.ops;
 
-import io.justsearch.adapters.lucene.runtime.CommitOps;
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
 import io.justsearch.adapters.lucene.runtime.IndexingCoordinator;
 import io.justsearch.indexerworker.inference.LocalSessionAcquisition;
@@ -9,9 +8,13 @@ import io.justsearch.indexerworker.loop.pacing.BulkPacePolicy;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.splade.SpladeEncoder;
 import io.justsearch.indexing.SchemaFields;
+import io.justsearch.indexerworker.metrics.EncoderOrtRunSpans;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.context.Scope;
 import io.justsearch.ort.SessionAcquisitionException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BooleanSupplier;
@@ -35,48 +38,14 @@ public final class SpladeBackfillOps {
   public record BackfillContext(
       DocumentFieldOps documentFieldOps,
       IndexingCoordinator indexingCoordinator,
-      CommitOps commitOps,
       IndexingPacing pacing,
       Supplier<SpladeEncoder> spladeEncoderSupplier,
       BooleanSupplier runningSupplier,
       int batchSize,
-      boolean commitAfterBatch,
-      // Tempdoc 712/931: chunk docs carry splade_status=PENDING from creation whatever this flag
-      // says, so without it here this lane encodes chunk sparse data the flag says not to produce.
       boolean chunkSpladeEnabled,
       Logger log,
       BooleanSupplier unitAllowed) {
-    public BackfillContext(
-        DocumentFieldOps documentFieldOps,
-        IndexingCoordinator indexingCoordinator,
-        CommitOps commitOps,
-        IndexingPacing pacing,
-        Supplier<SpladeEncoder> spladeEncoderSupplier,
-        BooleanSupplier runningSupplier,
-        int batchSize,
-        boolean commitAfterBatch,
-        boolean chunkSpladeEnabled,
-        Logger log) {
-      this(documentFieldOps, indexingCoordinator, commitOps, pacing, spladeEncoderSupplier, runningSupplier, batchSize, commitAfterBatch, chunkSpladeEnabled, log, () -> true);
-    }
-  }
 
-  /**
-   * Processes a batch of SPLADE backfill documents.
-   *
-   * @return outcome whose {@code success()} preserves the original "not a systemic failure"
-   *     signal ({@code true} on success or partial success, {@code false} when the entire batch
-   *     failed systemically e.g. GPU OOM — the caller backs off on consecutive {@code false}); the
-   *     record also carries docsProcessed/elapsedMs for {@link BackfillScheduler}'s per-stage
-   *     metrics recording (tempdoc 710 Move 2 item 4).
-   */
-  public static StageOutcome processSpladeBackfill(BackfillContext context) {
-    return processSpladeBackfill(context, null);
-  }
-
-  public static StageOutcome processSpladeBackfill(
-      BackfillContext context, EnrichmentSelection selection) {
-    return processSpladeBackfill(context, selection, null);
   }
 
   /** A bounded parent-only sparse unit, with its own keyset cursor. */
@@ -105,15 +74,13 @@ public final class SpladeBackfillOps {
         EnrichmentBatch.hardStop(() -> !context.runningSupplier().getAsBoolean(),
             context.indexingCoordinator(), cancellationEpoch, authority)
             || context.spladeEncoderSupplier().get() != encoder);
+    Map<String, String> terminalFailures = new LinkedHashMap<>();
+    Span enrichmentSpan = EncoderOrtRunSpans.maybeEnrichmentBatch();
+    try (Scope _ = enrichmentSpan.makeCurrent()) {
     try {
       List<String> pendingIds =
-          kind != null ? EnrichmentSelection.page(selection, context.documentFieldOps(),
-              SchemaFields.SPLADE_STATUS, Math.min(context.batchSize(), BulkPacePolicy.DEFAULTS.spladePhaseDocs()), kind)
-              : context.chunkSpladeEnabled()
-              ? EnrichmentSelection.page(selection, context.documentFieldOps(),
-              SchemaFields.SPLADE_STATUS, context.batchSize(), false)
-              : EnrichmentSelection.page(selection, context.documentFieldOps(),
-              SchemaFields.SPLADE_STATUS, context.batchSize(), true);
+          EnrichmentSelection.page(selection, context.documentFieldOps(),
+              SchemaFields.SPLADE_STATUS, Math.min(context.batchSize(), BulkPacePolicy.DEFAULTS.spladePhaseDocs()), kind);
       long queryMs = (System.nanoTime() - t0) / 1_000_000;
 
       var excluded = context.documentFieldOps().excludedProcessingIds(pendingIds);
@@ -166,7 +133,7 @@ public final class SpladeBackfillOps {
             // EmbeddingBackfillOps' handling of the identical condition.
             context.log().warn("SPLADE backfill: content missing or blank for {}", docId);
             markedFailed +=
-                batch.failure(docId, SchemaFields.SPLADE_RETRY_COUNT, SpladeBackfillOps::computeSpladeFailureUpdate);
+                publishFailure(batch, docId, "blank-content", terminalFailures);
             failed++;
             continue;
           }
@@ -178,7 +145,7 @@ public final class SpladeBackfillOps {
           accounting.cancelled(EnrichmentAccounting.Stage.SPLADE, e);
           context.log().error("SPLADE content fetch failed for {}: {}", docId, e.getMessage());
           markedFailed +=
-              batch.failure(docId, SchemaFields.SPLADE_RETRY_COUNT, SpladeBackfillOps::computeSpladeFailureUpdate);
+              publishFailure(batch, docId, "content-fetch-failure", terminalFailures);
           failed++;
         }
       }
@@ -219,6 +186,7 @@ public final class SpladeBackfillOps {
           }
           List<Map<String, Float>> sliceVecs;
           try {
+            accounting.attempted(EnrichmentAccounting.Stage.SPLADE);
             batch.started(batchDocIds.subList(sliceStart, sliceEnd), EnrichmentAccounting.Stage.SPLADE);
             List<String> sliceTexts = batchContents.subList(sliceStart, sliceEnd);
             sliceVecs = batch.inferenceCancellation(() -> !context.runningSupplier().getAsBoolean(), unavailable).call(() -> encoder.encodeBatch(sliceTexts));
@@ -242,7 +210,8 @@ public final class SpladeBackfillOps {
             accounting.computed(batchDocIds.get(i), EnrichmentAccounting.Stage.SPLADE);
           }
           if (batch.retired(unavailable, EnrichmentAccounting.Stage.SPLADE)) break;
-          sparseVecs.addAll(sliceVecs);
+          // Materialize one row at a time so fallback retains a successfully read prefix.
+          for (int i = 0; i < sliceVecs.size(); i++) sparseVecs.add(sliceVecs.get(i));
         }
       } catch (Exception e) {
         if (batch.retired(unavailable, EnrichmentAccounting.Stage.SPLADE)) {
@@ -251,7 +220,6 @@ public final class SpladeBackfillOps {
         boolean cancelled = accounting.cancelled(EnrichmentAccounting.Stage.SPLADE, e);
         if (!cancelled) {
           if (accounting.acquisitionUnavailable(encoder, e)) {
-            processed += publishSparseVectors(batch, batchDocIds, sparseVecs);
             commitIfNeeded(context, processed, failed, markedFailed);
             return StageOutcome.observed(false, processed, t0, accounting);
           }
@@ -296,7 +264,7 @@ public final class SpladeBackfillOps {
                 return StageOutcome.observed(false, processed, t0, accounting);
               }
               markedFailed +=
-                  batch.failure(batchDocIds.get(i), SchemaFields.SPLADE_RETRY_COUNT, SpladeBackfillOps::computeSpladeFailureUpdate);
+                  publishFailure(batch, batchDocIds.get(i), "encode-failure", terminalFailures);
               failed++;
             }
             pacer.afterUnit(1);
@@ -318,6 +286,8 @@ public final class SpladeBackfillOps {
           }
           return StageOutcome.observed(true, processed, t0, accounting);
         }
+        // Never enter Lucene with an interrupted reader or publish its partial native result.
+        return StageOutcome.observed(true, processed, t0, accounting);
       }
 
       if (sparseVecs.isEmpty()) {
@@ -360,6 +330,31 @@ public final class SpladeBackfillOps {
       boolean cancelled = accounting.cancelled(EnrichmentAccounting.Stage.SPLADE, e);
       context.log().error("Error during SPLADE backfill", e);
       return StageOutcome.observed(cancelled, 0, t0, accounting);
+    } finally {
+      if (!terminalFailures.isEmpty()) {
+        context.log().warn("SPLADE backfill: {} document(s) reached terminal SPLADE FAILED: {}",
+            terminalFailures.size(), List.copyOf(terminalFailures.values()));
+      }
+      context.log().info("Enrichment dispositions: {}", accounting.snapshot().counters());
+    }
+    } finally {
+      enrichmentSpan.end();
+    }
+  }
+
+  private static int publishFailure(EnrichmentBatch batch,
+      String id, String reason, Map<String, String> terminalFailures) {
+    var updates = computeSpladeFailureUpdate(CombinedEnrichmentBackfillOps.parseRetryCountOrZero(
+        batch.fields(id).get(SchemaFields.SPLADE_RETRY_COUNT)));
+    boolean terminal = SchemaFields.SPLADE_STATUS_FAILED.equals(updates.get(SchemaFields.SPLADE_STATUS));
+    try {
+      return batch.update(id, updates) && terminal ? 1 : 0;
+    } finally {
+      if (terminal && batch.acceptedIds().contains(id)) {
+        String detail = reason.equals("blank-content") && "true".equals(batch.fields(id).get(SchemaFields.IS_CHUNK))
+            ? "blank-chunk-content" : reason;
+        terminalFailures.putIfAbsent(id, id + "(" + detail + ")");
+      }
     }
   }
 
@@ -403,11 +398,6 @@ public final class SpladeBackfillOps {
   private static void commitIfNeeded(
       BackfillContext context, int processed, int failed, int markedFailed) {
     if (processed > 0 || failed > 0) {
-      if (context.commitAfterBatch()) {
-        context
-            .commitOps()
-            .commitAndTrack(io.justsearch.adapters.lucene.runtime.CommitReason.BACKFILL_SPLADE);
-      }
       context
           .log()
           .info(
@@ -418,16 +408,13 @@ public final class SpladeBackfillOps {
     }
   }
 
-
-
   /**
    * The terminal SPLADE status a successful encode earns: {@code COMPLETED} when the weights will
    * actually materialise at least one posting, {@code COMPLETED_EMPTY} when they will not (null map,
    * empty map, or no strictly-positive weight — {@code FieldMapper.addFields} emits a
    * {@code FeatureField} only for {@code weight > 0}).
    *
-   * <p>Shared by every SPLADE write site (this class, {@link BgeM3BackfillOps}, {@link
-   * CombinedEnrichmentBackfillOps}) so the "did the encode produce anything?" question is answered
+   * <p>Shared by this lane and {@link BgeM3BackfillOps}, so the "did the encode produce anything?" question is answered
    * identically at all of them. Stamping COMPLETED here without postings is the data-less COMPLETED
    * the write-time status/artifact contract rejects (tempdoc 798) and the RMW reset lane would
    * otherwise heal back to PENDING forever.
@@ -446,9 +433,7 @@ public final class SpladeBackfillOps {
 
   /**
    * Pure computation of the retry-count/status update for a SPLADE failure — no I/O. Shared by
-   * snapshot-bound individual publication and the combined enrichment path
-   * (merges the result into its own single batched write), so the two stay in escalation-parity
-   * by construction (tempdoc 700).
+   * snapshot-bound sparse and BGE-M3 lane publication.
    *
    * @param currentRetryCount the doc's retry count *before* this failure
    * @return field updates: always {@code SPLADE_RETRY_COUNT}; additionally {@code
@@ -463,6 +448,5 @@ public final class SpladeBackfillOps {
     }
     return updates;
   }
-
 
 }
