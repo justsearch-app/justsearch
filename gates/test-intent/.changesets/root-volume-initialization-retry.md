@@ -22,7 +22,7 @@ not an independent verdict or a claim of Windows execution.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Real directories at the pending-ledger or ledger temporary write path prevent atomic persistence. Existing refusal boundaries must retry authorized declared-root initialization and configured-root enrollment after release, including a configured root outside watched roots. Repeated failures grant no identity. Partial publication, creation of unrelated explicit-file authority during failed initialization, same-owner retry, restart, sibling progress, removal overlapping evidence, configuration replacement, unreadable indexed evidence, empty and half-matching size/mtime samples, conflicting established authority, explicit-file-folder authority, unchanged completed authority timestamps and UUID-less limits remain covered. rootOnRecordedVolume remains read-only. These are service/ledger checks with injected volume lookup and mocked serving-index samples, not real-Engine boundary proof.",
+      "behaviour": "Real directories at the pending-ledger or ledger temporary write path prevent atomic persistence. Existing refusal boundaries must retry authorized declared-root initialization and configured-root enrollment after release, including a configured root outside watched roots. Repeated failures grant no identity. Partial publication, creation of unrelated explicit-file authority during failed initialization, same-owner retry, restart, sibling progress, removal overlapping evidence, configuration replacement, unreadable indexed evidence, empty and half-matching size/mtime samples, conflicting established authority, explicit-file-folder authority, unchanged completed authority timestamps and UUID-less limits remain covered. rootOnRecordedVolume remains read-only. These are service/ledger checks with injected volume lookup and mocked serving-index samples, not real-Engine boundary proof. Same-Engine root handover retains the original captured inputs, current membership/configuration, unfinished enrollment, evidence checks, explicit-file authority and pending cleanup; removal overlapping evidence and handover cannot resurrect the removed root.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -35,6 +35,30 @@ not an independent verdict or a claim of Windows execution.
       ],
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RootVolumeInitializationRetryTest.java"
+      ]
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/server/DefaultWorkerAppServicesProducerTransferTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Unfinished declared-root initialization and configured-only enrollment survive the existing selected deferred-writer, runtime-reload, native, serving and query producer handoffs after either pending-publication or ledger-creation failure. Repeated prepared/discarded candidates do not advance or lose the incumbent obligation. Original roots without native watches and unqueried siblings recover; unrelated later declarations do not gain boot-seeding authority. Current membership/configuration filter unfinished inputs; bound-empty and unbound initialization remain distinct. Completed identity-less initialization is not reenrolled or rewritten on same-Engine replacement. These are real constructor/ownership interfaces with mocked runtimes and injected volume identity, not running-Engine or hosted Windows proof.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "This handover covers the existing Windows CI repair, reconciliation and cleanup of merged E4c, and independent assessment of the already-built narrow P2b+c close.",
+          "delegationLocation": "task t-20261102-redesign user turn 1",
+          "delegationScope": "The reported Windows root-volume initialization write failure, recovery of its original accepted operation in the same Engine, and preservation of settled R1-R8 and RP1-RP4 refusal/authority cases only.",
+          "choice": "Share a small Engine-lifetime initialization state through existing producer preparation and ownership facilities; only the selected physical watcher owner may advance it. Exercise the existing deferred writer, stopped-loop reload, native-to-Green, serving and query successor constructor/installation interfaces without before-tree compatibility helpers. Keep successful and UUID-less completion, exact original boot inputs, current membership/configuration and discarded-candidate isolation.",
+          "label": "agent choice"
+        }
+      ],
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/server/DefaultWorkerAppServicesProducerTransferTest.java#unfinishedRootInitializationSurvivesSelectedProducerReplacement",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/server/DefaultWorkerAppServicesProducerTransferTest.java#uuidlessCompletionIsNotReenrolledByPreparedOrSelectedReplacement",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/server/DefaultWorkerAppServicesProducerTransferTest.java#replacementPreservesBoundEmptyVersusUnboundBootInputs",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/server/DefaultWorkerAppServicesProducerTransferTest.java#replacementUsesCurrentConfigurationAndMembershipForUnfinishedEnrollment"
       ]
     },
     {
@@ -137,13 +161,23 @@ An unchanged neighboring selftest currently fails its UNKNOWN/FAILED outcome cas
 hostile-lock-scenario.test.mjs:296 because it expects one search probe but observes zero.
 The same two failures reproduce on baseline 45cb5755de. The dedicated fixture builder owns those files; this candidate does not repair that check. The extra unchanged recovery-startup-budget.test.mjs run also timed out all four subprocess cases at their existing 60/90-second bounds (spawnSync ETIMEDOUT); no startup-budget pass is claimed.
 
-Open ownership limitation found by inspection: unfinished declared initialization currently belongs
-to the WorkerIngestService instance. KnowledgeServer.newAppServices can replace that instance;
-wireAppServicesPostConstruction seeds configured roots but does not transfer the failed declared
-initialization state. No producer-replacement recovery test has run and no handover change is
-included. The orchestrator must settle that case before claiming recovery for every replacement
-within one Engine lifetime. The previous pass returned needs-decision rather than expanding
-the state handover design; this fixture completion does not broaden that scope.
+The declared-initialization handoff is now carried by a private in-memory state object shared
+through the existing DefaultWorkerAppServices producer construction. The existing physical
+watcher close owner selects the only view allowed to advance it. The carrier holds only original
+boot paths, unfinished initialization and configured enrollment/completion lists; it holds no
+runtime/service reference and creates no persisted marker, format, scheduler or registry.
+Current Head membership and configured roots still govern each selected retry. An unpublished
+candidate can receive current configuration but cannot advance or consume the incumbent's work.
+Configured identity-less completion remains completed within this Engine; a new Engine retains
+the existing configured-root reenrollment exception.
+
+The added producer lifecycle cases and service handoff cases are durable regression checks.
+Their shared-clone before tree uses committed `a2dcdd8593` and exactly the changed test sources,
+with no production/helper-signature patch. The existing fixture and lock harness remain
+scaffolding; this completion changes no scripts and reruns neither classifier nor unrelated
+hostile-lock/startup-budget selftests. The neighboring hostile-lock UNKNOWN/FAILED selftests
+have since been fixed separately at `ba3bfa9ef8`; the earlier failures below are historical
+observations and are not current handoff blockers.
 
 Previously observed local results (unchanged worker-services checks, not re-run for this completion): RootVolumeInitializationRetryTest 15/15,
 RootVolumeUnknownIdentityTest 9/9, RootPresenceGuardTest 5 passed/2 Windows cases skipped,
@@ -177,5 +211,89 @@ Checks used private temporary SQLite resources, local CPU and the authorized sha
 and build-slot/admission locks. No shared stack, running app or GPU was used. Hosted Windows
 execution, Windows fail-before and independent verification remain pending; no evidence JSON or
 acceptance was authored.
+
+Same-Engine handoff completion (still the unfinished Windows round 2; no round-history reset):
+only WorkerIngestService, DefaultWorkerAppServices, the two durable test classes above and this
+changeset changed. Existing RootWatcherRegistry already supplies shared watch membership and removal handover;
+DefaultWorkerAppServices supplies producer ownership. No additional registry was needed. The carrier does not keep a stale runtime
+alive. The owner decision uses the existing selected watcher ownership, including for a borrowed
+query view. Rebinding current roots/configuration does not recapture arbitrary later boot inputs.
+
+Before evidence on committed `a2dcdd8593`, using a shared clone under the supplied TMPDIR and
+exact changed test sources with no production compatibility edits:
+
+```bash
+cd "$TMPDIR/before"
+env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew \
+  :modules:worker-services:test \
+  --tests '*DefaultWorkerAppServicesProducerTransferTest.unfinishedRootInitializationSurvivesSelectedProducerReplacement' \
+  --tests '*DefaultWorkerAppServicesProducerTransferTest.uuidlessCompletionIsNotReenrolledByPreparedOrSelectedReplacement' \
+  --tests '*DefaultWorkerAppServicesProducerTransferTest.replacementPreservesBoundEmptyVersusUnboundBootInputs' \
+  --tests '*DefaultWorkerAppServicesProducerTransferTest.replacementUsesCurrentConfigurationAndMembershipForUnfinishedEnrollment' \
+  --tests '*RootVolumeInitializationRetryTest.rootHandoverRetainsFailedBootInputsAndExplicitAuthority' \
+  --tests '*RootVolumeInitializationRetryTest.removalAcrossRootHandoverPreservesIndependentChildAndSibling' \
+  --tests '*RootVolumeInitializationRetryTest.handoverRetriesAllCapturedSiblingsUsingCurrentEvidenceAndAuthority' \
+  --tests '*RootVolumeInitializationRetryTest.recordedAuthorityBeforePendingCleanupFailureStaysCompletedAcrossHandover' \
+  -PskipWebBuild=true
+# Across these 20 new cases: 19 behavior assertions fail; unbound-input preservation passes.
+# Constructor/transfer compilation succeeds without any new production-method dependency.
+env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew \
+  :modules:worker-services:test \
+  --tests '*RootVolumeInitializationRetryTest.removalOverlappingEvidenceRetryWinsWithoutReenrollment' \
+  -PskipWebBuild=true
+# Preservation passes after observing removal through the successor registry, its current owner.
+```
+
+The before run with the new cases also included the overlap selector before its observation was
+corrected: that additional fixture assertion failed on the retired registry. The corrected
+preservation check was copied unchanged into the before clone and passed there. The first
+pending-cleanup fixture mistakenly tried to seed an already-completed root and did not produce
+its intended IOException; the corrected fixture creates pending state, persists authority, and
+fails cleanup on the real temporary write path. Its before failure then moved to the intended
+uncleaned-pending assertion. Neither setup failure is counted as fail-before evidence. PMD also
+identified two unused identity-scope names; those were corrected without suppressing the check.
+
+Final candidate command, run in this worktree:
+
+```bash
+env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew \
+  :modules:worker-services:test \
+  --tests '*RootVolumeInitializationRetryTest' \
+  --tests '*DefaultWorkerAppServicesProducerTransferTest' \
+  :modules:worker-services:pmdMain :modules:worker-services:pmdTest \
+  :modules:worker-services:spotlessJavaSourcesCheck \
+  :modules:app-launcher:test --tests '*UnreferencedCodeTest' -PskipWebBuild=true
+# BUILD SUCCESSFUL, 39 seconds.
+# RootVolumeInitializationRetryTest 20/20; ProducerTransferTest 56/56;
+# UnreferencedCodeTest 3/3; requested PMD and Spotless tasks executed successfully.
+```
+
+Additional scoped preservation/lifecycle checks in this handoff completion used:
+
+```bash
+env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot ./gradlew \
+  :modules:worker-services:test --tests '*RootVolumeInitializationRetryTest' \
+  --tests '*RootVolumeUnknownIdentityTest' --tests '*RootPresenceGuardTest' \
+  --tests '*RootWatcherRegistryTest' --tests '*DefaultWorkerAppServicesProducerTransferTest' \
+  :modules:indexer-worker:test --tests '*KnowledgeServerProducerOwnershipTest' \
+  --tests '*UpgradeRootVolumeSeedingTest' --tests '*NoVolumeIdentityRootTest' \
+  --tests '*RootVolumeCheckTest' --tests '*CommittedBootRootVolumeTest' -PskipWebBuild=true
+```
+
+That invocation failed solely on the first pending-cleanup fixture setup described above.
+Executed preservation results were RootVolumeUnknownIdentityTest 9/9, RootPresenceGuardTest
+5 passed/2 Windows skips, RootWatcherRegistryTest 9/9, KnowledgeServerProducerOwnershipTest 2/2,
+NoVolumeIdentityRootTest 1/1, and automatically included IndexerWorkerGuardrailsTest 6/6.
+UpgradeRootVolumeSeedingTest (3), RootVolumeCheckTest (1) and CommittedBootRootVolumeTest (1)
+were platform skips, not passes. The final 20/20 service run covers the corrected cleanup setup
+and the corrected handoff/removal overlap observation.
+
+No `.agents/preflight` exists. No scripts changed, so classifier rerun was unnecessary.
+No full candidate gate or real Windows lock execution was run. The dedicated Windows harness
+remains Incidental with pending hosted lock/fail-before proof. The orchestrator still owns the
+combined changed-module gate and independent verification. Checks used private checkout/build
+and temporary fixture resources, local CPU, shared authorized ~/.gradle and the Gradle slot locks;
+no shared dev stack, GPU, running owner app, main models or ~/.justsearch was touched.
+Acceptance remains empty; no evidence JSON was authored.
 
 ## Acceptance records

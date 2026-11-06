@@ -241,22 +241,24 @@ final class RootVolumeInitializationRetryTest {
       assertTrue(release.await(5, java.util.concurrent.TimeUnit.SECONDS));
       return new SearchResult(List.of(), 0L, 0L);
     }).when(reads).search(any(), anyInt(), anySet(), any(), isNull());
+    var successor = service();
     long mark = service.rootRemovalMark();
     try (var executor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
       var retry = executor.submit(() -> service.rootVolumeRefusal(root.toString(), CallContext.none()));
       assertTrue(entered.await(5, java.util.concurrent.TimeUnit.SECONDS));
+      service.handWatchedRootsTo(successor);
       var removal = executor.submit(() -> service.unwatchRoot(UnwatchRootRequest.newBuilder()
           .setRootPath(root.toString()).build(), CallContext.none()));
       long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
-      while (!service.rootRemovedSince(root, mark) && System.nanoTime() < deadline) {
+      while (!successor.rootRemovedSince(root, mark) && System.nanoTime() < deadline) {
         java.util.concurrent.locks.LockSupport.parkNanos(1_000_000L);
       }
-      assertTrue(service.rootRemovedSince(root, mark), "removal must overlap the held evidence check");
+      assertTrue(successor.rootRemovedSince(root, mark), "removal must overlap the held evidence check");
       release.countDown();
       retry.get(5, java.util.concurrent.TimeUnit.SECONDS);
       removal.get(5, java.util.concurrent.TimeUnit.SECONDS);
     } finally { release.countDown(); }
-    service.rootVolumeRefusal(root.toString(), CallContext.none());
+    successor.rootVolumeRefusal(root.toString(), CallContext.none());
     assertTrue(ledger().recorded(root).isEmpty());
     assertFalse(ledger().awaitsSeeding(root));
   }
@@ -324,6 +326,107 @@ final class RootVolumeInitializationRetryTest {
       assertFalse(ledger().awaitsSeeding(configured));
       assertTrue(ledger().recorded(configured).isEmpty());
     }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void rootHandoverRetainsFailedBootInputsAndExplicitAuthority(boolean boundEmpty) throws Exception {
+    Path root = root("boot-without-watch");
+    Path configured = root("configured");
+    Path explicit = root("explicit");
+    Path later = root("later");
+    var source = service();
+    if (boundEmpty) source.useExclusionRoots(List::of);
+    Path blocked = block(RootVolumeLedger.PENDING_FILE_NAME);
+    source.seedRootVolumesAfterUpgrade(List.of(root));
+    source.seedConfiguredRoots(List.of(configured));
+    String volume = RootIdentity.capture(explicit).volume();
+    ledger().recordFileFolder(explicit, volume);
+    var successor = service();
+    source.handWatchedRootsTo(successor);
+    // A later declaration is current membership only, never an original boot input.
+    if (!boundEmpty) successor.useExclusionRoots(() -> List.of(root, later));
+    Files.delete(blocked);
+    successor.retryRootVolumeSeeding();
+    assertEquals(!boundEmpty, successor.rootOnRecordedVolume(root.toString()));
+    assertTrue(successor.rootOnRecordedVolume(configured.toString()));
+    assertTrue(ledger().recorded(later).isEmpty());
+    assertEquals(volume, ledger().recordedFileFolder(explicit).orElseThrow());
+  }
+
+  @Test
+  void removalAcrossRootHandoverPreservesIndependentChildAndSibling() throws Exception {
+    Path parent = root("parent");
+    Path child = Files.createDirectory(parent.resolve("child"));
+    Path sibling = root("sibling");
+    var source = service();
+    Path blocked = block(RootVolumeLedger.PENDING_FILE_NAME);
+    source.seedRootVolumesAfterUpgrade(List.of(parent, child, sibling));
+    source.seedConfiguredRoots(List.of(parent, child));
+    var successor = service();
+    source.handWatchedRootsTo(successor);
+    source.unwatchRoot(UnwatchRootRequest.newBuilder().setRootPath(parent.toString()).build(),
+        CallContext.none());
+    Files.delete(blocked);
+    successor.retryRootVolumeSeeding();
+    assertTrue(ledger().recorded(parent).isEmpty());
+    assertFalse(ledger().awaitsSeeding(parent));
+    assertTrue(successor.rootOnRecordedVolume(child.toString()));
+    assertTrue(successor.rootOnRecordedVolume(sibling.toString()));
+  }
+
+  @Test
+  void handoverRetriesAllCapturedSiblingsUsingCurrentEvidenceAndAuthority() throws Exception {
+    Path missing = temp.resolve("missing");
+    Path unreadable = root("unreadable");
+    Path ancestor = root("ancestor");
+    Path conflict = Files.createDirectory(ancestor.resolve("child"));
+    Path eligible = root("eligible");
+    var source = service();
+    Path blocked = block(RootVolumeLedger.FILE_NAME);
+    source.seedRootVolumesAfterUpgrade(List.of(missing, unreadable, conflict, eligible));
+    Files.delete(blocked);
+    ledger().record(ancestor, "windows-volume:bad");
+    when(runtime.readPathOps().search(any(), anyInt(), anySet(), any(), isNull()))
+        .thenThrow(new IllegalStateException("unreadable index"));
+    var successor = service();
+    source.handWatchedRootsTo(successor);
+    successor.retryRootVolumeSeeding();
+    assertTrue(ledger().awaitsSeeding(missing));
+    assertTrue(ledger().awaitsSeeding(unreadable));
+    assertTrue(ledger().awaitsSeeding(conflict));
+    assertTrue(ledger().recorded(eligible).isEmpty());
+    sample(List.of());
+    successor.retryRootVolumeSeeding();
+    assertTrue(successor.rootOnRecordedVolume(eligible.toString()));
+    assertTrue(successor.rootOnRecordedVolume(unreadable.toString()));
+    assertTrue(ledger().awaitsSeeding(missing));
+    assertTrue(ledger().awaitsSeeding(conflict));
+    assertTrue(ledger().recorded(conflict).isEmpty());
+    assertEquals("windows-volume:bad", ledger().recorded(ancestor).orElseThrow());
+  }
+
+  @Test
+  void recordedAuthorityBeforePendingCleanupFailureStaysCompletedAcrossHandover() throws Exception {
+    Path root = root("root");
+    Path sibling = root("sibling");
+    var source = service();
+    Path initialBlock = block(RootVolumeLedger.PENDING_FILE_NAME);
+    source.seedRootVolumesAfterUpgrade(List.of(root, sibling));
+    Files.delete(initialBlock);
+    ledger().beginUpgradeSeeding(List.of(root, sibling));
+    ledger().record(sibling, RootIdentity.capture(sibling).volume());
+    Path blocked = block(RootVolumeLedger.PENDING_FILE_NAME);
+    assertThrows(IOException.class, () -> ledger().seeded(root, RootIdentity.capture(root).volume()));
+    byte[] authority = Files.readAllBytes(base.resolve(RootVolumeLedger.FILE_NAME));
+    var successor = service();
+    source.handWatchedRootsTo(successor);
+    Files.delete(blocked);
+    successor.retryRootVolumeSeeding();
+    assertFalse(ledger().awaitsSeeding(root));
+    assertTrue(successor.rootOnRecordedVolume(root.toString()));
+    assertTrue(successor.rootOnRecordedVolume(sibling.toString()));
+    assertArrayEquals(authority, Files.readAllBytes(base.resolve(RootVolumeLedger.FILE_NAME)));
   }
 
   private RootVolumeLedger ledger() { return RootVolumeLedger.under(base); }

@@ -140,9 +140,16 @@ public final class WorkerIngestService {
   private final IndexGenerationManager indexGenerationManager;
   /** Volume each root was first pruned from, kept across restarts (#758). */
   private final RootVolumeLedger rootVolumes;
-  private final Object rootVolumeSeedingLock = new Object();
-  private boolean rootVolumeInitializationPending;
-  private List<Path> configuredEnrollmentPending = List.of();
+  /** Engine-lifetime obligation shared only by views of the existing producer owner. */
+  private static final class RootVolumeInitialization {
+    private volatile List<Path> bootRoots = List.of();
+    private boolean pending;
+    private List<Path> configuredRoots = List.of();
+    private List<Path> configuredPending = List.of();
+  }
+  private RootVolumeInitialization rootVolumeInitialization = new RootVolumeInitialization();
+  private java.util.function.BooleanSupplier rootVolumeInitializationOwner = () -> true;
+
   /** #758: the root-identity check every deletion decision asks. */
   private final RootWitness rootWitness;
   private final boolean ingestIsServing;
@@ -1267,12 +1274,28 @@ public final class WorkerIngestService {
     }
   }
 
+  /** Prepared views borrow the obligation; only the selected producer may advance it. */
+  public void useRootVolumeInitializationFrom(WorkerIngestService source,
+      java.util.function.BooleanSupplier selected) {
+    rootVolumeInitialization = source.rootVolumeInitialization;
+    if (!configuredRecoveryRootsBound) {
+      configuredRecoveryRoots = source.configuredRecoveryRoots;
+      configuredRecoveryRootsBound = source.configuredRecoveryRootsBound;
+    }
+    if (!exclusionRootsBound && source.exclusionRootsBound) {
+      exclusionRoots = source.exclusionRoots;
+      exclusionRootsBound = true;
+    }
+    rootVolumeInitializationOwner = Objects.requireNonNull(selected, "selected");
+  }
+
   /**
    * A closing reload's successor takes over every root this service watched or held for its
    * volume, so the reload leaves the watch list as it was; removed roots stay removed.
    */
   public void handWatchedRootsTo(WorkerIngestService successor) {
     try (var ignoredMutation = successor.mutationLease()) {
+      successor.useRootVolumeInitializationFrom(this, successor.rootVolumeInitializationOwner);
       rootWatcherRegistry.handOverTo(successor.rootWatcherRegistry, (registry, root, collection) ->
           successor.rootOnAnotherVolume(root.toString()) != null
               ? registry.watchWhenVolumeReturns(root, collection)
@@ -1389,13 +1412,14 @@ public final class WorkerIngestService {
     for (Path root : declared) {
       roots.add(root.toAbsolutePath().normalize());
     }
-    synchronized (rootVolumeSeedingLock) {
-      bootExclusionRoots = List.copyOf(roots);
+    synchronized (rootVolumeInitialization) {
+      if (!rootVolumeInitializationOwner.getAsBoolean()) return;
+      rootVolumeInitialization.bootRoots = List.copyOf(roots);
       try {
         rootVolumes.beginUpgradeSeeding(currentBootSeedingRoots());
-        rootVolumeInitializationPending = false;
+        rootVolumeInitialization.pending = false;
       } catch (IOException notStarted) {
-        rootVolumeInitializationPending = true;
+        rootVolumeInitialization.pending = true;
         log.warn("Upgrade seeding of root volumes could not start; roots stay unconfirmed ({})",
             notStarted.getMessage());
         return;
@@ -1406,17 +1430,17 @@ public final class WorkerIngestService {
 
   /** Configured roots use the same one-time evidence rule, including roots outside watches. */
   public void seedConfiguredRoots(java.util.Collection<Path> configured) {
-    synchronized (rootVolumeSeedingLock) {
+    synchronized (rootVolumeInitialization) {
+      configuredRecoveryRootsBound = true;
       configuredRecoveryRoots = configured.stream().filter(Objects::nonNull)
           .map(root -> root.toAbsolutePath().normalize()).distinct().toList();
-      configuredEnrollmentPending = List.copyOf(configuredRecoveryRoots);
       retryRootVolumeSeeding();
     }
   }
 
   /** Retry unfinished boot work through the existing periodic recovery producer. */
   public void retryRootVolumeSeeding() {
-    synchronized (rootVolumeSeedingLock) {
+    synchronized (rootVolumeInitialization) {
       if (!retryRootVolumeEnrollment()) return;
       for (Path root : currentBootSeedingRoots()) seedPendingRootVolume(root);
       for (Path root : configuredRecoveryRoots) seedPendingRootVolume(root);
@@ -1426,11 +1450,19 @@ public final class WorkerIngestService {
   private List<Path> currentBootSeedingRoots() {
     var current = exclusionRoots.get().stream()
         .map(root -> root.toAbsolutePath().normalize()).toList();
-    return bootExclusionRoots.stream().filter(current::contains).toList();
+    return rootVolumeInitialization.bootRoots.stream().filter(current::contains).toList();
   }
 
   private boolean retryRootVolumeEnrollment() {
-    if (rootVolumeInitializationPending) {
+    if (!rootVolumeInitializationOwner.getAsBoolean()) return false;
+    var configured = new ArrayList<>(rootVolumeInitialization.configuredPending.stream()
+        .filter(configuredRecoveryRoots::contains).toList());
+    for (Path root : configuredRecoveryRoots) {
+      if (!rootVolumeInitialization.configuredRoots.contains(root)) configured.add(root);
+    }
+    rootVolumeInitialization.configuredRoots = List.copyOf(configuredRecoveryRoots);
+    rootVolumeInitialization.configuredPending = List.copyOf(configured);
+    if (rootVolumeInitialization.pending) {
       try {
         var roots = currentBootSeedingRoots();
         if (!rootVolumes.beginUpgradeSeeding(roots)) {
@@ -1438,17 +1470,17 @@ public final class WorkerIngestService {
           // Only the still-unrecorded captured startup inputs need enrollment in that case.
           rootVolumes.awaitSeedingUnlessRecorded(roots);
         }
-        rootVolumeInitializationPending = false;
+        rootVolumeInitialization.pending = false;
       } catch (IOException notStarted) {
         log.warn("Upgrade seeding of root volumes could not start; roots stay unconfirmed ({})",
             notStarted.getMessage());
         return false;
       }
     }
-    if (!configuredEnrollmentPending.isEmpty()) {
+    if (!rootVolumeInitialization.configuredPending.isEmpty()) {
       try {
-        var awaiting = rootVolumes.awaitSeedingUnlessRecorded(configuredEnrollmentPending);
-        configuredEnrollmentPending = List.of();
+        var awaiting = rootVolumes.awaitSeedingUnlessRecorded(rootVolumeInitialization.configuredPending);
+        rootVolumeInitialization.configuredPending = List.of();
         for (Path root : awaiting) seedPendingRootVolume(root);
       } catch (IOException notStarted) {
         log.warn("Seeding of configured collection roots could not start; they stay unconfirmed ({})",
@@ -1459,7 +1491,7 @@ public final class WorkerIngestService {
   }
 
   private void seedRootAfterUpgrade(Path root) {
-    synchronized (rootVolumeSeedingLock) {
+    synchronized (rootVolumeInitialization) {
       if (retryRootVolumeEnrollment()) seedPendingRootVolume(root);
     }
   }
@@ -2024,9 +2056,10 @@ public final class WorkerIngestService {
     }
   }
 
-  private volatile java.util.Collection<Path> bootExclusionRoots = List.of();
   private volatile java.util.Collection<Path> configuredRecoveryRoots = List.of();
-  private volatile Supplier<java.util.Collection<Path>> exclusionRoots = () -> bootExclusionRoots;
+  private boolean configuredRecoveryRootsBound;
+  private boolean exclusionRootsBound;
+  private volatile Supplier<java.util.Collection<Path>> exclusionRoots = () -> rootVolumeInitialization.bootRoots;
 
   /**
    * The composing owner binds its current file policy and Head-owned watched membership before
@@ -2035,6 +2068,7 @@ public final class WorkerIngestService {
    */
   public void useExclusionRoots(Supplier<java.util.Collection<Path>> roots) {
     exclusionRoots = Objects.requireNonNull(roots, "roots");
+    exclusionRootsBound = true;
     if (ingestLifecycle != null) {
       ingestLifecycle.useSourceProcessingPolicy(this::sourceProcessingAllowed);
     }
@@ -4890,10 +4924,12 @@ public final class WorkerIngestService {
     }
     boolean removed = rootWatcherRegistry.unwatch(rootPath);
     Path removedRoot = Path.of(rootPath).toAbsolutePath().normalize();
-    synchronized (rootVolumeSeedingLock) {
-      bootExclusionRoots = bootExclusionRoots.stream().filter(root -> !root.equals(removedRoot)).toList();
+    synchronized (rootVolumeInitialization) {
+      rootVolumeInitialization.bootRoots = rootVolumeInitialization.bootRoots.stream()
+          .filter(root -> !root.equals(removedRoot)).toList();
       configuredRecoveryRoots = configuredRecoveryRoots.stream().filter(root -> !root.equals(removedRoot)).toList();
-      configuredEnrollmentPending = configuredEnrollmentPending.stream().filter(root -> !root.equals(removedRoot)).toList();
+      rootVolumeInitialization.configuredPending = rootVolumeInitialization.configuredPending.stream()
+          .filter(root -> !root.equals(removedRoot)).toList();
       forgetRemovedRoot(rootPath);
     }
     if (jobQueue instanceof SwitchBufferCapableQueue journal) {

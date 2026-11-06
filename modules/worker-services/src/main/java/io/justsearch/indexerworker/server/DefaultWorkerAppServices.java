@@ -822,6 +822,9 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       this.rootWatcherRegistry = nativeSource.rootWatcherRegistry;
     }
     this.ingestService.setRootWatcherRegistry(rootWatcherRegistry);
+    this.ingestService.useRootVolumeInitializationFrom(
+        nativeSource == null ? this.ingestService : nativeSource.ingestService,
+        producerOwnership::ownsWatcher);
     if (nativeSource == null) {
       workerWatcher.startRootRecovery(executors.watcherReturnPoll(), executors.watcherReturn(),
           watcherCallbacks::recoveryRoots, watcherCallbacks::recoverRoot);
@@ -1023,6 +1026,8 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     healthService.setQueryEncodersWarm(searchService::queryEncodersWarm);
     healthService.shareQueryReadiness(incumbent.healthService.queryReadiness());
     ingestService.setRootWatcherRegistry(rootWatcherRegistry);
+    ingestService.useRootVolumeInitializationFrom(incumbent.ingestService,
+        producerOwnership::ownsWatcher);
 
     var lifecycle = indexingLoop.getEmbeddingLifecycle();
     var ecc = lifecycle.embeddingCompatController();
