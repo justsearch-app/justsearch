@@ -1,7 +1,7 @@
 // GENERATED FILE — DO NOT EDIT.
 // Source: scripts/dev/justsearch-dev-mcp/runtime-entry.mjs
 // Regenerate: node scripts/dev/generate-dev-mcp-runtime.mjs
-// Locked inputs: @modelcontextprotocol/sdk@1.32.1, zod@4.6.7, esbuild@0.28.2
+// Locked inputs: @modelcontextprotocol/sdk@1.32.2, zod@4.6.7, esbuild@0.28.2
 var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -36023,6 +36023,15 @@ var McpServer = class {
     this._promptHandlersInitialized = false;
     this.server = new Server(serverInfo, options);
     this._maxToolInputElements = resolveMaxToolInputElements(options?.maxToolInputElements);
+    if (options?.capabilities?.tools) {
+      this.setToolRequestHandlers();
+    }
+    if (options?.capabilities?.resources) {
+      this.setResourceRequestHandlers();
+    }
+    if (options?.capabilities?.prompts) {
+      this.setPromptRequestHandlers();
+    }
   }
   /**
    * Access experimental features.
