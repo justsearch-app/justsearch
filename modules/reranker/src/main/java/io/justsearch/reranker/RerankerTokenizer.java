@@ -127,13 +127,20 @@ public final class RerankerTokenizer implements Closeable {
     if ("BertProcessing".equals(type.getAsString()) || "RobertaProcessing".equals(type.getAsString())) {
       return true;
     }
-    if (!"TemplateProcessing".equals(type.getAsString())
-        || !processor.has("pair") || !processor.get("pair").isJsonArray()) {
+    if (!"TemplateProcessing".equals(type.getAsString())) {
+      return false;
+    }
+    return hasQueryPolicySequences(processor.get("single"), 0)
+        && hasQueryPolicySequences(processor.get("pair"), 1);
+  }
+
+  private static boolean hasQueryPolicySequences(JsonElement template, int expectedDocuments) {
+    if (template == null || !template.isJsonArray()) {
       return false;
     }
     int a = 0;
     int b = 0;
-    for (JsonElement item : processor.getAsJsonArray("pair")) {
+    for (JsonElement item : template.getAsJsonArray()) {
       if (!item.isJsonObject() || item.getAsJsonObject().size() != 1) {
         return false;
       }
@@ -154,7 +161,7 @@ public final class RerankerTokenizer implements Closeable {
         return false;
       }
     }
-    return a == 1 && b == 1;
+    return a == 1 && b == expectedDocuments;
   }
 
   /**

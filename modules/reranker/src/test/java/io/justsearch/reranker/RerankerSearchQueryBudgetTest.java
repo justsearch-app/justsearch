@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import ai.djl.huggingface.tokenizers.HuggingFaceTokenizer;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import java.nio.file.Files;
@@ -76,6 +77,79 @@ final class RerankerSearchQueryBudgetTest {
       assertEquals(16, tokenizer.encodePairs(words(20), new String[] {"a"}).seqLength());
       assertThrows(RerankerTokenizer.PairTooLongException.class,
           () -> tokenizer.encodePairsStrict(words(20), new String[] {"a"}));
+    }
+  }
+
+  @Test
+  void repeatedSingleQueryFallsBackWithoutChangingPairsOrStrictCitationRefusal() throws Exception {
+    Path file = fixture(64, 4, 0);
+    try (var ordinary = new RerankerTokenizer(file, 32)) {
+      assertEquals(8, java.util.Arrays.stream(active(ordinary).encode(words(8), false, false).getAttentionMask()).sum());
+      assertFalse(ordinary.exceedsSearchQueryBudget(words(14)));
+      assertTrue(ordinary.exceedsSearchQueryBudget(words(15)));
+    }
+    var json = JsonParser.parseString(Files.readString(file)).getAsJsonObject();
+    var single = json.getAsJsonObject("post_processor").getAsJsonArray("single");
+    single.add(single.get(1).deepCopy());
+    Files.writeString(file, json.toString());
+    try (var tokenizer = new RerankerTokenizer(file, 32)) {
+      var nativeOwner = active(tokenizer);
+      assertEquals(16, java.util.Arrays.stream(nativeOwner.encode(words(8), false, false).getAttentionMask()).sum(),
+          "native single encoding repeats A even without automatic special tokens");
+      var pair = nativeOwner.encode(words(8), "a", true, false);
+      assertEquals(13, java.util.Arrays.stream(pair.getAttentionMask()).sum(),
+          "the actual pair still contains eight query tokens, one document token and four specials");
+      var before = tokenizer.encodePairs(words(8), new String[] {"a"});
+      assertThrows(RerankerTokenizer.PairTooLongException.class,
+          () -> tokenizer.encodePairsStrict(words(40), new String[] {"a"}));
+      assertFalse(tokenizer.exceedsSearchQueryBudget(words(8)),
+          "a repeated single sequence cannot justify QUERY_TOO_LONG for an eight-token query");
+      assertFalse(tokenizer.exceedsSearchQueryBudget(words(40)), "unsupported metadata keeps ordinary CE even for a long query");
+      var after = tokenizer.encodePairsStrict(words(8), new String[] {"a"});
+      assertArrayEquals(before.inputIds()[0], after.inputIds()[0]);
+      assertArrayEquals(before.attentionMask()[0], after.attentionMask()[0]);
+      assertArrayEquals(before.tokenTypeIds()[0], after.tokenTypeIds()[0]);
+      assertThrows(RerankerTokenizer.PairTooLongException.class,
+          () -> tokenizer.encodePairsStrict(words(40), new String[] {"a"}));
+    }
+  }
+
+  @Test
+  void omittedSingleQueryPreservesOrdinaryPairEncodingAndStrictCitationRefusal() throws Exception {
+    Path file = fixture(64, 4, 0);
+    var json = JsonParser.parseString(Files.readString(file)).getAsJsonObject();
+    json.getAsJsonObject("post_processor").getAsJsonArray("single").remove(1);
+    Files.writeString(file, json.toString());
+    try (var tokenizer = new RerankerTokenizer(file, 32)) {
+      assertEquals(0, java.util.Arrays.stream(active(tokenizer).encode(words(40), false, false).getAttentionMask()).sum(),
+          "native accepts a single template that omits the input");
+      var before = tokenizer.encodePairsStrict(words(8), new String[] {"a"});
+      assertFalse(tokenizer.exceedsSearchQueryBudget(words(40)));
+      var after = tokenizer.encodePairsStrict(words(8), new String[] {"a"});
+      assertArrayEquals(before.inputIds()[0], after.inputIds()[0]);
+      assertArrayEquals(before.attentionMask()[0], after.attentionMask()[0]);
+      assertArrayEquals(before.tokenTypeIds()[0], after.tokenTypeIds()[0]);
+      assertThrows(RerankerTokenizer.PairTooLongException.class,
+          () -> tokenizer.encodePairsStrict(words(40), new String[] {"a"}));
+    }
+  }
+
+  @Test
+  void missingMalformedAndOtherSingleSequencesNeverEnableQueryPolicy() throws Exception {
+    var processor = JsonParser.parseString(Files.readString(fixture(32, 4, 0)))
+        .getAsJsonObject().getAsJsonObject("post_processor");
+    var supports = RerankerTokenizer.class.getDeclaredMethod("supportsQueryPolicyTemplate", JsonElement.class);
+    supports.setAccessible(true);
+    assertTrue((boolean) supports.invoke(null, processor), "ordinary single and pair templates remain supported");
+    processor.remove("single");
+    assertFalse((boolean) supports.invoke(null, processor), "missing single metadata is unsupported");
+    for (String single : new String[] {"null", "{}", "\"A\"", "[]",
+        "[{\"Sequence\":null}]", "[{\"Sequence\":{\"id\":7}}]",
+        "[{\"Sequence\":{\"id\":\"B\"}}]", "[{\"Sequence\":{\"id\":\"C\"}}]",
+        "[{\"Sequence\":{\"id\":\"A\"}},{\"Sequence\":{\"id\":\"A\"}}]",
+        "[{\"Sequence\":{\"id\":\"A\"},\"SpecialToken\":{}}]"}) {
+      processor.add("single", JsonParser.parseString(single));
+      assertFalse((boolean) supports.invoke(null, processor), "unsupported single metadata: " + single);
     }
   }
 
