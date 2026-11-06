@@ -1379,3 +1379,14 @@ The brief's adopted scenarios are quoted below; choices the scenarios leave open
   "note": "Acceptance by independent verifier session verifier-s2x-acc4 (Codex): accept, no must-fix. Transcribed by the orchestrator."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-s2x-acc5",
+  "verdict": "accept",
+  "digest": "sha256:cc5f7f418bb12c3332d31b27e7ec0d1416163992ddccd34f56e78e3037ec87cc",
+  "note": "Acceptance by independent verifier session verifier-s2x-acc5 (Codex): accept, no must-fix. Transcribed by the orchestrator."
+}
+```
