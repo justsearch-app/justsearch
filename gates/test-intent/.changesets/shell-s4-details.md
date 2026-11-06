@@ -1620,3 +1620,14 @@ existing expectation changed only in the three places the Obsolete entry names.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-e98ofqb0",
+  "verdict": "accept",
+  "digest": "sha256:b968249e807576dd98326b55637224da5a49edef6e66e3d4b67a6b741d22d758",
+  "note": "Round 3 on e0b402cdc1: entries and evidence hold; 9347 unit tests, 68 Chromium tests, 110 axe surfaces pass. Earlier rounds accepted earlier digests (01a1af73-8c14-74f1-8b9b-1b46333aff65, mfmse3gc-verifier) while product repairs proceeded. Transcribed by the orchestrator from the verifier's answer (Codex sandbox)."
+}
+```
