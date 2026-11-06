@@ -34,7 +34,7 @@
 
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
-import { deepActiveElement } from '../utils/keyboardHandler.js';
+import { deepActiveElement, shouldIgnoreKeyEvent } from '../utils/keyboardHandler.js';
 import { operationConsequence } from './operationConsequence.js';
 import './ConfirmBand.js';
 
@@ -69,7 +69,11 @@ export class ActionButton extends JfElement {
     typedConfirm: { state: true },
   } as const;
 
-  private returnFocusAfterInvoke = false;
+  private pendingFocus: {
+    opener: HTMLButtonElement;
+    operationId: string;
+    stop: () => void;
+  } | null = null;
 
   declare operationId: string;
   declare label: string;
@@ -222,7 +226,14 @@ export class ActionButton extends JfElement {
     if (this.disabled || this.pending) {
       return;
     }
-    this.returnFocusAfterInvoke = this.confirmStage === 'awaiting-confirm';
+    this.releasePendingFocus();
+    if (this.confirmStage === 'awaiting-confirm') {
+      const opener = this.shadowRoot?.querySelector<HTMLButtonElement>('button.invoke');
+      if (opener) {
+        this.pendingFocus = { opener, operationId: this.operationId, stop: () => {} };
+        this.watchPendingFocus();
+      }
+    }
     this.dispatchEvent(
       new CustomEvent<ActionInvokeEventDetail>('action-invoke', {
         detail: { operationId: this.operationId, risk: this.risk },
@@ -234,14 +245,91 @@ export class ActionButton extends JfElement {
     this.typedConfirm = '';
   };
 
-  protected override updated(): void {
-    if (!this.returnFocusAfterInvoke || this.pending) return;
-    this.returnFocusAfterInvoke = false;
-    // The band closes on invocation; the opener may stay disabled until the host finishes.
-    // Restore it once enabled, unless the person has already moved to another control.
-    if (deepActiveElement() === this.ownerDocument.body) {
-      this.shadowRoot?.querySelector<HTMLButtonElement>('button.invoke')?.focus({ preventScroll: true });
+  override connectedCallback(): void {
+    super.connectedCallback();
+    // A keyed move can disconnect and reconnect this exact action in the same turn.
+    if (this.pendingFocus) this.watchPendingFocus();
+  }
+
+  override disconnectedCallback(): void {
+    this.pendingFocus?.stop();
+    const claim = this.pendingFocus;
+    queueMicrotask(() => {
+      if (!this.isConnected && this.pendingFocus === claim) this.releasePendingFocus();
+    });
+    super.disconnectedCallback();
+  }
+
+  private releasePendingFocus(): void {
+    this.pendingFocus?.stop();
+    this.pendingFocus = null;
+  }
+
+  /** Visibility and inertness must also hold through the opener's enclosing shadow hosts. */
+  private openerAvailable(opener: HTMLButtonElement): boolean {
+    if (!opener.isConnected || !opener.getClientRects().length) return false;
+    for (let node: Node | null = opener; node;
+      node = node.parentNode ?? (node instanceof ShadowRoot ? node.host : null)) {
+      if (node instanceof HTMLElement && (node.inert || node.hidden)) return false;
     }
+    return true;
+  }
+
+  private watchPendingFocus(): void {
+    const claim = this.pendingFocus;
+    if (!claim) return;
+    claim.stop();
+    const doc = this.ownerDocument;
+    const listeners = new AbortController();
+    const options = { capture: true, signal: listeners.signal };
+    const release = () => { if (this.pendingFocus === claim) this.releasePendingFocus(); };
+    // FocusKeeper may focus a neighbour while the opener is disabled. Only subsequent input
+    // relinquishes this invocation's claim; that automatic fallback is not a person's choice.
+    doc.addEventListener('pointerdown', release, options);
+    doc.addEventListener('keydown', event => {
+      if (event.repeat && (event.key === 'Enter' || event.key === ' ')) {
+        // The confirmation key can still be held when a fallback control receives focus.
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+      if (shouldIgnoreKeyEvent(event)) return;
+      if (event.key === 'Tab') { release(); return; }
+      const before = deepActiveElement(doc);
+      queueMicrotask(() => {
+        const after = deepActiveElement(doc);
+        if (after !== before && after !== doc.body) release();
+      });
+    }, options);
+    doc.addEventListener('focusin', event => {
+      if (event.composedPath().some(node => node instanceof HTMLElement
+        && node.localName === 'jf-confirm-band' && node.getRootNode() !== this.shadowRoot)) release();
+    }, options);
+    doc.defaultView?.addEventListener('blur', event => {
+      if (event.target === doc.defaultView) release();
+    }, options);
+    doc.addEventListener('visibilitychange', () => { if (doc.hidden) release(); }, options);
+    const watcher = new MutationObserver(() => {
+      if (!this.openerAvailable(claim.opener)) release();
+    });
+    for (let node: Node | null = this; node;
+      node = node.parentNode ?? (node instanceof ShadowRoot ? node.host : null)) {
+      if (node instanceof HTMLElement) watcher.observe(node, { attributes: true });
+    }
+    claim.stop = () => { listeners.abort(); watcher.disconnect(); };
+  }
+
+  protected override updated(): void {
+    const claim = this.pendingFocus;
+    if (!claim) return;
+    if (claim.operationId !== this.operationId || this.disabled || !this.openerAvailable(claim.opener)) {
+      this.releasePendingFocus();
+      return;
+    }
+    if (this.pending) return;
+    this.releasePendingFocus();
+    // Settlement returns to this same surviving opener even if a list controller filled the gap.
+    if (this.ownerDocument.hasFocus() && !claim.opener.disabled) claim.opener.focus({ preventScroll: true });
   }
 
   private readonly cancelConfirm = (): void => {
