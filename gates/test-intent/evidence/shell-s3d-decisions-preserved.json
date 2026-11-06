@@ -1,0 +1,391 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-06T00:14:33.540Z",
+  "revision": "29028ddad845388a17dfbe03783760a67e08c55a",
+  "tree": "8dd05c34987ea0fed1a9764420ed00afe10d3e6f",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"notices::tests::a_click_carries_the_activation_token_sent_before_it\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3408
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"notices::tests::a_click_from_a_server_without_tokens_has_none_so_the_window_asks_for_attention\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1793
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"notices::tests::signals_about_another_notification_are_not_this_click\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1815
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"notices::tests::closing_or_another_action_is_not_a_click\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1844
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"notices::tests::the_notification_asks_for_the_platform_sound_only_with_sound_on\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1765
+    },
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/StatusPill.notices.test.ts\" \"src/shell-v0/state/UserStateDocument.multiWindow.test.ts\" \"src/utils/windowFocusChange.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/hbp47hca/tmp/test-intent-vitest-19393-1793924071818.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1720
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 work ending across a gap in observation a poll that lagged while contact held is not a gap, so the end still notifies",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:96cbfd84999a77aaee67a0129fbabb1f8883223f4fc20f0607b8bf40496a2707",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C6 work ending across a gap in observation a poll that lagged while contact held is not a gap, so the end still notifies",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 work ending across a gap in observation work seen active again after the gap ends live, so it notifies",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:96cbfd84999a77aaee67a0129fbabb1f8883223f4fc20f0607b8bf40496a2707",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C6 work ending across a gap in observation work seen active again after the gap ends live, so it notifies",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 work ending across a gap in observation an install seen active again after the gap ends live, so it notifies",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:96cbfd84999a77aaee67a0129fbabb1f8883223f4fc20f0607b8bf40496a2707",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C6 work ending across a gap in observation an install seen active again after the gap ends live, so it notifies",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 work ending across a gap in observation an operation seen running again after the gap ends live, so it notifies",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:96cbfd84999a77aaee67a0129fbabb1f8883223f4fc20f0607b8bf40496a2707",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C6 work ending across a gap in observation an operation seen running again after the gap ends live, so it notifies",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 a write from one window keeps writing what it chose over the same field from earlier",
+      "file": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3f6b438c0756161cb0daa96850c2dd6d796d9f00c771d02120824a69f74f2559",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C11 a write from one window keeps writing what it chose over the same field from earlier",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 profiles across windows switching profile in the first window then takes over the stored choice",
+      "file": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3f6b438c0756161cb0daa96850c2dd6d796d9f00c771d02120824a69f74f2559",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C11 profiles across windows switching profile in the first window then takes over the stored choice",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 profiles across windows deleting the profile another window chose does not leave storage pointing at it",
+      "file": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3f6b438c0756161cb0daa96850c2dd6d796d9f00c771d02120824a69f74f2559",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C11 profiles across windows deleting the profile another window chose does not leave storage pointing at it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 what the re-read leaves alone one window alone keeps a session-only edit whose save failed (F10)",
+      "file": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3f6b438c0756161cb0daa96850c2dd6d796d9f00c771d02120824a69f74f2559",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C11 what the re-read leaves alone one window alone keeps a session-only edit whose save failed (F10)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 what the re-read leaves alone a stored document from a newer build is not adopted (F9)",
+      "file": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3f6b438c0756161cb0daa96850c2dd6d796d9f00c771d02120824a69f74f2559",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C11 what the re-read leaves alone a stored document from a newer build is not adopted (F9)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 what the re-read leaves alone the stored format is unchanged: the same version and fields as before",
+      "file": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3f6b438c0756161cb0daa96850c2dd6d796d9f00c771d02120824a69f74f2559",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C11 what the re-read leaves alone the stored format is unchanged: the same version and fields as before",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/utils/windowFocusChange.test.ts#DE5 onWindowFocusChange reports focus, until stopped",
+      "file": "modules/ui-web/src/utils/windowFocusChange.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c86b5d8ead81fb3db16408549e290b87609c8beddfabe0b91923ef27d9907f8b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 onWindowFocusChange reports focus, until stopped",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/utils/windowFocusChange.test.ts#DE5 onWindowFocusChange reports blur, until stopped",
+      "file": "modules/ui-web/src/utils/windowFocusChange.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c86b5d8ead81fb3db16408549e290b87609c8beddfabe0b91923ef27d9907f8b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 onWindowFocusChange reports blur, until stopped",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/utils/windowFocusChange.test.ts#DE5 onWindowFocusChange reports visibilitychange, until stopped",
+      "file": "modules/ui-web/src/utils/windowFocusChange.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c86b5d8ead81fb3db16408549e290b87609c8beddfabe0b91923ef27d9907f8b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 onWindowFocusChange reports visibilitychange, until stopped",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/utils/windowFocusChange.test.ts#DE5 onWindowFocusChange inside the shell also reports the native signal, and stopping removes it",
+      "file": "modules/ui-web/src/utils/windowFocusChange.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c86b5d8ead81fb3db16408549e290b87609c8beddfabe0b91923ef27d9907f8b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 onWindowFocusChange inside the shell also reports the native signal, and stopping removes it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/utils/windowFocusChange.test.ts#DE5 onWindowFocusChange C10 stopping before the native subscription lands still removes it",
+      "file": "modules/ui-web/src/utils/windowFocusChange.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c86b5d8ead81fb3db16408549e290b87609c8beddfabe0b91923ef27d9907f8b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 onWindowFocusChange C10 stopping before the native subscription lands still removes it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/utils/windowFocusChange.test.ts#DE5 onWindowFocusChange outside the shell asks for no native signal",
+      "file": "modules/ui-web/src/utils/windowFocusChange.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c86b5d8ead81fb3db16408549e290b87609c8beddfabe0b91923ef27d9907f8b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 onWindowFocusChange outside the shell asks for no native signal",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 an agent request C10 a remount watches focus once: the old watch is stopped",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:96cbfd84999a77aaee67a0129fbabb1f8883223f4fc20f0607b8bf40496a2707",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 an agent request C10 a remount watches focus once: the old watch is stopped",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/notices.rs#notices::tests::a_click_carries_the_activation_token_sent_before_it",
+      "file": "modules/shell/src-tauri/src/notices.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:86f7ff38ecf60160f70529d810754ceaa7ce12df904ec63e04c096b6d54a71d1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "notices::tests::a_click_carries_the_activation_token_sent_before_it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/notices.rs#notices::tests::a_click_from_a_server_without_tokens_has_none_so_the_window_asks_for_attention",
+      "file": "modules/shell/src-tauri/src/notices.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:86f7ff38ecf60160f70529d810754ceaa7ce12df904ec63e04c096b6d54a71d1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "notices::tests::a_click_from_a_server_without_tokens_has_none_so_the_window_asks_for_attention",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/notices.rs#notices::tests::signals_about_another_notification_are_not_this_click",
+      "file": "modules/shell/src-tauri/src/notices.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:86f7ff38ecf60160f70529d810754ceaa7ce12df904ec63e04c096b6d54a71d1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "notices::tests::signals_about_another_notification_are_not_this_click",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/notices.rs#notices::tests::closing_or_another_action_is_not_a_click",
+      "file": "modules/shell/src-tauri/src/notices.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:86f7ff38ecf60160f70529d810754ceaa7ce12df904ec63e04c096b6d54a71d1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "notices::tests::closing_or_another_action_is_not_a_click",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/notices.rs#notices::tests::the_notification_asks_for_the_platform_sound_only_with_sound_on",
+      "file": "modules/shell/src-tauri/src/notices.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:86f7ff38ecf60160f70529d810754ceaa7ce12df904ec63e04c096b6d54a71d1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "notices::tests::the_notification_asks_for_the_platform_sound_only_with_sound_on",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:84d272d79da6bd152a1415cbdb5d561e31e2afc499753f7cf634e272e3ba65bb"
+}

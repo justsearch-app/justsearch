@@ -234,8 +234,14 @@ pub(crate) fn initialize(app: &tauri::AppHandle) {
     state.status.revision += 1;
 }
 
-/// Keep valid saved geometry; recover only a window wholly outside every connected monitor.
 pub(crate) fn foreground(app: &tauri::AppHandle) {
+    foreground_with_token(app, None);
+}
+
+/// Keep valid saved geometry; recover only a window wholly outside every connected monitor.
+/// `activation_token` is the desktop's permission to take focus, handed over with a click elsewhere.
+#[cfg_attr(not(target_os = "linux"), allow(unused_variables))]
+pub(crate) fn foreground_with_token(app: &tauri::AppHandle, activation_token: Option<String>) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
         let _ = window.unminimize();
@@ -274,6 +280,9 @@ pub(crate) fn foreground(app: &tauri::AppHandle) {
                 #[cfg(target_os = "linux")]
                 if let Ok(native) = window.gtk_window() {
                     use gtk::prelude::{GtkWindowExt, WidgetExt};
+                    if let Some(token) = &activation_token {
+                        crate::notices::use_activation_token(&native, token);
+                    }
                     native.present_with_time(0);
                     // On the first map GTK's present may only show the widget.
                     // Ask GDK explicitly so X11 receives _NET_ACTIVE_WINDOW too.

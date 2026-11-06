@@ -4,13 +4,13 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-05T22:25:59.958Z",
-  "revision": "32149108492c1f93c6d9227774ef49a975b44390",
-  "tree": "06686f7986b2382239822348bbd601a58e0caf14",
+  "createdAt": "2026-11-06T00:14:58.323Z",
+  "revision": "29028ddad845388a17dfbe03783760a67e08c55a",
+  "tree": "1e1c43ee1ffe584a5035b24b31afc8403ae5662c",
   "environment": {
     "platform": "linux",
     "arch": "x64",
-    "osRelease": "7.0.0-38-generic",
+    "osRelease": "7.0.0-42-generic",
     "node": "v24.22.0",
     "java": null,
     "cargo": null,
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/StatusPill.notices.test.ts\" \"src/shell-v0/state/noticePolicy.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/8x00ak4p/tmp/test-intent-vitest-6-1793917547199.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/StatusPill.notices.test.ts\" \"src/shell-v0/state/noticePolicy.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/hbp47hca/tmp/test-intent-vitest-21278-1793924092906.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 1656
+      "durationMs": 1449
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 short work stays inside 59 seconds stays in the pill and Earlier; a later 60 second run notifies once",
       "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:948729b9baf8ec75e25d4682378f4f951f30e0bd9d1a930569ba797bc0ba5fc2",
+      "contentDigest": "sha256:96cbfd84999a77aaee67a0129fbabb1f8883223f4fc20f0607b8bf40496a2707",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 short work stays inside indexing durations reset between runs, so repeated short runs stay silent",
       "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:948729b9baf8ec75e25d4682378f4f951f30e0bd9d1a930569ba797bc0ba5fc2",
+      "contentDigest": "sha256:96cbfd84999a77aaee67a0129fbabb1f8883223f4fc20f0607b8bf40496a2707",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -59,7 +59,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 short work stays inside a short operation completes without notifying",
       "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:948729b9baf8ec75e25d4682378f4f951f30e0bd9d1a930569ba797bc0ba5fc2",
+      "contentDigest": "sha256:96cbfd84999a77aaee67a0129fbabb1f8883223f4fc20f0607b8bf40496a2707",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -74,7 +74,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 short work stays inside a short install completes silently, but a short failure notifies",
       "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:948729b9baf8ec75e25d4682378f4f951f30e0bd9d1a930569ba797bc0ba5fc2",
+      "contentDigest": "sha256:96cbfd84999a77aaee67a0129fbabb1f8883223f4fc20f0607b8bf40496a2707",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -89,7 +89,7 @@
       "id": "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts#DE5 work duration 59 seconds stays in the app; 60 seconds notifies",
       "file": "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:be3ac379166aa2417a8e607b59fe94656bf8a4514c19b145e174cf40deda9022",
+      "contentDigest": "sha256:126b7f2490f9b80b6a91cfd2337af7625e7d8322676a90b7fbae3549051d120c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -104,7 +104,7 @@
       "id": "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts#DE5 work duration an unknown duration stays in the app",
       "file": "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:be3ac379166aa2417a8e607b59fe94656bf8a4514c19b145e174cf40deda9022",
+      "contentDigest": "sha256:126b7f2490f9b80b6a91cfd2337af7625e7d8322676a90b7fbae3549051d120c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -123,11 +123,11 @@
     "patches": [],
     "runs": [
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/StatusPill.notices.test.ts\" \"src/shell-v0/state/noticePolicy.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/8x00ak4p/tmp/test-intent-vitest-6-1793917555495.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/StatusPill.notices.test.ts\" \"src/shell-v0/state/noticePolicy.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/hbp47hca/tmp/test-intent-vitest-21278-1793924096215.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 3811,
-        "output": "JSON report written to /home/elias/.cache/am/8x00ak4p/tmp/test-intent-vitest-6-1793917555495.json\n\n"
+        "durationMs": 1647,
+        "output": "JSON report written to /home/elias/.cache/am/hbp47hca/tmp/test-intent-vitest-21278-1793924096215.json\n\n"
       }
     ],
     "checks": [
@@ -154,14 +154,14 @@
       {
         "id": "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts#DE5 work duration 59 seconds stays in the app; 60 seconds notifies",
         "classification": "assertion",
-        "detail": "DE5 work duration 59 seconds stays in the app; 60 seconds notifies:  AssertionError: expected { sound: false } to be null\n    at /home/elias/.cache/am/8x00ak4p/tmp/test-intent-before-lCgazn/modules/ui-web/src/shell-v0/state/noticePolicy.test.ts:28:136\n    at file:///home/elias/.cache/am/8x00ak4p/tmp/test-intent-before-lCgazn/modules/ui-web/node_modules/@vitest/runner"
+        "detail": "DE5 work duration 59 seconds stays in the app; 60 seconds notifies:  AssertionError: expected { sound: false } to be null\n    at /home/elias/.cache/am/hbp47hca/tmp/before-root/test-intent-before-MBjQwl/modules/ui-web/src/shell-v0/state/noticePolicy.test.ts:28:142\n    at file:///home/elias/.cache/am/hbp47hca/tmp/before-root/test-intent-before-MBjQwl/modules/ui-web/nod"
       },
       {
         "id": "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts#DE5 work duration an unknown duration stays in the app",
         "classification": "assertion",
-        "detail": "DE5 work duration an unknown duration stays in the app:  AssertionError: expected { sound: false } to be null\n    at /home/elias/.cache/am/8x00ak4p/tmp/test-intent-before-lCgazn/modules/ui-web/src/shell-v0/state/noticePolicy.test.ts:32:117\n    at file:///home/elias/.cache/am/8x00ak4p/tmp/test-intent-before-lCgazn/modules/ui-web/node_modules/@vitest/runner"
+        "detail": "DE5 work duration an unknown duration stays in the app:  AssertionError: expected { sound: false } to be null\n    at /home/elias/.cache/am/hbp47hca/tmp/before-root/test-intent-before-MBjQwl/modules/ui-web/src/shell-v0/state/noticePolicy.test.ts:32:123\n    at file:///home/elias/.cache/am/hbp47hca/tmp/before-root/test-intent-before-MBjQwl/modules/ui-web/nod"
       }
     ]
   },
-  "digest": "sha256:e9d9b79b3213dc1eb958ee8e681bb1de9ef449a2bb448b9e5c18828d4c9f270a"
+  "digest": "sha256:828873de45b7f3a4f5c8b86783b4a9bccd46dcef86b5e6145fecbf2a5538cf32"
 }

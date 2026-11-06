@@ -530,6 +530,10 @@ function projectionEquals(a: unknown, b: unknown): boolean {
 let initialized = false;
 /** Last error thrown by saveDocument, or null if the last write succeeded (F10). */
 let lastPersistError: unknown = null;
+/** The stored text this window last read or wrote; any other text is another window's save. */
+let lastStoredRaw: string | null = null;
+/** Another window's active profile, kept in storage while this window stays on its own. */
+let otherWindowProfileId: string | null = null;
 
 /**
  * Read the persisted document from localStorage, applying the
@@ -553,6 +557,7 @@ function ensureInitialized(): void {
     }
   };
   const v2Raw = readKey(DOCUMENT_STORAGE_KEY);
+  lastStoredRaw = v2Raw;
   if (v2Raw !== null) {
     const parsed = parseDocument(v2Raw);
     if (parsed !== null) {
@@ -1210,7 +1215,10 @@ function saveDocument(doc: UserStateV1): boolean {
     // Serialize the V2 storage shape (no duplication of root flat
     // fields — they're derived from profiles on read).
     const storage = storageFromView(doc);
-    localStorage.setItem(DOCUMENT_STORAGE_KEY, JSON.stringify(storage));
+    const raw = JSON.stringify(otherWindowProfileId !== null && storage.profiles[otherWindowProfileId]
+      ? { ...storage, activeProfileId: otherWindowProfileId } : storage);
+    localStorage.setItem(DOCUMENT_STORAGE_KEY, raw);
+    lastStoredRaw = raw;
     lastPersistError = null;
     return true;
   } catch (err) {
@@ -1226,6 +1234,33 @@ function saveDocument(doc: UserStateV1): boolean {
     });
     return false;
   }
+}
+
+/**
+ * Take in what another window saved, before a write here: every window holds the whole document, so
+ * writing an older copy would drop that window's values, in any field. The edit then applies to the
+ * latest document. This window stays on its own profile, so the edit lands on the profile it shows,
+ * while storage keeps the other window's choice. A stored document this build cannot read stays
+ * unadopted (F9). A session-only edit whose save failed (F10) yields to what another window saved.
+ */
+function adoptOtherWindowSaves(): void {
+  if (typeof localStorage === 'undefined') return;
+  let raw: string | null;
+  try {
+    raw = localStorage.getItem(DOCUMENT_STORAGE_KEY);
+  } catch {
+    return;
+  }
+  if (raw === null || raw === lastStoredRaw) return;
+  lastStoredRaw = raw;
+  const stored = parseDocument(raw);
+  if (stored === null) return;
+  const storage = storageFromView(migrateSurfacePreferences(stored));
+  const here = storageSig.get().activeProfileId;
+  const held = storage.profiles[here] ? here : storage.activeProfileId;
+  otherWindowProfileId = held === storage.activeProfileId ? null : storage.activeProfileId;
+  storageSig.set({ ...storage, activeProfileId: held });
+  notify();
 }
 
 function notify(): void {
@@ -1313,12 +1348,16 @@ const SENTINEL = Symbol('userstate-projection-sentinel');
  * Producer must return a NEW object reference; mutating in place
  * doesn't fire listeners (listener equality check would short-
  * circuit). The TS type enforces this via `readonly` fields.
+ *
+ * The producer sees the latest stored document, which another window may have saved: it must build
+ * on what it receives, not on a value read before this call, or that window's edit is lost (C11).
  */
 export function mutateDocument(
   producer: (current: UserStateV1) => UserStateV1,
   persistFirst = false,
 ): void {
   ensureInitialized();
+  adoptOtherWindowSaves();
   const produced = producer(docSig.get());
   if (produced === docSig.get()) return;
   if (persistFirst && !saveDocument(produced)) {
@@ -1342,6 +1381,8 @@ export function __resetUserStateForTest(): void {
   listeners.clear();
   initialized = false;
   lastPersistError = null;
+  lastStoredRaw = null;
+  otherWindowProfileId = null;
   if (typeof localStorage !== 'undefined') {
     try {
       localStorage.removeItem(DOCUMENT_STORAGE_KEY);
@@ -1365,6 +1406,8 @@ export function __resetInMemoryStateForTest(): void {
   listeners.clear();
   initialized = false;
   lastPersistError = null;
+  lastStoredRaw = null;
+  otherWindowProfileId = null;
 }
 
 /**
@@ -1423,16 +1466,16 @@ export function getPluginSetting(pluginId: string, key: string): unknown {
 }
 
 export function setPluginSetting(pluginId: string, key: string, value: unknown): void {
-  const doc = getDocument();
-  const current = doc.pluginSettings ?? {};
-  const pluginCurrent = current[pluginId] ?? {};
-  mutateDocument((d) => ({
-    ...d,
-    pluginSettings: {
-      ...current,
-      [pluginId]: { ...pluginCurrent, [key]: value },
-    },
-  }));
+  mutateDocument((d) => {
+    const current = d.pluginSettings ?? {};
+    return {
+      ...d,
+      pluginSettings: {
+        ...current,
+        [pluginId]: { ...current[pluginId], [key]: value },
+      },
+    };
+  });
 }
 
 export function subscribePluginSetting(
@@ -1462,9 +1505,10 @@ export function getRecentCommandIds(): readonly string[] {
 }
 
 export function recordRecentCommandId(id: string): void {
-  const current = getDocument().recentCommandIds ?? [];
-  const next = [id, ...current.filter((x) => x !== id)].slice(0, RECENT_COMMANDS_CAP);
-  mutateDocument((doc) => ({ ...doc, recentCommandIds: next }));
+  mutateDocument((doc) => ({
+    ...doc,
+    recentCommandIds: [id, ...(doc.recentCommandIds ?? []).filter((x) => x !== id)].slice(0, RECENT_COMMANDS_CAP),
+  }));
 }
 
 export function subscribeRecentCommandIds(handler: (ids: readonly string[]) => void): () => void {
@@ -1620,6 +1664,7 @@ export function getProfile(id: string): Profile | undefined {
  */
 export function setActiveProfileId(id: string): void {
   ensureInitialized();
+  adoptOtherWindowSaves();
   const storage = storageSig.get();
   if (storage.activeProfileId === id) return;
   if (!storage.profiles[id]) {
@@ -1635,6 +1680,7 @@ export function setActiveProfileId(id: string): void {
   // slices into the incoming profile — the F11 bug. With the slices held only
   // in `storage.profiles[id]`, that drift is unrepresentable.
   storageSig.set({ ...storage, activeProfileId: id });
+  otherWindowProfileId = null;
   saveDocument(docSig.get());
   notify();
 }

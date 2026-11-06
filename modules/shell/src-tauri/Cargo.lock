@@ -3825,9 +3825,9 @@ version = "0.3.2"
 dependencies = [
  "base64 0.22.1",
  "dunce",
+ "gdkwayland-sys",
  "gtk",
  "libc",
- "notify-rust",
  "open",
  "reqwest",
  "ring",
@@ -3852,6 +3852,7 @@ dependencies = [
  "tokio",
  "uuid",
  "windows-sys 0.61.2",
+ "zbus",
 ]
 
 [[package]]

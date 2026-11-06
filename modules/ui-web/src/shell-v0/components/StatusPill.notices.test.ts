@@ -59,6 +59,15 @@ const sent = () => vi.mocked(sendDesktopNotification).mock.calls.map(call => cal
 const lastBadge = () => vi.mocked(setTaskbarBadge).mock.calls.at(-1)?.[0];
 /** The shell reports a clicked notification. */
 const clickNotification = (id: string) => vi.mocked(installNoticeActivationBridge).mock.calls.at(-1)![0](id);
+/** The next focus check waits until answered. */
+function pendingFocusCheck() {
+  let answer: (focused: boolean) => void = () => {};
+  vi.mocked(isWindowFocused).mockImplementationOnce(() => new Promise(resolve => { answer = resolve; }));
+  return { answer: (focused: boolean) => answer(focused) };
+}
+/** The engine out of contact: what a reader of the status sees between losing and regaining it. */
+const disconnected = (): Partial<AiState> => ({ phase: 'stale', snapshotLive: false, indexingStatusLive: false,
+  connection: { reachable: false, lastSuccessMs: Date.now() - 60_000, lastContactMs: Date.now() - 60_000, consecutiveFailures: 1 } });
 /** An operation the engine reports through the status cadence, starting in `first`. */
 function operation(key: string, label: string, first: Record<string, unknown>) {
   let outcome = first;
@@ -127,6 +136,57 @@ describe('DE5 an agent request', () => {
     expect(sendDesktopNotification).not.toHaveBeenCalled();
     expect(lastBadge()).toBe(1);
   });
+  it('a background result older than focus returning to the window sends nothing', async () => {
+    const check = pendingFocusCheck();
+    agent('k1'); await flush();
+    vi.mocked(isWindowFocused).mockResolvedValue(true);
+    try {
+      window.dispatchEvent(new Event('focus'));
+      check.answer(false); await flush();
+      expect(sendDesktopNotification).not.toHaveBeenCalled();
+      expect(pill.status.model.pill).toMatchObject({ kind: 'needs', count: 1 });
+    } finally { vi.mocked(isWindowFocused).mockResolvedValue(false); }
+  });
+  it('a focused result older than the window losing focus is read again, so the request still notifies', async () => {
+    const check = pendingFocusCheck();
+    agent('k2'); await flush();
+    window.dispatchEvent(new Event('blur'));
+    check.answer(true); await flush();
+    expect(sent().map(notice => notice.id)).toEqual(['authorization:k2']);
+  });
+  it('focus changing again during the second read keeps reading until a result is current', async () => {
+    const first = pendingFocusCheck();
+    agent('k3'); await flush();
+    const second = pendingFocusCheck();
+    window.dispatchEvent(new Event('focus'));
+    first.answer(false); await flush();
+    vi.mocked(isWindowFocused).mockResolvedValue(true);
+    try {
+      window.dispatchEvent(new Event('focus'));
+      second.answer(false); await flush();
+      expect(sendDesktopNotification).not.toHaveBeenCalled();
+    } finally { vi.mocked(isWindowFocused).mockResolvedValue(false); }
+  });
+  it('C10 detaching and reattaching while the focus check waits cancels the old decision', async () => {
+    const check = pendingFocusCheck();
+    agent('g2'); await flush();
+    pill.remove(); document.body.append(pill); await flush();
+    check.answer(false); await flush();
+    expect(sendDesktopNotification).not.toHaveBeenCalled();
+    agent('g3'); await flush();
+    expect(sent().map(notice => notice.id)).toEqual(['authorization:g3']);
+  });
+  it('C10 a remount watches focus once: the old watch is stopped', async () => {
+    const add = vi.spyOn(window, 'addEventListener');
+    const remove = vi.spyOn(window, 'removeEventListener');
+    const focusListeners = (spy: typeof add | typeof remove) => spy.mock.calls.filter(call => call[0] === 'focus').map(call => call[1]);
+    pill.remove(); document.body.append(pill); await flush();
+    const [attached] = focusListeners(add);
+    pill.remove();
+    expect(focusListeners(remove)).toContain(attached);
+    expect(focusListeners(add)).toHaveLength(1);
+    document.body.append(pill); await flush();
+  });
   it('C10 a teardown while the focus check is in flight sends nothing, and a remount does not repeat it', async () => {
     let answer: (focused: boolean) => void = () => {};
     vi.mocked(isWindowFocused).mockImplementationOnce(() => new Promise(resolve => { answer = resolve; }));
@@ -187,6 +247,108 @@ describe('DE5 long work', () => {
       expect(pill.status.model.pill).toMatchObject({ kind: 'finished', label: 'Search is up to date' });
       expect(sendDesktopNotification).not.toHaveBeenCalled();
     } finally { vi.mocked(isWindowFocused).mockResolvedValue(false); }
+  });
+});
+
+describe('C6 work ending across a gap in observation', () => {
+  it('a transition finished while disconnected is silent, and Earlier still lists it', async () => {
+    await observe(verdict('operational'));
+    await observe(verdict('transitioning'));
+    elapsed += 60_000;
+    await observe(disconnected());
+    await observe(verdict('operational'));
+    expect(sendDesktopNotification).not.toHaveBeenCalled();
+    expect(panel().model!.sections.earlier.some(row => row.title === 'Search is up to date')).toBe(true);
+  });
+  it('indexing finished while disconnected is silent', async () => {
+    const indexing = { status: { worker: { core: { indexState: 'INDEXING', pendingJobs: 5 }, enrichment: {} } } as AiState['status'] };
+    await observe(indexing);
+    elapsed += 60_000;
+    await observe(disconnected());
+    await observe({});
+    expect(sendDesktopNotification).not.toHaveBeenCalled();
+  });
+  it('an install finished while disconnected is silent', async () => {
+    await observe(engine('installing'));
+    elapsed += 60_000;
+    await observe(disconnected());
+    await observe(engine('online'));
+    expect(sendDesktopNotification).not.toHaveBeenCalled();
+  });
+  it('an install that failed while disconnected is silent, its end was not observed either', async () => {
+    await observe(engine('installing'));
+    await observe(disconnected());
+    await observe(engine('install_failed'));
+    expect(sendDesktopNotification).not.toHaveBeenCalled();
+  });
+  it.each([['complete'], ['failed']])('an operation %s while disconnected is silent', async (state) => {
+    const advance = operation('gap-op', 'Rebuild search', { state: 'running', historySince: 0 });
+    await advance();
+    elapsed += 60_000;
+    await observe(disconnected());
+    await advance({ state, historySince: 0 });
+    await advance();
+    expect(sendDesktopNotification).not.toHaveBeenCalled();
+  });
+  it('an operation ending behind a failed read is silent', async () => {
+    const advance = operation('gap-read', 'Rebuild search', { state: 'running', historySince: 0 });
+    await advance();
+    elapsed += 60_000;
+    const history = vi.mocked(fetch).getMockImplementation()!;
+    vi.mocked(fetch).mockImplementation(async () => new Response('{}', { status: 503 }));
+    __feedForTest({ status: { worker: { core: { indexState: 'IDLE', pendingJobs: 0 }, enrichment: {} } } as unknown as StatusSnapshot });
+    await vi.waitFor(() => expect(Object.values(panel().model!.sections).flat().find(row => row.id === 'operation:gap-read')?.stale).toBe(true));
+    vi.mocked(fetch).mockImplementation(history);
+    await advance({ state: 'complete', historySince: 0 });
+    await advance();
+    expect(sendDesktopNotification).not.toHaveBeenCalled();
+  });
+  it('an operation ending across a detach is silent', async () => {
+    const advance = operation('gap-detach', 'Rebuild search', { state: 'running', historySince: 0 });
+    await advance();
+    elapsed += 60_000;
+    pill.remove(); document.body.append(pill); await flush();
+    await advance({ state: 'complete', historySince: 0 });
+    await advance();
+    expect(sendDesktopNotification).not.toHaveBeenCalled();
+  });
+  it('a poll that lagged while contact held is not a gap, so the end still notifies', async () => {
+    await observe(verdict('transitioning'));
+    await observe({ phase: 'stale' });
+    elapsed += 60_000;
+    await observe(verdict('operational'));
+    expect(sent().map(notice => notice.title)).toEqual(['Search is up to date']);
+  });
+  it('work seen active again after the gap ends live, so it notifies', async () => {
+    await observe(verdict('transitioning'));
+    await observe(disconnected());
+    await observe(verdict('transitioning'));
+    elapsed += 60_000;
+    await observe(verdict('operational'));
+    expect(sent().map(notice => notice.title)).toEqual(['Search is up to date']);
+  });
+  it('an install seen active again after the gap ends live, so it notifies', async () => {
+    await observe(engine('installing'));
+    await observe(disconnected());
+    await observe(engine('installing'));
+    elapsed += 60_000;
+    await observe(engine('online'));
+    expect(sent().map(notice => notice.title)).toEqual(['AI install complete']);
+  });
+  it('an operation seen running again after the gap ends live, so it notifies', async () => {
+    const advance = operation('gap-live', 'Rebuild search', { state: 'running', historySince: 0 });
+    await advance();
+    await observe(disconnected());
+    await observe({});
+    const reads = () => vi.mocked(fetch).mock.calls.filter(([url]) => String(url).includes('/api/operation-history/gap-live')).length;
+    const readsBefore = reads();
+    await advance();
+    await vi.waitFor(() => expect(reads()).toBeGreaterThan(readsBefore));
+    await flush();
+    elapsed += 60_000;
+    await advance({ state: 'complete', historySince: 0 });
+    await advance();
+    expect(sent().map(notice => notice.title)).toEqual(['Rebuild search finished']);
   });
 });
 

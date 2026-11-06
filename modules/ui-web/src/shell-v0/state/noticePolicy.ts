@@ -46,14 +46,17 @@ export function agentRequestNotice(row: Pick<StatusFact, 'id' | 'title' | 'deadl
   return { id: row.id, kind: 'agent-request', title: row.title, ...(row.deadline ? { body: row.deadline } : {}), live };
 }
 
-/** A live completion edge; the pill shows it regardless of its active duration. */
-export function workFinishedNotice(title: string, id = title, activeDurationMs?: number): DesktopNotice {
-  return { id, kind: 'work-finished', title, live: true, activeDurationMs };
+/**
+ * A completion edge; the pill shows it regardless of its active duration. `live` says its end was
+ * observed: work that ended across a gap in observation is only rediscovered (C6).
+ */
+export function workFinishedNotice(title: string, live: boolean, id = title, activeDurationMs?: number): DesktopNotice {
+  return { id, kind: 'work-finished', title, live, activeDurationMs };
 }
 
 /** A failure edge. The failure's own message stays in the panel: it can carry paths. */
-export function workFailedNotice(title: string, id = title): DesktopNotice {
-  return { id, kind: 'work-failed', title, body: 'Open JustSearch to see what to do next.', live: true };
+export function workFailedNotice(title: string, live: boolean, id = title): DesktopNotice {
+  return { id, kind: 'work-failed', title, body: 'Open JustSearch to see what to do next.', live };
 }
 
 /** The taskbar badge: the same count the pill shows for Needs you, so Earlier never adds to it. */

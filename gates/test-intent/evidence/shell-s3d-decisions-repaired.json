@@ -1,0 +1,507 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-06T00:14:18.755Z",
+  "revision": "29028ddad845388a17dfbe03783760a67e08c55a",
+  "tree": "bb5bf7fad8e0d4bf80904bd3de24abe49e256857",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/StatusPill.notices.test.ts\" \"src/shell-v0/state/UserStateDocument.multiWindow.test.ts\" \"src/shell-v0/state/noticePolicy.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/hbp47hca/tmp/test-intent-vitest-19201-1793924052607.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1787
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 an agent request a background result older than focus returning to the window sends nothing",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:96cbfd84999a77aaee67a0129fbabb1f8883223f4fc20f0607b8bf40496a2707",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 an agent request a background result older than focus returning to the window sends nothing",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 an agent request a focused result older than the window losing focus is read again, so the request still notifies",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:96cbfd84999a77aaee67a0129fbabb1f8883223f4fc20f0607b8bf40496a2707",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 an agent request a focused result older than the window losing focus is read again, so the request still notifies",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 an agent request focus changing again during the second read keeps reading until a result is current",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:96cbfd84999a77aaee67a0129fbabb1f8883223f4fc20f0607b8bf40496a2707",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 an agent request focus changing again during the second read keeps reading until a result is current",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 an agent request C10 detaching and reattaching while the focus check waits cancels the old decision",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:96cbfd84999a77aaee67a0129fbabb1f8883223f4fc20f0607b8bf40496a2707",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 an agent request C10 detaching and reattaching while the focus check waits cancels the old decision",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 work ending across a gap in observation a transition finished while disconnected is silent, and Earlier still lists it",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:96cbfd84999a77aaee67a0129fbabb1f8883223f4fc20f0607b8bf40496a2707",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C6 work ending across a gap in observation a transition finished while disconnected is silent, and Earlier still lists it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 work ending across a gap in observation indexing finished while disconnected is silent",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:96cbfd84999a77aaee67a0129fbabb1f8883223f4fc20f0607b8bf40496a2707",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C6 work ending across a gap in observation indexing finished while disconnected is silent",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 work ending across a gap in observation an install finished while disconnected is silent",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:96cbfd84999a77aaee67a0129fbabb1f8883223f4fc20f0607b8bf40496a2707",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C6 work ending across a gap in observation an install finished while disconnected is silent",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 work ending across a gap in observation an install that failed while disconnected is silent, its end was not observed either",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:96cbfd84999a77aaee67a0129fbabb1f8883223f4fc20f0607b8bf40496a2707",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C6 work ending across a gap in observation an install that failed while disconnected is silent, its end was not observed either",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 work ending across a gap in observation an operation complete while disconnected is silent",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:96cbfd84999a77aaee67a0129fbabb1f8883223f4fc20f0607b8bf40496a2707",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C6 work ending across a gap in observation an operation complete while disconnected is silent",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 work ending across a gap in observation an operation failed while disconnected is silent",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:96cbfd84999a77aaee67a0129fbabb1f8883223f4fc20f0607b8bf40496a2707",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C6 work ending across a gap in observation an operation failed while disconnected is silent",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 work ending across a gap in observation an operation ending behind a failed read is silent",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:96cbfd84999a77aaee67a0129fbabb1f8883223f4fc20f0607b8bf40496a2707",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C6 work ending across a gap in observation an operation ending behind a failed read is silent",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 work ending across a gap in observation an operation ending across a detach is silent",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:96cbfd84999a77aaee67a0129fbabb1f8883223f4fc20f0607b8bf40496a2707",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C6 work ending across a gap in observation an operation ending across a detach is silent",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 a write from one window keeps Off chosen in another window",
+      "file": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3f6b438c0756161cb0daa96850c2dd6d796d9f00c771d02120824a69f74f2559",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C11 a write from one window keeps Off chosen in another window",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 a write from one window keeps the other window's value in every kind of field: cross-profile, per plugin and per profile",
+      "file": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3f6b438c0756161cb0daa96850c2dd6d796d9f00c771d02120824a69f74f2559",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C11 a write from one window keeps the other window's value in every kind of field: cross-profile, per plugin and per profile",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 a write from one window keeps both windows' entries when both add to the same list",
+      "file": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3f6b438c0756161cb0daa96850c2dd6d796d9f00c771d02120824a69f74f2559",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C11 a write from one window keeps both windows' entries when both add to the same list",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 a write from one window keeps both windows' keybindings when both add one",
+      "file": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3f6b438c0756161cb0daa96850c2dd6d796d9f00c771d02120824a69f74f2559",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C11 a write from one window keeps both windows' keybindings when both add one",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 a write from one window leaves the window it is made in up to date with what it kept",
+      "file": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3f6b438c0756161cb0daa96850c2dd6d796d9f00c771d02120824a69f74f2559",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C11 a write from one window leaves the window it is made in up to date with what it kept",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 a write from one window that changes nothing still leaves the window up to date",
+      "file": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3f6b438c0756161cb0daa96850c2dd6d796d9f00c771d02120824a69f74f2559",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C11 a write from one window that changes nothing still leaves the window up to date",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 a write from one window a later write from the first window keeps the value too",
+      "file": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3f6b438c0756161cb0daa96850c2dd6d796d9f00c771d02120824a69f74f2559",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C11 a write from one window a later write from the first window keeps the value too",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 profiles across windows a window stays on its profile, and its edit lands there, while storage keeps the other window's choice",
+      "file": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3f6b438c0756161cb0daa96850c2dd6d796d9f00c771d02120824a69f74f2559",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C11 profiles across windows a window stays on its profile, and its edit lands there, while storage keeps the other window's choice",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 profiles across windows a profile created in another window survives a write here",
+      "file": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3f6b438c0756161cb0daa96850c2dd6d796d9f00c771d02120824a69f74f2559",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C11 profiles across windows a profile created in another window survives a write here",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 profiles across windows a window whose profile another window deleted moves to the stored one instead of bringing it back",
+      "file": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3f6b438c0756161cb0daa96850c2dd6d796d9f00c771d02120824a69f74f2559",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C11 profiles across windows a window whose profile another window deleted moves to the stored one instead of bringing it back",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts#DE5 work duration C6 work whose end was not observed stays silent, finished or failed",
+      "file": "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:126b7f2490f9b80b6a91cfd2337af7625e7d8322676a90b7fbae3549051d120c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 work duration C6 work whose end was not observed stays silent, finished or failed",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "29028ddad845388a17dfbe03783760a67e08c55a",
+    "revision": "29028ddad845388a17dfbe03783760a67e08c55a",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/StatusPill.notices.test.ts\" \"src/shell-v0/state/UserStateDocument.multiWindow.test.ts\" \"src/shell-v0/state/noticePolicy.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/hbp47hca/tmp/test-intent-vitest-19201-1793924056422.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1926,
+        "output": "JSON report written to /home/elias/.cache/am/hbp47hca/tmp/test-intent-vitest-19201-1793924056422.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 an agent request a background result older than focus returning to the window sends nothing",
+        "classification": "assertion",
+        "detail": "DE5 an agent request a background result older than focus returning to the window sends nothing:  AssertionError: expected \"vi.fn()\" to not be called at all, but actually been called 1 times\n\nReceived:\n\n  1st vi.fn() call:\n\n    Array [\n      Object {\n        \"body\": \"Denied automatically in 4 min\",\n        \"id\": \"authorization:k1\",\n        \"sound\": false,\n        \"title\": \"Claude Desktop request"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 an agent request a focused result older than the window losing focus is read again, so the request still notifies",
+        "classification": "assertion",
+        "detail": "DE5 an agent request a focused result older than the window losing focus is read again, so the request still notifies:  AssertionError: expected [] to deeply equal [ 'authorization:k2' ]\n    at /home/elias/.cache/am/hbp47hca/tmp/before-root/test-intent-before-Lpu0Mv/modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts:155:45\n    at file:///home/elias/.cache/am/hbp47hca/tmp/before-root/test-intent-before-"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 an agent request focus changing again during the second read keeps reading until a result is current",
+        "classification": "assertion",
+        "detail": "DE5 an agent request focus changing again during the second read keeps reading until a result is current:  AssertionError: expected \"vi.fn()\" to not be called at all, but actually been called 1 times\n\nReceived:\n\n  1st vi.fn() call:\n\n    Array [\n      Object {\n        \"body\": \"Denied automatically in 4 min\",\n        \"id\": \"authorization:k3\",\n        \"sound\": false,\n        \"title\": \"Claude Desktop request"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 an agent request C10 detaching and reattaching while the focus check waits cancels the old decision",
+        "classification": "assertion",
+        "detail": "DE5 an agent request C10 detaching and reattaching while the focus check waits cancels the old decision:  AssertionError: expected [] to deeply equal [ 'authorization:g3' ]\n    at /home/elias/.cache/am/hbp47hca/tmp/before-root/test-intent-before-Lpu0Mv/modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts:177:45\n    at file:///home/elias/.cache/am/hbp47hca/tmp/before-root/test-intent-before-"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 work ending across a gap in observation a transition finished while disconnected is silent, and Earlier still lists it",
+        "classification": "assertion",
+        "detail": "C6 work ending across a gap in observation a transition finished while disconnected is silent, and Earlier still lists it:  AssertionError: expected \"vi.fn()\" to not be called at all, but actually been called 1 times\n\nReceived:\n\n  1st vi.fn() call:\n\n    Array [\n      Object {\n        \"id\": \"Search is up to date\",\n        \"sound\": false,\n        \"title\": \"Search is up to date\",\n      },\n    ]\n\n\nNumber of calls: 1\n\n    at"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 work ending across a gap in observation indexing finished while disconnected is silent",
+        "classification": "assertion",
+        "detail": "C6 work ending across a gap in observation indexing finished while disconnected is silent:  AssertionError: expected \"vi.fn()\" to not be called at all, but actually been called 1 times\n\nReceived:\n\n  1st vi.fn() call:\n\n    Array [\n      Object {\n        \"id\": \"Search is up to date\",\n        \"sound\": false,\n        \"title\": \"Search is up to date\",\n      },\n    ]\n\n\nNumber of calls: 1\n\n    at"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 work ending across a gap in observation an install finished while disconnected is silent",
+        "classification": "assertion",
+        "detail": "C6 work ending across a gap in observation an install finished while disconnected is silent:  AssertionError: expected \"vi.fn()\" to not be called at all, but actually been called 1 times\n\nReceived:\n\n  1st vi.fn() call:\n\n    Array [\n      Object {\n        \"id\": \"AI install complete\",\n        \"sound\": false,\n        \"title\": \"AI install complete\",\n      },\n    ]\n\n\nNumber of calls: 1\n\n    at Pr"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 work ending across a gap in observation an install that failed while disconnected is silent, its end was not observed either",
+        "classification": "assertion",
+        "detail": "C6 work ending across a gap in observation an install that failed while disconnected is silent, its end was not observed either:  AssertionError: expected \"vi.fn()\" to not be called at all, but actually been called 1 times\n\nReceived:\n\n  1st vi.fn() call:\n\n    Array [\n      Object {\n        \"body\": \"Open JustSearch to see what to do next.\",\n        \"id\": \"AI install failed\",\n        \"sound\": false,\n        \"title\": \"AI install"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 work ending across a gap in observation an operation complete while disconnected is silent",
+        "classification": "assertion",
+        "detail": "C6 work ending across a gap in observation an operation complete while disconnected is silent:  AssertionError: expected \"vi.fn()\" to not be called at all, but actually been called 1 times\n\nReceived:\n\n  1st vi.fn() call:\n\n    Array [\n      Object {\n        \"id\": \"operation:gap-op\",\n        \"sound\": false,\n        \"title\": \"Rebuild search finished\",\n      },\n    ]\n\n\nNumber of calls: 1\n\n    at P"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 work ending across a gap in observation an operation failed while disconnected is silent",
+        "classification": "assertion",
+        "detail": "C6 work ending across a gap in observation an operation failed while disconnected is silent:  AssertionError: expected \"vi.fn()\" to not be called at all, but actually been called 1 times\n\nReceived:\n\n  1st vi.fn() call:\n\n    Array [\n      Object {\n        \"body\": \"Open JustSearch to see what to do next.\",\n        \"id\": \"operation:gap-op\",\n        \"sound\": false,\n        \"title\": \"Rebuild sear"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 work ending across a gap in observation an operation ending behind a failed read is silent",
+        "classification": "assertion",
+        "detail": "C6 work ending across a gap in observation an operation ending behind a failed read is silent:  AssertionError: expected \"vi.fn()\" to not be called at all, but actually been called 1 times\n\nReceived:\n\n  1st vi.fn() call:\n\n    Array [\n      Object {\n        \"id\": \"operation:gap-read\",\n        \"sound\": false,\n        \"title\": \"Rebuild search finished\",\n      },\n    ]\n\n\nNumber of calls: 1\n\n    at"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 work ending across a gap in observation an operation ending across a detach is silent",
+        "classification": "assertion",
+        "detail": "C6 work ending across a gap in observation an operation ending across a detach is silent:  AssertionError: expected \"vi.fn()\" to not be called at all, but actually been called 1 times\n\nReceived:\n\n  1st vi.fn() call:\n\n    Array [\n      Object {\n        \"id\": \"operation:gap-detach\",\n        \"sound\": false,\n        \"title\": \"Rebuild search finished\",\n      },\n    ]\n\n\nNumber of calls: 1"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 a write from one window keeps Off chosen in another window",
+        "classification": "assertion",
+        "detail": "C11 a write from one window keeps Off chosen in another window:  AssertionError: expected { version: 2, …(3) } to match object { notifications: 'off', …(1) }\n(4 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/hbp47hca/tmp/before-root/test-intent-before-Lpu0Mv/modules/ui-web/node_modules/@vitest/expect/dist/index.js:"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 a write from one window keeps the other window's value in every kind of field: cross-profile, per plugin and per profile",
+        "classification": "assertion",
+        "detail": "C11 a write from one window keeps the other window's value in every kind of field: cross-profile, per plugin and per profile:  AssertionError: expected { version: 2, …(3) } to match object { chatWidth: 'narrow', …(2) }\n(7 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/hbp47hca/tmp/before-root/test-intent-before-Lpu0Mv/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 a write from one window keeps both windows' entries when both add to the same list",
+        "classification": "assertion",
+        "detail": "C11 a write from one window keeps both windows' entries when both add to the same list:  AssertionError: expected [ 'from-a' ] to deeply equal [ 'from-a', 'from-b' ]\n    at /home/elias/.cache/am/hbp47hca/tmp/before-root/test-intent-before-Lpu0Mv/modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts:56:42\n    at file:///home/elias/.cache/am/hbp47hca/tmp/before-root/test"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 a write from one window keeps both windows' keybindings when both add one",
+        "classification": "assertion",
+        "detail": "C11 a write from one window keeps both windows' keybindings when both add one:  AssertionError: expected [ 'ctrl+a' ] to deeply equal [ 'ctrl+a', 'ctrl+b' ]\n    at /home/elias/.cache/am/hbp47hca/tmp/before-root/test-intent-before-Lpu0Mv/modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts:63:99\n    at file:///home/elias/.cache/am/hbp47hca/tmp/before-root/test"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 a write from one window leaves the window it is made in up to date with what it kept",
+        "classification": "assertion",
+        "detail": "C11 a write from one window leaves the window it is made in up to date with what it kept:  AssertionError: expected 'on' to be 'off' // Object.is equality\n    at /home/elias/.cache/am/hbp47hca/tmp/before-root/test-intent-before-Lpu0Mv/modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts:72:48\n    at file:///home/elias/.cache/am/hbp47hca/tmp/before-root/test-intent-befor"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 a write from one window that changes nothing still leaves the window up to date",
+        "classification": "assertion",
+        "detail": "C11 a write from one window that changes nothing still leaves the window up to date:  AssertionError: expected 'on' to be 'off' // Object.is equality\n    at /home/elias/.cache/am/hbp47hca/tmp/before-root/test-intent-before-Lpu0Mv/modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts:80:48\n    at file:///home/elias/.cache/am/hbp47hca/tmp/before-root/test-intent-befor"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 a write from one window a later write from the first window keeps the value too",
+        "classification": "assertion",
+        "detail": "C11 a write from one window a later write from the first window keeps the value too:  AssertionError: expected { version: 2, …(3) } to match object { notifications: 'off', …(1) }\n(4 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/hbp47hca/tmp/before-root/test-intent-before-Lpu0Mv/modules/ui-web/node_modules/@vitest/expect/dist/index.js:"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 profiles across windows a window stays on its profile, and its edit lands there, while storage keeps the other window's choice",
+        "classification": "assertion",
+        "detail": "C11 profiles across windows a window stays on its profile, and its edit lands there, while storage keeps the other window's choice:  AssertionError: expected 'default' to be 'work' // Object.is equality\n    at /home/elias/.cache/am/hbp47hca/tmp/before-root/test-intent-before-Lpu0Mv/modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts:111:38\n    at file:///home/elias/.cache/am/hbp47hca/tmp/before-root/test-inten"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 profiles across windows a profile created in another window survives a write here",
+        "classification": "assertion",
+        "detail": "C11 profiles across windows a profile created in another window survives a write here:  AssertionError: expected [ 'default', 'work' ] to include 'home'\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/hbp47hca/tmp/before-root/test-intent-before-Lpu0Mv/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1319:15)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/hbp47hca"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 profiles across windows a window whose profile another window deleted moves to the stored one instead of bringing it back",
+        "classification": "assertion",
+        "detail": "C11 profiles across windows a window whose profile another window deleted moves to the stored one instead of bringing it back:  AssertionError: expected 'work' to be 'default' // Object.is equality\n    at /home/elias/.cache/am/hbp47hca/tmp/before-root/test-intent-before-Lpu0Mv/modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts:135:45\n    at file:///home/elias/.cache/am/hbp47hca/tmp/before-root/test-inten"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts#DE5 work duration C6 work whose end was not observed stays silent, finished or failed",
+        "classification": "assertion",
+        "detail": "DE5 work duration C6 work whose end was not observed stays silent, finished or failed:  AssertionError: expected { sound: true } to be null\n    at /home/elias/.cache/am/hbp47hca/tmp/before-root/test-intent-before-Lpu0Mv/modules/ui-web/src/shell-v0/state/noticePolicy.test.ts:44:122\n    at file:///home/elias/.cache/am/hbp47hca/tmp/before-root/test-intent-before-Lpu0Mv/modules/ui-web/node"
+      }
+    ]
+  },
+  "digest": "sha256:dcf0219e47ce6e047801d9114a30c28ed8c5a3ca5f496ea1c29a4407c87f964a"
+}

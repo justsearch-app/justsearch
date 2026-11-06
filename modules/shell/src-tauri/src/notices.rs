@@ -1,8 +1,9 @@
 //! DE5: desktop notifications and the taskbar badge.
 //!
 //! The notification plugin's desktop path is fire-and-forget, so a click never reaches the app.
-//! Delivery lives here because clicking must bring the app forward on the event's item. Which
-//! events leave the app is decided in the frontend's notice policy, not here.
+//! Delivery lives here because clicking must bring the app forward on the event's item, using the
+//! activation token the desktop gives with the click where it gives one. Which events leave the app
+//! is decided in the frontend's notice policy, not here.
 
 use std::{
     collections::HashMap,
@@ -11,8 +12,15 @@ use std::{
 };
 
 use tauri::{AppHandle, Emitter, State, WebviewWindow};
+#[cfg(target_os = "linux")]
+use tauri::{Manager, UserAttentionType};
 
 const ACTIVATED_EVENT: &str = "justsearch://notice-activated";
+/// The freedesktop notification service: its bus name and interface are the same string.
+#[cfg(target_os = "linux")]
+const NOTIFICATIONS: &str = "org.freedesktop.Notifications";
+#[cfg(target_os = "linux")]
+const NOTIFICATIONS_PATH: &str = "/org/freedesktop/Notifications";
 /// Every open window sees the same live event at nearly the same moment.
 const CLAIM_WINDOW: Duration = Duration::from_secs(60);
 /// Must equal OVERLAY_SIZE in the frontend's taskbarBadge.ts.
@@ -35,10 +43,47 @@ impl NoticeLedger {
     }
 }
 
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(windows)]
 fn activate(app: &AppHandle, id: &str) {
     crate::search_shortcut::foreground(app);
     let _ = app.emit(ACTIVATED_EVENT, id);
+}
+
+/// A desktop grants focus only to a request carrying the token of the person's click. Without one
+/// the window may stay behind what they were using, so it asks for attention as well.
+#[cfg(target_os = "linux")]
+fn activate(app: &AppHandle, id: &str, activation_token: Option<String>) {
+    let attention = activation_token.is_none();
+    crate::search_shortcut::foreground_with_token(app, activation_token);
+    if attention {
+        if let Some(window) = app.get_webview_window("main") {
+            let _ = window.request_user_attention(Some(UserAttentionType::Informational));
+        }
+    }
+    let _ = app.emit(ACTIVATED_EVENT, id);
+}
+
+/// Hand a click's token to the toolkit, for the present that follows it to use. Main thread only.
+#[cfg(target_os = "linux")]
+pub(crate) fn use_activation_token(window: &gtk::ApplicationWindow, token: &str) {
+    use gtk::{
+        glib::{object::ObjectExt, translate::ToGlibPtr},
+        prelude::{GtkWindowExt, WidgetExt},
+    };
+    let display = WidgetExt::display(window);
+    if display.type_().name() != "GdkWaylandDisplay" {
+        // On X11 the token is a startup id, which also carries the click's timestamp.
+        window.set_startup_id(token);
+    } else if let Ok(token) = std::ffi::CString::new(token) {
+        let display: *mut gtk::gdk::ffi::GdkDisplay = display.to_glib_none().0;
+        // SAFETY: the display is a live GdkWaylandDisplay, checked above, and GDK copies the id.
+        unsafe {
+            gdk_wayland_sys::gdk_wayland_display_set_startup_notification_id(
+                display.cast(),
+                token.as_ptr(),
+            );
+        }
+    }
 }
 
 #[cfg(windows)]
@@ -61,26 +106,101 @@ fn deliver(app: AppHandle, id: String, title: String, body: String, sound: bool)
         .show();
 }
 
+/// A click on a notification, with the desktop's permission to take focus when it gave one.
+#[cfg(target_os = "linux")]
+#[derive(Debug, PartialEq)]
+struct Click {
+    activation_token: Option<String>,
+}
+
+/// Show one notification and wait until it is clicked or closed. notify-rust keeps its connection
+/// private and listens for no activation token, and servers may address that signal only to the
+/// connection that asked for the notification, so this speaks the protocol itself.
+#[cfg(target_os = "linux")]
+fn show_until_answered(
+    connection: &zbus::blocking::Connection,
+    title: &str,
+    body: &str,
+    sound: bool,
+) -> zbus::Result<Option<Click>> {
+    use std::collections::HashMap;
+    use zbus::{message::Type, zvariant::Value, MatchRule};
+
+    // Subscribed first: a server may answer as soon as the notification is up.
+    let rule = MatchRule::builder()
+        .msg_type(Type::Signal)
+        .interface(NOTIFICATIONS)?
+        .build();
+    let signals = zbus::blocking::MessageIterator::for_match_rule(rule, connection, None)?;
+
+    let app_name = std::env::current_exe()
+        .ok()
+        .and_then(|path| Some(path.file_name()?.to_str()?.to_owned()))
+        .unwrap_or_default();
+    let hints: HashMap<&str, Value<'_>> = if sound {
+        HashMap::from([("sound-name", Value::from("message-new-instant"))])
+    } else {
+        HashMap::from([("suppress-sound", Value::from(true))])
+    };
+    let id: u32 = connection
+        .call_method(
+            Some(NOTIFICATIONS),
+            NOTIFICATIONS_PATH,
+            Some(NOTIFICATIONS),
+            "Notify",
+            &(
+                &app_name,
+                0u32,
+                &app_name,
+                title,
+                body,
+                vec!["default", "Open"],
+                hints,
+                -1i32,
+            ),
+        )?
+        .body()
+        .deserialize()?;
+
+    let mut activation_token = None;
+    for signal in signals {
+        let signal = signal?;
+        let header = signal.header();
+        let body = signal.body();
+        match header.member().map(|member| member.as_str()) {
+            // The specification sends the token before the action it belongs to.
+            Some("ActivationToken") => {
+                if let Ok((notification, token)) = body.deserialize::<(u32, String)>() {
+                    if notification == id {
+                        activation_token = Some(token);
+                    }
+                }
+            }
+            Some("ActionInvoked") => {
+                if let Ok((notification, action)) = body.deserialize::<(u32, String)>() {
+                    if notification == id {
+                        return Ok((action == "default").then_some(Click { activation_token }));
+                    }
+                }
+            }
+            Some("NotificationClosed") => {
+                if matches!(body.deserialize::<(u32, u32)>(), Ok((notification, _)) if notification == id)
+                {
+                    return Ok(None);
+                }
+            }
+            _ => {}
+        }
+    }
+    Ok(None)
+}
+
 #[cfg(target_os = "linux")]
 fn deliver(app: AppHandle, id: String, title: String, body: String, sound: bool) {
-    use notify_rust::{Hint, Notification};
-    let mut notification = Notification::new();
-    notification
-        .summary(&title)
-        .body(&body)
-        .auto_icon()
-        .action("default", "Open");
-    if sound {
-        notification.sound_name("message-new-instant");
-    } else {
-        notification.hint(Hint::SuppressSound(true));
-    }
-    if let Ok(handle) = notification.show() {
-        handle.wait_for_action(|action| {
-            if action == "default" {
-                activate(&app, &id);
-            }
-        });
+    let answer = zbus::blocking::Connection::session()
+        .and_then(|connection| show_until_answered(&connection, &title, &body, sound));
+    if let Ok(Some(click)) = answer {
+        activate(&app, &id, click.activation_token);
     }
 }
 
@@ -169,6 +289,140 @@ mod tests {
         assert_eq!(ledger.0.lock().unwrap().len(), 1);
     }
 
+    /// Runs `show_until_answered` against a notification server on a private connection, which
+    /// answers Notify with id 7 and then sends `signals`. Returns the answer and the hints it saw.
+    #[cfg(target_os = "linux")]
+    fn answered_by(
+        signals: Vec<(&'static str, Signal)>,
+        sound: bool,
+    ) -> (Option<Click>, Vec<String>) {
+        use std::{collections::HashMap, os::unix::net::UnixStream, thread};
+        use zbus::{
+            blocking::{connection::Builder, MessageIterator},
+            zvariant::OwnedValue,
+            Guid,
+        };
+
+        let (client, server) = UnixStream::pair().unwrap();
+        let guid = Guid::generate();
+        let server = thread::spawn(move || {
+            let connection = Builder::unix_stream(server)
+                .server(guid)
+                .unwrap()
+                .p2p()
+                .build()
+                .unwrap();
+            let call = MessageIterator::from(&connection)
+                .find_map(|message| {
+                    let message = message.unwrap();
+                    let is_notify = message.header().member().is_some_and(|m| m == "Notify");
+                    is_notify.then_some(message)
+                })
+                .unwrap();
+            type Notify = (
+                String,
+                u32,
+                String,
+                String,
+                String,
+                Vec<String>,
+                HashMap<String, OwnedValue>,
+                i32,
+            );
+            let hints = call.body().deserialize::<Notify>().unwrap().6;
+            connection.reply(&call.header(), &(7u32,)).unwrap();
+            for (name, signal) in signals {
+                let path = NOTIFICATIONS_PATH;
+                match signal {
+                    Signal::Text(id, text) => connection
+                        .emit_signal(None::<()>, path, NOTIFICATIONS, name, &(id, text))
+                        .unwrap(),
+                    Signal::Closed(id) => connection
+                        .emit_signal(None::<()>, path, NOTIFICATIONS, name, &(id, 2u32))
+                        .unwrap(),
+                }
+            }
+            // Held until the client has its answer, so every signal reaches it.
+            (connection, hints.into_keys().collect::<Vec<_>>())
+        });
+        let client = Builder::unix_stream(client).p2p().build().unwrap();
+        let answer = show_until_answered(&client, "Title", "Body", sound).unwrap();
+        (answer, server.join().unwrap().1)
+    }
+
+    #[cfg(target_os = "linux")]
+    enum Signal {
+        Text(u32, &'static str),
+        Closed(u32),
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_click_carries_the_activation_token_sent_before_it() {
+        let (click, _) = answered_by(
+            vec![
+                ("ActivationToken", Signal::Text(7, "token-from-the-server")),
+                ("ActionInvoked", Signal::Text(7, "default")),
+            ],
+            false,
+        );
+        assert_eq!(
+            click,
+            Some(Click {
+                activation_token: Some("token-from-the-server".to_owned())
+            })
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_click_from_a_server_without_tokens_has_none_so_the_window_asks_for_attention() {
+        let (click, _) = answered_by(vec![("ActionInvoked", Signal::Text(7, "default"))], false);
+        assert_eq!(
+            click,
+            Some(Click {
+                activation_token: None
+            })
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn signals_about_another_notification_are_not_this_click() {
+        let (click, _) = answered_by(
+            vec![
+                ("ActivationToken", Signal::Text(8, "someone-elses-token")),
+                ("ActionInvoked", Signal::Text(8, "default")),
+                ("NotificationClosed", Signal::Closed(8)),
+                ("ActionInvoked", Signal::Text(7, "default")),
+            ],
+            false,
+        );
+        assert_eq!(
+            click,
+            Some(Click {
+                activation_token: None
+            })
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn closing_or_another_action_is_not_a_click() {
+        let closed = vec![("NotificationClosed", Signal::Closed(7))];
+        assert_eq!(answered_by(closed, false).0, None);
+        let other = vec![("ActionInvoked", Signal::Text(7, "snooze"))];
+        assert_eq!(answered_by(other, false).0, None);
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn the_notification_asks_for_the_platform_sound_only_with_sound_on() {
+        let closed = || vec![("NotificationClosed", Signal::Closed(7))];
+        assert_eq!(answered_by(closed(), true).1, ["sound-name"]);
+        assert_eq!(answered_by(closed(), false).1, ["suppress-sound"]);
+    }
+
     #[test]
     fn zero_clears_the_badge() {
         assert_eq!(badge_value(0), None);
@@ -178,7 +432,10 @@ mod tests {
     #[test]
     fn the_overlay_clears_at_zero_and_rejects_a_wrong_size() {
         let pixels = vec![0; (OVERLAY_SIZE * OVERLAY_SIZE * 4) as usize];
-        assert_eq!(overlay_pixels(2, Some(pixels.clone())), Some(pixels.clone()));
+        assert_eq!(
+            overlay_pixels(2, Some(pixels.clone())),
+            Some(pixels.clone())
+        );
         assert_eq!(overlay_pixels(0, Some(pixels)), None);
         assert_eq!(overlay_pixels(2, Some(vec![0; 4])), None);
         assert_eq!(overlay_pixels(2, None), None);

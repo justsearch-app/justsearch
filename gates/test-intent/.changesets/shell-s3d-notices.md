@@ -14,9 +14,9 @@ notification. The taskbar badge counts Needs you. Settings › General › Notif
 On with sound.
 
 The notification plugin's desktop path is fire-and-forget, so a click never reaches the app. Delivery
-moved to `modules/shell/src-tauri/src/notices.rs`: `notify-rust` on Linux and
+moved to `modules/shell/src-tauri/src/notices.rs`: the freedesktop service over `zbus` on Linux and
 `tauri-winrt-notification` on Windows, both already in the lock file through the plugin, now direct
-dependencies. The shell also shows each event id once across windows. No capability changed. The npm
+dependencies, with `gdkwayland-sys` (already in the lock file through Tao) for the activation token. The shell also shows each event id once across windows. No capability changed. The npm
 `@tauri-apps/plugin-notification` lost its only importer, so it left `package.json` and
 `THIRD_PARTY_NOTICES` (regenerated); the Rust plugin and its capability entries stay, because
 unshipped platforms still deliver through it.
@@ -52,6 +52,21 @@ test files. The original twelve repaired checks are rerun in `shell-s3d-repaired
 original base, retaining their assertion fail-before evidence. Temporary adapters replace only
 Git worktree creation/removal with shared temporary clones and cap Vitest at four workers; before
 runs copy node_modules, so each checkout has its own dependency and build directories.
+
+The decisions repair closes five stale or lost decisions found on 29028ddad8. The focus read is
+repeated when a focus change overtakes it (`utils/windowFocusChange.ts`, a separate module so the
+eight test files that mock `windowFocus.js` keep working); a detach cancels pending decisions through
+the controller's lifecycle count. Work records the observation gap count when last seen active, and
+an older count at its end makes the notice not live. A write to the user-state document first takes in
+what another window saved, which covers every field; `setPluginSetting`, `recordRecentCommandId` and
+`registerKeybinding` now build on the document they receive. On Linux the shell speaks the
+notification protocol itself, because notify-rust neither listens for `ActivationToken` nor exposes
+the connection it may be addressed to, and hands the token to GDK before presenting the window.
+`shell-s3d-decisions-repaired.json` holds the checks failing by assertion on 29028ddad8.
+`shell-s3d-decisions-preserved.json` holds the new checks with no fail-before claim: behaviour that
+already held, new mechanisms with no before-state, and the Rust token path. All four earlier evidence
+files are rerun with their original bases, because their test files changed. The same temporary
+adapters apply, and `--before-root` keeps before-states in the session's temporary folder.
 
 ```json
 {
@@ -587,6 +602,284 @@ runs copy node_modules, so each checkout has its own dependency and build direct
           "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
           "delegationScope": "design decisions of the frame build, within the canonical design",
           "choice": "Finished work may notify only after at least 60 seconds of observed active work, measured separately for each indexing or transition episode, install, and operation. A shorter completion stays in the pill and Earlier; an unknown duration stays inside. Failures notify at any duration, subject to the existing focus, setting and replay rules.",
+          "label": "agent choice"
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "The decision to notify uses the window's focus at send time: a focus read that a focus change overtook is read again, so a background result older than focus returning sends nothing and a focused result older than focus leaving still notifies.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "DE5",
+          "quote": "Notices only when you're not looking: in-app notice only for needs-you items when you're elsewhere in the app; nothing for what is on screen; OS notification only when the app is in the background, for agent requests waiting and long work finished or failed; taskbar badge counts needs-you; Settings › General › Notifications: Off / On / On with sound.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "design decisions of the frame build, within the canonical design",
+          "choice": "A focus read older than the latest focus change is discarded and read again until a result is current, in both directions, so a request is neither sent to a person who is looking nor lost when they look away during the check.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s3d-decisions-repaired.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 an agent request a background result older than focus returning to the window sends nothing",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 an agent request a focused result older than the window losing focus is read again, so the request still notifies",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 an agent request focus changing again during the second read keeps reading until a result is current"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Detaching the pill cancels its pending notification decisions, even when it reattaches before the focus check answers.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "C10",
+          "quote": "Host lifecycle: shell teardown/remount and desktop hide-to-tray/reopen don't duplicate streams or listeners, orphan prompts, lose activity reporting or break idle locking.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s3d-decisions-repaired.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 an agent request C10 detaching and reattaching while the focus check waits cancels the old decision"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+        "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Work whose end was seen only across a gap in observation raises no desktop notification, finished or failed, for transitions, indexing, installs and operations; the pill and Earlier still show it.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "C6",
+          "quote": "Historical replay stays silent: startup snapshots, reconnects and late resource discovery list retained records in Earlier without new notices, sounds, badges or completion announcements.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "design decisions of the frame build, within the canonical design",
+          "choice": "A desktop notification needs the end of the work to be observed live: the work was seen active, with no gap in observation, up to the observation that shows it ended. A gap is lost engine contact, a failed read of that operation, or the pill being detached. This holds for failures as well as completions; the Problems section still reports a failure.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s3d-decisions-repaired.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 work ending across a gap in observation a transition finished while disconnected is silent, and Earlier still lists it",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 work ending across a gap in observation indexing finished while disconnected is silent",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 work ending across a gap in observation an install finished while disconnected is silent",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 work ending across a gap in observation an install that failed while disconnected is silent, its end was not observed either",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 work ending across a gap in observation an operation complete while disconnected is silent",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 work ending across a gap in observation an operation failed while disconnected is silent",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 work ending across a gap in observation an operation ending behind a failed read is silent",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 work ending across a gap in observation an operation ending across a detach is silent",
+        "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts#DE5 work duration C6 work whose end was not observed stays silent, finished or failed"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "A gap does not silence work that was seen active again and then ended live, and a poll lagging while contact holds is not a gap.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "C6",
+          "quote": "Historical replay stays silent: startup snapshots, reconnects and late resource discovery list retained records in Earlier without new notices, sounds, badges or completion announcements.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "design decisions of the frame build, within the canonical design",
+          "choice": "A lagging poll with engine contact held is not a gap in observation: timers are throttled in the minimised window a notification is for, so counting it would silence real completions.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s3d-decisions-preserved.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 work ending across a gap in observation a poll that lagged while contact held is not a gap, so the end still notifies",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 work ending across a gap in observation work seen active again after the gap ends live, so it notifies",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 work ending across a gap in observation an install seen active again after the gap ends live, so it notifies",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 work ending across a gap in observation an operation seen running again after the gap ends live, so it notifies"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "A write from one window keeps what another window saved, in every field of the user-state document: the edit applies to the latest stored document, and the writing window takes in the other window's values.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "C11",
+          "quote": "Any userState document or settings change preserves co-resident values.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "design decisions of the frame build, within the canonical design",
+          "choice": "The fix is at the document layer: each write first re-reads the stored document and takes in another window's save, then applies the edit, so every field is covered. Producers build on the document they receive. The stored format does not change. The writing window sees the other window's values from that write on; windows do not otherwise update each other live.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s3d-decisions-repaired.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 a write from one window keeps Off chosen in another window",
+        "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 a write from one window keeps the other window's value in every kind of field: cross-profile, per plugin and per profile",
+        "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 a write from one window keeps both windows' entries when both add to the same list",
+        "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 a write from one window keeps both windows' keybindings when both add one",
+        "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 a write from one window leaves the window it is made in up to date with what it kept",
+        "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 a write from one window that changes nothing still leaves the window up to date",
+        "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 a write from one window a later write from the first window keeps the value too",
+        "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 profiles across windows a window stays on its profile, and its edit lands there, while storage keeps the other window's choice",
+        "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 profiles across windows a profile created in another window survives a write here",
+        "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 profiles across windows a window whose profile another window deleted moves to the stored one instead of bringing it back"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "The re-read leaves alone what must not change: a window's own later choice wins its field, a window stays on its profile, a lone window keeps a session-only edit, a newer build's document is not adopted, and the stored format is unchanged.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "C11",
+          "quote": "Any userState document or settings change preserves co-resident values.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "design decisions of the frame build, within the canonical design",
+          "choice": "A window keeps showing its own profile when another window switches, so an edit lands on the profile on screen, while storage keeps the other window's choice until this window switches. A window whose profile was deleted elsewhere moves to the stored one.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s3d-decisions-preserved.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 a write from one window keeps writing what it chose over the same field from earlier",
+        "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 profiles across windows switching profile in the first window then takes over the stored choice",
+        "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 profiles across windows deleting the profile another window chose does not leave storage pointing at it",
+        "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 what the re-read leaves alone one window alone keeps a session-only edit whose save failed (F10)",
+        "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 what the re-read leaves alone a stored document from a newer build is not adopted (F9)",
+        "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 what the re-read leaves alone the stored format is unchanged: the same version and fields as before"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/utils/windowFocusChange.test.ts",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Every change in the window's focus is reported, from the DOM and inside the shell from the native signal, and stopping ends the watch, even before the native subscription lands, so a remount watches once.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "C10",
+          "quote": "Host lifecycle: shell teardown/remount and desktop hide-to-tray/reopen don't duplicate streams or listeners, orphan prompts, lose activity reporting or break idle locking.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "DE5",
+          "quote": "Notices only when you're not looking: in-app notice only for needs-you items when you're elsewhere in the app; nothing for what is on screen; OS notification only when the app is in the background, for agent requests waiting and long work finished or failed; taskbar badge counts needs-you; Settings › General › Notifications: Off / On / On with sound.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s3d-decisions-preserved.json",
+      "newChecks": [
+        "modules/ui-web/src/utils/windowFocusChange.test.ts#DE5 onWindowFocusChange reports focus, until stopped",
+        "modules/ui-web/src/utils/windowFocusChange.test.ts#DE5 onWindowFocusChange reports blur, until stopped",
+        "modules/ui-web/src/utils/windowFocusChange.test.ts#DE5 onWindowFocusChange reports visibilitychange, until stopped",
+        "modules/ui-web/src/utils/windowFocusChange.test.ts#DE5 onWindowFocusChange inside the shell also reports the native signal, and stopping removes it",
+        "modules/ui-web/src/utils/windowFocusChange.test.ts#DE5 onWindowFocusChange C10 stopping before the native subscription lands still removes it",
+        "modules/ui-web/src/utils/windowFocusChange.test.ts#DE5 onWindowFocusChange outside the shell asks for no native signal",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 an agent request C10 a remount watches focus once: the old watch is stopped"
+      ]
+    },
+    {
+      "items": [
+        "modules/shell/src-tauri/src/notices.rs#cfg(test)"
+      ],
+      "class": "New",
+      "behaviour": "On Linux a click carries the activation token the notification server sent before it for that notification; a server that sends none gives a click without one; closing, another action and another notification's signals are not this click; the sound hints are unchanged.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "DE5",
+          "quote": "Notices only when you're not looking: in-app notice only for needs-you items when you're elsewhere in the app; nothing for what is on screen; OS notification only when the app is in the background, for agent requests waiting and long work finished or failed; taskbar badge counts needs-you; Settings › General › Notifications: Off / On / On with sound.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "design decisions of the frame build, within the canonical design",
+          "choice": "A clicked notification raises the window where the desktop allows: the shell hands the server's activation token to the toolkit before presenting the window, and without a token it requests user attention. A compositor that still refuses is a named limit, not a failure.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s3d-decisions-preserved.json",
+      "newChecks": [
+        "modules/shell/src-tauri/src/notices.rs#notices::tests::a_click_carries_the_activation_token_sent_before_it",
+        "modules/shell/src-tauri/src/notices.rs#notices::tests::a_click_from_a_server_without_tokens_has_none_so_the_window_asks_for_attention",
+        "modules/shell/src-tauri/src/notices.rs#notices::tests::signals_about_another_notification_are_not_this_click",
+        "modules/shell/src-tauri/src/notices.rs#notices::tests::closing_or_another_action_is_not_a_click",
+        "modules/shell/src-tauri/src/notices.rs#notices::tests::the_notification_asks_for_the_platform_sound_only_with_sound_on"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "signature"
+      ],
+      "whatMoved": "workFinishedNotice and workFailedNotice take whether the end was observed live as their second argument, where it used to be fixed to true. Existing checks pass true and every assertion is unchanged. Every check in the file is rerun in shell-s3d-preserved.json and shell-s3d-duration-preserved.json, or shell-s3d-duration-repaired.json for its fail-before.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "design decisions of the frame build, within the canonical design",
+          "choice": "A desktop notification needs the end of the work to be observed live: the work was seen active, with no gap in observation, up to the observation that shows it ended.",
           "label": "agent choice"
         }
       ]
