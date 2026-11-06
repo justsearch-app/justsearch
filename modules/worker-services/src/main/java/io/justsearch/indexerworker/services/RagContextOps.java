@@ -255,17 +255,6 @@ final class RagContextOps {
       Set<String> docIds, int topK, int maxContextTokens,
       boolean allowQueryEmbeddings, String compatibilityReason,
       EngineContext.Urgency urgency, io.justsearch.core.execution.EngineTaskLifetime childLifetime,
-      InferenceRequest acquisition, SemanticDeadline semantic) {
-    return executeRetrieval(request, docIds, topK, maxContextTokens, allowQueryEmbeddings,
-        compatibilityReason, urgency, childLifetime, acquisition, semantic,
-        io.justsearch.configuration.InternalCollections.includesHistory(request.getCollectionList()));
-  }
-
-  RetrieveContextResponse executeRetrieval(
-      io.justsearch.ipc.RetrieveContextRequest request,
-      Set<String> docIds, int topK, int maxContextTokens,
-      boolean allowQueryEmbeddings, String compatibilityReason,
-      EngineContext.Urgency urgency, io.justsearch.core.execution.EngineTaskLifetime childLifetime,
       InferenceRequest acquisition, SemanticDeadline semantic, boolean includePrivateData) {
     acquisition.remainingNanos();
 

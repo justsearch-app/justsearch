@@ -34,7 +34,7 @@ final class AdmissionSourceHashTest {
       hashes.when(() -> SourceContentHash.isCloudPlaceholder(file)).thenReturn(true);
       placeholders.when(() -> CloudPlaceholderDetector.isCloudPlaceholder(file)).thenReturn(true);
       assertNull(SourceContentHash.admissionIdentity(file, temporary));
-      var admission = new WorkerIngestionAuthority().admit(file, temporary);
+      var admission = new WorkerIngestionAuthority().admit(file, temporary, null);
       assertEquals(SourceAdmissionAction.RETRYABLE_FAILURE, admission.action());
       assertEquals(IngestionReasonCodes.CLOUD_PLACEHOLDER, admission.outcome().reasonCode());
       hashes.verify(() -> SourceContentHash.isCloudPlaceholder(file));

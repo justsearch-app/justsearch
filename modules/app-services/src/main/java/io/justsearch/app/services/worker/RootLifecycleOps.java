@@ -570,10 +570,6 @@ final class RootLifecycleOps {
         }
     }
 
-    IndexingService.DeletionOutcome deleteDocByIdWithOutcome(String docId, EngineContext engineContext) {
-        return deleteDocByIdWithOutcome(docId, engineContext, deleteByIdFn);
-    }
-
     IndexingService.DeletionOutcome deleteDocByIdWithOutcome(String docId, EngineContext engineContext,
             java.util.function.BiFunction<String, EngineContext, DeleteByIdResponse> deleteSettled) {
         if (docId == null || docId.isBlank()) {

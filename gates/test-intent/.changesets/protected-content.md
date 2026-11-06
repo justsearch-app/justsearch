@@ -15,6 +15,17 @@ in existing tests; the independent verifier checks the new sources and fail-befo
   "entries": [
     {
       "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/WorkerIngestionAuthorityTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/AdmissionSourceHashTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "input re-encoding"
+      ],
+      "whatMoved": "Pass an explicit null collection to the remaining admission signature. The removed two-argument overload passed null to this same method; every existing input, assertion, fixture, resource and timing limit is unchanged."
+    },
+    {
+      "items": [
         "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteDocumentServiceRequestEndTest.java"
       ],
       "class": "Adaptation",
@@ -49,7 +60,7 @@ in existing tests; the independent verifier checks the new sources and fail-befo
           "label": "agent choice"
         }
       ],
-      "conflictSearch": "decision records searched for a conflict: none; repeated search of docs/decisions for .env, .gitignore, protected files and hidden directories found no conflicting contract. Only the former .env exemption is superseded; ordinary exclusions and the .gitignore exemption remain."
+      "conflictSearch": "decision records searched for a conflict: none; repeated search of docs/decisions for .env, .gitignore, protected files and hidden directories found no conflicting contract. Only the former .env exemption is superseded; ordinary exclusions and the .gitignore exemption remain. WorkerUserExclusionsTest now passes an explicit null collection to the remaining admission signature after deleting the unused two-argument wrapper; every input and assertion is preserved."
     },
     {
       "items": [
@@ -142,7 +153,7 @@ in existing tests; the independent verifier checks the new sources and fail-befo
       "moved": [
         "instrumentation"
       ],
-      "whatMoved": "Select the two-argument completion-receipt overload that the existing reflection fixture invokes. The unspecified getDeclaredMethods order otherwise selects the same-name three-argument overload and fails before any existing assertion executes. Every assertion, request, response, resource and timing limit is unchanged. The original fixture fails twice on 0932dc7127; the corrected selector is checked on that baseline and the repaired source."
+      "whatMoved": "Select the remaining completion-receipt signatures: two arguments for prefix deletion and three for file deletion, supplying the fixture's existing deleteByIdFn callback to file deletion. The Apply proxy forwards its existing path and context through the same selector. Every assertion, request, response, callback, resource and timing limit is unchanged; unused production wrappers are removed rather than retained for reflection."
     },
     {
       "items": [

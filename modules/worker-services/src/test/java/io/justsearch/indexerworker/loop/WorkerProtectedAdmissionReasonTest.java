@@ -24,19 +24,19 @@ final class WorkerProtectedAdmissionReasonTest {
   void protectedEnvHasDistinctSkipReason() throws Exception {
     Path env = Files.writeString(root.resolve(".env"), "env");
     var authority = new WorkerIngestionAuthority();
-    var admission = authority.admit(env, root);
+    var admission = authority.admit(env, root, null);
     assertNotNull(admission.outcome(), "protected env must carry a protected skip outcome");
     assertEquals("SKIPPED_PROTECTED", admission.outcome().reasonCode());
-    assertEquals(SourceAdmissionAction.SKIP_DONE, authority.admit(env, root).action());
+    assertEquals(SourceAdmissionAction.SKIP_DONE, authority.admit(env, root, null).action());
     Path system = Files.writeString(root.resolve("Thumbs.db"), "system");
-    assertEquals("SKIPPED_TEMP_OR_SYSTEM", authority.admit(system, root).outcome().reasonCode());
-    assertEquals(SourceAdmissionAction.SKIP_DONE, authority.admit(system, root).action());
+    assertEquals("SKIPPED_TEMP_OR_SYSTEM", authority.admit(system, root, null).outcome().reasonCode());
+    assertEquals(SourceAdmissionAction.SKIP_DONE, authority.admit(system, root, null).action());
   }
 
   @Test
   void ordinaryGitignoreRemainsAdmitted() throws Exception {
     Path gitignore = Files.writeString(root.resolve(".gitignore"), "ignored.txt");
     assertEquals(SourceAdmissionAction.ADMIT,
-        new WorkerIngestionAuthority().admit(gitignore, root).action());
+        new WorkerIngestionAuthority().admit(gitignore, root, null).action());
   }
 }

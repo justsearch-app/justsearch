@@ -69,16 +69,8 @@ final class WorkerIngestionAuthority {
     userExclusions = java.util.Objects.requireNonNull(exclusions, "exclusions");
   }
 
-  boolean excludes(Path file, Path root) {
-    return excludes(file, root, null);
-  }
-
   boolean excludes(Path file, Path root, String collection) {
     return IngestionSkipPolicy.shouldSkipWithinRoot(file, root, collection) || userExclusions.test(file, root);
-  }
-
-  SourceAdmission admit(Path filePath, Path root) throws IOException {
-    return admit(filePath, root, null);
   }
 
   SourceAdmission admit(Path filePath, Path root, String collection) throws IOException {
