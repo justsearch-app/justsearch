@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-06T07:37:48.127Z",
-  "revision": "1d74a74131e48da790f5e06b90535978c23e6400",
-  "tree": "3fc34af16c9d67d50baf5973178b443287e6b6fd",
+  "createdAt": "2026-11-06T08:32:51.522Z",
+  "revision": "1b3d30da00bcd55646a89d051e3f910a8f5fe4e2",
+  "tree": "e9eeadeb824abcc7144aeb253a4df355627293a1",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.CombinedChunkPublicationTest\" --tests \"io.justsearch.indexerworker.loop.EnrichmentLaneDecompositionTest\" --tests \"io.justsearch.indexerworker.loop.ops.BlankChunkReadinessIntegrationTest\" --tests \"io.justsearch.indexerworker.loop.ops.BulkEncodeUrgencyTest\" --tests \"io.justsearch.indexerworker.loop.ops.BulkPacePolicyUseTest\" --tests \"io.justsearch.indexerworker.loop.ops.BulkPaceStretchTest\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentBackfillOpsTest\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentCycleBudgetTest\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentFailureAccountingTest\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentLongDocumentTest\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentRmwIntegrationTest\" --tests \"io.justsearch.indexerworker.loop.ops.DisambiguationReconciliationTest\" --tests \"io.justsearch.indexerworker.loop.ops.EmbeddingBackfillOpsTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentAttemptAccountingTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentAuthorityRaceTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentExclusionPublicationTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentHardStopRepairTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentInternalStopTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentMapperDispositionTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentPreservationTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentPublicationBenchmarkTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentQuarantineProgressTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentRevisionRaceTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest\" --tests \"io.justsearch.indexerworker.loop.ops.NerBackfillOpsTest\" --tests \"io.justsearch.indexerworker.loop.ops.NerLazyCreationRetryTest\" --tests \"io.justsearch.indexerworker.loop.ops.SpladeBackfillOpsTest\" --tests \"io.justsearch.indexerworker.loop.ops.SpladeOptInResumeTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 83472
+      "durationMs": 82529
     }
   ],
   "checks": [
@@ -529,7 +529,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentFailureAccountingTest.java",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentFailureAccountingTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:f153a4244f4093d5c43b0a5c9a5e7b8d1596e79db13d4c80eecab39d8785626a",
+      "contentDigest": "sha256:fd2c1e5cde1d86a5ab31d1064d8a0f8c59db6290b241aaf721ad4298637b3756",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -600,6 +600,50 @@
         },
         {
           "name": "interruptedRejectedBatchReportsPublishedCount()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] 0",
+          "status": "passed"
+        },
+        {
+          "name": "[2] 1",
+          "status": "passed"
+        },
+        {
+          "name": "[3] 2",
+          "status": "passed"
+        },
+        {
+          "name": "[1] false, 0",
+          "status": "passed"
+        },
+        {
+          "name": "[2] false, 1",
+          "status": "passed"
+        },
+        {
+          "name": "[3] false, 2",
+          "status": "passed"
+        },
+        {
+          "name": "[4] true, 0",
+          "status": "passed"
+        },
+        {
+          "name": "[5] true, 1",
+          "status": "passed"
+        },
+        {
+          "name": "[6] true, 2",
+          "status": "passed"
+        },
+        {
+          "name": "[1] 0",
+          "status": "passed"
+        },
+        {
+          "name": "[2] 2",
           "status": "passed"
         },
         {
@@ -3966,5 +4010,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:9f772cbe08abad2459e5d6dc1df26db65c94a1a2ed78231a10d57509b15efd0c"
+  "digest": "sha256:8f1a09bcbe6b910ec921e986e37cfebb4e037aac1f560c1f618732b67cf0ea7f"
 }
