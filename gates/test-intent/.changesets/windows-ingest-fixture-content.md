@@ -77,3 +77,14 @@ checks; hosted acquisition and recovery evidence is still required for real Wind
   "note": "Baseline-before-diff independent review accepts input-location and cleanup adaptation; original oracles retained. Linux5pass; Windows execution pending."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1b1ce-7eee-7b23-8b13-3314d9262da6",
+  "verdict": "accept",
+  "digest": "sha256:558d977cd767061e2f45d86fd126e64379e4c959c5bd876bc684019079cdd4bf",
+  "note": "Independent final intent acceptance at 5df5262cd57c52914b747485e94da52c4ae893ca; all entries accepted within recorded evidence limits. Full hosted tier and publication gate remain separate."
+}
+```

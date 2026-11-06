@@ -297,3 +297,14 @@ process-census limits remain unchanged.
 The observation repair leaves production admission, normalization, queue, ledger and runtime APIs unchanged.
 The historical failed Windows artifact remains preserved in Git history and the rejection
 above is retained unchanged; neither is a pass for the repaired source.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1b1ce-7eee-7b23-8b13-3314d9262da6",
+  "verdict": "accept",
+  "digest": "sha256:7a5c1ee83fcf5a0af5e9a32ffae5e228f6751d277fa8f75948922b9d2a3d0b6b",
+  "note": "Independent final intent acceptance at 5df5262cd57c52914b747485e94da52c4ae893ca; all entries accepted within recorded evidence limits. Full hosted tier and publication gate remain separate."
+}
+```
