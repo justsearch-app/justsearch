@@ -59,6 +59,15 @@ function contains(ancestor: Element, el: Element | null): boolean {
   return false;
 }
 
+/** A window's own tab row: the tabs of a details pane inside the window are the details region. */
+function windowTabs(root: Element): Element | null {
+  return deepQuery(root, '[role="tablist"]', el => {
+    if (!isShown(el)) return false;
+    for (let node: Element | null = el; node; node = flatParent(node)) if (node.hasAttribute('data-details-pane')) return false;
+    return true;
+  });
+}
+
 const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /**
@@ -83,7 +92,7 @@ function target(region: FrameRegion): HTMLElement | null {
         ?? deepQuery(root, FOCUSABLE, shown)) as HTMLElement | null;
     }
     case 'window-tabs': {
-      const tablist = deepQuery(root, '[role="tablist"]', isShown);
+      const tablist = windowTabs(root);
       if (!tablist) return null;
       return (tablist.querySelector('[role="tab"][aria-selected="true"]')
         ?? tablist.querySelector('[role="tab"]')) as HTMLElement | null;
@@ -93,7 +102,7 @@ function target(region: FrameRegion): HTMLElement | null {
     case 'details': {
       const pane = deepQuery(root, DETAILS_SELECTOR, isShown);
       if (!pane) return null;
-      const inner = deepQuery(pane, FOCUSABLE, isShown);
+      const inner = deepQuery(pane, '[role="tab"][aria-selected="true"]', isShown) ?? deepQuery(pane, FOCUSABLE, isShown);
       if (inner) return inner as HTMLElement;
       return focusableOnce(pane as HTMLElement);
     }
@@ -109,7 +118,7 @@ function currentRegion(regions: readonly FrameRegion[]): number {
     const region = regions[index];
     if (!region?.root) continue;
     const scope = kind === 'details' ? deepQuery(region.root, DETAILS_SELECTOR, isShown)
-      : kind === 'window-tabs' ? deepQuery(region.root, '[role="tablist"]', isShown)
+      : kind === 'window-tabs' ? windowTabs(region.root)
         : region.root;
     if (scope && contains(scope, active)) return index;
   }

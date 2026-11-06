@@ -60,6 +60,8 @@ export class WindowDetails extends JfElement {
   private opener: HTMLElement | null = null;
   private unsubs: Array<() => void> = [];
   private observer: ResizeObserver | null = null;
+  /** The stage, or a split's pane: what this window and its details share. */
+  private box: HTMLElement | null = null;
 
   constructor() {
     super();
@@ -73,13 +75,14 @@ export class WindowDetails extends JfElement {
 
   override connectedCallback(): void {
     super.connectedCallback();
+    this.box = (this.parentElement ?? (this.getRootNode() as ShadowRoot).host) as HTMLElement;
     this.unsubs = [
       subscribeInspector(state => this.onInspector(state)),
       onInspectorTabChange(() => this.onPluginTabsChange()),
     ];
     if (typeof ResizeObserver !== 'undefined') {
       this.observer = new ResizeObserver(() => this.measure());
-      this.observer.observe(this.windowBox());
+      this.observer.observe(this.box);
     }
     this.measure();
   }
@@ -91,6 +94,7 @@ export class WindowDetails extends JfElement {
     this.observer?.disconnect();
     this.observer = null;
     this.previousElementSibling?.removeAttribute('inert');
+    this.box?.style.removeProperty('padding-inline-end');
   }
 
   /** The element is reused when the window changes: another window's document must not come along. */
@@ -108,17 +112,15 @@ export class WindowDetails extends JfElement {
       if (opened && this.overlay) void this.focusPane();
     }
     this.style.setProperty('--details-width', `${this.widthPx}px`);
+    // The window takes what an inline pane leaves; a sheet leaves it everything.
+    if (this.selected !== null && !this.overlay) this.box?.style.setProperty('padding-inline-end', `${this.widthPx}px`);
+    else this.box?.style.removeProperty('padding-inline-end');
     // A sheet is the only thing the keyboard should reach in its window.
     this.previousElementSibling?.toggleAttribute('inert', this.selected !== null && this.overlay);
   }
 
-  /** The stage, or a split's pane: what this window and its details share. */
-  private windowBox(): Element {
-    return this.parentElement ?? (this.getRootNode() as ShadowRoot).host;
-  }
-
   private measure(): void {
-    const width = this.windowBox().getBoundingClientRect().width;
+    const width = this.box?.getBoundingClientRect().width ?? 0;
     this.overlay = !detailsPaneIsInline(width > 0 ? width : Number.POSITIVE_INFINITY);
   }
 
@@ -157,6 +159,13 @@ export class WindowDetails extends JfElement {
     this.clear();
     if (getInspectorState().owner === this.windowId) setInspectorOpen(false);
     void this.updateComplete.then(() => { if (opener?.isConnected) opener.focus(); });
+  }
+
+  /** Close from outside the pane (Escape with the keyboard on the page). False when none is open. */
+  closeDetails(): boolean {
+    if (this.selected === null) return false;
+    this.close();
+    return true;
   }
 
   private readonly onKeydown = (event: KeyboardEvent): void => {
@@ -232,18 +241,18 @@ export class WindowDetails extends JfElement {
   static styles = css`
     :host {
       display: block;
-      position: relative;
-      flex: 0 0 auto;
-      min-block-size: 0;
+      position: absolute;
+      inset-block: 0;
+      inset-inline-end: 0;
     }
     :host(:not([overlay])) jf-details-pane { inline-size: var(--details-width); }
     /* Below 980 px the frame positions itself against the window's box. */
-    :host([overlay]) { position: static; flex: none; }
+    :host([overlay]) { position: static; }
     .grip {
       position: absolute;
       inset-block: 0;
       inset-inline-start: calc(-1 * var(--jf-space-2));
-      z-index: 1;
+      z-index: var(--z-base);
       inline-size: var(--jf-space-4);
       padding: 0;
       border: 0;

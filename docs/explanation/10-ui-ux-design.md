@@ -69,7 +69,7 @@ the top bar (banner), its area switcher (navigation) and the window area (main).
 | More (⋯) menu | System (Health, Activity, Logs), Help & shortcuts (F1) and About; windows contributed by the catalog or plugins under “More”; a Developer group (API explorer, Copy link to this view, Show backend address) only while the developer view tier is on (Settings › Developer › View tier) |
 | Window tab row | A window's own tabs at its top (Library: Folders, Browse; AI Brain: AI Brain, Memory; System: Health, Logs, Activity) and its window actions. Search has none |
 | Stage | The active window; layouts can also compose a second window in a split stage, with a picker for the second pane |
-| Details pane (`jf-details-pane`) | At most one per window, on its right edge: tabs, 360-560 px and resizable, inline from 980 px of window width, a sheet over the window below. Each window owns its details, so a split stage's two windows never show each other's selection |
+| Details pane (`jf-details-pane`) | At most one per window, on its right edge: tabs that scroll rather than shrink, 360-560 px and resizable, inline from 980 px of window width, a sheet over the window below. Each window owns its details, so a split stage's two windows never show each other's selection |
 | Status pill and panel (`jf-status-pill`, `jf-status-panel`) | One status in the top bar; the pill opens current conditions, work and earlier activity over the page |
 | Overlay slots (`jf-overlay-host`) | Command palette, Settings, authorization dialogs and other transient surfaces in named slots. The frame has no side drawers |
 
@@ -113,7 +113,8 @@ Back never reopens Settings from there.
   runs that can be resumed, replayed or exported. Legacy mode-specific
   surface IDs remain compatibility addresses rather than extra destinations.
 - **Library** manages indexed sources and folders, their state, exclusions and recovery actions.
-  A folder's failed files list under the folder; its `N failed` chip and its problem both go there.
+  A folder's failed files list under the folder and open and close with it, scrolling past a set
+  height; its `N failed` chip and its problem both open the folder and go there.
 - **AI Brain** presents AI installation and readiness; engine configuration sits behind
   its own Advanced settings disclosure, independent of the app-wide Detailed mode. It surfaces schema incompatibility and enrichment readiness
   rather than treating a drained job queue as complete semantic coverage.
@@ -349,8 +350,8 @@ facet controls. In the Search window, opening a result and choosing it for an As
 separate acts: a plain click opens the document; explicit selection controls choose files.
 The results can prepare an Ask about those chosen files.
 
-Space previews the focused result in a floating card; Space again or Escape closes it,
-Enter opens the file and the right arrow opens the result's details. The preview shows what
+Space previews the focused result in a floating card; Space again, Escape or leaving the row
+closes it, Enter opens the file and the right arrow opens the result's details. The preview shows what
 the result already carries. It never fires inside a text field, during composition, on key
 repeat or under a dialog.
 
@@ -369,6 +370,7 @@ nothing. The width is remembered across windows.
 
 A selection made elsewhere (`host.ui.showInspector`, a citation outside Search) opens in the
 details pane of the window the reader is in, beside the work; nothing navigates to Search.
+Escape with the keyboard on the page closes the pane of the window the pointer or focus was last in.
 
 ### Keyboard and implicit actions
 

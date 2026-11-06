@@ -60,6 +60,7 @@ import '../../components/chat/ReasoningBlock.js';
 import '../../components/Control.js';
 import type { CitationHoverCard, CitationHoverData } from '../../components/chat/CitationHoverCard.js';
 import type { CitationSelectDetail } from '../../components/chat/citationTypes.js';
+import type { Citation } from '../../components/chat/MarkdownBlock.js';
 import type { DocumentCitationAnchor } from '../../components/documentPane/DocumentPane.js';
 import {
   sv3CitationAnchor,
@@ -235,6 +236,9 @@ export type Sv3RunDecision =
  * non-zero so sub-pixel scroll heights cannot disarm the follow on their own.
  */
 const FOLLOW_END_SLACK_PX = 24;
+
+/** One empty list: the marks are bound by identity, and a new array would re-weave the answer. */
+const NO_MARKS: readonly Citation[] = [];
 
 /** The reference `size-3.5` on the inline disclosure's chevron. */
 const TAIL_CHEVRON_SIZE = 14;
@@ -2086,7 +2090,7 @@ export class Sv3Main extends JfElement {
                       data-turn-id=${turn.id}
                       .text=${turn.answer}
                       ?is-streaming=${streaming}
-                      .citations=${[...(turn.evidence?.marks ?? [])]}
+                      .citations=${turn.evidence?.marks ?? NO_MARKS}
                       frame=${sv3AnswerFrame(turn) ?? 'grounded'}
                       .sourceCount=${turn.evidence?.sources.length ?? 0}
                       @citation-select=${this.onCitationSelect}

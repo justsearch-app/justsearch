@@ -150,6 +150,7 @@ export function renderFolderRow(f: FolderRow, actions: RowActions): TemplateResu
       action-label=${f.removeConfirm.actionLabel} ?busy=${disabled}
       @confirm-band-confirm=${() => actions.invoke('confirm-remove')} @confirm-band-cancel=${() => actions.invoke('keep')}></jf-confirm-band>` : nothing}
     ${failed ? html`<jf-failed-files-list .folderPathHash=${f.pathHash ?? ''} .observedCount=${f.failed ?? 0}
-      .lastKnown=${f.failedLastKnown === true} .host_=${actions.host} api-base=${f.apiBase ?? ''}></jf-failed-files-list>` : nothing}
+      .lastKnown=${f.failedLastKnown === true} .host_=${actions.host} api-base=${f.apiBase ?? ''}
+      .collapsed=${!actions.expanded} @failed-files-expand=${actions.toggle}></jf-failed-files-list>` : nothing}
   </div>`;
 }

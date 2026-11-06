@@ -59,7 +59,7 @@ import { Sv3ComposerPort } from './Sv3ComposerPort.js';
 import { flushPendingNavigationWrite, refreshProjection } from '../../router/URLProjector.js';
 import { registerViewFactory, getViewFactory } from '../../router/viewFactoryRegistry.js';
 import { CORE_INTERACTION_SHAPES, ONE_WINDOW_MOUNT_TAG } from '../../plugin-api/coreInteractionShapes.js';
-import { subscribeInspector, setOpen as setInspectorOpen } from '../../state/inspectorState.js';
+import { subscribeInspector, setOpen as setInspectorOpen, getInspectorState } from '../../state/inspectorState.js';
 import type { DocumentLineRange } from '../../components/documentPane/DocumentPane.js';
 import { peekSearchV3Handoff, takeSearchV3Handoff } from '../../utils/compose.js';
 import { html, css, nothing, type TemplateResult } from 'lit';
@@ -1120,7 +1120,11 @@ export class SearchV3View extends JfElement {
     forgetCompletionOwner: () => this.forgetCompletionOwner,
     paneDocPath: () => this.paneDocPath,
     closePane: () => this.closePane(),
-    openResult: docPath => this.openPane({ docPath, anchor: null, turnId: '', sourceIndex: SV3_SOURCE_INDEX_ABSENT }),
+    openResult: docPath => {
+      this.details.rememberOpener();
+      this.openPane({ docPath, anchor: null, turnId: '', sourceIndex: SV3_SOURCE_INDEX_ABSENT });
+      if (this.paneOverlay) this.details.focusPane();
+    },
     announceWarning: message => emitEphemeralToast({ message, severity: 'warning' }),
     confirmForget,
     publishForgetCompletion: detail => publishForgetCompletion(this, detail.apiBase, detail.outcome, detail.owner),
@@ -1284,7 +1288,10 @@ export class SearchV3View extends JfElement {
       // Another window's selection stays in that window's details (C4).
       if (state.owner !== null && state.owner !== SV3_SURFACE_KEY) return;
       if (state.isOpen && state.selected?.path) {
+        const opening = this.paneTab === null;
+        if (opening) this.details.rememberOpener();
         this.openPane({ docPath: state.selected.path, turnId: '', sourceIndex: SV3_SOURCE_INDEX_ABSENT, anchor: null });
+        if (opening && this.paneOverlay) this.details.focusPane();
         this.paneSource = null;
         this.paneCitationHeader = null;
         this.sharedInspectorPath = state.selected.path;
@@ -2094,8 +2101,17 @@ export class SearchV3View extends JfElement {
     this.details.remember(false);
     const giveBack = this.details.takeFocusReturn();
     this.clearPane();
-    setInspectorOpen(false);
+    // A document another window holds stays open there (C4).
+    const { owner } = getInspectorState();
+    if (owner === null || owner === SV3_SURFACE_KEY) setInspectorOpen(false);
     void this.updateComplete.then(giveBack);
+  }
+
+  /** Close from outside the window (Escape with the keyboard on the page). False when none is open. */
+  closeDetails(): boolean {
+    if (this.paneTab === null) return false;
+    this.dismissPane();
+    return true;
   }
 
   private clearPane(): void {

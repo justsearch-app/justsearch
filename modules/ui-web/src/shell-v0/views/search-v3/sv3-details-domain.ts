@@ -168,9 +168,11 @@ export class Sv3DetailsDomain {
     const index = paneTab === null ? null : sv3TabSourceIndex(paneTab);
     const open = paneSource !== null && paneSource.sourceIndex !== SV3_SOURCE_INDEX_ABSENT ? paneSource.sourceIndex : index;
     const sources = sv3SourceTabs(this.turn(), open);
-    const reading: DetailsTab[] = paneDocPath !== null && sources.length === 0
+    // A document that is not one of the answer's sources (a result, a plugin's selection) has its own tab.
+    const unsourced = paneSource === null || paneSource.sourceIndex === SV3_SOURCE_INDEX_ABSENT;
+    const reading: DetailsTab[] = paneDocPath !== null && (unsourced || sources.length === 0)
       ? [{ id: SV3_PANE_DOCUMENT_TAB, label: filenameOf(paneDocPath), title: paneDocPath }] : [];
-    return [...reading, ...sources, { id: SV3_PANE_CONTEXT_TAB, label: 'Context', title: 'What the assistant sees' }, ...pluginDetailsTabs()];
+    return [...sources, ...reading, { id: SV3_PANE_CONTEXT_TAB, label: 'Context', title: 'What the assistant sees' }, ...pluginDetailsTabs()];
   }
 
   /** What plugin tabs are told is selected: the document on show. One object per document, so a

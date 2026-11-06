@@ -55,6 +55,8 @@
   --frame-details-max: 35rem;
   --frame-details-sheet-share: 49%;
   --frame-details-tab-max: 8.5rem;
+  /* A folder's failed files scroll past this height (design system §1: the problem sits at the item). */
+  --frame-failed-list-max: 24rem;
   /* === Primitive Palette ===
      Base colors and hue angles shared across semantic tokens.
      Override these to create new themes — semantic tokens derive from them. */

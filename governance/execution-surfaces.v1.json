@@ -435,6 +435,14 @@
       "note": "Tempdoc 849 slice 3 §8.1: the Search window's pane REGION. Forwards `citationHeader` to the shared reader verbatim and derives nothing — declared here so the discovery oracle names it, since a label re-authored at this hop is precisely the fork this register exists to prevent. Its guard is the test file the slice created (there was none before)."
     },
     {
+      "id": "evidence-fe-sv3-details-domain",
+      "kind": "consumer",
+      "lang": "ts",
+      "path": "modules/ui-web/src/shell-v0/views/search-v3/sv3-details-domain.ts",
+      "guard": "test:SearchV3View.pane",
+      "note": "Search's details pane decisions (S4): reads a turn's sources for the source tabs and the hide/restore control, and hands citation headers on through the shared `sv3CitationHeader` join. Declared so the discovery oracle names it; it re-authors no field of the evidence record, and its guard is the pane's own test file."
+    },
+    {
       "id": "evidence-fe-summarize-view",
       "kind": "consumer",
       "lang": "ts",

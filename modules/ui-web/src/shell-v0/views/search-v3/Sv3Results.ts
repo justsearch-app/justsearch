@@ -45,9 +45,6 @@ const SV3_RESULTS_CLEAR_SELECTION = 'sv3-results-clear-selection';
 
 const SKELETON_ROWS = 3;
 
-/** The floating card keeps this far from the window's edges. */
-const PREVIEW_EDGE_PX = 8;
-
 export class Sv3Results extends JfElement {
   static properties = {
     view: { attribute: false },
@@ -78,15 +75,20 @@ export class Sv3Results extends JfElement {
   }
 
   private readonly closePreview = (): void => {
+    this.previewRow?.removeEventListener('focusout', this.closePreview);
     this.previewId = null;
     this.previewRow = null;
   };
 
   private readonly onCardPreview = (event: Event): void => {
     const detail = (event as CustomEvent<{ id: string; row: HTMLElement }>).detail;
-    if (this.previewId === detail.id) { this.closePreview(); return; }
+    const again = this.previewId === detail.id;
+    this.closePreview();
+    if (again) return;
     this.previewId = detail.id;
     this.previewRow = detail.row;
+    // On the row, not around the list: a move inside the card's shadow tree never reaches this one.
+    detail.row.addEventListener('focusout', this.closePreview);
   };
 
   /** While the card is open the row keeps the keyboard, so the card's keys arrive here. */
@@ -136,8 +138,10 @@ export class Sv3Results extends JfElement {
     const row = this.previewRow?.getBoundingClientRect();
     if (card === null || row === undefined) return;
     const { width, height } = card.getBoundingClientRect();
-    card.style.insetInlineStart = `${Math.max(PREVIEW_EDGE_PX, Math.min(row.right - width - PREVIEW_EDGE_PX, window.innerWidth - width - PREVIEW_EDGE_PX))}px`;
-    card.style.insetBlockStart = `${Math.max(PREVIEW_EDGE_PX, Math.min(row.top + PREVIEW_EDGE_PX, window.innerHeight - height - PREVIEW_EDGE_PX))}px`;
+    // The card keeps one step of the scale from the window's edges.
+    const edge = 'var(--jf-space-2)';
+    card.style.insetInlineStart = `clamp(${edge}, calc(${row.right - width}px - ${edge}), calc(100vw - ${width}px - ${edge}))`;
+    card.style.insetBlockStart = `clamp(${edge}, calc(${row.top}px + ${edge}), calc(100vh - ${height}px - ${edge}))`;
   }
 
   /** The floating card (design system §7, ref-04). Everything in it is already on the row's record. */
@@ -163,7 +167,7 @@ export class Sv3Results extends JfElement {
     const view = this.view;
     return html`
       <section class="results" aria-label="Search results" data-testid="sv3-results"
-        @card-preview=${this.onCardPreview} @keydown=${this.onPreviewKeydown} @focusout=${this.closePreview}>
+        @card-preview=${this.onCardPreview} @keydown=${this.onPreviewKeydown}>
         <h2 class="heading" data-testid="sv3-results-heading">Results for “${view.query}”</h2>
         ${this.filters(view.filters)} ${this.selection(view)} ${this.body(view)}
       </section>

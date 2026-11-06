@@ -140,6 +140,7 @@ export type TokenName =
   | '--frame-details-tab-max'
   | '--frame-dialog-dim'
   | '--frame-dialog-width'
+  | '--frame-failed-list-max'
   | '--frame-focus-width'
   | '--frame-hairline'
   | '--frame-menu-width'
@@ -386,6 +387,7 @@ export const TOKEN_NAMES: readonly TokenName[] = [
   '--frame-details-tab-max',
   '--frame-dialog-dim',
   '--frame-dialog-width',
+  '--frame-failed-list-max',
   '--frame-focus-width',
   '--frame-hairline',
   '--frame-menu-width',

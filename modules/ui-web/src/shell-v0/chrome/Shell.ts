@@ -82,6 +82,7 @@ import '../components/AuthorizationHost.js';
 import { requestAuthorization } from '../operations/authorizationBroker.js';
 // §25.δ2 — per-action audit log surface (filterable Effect Journal viewer).
 import '../components/detailsPane/WindowDetails.js';
+import type { WindowDetails } from '../components/detailsPane/WindowDetails.js';
 import { requestActivitySection } from '../state/activitySection.js';
 import { getAgentSessionController } from '../state/agentSessionStore.js';
 // 543-fwd #12 — macro dry-run diff panel (opens via jf-open-macro-dry-run).
@@ -1348,6 +1349,7 @@ export class Shell extends JfElement {
       this.refreshSurfaces();
     });
     document.addEventListener('keydown', this.boundKeyHandler, true);
+    document.addEventListener('keydown', this.onPageEscape);
     // Slice 492 — Intent substrate bootstrap.
     //
     // Three-tier wiring per the substrate-completion design:
@@ -1835,6 +1837,7 @@ export class Shell extends JfElement {
       this.undoOperationListener = null;
     }
     document.removeEventListener('keydown', this.boundKeyHandler, true);
+    document.removeEventListener('keydown', this.onPageEscape);
     // Slice 492 — tear down intent substrate.
     //
     // The flag set BEFORE iterating tells any in-flight async
@@ -2076,6 +2079,17 @@ export class Shell extends JfElement {
     ];
     focusRegion(regions, direction);
   }
+
+  /**
+   * Escape with the keyboard on the page, where no window hears it: the details of the window last
+   * in use close (DP1). Bubbling, so anything more local has already had the key.
+   */
+  private readonly onPageEscape = (e: KeyboardEvent): void => {
+    if (e.key !== 'Escape' || e.defaultPrevented || e.isComposing || modalOwnsFocus()) return;
+    const active = deepActiveElement();
+    if (active !== null && active !== document.body && active !== this.shadowRoot?.querySelector('.stage')) return;
+    if (this.shadowRoot?.querySelector<Stage>('jf-stage')?.closeDetails()) e.preventDefault();
+  };
 
   /** Alt+Left/Right; on macOS, in a text field Option+Left/Right move the caret by word instead (C8). */
   private static isBackForwardChord(e: KeyboardEvent): boolean {
@@ -2498,12 +2512,40 @@ export class Stage extends JfElement {
   windowHolding(active: Element | null): string | null {
     const primary = this.resolveSurface();
     if (!primary) return null;
-    const windows = [primary, ...(this.splitAxis ? [this.resolveSurface(this.secondarySurface)] : [])];
-    for (let node: Node | null = active; node !== null; node = node.parentNode ?? (node as ShadowRoot).host ?? null) {
-      const surface = windows.find(candidate => candidate !== null && this._surfaceElCache.get(candidate.id) === node);
+    return this.windowOf(active) ?? canonicalSplitSurfaceId(primary.id);
+  }
+
+  /** The windows on show: the primary, and a split's second. */
+  private shownWindows(): SurfaceCatalogEntry[] {
+    return [this.resolveSurface(), ...(this.splitAxis ? [this.resolveSurface(this.secondarySurface)] : [])]
+      .filter(surface => surface !== null);
+  }
+
+  /** The window `start` sits in, its details included, by canonical surface id. */
+  private windowOf(start: Node | null): string | null {
+    const windows = this.shownWindows();
+    for (let node: Node | null = start; node !== null; node = node.parentNode ?? (node as ShadowRoot).host ?? null) {
+      if ((node as Element).localName === 'jf-window-details') return (node as WindowDetails).windowId;
+      const surface = windows.find(candidate => this._surfaceElCache.get(candidate.id) === node);
       if (surface) return canonicalSplitSurfaceId(surface.id);
     }
-    return canonicalSplitSurfaceId(primary.id);
+    return null;
+  }
+
+  /** The pointer or the keyboard arrived somewhere: the most recent of the two is the window in use. */
+  private readonly noteWindowInUse = (event: Event): void => {
+    this.windowInUse = this.windowOf(event.composedPath()[0] as Node) ?? this.windowInUse;
+  };
+
+  /** Close the details of the window in use, else the primary's. False when there are none to close. */
+  closeDetails(): boolean {
+    const windows = this.shownWindows();
+    const surface = windows.find(candidate => canonicalSplitSurfaceId(candidate.id) === this.windowInUse) ?? windows[0];
+    if (!surface) return false;
+    const id = canonicalSplitSurfaceId(surface.id);
+    const details = [...this.renderRoot.querySelectorAll('jf-window-details')].find(pane => pane.windowId === id);
+    const own = this._surfaceElCache.get(surface.id) as (HTMLElement & { closeDetails?(): boolean }) | undefined;
+    return details?.closeDetails() ?? own?.closeDetails?.() ?? false;
   }
 
   /** Target a single retained element; never broadcast to both search implementations. */
@@ -2559,6 +2601,8 @@ export class Stage extends JfElement {
    * in connect, tear down in disconnect.
    */
   private _surfaceElCache = new Map<string, HTMLElement>();
+  /** The window the pointer or the keyboard was last in, by canonical surface id. */
+  private windowInUse: string | null = null;
   private forgetApiOwner: object = {};
 
   protected override willUpdate(changed: Map<string, unknown>): void {
@@ -2609,8 +2653,16 @@ export class Stage extends JfElement {
     this.summonCoreSurface = null;
   }
 
+  /** On the shadow root: a move between two windows has both ends in here and never reaches the host. */
+  override firstUpdated(): void {
+    this.renderRoot.addEventListener('pointerover', this.noteWindowInUse);
+    this.renderRoot.addEventListener('focusin', this.noteWindowInUse);
+  }
+
   static styles = css`
     :host {
+      display: block;
+      box-sizing: border-box;
       width: 100%;
       height: 100%;
     }
@@ -2627,16 +2679,12 @@ export class Stage extends JfElement {
       text-align: center;
       color: var(--text-secondary);
     }
-    /* The box a window's details are measured against and, below 980 px, drawn over: the stage, or
-       a split's pane. A window takes what its details leave. */
+    /* The box a window's details are measured against and drawn in: the stage, or a split's pane.
+       Windows stay ordinary block content here, because several are 'display: contents' and a flex
+       parent would size their inner shell to its content. An inline pane reserves its own width. */
     :host, .pane, .right-pane-body {
       position: relative;
-      display: flex;
-    }
-    :host > :not(jf-window-details), .pane > :not(jf-window-details, jf-pane-picker, .right-pane-body),
-    .right-pane-body > :not(jf-window-details) {
-      flex: 1 1 auto;
-      min-width: 0;
+      box-sizing: border-box;
     }
     /* Tempdoc 521 §16.7 deeper — split-stage CSS grid. Two surfaces
        sized 1fr each; gap is a hairline divider users can see. The
@@ -2659,6 +2707,7 @@ export class Stage extends JfElement {
     }
     /* Right pane stacks the PanePicker strip on top of the surface body. */
     .right-pane {
+      display: flex;
       flex-direction: column;
     }
     .right-pane-body {

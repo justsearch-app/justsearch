@@ -48,6 +48,9 @@ export class DetailsPane extends JfElement {
   declare closeLabel: string;
   declare private hasActions: boolean;
 
+  private shownStrip = '';
+  private stripObserver: ResizeObserver | null = null;
+
   constructor() {
     super();
     this.tabs = [];
@@ -62,12 +65,32 @@ export class DetailsPane extends JfElement {
     super.connectedCallback();
     // F6 finds the details region by this marker (`chrome/frameRegions.ts`).
     this.setAttribute('data-details-pane', '');
+    if (typeof ResizeObserver === 'undefined') return;
+    // A narrower pane must not leave the selected tab behind the strip's edge.
+    this.stripObserver = new ResizeObserver(() => this.revealActiveTab());
+    void this.updateComplete.then(() => {
+      const strip = this.renderRoot.querySelector('.tabs');
+      if (strip !== null) this.stripObserver?.observe(strip);
+    });
   }
 
-  override updated(changed: Map<string, unknown>): void {
-    if (changed.has('activeTab') || changed.has('tabs')) {
-      this.renderRoot.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+  override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this.stripObserver?.disconnect();
+    this.stripObserver = null;
+  }
+
+  override updated(): void {
+    // The window rebuilds the list on every render; only a real change may move the reader's scroll.
+    const strip = `${this.activeTab}\n${this.tabs.map((tab) => tab.id).join('\n')}`;
+    if (strip !== this.shownStrip) {
+      this.shownStrip = strip;
+      this.revealActiveTab();
     }
+  }
+
+  private revealActiveTab(): void {
+    this.renderRoot.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
   }
 
   /** Put the keyboard on the active tab; the window calls this when the reader opened the pane. */
@@ -168,11 +191,11 @@ export class DetailsPane extends JfElement {
       display: flex;
       gap: var(--jf-space-1);
       overflow-x: auto;
-      scrollbar-width: none;
+      scrollbar-width: thin;
     }
+    /* Tabs keep their size and the strip scrolls: a label is never squeezed to fit its neighbours. */
     .tab {
-      flex: 0 1 auto;
-      min-inline-size: 0;
+      flex: none;
       max-inline-size: var(--frame-details-tab-max);
       display: inline-flex;
       align-items: center;

@@ -80,6 +80,7 @@ export class FailedFilesList extends JfElement {
     folderPathHash: { type: String, attribute: 'folder-path-hash' },
     observedCount: { type: Number },
     lastKnown: { type: Boolean },
+    collapsed: { type: Boolean, reflect: true },
     apiBase: { attribute: 'api-base', type: String },
     host_: { attribute: false },
     rows: { state: true },
@@ -91,6 +92,8 @@ export class FailedFilesList extends JfElement {
   declare folderPathHash: string;
   declare observedCount: number;
   declare lastKnown: boolean;
+  /** The list closes with its folder. */
+  declare collapsed: boolean;
   declare apiBase: string;
   declare host_: PluginHostApi | undefined;
   declare rows: FailedRow[];
@@ -102,6 +105,7 @@ export class FailedFilesList extends JfElement {
   private targetFolder: string | null = null;
   private requestSerial = 0;
   private targetSerial = 0;
+  private revealOnExpand = false;
 
   constructor() {
     super();
@@ -110,6 +114,7 @@ export class FailedFilesList extends JfElement {
     this.folderPathHash = '';
     this.observedCount = 0;
     this.lastKnown = false;
+    this.collapsed = false;
     this.apiBase = '';
     this.rows = [];
     this.loading = false;
@@ -132,6 +137,12 @@ export class FailedFilesList extends JfElement {
   }
 
   reveal(): void {
+    if (this.collapsed) {
+      // A closed folder opens first; the list is revealed once it is on show.
+      this.revealOnExpand = true;
+      this.dispatchEvent(new CustomEvent('failed-files-expand'));
+      return;
+    }
     const list = this.renderRoot.querySelector<HTMLElement>('.list');
     list?.scrollIntoView?.({ block: 'nearest' });
     list?.focus();
@@ -150,6 +161,10 @@ export class FailedFilesList extends JfElement {
   }
 
   override updated(changed: Map<string, unknown>): void {
+    if (changed.has('collapsed') && !this.collapsed && this.revealOnExpand) {
+      this.revealOnExpand = false;
+      this.reveal();
+    }
     if (changed.has('folderPathHash') || changed.has('observedCount') && !this.lastKnown) void this.refresh();
   }
 
@@ -235,6 +250,8 @@ export class FailedFilesList extends JfElement {
       --justsearch-shell-action-button-padding: .4rem 0;
       --justsearch-shell-form-control-spacing: 0;
     }
+    :host([collapsed]) { display: none; }
+    .list { max-block-size: var(--frame-failed-list-max); overflow-y: auto; }
     .list:focus { outline: none; }
     .list:focus-visible { outline: var(--frame-focus-width) solid var(--accent-tint); outline-offset: var(--frame-focus-width); }
     /**
