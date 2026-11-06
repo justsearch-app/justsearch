@@ -13,8 +13,9 @@ const LONG_WORK_MIN_DURATION_MS = 60_000;
 type NoticeKind = 'agent-request' | 'work-finished' | 'work-failed';
 
 /**
- * One live event. `id` finds its row when the notification is clicked: the row's id, or for an event
- * listed only by its words in Earlier ("Search is up to date"), those words.
+ * One live event. `id` is that event's own: every window reporting it gives the same id, and no other
+ * event has it (the shell shows an id once). It finds the row when the notification is clicked: the
+ * row's id, or for an end listed only by its words in Earlier, those words ({@link endEventId}).
  */
 export interface DesktopNotice {
   readonly id: string;
@@ -47,15 +48,28 @@ export function agentRequestNotice(row: Pick<StatusFact, 'id' | 'title' | 'deadl
 }
 
 /**
+ * The id of an end listed only by its words ("Search is up to date"), which repeat from one event to
+ * the next. `time` must be the engine's own, the same in every window; a window's clock is not.
+ */
+export function endEventId(words: string, time: number | string): string {
+  return `${words}@${time}`;
+}
+
+/** The words of an {@link endEventId}, to find the row a clicked notification is about. */
+export function noticeRowWords(id: string): string {
+  return id.split('@')[0]!;
+}
+
+/**
  * A completion edge; the pill shows it regardless of its active duration. `live` says its end was
  * observed: work that ended across a gap in observation is only rediscovered (C6).
  */
-export function workFinishedNotice(title: string, live: boolean, id = title, activeDurationMs?: number): DesktopNotice {
+export function workFinishedNotice(title: string, live: boolean, id: string, activeDurationMs?: number): DesktopNotice {
   return { id, kind: 'work-finished', title, live, activeDurationMs };
 }
 
 /** A failure edge. The failure's own message stays in the panel: it can carry paths. */
-export function workFailedNotice(title: string, live: boolean, id = title): DesktopNotice {
+export function workFailedNotice(title: string, live: boolean, id: string): DesktopNotice {
   return { id, kind: 'work-failed', title, body: 'Open JustSearch to see what to do next.', live };
 }
 

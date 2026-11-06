@@ -1435,7 +1435,9 @@ export class Shell extends JfElement {
       setActiveSurface: (id) => {
         // Slice 496 P1+P6 — track previous surface for navigation toast.
         const prev = this.activeId;
-        this.shadowRoot?.querySelector<StatusPill>('jf-status-pill')?.dismissForWindowChange();
+        // Closing Settings returns to the area under it: nothing takes over from the panel, which a
+        // clicked notification may have opened as Settings closed.
+        if (id !== prev) this.shadowRoot?.querySelector<StatusPill>('jf-status-pill')?.dismissForWindowChange();
         this.activeId = id;
         // Tempdoc 508 §11.1 / §13.1 — drive ShellContext so all four
         // registries (commands, context actions, inspector tabs,

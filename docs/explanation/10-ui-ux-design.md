@@ -198,8 +198,11 @@ finishing (the events the pill shows as just finished) or failing. Startup snaps
 reconnects and anything found late never notify. A notification says who and what in the
 words of the panel's first line, with a request's deadline; it never carries argument
 values, file contents or failure messages. Clicking it brings the app forward and opens the
-panel on that item, or the review for an agent request; a dialog that must be answered first
-stays on top, and the panel does not open over it.
+panel on that item, or the review for an agent request. An open dialog stays on top: the click
+is remembered and opens when the dialog closes. The exception is an agent request's own dialog,
+which gives way to the request clicked, and that first request keeps waiting. If the item has
+gone by then, no review opens and the panel says so. Work whose end was not observed live is
+not announced either; Earlier still lists it.
 
 The taskbar or dock badge counts Needs you, updates live and clears at zero. Windows has no
 badge count, so the taskbar shows the count as an overlay on the icon; a platform with
@@ -209,7 +212,8 @@ plain browser there are no desktop notifications and no permission prompt.
 
 `state/noticePolicy.ts` is the one routing decision. The shell delivers the notification
 (`modules/shell/src-tauri/src/notices.rs`) because the notification plugin cannot report a
-click on desktop; it also shows each event id once, however many windows report it.
+click on desktop; it also shows each event id once, however many windows report it. Each event
+has its own id, built from the engine's time for it so that every window gives the same one.
 
 #### Confirming and undoing
 

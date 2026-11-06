@@ -30,6 +30,7 @@ import type { ReactiveController, ReactiveControllerHost } from 'lit';
  */
 let openModalCount = 0;
 let savedHtmlOverflow: string | null = null;
+const closedListeners = new Set<() => void>();
 
 /** Lock background scroll (reference-counted across stacked modals). */
 function acquireScrollLock(): void {
@@ -78,6 +79,15 @@ export function openModalDepth(): number {
 }
 
 /**
+ * Call `listener` each time the last entered modal has closed and given focus back, so something a
+ * modal held off can happen. Returns the stop function.
+ */
+export function onModalsClosed(listener: () => void): () => void {
+  closedListeners.add(listener);
+  return () => closedListeners.delete(listener);
+}
+
+/**
  * Test seam: drop every entered modality. Module state outlives a test's DOM, so a case that leaves
  * a modal open would otherwise make the NEXT case's global keys silently inert.
  */
@@ -121,10 +131,10 @@ export class ModalityController implements ReactiveController {
     // native <dialog> only auto-restores for invoker clicks, not property-driven opens).
     const target = this.savedFocus;
     this.savedFocus = null;
-    if (opts?.skipFocusRestore) return;
-    if (target && typeof target.focus === 'function' && target.isConnected) {
+    if (!opts?.skipFocusRestore && target && typeof target.focus === 'function' && target.isConnected) {
       target.focus();
     }
+    if (openModalCount === 0) for (const listener of [...closedListeners]) listener();
   }
 
   hostDisconnected(): void {

@@ -29,7 +29,7 @@ import { presentAiEngineVerdict, type AiEngineVerdictPresentation } from '../sta
 import { isIndexingObservation } from '../state/readinessNotice.js';
 import { resolvePathLazy } from '../hooks/resolvePathLazy.js';
 import { needsTypedConfirm } from '../components/acceptPendingEffect.js';
-import { agentRequestNotice, needsYouCount, routeDesktopNotice, workFailedNotice, workFinishedNotice, type DesktopNotice } from '../state/noticePolicy.js';
+import { agentRequestNotice, endEventId, needsYouCount, routeDesktopNotice, workFailedNotice, workFinishedNotice, type DesktopNotice } from '../state/noticePolicy.js';
 import { getNotifications } from '../state/notificationsState.js';
 import { setTaskbarBadge } from '../../utils/taskbarBadge.js';
 
@@ -109,6 +109,10 @@ export class FrameStatusController implements ReactiveController {
   private gaps = 0;
   private workSeenAtGap = 0;
   private installSeenAtGap = 0;
+  /** The AI engine state an unobserved install end left: stays unsaid until the state moves on (C6). */
+  private unsaidEngineKind: string | null = null;
+  /** The engine's time of the last settling seen here, and how many settlings have shared it. */
+  private settled: { readonly since: string; readonly repeat: number } | null = null;
   /** Grows with every focus change, so a focus read that began before one is known to be old. */
   private focusChanges = 0;
   private stopFocusWatch: (() => void) | undefined;
@@ -168,6 +172,7 @@ export class FrameStatusController implements ReactiveController {
           if (this.paused) this.transientQueue.push(record.key);
           else this.showTransient(record.key);
           const presentation = presentationForSeverity(record.event.severity);
+          if (record.toast?.silent) continue;
           if (presentation.live === 'alert') { this.assertive = record.toast?.message ?? ''; this.assertiveKey = record.key; }
           else { this.polite = record.toast?.message ?? ''; this.politeKey = record.key; }
         }
@@ -191,6 +196,16 @@ export class FrameStatusController implements ReactiveController {
     } while (changes !== this.focusChanges);
     const route = routeDesktopNotice(notice, { notifications: getNotifications(), focused });
     if (route) void sendDesktopNotification({ id: notice.id, title: notice.title, ...(notice.body ? { body: notice.body } : {}), ...route });
+  }
+  /**
+   * Search settling has no id of its own. The time the engine's indexing state last changed is the
+   * same in every window; a settling that changed nothing there, such as a restart, repeats that time,
+   * so each window also counts the settlings it has seen at it.
+   */
+  private settledEventId(now: number): string {
+    const since = this.ai?.status?.operating?.indexing?.since ?? String(now);
+    this.settled = { since, repeat: this.settled?.since === since ? this.settled.repeat + 1 : 0 };
+    return endEventId('Search is up to date', `${since}#${this.settled.repeat}`);
   }
   private showTransient(key: string): void {
     this.transientKey = key;
@@ -271,7 +286,7 @@ export class FrameStatusController implements ReactiveController {
         const endSeenLive = operation.fresh === true && operation.seenAtGap === this.gaps;
         if (wasRunning && outcome.state === 'complete') {
           this.finished = { title: `${operation.label} finished`, at: Date.now() };
-          emitEphemeralToast({ message: this.finished.title, classId: 'core.verdict.settled' });
+          emitEphemeralToast({ message: this.finished.title, classId: 'core.verdict.settled', silent: !endSeenLive });
           void this.notifyDesktop(workFinishedNotice(this.finished.title, endSeenLive, `operation:${key}`,
             operation.activeSince === undefined ? undefined : Date.now() - operation.activeSince));
         } else if (wasRunning && outcome.state === 'failed') void this.notifyDesktop(workFailedNotice(`${operation.label} failed`, endSeenLive, `operation:${key}`));
@@ -371,22 +386,25 @@ export class FrameStatusController implements ReactiveController {
       this.activeWork = null; this.activeWorkSince = null;
       if (!this.finished || this.finished.title !== 'Search is up to date' || now - this.finished.at >= FINISHED_DWELL_MS) {
         this.finished = { title: 'Search is up to date', at: now };
-        emitEphemeralToast({ message: this.finished.title, classId: 'core.verdict.settled' });
-        void this.notifyDesktop(workFinishedNotice(this.finished.title, workEndSeenLive, undefined, activeDurationMs));
+        emitEphemeralToast({ message: this.finished.title, classId: 'core.verdict.settled', silent: !workEndSeenLive });
+        void this.notifyDesktop(workFinishedNotice(this.finished.title, workEndSeenLive, this.settledEventId(now), activeDurationMs));
       }
     }
     if (this.ai?.snapshotLive && this.ai.aiEngine.kind === 'installing') { this.installingSince ??= now; if (observing) this.installSeenAtGap = this.gaps; }
     if (this.installingSince !== null && this.ai?.snapshotLive && ['online', 'install_failed'].includes(this.ai.aiEngine.kind)) {
       const activeDurationMs = now - this.installingSince;
       const installEndSeenLive = this.installSeenAtGap === this.gaps;
+      // One install, one start: the engine's time for it, the same in every window.
+      const installStart = this.ai.installStatus?.startedAtEpochMs || now;
       this.installingSince = null;
+      if (!installEndSeenLive) this.unsaidEngineKind = this.ai.aiEngine.kind;
       if (this.ai.aiEngine.kind === 'online') {
         this.finished = { title: 'AI install complete', at: now };
-        emitEphemeralToast({ message: 'AI install complete', classId: 'core.ai-engine.settled' });
-        void this.notifyDesktop(workFinishedNotice('AI install complete', installEndSeenLive, undefined, activeDurationMs));
+        emitEphemeralToast({ message: 'AI install complete', classId: 'core.ai-engine.settled', silent: !installEndSeenLive });
+        void this.notifyDesktop(workFinishedNotice('AI install complete', installEndSeenLive, endEventId('AI install complete', installStart), activeDurationMs));
       } else {
-        emitEphemeralToast({ message: 'AI install failed', classId: 'core.ai-engine.failed' });
-        void this.notifyDesktop(workFailedNotice('AI install failed', installEndSeenLive));
+        emitEphemeralToast({ message: 'AI install failed', classId: 'core.ai-engine.failed', silent: !installEndSeenLive });
+        void this.notifyDesktop(workFailedNotice('AI install failed', installEndSeenLive, endEventId('AI install failed', installStart)));
       }
     }
     // 595 §15.1 — one verdict announcer and its AI-engine sibling, moved from the retired status
@@ -394,7 +412,9 @@ export class FrameStatusController implements ReactiveController {
     const verdict = this.ai ? presentVerdict(this.ai.verdict).announce : null;
     this.indexingTransition = this.ai?.verdict.kind === 'transitioning' && this.ai.verdict.reasons.some(isIndexingObservation);
     this.verdictAnnouncement = verdict && !this.indexingTransition ? verdict : null;
-    this.aiEngineAnnouncement = this.ai && this.ai.aiEngine.kind !== 'indexing' ? presentAiEngineVerdict(this.ai.aiEngine).announce : null;
+    if (this.ai?.aiEngine.kind !== this.unsaidEngineKind) this.unsaidEngineKind = null;
+    this.aiEngineAnnouncement = this.ai && this.ai.aiEngine.kind !== 'indexing' && this.unsaidEngineKind === null
+      ? presentAiEngineVerdict(this.ai.aiEngine).announce : null;
     const activityAnnouncement = [this.indexingTransition && p.activity.confirmed
       ? verdict?.text ?? p.activity.summary : p.activity.summary, p.activity.detail].filter(Boolean).join(' — ');
     if (p.activity.confirmed) {

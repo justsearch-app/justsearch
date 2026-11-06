@@ -15,7 +15,7 @@ import { __resetAiStateForTest, __feedForTest, type AiState, type StatusSnapshot
 import { __resetTasksForTest, startTask, bindTaskOperation } from '../substrates/tasks/index.js';
 import { __resetUserStateForTest } from '../state/UserStateDocument.js';
 import { setNotifications } from '../state/notificationsState.js';
-import { ModalityController, __resetModalityForTest } from '../primitives/modality.js';
+import { ModalityController, __resetModalityForTest, modalOwnsFocus } from '../primitives/modality.js';
 import { sendDesktopNotification } from '../../utils/notify.js';
 import { setTaskbarBadge } from '../../utils/taskbarBadge.js';
 import { isWindowFocused } from '../../utils/windowFocus.js';
@@ -54,8 +54,14 @@ function ai(overrides: Partial<AiState> = {}): AiState {
 }
 async function observe(state: Partial<AiState>) { pill.status.ai = ai(state); pill.status.refresh(); await flush(); }
 const verdict = (kind: string) => ({ verdict: { kind, severity: 'info', reasons: [] } as unknown as AiState['verdict'] });
-const engine = (kind: string) => ({ aiEngine: { kind, stability: { kind: 'settled' }, installFailure: null } as unknown as AiState['aiEngine'] });
+const engine = (kind: string, startedAtEpochMs = 1000) => ({ aiEngine: { kind, stability: { kind: 'settled' }, installFailure: null } as unknown as AiState['aiEngine'],
+  installStatus: { startedAtEpochMs } as unknown as AiState['installStatus'] });
+/** The engine's status, with the time its indexing state last changed. */
+const idleSince = (since: string): Partial<AiState> => ({ status: { worker: { core: { indexState: 'IDLE', pendingJobs: 0 }, enrichment: {} },
+  operating: { indexing: { since } } } as unknown as AiState['status'] });
+const SINCE = '2026-11-06T10:00:00Z';
 const sent = () => vi.mocked(sendDesktopNotification).mock.calls.map(call => call[0]);
+const noticeGone = () => root().querySelector('[data-testid="status-notice-gone"]')?.textContent;
 const lastBadge = () => vi.mocked(setTaskbarBadge).mock.calls.at(-1)?.[0];
 /** The shell reports a clicked notification. */
 const clickNotification = (id: string) => vi.mocked(installNoticeActivationBridge).mock.calls.at(-1)![0](id);
@@ -230,8 +236,8 @@ describe('DE5 long work', () => {
     expect(sendDesktopNotification).not.toHaveBeenCalled();
     await observe(verdict('transitioning'));
     elapsed += 60_000;
-    await observe(verdict('operational'));
-    expect(sent()).toEqual([{ id: 'Search is up to date', title: 'Search is up to date', sound: false }]);
+    await observe({ ...verdict('operational'), ...idleSince(SINCE) });
+    expect(sent()).toEqual([{ id: `Search is up to date@${SINCE}#0`, title: 'Search is up to date', sound: false }]);
   });
   it('an AI install completing or failing notifies; finding one already online does not', async () => {
     await observe(engine('online'));
@@ -362,9 +368,9 @@ describe('DE5 short work stays inside', () => {
     expect(panel().model!.sections.earlier.some(row => row.title === 'Search is up to date')).toBe(true);
     await observe(verdict('transitioning'));
     elapsed += 60_000;
-    await observe(verdict('operational'));
+    await observe({ ...verdict('operational'), ...idleSince(SINCE) });
     await flush();
-    expect(sent()).toEqual([{ id: 'Search is up to date', title: 'Search is up to date', sound: false }]);
+    expect(sent()).toEqual([{ id: `Search is up to date@${SINCE}#0`, title: 'Search is up to date', sound: false }]);
   });
   it('indexing durations reset between runs, so repeated short runs stay silent', async () => {
     const indexing = { status: { worker: { core: { indexState: 'INDEXING', pendingJobs: 5 }, enrichment: {} } } as AiState['status'] };
@@ -377,8 +383,8 @@ describe('DE5 short work stays inside', () => {
     }
     await observe(indexing);
     elapsed += 60_000;
-    await observe({});
-    expect(sent()).toEqual([{ id: 'Search is up to date', title: 'Search is up to date', sound: false }]);
+    await observe(idleSince(SINCE));
+    expect(sent()).toEqual([{ id: `Search is up to date@${SINCE}#0`, title: 'Search is up to date', sound: false }]);
   });
   it('a short operation completes without notifying', async () => {
     const advance = operation('short-op', 'Rebuild search', { state: 'running', historySince: 0 });
@@ -447,6 +453,20 @@ describe('DE5 clicking a notification', () => {
     clickNotification('authorization:j1'); await flush(); await flush();
     expect(pill.open).toBe(false);
   });
+  it('a request answered since says so in the panel, and opens no review', async () => {
+    clickNotification('authorization:gone'); await flush(); await flush();
+    expect(noticeGone()).toBe('What that notification was about is no longer here.');
+    expect(root().querySelector('[data-testid="status-review"]')).toBeNull();
+    pill.close(); await flush();
+    agent('i2'); await flush();
+    clickNotification('authorization:i2'); await flush(); await flush();
+    expect(noticeGone()).toBeUndefined();
+  });
+  it('a row that is there says nothing about it having gone', async () => {
+    agent('i3'); await flush();
+    clickNotification('authorization:i3'); await flush(); await flush();
+    expect(noticeGone()).toBeUndefined();
+  });
   it('C10 a remount listens once: the old listener is stopped', async () => {
     const stop = vi.fn();
     vi.mocked(installNoticeActivationBridge).mockReturnValueOnce(stop);
@@ -455,5 +475,230 @@ describe('DE5 clicking a notification', () => {
     pill.remove();
     expect(stop).toHaveBeenCalledTimes(1);
     document.body.append(pill); await flush();
+  });
+});
+
+describe('DE5 clicking a notification while a dialog is open', () => {
+  const reviewing = () => root().querySelector('[data-testid="status-review"]')?.getAttribute('data-fact');
+  /** A dialog owning the screen, as Settings does. */
+  function openDialog() { const dialog = new ModalityController(pill); dialog.enter(); return dialog; }
+  const settle = async () => { await new Promise(resolve => setTimeout(resolve)); await flush(); await flush(); };
+  it('waits for the dialog, then opens the review', async () => {
+    agent('m1'); await flush();
+    const dialog = openDialog();
+    clickNotification('authorization:m1'); await flush(); await flush();
+    expect(pill.open).toBe(false);
+    dialog.exit(); await settle();
+    expect(pill.open).toBe(true);
+    expect(reviewing()).toBe('authorization:m1');
+  });
+  it('waits for the last of two dialogs', async () => {
+    agent('m2'); await flush();
+    const under = openDialog(); const over = openDialog();
+    clickNotification('authorization:m2');
+    over.exit(); await settle();
+    expect(pill.open).toBe(false);
+    under.exit(); await settle();
+    expect(reviewing()).toBe('authorization:m2');
+  });
+  it('keeps waiting when another dialog follows the closed one in the same turn', async () => {
+    agent('m3'); await flush();
+    const first = openDialog();
+    clickNotification('authorization:m3');
+    first.exit();
+    const next = openDialog(); await settle();
+    expect(pill.open).toBe(false);
+    next.exit(); await settle();
+    expect(reviewing()).toBe('authorization:m3');
+  });
+  it('the latest click is the one remembered', async () => {
+    agent('m4'); agent('m5'); await flush();
+    const dialog = openDialog();
+    clickNotification('authorization:m4'); clickNotification('authorization:m5');
+    dialog.exit(); await settle();
+    expect(reviewing()).toBe('authorization:m5');
+  });
+  it('a request answered meanwhile opens no review and says so in the panel', async () => {
+    agent('m6'); await flush();
+    const dialog = openDialog();
+    clickNotification('authorization:m6');
+    withdrawAuthorization('m6');
+    dialog.exit(); await settle();
+    expect(pill.open).toBe(true);
+    expect(reviewing()).toBeUndefined();
+    expect(noticeGone()).toBe('What that notification was about is no longer here.');
+  });
+  it('a request that expired meanwhile opens no review and says so in the panel', async () => {
+    agent('m7'); await flush();
+    const dialog = openDialog();
+    clickNotification('authorization:m7');
+    elapsed += 5 * 60_000;
+    dialog.exit(); await settle();
+    expect(reviewing()).toBeUndefined();
+    expect(noticeGone()).toBe('What that notification was about is no longer here.');
+  });
+  it('C10 a detach forgets the click', async () => {
+    agent('m8'); await flush();
+    const dialog = openDialog();
+    clickNotification('authorization:m8');
+    pill.remove(); document.body.append(pill); await flush();
+    dialog.exit(); await settle();
+    expect(pill.open).toBe(false);
+  });
+  it('with a review open, the review moves to the request clicked', async () => {
+    agent('n1'); agent('n2'); await flush();
+    clickNotification('authorization:n1'); await flush(); await flush();
+    expect(reviewing()).toBe('authorization:n1');
+    clickNotification('authorization:n2'); await flush(); await flush();
+    expect(reviewing()).toBe('authorization:n2');
+  });
+  it('with a review open, a request that has gone leaves the review where it is and says so', async () => {
+    agent('n3'); await flush();
+    clickNotification('authorization:n3'); await flush(); await flush();
+    clickNotification('authorization:gone'); await flush(); await flush();
+    expect(reviewing()).toBe('authorization:n3');
+    expect(noticeGone()).toBe('What that notification was about is no longer here.');
+  });
+  it('with a request\'s security dialog open, the review moves to the request clicked, and the first keeps waiting', async () => {
+    agent('n4', { gateBehavior: 'TYPED_CONFIRM' }); agent('n5'); await flush();
+    clickNotification('authorization:n4'); await settle();
+    expect(modalOwnsFocus()).toBe(true);
+    clickNotification('authorization:n5'); await settle();
+    expect(modalOwnsFocus()).toBe(false);
+    expect(reviewing()).toBe('authorization:n5');
+    expect(pill.status.model.sections.needs.map(row => row.id).sort()).toEqual(['authorization:n4', 'authorization:n5']);
+  });
+  it('with a request\'s security dialog open, a typed request clicked takes the dialog', async () => {
+    agent('n8', { gateBehavior: 'TYPED_CONFIRM' }); agent('n9', { gateBehavior: 'TYPED_CONFIRM' }); await flush();
+    clickNotification('authorization:n8'); await settle();
+    clickNotification('authorization:n9'); await settle();
+    expect(modalOwnsFocus()).toBe(true);
+    expect(host.statusRequests()[0]).toMatchObject({ prompt: { pendingId: 'n9' } });
+    expect(pill.status.model.sections.needs.map(row => row.id).sort()).toEqual(['authorization:n8', 'authorization:n9']);
+  });
+  it('a dialog the person started is not an agent request\'s: it stays, and the target waits for it', async () => {
+    agent('n6'); await flush();
+    void requestAuthorization({ pendingId: 'own', operationId: 'core.ingest-files', gateBehavior: 'TYPED_CONFIRM', riskTier: 'HIGH' }); await settle();
+    expect(modalOwnsFocus()).toBe(true);
+    clickNotification('authorization:n6'); await settle();
+    expect(modalOwnsFocus()).toBe(true);
+    expect(pill.open).toBe(false);
+  });
+  it('clicking the request whose dialog is open keeps that dialog', async () => {
+    agent('n7', { gateBehavior: 'TYPED_CONFIRM' }); await flush();
+    clickNotification('authorization:n7'); await settle();
+    clickNotification('authorization:n7'); await settle();
+    expect(modalOwnsFocus()).toBe(true);
+    expect(pill.open).toBe(false);
+  });
+});
+
+describe('DE5 each end is its own event', () => {
+  const ids = () => sent().map(notice => notice.id);
+  it('two AI install failures a second apart each notify', async () => {
+    await observe(engine('installing', 1000)); await observe(engine('install_failed', 1000));
+    elapsed += 1_000;
+    await observe(engine('installing', 2000)); await observe(engine('install_failed', 2000));
+    expect(ids()).toEqual(['AI install failed@1000', 'AI install failed@2000']);
+  });
+  it('two installs completing each notify', async () => {
+    await observe(engine('installing', 1000)); elapsed += 60_000; await observe(engine('online', 1000));
+    await observe(engine('installing', 2000)); elapsed += 60_000; await observe(engine('online', 2000));
+    expect(ids()).toEqual(['AI install complete@1000', 'AI install complete@2000']);
+  });
+  it('two settlings at different engine times each notify', async () => {
+    await observe(verdict('transitioning')); elapsed += 60_000; await observe({ ...verdict('operational'), ...idleSince(SINCE) });
+    elapsed += 60_000;
+    await observe(verdict('transitioning')); elapsed += 60_000; await observe({ ...verdict('operational'), ...idleSince('2026-11-06T10:05:00Z') });
+    expect(ids()).toEqual([`Search is up to date@${SINCE}#0`, 'Search is up to date@2026-11-06T10:05:00Z#0']);
+  });
+  it('a settling that changed nothing in the engine\'s indexing state is still its own event', async () => {
+    await observe(verdict('transitioning')); elapsed += 60_000; await observe({ ...verdict('operational'), ...idleSince(SINCE) });
+    elapsed += 60_000;
+    await observe(verdict('transitioning')); elapsed += 60_000; await observe({ ...verdict('operational'), ...idleSince(SINCE) });
+    expect(ids()).toEqual([`Search is up to date@${SINCE}#0`, `Search is up to date@${SINCE}#1`]);
+  });
+  it('a second window seeing the same end later gives the same id, so the shell shows it once', async () => {
+    const other = new StatusPill(); other.store = store; other.authorizationHost = () => host; document.body.append(other); await flush();
+    try {
+      for (const [window, delay] of [[pill, 0], [other, 700]] as const) {
+        window.status.ai = ai(engine('installing')); window.status.refresh(); await flush();
+        elapsed += delay;
+        window.status.ai = ai(engine('install_failed')); window.status.refresh(); await flush();
+        window.status.ai = ai({ ...verdict('transitioning') }); window.status.refresh(); await flush();
+        elapsed += 60_000 + delay;
+        window.status.ai = ai({ ...verdict('operational'), ...idleSince(SINCE) }); window.status.refresh(); await flush();
+      }
+      const [first, second] = [ids().slice(0, 2), ids().slice(2)];
+      expect(first).toEqual(['AI install failed@1000', `Search is up to date@${SINCE}#0`]);
+      expect(second).toEqual(first);
+    } finally { other.remove(); }
+  });
+  it('clicking one lands on its row by its words', async () => {
+    await observe(engine('installing', 1000)); await observe(engine('install_failed', 1000));
+    clickNotification('AI install failed@1000'); await flush(); await flush();
+    expect(root().activeElement?.closest('article')?.textContent).toContain('AI install failed');
+    expect(noticeGone()).toBeUndefined();
+  });
+});
+
+describe('C6 live regions follow the same rule as notifications', () => {
+  /** Everything the pill's live regions hold now. */
+  const spoken = () => [...pill.shadowRoot!.querySelectorAll('[aria-live], jf-system-notice')].map(region => region.textContent?.trim()).filter(Boolean);
+  const earlier = () => panel().model!.sections.earlier.map(row => row.title);
+  it('a transition finished while disconnected says nothing, and Earlier lists it', async () => {
+    await observe(verdict('operational'));
+    await observe(verdict('transitioning'));
+    await observe(disconnected());
+    await observe(verdict('operational'));
+    expect(spoken()).not.toContain('Search is up to date');
+    expect(earlier()).toContain('Search is up to date');
+  });
+  it('indexing finished while disconnected says nothing, and Earlier lists it', async () => {
+    await observe({ status: { worker: { core: { indexState: 'INDEXING', pendingJobs: 5 }, enrichment: {} } } as AiState['status'] });
+    await observe(disconnected());
+    await observe({});
+    expect(spoken()).not.toContain('Search is up to date');
+    expect(earlier()).toContain('Search is up to date');
+  });
+  it('an install that failed while disconnected says nothing, in either announcer, and Earlier lists it', async () => {
+    await observe(engine('installing'));
+    await observe(disconnected());
+    await observe(engine('install_failed'));
+    expect(spoken()).not.toContain('AI install failed');
+    expect(spoken()).not.toContain('Install Failed');
+    expect(earlier()).toContain('AI install failed');
+  });
+  it('an install completed while disconnected says nothing, and Earlier lists it', async () => {
+    await observe(engine('installing'));
+    await observe(disconnected());
+    await observe(engine('online'));
+    expect(spoken()).not.toContain('AI install complete');
+    expect(earlier()).toContain('AI install complete');
+  });
+  it('an operation finished while disconnected says nothing, and Earlier lists it', async () => {
+    const advance = operation('gap-spoken', 'Rebuild search', { state: 'running', historySince: 0 });
+    await advance();
+    await observe(disconnected());
+    await advance({ state: 'complete', historySince: 0 });
+    await advance();
+    expect(spoken()).not.toContain('Rebuild search finished');
+    expect(earlier()).toContain('Rebuild search finished');
+  });
+  it('the engine state speaks again once it moves on from the unsaid end', async () => {
+    await observe(engine('installing'));
+    await observe(disconnected());
+    await observe(engine('install_failed'));
+    await observe(engine('offline'));
+    expect(pill.status.aiEngineAnnouncement).not.toBeNull();
+  });
+  it('an end observed live is still announced', async () => {
+    await observe(verdict('transitioning'));
+    await observe(verdict('operational'));
+    expect(spoken()).toContain('Search is up to date');
+    await observe(engine('installing'));
+    await observe(engine('install_failed'));
+    expect(spoken()).toContain('AI install failed');
+    expect(spoken()).toContain('Install Failed');
   });
 });

@@ -144,6 +144,62 @@ describe('C11 profiles across windows', () => {
   });
 });
 
+describe('C11 overlapping saves', () => {
+  /** Run `during` once, after this window has read the document and before it saves. */
+  const once = (during: () => void) => { let ran = false; return () => { if (!ran) { ran = true; during(); } }; };
+  it('a plugin value another window saves while this window is writing survives', async () => {
+    const a = await openWindow();
+    const b = await openWindow();
+    const bSaves = once(() => b.document.setPluginSetting('plugin.b', 'kept', 1));
+    a.document.mutateDocument(doc => { bSaves(); return { ...doc, chatWidth: 'wide' }; });
+    expect(stored()).toMatchObject({ chatWidth: 'wide', pluginSettings: { 'plugin.b': { kept: 1 } } });
+  });
+  it('both windows\' values in the same plugin survive', async () => {
+    const a = await openWindow();
+    const b = await openWindow();
+    const bSaves = once(() => b.document.setPluginSetting('plugin', 'from-b', 1));
+    a.document.mutateDocument(doc => {
+      bSaves();
+      return { ...doc, pluginSettings: { ...doc.pluginSettings, plugin: { ...doc.pluginSettings?.['plugin'], 'from-a': 2 } } };
+    });
+    expect(stored()['pluginSettings']).toEqual({ plugin: { 'from-a': 2, 'from-b': 1 } });
+  });
+  it('a profile another window deletes while this window is writing stays deleted', async () => {
+    const a = await openWindow();
+    a.document.createProfile('work', 'Work');
+    const b = await openWindow();
+    a.document.getDocument();
+    const bDeletes = once(() => b.document.deleteProfile('work'));
+    a.document.mutateDocument(doc => { bDeletes(); return { ...doc, chatWidth: 'wide' }; });
+    expect(Object.keys(stored().profiles)).toEqual(['default']);
+    expect(stored()['chatWidth']).toBe('wide');
+  });
+  it('a save that must land first still builds on the other window\'s save', async () => {
+    const a = await openWindow();
+    const b = await openWindow();
+    const bSaves = once(() => b.notifications.setNotifications('off'));
+    a.document.mutateDocument(doc => { bSaves(); return { ...doc, chatWidth: 'wide' }; }, true);
+    expect(stored()).toMatchObject({ notifications: 'off', chatWidth: 'wide' });
+  });
+  it('an edit the other window\'s save made pointless stays one, and writes nothing over it', async () => {
+    const a = await openWindow();
+    const b = await openWindow();
+    let saved: string | null = null;
+    const bSaves = once(() => { b.chatWidth.setChatWidth('wide'); saved = localStorage.getItem(KEY); });
+    a.document.mutateDocument(doc => { bSaves(); return doc.chatWidth === 'wide' ? doc : { ...doc, chatWidth: 'wide' }; });
+    expect(saved).not.toBeNull();
+    expect(localStorage.getItem(KEY)).toBe(saved);
+  });
+  it('a window that never stops saving cannot hold an edit forever: the edit lands', async () => {
+    const a = await openWindow();
+    const b = await openWindow();
+    let saves = 0;
+    a.document.mutateDocument(doc => { b.document.setPluginSetting('plugin.b', 'count', ++saves); return { ...doc, chatWidth: 'wide' }; });
+    expect(saves).toBeLessThan(10);
+    expect(stored()['chatWidth']).toBe('wide');
+  });
+});
+
 describe('C11 what the re-read leaves alone', () => {
   it('one window alone keeps a session-only edit whose save failed (F10)', async () => {
     const a = await openWindow();

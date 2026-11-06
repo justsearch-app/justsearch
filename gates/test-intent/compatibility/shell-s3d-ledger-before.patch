@@ -1,0 +1,36 @@
+diff --git a/modules/shell/src-tauri/src/notices.rs b/modules/shell/src-tauri/src/notices.rs
+index 0a5dfb6708..0d297390aa 100644
+--- a/modules/shell/src-tauri/src/notices.rs
++++ b/modules/shell/src-tauri/src/notices.rs
+@@ -23,6 +23,11 @@ const NOTIFICATIONS: &str = "org.freedesktop.Notifications";
+ const NOTIFICATIONS_PATH: &str = "/org/freedesktop/Notifications";
+ /// Every open window sees the same live event at nearly the same moment.
+ const CLAIM_WINDOW: Duration = Duration::from_secs(60);
++// Compatibility only: lets the ledger checks load on the before-state, and stands in for the time a
++// check cannot wait out, with each claim one window after the last. No behaviour of the repair.
++#[allow(dead_code)]
++const CLAIM_LIMIT: usize = 500;
++static CLAIMS: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+ /// Must equal OVERLAY_SIZE in the frontend's taskbarBadge.ts.
+ #[cfg(any(windows, test))]
+ const OVERLAY_SIZE: u32 = 32;
+@@ -32,7 +37,9 @@ const OVERLAY_SIZE: u32 = 32;
+ pub(crate) struct NoticeLedger(Mutex<HashMap<String, Instant>>);
+ 
+ impl NoticeLedger {
+-    fn claim(&self, id: &str, now: Instant) -> bool {
++    fn claim(&self, id: &str) -> bool {
++        let later = CLAIMS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
++        let now = Instant::now() + CLAIM_WINDOW * later;
+         let mut claims = self.0.lock().expect("notice ledger mutex poisoned");
+         claims.retain(|_, at| now.duration_since(*at) < CLAIM_WINDOW);
+         if claims.contains_key(id) {
+@@ -224,7 +231,7 @@ pub(crate) fn show_desktop_notice(
+     body: Option<String>,
+     sound: bool,
+ ) {
+-    if ledger.claim(&id, Instant::now()) {
++    if ledger.claim(&id) {
+         // Delivery blocks: on Linux for as long as the notification stays open.
+         tauri::async_runtime::spawn_blocking(move || {
+             deliver(app, id, title, body.unwrap_or_default(), sound);

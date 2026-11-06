@@ -5,11 +5,7 @@
 //! activation token the desktop gives with the click where it gives one. Which events leave the app
 //! is decided in the frontend's notice policy, not here.
 
-use std::{
-    collections::HashMap,
-    sync::Mutex,
-    time::{Duration, Instant},
-};
+use std::{collections::VecDeque, sync::Mutex};
 
 use tauri::{AppHandle, Emitter, State, WebviewWindow};
 #[cfg(target_os = "linux")]
@@ -21,24 +17,27 @@ const ACTIVATED_EVENT: &str = "justsearch://notice-activated";
 const NOTIFICATIONS: &str = "org.freedesktop.Notifications";
 #[cfg(target_os = "linux")]
 const NOTIFICATIONS_PATH: &str = "/org/freedesktop/Notifications";
-/// Every open window sees the same live event at nearly the same moment.
-const CLAIM_WINDOW: Duration = Duration::from_secs(60);
+/// Event ids remembered. Ids are unique per event, so forgetting the oldest risks nothing unless a
+/// window reports an event this many events late.
+const CLAIM_LIMIT: usize = 500;
 /// Must equal OVERLAY_SIZE in the frontend's taskbarBadge.ts.
 #[cfg(any(windows, test))]
 const OVERLAY_SIZE: u32 = 32;
 
 /// One notification per event id, across every window that reports it.
 #[derive(Default)]
-pub(crate) struct NoticeLedger(Mutex<HashMap<String, Instant>>);
+pub(crate) struct NoticeLedger(Mutex<VecDeque<String>>);
 
 impl NoticeLedger {
-    fn claim(&self, id: &str, now: Instant) -> bool {
+    fn claim(&self, id: &str) -> bool {
         let mut claims = self.0.lock().expect("notice ledger mutex poisoned");
-        claims.retain(|_, at| now.duration_since(*at) < CLAIM_WINDOW);
-        if claims.contains_key(id) {
+        if claims.iter().any(|claimed| claimed == id) {
             return false;
         }
-        claims.insert(id.to_owned(), now);
+        if claims.len() == CLAIM_LIMIT {
+            claims.pop_front();
+        }
+        claims.push_back(id.to_owned());
         true
     }
 }
@@ -224,7 +223,7 @@ pub(crate) fn show_desktop_notice(
     body: Option<String>,
     sound: bool,
 ) {
-    if ledger.claim(&id, Instant::now()) {
+    if ledger.claim(&id) {
         // Delivery blocks: on Linux for as long as the notification stays open.
         tauri::async_runtime::spawn_blocking(move || {
             deliver(app, id, title, body.unwrap_or_default(), sound);
@@ -267,26 +266,42 @@ mod tests {
     #[test]
     fn an_event_reported_by_two_windows_shows_once() {
         let ledger = NoticeLedger::default();
-        let now = Instant::now();
-        assert!(ledger.claim("authorization:a", now));
-        assert!(!ledger.claim("authorization:a", now + Duration::from_millis(5)));
+        assert!(ledger.claim("authorization:a"));
+        assert!(!ledger.claim("authorization:a"));
     }
 
     #[test]
     fn different_events_each_show() {
         let ledger = NoticeLedger::default();
-        let now = Instant::now();
-        assert!(ledger.claim("authorization:a", now));
-        assert!(ledger.claim("authorization:b", now));
+        assert!(ledger.claim("authorization:a"));
+        assert!(ledger.claim("authorization:b"));
     }
 
     #[test]
-    fn a_claim_expires_so_later_work_can_notify_and_the_ledger_stays_small() {
+    fn two_failures_of_the_same_kind_are_two_events() {
         let ledger = NoticeLedger::default();
-        let now = Instant::now();
-        assert!(ledger.claim("finished:search", now));
-        assert!(ledger.claim("finished:search", now + CLAIM_WINDOW));
-        assert_eq!(ledger.0.lock().unwrap().len(), 1);
+        assert!(ledger.claim("AI install failed@1000"));
+        assert!(ledger.claim("AI install failed@2000"));
+    }
+
+    #[test]
+    fn an_event_never_shows_twice_while_the_ledger_remembers_it() {
+        let ledger = NoticeLedger::default();
+        assert!(ledger.claim("operation:a"));
+        for other in 1..CLAIM_LIMIT {
+            assert!(ledger.claim(&format!("operation:{other}")));
+            assert!(!ledger.claim("operation:a"));
+        }
+    }
+
+    #[test]
+    fn the_ledger_stays_small_by_forgetting_the_oldest_event() {
+        let ledger = NoticeLedger::default();
+        for event in 0..=CLAIM_LIMIT {
+            assert!(ledger.claim(&format!("operation:{event}")));
+        }
+        assert_eq!(ledger.0.lock().unwrap().len(), CLAIM_LIMIT);
+        assert!(ledger.claim("operation:0"));
     }
 
     /// Runs `show_until_answered` against a notification server on a private connection, which

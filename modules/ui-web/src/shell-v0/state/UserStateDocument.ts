@@ -68,6 +68,8 @@ const DOCUMENT_STORAGE_KEY_V1 = 'justsearch.userState.v1';
  * preserves it rather than overwriting (F9 — see docs/tempdocs/547).
  */
 const CURRENT_SCHEMA_VERSION = 2;
+/** How many times an edit starts over because another window saved while it was being made. */
+const SAVE_CONFLICT_RETRIES = 5;
 
 /** Built-in default profile id; cannot be deleted. */
 export const DEFAULT_PROFILE_ID = 'default';
@@ -1242,25 +1244,27 @@ function saveDocument(doc: UserStateV1): boolean {
  * latest document. This window stays on its own profile, so the edit lands on the profile it shows,
  * while storage keeps the other window's choice. A stored document this build cannot read stays
  * unadopted (F9). A session-only edit whose save failed (F10) yields to what another window saved.
+ * True when something was taken in.
  */
-function adoptOtherWindowSaves(): void {
-  if (typeof localStorage === 'undefined') return;
+function adoptOtherWindowSaves(): boolean {
+  if (typeof localStorage === 'undefined') return false;
   let raw: string | null;
   try {
     raw = localStorage.getItem(DOCUMENT_STORAGE_KEY);
   } catch {
-    return;
+    return false;
   }
-  if (raw === null || raw === lastStoredRaw) return;
+  if (raw === null || raw === lastStoredRaw) return false;
   lastStoredRaw = raw;
   const stored = parseDocument(raw);
-  if (stored === null) return;
+  if (stored === null) return false;
   const storage = storageFromView(migrateSurfacePreferences(stored));
   const here = storageSig.get().activeProfileId;
   const held = storage.profiles[here] ? here : storage.activeProfileId;
   otherWindowProfileId = held === storage.activeProfileId ? null : storage.activeProfileId;
   storageSig.set({ ...storage, activeProfileId: held });
   notify();
+  return true;
 }
 
 function notify(): void {
@@ -1351,6 +1355,9 @@ const SENTINEL = Symbol('userstate-projection-sentinel');
  *
  * The producer sees the latest stored document, which another window may have saved: it must build
  * on what it receives, not on a value read before this call, or that window's edit is lost (C11).
+ * A save from another window while the producer runs starts the edit over on that save, so the
+ * producer can run more than once. The stored text is the revision checked. localStorage has no
+ * compare-and-set, so a save landing between this check and the write below is still overwritten.
  */
 export function mutateDocument(
   producer: (current: UserStateV1) => UserStateV1,
@@ -1358,7 +1365,10 @@ export function mutateDocument(
 ): void {
   ensureInitialized();
   adoptOtherWindowSaves();
-  const produced = producer(docSig.get());
+  let produced = producer(docSig.get());
+  for (let retry = 0; retry < SAVE_CONFLICT_RETRIES && adoptOtherWindowSaves(); retry++) {
+    produced = producer(docSig.get());
+  }
   if (produced === docSig.get()) return;
   if (persistFirst && !saveDocument(produced)) {
     throw lastPersistError ?? new Error('User state could not be saved.');

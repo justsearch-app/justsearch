@@ -34,7 +34,7 @@ requests arriving in the same refresh each notify, where only the first used to.
 `shell-s3d-repaired.json` holds the 12 repaired checks, each failing on 6ac7c57e77 by assertion. Its
 before-state patch (`compatibility/shell-s3d-notices-before.patch`) adds only two inert entry points
 (`setNotifications`, `setTaskbarBadge`) so the checks load there; it contains none of the repaired
-behaviour. `shell-s3d-preserved.json` runs the other 65 checks, including every other check in the
+behaviour. `shell-s3d-preserved.json` runs the other 64 checks, including every other check in the
 edited `windowFocus.test.ts`, on the candidate with no fail-before claim: they are new behaviour with
 no before-state to fail, or preservation that passes on the baseline. Evidence runs used a temporary
 Git command adapter (the before-state is a shared clone in the session's temporary folder; nothing
@@ -67,6 +67,20 @@ the connection it may be addressed to, and hands the token to GDK before present
 already held, new mechanisms with no before-state, and the Rust token path. All four earlier evidence
 files are rerun with their original bases, because their test files changed. The same temporary
 adapters apply, and `--before-root` keeps before-states in the session's temporary folder.
+
+The events repair closes five items found on 67cd75a153. A clicked notification now remembers its
+target: `primitives/modality.ts` reports when the last modal has closed, the pill opens the target
+then, and an agent request's own security dialog gives way (`AuthorizationHost.yieldDialogTo`). The
+Shell no longer closes the panel when navigation lands on the area already shown, because closing
+Settings does exactly that. Each end has its own id (`endEventId`), built from engine time so windows
+agree, and the shell's ledger is bounded by count instead of expiring. An end not observed live is no
+longer announced (`silent` on the toast, and the AI engine announcer holds that state). A save from
+another window during an edit restarts the edit, using the stored text already kept as the revision;
+localStorage has no compare-and-set, so a save between that check and the write is a named limit.
+`shell-s3d-events-repaired.json` holds the checks failing by assertion on 67cd75a153, and
+`shell-s3d-events-preserved.json` the new checks with no fail-before claim. All six earlier evidence
+files are rerun with their original bases, because their test files changed. The same temporary
+adapters apply.
 
 ```json
 {
@@ -484,7 +498,7 @@ adapters apply, and `--before-root` keeps before-states in the session's tempora
         "modules/shell/src-tauri/src/notices.rs#cfg(test)"
       ],
       "class": "New",
-      "behaviour": "The shell shows each event id once however many windows report it, a claim expires so later work can notify, zero clears the badge, and the overlay clears at zero and rejects a wrong size.",
+      "behaviour": "The shell shows each event id once however many windows report it, zero clears the badge, and the overlay clears at zero and rejects a wrong size.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -515,7 +529,6 @@ adapters apply, and `--before-root` keeps before-states in the session's tempora
       "newChecks": [
         "modules/shell/src-tauri/src/notices.rs#notices::tests::an_event_reported_by_two_windows_shows_once",
         "modules/shell/src-tauri/src/notices.rs#notices::tests::different_events_each_show",
-        "modules/shell/src-tauri/src/notices.rs#notices::tests::a_claim_expires_so_later_work_can_notify_and_the_ledger_stays_small",
         "modules/shell/src-tauri/src/notices.rs#notices::tests::zero_clears_the_badge",
         "modules/shell/src-tauri/src/notices.rs#notices::tests::the_overlay_clears_at_zero_and_rejects_a_wrong_size"
       ]
@@ -880,6 +893,381 @@ adapters apply, and `--before-root` keeps before-states in the session's tempora
           "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
           "delegationScope": "design decisions of the frame build, within the canonical design",
           "choice": "A desktop notification needs the end of the work to be observed live: the work was seen active, with no gap in observation, up to the observation that shows it ended.",
+          "label": "agent choice"
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+        "modules/ui-web/src/shell-v0/chrome/Shell.noticeClick.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "A notification clicked while a dialog is open leaves the dialog in place and remembers the target, which opens when the last blocking dialog closes, including through the real Settings window and its return to the area under it. An agent request's own security dialog gives way to the request clicked. A target that expired or was answered meanwhile opens no review and the panel says so.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "DE5",
+          "quote": "Notices only when you're not looking: in-app notice only for needs-you items when you're elsewhere in the app; nothing for what is on screen; OS notification only when the app is in the background, for agent requests waiting and long work finished or failed; taskbar badge counts needs-you; Settings › General › Notifications: Off / On / On with sound.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "design decisions of the frame build, within the canonical design",
+          "choice": "A clicked notification brings the app forward. Its target is remembered and opens when the blocking dialog closes, or at once where nothing blocks. With one agent request's review open, whether in the panel or in its security dialog, the review moves to the request clicked and the first keeps waiting; a dialog the person started stays. A target that expired or was answered meanwhile opens nothing, and the panel says so.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s3d-events-repaired.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.noticeClick.test.ts#DE5 a notification clicked with Settings open leaves Settings where it is, and opens the review once Settings closes",
+        "modules/ui-web/src/shell-v0/chrome/Shell.noticeClick.test.ts#DE5 a notification clicked with Settings open a request answered before Settings closes opens no review and says so in the panel",
+        "modules/ui-web/src/shell-v0/chrome/Shell.noticeClick.test.ts#DE5 a notification clicked with Settings open the return to the area under Settings landing after the panel opened leaves it open",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification a request answered since says so in the panel, and opens no review",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification while a dialog is open waits for the dialog, then opens the review",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification while a dialog is open waits for the last of two dialogs",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification while a dialog is open keeps waiting when another dialog follows the closed one in the same turn",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification while a dialog is open the latest click is the one remembered",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification while a dialog is open a request answered meanwhile opens no review and says so in the panel",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification while a dialog is open a request that expired meanwhile opens no review and says so in the panel",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification while a dialog is open with a review open, a request that has gone leaves the review where it is and says so",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification while a dialog is open with a request's security dialog open, the review moves to the request clicked, and the first keeps waiting",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification while a dialog is open with a request's security dialog open, a typed request clicked takes the dialog"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+        "modules/ui-web/src/shell-v0/chrome/Shell.noticeClick.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "What the click must not disturb: another area still closes the panel, a detach forgets the click, a row that is there says nothing about having gone, a review open in the panel moves to the request clicked, a dialog the person started stays, and clicking the request whose dialog is open keeps it.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "DE5",
+          "quote": "Notices only when you're not looking: in-app notice only for needs-you items when you're elsewhere in the app; nothing for what is on screen; OS notification only when the app is in the background, for agent requests waiting and long work finished or failed; taskbar badge counts needs-you; Settings › General › Notifications: Off / On / On with sound.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "C10",
+          "quote": "Host lifecycle: shell teardown/remount and desktop hide-to-tray/reopen don't duplicate streams or listeners, orphan prompts, lose activity reporting or break idle locking.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "design decisions of the frame build, within the canonical design",
+          "choice": "A clicked notification brings the app forward. Its target is remembered and opens when the blocking dialog closes, or at once where nothing blocks. With one agent request's review open, whether in the panel or in its security dialog, the review moves to the request clicked and the first keeps waiting; a dialog the person started stays. A target that expired or was answered meanwhile opens nothing, and the panel says so.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": false,
+      "evidence": "gates/test-intent/evidence/shell-s3d-events-preserved.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.noticeClick.test.ts#DE5 a notification clicked with Settings open moving to another area still closes the panel",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification a row that is there says nothing about it having gone",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification while a dialog is open C10 a detach forgets the click",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification while a dialog is open with a review open, the review moves to the request clicked",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification while a dialog is open a dialog the person started is not an agent request's: it stays, and the target waits for it",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 clicking a notification while a dialog is open clicking the request whose dialog is open keeps that dialog"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Two ends in the same words are two events, each notifying: AI install failures a second apart, installs completing, and search settling with or without a change in the engine's indexing state. A second window seeing the same end later gives the same id, and a click finds the row by its words.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "DE5",
+          "quote": "Notices only when you're not looking: in-app notice only for needs-you items when you're elsewhere in the app; nothing for what is on screen; OS notification only when the app is in the background, for agent requests waiting and long work finished or failed; taskbar badge counts needs-you; Settings › General › Notifications: Off / On / On with sound.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "design decisions of the frame build, within the canonical design",
+          "choice": "Each real event has its own id, the same in every window that sees it: an agent request or operation by its own key, an install by the engine's start time, and search settling by the time the engine's indexing state last changed plus a count of settlings at that time. The shell's dedupe only collapses one event seen from two windows.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s3d-events-repaired.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 each end is its own event two AI install failures a second apart each notify",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 each end is its own event two installs completing each notify",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 each end is its own event two settlings at different engine times each notify",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 each end is its own event a settling that changed nothing in the engine's indexing state is still its own event",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 each end is its own event a second window seeing the same end later gives the same id, so the shell shows it once",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#DE5 each end is its own event clicking one lands on its row by its words"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts",
+        "modules/shell/src-tauri/src/notices.rs#cfg(test)"
+      ],
+      "class": "New",
+      "behaviour": "An end's id carries its time and gives back its words, and the shell shows two failures of the same kind as two events.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "DE5",
+          "quote": "Notices only when you're not looking: in-app notice only for needs-you items when you're elsewhere in the app; nothing for what is on screen; OS notification only when the app is in the background, for agent requests waiting and long work finished or failed; taskbar badge counts needs-you; Settings › General › Notifications: Off / On / On with sound.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "design decisions of the frame build, within the canonical design",
+          "choice": "Each real event has its own id, the same in every window that sees it: an agent request or operation by its own key, an install by the engine's start time, and search settling by the time the engine's indexing state last changed plus a count of settlings at that time. The shell's dedupe only collapses one event seen from two windows.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": false,
+      "evidence": "gates/test-intent/evidence/shell-s3d-events-preserved.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts#DE5 the id of an end listed by its words each event has its own: the same words at another time are another id",
+        "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts#DE5 the id of an end listed by its words the same event has the same one, and it finds the row by its words",
+        "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts#DE5 the id of an end listed by its words an id without a time is its own words",
+        "modules/shell/src-tauri/src/notices.rs#notices::tests::two_failures_of_the_same_kind_are_two_events"
+      ]
+    },
+    {
+      "items": [
+        "modules/shell/src-tauri/src/notices.rs#cfg(test)"
+      ],
+      "class": "New",
+      "behaviour": "The same event id never shows twice while the ledger remembers it, however long ago it was claimed. The before-state patch (compatibility/shell-s3d-ledger-before.patch) adds only the check's constant and a clock with each claim one window after the last, standing in for time a check cannot wait out.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "DE5",
+          "quote": "Notices only when you're not looking: in-app notice only for needs-you items when you're elsewhere in the app; nothing for what is on screen; OS notification only when the app is in the background, for agent requests waiting and long work finished or failed; taskbar badge counts needs-you; Settings › General › Notifications: Off / On / On with sound.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "design decisions of the frame build, within the canonical design",
+          "choice": "The same event id never delivers twice while the ledger remembers it. The ledger is bounded by count, not by time: it keeps the latest 500 ids and forgets the oldest.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s3d-events-repaired.json",
+      "newChecks": [
+        "modules/shell/src-tauri/src/notices.rs#notices::tests::an_event_never_shows_twice_while_the_ledger_remembers_it"
+      ]
+    },
+    {
+      "items": [
+        "modules/shell/src-tauri/src/notices.rs#cfg(test)"
+      ],
+      "class": "New",
+      "behaviour": "The ledger stays bounded, by count: it keeps the latest ids and forgets the oldest.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "DE5",
+          "quote": "Notices only when you're not looking: in-app notice only for needs-you items when you're elsewhere in the app; nothing for what is on screen; OS notification only when the app is in the background, for agent requests waiting and long work finished or failed; taskbar badge counts needs-you; Settings › General › Notifications: Off / On / On with sound.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "design decisions of the frame build, within the canonical design",
+          "choice": "The same event id never delivers twice while the ledger remembers it. The ledger is bounded by count, not by time: it keeps the latest 500 ids and forgets the oldest.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": false,
+      "evidence": "gates/test-intent/evidence/shell-s3d-events-preserved.json",
+      "newChecks": [
+        "modules/shell/src-tauri/src/notices.rs#notices::tests::the_ledger_stays_small_by_forgetting_the_oldest_event"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "An end not observed live is not announced, for transitions, indexing, installs and operations, in the toast announcer and the AI engine announcer; Earlier still lists it.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "C6",
+          "quote": "Historical replay stays silent: startup snapshots, reconnects and late resource discovery list retained records in Earlier without new notices, sounds, badges or completion announcements.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "design decisions of the frame build, within the canonical design",
+          "choice": "Live-region announcements follow the same rule as desktop notifications: an end not observed live is not announced, and Earlier still lists it. The words of the end, and the AI engine's state that end left, stay unsaid until that state moves on. The current state read back after a reconnect (Search available, Indexing queue empty) is not an end and stays.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s3d-events-repaired.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 live regions follow the same rule as notifications a transition finished while disconnected says nothing, and Earlier lists it",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 live regions follow the same rule as notifications indexing finished while disconnected says nothing, and Earlier lists it",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 live regions follow the same rule as notifications an install that failed while disconnected says nothing, in either announcer, and Earlier lists it",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 live regions follow the same rule as notifications an install completed while disconnected says nothing, and Earlier lists it",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 live regions follow the same rule as notifications an operation finished while disconnected says nothing, and Earlier lists it"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "The silence ends with the unobserved end: the engine state speaks again once it moves on, and an end observed live is still announced.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "C6",
+          "quote": "Historical replay stays silent: startup snapshots, reconnects and late resource discovery list retained records in Earlier without new notices, sounds, badges or completion announcements.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "design decisions of the frame build, within the canonical design",
+          "choice": "Live-region announcements follow the same rule as desktop notifications: an end not observed live is not announced, and Earlier still lists it. The words of the end, and the AI engine's state that end left, stay unsaid until that state moves on. The current state read back after a reconnect (Search available, Indexing queue empty) is not an end and stays.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": false,
+      "evidence": "gates/test-intent/evidence/shell-s3d-events-preserved.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 live regions follow the same rule as notifications the engine state speaks again once it moves on from the unsaid end",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#C6 live regions follow the same rule as notifications an end observed live is still announced"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "A save from another window while an edit is being made survives it: a plugin value, values in the same plugin, a deleted profile, and with an edit that must persist first.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "C11",
+          "quote": "Any userState document or settings change preserves co-resident values.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "design decisions of the frame build, within the canonical design",
+          "choice": "The stored text the document already keeps is the revision for an optimistic check: a save from another window while an edit is being made restarts the edit on that save, a bounded number of times. localStorage offers no compare-and-set, so a save landing between that check and the write is a named limit; the stored format and the backend do not change.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/shell-s3d-events-repaired.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 overlapping saves a plugin value another window saves while this window is writing survives",
+        "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 overlapping saves both windows' values in the same plugin survive",
+        "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 overlapping saves a profile another window deletes while this window is writing stays deleted",
+        "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 overlapping saves a save that must land first still builds on the other window's save"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "The restart stays bounded: an edit the other window's save made pointless writes nothing over it, and a window that never stops saving cannot hold an edit forever.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "C11",
+          "quote": "Any userState document or settings change preserves co-resident values.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "design decisions of the frame build, within the canonical design",
+          "choice": "The stored text the document already keeps is the revision for an optimistic check: a save from another window while an edit is being made restarts the edit on that save, a bounded number of times. localStorage offers no compare-and-set, so a save landing between that check and the write is a named limit; the stored format and the backend do not change.",
+          "label": "agent choice"
+        }
+      ],
+      "repaired": false,
+      "evidence": "gates/test-intent/evidence/shell-s3d-events-preserved.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 overlapping saves an edit the other window's save made pointless stays one, and writes nothing over it",
+        "modules/ui-web/src/shell-v0/state/UserStateDocument.multiWindow.test.ts#C11 overlapping saves a window that never stops saving cannot hold an edit forever: the edit lands"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/noticePolicy.test.ts",
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "signature"
+      ],
+      "whatMoved": "workFinishedNotice and workFailedNotice now require the event's id, where they defaulted to the words, which is what let two events share one. The policy checks pass an id, and the words-based assertion in the policy file now expects that id. Three component checks provide the engine's time and expect the exact new id in place of the old words; each still pins the whole notification. No other assertion changes. Every check in both files is rerun.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "design decisions of the frame build, within the canonical design",
+          "choice": "Each real event has its own id, the same in every window that sees it: an agent request or operation by its own key, an install by the engine's start time, and search settling by the time the engine's indexing state last changed plus a count of settlings at that time. The shell's dedupe only collapses one event seen from two windows.",
+          "label": "agent choice"
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/shell/src-tauri/src/notices.rs#cfg(test)"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "signature"
+      ],
+      "whatMoved": "NoticeLedger::claim no longer takes the time, because the ledger is bounded by count. The two checks that pass it now call it without, with their assertions unchanged. The check that let a claim expire is replaced: its repeat after 60 seconds contradicted once per event, and its small-ledger half is kept by the bound check.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "design decisions of the frame build, within the canonical design",
+          "choice": "The same event id never delivers twice while the ledger remembers it. The ledger is bounded by count, not by time: it keeps the latest 500 ids and forgets the oldest.",
           "label": "agent choice"
         }
       ]
