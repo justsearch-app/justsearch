@@ -250,3 +250,25 @@ in existing tests; the independent verifier checks the new sources and fail-befo
   "note": "Transcribed by the orchestrator. Independent audit accepts all 15 entries on this digest; before-state tests and supplied sources reviewed before provisional classification and candidate diffs, then the class table. No must-fix findings. Static test-intent audit only; no builds or tests executed."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1afea-5349-70b1-be49-adf0f1d1bffa",
+  "verdict": "accept",
+  "digest": "sha256:a78c1daf98a93bebe18b3830c434eb49c0375dbff0ea1d7a2c1c707f45620aa6",
+  "note": "Transcribed by the orchestrator from the verifier's result (Codex sandbox cannot run accept). Accept all 16 entries on this digest. Sources are delegated choices; no conflicting decision source found. One SQLITE_BUSY at EngineHintlessCollectionMigrationTest:228 under the full run, focused reruns pass on both commits; kept as a separate flake record."
+}
+```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "01a1afea-2647-7c11-96fa-cceeeb1d570f",
+  "verdict": "accept",
+  "digest": "sha256:a78c1daf98a93bebe18b3830c434eb49c0375dbff0ea1d7a2c1c707f45620aa6",
+  "note": "Transcribed by the orchestrator. Independent audit accepts all 16 entries covering 32 files on this digest. Before-state tests and supplied sources informed provisional classification before candidate-diff review and final class-table assessment. No must-fix findings. Static audit only; no builds or tests executed."
+}
+```
