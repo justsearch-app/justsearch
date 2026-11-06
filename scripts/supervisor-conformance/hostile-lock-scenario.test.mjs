@@ -26,8 +26,11 @@ function fixture(t, options = {}) {
   let submitted = false;
   let ingestPosts = 0;
   let searchPosts = 0;
+  let healthGets = 0;
   let operationGets = [];
   let submittedPaths = [];
+  let observedStates = [];
+  let lastOutcome = null;
   let lastSupervisor = null;
   let successorReads = 0;
   let acknowledgedRelease = false;
@@ -81,7 +84,7 @@ function fixture(t, options = {}) {
     if (file.endsWith('manifest.json')) {
       assert.ok(lastSupervisor, 'the supervisor snapshot must be read before its manifest');
       return {
-        pid: lastSupervisor.pid,
+        pid: lastSupervisor.pid + (submitted && options.staleManifest ? 1 : 0),
         instanceId: lastSupervisor.instanceId,
         head: { apiPort: 12345 },
       };
@@ -89,7 +92,7 @@ function fixture(t, options = {}) {
     throw new Error(`unexpected JSON path: ${file}`);
   };
 
-  const waitFor = async (label, _timeoutMs, probe) => {
+  const waitFor = async (label, timeoutMs, probe) => {
     if (label.includes('releases hostile locks after')) {
       assert.ok(fs.existsSync(path.join(work, 'intruder-stop')),
         'hostile locks are released only after the qualifying exit is observed');
@@ -102,6 +105,7 @@ function fixture(t, options = {}) {
     }
 
     if (label.startsWith('the original operation completes')) {
+      assert.ok(timeoutMs > 0 && timeoutMs <= 180000, 'retain the original recovery bound');
       for (let attempt = 0; attempt < 4; attempt += 1) {
         const result = await probe();
         if (result) return result;
@@ -118,12 +122,19 @@ function fixture(t, options = {}) {
     if (endpoint === '/api/knowledge/ingest') {
       ingestPosts += 1;
       assert.equal(ingestPosts, 1, 'an accepted or refused ingest is submitted exactly once');
-      assert.equal(body.paths.length, 100, 'the scenario submits the complete 100-file corpus');
+      const corpus = path.join(work, 'contention-corpus', 'boot-contention');
+      assert.deepEqual(body.paths, [corpus], 'submit all 100 documents under one directory root');
+      submittedPaths = fs.readdirSync(corpus).map(file => path.join(corpus, file));
+      assert.deepEqual(new Set(submittedPaths), new Set(Array.from({ length: 100 }, (_, i) =>
+        path.join(corpus, `boot-contention-${i}.txt`))), 'retain all 100 distinct expected files');
+      for (let i = 0; i < 100; i += 1) {
+        assert.match(fs.readFileSync(path.join(corpus, `boot-contention-${i}.txt`), 'utf8'),
+          new RegExp(`boot contention probe document ${i}\\n`));
+      }
       assert.match(body.idempotencyKey,
         /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
       assert.equal(fs.existsSync(path.join(work, 'intruder-stop')), false,
         'the intruder remains active through submission');
-      submittedPaths = body.paths;
       submitted = true;
 
       if (options.lostAcceptance) {
@@ -148,6 +159,10 @@ function fixture(t, options = {}) {
 
     assert.equal(endpoint, '/api/knowledge/search');
     searchPosts += 1;
+    assert.equal(lastOutcome?.state, 'complete', 'never search while the operation is running');
+    assert.equal(lastOutcome.result.code, 'SUCCESS', 'never search after an unsuccessful result');
+    assert.equal(lastOutcome.unitsFailed, 0, 'never search after failed units');
+    assert.equal(body.limit, 100, 'the final search must cover all 100 expected paths');
     if (options.countedExit) {
       assert.ok(acknowledgedRelease, 'the lock intruder must stop after a counted exit');
       assert.ok(lastSupervisor.incarnation > qualifyingExit.incarnation,
@@ -157,10 +172,13 @@ function fixture(t, options = {}) {
         'a healthy run must not stop the lock intruder');
     }
     const matchedCount = options.matchedCount ?? 100;
+    const resultPaths = submittedPaths.slice(0, matchedCount);
+    if (options.duplicatePath) resultPaths[99] = resultPaths[0];
+    if (options.unrelatedPath) resultPaths[99] = path.join(work, 'unrelated.txt');
     return {
       status: 200,
       text: JSON.stringify({
-        results: submittedPaths.slice(0, matchedCount).map((file) => ({ fields: { path: file } })),
+        results: resultPaths.map((file) => ({ fields: { path: file } })),
       }),
     };
   };
@@ -182,17 +200,26 @@ function fixture(t, options = {}) {
           'the outcome is read only after the successor incarnation exceeds the counted exit');
         operationGetIncarnations.push(lastSupervisor.incarnation);
       }
+      const state = options.outcomeStates?.[operationGets.length - 1] ?? options.outcomeState ?? 'complete';
+      if (options.outcomeStates && !observedStates.includes('complete')) {
+        assert.equal(searchPosts, 0, 'all polls through the first complete observation precede search');
+      }
+      observedStates.push(state);
+      lastOutcome = {
+        operationKey: OPERATION_KEY,
+        state,
+        result: { code: options.outcomeCode ?? 'SUCCESS' },
+        unitsFailed: options.unitsFailed ?? 0,
+      };
       return {
         status: 200,
-        text: JSON.stringify({
-          operationKey: OPERATION_KEY,
-          state: options.outcomeState ?? 'complete',
-          result: { code: options.outcomeCode ?? 'SUCCESS' },
-          unitsFailed: options.unitsFailed ?? 0,
-        }),
+        text: JSON.stringify(lastOutcome),
       };
     }
-    if (endpoint === '/api/health') return { status: 200, text: '{}' };
+    if (endpoint === '/api/health') {
+      healthGets += 1;
+      return { status: options.healthStatus ?? 200, text: '{}' };
+    }
     throw new Error(`unexpected request path: ${endpoint}`);
   };
 
@@ -218,7 +245,9 @@ function fixture(t, options = {}) {
     stats: () => ({
       ingestPosts,
       searchPosts,
+      healthGets,
       operationGets: [...operationGets],
+      observedStates: [...observedStates],
       successorReads,
       acknowledgedRelease,
       releasedExit: releasedExit && { ...releasedExit },
@@ -240,6 +269,18 @@ test('healthy hostile-lock run submits once, indexes all 100, and never stops th
   assert.equal(stats.ingestPosts, 1);
   assert.equal(stats.operationGets.length, 1);
   assert.equal(stats.searchPosts, 1);
+  assert.equal(stats.healthGets, 1);
+  assert.equal(stats.intruderStopped, false);
+});
+
+test('running polls do not search until complete SUCCESS, then verify all 100 paths and health', async (t) => {
+  const c = await exercise(t, { outcomeStates: ['running', 'running', 'complete'] });
+  const stats = c.stats();
+  assert.equal(stats.ingestPosts, 1);
+  assert.deepEqual(stats.observedStates, ['running', 'running', 'complete']);
+  assert.deepEqual(stats.operationGets, Array(3).fill(`/api/operation-history/${OPERATION_KEY}`));
+  assert.equal(stats.searchPosts, 1);
+  assert.equal(stats.healthGets, 1);
   assert.equal(stats.intruderStopped, false);
 });
 
@@ -283,7 +324,7 @@ test('a stale counted exit does not release hostile locks', async (t) => {
   assert.equal(stats.intruderStopped, false);
 });
 
-for (const outcomeState of ['unknown', 'failed']) {
+for (const outcomeState of ['unknown', 'expired', 'failed']) {
   test(`${outcomeState.toUpperCase()} operation outcome cannot pass`, async (t) => {
     const c = fixture(t, { outcomeState });
     await assert.rejects(
@@ -293,11 +334,32 @@ for (const outcomeState of ['unknown', 'failed']) {
     const stats = c.stats();
     assert.equal(stats.ingestPosts, 1);
     assert.deepEqual(stats.operationGets, [`/api/operation-history/${OPERATION_KEY}`]);
-    assert.equal(stats.searchPosts, 1,
-      'the scenario may probe search, but must reject this durable operation outcome');
+    assert.equal(stats.searchPosts, 0, 'reject unsuccessful durable outcomes before searching');
     assert.equal(stats.intruderStopped, false);
   });
 }
+
+for (const options of [{ outcomeCode: 'FAILED' }, { unitsFailed: 1 }]) {
+  test(`complete but unsuccessful outcome rejects before search: ${JSON.stringify(options)}`, async (t) => {
+    const c = fixture(t, options);
+    await assert.rejects(exerciseHostileLocks(c), /complete corpus must have a successful durable outcome/);
+    const stats = c.stats();
+    assert.equal(stats.ingestPosts, 1);
+    assert.equal(stats.operationGets.length, 1);
+    assert.equal(stats.searchPosts, 0);
+    assert.equal(stats.healthGets, 0);
+  });
+}
+
+test('a stale manifest binding prevents polling or searching', async (t) => {
+  const c = fixture(t, { staleManifest: true });
+  await assert.rejects(exerciseHostileLocks(c), /simulated wait timeout/);
+  const stats = c.stats();
+  assert.equal(stats.ingestPosts, 1);
+  assert.equal(stats.operationGets.length, 0);
+  assert.equal(stats.searchPosts, 0);
+  assert.equal(stats.intruderStopped, false);
+});
 
 test('partial corpus cannot pass even with a complete SUCCESS outcome', async (t) => {
   const c = fixture(t, { matchedCount: 99 });
@@ -307,6 +369,23 @@ test('partial corpus cannot pass even with a complete SUCCESS outcome', async (t
   assert.equal(stats.operationGets.length, 4);
   assert.equal(stats.searchPosts, 4);
   assert.equal(stats.intruderStopped, false);
+});
+
+for (const options of [{ duplicatePath: true }, { unrelatedPath: true }]) {
+  test(`100 hits must contain all distinct expected paths: ${JSON.stringify(options)}`, async (t) => {
+    const c = fixture(t, options);
+    await assert.rejects(exerciseHostileLocks(c), /simulated wait timeout/);
+    assert.equal(c.stats().ingestPosts, 1);
+    assert.equal(c.stats().searchPosts, 4);
+    assert.equal(c.stats().healthGets, 0);
+  });
+}
+
+test('complete SUCCESS and all 100 paths still require healthy Engine', async (t) => {
+  const c = fixture(t, { healthStatus: 503 });
+  await assert.rejects(exerciseHostileLocks(c), /Engine must be healthy/);
+  assert.equal(c.stats().searchPosts, 1);
+  assert.equal(c.stats().healthGets, 1);
 });
 
 test('counted fatal exit releases locks and requires a higher incarnation to pass', async (t) => {

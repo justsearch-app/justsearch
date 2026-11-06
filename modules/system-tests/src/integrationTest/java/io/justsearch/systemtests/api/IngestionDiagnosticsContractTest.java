@@ -23,6 +23,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -58,6 +59,9 @@ class IngestionDiagnosticsContractTest {
   private static final Duration SEARCHABLE_TIMEOUT = Duration.ofSeconds(45);
   private static final Duration POLL_INTERVAL = Duration.ofMillis(250);
 
+  // User content stays outside protected app data; JUnit removes it after BACKEND.stop().
+  @TempDir static Path contentDir;
+
   @BeforeAll
   static void startBackend() throws Exception {
     BACKEND.start();
@@ -77,7 +81,7 @@ class IngestionDiagnosticsContractTest {
   void recentEventsContainNoPathDerivableContentAfterIngest() throws Exception {
     String dirMarker = "secretdir" + uniqueSuffix();
     String fileMarker = "secretfile" + uniqueSuffix();
-    Path corpus = Files.createDirectory(BACKEND.dataDir().resolve(dirMarker));
+    Path corpus = Files.createDirectory(contentDir.resolve(dirMarker));
     Path docPath = corpus.resolve(fileMarker + "-doc.txt");
     Path dataPath = corpus.resolve(fileMarker + "-data.md");
     Files.writeString(docPath, "alpha beta gamma " + fileMarker);
@@ -129,7 +133,7 @@ class IngestionDiagnosticsContractTest {
   @DisplayName("Search projection exposes extraction provenance fields end-to-end")
   void searchProjectionExposesExtractionProvenanceFields() throws Exception {
     String marker = "honesty" + uniqueSuffix();
-    Path corpus = Files.createDirectory(BACKEND.dataDir().resolve(marker + "-corpus"));
+    Path corpus = Files.createDirectory(contentDir.resolve(marker + "-corpus"));
     Path docPath = corpus.resolve("doc.txt");
     Files.writeString(docPath, "honesty marker " + marker);
     ingestSync(corpus.toAbsolutePath().toString());
@@ -178,7 +182,7 @@ class IngestionDiagnosticsContractTest {
   @DisplayName("resolve-hash returns the path for a freshly ingested file")
   void resolveHashReturnsPathForFreshlyIngestedFile() throws Exception {
     String marker = "resolve" + uniqueSuffix();
-    Path corpus = Files.createDirectory(BACKEND.dataDir().resolve(marker + "-corpus"));
+    Path corpus = Files.createDirectory(contentDir.resolve(marker + "-corpus"));
     Path probeFile = corpus.resolve("probe.txt");
     Files.writeString(probeFile, "content for resolver probe " + marker);
 
@@ -217,7 +221,7 @@ class IngestionDiagnosticsContractTest {
   @DisplayName("Diagnostic export does not leak paths even with the resolver wired")
   void diagnosticExportDoesNotLeakPathsEvenWithResolverWired() throws Exception {
     String marker = "leak" + uniqueSuffix();
-    Path corpus = Files.createDirectory(BACKEND.dataDir().resolve(marker + "-corpus"));
+    Path corpus = Files.createDirectory(contentDir.resolve(marker + "-corpus"));
     Path docPath = corpus.resolve("a.txt");
     Files.writeString(docPath, "alpha " + marker);
     ingestSync(corpus.toAbsolutePath().toString());

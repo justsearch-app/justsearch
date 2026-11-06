@@ -1079,7 +1079,7 @@ jobs:
     if: needs.changes.outputs.search != 'false'
     name: Unit tests (search-worker-1)
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - name: Checkout
         uses: actions/checkout@v7

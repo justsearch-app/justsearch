@@ -43,7 +43,7 @@ export async function exerciseHostileLocks(c) {
   try {
     // Exactly one submission: a lost connection never authorizes replay of an unknown outcome.
     ingested = await post(submittedBinding.port, '/api/knowledge/ingest', {
-      paths, idempotencyKey: operationKey,
+      paths: [corpus], idempotencyKey: operationKey,
     });
   } catch (error) {
     if (!lostConnection(error)) throw error;
@@ -96,8 +96,11 @@ export async function exerciseHostileLocks(c) {
         lastState = observed.state;
         console.log('LOCK_SURVIVAL_STATE', outcomeResponse.text);
       }
-      // A search is foreground work that pauses indexing: polling with one starves the import it waits for.
+      // Searches are foreground work; measured foreground interference warrants polling the
+      // durable operation first, but does not establish the cause of a recovery timeout.
       if (observed.state !== 'complete') return null;
+      requireThat(observed.result?.code === 'SUCCESS' && observed.unitsFailed === 0,
+        `the complete corpus must have a successful durable outcome: ${outcomeResponse.text}`);
       response = await post(binding.port, '/api/knowledge/search', {
         query: `${name.replaceAll('-', ' ')} probe`, limit: paths.length, mode: 'text',
       });
@@ -111,8 +114,6 @@ export async function exerciseHostileLocks(c) {
       .map(candidate => String(candidate.fields?.path ?? '').toLowerCase())
       .filter(file => expectedPaths.has(file)));
     if (matched.size !== expectedPaths.size) return null;
-    requireThat(outcome.result?.code === 'SUCCESS' && outcome.unitsFailed === 0,
-      `the complete corpus must have a successful durable outcome: ${outcomeResponse.text}`);
     return { port: binding.port, incarnation: binding.incarnation, matchedCount: matched.size, outcome };
   });
   requireThat((await request(result.port, '/api/health')).status === 200,
