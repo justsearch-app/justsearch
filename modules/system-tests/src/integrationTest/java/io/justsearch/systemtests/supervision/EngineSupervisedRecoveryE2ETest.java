@@ -1026,6 +1026,7 @@ final class EngineSupervisedRecoveryE2ETest {
   }
 
   static void runScenario(String scenario) throws Exception {
+    boolean rootVolumeScenario = RootVolumeInitializationRetryE2ETest.SCENARIO.equals(scenario);
     boolean processingFamily = "processing".equals(scenario) || "operation".equals(scenario);
     boolean operationFault = scenario.startsWith("ingest-") || scenario.startsWith("settings-")
         || scenario.startsWith("bulk-");
@@ -1035,7 +1036,7 @@ final class EngineSupervisedRecoveryE2ETest {
         || "lock-index-exhaustion-no-ai".equals(scenario);
     boolean indexLockScenario = semanticIndexLockScenario || indexLockExhaustionScenario;
     boolean nativeProjectionScenario = "native-mixed-after-pointer".equals(scenario);
-    if ("lock-boot".equals(scenario) || indexLockScenario) {
+    if ("lock-boot".equals(scenario) || indexLockScenario || rootVolumeScenario) {
       assumeTrue(System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("windows"),
           "mandatory file-locking contention at boot is a Windows property");
     }
@@ -1092,14 +1093,17 @@ final class EngineSupervisedRecoveryE2ETest {
       intruder.start(5, 10);
       intruderStarted = true;
     }
+    RootVolumeInitializationRetryE2ETest.Hold rootVolumeLock = null;
     Process process = null;
     int exit;
     boolean interrupted = false;
     Throwable primaryFailure = null;
     try {
+      if (rootVolumeScenario) rootVolumeLock = new RootVolumeInitializationRetryE2ETest.Hold(work);
       process = builder.start();
       long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(330);
       while (!process.waitFor(100, TimeUnit.MILLISECONDS)) {
+        if (rootVolumeLock != null) rootVolumeLock.releaseIfRequested();
         if (indexLockScenario) {
           Path runtime = work.resolve("data/runtime");
           Path initialReached = runtime.resolve("index-start-initial-reached.json");
@@ -1211,6 +1215,7 @@ final class EngineSupervisedRecoveryE2ETest {
       primaryFailure = failure;
       throw failure;
     } finally {
+      if (rootVolumeLock != null) rootVolumeLock.close();
       if (indexLock != null) indexLock.close();
       if (intruder != null) intruder.close();
       if (process != null && process.isAlive()) {
@@ -1247,7 +1252,9 @@ final class EngineSupervisedRecoveryE2ETest {
     }
     String output = Files.readString(outputFile, StandardCharsets.UTF_8);
 
-    if ("writer".equals(scenario)) {
+    if (rootVolumeScenario) {
+      RootVolumeInitializationRetryE2ETest.assertProof(output, work);
+    } else if ("writer".equals(scenario)) {
       assertTrue(output.contains("QUEUE_BEFORE_DEATH"), output);
       assertTrue(output.contains("fatal_or_uncaught"), output);
     } else if ("migration".equals(scenario)) {

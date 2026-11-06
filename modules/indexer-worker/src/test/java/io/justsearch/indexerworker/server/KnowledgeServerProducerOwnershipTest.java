@@ -96,6 +96,8 @@ final class KnowledgeServerProducerOwnershipTest {
       queueField.setAccessible(true);
       queueField.set(server, queue);
       var mutationOwner = mock(DefaultWorkerAppServices.class);
+      when(mutationOwner.ingestService()).thenReturn(
+          mock(io.justsearch.indexerworker.services.WorkerIngestService.class));
       var token = new Object();
       when(mutationOwner.mutationOwnerToken()).thenReturn(token);
       when(mutationOwner.mutationAdmission()).thenReturn(new WorkerMutationAdmission(token));

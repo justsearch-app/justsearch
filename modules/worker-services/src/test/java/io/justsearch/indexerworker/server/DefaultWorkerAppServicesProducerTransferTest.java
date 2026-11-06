@@ -2,7 +2,7 @@
 package io.justsearch.indexerworker.server;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 import io.justsearch.adapters.lucene.runtime.DeferredRuntime;
@@ -998,6 +998,190 @@ final class DefaultWorkerAppServicesProducerTransferTest {
       green.close();
       assertTrue(fixture.watcherExecutor.isShutdown());
       verify(nerA, never()).close();
+    }
+  }
+
+  @ParameterizedTest
+  @CsvSource({"deferred,false", "deferred,true", "reload,false", "reload,true",
+      "native,false", "native,true", "serving,false", "serving,true", "query,false", "query,true"})
+  void unfinishedRootInitializationSurvivesSelectedProducerReplacement(
+      String replacement, boolean ledgerFailure, @TempDir Path temp) throws Exception {
+    try (var ignored = io.justsearch.indexerworker.services.NoVolumeIdentityExtension.withVolumeIdentity(true);
+        Fixture fixture = new Fixture(temp)) {
+      stubRootEvidence(fixture.runtime);
+      stubRootEvidence(fixture.greenRuntime);
+      Path root = Files.createDirectory(temp.resolve("boot-without-native-watch"));
+      Path sibling = Files.createDirectory(temp.resolve("sibling"));
+      Path configured = Files.createDirectory(temp.resolve("configured-only"));
+      Path later = Files.createDirectory(temp.resolve("later-declaration"));
+      var membership = new AtomicReference<>(List.of(root, sibling));
+      var source = replacement.equals("deferred")
+          ? fixture.newDeferredIncumbent() : fixture.newIncumbent();
+      source.ingestService().useExclusionRoots(membership::get);
+      Path blocked = Files.createDirectory(temp.resolve(
+          ledgerFailure ? "root-volumes.properties.tmp" : "root-volumes-pending.properties.tmp"));
+      source.ingestService().seedRootVolumesAfterUpgrade(List.of(root, sibling));
+      source.ingestService().seedConfiguredRoots(List.of(configured));
+      for (int attempt = 0; attempt < 2; attempt++) {
+        // Preparation and abandonment must neither advance nor consume the incumbent's work.
+        try (var discarded = prepareRootReplacement(fixture, source, replacement)) {
+          discarded.ingestService().seedConfiguredRoots(List.of(configured));
+          discarded.ingestService().retryRootVolumeSeeding();
+        }
+      }
+      membership.set(List.of(root, sibling, later));
+      try (var successor = prepareRootReplacement(fixture, source, replacement)) {
+        successor.ingestService().seedConfiguredRoots(List.of(configured));
+        Files.delete(blocked);
+        successor.ingestService().retryRootVolumeSeeding();
+        assertFalse(successor.ingestService().rootOnRecordedVolume(root.toString()),
+            "an unpublished candidate cannot complete boot initialization");
+        installRootReplacement(source, successor, replacement);
+        successor.ingestService().retryRootVolumeSeeding();
+        assertTrue(successor.ingestService().rootOnRecordedVolume(root.toString()));
+        assertTrue(successor.ingestService().rootOnRecordedVolume(sibling.toString()),
+            "a sibling needs no individual Head query or working native watch");
+        assertTrue(successor.ingestService().rootOnRecordedVolume(configured.toString()),
+            "the selected retry producer includes configured-only roots");
+        assertFalse(successor.ingestService().rootOnRecordedVolume(later.toString()),
+            "current membership cannot widen the captured boot inputs");
+        byte[] authority = Files.readAllBytes(temp.resolve("root-volumes.properties"));
+        byte[] pending = Files.readAllBytes(temp.resolve("root-volumes-pending.properties"));
+        successor.ingestService().retryRootVolumeSeeding();
+        assertArrayEquals(authority, Files.readAllBytes(temp.resolve("root-volumes.properties")));
+        assertArrayEquals(pending, Files.readAllBytes(temp.resolve("root-volumes-pending.properties")));
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void uuidlessCompletionIsNotReenrolledByPreparedOrSelectedReplacement(
+      boolean query, @TempDir Path temp) throws Exception {
+    try (var ignored = io.justsearch.indexerworker.services.NoVolumeIdentityExtension.withVolumeIdentity(false);
+        Fixture fixture = new Fixture(temp)) {
+      Path root = Files.createDirectory(temp.resolve("boot"));
+      Path configured = Files.createDirectory(temp.resolve("configured"));
+      var source = fixture.newIncumbent();
+      source.ingestService().seedRootVolumesAfterUpgrade(List.of(root));
+      source.ingestService().seedConfiguredRoots(List.of(configured));
+      Path pendingFile = temp.resolve("root-volumes-pending.properties");
+      byte[] pending = Files.readAllBytes(pendingFile);
+      var timestamp = java.nio.file.attribute.FileTime.fromMillis(1_000L);
+      Files.setLastModifiedTime(pendingFile, timestamp);
+      try (var successor = prepareSuccessor(fixture, source, query)) {
+        successor.ingestService().seedConfiguredRoots(List.of(configured));
+        assertEquals(timestamp, Files.getLastModifiedTime(pendingFile));
+        try (var transfer = source.prepareProducerTransferTo(successor)) { transfer.install(); }
+        successor.ingestService().retryRootVolumeSeeding();
+        assertArrayEquals(pending, Files.readAllBytes(pendingFile));
+        assertEquals(timestamp, Files.getLastModifiedTime(pendingFile),
+            "same-Engine replacement is not the configured UUID-less restart exception");
+        assertFalse(successor.ingestService().rootOnRecordedVolume(root.toString()));
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void replacementPreservesBoundEmptyVersusUnboundBootInputs(
+      boolean boundEmpty, @TempDir Path temp) throws Exception {
+    try (var ignored = io.justsearch.indexerworker.services.NoVolumeIdentityExtension.withVolumeIdentity(true);
+        Fixture fixture = new Fixture(temp)) {
+      stubRootEvidence(fixture.runtime);
+      Path later = Files.createDirectory(temp.resolve("later"));
+      Path configured = Files.createDirectory(temp.resolve("configured"));
+      var source = fixture.newDeferredIncumbent();
+      Path blocked = Files.createDirectory(temp.resolve("root-volumes-pending.properties.tmp"));
+      if (boundEmpty) source.ingestService().seedRootVolumesAfterUpgrade(List.of());
+      source.ingestService().seedConfiguredRoots(List.of(configured));
+      try (var successor = prepareRootReplacement(fixture, source, "deferred")) {
+        successor.ingestService().useExclusionRoots(() -> List.of(later));
+        successor.ingestService().seedConfiguredRoots(List.of(configured));
+        installRootReplacement(source, successor, "deferred");
+        Files.delete(blocked);
+        successor.ingestService().retryRootVolumeSeeding();
+        assertEquals(boundEmpty, Files.exists(temp.resolve("root-volumes.properties")),
+            "only bound boot inputs may initialize the missing ledger");
+        assertEquals(boundEmpty, successor.ingestService().rootOnRecordedVolume(configured.toString()));
+        assertFalse(successor.ingestService().rootOnRecordedVolume(later.toString()));
+      }
+    }
+  }
+
+  @Test
+  void replacementUsesCurrentConfigurationAndMembershipForUnfinishedEnrollment(@TempDir Path temp)
+      throws Exception {
+    try (var ignored = io.justsearch.indexerworker.services.NoVolumeIdentityExtension.withVolumeIdentity(true);
+        Fixture fixture = new Fixture(temp)) {
+      stubRootEvidence(fixture.runtime);
+      Path removed = Files.createDirectory(temp.resolve("removed"));
+      Path kept = Files.createDirectory(temp.resolve("kept"));
+      Path oldConfigured = Files.createDirectory(temp.resolve("old-configured"));
+      Path currentConfigured = Files.createDirectory(temp.resolve("current-configured"));
+      var membership = new AtomicReference<>(List.of(removed, kept));
+      var source = fixture.newIncumbent();
+      source.ingestService().useExclusionRoots(membership::get);
+      Path blocked = Files.createDirectory(temp.resolve("root-volumes-pending.properties.tmp"));
+      source.ingestService().seedRootVolumesAfterUpgrade(List.of(removed, kept));
+      source.ingestService().seedConfiguredRoots(List.of(oldConfigured));
+      try (var successor = prepareSuccessor(fixture, source, false)) {
+        membership.set(List.of(kept));
+        successor.ingestService().seedConfiguredRoots(List.of(currentConfigured));
+        try (var transfer = source.prepareProducerTransferTo(successor)) { transfer.install(); }
+        Files.delete(blocked);
+        successor.ingestService().retryRootVolumeSeeding();
+        assertTrue(successor.ingestService().rootOnRecordedVolume(kept.toString()));
+        assertTrue(successor.ingestService().rootOnRecordedVolume(currentConfigured.toString()));
+        assertFalse(successor.ingestService().rootOnRecordedVolume(removed.toString()));
+        assertFalse(successor.ingestService().rootOnRecordedVolume(oldConfigured.toString()));
+      }
+    }
+  }
+
+  private static void stubRootEvidence(RunningRuntime runtime) throws Exception {
+    when(runtime.readPathOps().search(any(), anyInt(), anySet(), any(), isNull()))
+        .thenReturn(new io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.SearchResult(List.of(), 0L, 0L));
+  }
+
+  private static DefaultWorkerAppServices prepareRootReplacement(
+      Fixture fixture, DefaultWorkerAppServices source, String replacement) throws Exception {
+    return switch (replacement) {
+      case "deferred" -> DefaultWorkerAppServices.prepareDeferredWriterUpgrade(
+          fixture.executors, fixture.greenContext(), () -> false, null, source.indexingPacing(),
+          io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), fixture.configuration, source);
+      case "reload" -> {
+        // A stopped native loop is the existing reload prerequisite.
+        if (((DefaultWorkerAppServices.SharedProducerOwnership) field(source, "producerOwnership")).ownsLoop()) {
+          source.closeNativeLoopRetainingModels();
+        }
+        yield DefaultWorkerAppServices.prepareRuntimeReload(fixture.executors, fixture.greenContext(),
+            () -> false, null, source.indexingPacing(),
+            io.justsearch.app.api.runtime.child.DefaultChildControl.unrecorded(
+                io.justsearch.app.api.runtime.ManagedChildRegistry.noop()), fixture.configuration, source);
+      }
+      case "native" -> DefaultWorkerAppServices.prepareNativeGreen(
+          fixture.executors, fixture.nativeGreenContext(), () -> true, null, source.indexingPacing(),
+          io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), fixture.configuration,
+          fixture.candidateConfiguration, source);
+      default -> prepareSuccessor(fixture, source, replacement.equals("query"));
+    };
+  }
+
+  private static void installRootReplacement(DefaultWorkerAppServices source,
+      DefaultWorkerAppServices successor, String replacement) throws Exception {
+    if (replacement.equals("deferred")) {
+      try (var transfer = source.prepareDeferredWatcherHandoffTo(successor)) { transfer.install(); }
+    } else if (replacement.equals("reload") || replacement.equals("native")) {
+      try (var fence = source.mutationAdmission().beginFinalFence(source.mutationOwnerToken(), 1_000)) {
+        assertNotNull(fence);
+        if (replacement.equals("native")) source.closeNativeLoopRetainingModels();
+        source.installNativeWatcherHandoffTo(successor);
+        fence.install(successor.mutationOwnerToken());
+        fence.certifySuccessor();
+      }
+    } else {
+      try (var transfer = source.prepareProducerTransferTo(successor)) { transfer.install(); }
     }
   }
 
