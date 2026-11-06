@@ -33,7 +33,7 @@ beforeAll(async () => {
           <link rel="stylesheet" href="/src/styles/tokens.css">
           <link rel="stylesheet" href="/src/shell-v0/themes/default.css"></head><body><script type="module">
           import '/src/shell-v0/views/LibrarySurface.ts';
-          import '/src/shell-v0/components/FailedJobsDrawer.ts';
+          import '/src/shell-v0/components/FailedFilesList.ts';
           import '/src/shell-v0/renderers/layouts/VerticalLayout.ts';
           import '/src/shell-v0/renderers/controls/XUiRendererControl.ts';
           import '/src/shell-v0/renderers/controls/FolderCardRenderer.ts';
@@ -41,7 +41,6 @@ beforeAll(async () => {
           import { CORE_DECLARED } from '/src/shell-v0/themes/builtinPresentations.ts';
           import { __feedForTest } from '/src/shell-v0/state/aiStateStore.ts';
           import { createMockHostApi } from '/src/shell-v0/plugin-api/testHostApi.ts';
-          import { openFailedJobs } from '/src/shell-v0/state/failedJobsDrawer.ts';
           import { __seedForTest as seedOperations } from '/src/api/registry/OperationCatalogClient.ts';
           import { __seedForTest as seedResources } from '/src/api/registry/ResourceCatalogClient.ts';
           const settle = async () => { for (let i = 0; i < 4; i++) await new Promise(requestAnimationFrame); };
@@ -76,12 +75,12 @@ beforeAll(async () => {
             errorMessage: '', retryAfterMs: 0, collection: 'default', scanId: '' });
           window.prepareFailedDrawer = async () => {
             failed = ['first', 'target', 'last'];
-            drawer = document.createElement('jf-failed-jobs-drawer');
+            drawer = document.createElement('jf-failed-files-list');
             drawer.host_ = createMockHostApi({ data: { fetch: async () => new Response(JSON.stringify({ jobs: failed.map(job), count: failed.length })) } });
-            document.body.append(drawer); openFailedJobs('a');
+            drawer.folderPathHash = 'a'; document.body.append(drawer);
             for (let i = 0; i < 20 && drawer.rows.length !== failed.length; i++) await settle();
           };
-          // The drawer's own refresh, as it runs when the failed-files list is read again.
+          // The list's own refresh, as it runs when the failed-files list is read again.
           window.refreshFailedDrawer = async listed => { failed = listed; await drawer.refresh(); await settle(); };
           window.focusNow = () => {
             let active = document.activeElement;
@@ -233,7 +232,7 @@ it('L21 a confirmed collection removal hands focus to the next source', async ()
 it('L21 a failed-files refresh keeps an open band for a file still listed, with focus; a file that leaves hands focus on', async () => {
   const page = await open();
   await page.evaluate(() => window.prepareFailedDrawer());
-  const action = page.locator('jf-failed-jobs-drawer jf-row-actions[row-key="target"] jf-action-button');
+  const action = page.locator('jf-failed-files-list jf-row-actions[row-key="target"] jf-action-button');
   await action.locator('button.invoke').focus(); await page.keyboard.press('Enter');
   const band = action.locator('jf-confirm-band');
   await expect.poll(() => band.locator('jf-button.keep button').evaluate(el => el.matches(':focus'))).toBe(true);

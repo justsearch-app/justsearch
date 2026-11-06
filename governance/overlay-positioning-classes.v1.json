@@ -21,12 +21,12 @@
       "class": "anchored"
     },
     {
-      "file": "shell-v0/hover/HoverPreviewHost.ts",
+      "file": "shell-v0/views/search-v3/Sv3Results.ts",
       "class": "anchored"
     },
     {
-      "file": "shell-v0/components/EffectAuditLog.ts",
-      "class": "dialog"
+      "file": "shell-v0/hover/HoverPreviewHost.ts",
+      "class": "anchored"
     },
     {
       "file": "shell-v0/components/ConfirmDialog.ts",

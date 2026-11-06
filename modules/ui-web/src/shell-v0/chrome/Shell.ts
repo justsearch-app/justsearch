@@ -28,6 +28,7 @@ import { completedForget, FORGET_COMPLETED_EVENT,
 import { startSurfaceTransition } from './viewTransition.js';
 import {
   NAVIGATE_TO_SURFACE_EVENT,
+  requestSurfaceNavigation,
   type NavigateToSurfaceDetail,
 } from '../controllers/navigateRequest.js';
 // 478 §4.A — `unsafeStatic` no longer needed in Stage.render().
@@ -66,10 +67,6 @@ import { undoStatusNotice, type StatusPill } from '../components/StatusPill.js';
 import { latestReversalAt, undoLatestReversal } from '../state/ownReversals.js';
 // §21.E — register the PendingEffect chrome surface. Renders nothing
 // when the queue is empty; floats in lower-right when a proposal lands.
-import '../components/RetrospectivePanel.js';
-import '../components/FailedJobsDrawer.js';
-import '../components/SourcesPane.js';
-import '../components/ContextInspectorPane.js';
 import { startAppUpdateMonitor } from '../state/appUpdateState.js';
 // §25.β3 — elicit chrome surface (modal form host for Action handlers
 // asking the user mid-invocation questions).
@@ -84,8 +81,9 @@ import { restoreConsentFromStorage } from '../substrates/consent/index.js';
 import '../components/AuthorizationHost.js';
 import { requestAuthorization } from '../operations/authorizationBroker.js';
 // §25.δ2 — per-action audit log surface (filterable Effect Journal viewer).
-import '../components/EffectAuditLog.js';
-import type { EffectAuditLog } from '../components/EffectAuditLog.js';
+import '../components/detailsPane/WindowDetails.js';
+import { requestActivitySection } from '../state/activitySection.js';
+import { getAgentSessionController } from '../state/agentSessionStore.js';
 // 543-fwd #12 — macro dry-run diff panel (opens via jf-open-macro-dry-run).
 import '../components/MacroDryRun.js';
 import { registerAction as registerKernelAction } from '../substrates/actions/index.js';
@@ -99,8 +97,8 @@ import { bootSearchResultProjector } from '../substrates/evaluationContext/searc
 // real backend AI.
 import '../components/AgentEmitterDemo.js';
 import type { AgentEmitterDemo } from '../components/AgentEmitterDemo.js';
-// Search Thread S6 — `components/InspectorPane.ts` retired; `<jf-document-pane>` (mounted inside
-// UnifiedChatView's conversation-zone) is now the visual consumer of inspectorState.
+// Search Thread S6 — `components/InspectorPane.ts` retired; each window's details pane is now the
+// visual consumer of inspectorState.
 // Tempdoc 541 §4.2: side-effect import registers <jf-boot-phases-panel> — the named
 // production consumer of GET /api/boot/phases.
 import '../components/BootPhasesPanel.js';
@@ -118,12 +116,8 @@ import {
   setSelected,
   setOpen as setInspectorOpen,
   getInspectorState as getInspectorStateInternal,
-  subscribeInspector,
-  type InspectorState,
+  setInspectorOwnerResolver,
 } from '../state/inspectorState.js';
-import { isWideLayout, subscribeWide } from '../state/responsiveState.js';
-// 687 R5b — the narrow-viewport reading mount: the SAME <jf-document-pane> presents through the
-// OverlayHost right-drawer slot below the breakpoint (UnifiedChatView's grid mount is wide-only).
 import '../components/documentPane/DocumentPane.js';
 import type { CitationSelectDetail } from '../components/chat/CitationsPanel.js';
 import {
@@ -588,15 +582,9 @@ export class Shell extends JfElement {
   }
 
   // 504 A-3 / Search Thread S6 — citation-click → open the doc for reading + highlight the cited
-  // passage. `citation-select` is produced from several sites (inline [n] marks in MarkdownBlock, the
-  // docked evidence-rail's SourcesPane inside UnifiedChatView, AND the Shell-level drawer SourcesPane
-  // mounted in the OverlayHost right-drawer slot below — a sibling tree UnifiedChatView cannot itself
-  // hear bubble through it) — Shell stays the ONE listener for all of them (a `composed:true` event
-  // reaches here regardless of which subtree dispatched it). Rather than reaching into a specific pane
-  // instance (the retired InspectorPane.highlightCitation imperative call), this pushes the line range
-  // onto the shared inspectorState `selected` (via the new optional highlightStartLine/highlightEndLine
-  // fields) — UnifiedChatView's own inspectorState subscription derives `readingDocPath` +
-  // `readingHighlightRange` from it and DocumentPane renders the highlight declaratively.
+  // passage. Search answers its own citations; this is the ONE listener for `citation-select` raised
+  // anywhere else (a `composed:true` event reaches here whichever subtree dispatched it). It pushes the
+  // line range onto the shared inspectorState `selected`, and the window the reader is in shows it.
   private onCitationSelect = (ev: Event): void => {
     const detail = (ev as CustomEvent<CitationSelectDetail>).detail;
     if (!detail?.parentDocId) return;
@@ -777,10 +765,8 @@ export class Shell extends JfElement {
         category: 'Diagnostics',
         provenance: CORE_PROVENANCE,
         handler: () => {
-          const log = this.shadowRoot?.querySelector(
-            'jf-effect-audit-log',
-          ) as EffectAuditLog | null;
-          if (log) log.open = !log.open;
+          requestActivitySection('effect-journal');
+          requestSurfaceNavigation('core.activity-surface');
           return { kind: 'noop' as const };
         },
       });
@@ -1306,6 +1292,9 @@ export class Shell extends JfElement {
           });
         },
       });
+      // The one shared agent controller needs the host for its run stream and data reads; Search
+      // only observes it, so the frame hands the host over the moment there is one.
+      getAgentSessionController(this.apiBase, this.hostApi_);
     }
     this.refreshSurfaces();
 
@@ -1335,26 +1324,13 @@ export class Shell extends JfElement {
         void this.handleFolderDrop(paths);
       },
     });
-    // Search Thread S6 — the inspectorState subscription (the Shell-level `data-inspector-open` grid
-    // column + `<jf-inspector-pane>` mount) retired; `UnifiedChatView` now subscribes directly and
-    // Search now owns its `<jf-document-pane>` directly.
+    // Each window's details pane subscribes to inspectorState itself; the frame only says whose
+    // selection it is.
     // Slice 471 — userConfig subscribe drives both Stage's override
     // dispatch + the ProvenanceBadge visibility.
     // Slice 472 — also re-filter the window list when surfaceVisibility /
     // surfaceOrder change.
-    // 687 R5b — narrow reading mount inputs (the wide-layout decision + the shared inspector
-    // selection). The shared viewport authority remains after the old host's width reporter retires.
-    // Search owns its own reader; this fallback serves other surfaces at narrow widths.
-    this.narrowReadingUnsubs = [
-      subscribeWide(() => {
-        this.wideForReading = isWideLayout();
-        this.requestUpdate();
-      }),
-      subscribeInspector((st) => {
-        this.inspectorForReading = st;
-        this.requestUpdate();
-      }),
-    ];
+    setInspectorOwnerResolver(() => this.selectionWindow());
     this.userConfigUnsubscribe = subscribeUserConfig((cfg) => {
       this.userConfig = cfg;
       this.refreshSurfaces();
@@ -1471,8 +1447,9 @@ export class Shell extends JfElement {
           startSurfaceTransition(this);
           // Q12: the inspector pane holds surface-specific context (e.g. a
           // search hit); close it on a genuine surface change so stale content
-          // doesn't persist across surfaces.
-          setInspectorOpen(false);
+          // doesn't persist across surfaces. A selection in the other window of a split stays.
+          const owner = getInspectorStateInternal().owner;
+          if (owner === null || owner === canonicalSplitSurfaceId(prev)) setInspectorOpen(false);
         }
         // Tempdoc 855 §11.1 — a REALIZED stage navigation reaches this callback only from the
         // normal (non-MODAL) branch, so the address has moved off the settings window: dismiss it.
@@ -1799,8 +1776,7 @@ export class Shell extends JfElement {
     window.removeEventListener('mouseup', this.onMouseNavigate, true);
     document.removeEventListener(NAVIGATE_TO_SURFACE_EVENT, this.onNavigateToSurface);
     this.dragUnsubscribe?.();
-    for (const u of this.narrowReadingUnsubs) u();
-    this.narrowReadingUnsubs = [];
+    setInspectorOwnerResolver(() => null);
     this.userConfigUnsubscribe?.();
     this.catalogUnsubscribe?.();
     this.viewerAudienceUnsubscribe?.();
@@ -2095,7 +2071,7 @@ export class Shell extends JfElement {
       { kind: 'top-bar', root: bar },
       { kind: 'window-tabs', root: stage?.primaryWindow() ?? null },
       { kind: 'content', root: main },
-      // The details pane may sit in the window or, below the wide breakpoint, in the overlay drawer.
+      // Inside a window's own tree; found across shadow roots.
       { kind: 'details', root: this },
     ];
     focusRegion(regions, direction);
@@ -2288,27 +2264,10 @@ export class Shell extends JfElement {
     }
   }
 
-  private wideForReading = isWideLayout();
-  private inspectorForReading: InspectorState = getInspectorStateInternal();
-  private narrowReadingUnsubs: Array<() => void> = [];
-
-  /** 687 R5b — the OverlayHost right-drawer reading mount (narrow viewports only). */
-  private renderNarrowReadingPane(searchVisible: boolean) {
-    const st = this.inspectorForReading;
-    if (searchVisible || this.wideForReading || !st.isOpen || !st.selected?.path) return nothing;
-    const hl =
-      typeof st.selected.highlightStartLine === 'number' &&
-      typeof st.selected.highlightEndLine === 'number'
-        ? { startLine: st.selected.highlightStartLine, endLine: st.selected.highlightEndLine }
-        : null;
-    return html`<jf-document-pane
-      slot="right-drawer"
-      overlay
-      api-base=${this.apiBase}
-      .docPath=${st.selected.path}
-      .highlightRange=${hl}
-      @pane-close=${() => setInspectorOpen(false)}
-    ></jf-document-pane>`;
+  /** The window a new selection belongs to: the one holding the keyboard, else the primary. */
+  private selectionWindow(): string | null {
+    const stage = this.shadowRoot?.querySelector<Stage>('jf-stage') ?? null;
+    return stage?.windowHolding(deepActiveElement()) ?? null;
   }
 
   /**
@@ -2447,15 +2406,12 @@ export class Shell extends JfElement {
           api-base=${this.apiBase}
         ></jf-stage>
       </div>
-      <!-- Search Thread S6 — the jf-inspector-pane drawer mount retired; jf-document-pane
-           renders inside UnifiedChatView's own conversation-zone column instead. -->
       <!-- Tempdoc 559 Authority I: viewport-docked chrome overlays dock into the
            OverlayHost's named slots (the slot owns placement). Modals,
-           anchored/hover popovers, drawers and toggled panels follow as separate
+           anchored/hover popovers and toggled panels follow as separate
            clusters; they remain direct children below for now. -->
       <jf-overlay-host>
         <jf-provenance-badge slot="top-right"></jf-provenance-badge>
-        ${this.renderNarrowReadingPane([active?.id, secondary?.id].some(id => id !== undefined && canonicalSplitSurfaceId(id) === INTERACTION_SURFACE_ID))}
         <!-- center slot: full-screen modals (one shows at a time). -->
         <jf-drag-overlay
           slot="center"
@@ -2476,39 +2432,7 @@ export class Shell extends JfElement {
           @status-requests-changed=${() => this.shadowRoot?.querySelector<StatusPill>('jf-status-pill')?.status.refresh()}></jf-authorization-host>
         <jf-macro-dry-run slot="center"></jf-macro-dry-run>
         ${import.meta.env.DEV ? html`<jf-agent-emitter-demo slot="bottom-center"></jf-agent-emitter-demo>` : nothing}
-        ${/* Tempdoc 561 surface tier: the agent retrospective (Sessions/Timeline/History) folded into
-              the one window as a right-drawer panel — replaces the retired standalone agent surface. */ ''}
-        <jf-interaction-retrospective-panel
-          slot="right-drawer"
-          api-base=${this.apiBase}
-          role=${placementToLandmarkRole('DRAWER')}
-          aria-label="Agent retrospective"
-          .host_=${this.hostApi_ ?? undefined}
-        ></jf-interaction-retrospective-panel>
-        ${/* Tempdoc 565 §3.A: the answer's grounding sources (clickable local passages). */ ''}
-        <jf-sources-pane
-          slot="right-drawer"
-          api-base=${this.apiBase}
-          role=${placementToLandmarkRole('DRAWER')}
-          aria-label="Answer sources"
-          .host_=${this.hostApi_ ?? undefined}
-        ></jf-sources-pane>
-        ${/* Tempdoc 610 §K: the context inspector ("what the assistant sees"), fed via the
-              contextInspectorDrawer store (UnifiedChatView pushes the view). */ ''}
-        <jf-context-inspector-pane
-          slot="right-drawer"
-          role=${placementToLandmarkRole('DRAWER')}
-          aria-label="What the assistant sees"
-        ></jf-context-inspector-pane>
         <jf-walkthrough-card slot="bottom-left"></jf-walkthrough-card>
-        <!-- Tempdoc 599 §16/B1 — per-folder failed-files drill-down (right-drawer). -->
-        <jf-failed-jobs-drawer
-          slot="right-drawer"
-          api-base=${this.apiBase}
-          role=${placementToLandmarkRole('DRAWER')}
-          aria-label="Failed files"
-          .host_=${this.hostApi_ ?? undefined}
-        ></jf-failed-jobs-drawer>
       </jf-overlay-host>
       <!-- Tempdoc 508-followup §δ2 — hover-preview overlay. Listens for
            jf-peek-request/dismiss events from the palette (Alt+hover). -->
@@ -2516,9 +2440,6 @@ export class Shell extends JfElement {
         api-base=${this.apiBase}
         .host_=${this.hostApi_ ?? undefined}
       ></jf-peek>
-      <!-- §25.δ2 — Per-action audit log. Hidden until the
-           core.action.shell.show-audit-log Action toggles it open. -->
-      <jf-effect-audit-log></jf-effect-audit-log>
       <!-- Tempdoc 543 §12.3 #5 — kernel-rendered hover-preview host. -->
       <jf-hover-preview-host></jf-hover-preview-host>
     `;
@@ -2568,6 +2489,21 @@ export class Stage extends JfElement {
     const surface = this.resolveSurface();
     const element = surface ? this._surfaceElCache.get(surface.id) ?? null : null;
     return element?.isConnected ? element : null;
+  }
+
+  /**
+   * The window holding `active`, by canonical surface id, else the primary; null before one mounts.
+   * A selection belongs to the window the reader is in (C4).
+   */
+  windowHolding(active: Element | null): string | null {
+    const primary = this.resolveSurface();
+    if (!primary) return null;
+    const windows = [primary, ...(this.splitAxis ? [this.resolveSurface(this.secondarySurface)] : [])];
+    for (let node: Node | null = active; node !== null; node = node.parentNode ?? (node as ShadowRoot).host ?? null) {
+      const surface = windows.find(candidate => candidate !== null && this._surfaceElCache.get(candidate.id) === node);
+      if (surface) return canonicalSplitSurfaceId(surface.id);
+    }
+    return canonicalSplitSurfaceId(primary.id);
   }
 
   /** Target a single retained element; never broadcast to both search implementations. */
@@ -2675,7 +2611,6 @@ export class Stage extends JfElement {
 
   static styles = css`
     :host {
-      display: block;
       width: 100%;
       height: 100%;
     }
@@ -2691,6 +2626,17 @@ export class Stage extends JfElement {
       padding: 2rem;
       text-align: center;
       color: var(--text-secondary);
+    }
+    /* The box a window's details are measured against and, below 980 px, drawn over: the stage, or
+       a split's pane. A window takes what its details leave. */
+    :host, .pane, .right-pane-body {
+      position: relative;
+      display: flex;
+    }
+    :host > :not(jf-window-details), .pane > :not(jf-window-details, jf-pane-picker, .right-pane-body),
+    .right-pane-body > :not(jf-window-details) {
+      flex: 1 1 auto;
+      min-width: 0;
     }
     /* Tempdoc 521 §16.7 deeper — split-stage CSS grid. Two surfaces
        sized 1fr each; gap is a hairline divider users can see. The
@@ -2713,7 +2659,6 @@ export class Stage extends JfElement {
     }
     /* Right pane stacks the PanePicker strip on top of the surface body. */
     .right-pane {
-      display: flex;
       flex-direction: column;
     }
     .right-pane-body {
@@ -2782,7 +2727,7 @@ export class Stage extends JfElement {
       const onPick = (id: string): void => setSecondaryActiveSurface(id);
       return html`
         <div class="split ${this.splitAxis}">
-          <div class="pane">${this.renderOneSurface(primary)}</div>
+          <div class="pane">${this.renderWindow(primary)}</div>
           <div class="pane right-pane">
             <jf-pane-picker
               .candidates=${candidates}
@@ -2790,7 +2735,7 @@ export class Stage extends JfElement {
               .onPick=${onPick}
             ></jf-pane-picker>
             <div class="right-pane-body">
-              ${this.renderOneSurface(secondary)}
+              ${this.renderWindow(secondary)}
             </div>
           </div>
         </div>
@@ -2799,7 +2744,15 @@ export class Stage extends JfElement {
     if (!primary) {
       return html`<div class="empty">No surface selected.</div>`;
     }
-    return this.renderOneSurface(primary);
+    return this.renderWindow(primary);
+  }
+
+  /** A window and its details pane. Search owns a pane of its own, argued against its sidebar. */
+  private renderWindow(surface: SurfaceCatalogEntry): TemplateResult {
+    const windowId = canonicalSplitSurfaceId(surface.id);
+    if (windowId === INTERACTION_SURFACE_ID) return this.renderOneSurface(surface);
+    return html`${this.renderOneSurface(surface)}<jf-window-details
+      .windowId=${windowId} api-base=${this.apiBase}></jf-window-details>`;
   }
 
   /**

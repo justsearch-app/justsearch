@@ -134,6 +134,10 @@ export type TokenName =
   | '--frame-brand-halo'
   | '--frame-control-radius'
   | '--frame-control-size'
+  | '--frame-details-max'
+  | '--frame-details-min'
+  | '--frame-details-sheet-share'
+  | '--frame-details-tab-max'
   | '--frame-dialog-dim'
   | '--frame-dialog-width'
   | '--frame-focus-width'
@@ -239,11 +243,11 @@ export type TokenName =
   | '--tooltip-shadow'
   | '--warning-tint'
   | '--z-base'
+  | '--z-details-sheet'
   | '--z-float'
   | '--z-glass'
   | '--z-modal'
   | '--z-overlay-chrome'
-  | '--z-overlay-drawer'
   | '--z-overlay-float'
   | '--z-overlay-modal'
   | '--z-overlay-top'
@@ -376,6 +380,10 @@ export const TOKEN_NAMES: readonly TokenName[] = [
   '--frame-brand-halo',
   '--frame-control-radius',
   '--frame-control-size',
+  '--frame-details-max',
+  '--frame-details-min',
+  '--frame-details-sheet-share',
+  '--frame-details-tab-max',
   '--frame-dialog-dim',
   '--frame-dialog-width',
   '--frame-focus-width',
@@ -481,11 +489,11 @@ export const TOKEN_NAMES: readonly TokenName[] = [
   '--tooltip-shadow',
   '--warning-tint',
   '--z-base',
+  '--z-details-sheet',
   '--z-float',
   '--z-glass',
   '--z-modal',
   '--z-overlay-chrome',
-  '--z-overlay-drawer',
   '--z-overlay-float',
   '--z-overlay-modal',
   '--z-overlay-top',

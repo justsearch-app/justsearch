@@ -495,7 +495,7 @@ export class CitationsPanel extends JfElement {
 
   private onSourceClick(source: AnswerEvidenceSource): void {
     // Tempdoc 822 §5.4 — mark this source the cross-surface selection BEFORE the existing deep-link
-    // dispatch, exactly as its sibling `components/SourcesPane.ts:130` already does. That is the line
+    // dispatch, exactly as the inline mark does. That is the line
     // this panel was missing; adding it is what makes the binding two-ended, which is the only thing
     // that justifies the state existing at all. Nothing below changes.
     setSelectedSource(sourceKey(source.parentDocId, source.startLine));

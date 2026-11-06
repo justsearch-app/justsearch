@@ -6,7 +6,7 @@
     "symbol": "dispatchRunControl"
   },
   "adopters": [
-    "modules/ui-web/src/shell-v0/components/RetrospectivePanel.ts",
+    "modules/ui-web/src/shell-v0/views/search-v3/Sv3AgentRuns.ts",
     "modules/ui-web/src/shell-v0/views/search-v3/sv3-run-domain.ts"
   ],
   "runDirectiveChannels": {

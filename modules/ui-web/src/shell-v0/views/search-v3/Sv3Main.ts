@@ -1719,8 +1719,8 @@ export class Sv3Main extends JfElement {
    *
    *  - `defaultPrevented` — a window listener is the LAST handler in the chain and has no business
    *    acting on an event an inner one already claimed. This is not hypothetical:
-   *    `components/advisory/AdvisoryInboxDrawer.ts:379-386` binds bare `j`/`k` on its rows, is
-   *    mounted app-wide in the Shell's right drawer (`chrome/Shell.ts:2384`), and calls
+   *    `components/advisory/AdvisoryInboxDrawer.ts:379-386` bound bare `j`/`k` on its rows and
+   *    called
    *    `preventDefault()` without `stopPropagation()`, so its keys reach this listener by bubbling.
    *    Its rows are `role="button"`, not editables, so the typing guard below would not stop them.
    *  - modifiers — `Ctrl+J` and friends belong to the browser and to chorded bindings.

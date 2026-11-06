@@ -7,16 +7,15 @@
  *   - originator: all | user | agent | system
  *   - outcome: all | normal | accepted | rejected
  *
- * Hidden by default; opens via the "core.action.shell.show-audit-log"
- * Action (registered in Shell.ts boot). Closes via Escape or the X
- * button. Subscribes to journal appends so new entries surface live.
+ * A section of Activity (design system §1: "History → System › Activity"); the
+ * "core.action.shell.show-audit-log" Action arrives at it. Subscribes to journal
+ * appends so new entries surface live.
  */
 
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
 import './Button.js';
 import './StatusBadge.js';
-import { ModalController } from '../primitives/modalController.js';
 // Tempdoc 613 §6 — the in-control RECEIPT surface (export-to-clipboard ack is a receipt, not a toast).
 import { ReceiptController } from '../primitives/receiptController.js';
 import {
@@ -57,7 +56,6 @@ type OutcomeFilter = 'all' | 'normal' | 'accepted' | 'rejected';
 
 export class EffectAuditLog extends JfElement {
   static properties = {
-    open: { type: Boolean, reflect: true },
     originator: { state: true },
     outcome: { state: true },
     entries: { state: true },
@@ -77,7 +75,6 @@ export class EffectAuditLog extends JfElement {
     collapsedTurns: { state: true },
   };
 
-  declare open: boolean;
   declare originator: OriginatorFilter;
   declare outcome: OutcomeFilter;
   declare entries: ReadonlyArray<JournalEntry>;
@@ -94,7 +91,6 @@ export class EffectAuditLog extends JfElement {
 
   constructor() {
     super();
-    this.open = false;
     this.originator = 'all';
     this.outcome = 'all';
     this.entries = [];
@@ -330,50 +326,21 @@ export class EffectAuditLog extends JfElement {
     this.unsubJournal = null;
   }
 
-  /** The FULL modal contract (574 §22.G) — native <dialog> + scroll-lock + focus-restore, atomic by construction. */
-  private readonly modal = new ModalController(this, {
-    dialog: () => this.shadowRoot?.querySelector('dialog'),
-  });
-
   /** Tempdoc 613 §6 — the export confirmation is a RECEIPT (a direct copy-to-clipboard ack), flashed
    *  in the Export button, NOT a window toast. */
   private readonly exportReceipt = new ReceiptController(this);
 
-  /** Drive the native <dialog> from the reactive `open` flag (full contract by construction). */
-  override updated(changed: Map<string, unknown>): void {
-    if (changed.has('open')) {
-      if (this.open) this.modal.open();
-      else this.modal.close();
-    }
-  }
-
   static styles = css`
-    /* 543-fwd UPDATE 10 P3 — native <dialog> (showModal) as a right-side drawer:
-       focus management, Escape, ::backdrop, aria-modal for free. #12 — width clamps
-       so it never overflows a narrow viewport. */
     :host {
-      display: contents;
-    }
-    dialog {
-      position: fixed;
-      inset: 4rem 1rem 4rem auto;
-      margin: 0;
-      width: min(32rem, calc(100vw - 2rem));
-      max-height: none;
-      padding: 0;
-      background: var(--surface-1);
-      border: 1px solid var(--border-default);
-      border-radius: 0.5rem;
-      color: var(--text-primary);
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-    }
-    dialog::backdrop {
-      background: rgba(0, 0, 0, 0.4);
+      display: block;
     }
     .panel {
       display: flex;
       flex-direction: column;
-      max-height: 100%;
+      border: var(--frame-hairline) solid var(--border-default);
+      border-radius: var(--frame-control-radius);
+      background: var(--surface-1);
+      color: var(--text-primary);
     }
     header {
       padding: 0.75rem 1rem;
@@ -382,7 +349,7 @@ export class EffectAuditLog extends JfElement {
       align-items: center;
       justify-content: space-between;
     }
-    header h2 {
+    header h3 {
       margin: 0;
       font-size: var(--font-size-md);
       font-weight: 600;
@@ -577,31 +544,9 @@ export class EffectAuditLog extends JfElement {
     // entries exist; otherwise they're a no-op dead-end. Mirror save/export gating.
     const agentUndoableCount = previewUndoAllByOriginator('agent').length;
     return html`
-      <dialog
-        data-testid="effect-audit-dialog"
-        aria-label="Effect Journal"
-        @close=${() => (this.open = false)}
-        @keydown=${(e: KeyboardEvent) => {
-          // Sync `open` on Escape directly — some environments don't fire the
-          // dialog `close` event, which would otherwise leave us desynced.
-          if (e.key === 'Escape') this.open = false;
-        }}
-        @click=${(e: MouseEvent) => {
-          if (e.target === e.currentTarget) this.open = false;
-        }}
-      >
-        <div class="panel">
+      <section class="panel" aria-label="Effect Journal" data-testid="effect-audit-journal" tabindex="-1">
         <header>
-          <h2>Effect Journal</h2>
-          <jf-button
-            class="close"
-            variant="ghost"
-            size="icon"
-            label="Close"
-            .onActivate=${() => (this.open = false)}
-          >
-            ✕
-          </jf-button>
+          <h3>Effect Journal</h3>
         </header>
         <div class="filters">
           <label>
@@ -703,8 +648,7 @@ export class EffectAuditLog extends JfElement {
                 return only ? this.renderEntryRow(only) : nothing;
               })}
         </div>
-      </div>
-      </dialog>
+      </section>
     `;
   }
 

@@ -54,7 +54,7 @@ import { subscribeAiState } from '../state/aiStateStore.js';
 import '../components/IndexingControls.js';
 import '../components/IndexingRulesEditor.js';
 import type { IndexingRulesEditor, SavedIndexingRules } from '../components/IndexingRulesEditor.js';
-import '../components/FailedJobsDrawer.js';
+import { revealFailedFiles } from '../components/FailedFilesList.js';
 import { LIBRARY_CARDS_REGION } from '../themes/builtinPresentations.js';
 import '../components/DeclaredSurface.js';
 import type { PluginHostApi } from '../plugin-api/plugin-types.js';
@@ -97,8 +97,6 @@ import {
 // enumeration probe is issued there, not re-shaped here.
 import { fetchCollectionFacet } from '../state/searchState.js';
 import { UNKNOWN, type Maybe } from '../state/known.js';
-// Tempdoc 599 §16/B1 — the clickable "N failed" chip opens the per-folder failed-files drawer.
-import { openFailedJobs } from '../state/failedJobsDrawer.js';
 // Tempdoc 599 §9.4 — gate the Add button with a reachable reason (596 operability authority).
 import { unavailableBecause, AVAILABLE } from '../state/availability.js';
 // Tempdoc 914 D3 — the failed chip's shared look (one authority for both render sites).
@@ -730,7 +728,6 @@ export class LibrarySurface extends JfElement {
       .attention-title > span { color: var(--text-warning); }
       .attention-item p { margin: .35rem 0 .3rem 1.7rem; font-size: var(--font-size-sm); color: var(--text-secondary); overflow-wrap: anywhere; }
       .attention-actions { margin-left: 1.7rem; }
-      .attention-actions jf-failed-jobs-drawer { margin-left: 0; }
       .bottom-links { display: flex; flex-wrap: wrap; gap: 1.5rem; margin-top: 1.5rem;
         border-top: 1px solid var(--border-subtle); padding-top: .75rem; font-size: var(--font-size-sm); color: var(--text-secondary); }
       .bottom-links details { min-width: 0; flex: 1 1 17rem; }
@@ -1106,7 +1103,7 @@ export class LibrarySurface extends JfElement {
       metaText: this.removingHashes.has(pathHash) ? 'Removing folder…' : this.folderActivityText(fs.metaText),
       removalBusy: this.removingHashes.has(pathHash),
       ...(this.removeConfirm?.origin === 'row' && this.removalPlan(pathHash) ? { removeConfirm: this.removalPlan(pathHash)! } : {}),
-      failed: fs.failed, failedLastKnown: fs.failedIsLastKnown === true,
+      failed: fs.failed, failedLastKnown: fs.failedIsLastKnown === true, apiBase: this.apiBase,
       filesFound: (root.fileCount ?? -1) >= 0
         ? `${unknown ? 'Last known ' : ''}${(root.fileCount ?? 0).toLocaleString()} files found` : 'Files found: unknown',
       collection: root.collection ?? 'default',
@@ -1128,7 +1125,7 @@ export class LibrarySurface extends JfElement {
     if (intent === 'remove') void this.handleRemoveRoot(pathHash);
     else if (intent === 'confirm-remove') { if (this.removeConfirm?.hash === pathHash) void this.confirmRemoveRoot(); }
     else if (intent === 'keep') { if (this.removeConfirm?.hash === pathHash) this.keepRoot(); }
-    else if (intent === 'show-failed') openFailedJobs(pathHash);
+    else if (intent === 'show-failed') revealFailedFiles(pathHash);
     else if (intent === 'reindex') void this.handleReindexToVerify();
     else void this.revealFolder(pathHash);
   }
@@ -1154,7 +1151,7 @@ export class LibrarySurface extends JfElement {
     const body = activeBodyFor(LIBRARY_CARDS_REGION);
     const folders = this.roots.map(r => this.projectFolder(r));
     if (!body) return html`<h3>Folders</h3><div class="cards" role="list">${repeat(folders, f => f.pathHash, f => renderFolderRow(f, {
-      expanded: this.expandedFolders.has(f.pathHash ?? ''), enabled: true,
+      expanded: this.expandedFolders.has(f.pathHash ?? ''), enabled: true, host: this.host_,
       toggle: () => this.toggleFolder(f.pathHash ?? ''),
       invoke: intent => this.folderIntent(intent, f.pathHash ?? ''),
     }))}</div>`;
@@ -2191,9 +2188,7 @@ export class LibrarySurface extends JfElement {
           : item.kind === 'walk' ? html`<jf-button variant="ghost" .disabled=${this.removingHashes.has(hash)}
           .onActivate=${() => root.walkError?.startsWith('Removal incomplete.') ? this.handleRemoveRoot(hash, 'attention') : this.handleReindexToVerify()}
           >${root.walkError?.startsWith('Removal incomplete.') ? 'Retry removal' : 'Reindex'}</jf-button>`
-          : item.kind === 'files' ? html`<jf-failed-jobs-drawer inline .folderPathHash=${hash} .observedCount=${status.failed}
-          .lastKnown=${status.failedIsLastKnown === true} .host_=${this.host_} api-base=${this.apiBase}></jf-failed-jobs-drawer>
-          <jf-button variant="ghost" .onActivate=${() => openFailedJobs(hash)}>Open failed-files list</jf-button>`
+          : item.kind === 'files' ? html`<jf-button variant="ghost" .onActivate=${() => revealFailedFiles(hash)}>Show files</jf-button>`
           : html`<jf-button variant="ghost" label="Reindex to verify"
           .disabled=${this.removingHashes.has(hash)} .onActivate=${() => this.handleReindexToVerify()}>Reindex to verify</jf-button>` });
     }

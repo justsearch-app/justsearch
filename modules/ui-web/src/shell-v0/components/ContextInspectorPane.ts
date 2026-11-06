@@ -1,27 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * <jf-context-inspector-pane> — Tempdoc 610 §K/§J — the context-inspector drawer.
+ * <jf-context-inspector-pane> — Tempdoc 610 §K/§J — the details pane's Context tab.
  *
- * A right-drawer that shows the WHOLE prompt the LAST completed turn saw, as a legible projection:
- * the system phase, the in-context conversation turns, and the retrieved documents — each with its
- * estimated token cost and a position marker (§L.1: start/end attend well, the middle is "weaker").
- * Presentational only: `UnifiedChatView` (which holds the thread + floor + breakdown + the last turn's
- * sources) computes the `view` and passes it in. Mirrors the `SourcesPane` drawer chrome
- * (`right-drawer`-layer TransientController → single-open arbitration with the sources drawer).
+ * Shows the WHOLE prompt the LAST completed turn saw, as a legible projection: the system phase, the
+ * in-context conversation turns, and the retrieved documents — each with its estimated token cost and
+ * a position marker (§L.1: start/end attend well, the middle is "weaker"). Presentational only: the
+ * window, which holds the thread, floor, breakdown and sources, computes the `view` and passes it in.
  *
  * Honest framing: it shows what the model was GIVEN (input), with position as the visible caveat that
  * given ≠ uniformly used; tokens are estimates (the real total is the authoritative figure).
  */
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
-import './Button.js';
-import { TransientController } from '../primitives/transientController.js';
-import {
-  isContextInspectorOpen,
-  setContextInspectorOpen,
-  subscribeContextInspector,
-  getContextInspectorView,
-} from '../state/contextInspectorDrawer.js';
 
 /** One segment of the assembled prompt (a conversation turn or a retrieved source). */
 export interface InspectorSegment {
@@ -49,76 +39,30 @@ export interface InspectorView {
 
 export class ContextInspectorPane extends JfElement {
   static properties = {
-    open: { type: Boolean, reflect: true },
     view: { attribute: false },
   };
 
-  declare open: boolean;
   declare view: InspectorView | null;
-
-  private unsubs: Array<() => void> = [];
-
-  /** 574 §23.B — single-open arbitration: shares the `right-drawer` layer with the sources pane. */
-  private readonly transient = new TransientController(this, {
-    layer: 'right-drawer',
-    id: 'context-inspector',
-    close: () => setContextInspectorOpen(false),
-  });
 
   constructor() {
     super();
-    this.open = isContextInspectorOpen();
     this.view = null;
   }
 
-  connectedCallback(): void {
-    super.connectedCallback();
-    this.unsubs = [
-      subscribeContextInspector(() => {
-        this.open = isContextInspectorOpen();
-        this.requestUpdate();
-      }),
-    ];
-  }
-
-  disconnectedCallback(): void {
-    super.disconnectedCallback();
-    this.unsubs.forEach((u) => u());
-    this.unsubs = [];
-  }
-
-  override updated(changed: Map<string, unknown>): void {
-    if (changed.has('open')) {
-      if (this.open) this.transient.open();
-      else this.transient.close();
-    }
-  }
-
   static styles = css`
-    :host(:not([open])) {
-      display: none;
+    :host {
+      display: block;
+      height: 100%;
     }
     .panel {
-      position: relative;
       height: 100%;
-      width: 24rem;
-      max-width: 90vw;
-      background: var(--surface-1);
-      border-left: 1px solid var(--border-default);
-      box-shadow: -4px 0 16px rgba(0, 0, 0, 0.35);
       color: var(--text-primary);
       display: flex;
       flex-direction: column;
     }
-    .head {
-      flex-shrink: 0;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0.75rem 1rem;
-      border-bottom: 1px solid var(--border-default);
-    }
     .title {
+      margin: 0;
+      padding: 0.75rem 1rem 0;
       font-weight: 600;
       font-size: var(--font-size-sm);
     }
@@ -232,19 +176,9 @@ export class ContextInspectorPane extends JfElement {
   }
 
   render(): TemplateResult {
-    // The shell-mounted instance reads the store; the unit test passes `.view` directly.
-    const v = this.view ?? getContextInspectorView();
-    return html`<div class="panel" role="dialog" aria-label="What the assistant sees">
-      <div class="head">
-        <span class="title">What the assistant sees</span>
-        <jf-button
-          variant="ghost"
-          size="sm"
-          label="Close"
-          .onActivate=${() => setContextInspectorOpen(false)}
-          >Close</jf-button
-        >
-      </div>
+    const v = this.view;
+    return html`<div class="panel" data-testid="context-inspector">
+      <h2 class="title">What the assistant sees</h2>
       <div class="subtitle">The last turn's prompt — tokens are <span class="est">estimates</span>.</div>
       ${!v || (v.phases.length === 0 && v.systemTokens == null)
         ? html`<div class="empty-state">Send a turn to see what the assistant's context held.</div>`

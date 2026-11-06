@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Tempdoc 565 §12.3.E — the cross-highlight selection: which grounding source the user last focused.
-// A tiny module store (mirroring sourcesDrawer) shared by the answer's inline [n] marks (MarkdownBlock),
-// the persistent evidence rail (the docked SourcesPane), and any future source-chip row — so clicking a
+// A tiny module store shared by the answer's inline [n] marks (MarkdownBlock),
+// the citations panel, and the details pane's source tabs — so clicking a
 // citation, a rail card, or a chip highlights the SAME source across all three. The id is a stable
 // composite of the source's local-passage identity (parentDocId + startLine), the key both the inline
 // `MarkdownCitation.detail` and the rail's `AgentSource` carry — so the three surfaces resolve the same id.

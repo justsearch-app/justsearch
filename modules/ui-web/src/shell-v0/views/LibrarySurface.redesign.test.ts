@@ -10,7 +10,7 @@ import type { FolderCardRenderer } from '../renderers/controls/FolderCardRendere
 import { createMockHostApi } from '../plugin-api/testHostApi.js';
 import { __feedForTest, __resetAiStateForTest, __tickClockForTest, type StatusSnapshot } from '../state/aiStateStore.js';
 import type { IndexedRootView } from '../../api/generated/schema-types/indexed-root-view.js';
-import type { FailedJobsDrawer } from '../components/FailedJobsDrawer.js';
+import type { FailedFilesList } from '../components/FailedFilesList.js';
 import { applyPresentationBodies, clearPresentation } from '../state/presentationRuntime.js';
 import { CORE_DECLARED } from '../themes/builtinPresentations.js';
 import { createPlatformApi } from '../plugin-api/capabilities/platform.js';
@@ -63,17 +63,17 @@ it('retains named last-known failures while a missing folder returns and jobs re
     state: 'FAILED', attempts: 3, lastUpdatedMs: 1700000000000, errorMessage: 'Could not read the source',
     retryAfterMs: 0, collection: 'personal', scanId: '' }], count: 1 }));
   el.roots = [{ ...root('a'), status: 'unavailable', failedCount: 1 }]; await settle(el);
-  const failures = el.shadowRoot!.querySelector<FailedJobsDrawer>('jf-failed-jobs-drawer[inline]')!;
+  const failures = el.shadowRoot!.querySelector<FailedFilesList>('jf-failed-files-list')!;
   await settle(failures);
   expect(failures.shadowRoot!.textContent).toContain('Could not read the source');
   // A retained settled observation supplies the existing folderStatus memory seam.
   Object.assign(el, { lastKnownFailed: { a: 1 } });
   el.roots = [{ ...root('a'), inFlightCount: 1, failedCount: 0 }]; await settle(el); await settle(failures);
-  expect(el.shadowRoot!.querySelector('jf-failed-jobs-drawer[inline]')).toBe(failures);
+  expect(el.shadowRoot!.querySelector('jf-failed-files-list')).toBe(failures);
   expect(el.shadowRoot!.querySelector('.attention')?.textContent).toContain('last known');
   expect(failures.shadowRoot!.textContent).toContain('Could not read the source');
   el.roots = [root('a')]; await settle(el);
-  expect(el.shadowRoot!.querySelector('jf-failed-jobs-drawer[inline]')).toBeNull();
+  expect(el.shadowRoot!.querySelector('jf-failed-files-list')).toBeNull();
 });
 
 it.each(['fallback', 'themed'])('%s rows keep several disclosures open through status updates and expose full paths', async mode => {
@@ -232,7 +232,7 @@ it('D1 keeps attention and retried files through 25 alternating unconfirmed poll
     await settle(el);
     expect(el.shadowRoot!.querySelector('h2')!.textContent).toBe('2 things need your attention');
     expect(el.shadowRoot!.querySelector('.attention')!.textContent).toContain('Indexing paused');
-    expect(el.shadowRoot!.querySelector('jf-failed-jobs-drawer[inline]')).not.toBeNull();
+    expect(el.shadowRoot!.querySelector('jf-failed-files-list')).not.toBeNull();
     if (second % 2) expect(el.shadowRoot!.querySelector('.attention')!.textContent).toContain('last known');
   }
   now.mockReturnValue(receivedAt + 41000); __tickClockForTest(); await settle(el);

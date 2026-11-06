@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Tempdoc 610 §J.3 — the single FE source of truth for the active conversation's hidden retrieved
-// sources. Both the inline answer chips (UnifiedChatView) and the docked evidence rail (SourcesPane)
-// read + write this store, so hiding a source is consistent across the two views. A tiny pure store
-// mirroring the `contextInspectorDrawer` pattern; persistence rides `setSourceExcluded`.
+// sources. Search's details pane reads and writes it; persistence rides `setSourceExcluded`.
 
 import { setSourceExcluded } from './conversationListStore.js';
 
@@ -58,10 +56,4 @@ export async function toggleExcludedSource(
 export function subscribeExcludedSources(listener: () => void): () => void {
   _subs.add(listener);
   return () => _subs.delete(listener);
-}
-
-/** Test-only reset. */
-export function __resetExcludedSources(): void {
-  _ids = new Set();
-  _subs.clear();
 }

@@ -1,0 +1,13 @@
+diff --git a/modules/ui-web/src/shell-v0/components/FailedFilesList.ts b/modules/ui-web/src/shell-v0/components/FailedFilesList.ts
+new file mode 100644
+--- /dev/null
++++ b/modules/ui-web/src/shell-v0/components/FailedFilesList.ts
+@@ -0,0 +1,8 @@
++// Compatibility only: names the baseline's inline list so the C4 checks load and fail by assertion.
++import { FailedJobsDrawer } from './FailedJobsDrawer.js';
++
++export class FailedFilesList extends FailedJobsDrawer {
++  constructor() { super(); this.inline = true; }
++}
++
++customElements.define('jf-failed-files-list', FailedFilesList);

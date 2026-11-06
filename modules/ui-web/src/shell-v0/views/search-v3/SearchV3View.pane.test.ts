@@ -40,7 +40,8 @@ import { __resetConversationListForTest } from '../../state/conversationListStor
 import { __resetDraftProvidersForTest } from '../../controllers/draftPersistence.js';
 import { __resetDraftKeptForTest } from '../../controllers/draftKeptHint.js';
 // READ-ONLY here, on purpose: the shared store this window must never write is asserted untouched.
-import { getInspectorState, resetInspectorState } from '../../state/inspectorState.js';
+import { getInspectorState, resetInspectorState, setSelected } from '../../state/inspectorState.js';
+import { __resetUserStateForTest, createProfile, setActiveProfileId } from '../../state/UserStateDocument.js';
 import { FRAME_LATCH_FALLBACK_MS } from '../../primitives/frameLatch.js';
 import {
   sv3BoundaryStorageKeys,
@@ -147,6 +148,7 @@ const citationDetail = {
 beforeEach(() => {
   sessionStorage.clear();
   localStorage.clear();
+  __resetUserStateForTest();
   __resetConversationListForTest();
   __resetDraftProvidersForTest();
   __resetDraftKeptForTest();
@@ -423,8 +425,8 @@ describe('the pane is mounted exactly while a cited document is open', () => {
     // The element's OWN sheet (index 0 is the shared sv3 stylesheet every region adopts).
     const own = String(Sv3Pane.styles[1]);
     expect(own).not.toContain('highlight');
-    // Exactly one animation of its own, and it is the spec's sheet entry — not an emphasis.
-    expect([...own.matchAll(/@keyframes\s+([\w-]+)/g)].map((m) => m[1])).toEqual(['sv3-pane-in']);
+    // No animation of its own: panels and sheets open without one by default (design system §6).
+    expect([...own.matchAll(/@keyframes\s+([\w-]+)/g)]).toEqual([]);
   });
 });
 
@@ -447,9 +449,31 @@ describe('the pane closes on a real conversation switch, and only a real one', (
     await askGrounded(el); // conversation B, no citation pane opened yet
     await openPaneOnCurrent(el);
     expect(el.shadowRoot?.querySelector('jf-sv3-pane')).not.toBeNull(); // present BEFORE the switch
+    const bTurn = el.paneSource?.turnId;
 
     const rows = await rowsOf(el);
     expect(rows).toHaveLength(2); // B (newest, active) then A
+    await clickRow(rows[1] as Sv3SessionRow); // switch to A
+    await el.updateComplete;
+
+    // A's own pane comes back with its own document, never B's: it is what A was showing (DP1).
+    expect(el.paneDocPath).toBe('f:/docs/note-0.md');
+    expect(el.paneSource?.turnId).not.toBe(bTurn);
+  });
+
+  it('closes when the conversation it switches to left its pane closed', async () => {
+    const el = await mount();
+    await openPane(el); // conversation A, pane open…
+    el.shadowRoot!.querySelector('jf-sv3-pane')!.dispatchEvent(
+      new CustomEvent(SV3_PANE_CLOSE, { bubbles: true, composed: true }),
+    ); // …and closed by the reader
+    await el.updateComplete;
+    await newSession(el);
+    await askGrounded(el);
+    await openPaneOnCurrent(el);
+    expect(el.shadowRoot?.querySelector('jf-sv3-pane')).not.toBeNull(); // present BEFORE the switch
+
+    const rows = await rowsOf(el);
     await clickRow(rows[1] as Sv3SessionRow); // switch to A
     await el.updateComplete;
 
@@ -657,7 +681,9 @@ describe('the two boundaries leave the main column its 640', () => {
   });
 
   it('clamps the PANE against the open sidebar', async () => {
-    const el = await mount();
+    // A box where the main column binds before the pane's own 560 does.
+    const box = 1300;
+    const el = await mount(box);
     await openPane(el);
     const grip = q<HTMLElement>(el, 'sv3-pane-grip');
     grip!.setPointerCapture = (): void => undefined;
@@ -669,8 +695,8 @@ describe('the two boundaries leave the main column its 640', () => {
     grip!.dispatchEvent(new MouseEvent('pointerup', { bubbles: true }));
     await el.updateComplete;
 
-    expect(el.paneWidthPx).toBe(BOX - el.sidebarWidthPx - SV3_MAIN_MIN_PX);
-    expect(BOX - el.sidebarWidthPx - el.paneWidthPx).toBe(SV3_MAIN_MIN_PX);
+    expect(el.paneWidthPx).toBe(box - el.sidebarWidthPx - SV3_MAIN_MIN_PX);
+    expect(box - el.sidebarWidthPx - el.paneWidthPx).toBe(SV3_MAIN_MIN_PX);
   });
 
   it('persists the chosen width on pointerUP, and reverts a cancelled gesture', async () => {
@@ -682,13 +708,13 @@ describe('the two boundaries leave the main column its 640', () => {
     grip!.dispatchEvent(
       new MouseEvent('pointerdown', { bubbles: true, cancelable: true, button: 0, clientX: 1000 }),
     );
-    grip!.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 940 }));
+    grip!.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 990 }));
     // Mid-gesture: nothing is remembered yet (the spec writes only on pointerup).
     expect(localStorage.getItem(sv3BoundaryStorageKeys.paneWidth)).toBeNull();
     grip!.dispatchEvent(new MouseEvent('pointerup', { bubbles: true }));
     await el.updateComplete;
-    expect(el.paneWidthPx).toBe(SV3_PANE_DEFAULT_PX + 60);
-    expect(localStorage.getItem(sv3BoundaryStorageKeys.paneWidth)).toBe(String(SV3_PANE_DEFAULT_PX + 60));
+    expect(el.paneWidthPx).toBe(SV3_PANE_DEFAULT_PX + 10);
+    expect(localStorage.getItem(sv3BoundaryStorageKeys.paneWidth)).toBe(String(SV3_PANE_DEFAULT_PX + 10));
 
     // A CANCELLED gesture reverts to where it started and remembers nothing new.
     grip!.dispatchEvent(
@@ -697,9 +723,9 @@ describe('the two boundaries leave the main column its 640', () => {
     grip!.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 800 }));
     grip!.dispatchEvent(new MouseEvent('pointercancel', { bubbles: true }));
     await el.updateComplete;
-    expect(el.paneWidthPx).toBe(SV3_PANE_DEFAULT_PX + 60);
-    expect(el.style.getPropertyValue('--pane-width')).toBe(`${SV3_PANE_DEFAULT_PX + 60}px`);
-    expect(localStorage.getItem(sv3BoundaryStorageKeys.paneWidth)).toBe(String(SV3_PANE_DEFAULT_PX + 60));
+    expect(el.paneWidthPx).toBe(SV3_PANE_DEFAULT_PX + 10);
+    expect(el.style.getPropertyValue('--pane-width')).toBe(`${SV3_PANE_DEFAULT_PX + 10}px`);
+    expect(localStorage.getItem(sv3BoundaryStorageKeys.paneWidth)).toBe(String(SV3_PANE_DEFAULT_PX + 10));
   });
 
   it('lands the drag width on the fallback when the page stops delivering frames (860 P3)', async () => {
@@ -721,11 +747,11 @@ describe('the two boundaries leave the main column its 640', () => {
       grip!.dispatchEvent(
         new MouseEvent('pointerdown', { bubbles: true, cancelable: true, button: 0, clientX: 1000 }),
       );
-      grip!.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 940 }));
+      grip!.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 990 }));
       expect(el.style.getPropertyValue('--pane-width'), 'nothing paints without a frame').toBe(before);
 
       vi.advanceTimersByTime(FRAME_LATCH_FALLBACK_MS);
-      expect(el.style.getPropertyValue('--pane-width')).toBe(`${SV3_PANE_DEFAULT_PX + 60}px`);
+      expect(el.style.getPropertyValue('--pane-width')).toBe(`${SV3_PANE_DEFAULT_PX + 10}px`);
 
       // A cancelled gesture still reverts, and no pass left in flight writes over that verdict.
       grip!.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 800 }));
@@ -744,10 +770,10 @@ describe('the two boundaries leave the main column its 640', () => {
     const grip = q<HTMLElement>(el, 'sv3-pane-grip');
 
     // Right-anchored: ArrowLeft grows, the direction the pointer drags.
-    grip!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
-    await el.updateComplete;
-    expect(el.paneWidthPx).toBe(SV3_PANE_DEFAULT_PX + SV3_GRIP_KEY_STEP_PX);
     grip!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    await el.updateComplete;
+    expect(el.paneWidthPx).toBe(SV3_PANE_DEFAULT_PX - SV3_GRIP_KEY_STEP_PX);
+    grip!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
     await el.updateComplete;
     expect(el.paneWidthPx).toBe(SV3_PANE_DEFAULT_PX);
     expect(localStorage.getItem(sv3BoundaryStorageKeys.paneWidth)).toBe(String(SV3_PANE_DEFAULT_PX));
@@ -788,7 +814,9 @@ describe('below the spec 980 the pane is a window-scoped overlay', () => {
     expect(el.hasAttribute('pane-overlay')).toBe(true);
     expect(pane.hasAttribute('overlay')).toBe(true);
     // The dim is a real node only in this presentation, and it is an exit.
-    const backdrop = q<HTMLButtonElement>(pane, 'sv3-pane-backdrop');
+    const frame = pane.shadowRoot!.querySelector('jf-details-pane')!;
+    await frame.updateComplete;
+    const backdrop = q<HTMLButtonElement>(frame, 'details-pane-backdrop');
     expect(backdrop).not.toBeNull();
     // No boundary was dragged, so there is nothing to grab.
     expect(q(el, 'sv3-pane-grip')).toBeNull();
@@ -1135,5 +1163,377 @@ describe('the pane reads CITED documents and nothing else', () => {
     // Cited in prose (that is where the pattern comes from), imported from nowhere.
     expect(paneSrc).not.toMatch(/from '[^']*UnifiedChatView/);
     expect(paneSrc).not.toMatch(/import '[^']*UnifiedChatView/);
+  });
+});
+
+/* ── Search's details pane (design system §7): tabs, focus, memory, ownership ─────────────────── */
+
+const SECOND_DOC = 'f:/docs/heating.md';
+const second = (): Record<string, unknown> => ({ ...source(), parentDocId: SECOND_DOC, chunkIndex: 1, startChar: 50, endChar: 90,
+  excerpt: 'excerpt 1', startLine: 30, endLine: 34 });
+
+/** Two cited sources: the state in which the pane has more than one source tab. */
+async function askTwoSources(el: Mounted): Promise<void> {
+  const stream = await askUnmatched(el, [source(), second()]);
+  stream.emit('rag.citation_matches', { matches: [
+    { sentenceIndex: 0, sentenceText: 'The lock held.', similarity: 0.9, sourceIndex: 0 },
+    { sentenceIndex: 0, sentenceText: 'The lock held.', similarity: 0.8, sourceIndex: 1 },
+  ] });
+  stream.emit('done', {});
+  stream.end();
+  await settle(el);
+}
+
+async function frameOf(el: Mounted): Promise<HTMLElement & { updateComplete: Promise<unknown> }> {
+  const pane = await region(el, 'jf-sv3-pane');
+  const frame = pane.shadowRoot!.querySelector('jf-details-pane') as unknown as HTMLElement & { updateComplete: Promise<unknown> };
+  await frame.updateComplete;
+  return frame;
+}
+
+const tabButtons = (frame: HTMLElement): HTMLButtonElement[] => [...frame.shadowRoot!.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+const tabLabels = (frame: HTMLElement): string[] => tabButtons(frame).map(tab => tab.textContent!.replace(/\s+/g, ' ').trim());
+
+async function chooseTab(el: Mounted, id: string): Promise<void> {
+  const frame = await frameOf(el);
+  frame.shadowRoot!.querySelector<HTMLButtonElement>(`[data-tab="${id}"]`)!.click();
+  await settle(el);
+}
+
+/** Follow the citation from the panel, the disclosure already open. */
+async function openFirstCitation(el: Mounted): Promise<HTMLButtonElement> {
+  const main = await region(el, 'jf-sv3-main');
+  const trigger = q<HTMLButtonElement>(main, 'sv3-turn-sources')!;
+  trigger.click();
+  await main.updateComplete;
+  trigger.focus();
+  fireCitation(q(main, 'sv3-turn-citations')!);
+  await settle(el);
+  return trigger;
+}
+
+/** Put the keyboard inside the reader, as a reader scrolling the document has it. */
+async function focusReader(el: Mounted): Promise<HTMLElement> {
+  const pane = await region(el, 'jf-sv3-pane');
+  const reader = pane.shadowRoot!.querySelector('jf-document-pane') as HTMLElement;
+  reader.tabIndex = 0;
+  reader.focus();
+  return reader;
+}
+
+const pressEscape = (from: Element): void => {
+  from.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, composed: true, cancelable: true }));
+};
+
+function deepActive(): Element | null {
+  let active = document.activeElement;
+  while (active?.shadowRoot?.activeElement) active = active.shadowRoot.activeElement;
+  return active;
+}
+
+describe('DP1 the details pane shows tabs per cited source plus Context', () => {
+  it('offers a tab per cited source, numbered, then Context', async () => {
+    const el = await mount();
+    await askTwoSources(el);
+    await openFirstCitation(el);
+    const frame = await frameOf(el);
+    expect(tabLabels(frame)).toEqual(['1 note-0.md', '2 heating.md', 'Context']);
+    expect(tabButtons(frame)[0]!.getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('moves the reader to the chosen source and its passage, and marks it in the answer', async () => {
+    const { getSelectedSource, sourceKey } = await import('../../state/selectedSource.js');
+    const el = await mount();
+    await askTwoSources(el);
+    await openFirstCitation(el);
+    await chooseTab(el, 'source:1');
+    expect(el.paneDocPath).toBe(SECOND_DOC);
+    expect(el.paneCitation).toMatchObject({ startChar: 50, endChar: 90, excerpt: 'excerpt 1' });
+    expect(getSelectedSource()).toBe(sourceKey(SECOND_DOC, 30));
+  });
+
+  it('keeps the reader mounted under Context, so coming back keeps its place', async () => {
+    const el = await mount();
+    await askTwoSources(el);
+    await openFirstCitation(el);
+    const pane = await region(el, 'jf-sv3-pane');
+    const reader = pane.shadowRoot!.querySelector('jf-document-pane');
+    await chooseTab(el, 'context');
+    expect(el.paneTab).toBe('context');
+    expect(pane.shadowRoot!.querySelector('jf-context-inspector-pane')).not.toBeNull();
+    expect(pane.shadowRoot!.querySelector('.tab-body')!.hasAttribute('hidden')).toBe(true);
+    await chooseTab(el, 'source:0');
+    expect(pane.shadowRoot!.querySelector('jf-document-pane')).toBe(reader);
+  });
+
+  it('a citation the answer did not cite still gets its own tab, and a result gets a plain one', async () => {
+    const el = await mount();
+    await askGrounded(el);
+    await openFirstCitation(el);
+    el.paneDocPath = 'f:/docs/result.md';
+    el.paneSource = null;
+    el.paneTab = 'document';
+    await settle(el);
+    expect(tabLabels(await frameOf(el))[0]).toContain('note-0.md');
+  });
+});
+
+describe('DP1 Escape or close returns focus to what opened the pane', () => {
+  it('Escape returns focus to the citation that opened it', async () => {
+    const el = await mount();
+    await askGrounded(el);
+    const trigger = await openFirstCitation(el);
+    const reader = await focusReader(el);
+    pressEscape(reader);
+    await settle(el);
+    expect(el.shadowRoot?.querySelector('jf-sv3-pane')).toBeNull();
+    expect(deepActive()).toBe(trigger);
+  });
+
+  it('the close control returns focus the same way', async () => {
+    const el = await mount();
+    await askGrounded(el);
+    const trigger = await openFirstCitation(el);
+    await focusReader(el);
+    (await region(el, 'jf-sv3-pane')).dispatchEvent(new CustomEvent(SV3_PANE_CLOSE, { bubbles: true, composed: true }));
+    await settle(el);
+    expect(deepActive()).toBe(trigger);
+  });
+
+  it('moving between tabs keeps the citation that opened the pane as what gets focus back', async () => {
+    const el = await mount();
+    await askTwoSources(el);
+    const trigger = await openFirstCitation(el);
+    await chooseTab(el, 'source:1');
+    await chooseTab(el, 'context');
+    pressEscape((await frameOf(el)));
+    await settle(el);
+    expect(deepActive()).toBe(trigger);
+  });
+
+  it('an opener that has left falls back to the composer, never the page', async () => {
+    const el = await mount();
+    await askGrounded(el);
+    const trigger = await openFirstCitation(el);
+    const reader = await focusReader(el);
+    trigger.remove();
+    pressEscape(reader);
+    await settle(el);
+    expect(deepActive()).not.toBe(document.body);
+  });
+
+  it('opens with the keyboard in the pane, and Escape during a composition stays with the composition', async () => {
+    const el = await mount();
+    await askGrounded(el);
+    await openFirstCitation(el);
+    const frame = await frameOf(el);
+    expect(frame.shadowRoot!.activeElement?.getAttribute('role')).toBe('tab');
+    frame.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', isComposing: true, bubbles: true, composed: true, cancelable: true }));
+    await settle(el);
+    expect(el.shadowRoot?.querySelector('jf-sv3-pane')).not.toBeNull();
+  });
+});
+
+describe('DP1 the pane remembers each conversation', () => {
+  it('returns to the tab and source each conversation last showed', async () => {
+    const el = await mount();
+    await askTwoSources(el); // A
+    await openFirstCitation(el);
+    await chooseTab(el, 'source:1');
+    await newSession(el);
+    await askGrounded(el); // B
+    await openFirstCitation(el);
+    await chooseTab(el, 'context');
+    const rows = await rowsOf(el);
+    await clickRow(rows[1] as Sv3SessionRow); // to A
+    await settle(el);
+    expect(el.paneTab).toBe('source:1');
+    expect(el.paneDocPath).toBe(SECOND_DOC);
+    await clickRow((await rowsOf(el))[0] as Sv3SessionRow); // back to B
+    await settle(el);
+    expect(el.paneTab).toBe('context');
+  });
+
+  it('a reload comes back to the source being read, without taking the keyboard', async () => {
+    const before = await mount();
+    await askTwoSources(before);
+    await openFirstCitation(before);
+    await chooseTab(before, 'source:1');
+    const sessions = before.sessions;
+    before.remove();
+
+    const after = await mount();
+    const composerFocus = document.createElement('button');
+    document.body.append(composerFocus);
+    composerFocus.focus();
+    after.sessions = sessions;
+    await settle(after);
+    expect(after.paneTab).toBe('source:1');
+    expect(after.paneDocPath).toBe(SECOND_DOC);
+    expect(deepActive()).toBe(composerFocus);
+  });
+
+  it('a pane closed by the reader stays closed on return', async () => {
+    const el = await mount();
+    await askGrounded(el);
+    await openFirstCitation(el);
+    pressEscape(await frameOf(el));
+    await settle(el);
+    await newSession(el);
+    await askGrounded(el);
+    await clickRow((await rowsOf(el))[1] as Sv3SessionRow);
+    await settle(el);
+    expect(el.shadowRoot?.querySelector('jf-sv3-pane')).toBeNull();
+  });
+
+  it('a remembered source its record no longer holds opens nothing', async () => {
+    const before = await mount();
+    await askGrounded(before);
+    await openFirstCitation(before);
+    const { sessions } = before;
+    before.remove();
+    const after = await mount();
+    after.sessions = { ...sessions, sessions: sessions.sessions.map(session => ({ ...session, turns: session.turns.map(turn => ({ ...turn, id: `${turn.id}-replaced` })) })) };
+    await settle(after);
+    expect(after.shadowRoot?.querySelector('jf-sv3-pane')).toBeNull();
+  });
+});
+
+describe('C4 the pane never shows another conversation, window or profile', () => {
+  it('rapid selection lands on the last choice', async () => {
+    const el = await mount();
+    await askTwoSources(el);
+    await openFirstCitation(el);
+    const frame = await frameOf(el);
+    for (const id of ['source:1', 'source:0', 'source:1', 'context', 'source:0']) {
+      frame.shadowRoot!.querySelector<HTMLButtonElement>(`[data-tab="${id}"]`)!.click();
+    }
+    await settle(el);
+    expect(el.paneTab).toBe('source:0');
+    expect(el.paneDocPath).toBe(CITED_DOC);
+  });
+
+  it('a late record for the conversation left behind restores nothing here', async () => {
+    const el = await mount();
+    await askGrounded(el); // A, pane open
+    await openFirstCitation(el);
+    const conversationA = el.sessions;
+    await newSession(el); // the reader moved on; A's record lands afterwards
+    const activeNow = el.sessions.activeId;
+    el.sessions = { ...conversationA, activeId: activeNow };
+    await settle(el);
+    expect(el.shadowRoot?.querySelector('jf-sv3-pane')).toBeNull();
+  });
+
+  it('answers a selection placed in this window, or by no frame, and ignores another window\u2019s', async () => {
+    const { setInspectorOwnerResolver } = await import('../../state/inspectorState.js');
+    const el = await mount();
+    const item = { id: '/shared.md', title: 'shared.md', path: '/shared.md' };
+    setInspectorOwnerResolver(() => 'core.library-surface');
+    setSelected(item);
+    await settle(el);
+    expect(el.shadowRoot?.querySelector('jf-sv3-pane')).toBeNull();
+    setInspectorOwnerResolver(() => 'core.search-v3-surface');
+    setSelected(item);
+    await settle(el);
+    expect(el.paneDocPath).toBe('/shared.md');
+    setInspectorOwnerResolver(() => null);
+  });
+
+  it('another window closing its selection leaves this window\u2019s reader open', async () => {
+    const { setInspectorOwnerResolver, setOpen } = await import('../../state/inspectorState.js');
+    const el = await mount();
+    setInspectorOwnerResolver(() => 'core.search-v3-surface');
+    setSelected({ id: '/mine.md', title: 'mine.md', path: '/mine.md' });
+    await settle(el);
+    setInspectorOwnerResolver(() => 'core.library-surface');
+    setSelected({ id: '/theirs.md', title: 'theirs.md', path: '/theirs.md' });
+    setOpen(false);
+    await settle(el);
+    expect(el.paneDocPath).toBe('/mine.md');
+    setInspectorOwnerResolver(() => null);
+  });
+
+  it('a profile change closes the pane', async () => {
+    const el = await mount();
+    await askGrounded(el);
+    await openFirstCitation(el);
+    createProfile('work', 'Work');
+    setActiveProfileId('work');
+    await settle(el);
+    expect(el.shadowRoot?.querySelector('jf-sv3-pane')).toBeNull();
+  });
+});
+
+describe('DP5 hiding a source from the assistant keeps working from the pane', () => {
+  const control = async (el: Mounted): Promise<HTMLElement & { label: string }> => {
+    const pane = await region(el, 'jf-sv3-pane');
+    return pane.shadowRoot!.querySelector('[data-testid="sv3-pane-toggle-hidden"]') as HTMLElement & { label: string };
+  };
+  const activate = (button: HTMLElement & { onActivate?: () => void }): void => { button.onActivate?.(); };
+
+  it('hides and restores the source on show, naming the channel the assistant got it by', async () => {
+    const el = await mount();
+    await askGrounded(el);
+    await openFirstCitation(el);
+    expect((await control(el)).label).toBe("Hide note-0.md from the assistant's retrieval");
+    activate(await control(el));
+    await settle(el);
+    expect((await control(el)).label).toBe("Restore note-0.md to the assistant's retrieval");
+    activate(await control(el));
+    await settle(el);
+    expect((await control(el)).label).toBe("Hide note-0.md from the assistant's retrieval");
+  });
+
+  it('says so when the hide could not be saved, and the source stays as it was', async () => {
+    const el = await mount();
+    await askGrounded(el);
+    await openFirstCitation(el);
+    const notices: string[] = [];
+    const onToast = (event: Event): void => { notices.push((event as CustomEvent<{ message: string }>).detail.message); };
+    document.addEventListener('jf-advisory-ephemeral', onToast);
+    fetchMock.mockResolvedValue({ ok: false, status: 500, body: null, json: async () => ({}) });
+    activate(await control(el));
+    await settle(el);
+    document.removeEventListener('jf-advisory-ephemeral', onToast);
+    expect(notices).toEqual(['Could not hide note-0.md. Try again.']);
+    expect((await control(el)).label).toBe("Hide note-0.md from the assistant's retrieval");
+  });
+
+  it('each conversation starts from its own hidden sources', async () => {
+    const { getExcludedSources, setExcludedSources } = await import('../../state/excludedSources.js');
+    const el = await mount();
+    await askGrounded(el);
+    setExcludedSources(['left-over']);
+    await newSession(el);
+    await askGrounded(el);
+    expect([...getExcludedSources()]).toEqual([]);
+  });
+});
+
+describe('DP4 plugin inspector tabs are details-pane tabs', () => {
+  it('appear after Context, receive the document on show, and leave without stranding the pane', async () => {
+    const { registerInspectorTab, unregisterInspectorTab } = await import('../../commands/InspectorTabRegistry.js');
+    const { CORE_PROVENANCE } = await import('../../primitives/provenance.js');
+    const seen: unknown[] = [];
+    registerInspectorTab({ id: 'vendor.notes', label: 'Notes', priority: 1, source: 'plugin', provenance: CORE_PROVENANCE,
+      render: ({ selectedItem }) => { seen.push(selectedItem); return 'plugin says hello'; } });
+    try {
+      const el = await mount();
+      await askGrounded(el);
+      await openFirstCitation(el);
+      expect(tabLabels(await frameOf(el))).toEqual(['1 note-0.md', 'Context', 'Notes']);
+      await chooseTab(el, 'plugin:vendor.notes');
+      const pane = await region(el, 'jf-sv3-pane');
+      const tab = pane.shadowRoot!.querySelector('jf-details-plugin-tab') as unknown as HTMLElement & { updateComplete: Promise<unknown> };
+      await tab.updateComplete;
+      expect(tab.shadowRoot!.textContent).toContain('plugin says hello');
+      expect(seen.at(-1)).toMatchObject({ path: CITED_DOC });
+      unregisterInspectorTab('vendor.notes');
+      await settle(el);
+      expect(el.paneTab).toBe('source:0');
+    } finally {
+      unregisterInspectorTab('vendor.notes');
+    }
   });
 });

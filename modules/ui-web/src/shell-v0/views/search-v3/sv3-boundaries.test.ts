@@ -38,7 +38,7 @@ import {
   SV3_MAIN_MIN_PX,
   SV3_PANE_DEFAULT_PX,
   SV3_PANE_INLINE_MIN_PX,
-  SV3_PANE_MAX_SHARE,
+  SV3_PANE_MAX_PX,
   SV3_PANE_MIN_PX,
   SV3_SIDEBAR_COLLAPSED_PX,
   SV3_SIDEBAR_DEFAULT_PX,
@@ -57,7 +57,7 @@ describe('sv3 boundaries — the spec numbers', () => {
     // (rightPanelLayout.ts:1).
     expect(SV3_PANE_DEFAULT_PX).toBe(540);
     expect(SV3_PANE_MIN_PX).toBe(360);
-    expect(SV3_PANE_MAX_SHARE).toBe(0.7);
+    expect(SV3_PANE_MAX_PX).toBe(560);
     expect(SV3_PANE_INLINE_MIN_PX).toBe(980);
   });
 
@@ -100,23 +100,23 @@ describe('sv3 boundaries — the sidebar ceiling', () => {
 });
 
 describe('sv3 boundaries — the pane ceiling', () => {
-  it('takes the spec 70% share on a box wide enough that the share is the binding term', () => {
-    // The two terms cross at 0.3 × host = sidebar + 640; above that the SPEC's own 70% is what
-    // holds the pane back, and the improvement adds nothing. At 2400 with no sidebar: share 1680,
-    // main-safe remainder 1760.
-    expect(sv3PaneMaxWidth(2400, 0)).toBe(Math.floor(2400 * SV3_PANE_MAX_SHARE));
-    expect(clampSv3PaneWidth(5000, 2400, 0)).toBe(1680);
+  it('stops at the details pane\u2019s 560 on a box wide enough that the ceiling is the binding term', () => {
+    expect(sv3PaneMaxWidth(2400, 0)).toBe(SV3_PANE_MAX_PX);
+    expect(clampSv3PaneWidth(5000, 2400, 0)).toBe(560);
   });
 
   it('clamps a drag to the spec floor and to the ceiling', () => {
     expect(clampSv3PaneWidth(10, 1568, 256)).toBe(SV3_PANE_MIN_PX);
     expect(clampSv3PaneWidth(500, 1568, 256)).toBe(500);
-    expect(clampSv3PaneWidth(100_000, 1568, 256)).toBe(1568 - 256 - SV3_MAIN_MIN_PX);
+    expect(clampSv3PaneWidth(100_000, 1568, 256)).toBe(SV3_PANE_MAX_PX);
+    expect(clampSv3PaneWidth(100_000, 1300, 256)).toBe(1300 - 256 - SV3_MAIN_MIN_PX);
   });
 
   it('opens at the spec default, at a remembered width, or at whatever the box allows', () => {
     expect(resolveInitialSv3PaneWidth(null, 1568, 256)).toBe(SV3_PANE_DEFAULT_PX);
-    expect(resolveInitialSv3PaneWidth(700, 1920, 256)).toBe(700);
+    expect(resolveInitialSv3PaneWidth(500, 1920, 256)).toBe(500);
+    // Remembered before the ceiling existed: an older, wider choice comes back at the ceiling.
+    expect(resolveInitialSv3PaneWidth(700, 1920, 256)).toBe(SV3_PANE_MAX_PX);
     expect(resolveInitialSv3PaneWidth(200, 1920, 256)).toBe(SV3_PANE_MIN_PX);
     // Remembered from a wider window: 1400 − 256 − 640 = 504.
     expect(resolveInitialSv3PaneWidth(900, 1400, 256)).toBe(504);
@@ -125,9 +125,9 @@ describe('sv3 boundaries — the pane ceiling', () => {
   it('hands the pane the collapsed rail back', () => {
     // The clamp reads the RENDERED sidebar width, so collapsing it widens what the pane may take by
     // exactly the difference between the panel and the icon rail.
-    expect(sv3PaneMaxWidth(1400, SV3_SIDEBAR_COLLAPSED_PX)).toBe(
-      sv3PaneMaxWidth(1400, 256) + (256 - SV3_SIDEBAR_COLLAPSED_PX),
-    );
+    expect(sv3PaneMaxWidth(1240, SV3_SIDEBAR_COLLAPSED_PX)).toBe(1240 - SV3_SIDEBAR_COLLAPSED_PX - SV3_MAIN_MIN_PX);
+    expect(sv3PaneMaxWidth(1240, 200)).toBe(1240 - 200 - SV3_MAIN_MIN_PX);
+    expect(sv3PaneMaxWidth(1240, SV3_SIDEBAR_COLLAPSED_PX) - sv3PaneMaxWidth(1240, 200)).toBe(200 - SV3_SIDEBAR_COLLAPSED_PX);
   });
 
   it('keeps the pane legible when the box cannot hold every minimum', () => {
@@ -150,12 +150,12 @@ describe('sv3 boundaries — BOTH open (the F8 improvement the spec does not hav
   });
 
   it('leaves the main column its 640 with the pane at its ceiling beside an open sidebar', () => {
-    // The mirror probe: drop the sidebar term from `sv3PaneMaxWidth` and this reads 1097 (the raw
-    // 70% share) instead of 672.
-    expect(sv3PaneMaxWidth(1568, 256)).toBe(1568 - 256 - SV3_MAIN_MIN_PX);
-    expect(sv3PaneMaxWidth(1568, 256)).toBe(672);
-    const pane = clampSv3PaneWidth(10_000, 1568, 256);
-    expect(1568 - 256 - pane).toBe(SV3_MAIN_MIN_PX);
+    // The mirror probe: drop the sidebar term from `sv3PaneMaxWidth` and this reads 560 (the raw
+    // ceiling) instead of 404.
+    expect(sv3PaneMaxWidth(1300, 256)).toBe(1300 - 256 - SV3_MAIN_MIN_PX);
+    expect(sv3PaneMaxWidth(1300, 256)).toBe(404);
+    const pane = clampSv3PaneWidth(10_000, 1300, 256);
+    expect(1300 - 256 - pane).toBe(SV3_MAIN_MIN_PX);
   });
 
   it('gives BOTH boundaries back their room when the other one is not in the flow', () => {
@@ -169,11 +169,11 @@ describe('sv3 boundaries — BOTH open (the F8 improvement the spec does not hav
   });
 
   it('treats an unmeasured box as unknown rather than narrow', () => {
-    // The window before its first paint: no ceiling, floors still apply, and the pane presents
-    // inline rather than flashing an overlay it will immediately leave.
+    // The window before its first paint: no box-derived ceiling, the floors and the pane's own 560
+    // still apply, and the pane presents inline rather than flashing an overlay it will leave.
     expect(sv3PaneIsInline(Number.POSITIVE_INFINITY)).toBe(true);
     expect(clampSv3SidebarWidth(900, Number.POSITIVE_INFINITY, 0)).toBe(900);
-    expect(clampSv3PaneWidth(900, Number.POSITIVE_INFINITY, 0)).toBe(900);
+    expect(clampSv3PaneWidth(900, Number.POSITIVE_INFINITY, 0)).toBe(SV3_PANE_MAX_PX);
     expect(resolveInitialSv3PaneWidth(null, Number.POSITIVE_INFINITY, 0)).toBe(SV3_PANE_DEFAULT_PX);
   });
 

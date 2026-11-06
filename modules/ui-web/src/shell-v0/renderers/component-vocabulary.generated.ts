@@ -46,6 +46,8 @@ export type ComponentTag =
   | 'jf-corpus-picker'
   | 'jf-date-control'
   | 'jf-declared-surface'
+  | 'jf-details-pane'
+  | 'jf-details-plugin-tab'
   | 'jf-discrete-slider'
   | 'jf-dispatch-source'
   | 'jf-document-pane'
@@ -57,6 +59,7 @@ export type ComponentTag =
   | 'jf-enter-action-picker'
   | 'jf-enum-control'
   | 'jf-error-alert'
+  | 'jf-failed-files-list'
   | 'jf-failed-jobs-drawer'
   | 'jf-filter-chip'
   | 'jf-folder-card'
@@ -111,6 +114,7 @@ export type ComponentTag =
   | 'jf-results-card'
   | 'jf-route-chip'
   | 'jf-row-actions'
+  | 'jf-run-activity'
   | 'jf-run-node'
   | 'jf-scope-chip'
   | 'jf-search-results'
@@ -134,6 +138,7 @@ export type ComponentTag =
   | 'jf-status-pill'
   | 'jf-summarize-view'
   | 'jf-surface-tabs'
+  | 'jf-sv3-agent-runs'
   | 'jf-sv3-composer'
   | 'jf-sv3-context-bar'
   | 'jf-sv3-conversation-export'
@@ -163,6 +168,7 @@ export type ComponentTag =
   | 'jf-unified-chat-view'
   | 'jf-vertical-layout'
   | 'jf-walkthrough-card'
+  | 'jf-window-details'
   | 'jf-x-ui-renderer-control';
 
 export const COMPONENT_TAGS: readonly ComponentTag[] = [
@@ -203,6 +209,8 @@ export const COMPONENT_TAGS: readonly ComponentTag[] = [
   'jf-corpus-picker',
   'jf-date-control',
   'jf-declared-surface',
+  'jf-details-pane',
+  'jf-details-plugin-tab',
   'jf-discrete-slider',
   'jf-dispatch-source',
   'jf-document-pane',
@@ -214,6 +222,7 @@ export const COMPONENT_TAGS: readonly ComponentTag[] = [
   'jf-enter-action-picker',
   'jf-enum-control',
   'jf-error-alert',
+  'jf-failed-files-list',
   'jf-failed-jobs-drawer',
   'jf-filter-chip',
   'jf-folder-card',
@@ -268,6 +277,7 @@ export const COMPONENT_TAGS: readonly ComponentTag[] = [
   'jf-results-card',
   'jf-route-chip',
   'jf-row-actions',
+  'jf-run-activity',
   'jf-run-node',
   'jf-scope-chip',
   'jf-search-results',
@@ -291,6 +301,7 @@ export const COMPONENT_TAGS: readonly ComponentTag[] = [
   'jf-status-pill',
   'jf-summarize-view',
   'jf-surface-tabs',
+  'jf-sv3-agent-runs',
   'jf-sv3-composer',
   'jf-sv3-context-bar',
   'jf-sv3-conversation-export',
@@ -320,6 +331,7 @@ export const COMPONENT_TAGS: readonly ComponentTag[] = [
   'jf-unified-chat-view',
   'jf-vertical-layout',
   'jf-walkthrough-card',
+  'jf-window-details',
   'jf-x-ui-renderer-control',
 ];
 

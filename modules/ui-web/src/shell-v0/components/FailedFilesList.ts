@@ -1,14 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * <jf-failed-jobs-drawer> — Tempdoc 599 §16/B1.
+ * <jf-failed-files-list> — Tempdoc 599 §16/B1; design system §1: "One item's problem → at the item".
  *
- * The per-folder "failed files" drill-down: a right-drawer (mirroring RetrospectivePanel /
- * AdvisoryInboxDrawer) opened from a folder row's clickable "N failed" badge. Lists the FAILED
- * indexing jobs under that watched root (the folder-scoped `/api/indexing-jobs/failed/by-prefix`
- * endpoint), each with its error and a Retry. Retry dispatches the existing user-audience Operation
+ * A folder's failed files, inline under that folder in the Library. Lists the FAILED indexing jobs
+ * under the watched root (the folder-scoped `/api/indexing-jobs/failed/by-prefix` endpoint), each with
+ * its error and per-row actions. "Try again" dispatches the existing user-audience Operation
  * `core.retry-indexing-job` DIRECTLY via the OperationClient (the failed-jobs Resource itself is
  * operator-only, so we do not surface it as a Resource view here — we reuse the Operation, not the
- * Resource). After a retry the list refetches; the folder row's count then drops on its own live tick.
+ * Resource). After a retry the list refetches; the folder row's count drops on its own live tick.
+ *
+ * An instance answers for one folder at a time. Changing `folderPathHash` drops the old folder's rows
+ * BEFORE the next render, and every reply is checked against the folder it was asked for, so a late
+ * reply for folder A can never fill folder B (C4).
  */
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { repeat } from 'lit/directives/repeat.js';
@@ -16,14 +19,7 @@ import { JfElement } from '../primitives/JfElement.js';
 import './Button.js';
 import './RowActions.js';
 import { icon } from './Icon.js';
-import { TransientController } from '../primitives/transientController.js';
 import { FocusKeeper } from '../primitives/focusKeeper.js';
-import {
-  isFailedJobsOpen,
-  failedJobsFolderPathHash,
-  closeFailedJobs,
-  subscribeFailedJobs,
-} from '../state/failedJobsDrawer.js';
 import { resolvePathLazy } from '../hooks/resolvePathLazy.js';
 import { authorizedFetch } from '../api/authorizedFetch.js';
 import { getOperationClient } from '../operations/OperationClient.js';
@@ -72,13 +68,18 @@ function toRow(raw: FailedRow): FailedRow {
   };
 }
 
-export class FailedJobsDrawer extends JfElement {
+const mounted = new Set<FailedFilesList>();
+
+/** Take the reader to a folder's list: the `N failed` chip and the folder's problem both land here. */
+export function revealFailedFiles(folderPathHash: string): void {
+  for (const list of mounted) if (list.folderPathHash === folderPathHash) list.reveal();
+}
+
+export class FailedFilesList extends JfElement {
   static properties = {
-    inline: { type: Boolean, reflect: true },
     folderPathHash: { type: String, attribute: 'folder-path-hash' },
     observedCount: { type: Number },
     lastKnown: { type: Boolean },
-    open: { type: Boolean, reflect: true },
     apiBase: { attribute: 'api-base', type: String },
     host_: { attribute: false },
     rows: { state: true },
@@ -87,11 +88,9 @@ export class FailedJobsDrawer extends JfElement {
     resolved: { state: true },
   };
 
-  declare inline: boolean;
   declare folderPathHash: string;
   declare observedCount: number;
   declare lastKnown: boolean;
-  declare open: boolean;
   declare apiBase: string;
   declare host_: PluginHostApi | undefined;
   declare rows: FailedRow[];
@@ -103,22 +102,14 @@ export class FailedJobsDrawer extends JfElement {
   private targetFolder: string | null = null;
   private requestSerial = 0;
   private targetSerial = 0;
-  private unsub: (() => void) | null = null;
-
-  // 574 §23.B — single-open arbitration by construction; the panel reflects the failedJobsDrawer store.
-  // Only the global drawer owns the 'failed-jobs' right-drawer registration: an inline list in a
-  // Library row must never register it, nor unregister the open drawer's on its own teardown.
-  private transient: TransientController | null = null;
 
   constructor() {
     super();
-    // L21 — a row that leaves (retried, cancelled, refreshed away) hands focus to its neighbour, else Close.
-    new FocusKeeper(this, () => this.renderRoot.querySelector<HTMLElement>('.head-actions jf-button[label="Close"]'));
-    this.inline = false;
+    // L21 — a row that leaves (retried, cancelled, refreshed away) hands focus to its neighbour, else the list.
+    new FocusKeeper(this, () => this.renderRoot.querySelector<HTMLElement>('.list'));
     this.folderPathHash = '';
     this.observedCount = 0;
     this.lastKnown = false;
-    this.open = isFailedJobsOpen();
     this.apiBase = '';
     this.rows = [];
     this.loading = false;
@@ -128,68 +119,45 @@ export class FailedJobsDrawer extends JfElement {
 
   override connectedCallback(): void {
     super.connectedCallback();
-    if (this.inline) this.requestUpdate('folderPathHash');
-    else {
-      this.transient ??= new TransientController(this, {
-        layer: 'right-drawer',
-        id: 'failed-jobs',
-        close: () => closeFailedJobs(),
-      });
-      this.unsub = subscribeFailedJobs(() => this.syncTarget());
-      this.syncTarget();
-    }
-  }
-
-  private syncTarget(): void {
-    const next = isFailedJobsOpen();
-    const folder = next ? failedJobsFolderPathHash() : null;
-    const changed = folder !== this.targetFolder || next && !this.open;
-    this.open = next;
-    if (changed || !next) {
-      this.requestSerial++;
-      this.targetFolder = folder;
-      this.rows = [];
-      this.resolved = {};
-      this.error = null;
-      this.loading = false;
-      this.targetSerial++;
-      if (next) void this.refresh();
-    }
-    this.requestUpdate();
+    mounted.add(this);
+    this.requestUpdate('folderPathHash');
   }
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
-    this.unsub?.();
-    this.unsub = null;
+    mounted.delete(this);
     this.requestSerial++;
     this.targetFolder = null;
     this.targetSerial++;
   }
 
+  reveal(): void {
+    const list = this.renderRoot.querySelector<HTMLElement>('.list');
+    list?.scrollIntoView?.({ block: 'nearest' });
+    list?.focus();
+  }
+
+  /** Before render, so no frame ever shows one folder's rows under another. */
+  override willUpdate(changed: Map<string, unknown>): void {
+    if (!changed.has('folderPathHash') || this.targetFolder === this.folderPathHash) return;
+    this.targetFolder = this.folderPathHash;
+    this.rows = [];
+    this.resolved = {};
+    this.error = null;
+    this.loading = false;
+    this.requestSerial++;
+    this.targetSerial++;
+  }
+
   override updated(changed: Map<string, unknown>): void {
-    if (this.inline) {
-      this.open = true;
-      if (changed.has('folderPathHash') || changed.has('observedCount') && !this.lastKnown) {
-        if (this.targetFolder !== this.folderPathHash) {
-          this.rows = []; this.resolved = {}; this.targetSerial++;
-        }
-        this.targetFolder = this.folderPathHash;
-        void this.refresh();
-      }
-      return;
-    }
-    if (changed.has('open')) {
-      if (this.open) this.transient?.open();
-      else this.transient?.close();
-    }
+    if (changed.has('folderPathHash') || changed.has('observedCount') && !this.lastKnown) void this.refresh();
   }
 
   private async refresh(): Promise<void> {
     const folder = this.targetFolder;
     if (!folder) return;
     const serial = ++this.requestSerial;
-    const current = () => this.isConnected && this.open && serial === this.requestSerial && folder === this.targetFolder;
+    const current = () => this.isConnected && serial === this.requestSerial && folder === this.targetFolder;
     this.loading = true;
     this.error = null;
     try {
@@ -207,11 +175,11 @@ export class FailedJobsDrawer extends JfElement {
       // (api/schemas.ts) — its own doc says it degrades "so the downstream mapper is defensive".
       // That mapper is this line: without it, a drifted row reaches render, and `r.state.toUpperCase()`
       // throws a TypeError inside Lit's `performUpdate` — OUTSIDE this try/catch, so `this.error`
-      // would never be set and the drawer would freeze rather than degrade. Normalizing at the ONE
+      // would never be set and the list would freeze rather than degrade. Normalizing at the ONE
       // parse site (not at each render site) also covers `retryAll` and `onRowActionSuccess`, which
       // key on `pathHash`. Mirrors api/domains/indexing.ts's defensive `(parsed.jobs ?? [])`.
       const rows = (Array.isArray(parsed?.jobs) ? parsed.jobs : []).map(toRow);
-      if (!this.inline || rows.length > 0 || !this.rows.length) {
+      if (rows.length > 0 || !this.rows.length) {
         this.rows = rows;
       }
       // Lazy-resolve hashes → display paths (best-effort; deleted files resolve to null → show hash).
@@ -235,29 +203,16 @@ export class FailedJobsDrawer extends JfElement {
     return authorizedFetch((this.apiBase || '') + path);
   }
 
-  /**
-   * Per-row retry/cancel are rendered by {@code <jf-row-actions>} (tempdoc 599 §16.1 Move 1 — the
-   * failed-jobs Resource now declares the retry/cancel item-operations); when one succeeds, drop that
-   * row. The folder row's "N failed" count then updates on its own live tick.
-   */
-  private onRowActionSuccess(e: Event): void {
-    const key = (e as CustomEvent<{ rowKey?: string }>).detail?.rowKey;
-    if (key && !this.inline) this.rows = this.rows.filter((r) => r.pathHash !== key);
-  }
-
-  /** Header bulk action: invoke the existing retry Operation for each listed file, dropping each on
-   * success (the "Retry all" analogue of the Advisories drawer's "Mark all read"). */
+  /** "Try again": invoke the existing retry Operation for each listed file, then read the list again. */
   private async retryAll(): Promise<void> {
     const folder = this.targetFolder;
     const serial = this.targetSerial;
-    const current = () => this.isConnected && this.open && serial === this.targetSerial && folder === this.targetFolder;
+    const current = () => this.isConnected && serial === this.targetSerial && folder === this.targetFolder;
     const client = getOperationClient(this.apiBase || '');
     for (const r of [...this.rows]) {
       if (!current()) return;
       try {
         await client.invoke(RETRY_OP, { args: { pathHash: r.pathHash } });
-        if (!current()) return;
-        if (!this.inline) this.rows = this.rows.filter(row => row.pathHash !== r.pathHash);
       } catch (err) {
         if (!current()) return;
         // Leave the failed row and its original error visible, and report the retry failure.
@@ -268,76 +223,35 @@ export class FailedJobsDrawer extends JfElement {
         });
       }
     }
-    if (this.inline && current()) await this.refresh();
+    if (current()) await this.refresh();
   }
 
   static styles = css`
-    :host(:not([inline]):not([open])) {
-      display: none;
-    }
-    :host([inline]) { display: block; margin: .5rem 0 0 1.7rem; }
-    :host([inline]) {
+    :host {
+      display: block;
+      margin: .5rem 0 0 1.7rem;
       --justsearch-shell-form-button-border: transparent;
       --justsearch-shell-form-button-bg: transparent;
       --justsearch-shell-action-button-padding: .4rem 0;
       --justsearch-shell-form-control-spacing: 0;
     }
-    :host([inline]) .row { padding: .4rem 0; border: 0; }
-    :host([inline]) .row-path { font-size: var(--font-size-sm); }
-    :host([inline]) .row-error { color: var(--text-secondary); }
-    :host([inline]) .loading, :host([inline]) .empty { padding: .5rem 0; text-align: start; }
-    .panel {
-      position: relative;
-      height: 100%;
-      width: 26rem;
-      max-width: 90vw;
-      background: var(--surface-1);
-      border-left: 1px solid var(--border-default);
-      box-shadow: -4px 0 16px rgba(0, 0, 0, 0.35);
-      color: var(--text-primary);
-      display: flex;
-      flex-direction: column;
-    }
-    .head {
-      flex-shrink: 0;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 0.5rem;
-      padding: 0.75rem 1rem;
-      border-bottom: 1px solid var(--border-default);
-    }
-    .title {
-      font-weight: 600;
-      font-size: var(--font-size-sm);
-    }
-    .head-actions {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-    .body {
-      flex: 1;
-      overflow-y: auto;
-      padding: 0.5rem 1rem;
-    }
+    .list:focus { outline: none; }
+    .list:focus-visible { outline: var(--frame-focus-width) solid var(--accent-tint); outline-offset: var(--frame-focus-width); }
     /**
      * Tempdoc 914 D2 — the row STACKS; it is not a two-column flex row.
      *
-     * The panel is 26rem wide and jf-row-actions renders one full-label button per declared
+     * A list may be as narrow as a 26rem window: jf-row-actions renders one full-label button per declared
      * item-operation ("Retry indexing job", "Cancel indexing job"). Those buttons do not shrink, so
      * side-by-side they took 339px of the 373px row and squeezed .row-info to 22px — one
      * character per line, an 822px-tall row for a single path. The path IS the row's identity, so
-     * it takes the full width and the actions sit under it; the same shape AdvisoryInboxDrawer
-     * uses for its per-item action inside the same 26rem right-drawer slot.
+     * it takes the full width and the actions sit under it.
      */
     .row {
       display: flex;
       flex-direction: column;
       align-items: flex-start;
       gap: 0.4rem;
-      padding: 0.6rem 0;
-      border-bottom: 1px solid var(--border-subtle);
+      padding: .4rem 0;
     }
     .row-info {
       inline-size: 100%;
@@ -358,7 +272,7 @@ export class FailedJobsDrawer extends JfElement {
     .row-error {
       margin-top: 0.15rem;
       font-size: var(--font-size-xs);
-      color: var(--text-danger);
+      color: var(--text-secondary);
       overflow-wrap: anywhere;
     }
     /* Tempdoc 941 F2 — the scan that produced this failure. Secondary tone: it is provenance for
@@ -380,53 +294,24 @@ export class FailedJobsDrawer extends JfElement {
     }
     .empty,
     .loading {
-      padding: 1.5rem 0;
-      text-align: center;
+      padding: .5rem 0;
+      text-align: start;
       color: var(--text-secondary);
       font-size: var(--font-size-sm);
     }
   `;
 
   override render(): TemplateResult {
-    if (this.inline) return html`<div aria-label="Files needing review" @row-action-success=${(e: Event) => this.onRowActionSuccess(e)}>
+    return html`<div class="list" tabindex="-1" role="group" aria-label="Files needing review">
       ${this.lastKnown ? html`<p>Last-known failures; retries are in progress.</p>` : nothing}
       ${this.renderBody()}
       ${this.rows.length ? html`<jf-button variant="ghost" label="Try again"
         .onActivate=${() => { void this.retryAll(); /* no promise back: jf-control would hold Try again busy until the batch settles */ }}>${icon({ name: 'refresh-cw', size: 14 })} Try again</jf-button>` : nothing}
     </div>`;
-    if (!this.open) return html``;
-    return html`
-      <div class="panel" role="dialog" aria-label="Failed files">
-        <div class="head">
-          <span class="title">Failed files</span>
-          <div class="head-actions">
-            ${this.rows.length > 0
-              ? html`<jf-button
-                  size="sm"
-                  variant="ghost"
-                  label="Retry all failed files"
-                  .onActivate=${() => void this.retryAll()}
-                  >Retry all</jf-button
-                >`
-              : nothing}
-            <jf-button
-              size="sm"
-              variant="ghost"
-              label="Close"
-              .onActivate=${() => closeFailedJobs()}
-              >${icon({ name: 'x', size: 14 })}</jf-button
-            >
-          </div>
-        </div>
-        <div class="body" @row-action-success=${(e: Event) => this.onRowActionSuccess(e)}>
-          ${this.renderBody()}
-        </div>
-      </div>
-    `;
   }
 
   private renderBody(): TemplateResult {
-    // L21 — a refresh (here or in the drawer) keeps the listed rows: an open band and its opener
+    // L21 — a refresh keeps the listed rows: an open band and its opener
     // belong to their file, and stay while that file is still listed. A file that leaves takes its band.
     if (this.loading && !this.rows.length) return html`<div class="loading">Loading…</div>`;
     if (this.error && !this.rows.length) return html`<div class="empty">Couldn't load failed files: ${this.error}</div>`;
@@ -448,7 +333,7 @@ export class FailedJobsDrawer extends JfElement {
     // indexed content is kept; it must not read like a broken or a missing file.
     const indexedUnreadable = r.state.toUpperCase() === JOB_STATE_INDEXED_SOURCE_UNREADABLE;
     const unreadable = indexedUnreadable || r.state.toUpperCase() === JOB_STATE_SOURCE_UNREADABLE;
-    // Tempdoc 941 F2 — the by-prefix wire has carried `scanId` since 911 but the drawer never
+    // Tempdoc 941 F2 — the by-prefix wire has carried `scanId` since 911 but nothing
     // rendered it, so a failed row could not be tied back to the scan that produced it. `""` is the
     // contract's "no owning scan" (single-file ingest / watcher / pre-scan row), NOT an unknown —
     // so that case renders no line at all rather than an empty or invented one. `toRow` does not
@@ -494,6 +379,6 @@ export class FailedJobsDrawer extends JfElement {
   }
 }
 
-if (typeof customElements !== 'undefined' && !customElements.get('jf-failed-jobs-drawer')) {
-  customElements.define('jf-failed-jobs-drawer', FailedJobsDrawer);
+if (typeof customElements !== 'undefined' && !customElements.get('jf-failed-files-list')) {
+  customElements.define('jf-failed-files-list', FailedFilesList);
 }
