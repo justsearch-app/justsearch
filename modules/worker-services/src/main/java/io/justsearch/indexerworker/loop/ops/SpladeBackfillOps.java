@@ -220,7 +220,6 @@ public final class SpladeBackfillOps {
         boolean cancelled = accounting.cancelled(EnrichmentAccounting.Stage.SPLADE, e);
         if (!cancelled) {
           if (accounting.acquisitionUnavailable(encoder, e)) {
-            processed += publishSparseVectors(batch, batchDocIds, sparseVecs);
             commitIfNeeded(context, processed, failed, markedFailed);
             return StageOutcome.observed(false, processed, t0, accounting);
           }
@@ -287,6 +286,8 @@ public final class SpladeBackfillOps {
           }
           return StageOutcome.observed(true, processed, t0, accounting);
         }
+        // Never enter Lucene with an interrupted reader or publish its partial native result.
+        return StageOutcome.observed(true, processed, t0, accounting);
       }
 
       if (sparseVecs.isEmpty()) {

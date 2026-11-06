@@ -244,6 +244,25 @@ evidence JSON and acceptance records to the independent verifier, as requested.
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentFailureAccountingTest.java"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentMaterializationTest.java"
+      ],
+      "class": "New",
+      "behaviour": "SPLADE parent and chunk batch reads publish no partial results on cancellation, interruption or provider hold. The caller interrupt survives, the Lucene writer remains usable, and the provider hold reaches the scheduler. All four SPLADE/dense parent/chunk lanes check first, middle and last faults, ordinary prefix completion with searchable artifacts, uncharged unselected tails, retirement and stale-row rejection.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "location": "task redesign-e4c request",
+          "quote": "Thread interrupted | Nothing publishes; rows stay PENDING; the interrupt is restored; the writer stays usable (same as commit e0e897e5da)"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/redesign-e4c-materialization-guards.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentMaterializationTest.java"
+      ],
+      "repaired": true
     }
   ]
 }
@@ -374,6 +393,19 @@ env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot node scripts/governance/gates/t
   --before e0e897e5da0ed798038451ed8901fa7323dd1387
 ```
 
+## Repair round 3 verification command
+
+The repair-round-3 starting HEAD is `55d37227187f113f06cb6e55b13b3167da30942a`.
+This class-level selector covers every parameterized case. The verifier may write the evidence;
+the builder runs shared-clone checks directly and writes no evidence JSON.
+
+```bash
+env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot node scripts/governance/gates/test-intent/run-evidence.mjs \
+  --out gates/test-intent/evidence/redesign-e4c-materialization-guards.json \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/EnrichmentMaterializationTest.java \
+  --before 55d37227187f113f06cb6e55b13b3167da30942a
+```
+
 ## Builder check observations
 
 The focused command selects `io.justsearch.indexerworker.loop.ops.*`,
@@ -433,5 +465,48 @@ Checks used the shared Gradle cache and admission slots, checkout-owned build fo
 test-owned resources. No shared dev stack or system-tests integration task was started,
 and the owner's `~/.justsearch` was left alone. Git metadata is outside the writable sandbox,
 so the repair remains uncommitted. No evidence JSON was written.
+
+## Repair round 3 builder observations
+
+The verifier's original real-Lucene probe reproduced eight assertion failures on starting
+HEAD `55d37227187f113f06cb6e55b13b3167da30942a` in `$TMPDIR/before` (44 cases).
+The final proper `EnrichmentMaterializationTest` checks all 72 lane/position/fault combinations.
+On that same HEAD it ran 72 cases, with 12 assertion failures: cancellation, interruption and
+provider hold after a partial SPLADE prefix, in both parent and chunk lanes. The other 60 passed.
+An initial focused run had two incorrect stale-row retry expectations, corrected to require zero
+for rejected stale writes; this was a test-oracle correction, with no production scope change.
+The production repair only prevents the SPLADE catch path from publishing on cancellation or
+provider hold. Dense production code is unchanged.
+
+The same 72 checks ran against `e0e897e5da0ed798038451ed8901fa7323dd1387` in
+`$TMPDIR/known-good`: 54 passed, 18 failed by assertion. Twelve failures were the ordinary/stale
+prefix loss repaired in round 2. The other six were dense lazy-read provider-hold reporting:
+that historical kernel did not propagate the hold from these lazy reads. This is not claimed
+as a known-good hold check; the current dense kernel already propagates it without modification.
+All historical interruption, cancellation and retirement cases passed. Each tree has its own
+build folders; only candidate test source was copied into the shared clones.
+
+The final focused command (all operation tests plus CombinedChunkPublicationTest,
+EnrichmentLaneDecompositionTest, FairEnrichmentSchedulerTest and BackfillSchedulerModeRecordingTest)
+passed all 1,150 cases, with zero failures or skips, in 1m29s. This includes all 72 new combinations.
+The full `:modules:worker-services:test -PskipWebBuild=true --continue` run completed in 6m03s:
+4,327 cases, four failures, 24 skips. The failures were exactly the known
+`LinuxRootMountInfoTest#missingDanglingAndAmbiguousUuidMappingsAreUnknown` and three
+`WatcherUnavailabilityScopeTest` environment failures; skips are not passes.
+
+`env -u DISPLAY -u WAYLAND_DISPLAY node scripts/dev/java-prepush.mjs --unreferenced`
+passed in 6m37s (247 actionable tasks: 18 executed, four from cache, 225 up-to-date), using
+its `js-gradle-slot ./gradlew` invocation. PMD and the unreferenced-code check passed;
+app-services integration was up-to-date, and UI integration completed successfully with its
+configured exclusions. No check was weakened or suppressed.
+The test-intent gate reports only missing guard evidence and independent acceptance. Its
+nonblocking reconsider-rate finding remains 26.1% (12 of 46 audited PRs), above 10%.
+
+No `.agents/preflight` exists. Every Gradle command cleared DISPLAY/WAYLAND_DISPLAY, used the
+shared slot and ran in the background, one command at a time. Checks touched the shared Gradle
+cache and slot, checkout-owned build folders and test-owned temporary resources. No shared dev
+stack or system-tests integration task was started; the owner's `~/.justsearch` was left alone.
+Git metadata is outside the writable sandbox, so all three changed files remain uncommitted.
+No evidence JSON was written, and acceptance remains empty for the independent verifier.
 
 ## Acceptance records
