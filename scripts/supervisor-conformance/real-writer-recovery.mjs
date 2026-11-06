@@ -628,14 +628,16 @@ const engineLogWindow = modelLiveAB ? (() => {
   };
 })() : null;
 const launchArgs = [
-  runner, 'start', '--json', '--skip-build', '--clean', 'none', '--api-port', '0',
+  runner, 'start', '--json', '--skip-build', '--stop-with-stdin', '--clean', 'none', '--api-port', '0',
   '--ui-port', String(port), '--data-dir', data, '--session-id', 'writer-recovery-live',
   '--lease-duration-sec', nativeMixedAfterPointer || queryReconfigureMode ? '900' : '600',
 ];
 let output = '';
 let ownedRunId = null;
 function launchFixture() {
-  const launched = spawn(process.execPath, launchArgs, { cwd: repo, env, stdio: ['ignore', 'pipe', 'pipe'] });
+  // The open stdin pipe ties the stack to this script: it stops however the script ends.
+  const launched = spawn(process.execPath, launchArgs, { cwd: repo, env, stdio: ['pipe', 'pipe', 'pipe'] });
+  launched.stdin.on('error', () => {});
   launched.stdout.on('data', (b) => { output += b; process.stdout.write(b); });
   launched.stderr.on('data', (b) => { output += b; process.stderr.write(b); });
   return launched;
