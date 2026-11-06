@@ -241,9 +241,7 @@ evidence JSON and acceptance records to the independent verifier, as requested.
       ],
       "evidence": "gates/test-intent/evidence/redesign-e4c-materialization.json",
       "newChecks": [
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentFailureAccountingTest.java#spladeSliceFailurePreservesItsSuccessfulPrefixAndDoesNotChargeTheTail",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentFailureAccountingTest.java#spladeMaterializationFailureAtEitherEndPreservesOnlyItsPrefix",
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentFailureAccountingTest.java#denseMaterializationFailurePreservesItsPrefixAndDefersUnreadRows"
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentFailureAccountingTest.java"
       ],
       "repaired": true
     }
@@ -372,9 +370,7 @@ writing evidence JSON. NER is a preservation check, so it stays out of this fail
 ```bash
 env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot node scripts/governance/gates/test-intent/run-evidence.mjs \
   --out gates/test-intent/evidence/redesign-e4c-materialization.json \
-  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentFailureAccountingTest.java#spladeSliceFailurePreservesItsSuccessfulPrefixAndDoesNotChargeTheTail \
-  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentFailureAccountingTest.java#spladeMaterializationFailureAtEitherEndPreservesOnlyItsPrefix \
-  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentFailureAccountingTest.java#denseMaterializationFailurePreservesItsPrefixAndDefersUnreadRows \
+  --check modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/CombinedEnrichmentFailureAccountingTest.java \
   --before e0e897e5da0ed798038451ed8901fa7323dd1387
 ```
 
