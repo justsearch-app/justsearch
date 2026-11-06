@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-06T08:32:51.522Z",
-  "revision": "1b3d30da00bcd55646a89d051e3f910a8f5fe4e2",
-  "tree": "e9eeadeb824abcc7144aeb253a4df355627293a1",
+  "createdAt": "2026-11-06T09:16:02.342Z",
+  "revision": "97d636c16ca300ec7dc94b52a38ff208ec63e720",
+  "tree": "d1dc9690b87e8b15e7d60c7428884180230d778e",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.CombinedChunkPublicationTest\" --tests \"io.justsearch.indexerworker.loop.EnrichmentLaneDecompositionTest\" --tests \"io.justsearch.indexerworker.loop.ops.BlankChunkReadinessIntegrationTest\" --tests \"io.justsearch.indexerworker.loop.ops.BulkEncodeUrgencyTest\" --tests \"io.justsearch.indexerworker.loop.ops.BulkPacePolicyUseTest\" --tests \"io.justsearch.indexerworker.loop.ops.BulkPaceStretchTest\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentBackfillOpsTest\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentCycleBudgetTest\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentFailureAccountingTest\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentLongDocumentTest\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentRmwIntegrationTest\" --tests \"io.justsearch.indexerworker.loop.ops.DisambiguationReconciliationTest\" --tests \"io.justsearch.indexerworker.loop.ops.EmbeddingBackfillOpsTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentAttemptAccountingTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentAuthorityRaceTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentExclusionPublicationTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentHardStopRepairTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentInternalStopTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentMapperDispositionTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentPreservationTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentPublicationBenchmarkTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentQuarantineProgressTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentRevisionRaceTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest\" --tests \"io.justsearch.indexerworker.loop.ops.NerBackfillOpsTest\" --tests \"io.justsearch.indexerworker.loop.ops.NerLazyCreationRetryTest\" --tests \"io.justsearch.indexerworker.loop.ops.SpladeBackfillOpsTest\" --tests \"io.justsearch.indexerworker.loop.ops.SpladeOptInResumeTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.CombinedChunkPublicationTest\" --tests \"io.justsearch.indexerworker.loop.EnrichmentLaneDecompositionTest\" --tests \"io.justsearch.indexerworker.loop.ops.BlankChunkReadinessIntegrationTest\" --tests \"io.justsearch.indexerworker.loop.ops.BulkEncodeUrgencyTest\" --tests \"io.justsearch.indexerworker.loop.ops.BulkPacePolicyUseTest\" --tests \"io.justsearch.indexerworker.loop.ops.BulkPaceStretchTest\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentBackfillOpsTest\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentCycleBudgetTest\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentFailureAccountingTest\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentLongDocumentTest\" --tests \"io.justsearch.indexerworker.loop.ops.CombinedEnrichmentRmwIntegrationTest\" --tests \"io.justsearch.indexerworker.loop.ops.DisambiguationReconciliationTest\" --tests \"io.justsearch.indexerworker.loop.ops.EmbeddingBackfillOpsTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentAttemptAccountingTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentAuthorityRaceTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentExclusionPublicationTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentHardStopRepairTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentInternalStopTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentMapperDispositionTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentPreservationTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentPublicationBenchmarkTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentQuarantineProgressTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentRevisionRaceTest\" --tests \"io.justsearch.indexerworker.loop.ops.EnrichmentUnitBoundaryTest\" --tests \"io.justsearch.indexerworker.loop.ops.NerLazyCreationRetryTest\" --tests \"io.justsearch.indexerworker.loop.ops.SpladeBackfillOpsTest\" --tests \"io.justsearch.indexerworker.loop.ops.SpladeOptInResumeTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 82529
+      "durationMs": 77971
     }
   ],
   "checks": [
@@ -3934,16 +3934,6 @@
       ]
     },
     {
-      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/NerBackfillOpsTest.java",
-      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/NerBackfillOpsTest.java",
-      "runner": "gradle",
-      "contentDigest": "sha256:2ba70304171439e644dd0d9e1c742e07d5ce8d86d35226ddc96fa78874436584",
-      "executed": false,
-      "skipped": false,
-      "outcome": "not-found",
-      "cases": []
-    },
-    {
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/NerLazyCreationRetryTest.java",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/NerLazyCreationRetryTest.java",
       "runner": "gradle",
@@ -4010,5 +4000,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:8f1a09bcbe6b910ec921e986e37cfebb4e037aac1f560c1f618732b67cf0ea7f"
+  "digest": "sha256:349a94276647466f84d9894418999b7d47a72cb71aebf444b3d505e29b7aef61"
 }
