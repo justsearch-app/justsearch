@@ -69,3 +69,13 @@ all pre-existing classifications remain unchanged.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1b296-7b08-7710-8296-b1467b23a7fb",
+  "verdict": "accept",
+  "digest": "sha256:341821d412d487dca895c3bfff0962bf100d14eb0fc9d8a8ad9766a568703d4f"
+}
+```
