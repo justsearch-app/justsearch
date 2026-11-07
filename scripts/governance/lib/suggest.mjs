@@ -10,7 +10,7 @@
  * format → write changeset → re-run."
  */
 
-import { existsSync, writeFileSync, readFileSync } from 'node:fs';
+import { existsSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 

@@ -18,8 +18,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  loadEvents, groupBySession, repoRoot, round,
-  TELEMETRY_DIR,
+  loadEvents, groupBySession, round,
 } from './lib/telemetry-io.mjs';
 import { callsFromClaudeTranscript } from './lib/ledger/claude-adapter.mjs';
 

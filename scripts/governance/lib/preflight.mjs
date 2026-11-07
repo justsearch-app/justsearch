@@ -11,7 +11,6 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { resolve } from 'node:path';
 
 import { isShallowRepository, resolveBaselineRef } from './git-utils.mjs';
 

@@ -2,21 +2,18 @@ import { canonicalSurfaceId } from '../router/surfaceIdentity.js';
 import { readLastViewedConversation } from '../controllers/lastViewedConversation.js';
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Shell — Lit-side chrome root (slice 449 phase 10; frame per shell slice 2).
+ * Shell — production Lit chrome root.
  *
- * Replaces the React `<GlassShell>` + `<App>` skeleton for the
- * substrate-driven dispatch path. Layout zones:
+ * Layout zones:
  *   - top  : <jf-top-bar> (brand, area switcher, status pill, Settings, More menu)
  *   - main : <jf-stage> (window dispatcher; a window's own tab row sits at its top)
  *
  * Reads the SurfaceCatalog at boot; the `placement: 'RAIL'` subset names
  * the areas (Search, Library, AI Brain), System and the plugin windows
- * listed under More. Active-view state is owned here (not Zustand-coupled).
+ * listed under More. Active-view state is owned here.
  *
- * Mount path: `?lit-chrome=1` URL flag — `main.jsx` branches to mount
- * `<jf-shell>` instead of the React `<App>` when present. Production
- * default remains the React app for V1 coexistence; phase 11 (React
- * decommission) flips the default.
+ * Mount path: `main.jsx` imports the shell-v0 barrel during bootstrap
+ * and mounts `<jf-shell>` as the production application chrome after API discovery.
  *
  * Side-effect registers `<jf-shell>`, `<jf-stage>` (and `<jf-top-bar>` via its module).
  */

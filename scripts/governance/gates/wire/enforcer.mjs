@@ -47,7 +47,7 @@ function readFixtureBaselineVersion(fixtureRoot) {
  * ruleDescriptions }.
  */
 export async function enforceWire(options) {
-  const { repoRoot, gate, baselineRef, mode = 'warn', fixtureMode = false, fixtureRoot } = options;
+  const { repoRoot, gate, baselineRef, fixtureMode = false, fixtureRoot } = options;
   const sourceRoot = fixtureMode && fixtureRoot ? fixtureRoot : repoRoot;
 
   const cfg = gate.config ?? {};

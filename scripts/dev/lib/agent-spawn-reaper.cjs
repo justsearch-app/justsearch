@@ -87,7 +87,7 @@ const {
   DEFAULT_MAX_TABLE_AGE_MS,
   readProcessTable,
   normalizeCreationTime,
-  linuxIdentity, signalLinuxProcess,
+  signalLinuxProcess,
   verifyProcessIdentity,
   isVerifiedMatch,
 } = require('./process-identity.cjs');
