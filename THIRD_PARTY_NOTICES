@@ -196,7 +196,7 @@ Licenses of third-party components redistributed with JustSearch.
   org.slf4j:slf4j-api 2.0.17 — MIT License
   org.slf4j:slf4j-nop 2.0.17 — MIT License
   org.snakeyaml:snakeyaml-engine 3.0.1 — Apache License, Version 2.0
-  org.tallison:jmatio 1.5 — BSD Zero Clause License
+  org.tallison:jmatio 1.5 — The 3-Clause BSD License
   org.threeten:threeten-extra 1.8.0 — The 3-Clause BSD License
   org.tukaani:xz 1.10 — 0BSD
   org.xerial:sqlite-jdbc 3.51.2.0 — Apache License, Version 2.0
