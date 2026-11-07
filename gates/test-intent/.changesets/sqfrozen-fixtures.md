@@ -147,3 +147,13 @@ association or permission to publish or score.
   "digest": "sha256:9124d8d9c84235425d1d72bf09622d1b41b2972aeb623dffb33741dcb37920e9"
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "01a1b521-aad4-7bf2-9a68-ac66288dcd29",
+  "verdict": "accept",
+  "digest": "sha256:9124d8d9c84235425d1d72bf09622d1b41b2972aeb623dffb33741dcb37920e9"
+}
+```
