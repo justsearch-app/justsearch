@@ -79,3 +79,14 @@ all pre-existing classifications remain unchanged.
   "digest": "sha256:341821d412d487dca895c3bfff0962bf100d14eb0fc9d8a8ad9766a568703d4f"
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "01a1b393-bd61-7cd3-a34c-fc47d48b37a8",
+  "verdict": "accept",
+  "digest": "sha256:341821d412d487dca895c3bfff0962bf100d14eb0fc9d8a8ad9766a568703d4f",
+  "note": "Independent read-only audit of the four covered test-intent items at 35bd3f6eb2dbe9212377e206e5dd4bb57dfed171 against ac092095f39347750154a56a9c9a2091db939f8b. Whole-oracle target substitutions, New delegated-choice scope, current digest and stored evidence binding verified. No runtime, full-scenario, quality, or frozen-tool acceptance."
+}
+```

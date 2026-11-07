@@ -80,11 +80,12 @@ def source(tmp_path, monkeypatch):
     (root/'salt').write_text('f'*64)
     witness = {'index_population': c.index_population(), 'content': dict(c.content),
                'extracted_content': dict(c.content), 'samples': {'d000': {'chunks': 1}},
-               'generation': 'g-test', 'completeness': [{'stageId': 'embed', 'missing': 0}], 'probes': []}
+               'generation': 'g-test', 'counts': {'embeddingDocCount': 8, 'spladeDocCount': 8, 'chunkDocCount': 0}, 'completeness': [{'stageId': 'embed', 'missing': 0}], 'probes': []}
     ident = {'index_key': key, 'fingerprint': 'fixture'}
     entry = {'schema': index.SCHEMA, 'owner': owner, 'witness': witness,
              'identity': {'key': frozen.digest(ident), 'components': ident},
              'attestation': {'generation_id': 'g-test', 'build_state': 'COMPLETE',
+                             'counts': witness['counts'],
                              'watched_roots': [str(root/'documents')],
                              'canary': {'query': 'test canary', 'required_stages': list(index.CANARY_STAGES)}}}
     index._write(root/'entry.json', entry)
@@ -279,7 +280,15 @@ def retained_pair(source, tmp_path):
     guard.__enter__()
     handle = frozen.open_handle(out, c, cfg, baseline_path, path)
     try:
-        checks = {k: {'ok': True} for k in ('identity', 'binding', 'generation', 'counts', 'canary', 'watched_roots')}
+        entry = json.loads((clone/'entry.json').read_text())
+        checks = {
+            'identity': {'ok': True, 'key': entry['identity']['key']},
+            'binding': {'ok': True, 'data_dir': str(clone/'data')},
+            'generation': {'ok': True, 'activeGenerationId': 'g-test', 'buildingGenerationId': None, 'migrationState': 'IDLE'},
+            'counts': {'ok': True, **entry['attestation']['counts'], 'chunkVectorCoveragePercent': 100.0},
+            'watched_roots': {'ok': True, 'roots': entry['attestation']['watched_roots']},
+            'canary': {'ok': True, 'stages': {stage: 'executed' for stage in index.CANARY_STAGES}, 'totalHits': 1, 'transient': False}}
+
         runtime = {'process': {'pid': 123, 'pgid': 123, 'birth': '100', 'state': 'S'},
                    'cwd': '/retained/observed/'+handle.runtime_identity['distribution'],
                    'command': ['/retained/jdk/bin/java', '/retained/observed/'+handle.runtime_identity['distribution']+'/app.jar'],

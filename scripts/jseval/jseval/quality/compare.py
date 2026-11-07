@@ -81,9 +81,11 @@ def write_baseline(run_path: str | os.PathLike, c: Collection,
     """Score a run and store it as a baseline (its run file digest + per-query metrics)."""
     run_path = Path(run_path)
     text = run_path.read_text(encoding="utf-8")
-    run = RunRecord.read(run_path)
+    run = RunRecord.loads(text, str(run_path))
     if run.header.run_kind == "frozen-index":
         raise BaselineError("frozen-index run cannot be a baseline")
+    if (run_path.parent/'run.frozen-index.json').exists():
+        raise BaselineError('frozen evidence cannot be downgraded to an ordinary baseline')
     problems = validate_run(c, run, {c.version}, "baseline")
     if problems:
         raise BaselineError("; ".join(problems))
@@ -114,9 +116,11 @@ def load_baseline(path: str | os.PathLike) -> tuple[RunRecord, dict]:
         raise BaselineError(f"{p}: {type(e).__name__}: {e}") from None
     if sha256_text(text) != recorded:
         raise BaselineError(f"{p}: its run file {run_path} changed after the baseline was stored")
-    record = RunRecord.read(run_path)
+    record = RunRecord.loads(text, str(run_path))
     if record.header.run_kind != "standard":
         raise BaselineError(f"{p}: {record.header.run_kind} run cannot be a baseline")
+    if (run_path.parent/'run.frozen-index.json').exists():
+        raise BaselineError('frozen evidence cannot be downgraded to an ordinary baseline')
     return record, doc
 
 
