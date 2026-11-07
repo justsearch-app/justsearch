@@ -96,6 +96,7 @@ public final class WritePathOps {
       boolean hardDelete = asBoolean(fields.get(session.hardDeleteField));
       if (hardDelete) {
         w.deleteDocuments(new Term(idField, idValue));
+        session.pendingDocs.incrementAndGet();
         TelemetryEvents te = session.telemetryEvents;
         if (te != null) te.onHardDelete();
         return false;
@@ -108,8 +109,10 @@ public final class WritePathOps {
             new Term(idField, idValue),
             luceneDoc,
             new NumericDocValuesField(session.softDeleteField, 1));
+        session.pendingDocs.incrementAndGet();
       } else {
         w.updateDocument(new Term(idField, idValue), luceneDoc);
+        session.pendingDocs.incrementAndGet();
       }
       return luceneDoc.getField(SchemaFields.VECTOR) != null
           && SchemaFields.EMBEDDING_STATUS_COMPLETED.equals(luceneDoc.get(SchemaFields.EMBEDDING_STATUS));
@@ -141,9 +144,11 @@ public final class WritePathOps {
       if (!hardDeletes.isEmpty()) {
         Term[] terms = hardDeletes.stream().map(id -> new Term(idField, id)).toArray(Term[]::new);
         w.deleteDocuments(terms);
+        session.pendingDocs.incrementAndGet();
       }
       for (DocWork work : updates) {
         w.updateDocument(new Term(idField, work.id()), work.doc());
+        session.pendingDocs.incrementAndGet();
       }
       for (DocWork work : softDeletes) {
         appendSoftDeleteMaintenanceFields(work.doc(), work.fields());
@@ -151,6 +156,7 @@ public final class WritePathOps {
             new Term(idField, work.id()),
             work.doc(),
             new NumericDocValuesField(session.softDeleteField, 1));
+        session.pendingDocs.incrementAndGet();
       }
     } catch (org.apache.lucene.store.AlreadyClosedException closed) {
       LifecycleSnapshot current = session.snapshot;
@@ -216,6 +222,7 @@ public final class WritePathOps {
       IndexWriter w = snap != null ? snap.writer() : null;
       // 1) Delete the parent doc (exact id).
       w.deleteDocuments(new Term(idField, parentDocId));
+      session.pendingDocs.incrementAndGet();
 
       // 2) Delete chunk docs using field-based query (P0.8: no string pattern matching)
       // This works for both legacy and new opaque chunk IDs.
@@ -229,7 +236,6 @@ public final class WritePathOps {
                   BooleanClause.Occur.FILTER)
               .build();
       w.deleteDocuments(chunkQuery);
-
       session.pendingDocs.incrementAndGet();
       TelemetryEvents te = session.telemetryEvents;
       if (te != null) te.onHardDelete();
@@ -267,8 +273,8 @@ public final class WritePathOps {
   }
 
   /**
-   * Deletes all documents (parents and chunks) under the given path prefix. No pendingDocs/queue
-   * accounting — caller may handle this differently.
+   * Deletes all documents (parents and chunks) under the given path prefix. Caller owns queue
+   * accounting.
    */
   void deleteByPathPrefix(String pathPrefix) {
     deleteByPathPrefixExcludingAcceptedSurvivors(pathPrefix, List.of());
@@ -295,6 +301,7 @@ public final class WritePathOps {
 
       }
       w.deleteDocuments(query);
+      session.pendingDocs.incrementAndGet();
       // Tempdoc 809 finding 3: publish the bulk-deletion signal AFTER the delete is submitted, so
       // any reader that observes the new epoch is guaranteed the deletion is already in the writer.
       session.bulkDeleteEpoch.incrementAndGet();
@@ -333,6 +340,7 @@ public final class WritePathOps {
     try (DirectoryReader reader = DirectoryReader.open(w)) {
       int matched = new IndexSearcher(reader).count(query);
       w.deleteDocuments(query);
+      session.pendingDocs.incrementAndGet();
       // Mirrors deleteByPathPrefix (tempdoc 809 finding 3): publish the bulk-deletion signal AFTER
       // the delete is submitted, so a reader observing the new epoch is guaranteed the deletion is
       // already in the writer.
@@ -1427,6 +1435,7 @@ public final class WritePathOps {
         throw new IndexWriterUnavailableException("IndexWriter not available (runtime not started or closed)");
       }
       w.deleteAll();
+      session.pendingDocs.incrementAndGet();
       session.bulkDeleteEpoch.incrementAndGet(); // tempdoc 809 finding 3 — see deleteByPathPrefix
       log.info("deleteAll: all documents deleted from index");
     } catch (IOException e) {
