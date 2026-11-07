@@ -430,9 +430,17 @@ def execute(action: str, refs: tuple[str, ...], *, baseline_dir: Path,
             cpus: str | None = None, sample: int | None = None, seed: int = 0,
             frozen_indexes: Path | None = None) -> tuple[Outcome, str]:
     """Plan -> reserve -> run -> reap -> validate -> publish; no successful partial verdict."""
-    if frozen_indexes is not None and (action != 'check' or refs or full_suite or mode is not None
-            or documents_dir is not None or sets or cpus is not None or sample is not None or seed):
-        raise RunRefused('frozen indexes require the unchanged full default check without overrides')
+    if frozen_indexes is not None:
+        defaults = default_collections()
+        if (action != 'check' or full_suite or mode is not None
+                or documents_dir is not None or sets or cpus is not None or sample is not None or seed
+                or (refs and (len(refs) != len(defaults) or set(refs) != set(defaults)
+                              or refs[-1] != defaults[-1]))):
+            raise RunRefused('frozen indexes require the complete canonical default check without overrides; '
+                             'explicit aliases must occur once each with Enron last')
+        selected = refs or defaults
+    else:
+        selected = refs
     overrides = sensitivity.settings(sets) if action == 'sensitivity' else None
     requested_cpus = sensitivity.cpus(cpus) if action == 'sensitivity' else None
     if overrides is not None:
@@ -455,8 +463,12 @@ def execute(action: str, refs: tuple[str, ...], *, baseline_dir: Path,
     loaded = []
     totals, startups, footprints = [], [], []
     pending = {}
-    for ref in refs or default_collections(full_suite):
-        c, qc = collections.resolve_collection(ref)
+    for ref in selected or default_collections(full_suite):
+        if frozen_indexes is not None:
+            qc = collections.load_config(ref)
+            c = collections.build(qc)
+        else:
+            c, qc = collections.resolve_collection(ref)
         if action == 'check' and not full_suite and c.name == 'miracl-fr':
             raise RunRefused('MIRACL fr belongs to quality full-suite with an explicit window')
         # Refuses a collection without scored queries (K2); pending ones are counted, not run.

@@ -250,7 +250,8 @@ def _execute_quality(ctx, action, **kwargs):
 
 @quality_group.command('check')
 @click.option('--frozen-indexes', type=click.Path(file_okay=False, path_type=Path),
-              help='Use prepared owned copies of the unchanged original baseline indexes.')
+              help='Use prepared owned copies of the unchanged original baseline indexes; '
+                   'optional aliases must name all current defaults once, with Enron last.')
 @_run_options
 @click.pass_context
 @_never_crash

@@ -133,6 +133,12 @@ python -m jseval quality prepare-frozen --baseline-dir ORIGINAL_BASELINES --cach
 python -m jseval quality check --frozen-indexes OWN_COPIES --baseline-dir ORIGINAL_BASELINES --runs-dir OWN_RUNS --models-dir MODELS --window-seconds 600
 ```
 
+Optional positional aliases may explicitly order the complete current default set,
+each exactly once, with Enron last (for example, `real-use scifact miracl-de enron-email`
+when real-use is fully labelled). Frozen selections always use packaged canonical
+recipes and comparison settings. The same measured estimate and single window
+deadline apply; choosing an order does not establish that it fits.
+
 This mode requires Linux x86_64 and stopped original indexes. Read-only OFD locks
 protect their existing Engine lock files; original document paths remain in use.
 Missing ownership, source drift, runtime input mismatch, payload changes or budget
