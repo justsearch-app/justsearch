@@ -7,6 +7,7 @@ Only the caller publishes a verdict, after admission has reaped every child.
 from __future__ import annotations
 
 import argparse
+from contextlib import nullcontext
 import importlib.util
 from dataclasses import asdict, replace
 from datetime import datetime, timezone
@@ -25,7 +26,7 @@ import psutil
 
 from .. import backend
 from .._paths import REPO_ROOT
-from . import collections, compare, distribution, index, inputs, known_answers, report, scoring, sensitivity
+from . import collections, compare, distribution, index, inputs, known_answers, report, scoring, sensitivity, frozen_index
 from .types import (Outcome, QueryResult, RunHeader, RunRecord, Served,
                     atomic_write_text, canonical_json, sha256_text)
 
@@ -156,7 +157,7 @@ def _history(c, request: dict, models: dict, runs: Path):
             r = RunRecord.read(path)
             h = r.header
             if (h.collection_version != c.version or h.request_config != request
-                    or h.run_kind == 'sensitivity'
+                    or h.run_kind != 'standard'
                     or h.model_hashes != models or h.ended is None
                     or compare.validate_run(c, r, {c.version}, 'history')):
                 continue
@@ -293,8 +294,10 @@ def _collection_worker(plan: dict, item: dict, deadline: float) -> None:
             sensitivity.require_cpu_threads(arm['settings'], arm['requested_cpus'])
             sensitivity.pin_cpus(arm['requested_cpus'])
             arm = {**arm, 'cpu_affinity_checks': cpu_checks}
-        handle = index.prepare_index(c, cfg, prepared_only=True,
-            **({'sensitivity': arm['settings']} if arm is not None else {}))
+        frozen = item.get('frozen_indexes')
+        handle = (frozen_index.open_handle(Path(frozen), c, cfg, Path(item['baseline']), path)
+                  if frozen else index.prepare_index(c, cfg, prepared_only=True,
+                    **({'sensitivity': arm['settings']} if arm is not None else {})))
         handle.wait(prepared_only=True, deadline=deadline)
         header = RunHeader(
             collection=c.name, collection_version=c.version, index_key=handle.index_key,
@@ -308,7 +311,9 @@ def _collection_worker(plan: dict, item: dict, deadline: float) -> None:
             index_state={**handle.index_state, 'runtime': inputs.recorded(handle.components['runtime'])},
             identity=handle.identity, hardware=plan['hardware'],
             budget={'window_seconds': plan['budget']},
-            run_kind='sensitivity' if arm is not None else 'standard', sensitivity=arm or {})
+            run_kind='frozen-index' if frozen else 'sensitivity' if arm is not None else 'standard', sensitivity=arm or {},
+            **({'runtime_identity': handle.runtime_identity,
+                'frozen_index': {'baseline_run_sha256': handle.item['baseline_run_sha256']}} if frozen else {}))
         # started includes this collection's backend start and confirmation for estimation.
         header = replace(header, started=datetime.fromtimestamp(
             time.time() - (time.monotonic()-start), timezone.utc).isoformat())
@@ -340,7 +345,7 @@ def _collection_worker(plan: dict, item: dict, deadline: float) -> None:
                 if gpu_enabled and len(results) in (1, len(c.queries)):
                     _, measured = gpu_memory(os.getpid())
                     gpu_peak = max(gpu_peak or 0, measured or 0) or None
-        confirmed = index.confirm(handle)
+        confirmed = frozen_index.confirm(handle) if frozen else index.confirm(handle)
         if not confirmed.ok:
             raise RunRefused('not ready: index changed during scoring: ' + '; '.join(confirmed.failures))
         if arm is not None:
@@ -361,7 +366,16 @@ def _collection_worker(plan: dict, item: dict, deadline: float) -> None:
                 failure = f'cleanup failed: {e}'
         # A completion marker is written only after backend teardown succeeded.
         if header and failure is None:
-            RunRecord(replace(header, ended=utc()), tuple(results)).write(path)
+            completed = replace(header, ended=utc(), **({'frozen_index': {
+                **header.frozen_index, 'evidence_sha256': '0'*64}} if frozen else {}))
+            if frozen:
+                try:
+                    evidence = handle.finalize(RunRecord(completed, tuple(results)))
+                    completed = replace(completed, frozen_index=evidence)
+                except BaseException as e:
+                    failure = f'frozen evidence finalization failed: {type(e).__name__}: {e}'
+            if failure is None:
+                RunRecord(completed, tuple(results)).write(path)
         elif header and arm is not None:
             RunRecord(header, tuple(results)).write(path)
         ended = time.monotonic()
@@ -413,8 +427,12 @@ def execute(action: str, refs: tuple[str, ...], *, baseline_dir: Path,
             models_dir: Path | None = None, documents_dir: Path | None = None,
             cache_root: Path = index.CACHE_ROOT, repo_root: Path = REPO_ROOT,
             full_suite: bool = False, sets: tuple[str, ...] = (),
-            cpus: str | None = None, sample: int | None = None, seed: int = 0) -> tuple[Outcome, str]:
+            cpus: str | None = None, sample: int | None = None, seed: int = 0,
+            frozen_indexes: Path | None = None) -> tuple[Outcome, str]:
     """Plan -> reserve -> run -> reap -> validate -> publish; no successful partial verdict."""
+    if frozen_indexes is not None and (action != 'check' or refs or full_suite or mode is not None
+            or documents_dir is not None or sets or cpus is not None or sample is not None or seed):
+        raise RunRefused('frozen indexes require the unchanged full default check without overrides')
     overrides = sensitivity.settings(sets) if action == 'sensitivity' else None
     requested_cpus = sensitivity.cpus(cpus) if action == 'sensitivity' else None
     if overrides is not None:
@@ -453,10 +471,18 @@ def execute(action: str, refs: tuple[str, ...], *, baseline_dir: Path,
             # Revalidate core pins first, then the explicit scoring-only overlay.
             sensitivity.launch_environment(cfg.environment(), overrides)
             arms[c.name] = sensitivity.declaration(c, overrides, requested_cpus, sample, seed)
-        with index.prepare_index(c, cfg, prepared_only=True,
-                **({'sensitivity': overrides} if overrides is not None else {})) as handle:
-            models = dict(handle.model_hashes)
         baseline = baseline_dir / (sha256_text(c.name) + '.baseline.json')
+        frozen_allowance = 0
+        if frozen_indexes is not None:
+            checking = time.monotonic()
+            models = frozen_index.inspect(frozen_indexes, c, cfg, baseline)
+            # Reacquisition/source/payload preflight and postflight occur inside the
+            # same scoring deadline. Include their measured full-input cost.
+            frozen_allowance = max(5, 3*(time.monotonic()-checking))
+        else:
+            with index.prepare_index(c, cfg, prepared_only=True,
+                    **({'sensitivity': overrides} if overrides is not None else {})) as handle:
+                models = dict(handle.model_hashes)
         if action == 'check':
             compare.load_baseline(baseline)  # refuse an absent/corrupt baseline before scoring
         if overrides is not None:
@@ -465,7 +491,7 @@ def execute(action: str, refs: tuple[str, ...], *, baseline_dir: Path,
         else:
             total, startup = (estimate_seconds(c, request, models, runs_dir),
                               estimate_startup_seconds(c, request, models, runs_dir))
-        totals.append(total)
+        totals.append(total + frozen_allowance)
         startups.append(startup)
         for _, _, done in _history(c, request, models, runs_dir):
             footprint = done.get('gpu_engine_mib')
@@ -479,6 +505,9 @@ def execute(action: str, refs: tuple[str, ...], *, baseline_dir: Path,
     overlap = overrides is None and bool(footprint and can_overlap(gpu_enabled, None, footprint))
     estimate = estimate_window(totals, startups, overlap)
     require_budget(estimate, window_seconds, full_suite=full_suite)
+    if frozen_indexes is not None:
+        frozen_index.check_run_destination(frozen_indexes, runs_dir,
+            [(c, cfg, baseline) for c, qc, cfg, baseline, models in loaded])
     out = runs_dir.resolve() / (datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S') + '-' + uuid.uuid4().hex[:8])
     out.mkdir(parents=True)
     plan = {'path': str(out/'plan.json'), 'repo_root': str(repo_root), 'action': action, 'budget': window_seconds,
@@ -494,6 +523,8 @@ def execute(action: str, refs: tuple[str, ...], *, baseline_dir: Path,
         collections.write_collection(c, folder/'collection')
         plan['items'].append({'number': n, 'name': c.name, 'collection': str(folder/'collection'),
                               'index_config': _serial_config(cfg), 'run': str(folder/'run.jsonl'),
+                              **({'frozen_indexes': str(frozen_indexes.resolve()), 'baseline': str(baseline.resolve())}
+                                 if frozen_indexes is not None else {}),
                               'ready': str(folder/'ready'), 'go': str(folder/'go'), 'done': str(folder/'done.json'),
                               **({'sensitivity': arms[c.name],
                                   'sensitivity_expected': expected_profiles[c.name]}
@@ -503,15 +534,19 @@ def execute(action: str, refs: tuple[str, ...], *, baseline_dir: Path,
                '--purpose', 'search quality ' + action, '--gate-timeout', '1200',
                '--drain-timeout', '600', '--timeout', str(window_seconds), '--',
                sys.executable, '-m', 'jseval.quality.run', 'window', plan['path']]
-    # Capture logs to disk: stdout has exactly one outcome, only AFTER safe cleanup.
-    with (out/'window.log').open('w') as log:
-        proc = subprocess.Popen(backend.bind_command(repo_root, command), stdout=log, stderr=subprocess.STDOUT)
-        try:
-            code = proc.wait()
-        except BaseException:
-            proc.terminate()
-            proc.wait()  # admission waits for its guardian to reap the whole command tree
-            raise
+    resources = (frozen_index.run_resources(frozen_indexes, [(c, cfg, baseline) for c, qc, cfg, baseline, models in loaded])
+                 if frozen_indexes is not None else nullcontext(()))
+    with resources as retained_fds:
+        # Capture logs to disk: stdout has exactly one outcome, only AFTER safe cleanup.
+        with (out/'window.log').open('w') as log:
+            proc = subprocess.Popen(backend.bind_command(repo_root, command), stdout=log, stderr=subprocess.STDOUT,
+                    **({'pass_fds': retained_fds} if frozen_indexes is not None else {}))
+            try:
+                code = proc.wait()
+            except BaseException:
+                proc.terminate()
+                proc.wait()  # admission waits for its guardian to reap the whole command tree
+                raise
     problems = []
     if code != 0:
         problems.append(f'exclusive window exited {code}: {(out/"window.log").read_text()[-2000:]}')
@@ -520,13 +555,19 @@ def execute(action: str, refs: tuple[str, ...], *, baseline_dir: Path,
     comparisons, times, records, refusals, measurements = [], {}, [], {}, {}
     for item, (c, qc, cfg, baseline, models) in zip(plan['items'], loaded):
         record, errors = compare.load_run_or_reason(item['run'], c.name)
+        frozen_context = None
+        if frozen_indexes is not None and record is not None:
+            try:
+                _, _, record, frozen_context = frozen_index.validated_pair(Path(item['run']), baseline)
+            except (ValueError, OSError, KeyError, TypeError) as e:
+                errors.append(f'{c.name}: frozen pair validation failed: {e}')
         # The reservation/startup failure explains missing output. Lead with it
         # so the command names the holders/deadline instead of an absent file.
         errors = problems + errors
         if record:
             refusals[c.name] = [r.qid for r in record.results if compare.syntax_refused(r)]
             errors += compare.validate_run(c, record, {c.version}, c.name,
-                                           sensitivity=overrides is not None)
+                                           sensitivity=overrides is not None, frozen_context=frozen_context)
             if overrides is not None and (record.header.run_kind != 'sensitivity' or any(
                     record.header.sensitivity.get(k) != v for k, v in arms[c.name].items())):
                 errors.append(f'{c.name}: sensitivity declaration differs from the planned arm')
@@ -536,6 +577,8 @@ def execute(action: str, refs: tuple[str, ...], *, baseline_dir: Path,
             if dict(record.header.model_hashes) != models or index.model_hashes(
                     Path(pinned['JUSTSEARCH_MODELS_DIR']), llm_off=inputs.llm_off(pinned)) != models:
                 errors.append(f'{c.name}: result is from another model set')
+            if frozen_indexes is not None and record.header.run_kind != 'frozen-index':
+                errors.append(f'{c.name}: frozen plan produced an ordinary record')
             if record.header.commit != commit or record.header.request_config != request:
                 errors.append(f'{c.name}: result is from another candidate or request')
         if Path(item['done']).exists():
@@ -548,8 +591,8 @@ def execute(action: str, refs: tuple[str, ...], *, baseline_dir: Path,
         if action == 'check':
             b, metrics = compare.load_baseline(baseline)
             result = compare.compare(c, qc, b, record, baseline_metrics=metrics,
-                                     intended=('commit', 'index_key'), expect_commit=commit,
-                                     expect_models=models, invalid=errors)
+                                     intended=('commit',) if frozen_indexes is not None else ('commit', 'index_key'), expect_commit=commit,
+                                     expect_models=models, invalid=errors, frozen_context=frozen_context)
             comparisons.append(result)
             atomic_write_text(Path(item['run']).with_suffix('.md'), report.render(result))
         elif errors:

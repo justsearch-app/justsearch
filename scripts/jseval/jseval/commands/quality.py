@@ -13,6 +13,7 @@ import functools
 import json
 import subprocess
 from pathlib import Path
+import os
 
 import click
 
@@ -110,15 +111,24 @@ def cmd_known_answers(ctx, collection: str) -> None:
 @click.argument("run", type=click.Path(dir_okay=False, path_type=Path))
 @click.option("--store-baseline", type=click.Path(dir_okay=False, path_type=Path),
               help="Also store this run as a baseline (run digest + per-query metrics).")
+@click.option('--baseline', 'baseline_path', type=click.Path(dir_okay=False, path_type=Path),
+              help='Original baseline pointer, required to validate frozen-index evidence.')
 @click.pass_context
 @_never_crash
-def cmd_score(ctx, collection: str, run: Path, store_baseline: Path | None) -> None:
+def cmd_score(ctx, collection: str, run: Path, store_baseline: Path | None, baseline_path: Path | None) -> None:
     """Score a stored RUN against COLLECTION after validating it completely."""
     c, _cfg, _ka = _checked_collection(ctx, collection)
     record, problems = qcmp.load_run_or_reason(run, "run")
+    frozen_context = None
+    if record is not None and record.header.run_kind == 'frozen-index':
+        if store_baseline or baseline_path is None:
+            _invalid(ctx, 'frozen-index scoring requires --baseline and cannot store a baseline')
+        from ..quality.frozen_index import validated_pair
+        _, _, record, frozen_context = validated_pair(run, baseline_path)
     if record is not None:
         problems = qcmp.validate_run(c, record, {c.version}, "run",
-                                     sensitivity=record.header.run_kind == "sensitivity" and not store_baseline)
+                                     sensitivity=record.header.run_kind == "sensitivity" and not store_baseline,
+                                     frozen_context=frozen_context)
     if problems:
         _invalid(ctx, f"{c.name}: " + "; ".join(problems))
     try:
@@ -172,13 +182,20 @@ def cmd_compare(ctx, collection: str, baseline_path: Path, candidate_path: Path,
         invalid.append(str(e))
     candidate, problems = qcmp.load_run_or_reason(candidate_path, "candidate")
     invalid += problems
+    frozen_context = None
+    if candidate is not None and candidate.header.run_kind == 'frozen-index':
+        from ..quality.frozen_index import validated_pair
+        try:
+            baseline, metrics, candidate, frozen_context = validated_pair(candidate_path, baseline_path)
+        except (ValueError, OSError, KeyError, TypeError) as e:
+            invalid.append(f'frozen pair refused: {e}')
     if expect_commit == "HEAD":
         expect_commit = _head_commit()
         if expect_commit is None:
             invalid.append("cannot determine the candidate commit (git rev-parse HEAD failed)")
     result = qcmp.compare(c, cfg, baseline, candidate, baseline_metrics=metrics,
                           intended=[s.strip() for s in intended.split(",") if s.strip()],
-                          expect_commit=expect_commit, invalid=invalid)
+                          expect_commit=expect_commit, invalid=invalid, frozen_context=frozen_context)
     if report_path:
         try:
             atomic_write_text(report_path, report.render(result))
@@ -232,6 +249,8 @@ def _execute_quality(ctx, action, **kwargs):
 
 
 @quality_group.command('check')
+@click.option('--frozen-indexes', type=click.Path(file_okay=False, path_type=Path),
+              help='Use prepared owned copies of the unchanged original baseline indexes.')
 @_run_options
 @click.pass_context
 @_never_crash
@@ -332,3 +351,20 @@ def cmd_prepare(ctx, collection, documents_dir, models_dir, cache_root):
         click.echo('INVALID ' + ' '.join(str(error).split()))
         ctx.exit(Outcome.INVALID.exit_code)
     click.echo(f'PASS {c.name} prepared index ready')
+
+
+@quality_group.command('prepare-frozen')
+@click.option('--baseline-dir', required=True, type=click.Path(file_okay=False, path_type=Path))
+@click.option('--cache-root', required=True, type=click.Path(file_okay=False, path_type=Path))
+@click.option('--output', required=True, type=click.Path(file_okay=False, path_type=Path))
+@click.option('--models-dir', type=click.Path(file_okay=False, path_type=Path))
+@click.pass_context
+@_never_crash
+def cmd_prepare_frozen(ctx, baseline_dir, cache_root, output, models_dir):
+    """Prepare the current snapshot and baseline-bound copies without starting Engine."""
+    from .. import backend
+    from ..quality import frozen_index, index
+    cfg = index.IndexConfig(models_dir=models_dir, cache_root=cache_root)
+    with backend._machine_admission(dict(os.environ)):
+        prepared = frozen_index.prepare(baseline_dir, cache_root, output, cfg)
+    click.echo(f'PASS frozen copies prepared: {prepared}')

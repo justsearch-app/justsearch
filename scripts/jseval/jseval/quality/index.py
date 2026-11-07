@@ -164,6 +164,13 @@ def compute_index_key(collection: Collection, config: IndexConfig,
     Unrelated source edits (docs, web UI, CI, scoring code) leave the snapshot digest and
     so the key unchanged. Any input that cannot be resolved, hashed or validated refuses.
     """
+    components = effective_components(collection, config, env)
+    return sha256_text(canonical_json(components)), components
+
+
+def effective_components(collection: Collection, config: IndexConfig,
+                         env: Mapping[str, str] | None = None) -> dict:
+    """Resolve the effective inputs without assigning authority to an existing index."""
     env = dict(env) if env is not None else config.environment()
     try:
         inputs.jvm_options(env)
@@ -196,7 +203,7 @@ def compute_index_key(collection: Collection, config: IndexConfig,
         raise InputUnavailable(f"not ready: {e}") from None
     finally:
         distribution.flush_digests()
-    return sha256_text(canonical_json(components)), components
+    return components
 
 
 def identity_digests(components: Mapping[str, Any]) -> dict[str, str]:

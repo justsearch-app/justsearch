@@ -81,7 +81,9 @@ def write_baseline(run_path: str | os.PathLike, c: Collection,
     """Score a run and store it as a baseline (its run file digest + per-query metrics)."""
     run_path = Path(run_path)
     text = run_path.read_text(encoding="utf-8")
-    run = RunRecord.loads(text, str(run_path))
+    run = RunRecord.read(run_path)
+    if run.header.run_kind == "frozen-index":
+        raise BaselineError("frozen-index run cannot be a baseline")
     problems = validate_run(c, run, {c.version}, "baseline")
     if problems:
         raise BaselineError("; ".join(problems))
@@ -112,9 +114,9 @@ def load_baseline(path: str | os.PathLike) -> tuple[RunRecord, dict]:
         raise BaselineError(f"{p}: {type(e).__name__}: {e}") from None
     if sha256_text(text) != recorded:
         raise BaselineError(f"{p}: its run file {run_path} changed after the baseline was stored")
-    record = RunRecord.loads(text, str(run_path))
-    if record.header.run_kind == "sensitivity":
-        raise BaselineError(f"{p}: sensitivity run cannot be a baseline")
+    record = RunRecord.read(run_path)
+    if record.header.run_kind != "standard":
+        raise BaselineError(f"{p}: {record.header.run_kind} run cannot be a baseline")
     return record, doc
 
 
@@ -148,10 +150,14 @@ def syntax_refused(result: QueryResult) -> bool:
 
 
 def validate_run(c: Collection, run: RunRecord, label_versions: set[str], arm: str,
-                 *, sensitivity: bool = False) -> list[str]:
+                 *, sensitivity: bool = False, frozen_context=None) -> list[str]:
     """Every reason this run is not a complete, valid result for collection ``c``."""
     h = run.header
     out = []
+    if h.run_kind == "frozen-index":
+        from .frozen_index import context_matches
+        if not context_matches(frozen_context, run):
+            out.append(f"{arm}: frozen-index requires a validated file pair context")
     if h.run_kind == "sensitivity" and not sensitivity:
         out.append(f"{arm}: sensitivity run cannot be baseline or comparison evidence")
     if h.collection != c.name:
@@ -378,9 +384,19 @@ def compare(c: Collection, cfg: QualityConfig, baseline: RunRecord | None,
             intended: Iterable[str] = ("commit",),
             expect_commit: str | None = None,
             expect_models: Mapping[str, str] | None = None,
-            invalid: Iterable[str] = ()) -> Comparison:
+            invalid: Iterable[str] = (), frozen_context=None) -> Comparison:
     intended = tuple(intended)
     reasons = list(invalid)
+    if frozen_context is not None and (candidate is None or candidate.header.run_kind != 'frozen-index'):
+        reasons.append('validated frozen pair cannot be downgraded to ordinary evidence')
+    if candidate is not None and candidate.header.run_kind == "frozen-index":
+        from .frozen_index import context_matches
+        if baseline is None or not context_matches(frozen_context, candidate, baseline):
+            reasons.append("frozen-index comparison requires the validated actual file pair")
+        if intended != ("commit",):
+            reasons.append("frozen-index comparison permits only intended=commit")
+    if baseline is not None and baseline.header.run_kind == "frozen-index":
+        reasons.append("frozen-index run cannot be a baseline")
     if baseline is None:
         reasons.append("absent baseline")
     if candidate is None:
@@ -393,7 +409,7 @@ def compare(c: Collection, cfg: QualityConfig, baseline: RunRecord | None,
     if baseline is not None:
         reasons += validate_run(c, baseline, versions, "baseline")
     if candidate is not None:
-        reasons += validate_run(c, candidate, versions, "candidate")
+        reasons += validate_run(c, candidate, versions, "candidate", frozen_context=frozen_context)
         h = candidate.header
         if expect_commit is not None and h.commit != expect_commit:
             reasons.append(f"candidate: result is from commit {h.commit[:12]}, not the candidate "
