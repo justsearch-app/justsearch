@@ -214,7 +214,10 @@ final class QueueDbHealthRecoveryTest {
         fault.restore();
         assertTrue(queue.performIntegrityCheck());
         assertFalse(queue.queueDbHealthSnapshot().healthy(), "integrity cannot certify a read");
-        assertNotNull(read(queue, operation));
+        Object observed = read(queue, operation);
+        assertNotNull(observed);
+        if (operation.equals("readiness")) assertEquals(true, observed, "the fixture has an immediately ready job");
+        if (operation.equals("unowned")) assertEquals(0L, observed, "ordinary pending rows are not legacy terminal failures");
         assertTrue(queue.queueDbHealthSnapshot().healthy(), "complete matching read recovers");
         assertEquals(errorAt, queue.queueDbHealthSnapshot().lastDbErrorAtMs());
       }

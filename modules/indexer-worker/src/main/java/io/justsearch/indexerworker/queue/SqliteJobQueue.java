@@ -4925,8 +4925,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           """)) {
         query.setLong(1,System.currentTimeMillis());
         try (var row = query.executeQuery()) { {
-        var dbResult = dbRecoveryEligible && row.getBoolean(1);
         dbRecoveryEligible = row.next();
+        var dbResult = dbRecoveryEligible && row.getBoolean(1);
         return dbResult;
       } }
       }
@@ -6976,8 +6976,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM jobs WHERE ingestion_root IS NULL "
               + "AND state IN ('FAILED','RETRY_EXHAUSTED') AND unit_revision LIKE 'release030/%'")) {
         {
-        var dbResult = dbRecoveryEligible ? rs.getLong(1) : 0L;
         dbRecoveryEligible = rs.next();
+        var dbResult = dbRecoveryEligible ? rs.getLong(1) : 0L;
         return dbResult;
       }
       }
