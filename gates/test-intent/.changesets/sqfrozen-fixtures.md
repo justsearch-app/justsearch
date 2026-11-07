@@ -137,3 +137,13 @@ association or permission to publish or score.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1b552-fc68-7762-b28c-f38b30172462",
+  "verdict": "accept",
+  "digest": "sha256:9124d8d9c84235425d1d72bf09622d1b41b2972aeb623dffb33741dcb37920e9"
+}
+```
