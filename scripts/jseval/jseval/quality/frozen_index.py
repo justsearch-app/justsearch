@@ -37,7 +37,7 @@ READY = 'frozen-indexes.json'
 SIDECAR = 'run.frozen-index.json'
 EVIDENCE = 'frozen-evidence'
 METADATA = ('entry.json', 'materialized.json', 'manifest.tsv', 'salt')
-RETAINED = (*METADATA, 'quality-owner.json', 'baseline.json', 'baseline-run.jsonl', 'copy.json')
+RETAINED = (*METADATA, 'quality-owner.json', 'baseline.json', 'baseline-run.txt', 'copy.json')
 CHECKS = ('before', 'after', 'post_stop')
 IDENTITY_FIELDS = {'distribution', 'harness', 'jdk', 'jvm_options', 'library_path',
                    'gpu', 'ocr', 'models', 'runtime', 'documents'}
@@ -425,8 +425,8 @@ def prepare(baseline_dir: Path, cache_root: Path, output: Path, cfg: index.Index
                 _copy_file(root/'data/quality-owner.json', target/'quality-owner.json')
                 _copy_file(baseline, target/'baseline.json')
                 raw_run = baseline.parent/metadata['run_file']
-                _copy_file(raw_run, target/'baseline-run.jsonl')
-                require(hashlib.sha256(read_bytes(target/'baseline-run.jsonl')).hexdigest() == metadata['run_sha256'],
+                _copy_file(raw_run, target/'baseline-run.txt')
+                require(hashlib.sha256(read_bytes(target/'baseline-run.txt')).hexdigest() == metadata['run_sha256'],
                         'baseline raced during frozen preparation')
                 original_payload = payload(root/'data', entry['witness']['generation'])
                 require(payload(target/'data', entry['witness']['generation']) == original_payload,
@@ -468,7 +468,7 @@ def _ready(output: Path, c, cfg, baseline):
     require(item['collection'] == c.name and item['collection_version'] == c.version
             and item['index_key'] == b.header.index_key and item['baseline_run_sha256'] == meta['run_sha256']
             and item['baseline_sha256'] == hashlib.sha256(read_bytes(baseline)).hexdigest(), 'frozen floor changed')
-    require(read_bytes(root/'baseline-run.jsonl') == read_bytes(baseline.parent/meta['run_file'])
+    require(read_bytes(root/'baseline-run.txt') == read_bytes(baseline.parent/meta['run_file'])
             and read_bytes(root/'baseline.json') == read_bytes(baseline), 'frozen baseline copy differs')
     origin = checked_path(Path(item['original_root']))
     require(item['documents_dir'] == str(origin/'documents'), 'frozen document-root changed')
@@ -766,7 +766,7 @@ def validate_record_evidence(path: Path, record: RunRecord):
     runtime_inputs = read_json(folder/'runtime-inputs.json')
     require(index.identity_digests(runtime_inputs) == h.runtime_identity,
             'runtime input receipt does not match runtime identity')
-    braw = read_bytes(folder/'baseline-run.jsonl')
+    braw = read_bytes(folder/'baseline-run.txt')
     b = RunRecord.loads(braw.decode(), 'frozen original baseline')
     require(b.header.run_kind == 'standard' and hashlib.sha256(braw).hexdigest() == h.frozen_index['baseline_run_sha256'],
             'wrong original baseline bytes')
@@ -869,7 +869,7 @@ def validated_pair(candidate_path: Path, baseline_path: Path):
     baseline, metadata = compare.load_baseline(checked_path(baseline_path))
     raw_baseline = read_bytes(baseline_path.parent/metadata['run_file'])
     pointer = read_bytes(baseline_path)
-    require(raw_baseline == read_bytes(candidate_path.parent/EVIDENCE/'baseline-run.jsonl')
+    require(raw_baseline == read_bytes(candidate_path.parent/EVIDENCE/'baseline-run.txt')
             and pointer == read_bytes(candidate_path.parent/EVIDENCE/'baseline.json'), 'supplied original baseline differs from frozen evidence')
     context = object.__new__(FrozenPair)
     for key, value in {'_seal': _PAIR_SEAL, 'candidate_sha256': hashlib.sha256(candidate_raw).hexdigest(),

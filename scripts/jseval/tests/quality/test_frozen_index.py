@@ -16,7 +16,7 @@ import pytest
 from jseval import backend
 from jseval.cli import main
 from jseval.quality import compare, distribution, frozen_index as frozen, index, run
-from jseval.quality.types import RunRecord, RunRecordError, canonical_manifest_text, canonical_json, document_text, sha256_text
+from jseval.quality.types import RunRecord, RunRecordError, canonical_manifest_text, canonical_json, document_text, sha256_text, UnknownDocument
 from .conftest import pinned_env, ready_distribution
 from .helpers import make_collection, make_run, config_for
 
@@ -384,6 +384,18 @@ def test_frozen_runs_cannot_be_replacement_baselines_or_normal_history(retained_
     doc['run_sha256'] = hashlib.sha256(cp.read_bytes()).hexdigest(); index._write(pointer, doc)
     with pytest.raises(compare.BaselineError, match='cannot be a baseline'):
         compare.load_baseline(pointer)
+    # Raw historical evidence has an archival role, never a produced-run suffix.
+    # Keep exact original bytes and the original pointer's run_file observation.
+    archive = cp.parent/frozen.EVIDENCE/'baseline-run.txt'
+    original_pointer = json.loads(bp.read_text())
+    original_raw = (bp.parent/original_pointer['run_file']).read_bytes()
+    assert archive.read_bytes() == original_raw
+    assert hashlib.sha256(archive.read_bytes()).hexdigest() == original_pointer['run_sha256']
+    assert json.loads((archive.parent/'baseline.json').read_text()) == original_pointer
+    assert not list(archive.parent.glob('*.jsonl'))
+    ready_archive = tmp_path/'copies'/sha256_text(c.name)/'baseline-run.txt'
+    assert ready_archive.read_bytes() == original_raw
+    assert not list(ready_archive.parent.glob('*.jsonl'))
     assert run._history(c, dict(n.header.request_config), dict(n.header.model_hashes), cp.parent.parent) == []
     assert not compare.validate_run(c, b, {c.version}, 'baseline')
 
@@ -394,7 +406,7 @@ def test_nested_unicode_spaces_file_uris_and_same_basename_use_original_manifest
     assert m.doc_id_for_location((root/'documents'/c.documents['d000']).as_uri(), root/'documents') == 'd000'
     assert m.doc_id_for_location(str(root/'documents'/c.documents['d001']), root/'documents') == 'd001'
     for location in ('same name.txt', str(tmp_path/'foreign/same name.txt')):
-        with pytest.raises(ValueError): m.doc_id_for_location(location, root/'documents')
+        with pytest.raises(UnknownDocument): m.doc_id_for_location(location, root/'documents')
 
 
 @pytest.mark.parametrize('ending', ['success', 'error', 'deadline', 'caller-death', 'worker-death'])
