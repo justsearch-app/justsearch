@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from contextlib import ExitStack, contextmanager
 import ctypes
+import base64
+import binascii
 from datetime import datetime
 import math
 from dataclasses import dataclass, field, replace
@@ -60,8 +62,20 @@ def digest(value):
     return sha256_text(canonical_json(value))
 
 
+def strict_json(raw):
+    def pairs(items):
+        result = {}
+        for key, value in items:
+            require(key not in result, 'duplicate frozen JSON key: '+key)
+            result[key] = value
+        return result
+    def constant(value):
+        raise FrozenRefused('invalid frozen JSON constant: '+value)
+    return json.loads(raw, object_pairs_hook=pairs, parse_constant=constant)
+
+
 def read_json(path):
-    return json.loads(read_bytes(path))
+    return strict_json(read_bytes(path))
 
 
 def checked_path(path: Path, *, missing=False) -> Path:
@@ -229,26 +243,29 @@ def run_resources(output, selections):
                         'runtime input pins changed during admitted window')
 
 
-def predecessor_ownership(data):
-    """Observe all copied authority consumed by the unchanged Linux eval boot.
+def ownership_source(relative):
+    return relative == 'runtime/manifest.json' or bool(re.fullmatch(
+        r'runtime/exit-ledger/(children|engine)\.v1(?:\.(?:[0-9]+|lost))?\.jsonl', relative))
 
-    RuntimeManifestPublisher and LedgerReconciler seed predecessor children from
-    manifest.json and every retained children ledger generation. Refuse uncertainty
-    instead of reproducing the runtime's tolerant/repairing reader here. eval-runner
-    uses a new UUID job record and never loads a copied runner record; its shutdown
-    request is scoped to the fresh incarnation, not predecessor stop authority.
+
+def ownership_receipts(raw_inputs):
+    """Pure, deterministic replay of exactly the finite authority inputs consumed.
+
+    No filesystem/process reads, historical path lookup, signalling or lifecycle
+    replay. Intentional repeated receipts remain repeated in source/line order.
     """
-    observations = {'files': {}, 'processes': []}
-    boot = Path('/proc/sys/kernel/random/boot_id').read_text().strip()
-    require(re.fullmatch(r'[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}', boot), 'unknown Linux boot identity')
+    require(isinstance(raw_inputs, dict) and all(isinstance(name, str) and ownership_source(name)
+            and isinstance(raw, bytes) for name, raw in raw_inputs.items()), 'invalid authority input selection')
+    receipts = []
 
-    def observe(row, origin, *, native=True, wall_clock=True):
+    def receipt(row, origin, *, native=True, wall_clock=True):
+        require(isinstance(row, dict), 'invalid predecessor receipt')
         pid = row.get('pid')
         require(type(pid) is int and 0 < pid <= 2147483647, 'invalid predecessor pid: '+origin)
         if native:
             identity = row.get('processIdentity')
             require(isinstance(identity, dict) and set(identity) == {'kind', 'pid', 'bootId', 'startTicks'}
-                    and identity.get('kind') == 'linux-proc-v1' and identity.get('pid') == pid
+                    and identity.get('kind') == 'linux-proc-v1' and type(identity.get('pid')) is int and identity['pid'] == pid
                     and isinstance(identity.get('bootId'), str)
                     and re.fullmatch(r'[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}', identity['bootId'])
                     and isinstance(identity.get('startTicks'), str)
@@ -268,72 +285,131 @@ def predecessor_ownership(data):
                             'unknown predecessor ledger process time')
             except ValueError:
                 raise FrozenRefused('invalid predecessor start time: '+origin) from None
-        try:
-            process = index._process(pid)
-        except FileNotFoundError:
-            process = None
-        except (OSError, ValueError, IndexError) as e:
-            raise FrozenRefused('uncertain predecessor process: '+origin) from e
-        require(process is None or process['state'] in ('Z', 'X', 'x'),
-                f'live predecessor process outside owned clone: {origin} pid={pid} observed={process}')
-        observations['processes'].append({'source': origin, 'recorded': row,
-                                         'observation': 'gone', 'boot_id': boot})
+        receipts.append({'source': origin, 'recorded': row})
 
-    runtime = data/'runtime'
-    try:
-        runtime.lstat()
-    except FileNotFoundError:
-        return observations
-    checked_path(runtime)
-    names = {path.name for path in runtime.iterdir()}  # unreadable is uncertainty, not absence
-    manifest = runtime/'manifest.json'
-    if 'manifest.json' in names:
-        raw = read_bytes(manifest)
-        observations['files']['runtime/manifest.json'] = hashlib.sha256(raw).hexdigest()
-        doc = json.loads(raw)
-        require(isinstance(doc, dict) and type(doc.get('schemaVersion')) is int and doc['schemaVersion'] in (1, 2), 'unknown predecessor manifest schema')
-        observe(doc, 'manifest owner', native=False)
+    manifest = raw_inputs.get('runtime/manifest.json')
+    if manifest is not None:
+        doc = strict_json(manifest)
+        require(isinstance(doc, dict) and type(doc.get('schemaVersion')) is int
+                and doc['schemaVersion'] in (1, 2), 'unknown predecessor manifest schema')
+        receipt(doc, 'manifest owner', native=False)
         children = doc.get('children', [] if doc['schemaVersion'] == 1 else None)
         require(isinstance(children, list), 'unknown predecessor manifest children')
         for child in children:
             require(isinstance(child, dict) and child.get('kind') in ('EXTRACTION', 'LLAMA_SERVER')
                     and isinstance(child.get('id'), str) and bool(child['id']), 'invalid predecessor child')
-            observe(child, 'manifest child')
-    ledgers = data/'runtime/exit-ledger'
-    if 'exit-ledger' in names:
-        checked_path(ledgers)
-        # LedgerRetention.files includes numeric archives, loss journal and current.
-        for path in sorted(ledgers.iterdir()):
-            if not re.fullmatch(r'(children|engine)\.v1(?:\.(?:[0-9]+|lost))?\.jsonl', path.name):
-                continue
-            raw = read_bytes(path)
-            observations['files'][path.relative_to(data).as_posix()] = hashlib.sha256(raw).hexdigest()
-            require(not raw or raw.endswith(b'\n'), 'torn predecessor ledger')
-            for line in raw.splitlines():
-                if not line.strip(): continue
-                row = json.loads(line)
-                require(isinstance(row, dict) and type(row.get('schemaVersion')) is int and row['schemaVersion'] == 1
-                        and type(row.get('seq')) is int and row['seq'] > 0
-                        and isinstance(row.get('writer'), dict)
-                        and row['writer'].get('role') in ('engine', 'shell', 'dev-runner', 'dev-cli')
-                        and type(row['writer'].get('pid')) is int and row['writer']['pid'] > 0
-                        and isinstance(row['writer'].get('startedAt'), str)
-                        and row.get('type') in {'child-spawn','child-start','stop-intent','stop-escalate',
-                            'child-exit','child-survived','gpu-release','child-note','owner-died',
-                            'job-process-start','job-process-exit','helper-start','helper-intent','helper-exit',
-                            'helper-window-start','helper-window-end','engine-start','engine-intent',
-                            'engine-self-intent','engine-exit','engine-owner-died','ledger-gap'},
-                        'unknown predecessor ledger record')
-                try:
-                    require(row['writer']['startedAt'].endswith('Z')
-                            and datetime.fromisoformat(row['writer']['startedAt']) >= datetime.fromisoformat('2001-01-01T00:00:00Z'),
-                            'unknown predecessor ledger writer time')
-                except ValueError:
-                    raise FrozenRefused('invalid predecessor ledger writer time') from None
-                # Never ignore a malformed start that the tolerant runtime might accept.
-                if row['type'] in ('child-start', 'job-process-start', 'helper-start', 'engine-start'):
-                    observe(row, path.name, wall_clock=row['type'] == 'child-start')
-    return observations
+            receipt(child, 'manifest child')
+    for name in sorted(raw_inputs):
+        if name == 'runtime/manifest.json':
+            continue
+        raw = raw_inputs[name]
+        require(not raw or raw.endswith(b'\n'), 'torn predecessor ledger')
+        for line in raw.splitlines():
+            if not line.strip(): continue
+            row = strict_json(line)
+            require(isinstance(row, dict) and type(row.get('schemaVersion')) is int and row['schemaVersion'] == 1
+                    and type(row.get('seq')) is int and row['seq'] > 0
+                    and isinstance(row.get('writer'), dict)
+                    and row['writer'].get('role') in ('engine', 'shell', 'dev-runner', 'dev-cli')
+                    and type(row['writer'].get('pid')) is int and row['writer']['pid'] > 0
+                    and isinstance(row['writer'].get('startedAt'), str)
+                    and row.get('type') in {'child-spawn','child-start','stop-intent','stop-escalate',
+                        'child-exit','child-survived','gpu-release','child-note','owner-died',
+                        'job-process-start','job-process-exit','helper-start','helper-intent','helper-exit',
+                        'helper-window-start','helper-window-end','engine-start','engine-intent',
+                        'engine-self-intent','engine-exit','engine-owner-died','ledger-gap'},
+                    'unknown predecessor ledger record')
+            try:
+                require(row['writer']['startedAt'].endswith('Z')
+                        and datetime.fromisoformat(row['writer']['startedAt']) >= datetime.fromisoformat('2001-01-01T00:00:00Z'),
+                        'unknown predecessor ledger writer time')
+            except ValueError:
+                raise FrozenRefused('invalid predecessor ledger writer time') from None
+            if row['type'] in ('child-start', 'job-process-start', 'helper-start', 'engine-start'):
+                receipt(row, Path(name).name, wall_clock=row['type'] == 'child-start')
+    return receipts
+
+
+def predecessor_ownership(data):
+    """Capture exact authority bytes under source exclusion; OS observations are producer-only.
+
+    The unchanged eval runner uses a fresh UUID job record, never a copied one.
+    Boot request files target only the fresh incarnation, not an external stop.
+    """
+    raw_inputs = {}
+    runtime = data/'runtime'
+    try:
+        runtime.lstat()
+    except FileNotFoundError:
+        pass
+    else:
+        checked_path(runtime)
+        names = {path.name for path in runtime.iterdir()}
+        if 'manifest.json' in names:
+            raw_inputs['runtime/manifest.json'] = read_bytes(runtime/'manifest.json')
+        if 'exit-ledger' in names:
+            for path in sorted(checked_path(runtime/'exit-ledger').iterdir()):
+                relative = path.relative_to(data).as_posix()
+                if ownership_source(relative):
+                    raw_inputs[relative] = read_bytes(path)
+    expected = ownership_receipts(raw_inputs)
+    boot = Path('/proc/sys/kernel/random/boot_id').read_text().strip()
+    require(valid_boot(boot), 'unknown Linux boot identity')
+    observations = []
+    for receipt in expected:
+        pid = receipt['recorded']['pid']
+        try:
+            process = index._process(pid)
+        except FileNotFoundError:
+            process = None
+        except (OSError, ValueError, IndexError) as e:
+            raise FrozenRefused('uncertain predecessor process: '+receipt['source']) from e
+        require(process is None or process['state'] in ('Z', 'X', 'x'),
+                f'live predecessor process outside owned clone: {receipt["source"]} pid={pid} observed={process}')
+        observations.append({**receipt, 'observation': 'gone', 'boot_id': boot})
+    return {'files': {name: hashlib.sha256(raw).hexdigest() for name, raw in raw_inputs.items()},
+            'inputs': [[name, base64.b64encode(raw).decode('ascii')] for name, raw in raw_inputs.items()],
+            'processes': observations}
+
+
+def valid_boot(value):
+    return isinstance(value, str) and bool(re.fullmatch(r'[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}', value))
+
+
+def validate_ownership_evidence(ownership, source_data):
+    """Replay retained raw bytes only; never probe historical paths or PIDs."""
+    require(isinstance(ownership, dict) and set(ownership) == {'files','inputs','processes'}
+            and isinstance(ownership['files'], dict) and isinstance(ownership['inputs'], list)
+            and isinstance(ownership['processes'], list), 'missing predecessor input envelope')
+    selected = {name for name, row in source_data.items() if row['kind'] == 'file' and ownership_source(name)}
+    raw_inputs = {}
+    for pair in ownership['inputs']:
+        require(isinstance(pair, list) and len(pair) == 2 and isinstance(pair[0], str)
+                and isinstance(pair[1], str) and pair[0] in selected and pair[0] not in raw_inputs,
+                'extra/missing/duplicate predecessor input')
+        name, encoded = pair
+        size = source_data[name].get('size')
+        require(type(size) is int and size >= 0 and len(encoded) == 4*((size+2)//3), 'predecessor input size mismatch')
+        try:
+            raw = base64.b64decode(encoded, validate=True)
+        except (ValueError, binascii.Error):
+            raise FrozenRefused('invalid predecessor input encoding') from None
+        require(base64.b64encode(raw).decode('ascii') == encoded and len(raw) == size
+                and hashlib.sha256(raw).hexdigest() == source_data[name]['sha256'] == ownership['files'].get(name),
+                'predecessor raw input/hash/size mismatch')
+        raw_inputs[name] = raw
+    require(set(raw_inputs) == set(ownership['files']) == selected, 'incomplete predecessor input coverage')
+    expected = ownership_receipts(raw_inputs)
+    observed = ownership['processes']
+    require(len(observed) == len(expected), 'incomplete predecessor observation coverage')
+    host_boot = None
+    for row, receipt in zip(observed, expected):
+        require(isinstance(row, dict) and set(row) == {'source','recorded','observation','boot_id'}
+                and row['source'] == receipt['source'] and row['recorded'] == receipt['recorded']
+                and row['observation'] == 'gone' and valid_boot(row['boot_id']), 'contradictory predecessor observation')
+        if host_boot is None: host_boot = row['boot_id']
+        require(row['boot_id'] == host_boot, 'inconsistent predecessor observation host boot')
+
 
 def materialization(c: Collection, root: Path):
     manifest = read_json(root/'materialized.json')
@@ -549,6 +625,7 @@ def prepare(baseline_dir: Path, cache_root: Path, output: Path, cfg: index.Index
                         'baseline_run_sha256': metadata['run_sha256'], 'baseline_sha256': hashlib.sha256(read_bytes(baseline)).hexdigest(),
                         'source_data': before, 'source_documents': documents, 'source_metadata': source_metadata,
                         'payload': original_payload, 'predecessor_ownership': predecessor_ownership(root/'data'), 'runtime_identity': index.identity_digests(current)}
+                validate_ownership_evidence(item['predecessor_ownership'], before)
                 index._write(target/'copy.json', item)
                 manifest['items'][c.name] = {'folder': target.name, 'sha256': hashlib.sha256(read_bytes(target/'copy.json')).hexdigest()}
         require(list(backend.source_identity(cfg.repo_root)) == source, 'current source changed during preparation')
@@ -903,7 +980,7 @@ def validate_record_evidence(path: Path, record: RunRecord):
         return None
     sidecar = read_bytes(path.parent/SIDECAR)
     require(hashlib.sha256(sidecar).hexdigest() == h.frozen_index['evidence_sha256'], 'frozen sidecar digest mismatch')
-    doc = json.loads(sidecar)
+    doc = strict_json(sidecar)
     require(doc.get('candidate_semantic') == candidate_binding(record), 'frozen candidate/evidence binding mismatch')
     require(doc.get('schema') == SCHEMA and doc.get('source') == [h.commit, h.dirty_hash]
             and h.dirty_hash is None and doc.get('runtime_identity') == h.runtime_identity
@@ -968,15 +1045,7 @@ def validate_record_evidence(path: Path, record: RunRecord):
     for name in METADATA:
         require(hashlib.sha256(read_bytes(folder/name)).hexdigest() == item['source_metadata'][name], 'changed original metadata')
     require(not index._adoption_agreement(entry['witness'], b.header.index_state), 'stored original witness mismatch')
-    ownership = item['predecessor_ownership']
-    expected_ownership_files = {rel for rel, row in item['source_data'].items()
-        if row['kind'] == 'file' and (rel == 'runtime/manifest.json' or re.fullmatch(
-            r'runtime/exit-ledger/(children|engine)\.v1(?:\.(?:[0-9]+|lost))?\.jsonl', rel))}
-    require(isinstance(ownership, dict) and isinstance(ownership.get('files'), dict)
-            and set(ownership['files']) == expected_ownership_files
-            and isinstance(ownership.get('processes'), list)
-            and all(item['source_data'].get(rel, {}).get('sha256') == sha for rel, sha in ownership['files'].items())
-            and all(row.get('observation') == 'gone' for row in ownership['processes']), 'missing predecessor observation evidence')
+    validate_ownership_evidence(item['predecessor_ownership'], item['source_data'])
     observations = {phase: read_json(folder/(phase+'.json')) for phase in CHECKS}
     for phase in ('before', 'after'):
         row = observations[phase]
