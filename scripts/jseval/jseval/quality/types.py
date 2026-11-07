@@ -23,6 +23,7 @@ text (a changed document format, a re-extraction) never pass as the same populat
 from __future__ import annotations
 
 import enum
+import errno
 import hashlib
 import json
 import math
@@ -30,6 +31,7 @@ import ntpath
 import os
 import posixpath
 import re
+import stat
 import tempfile
 import unicodedata
 from dataclasses import dataclass, field
@@ -45,6 +47,34 @@ BASELINE_SCHEMA = "jseval.quality.baseline.v1"
 
 
 # --------------------------------------------------------------------------- canonical forms
+
+
+def read_regular_text(path: str | os.PathLike, encoding=None) -> str:
+    """Read ordinary regular text, retaining supported links and universal newlines.
+
+    POSIX nonblocking open prevents a raced FIFO from waiting for a peer. Other
+    platforms retain regular-file compatibility, without that special-file claim.
+    """
+    path = Path(path)
+    before = path.stat()
+    if not stat.S_ISREG(before.st_mode):
+        raise OSError(errno.EINVAL, "not a regular text file", str(path))
+    flags = os.O_RDONLY | getattr(os, 'O_NONBLOCK', 0) | getattr(os, 'O_BINARY', 0)
+    fd = os.open(path, flags)
+    try:
+        def identity(st):
+            return (st.st_dev, st.st_ino, st.st_mode, st.st_nlink, st.st_size,
+                    st.st_mtime_ns, st.st_ctime_ns)
+        opened = os.fstat(fd)
+        if not stat.S_ISREG(opened.st_mode) or identity(before) != identity(opened):
+            raise OSError(errno.EINVAL, "text input replaced", str(path))
+        with os.fdopen(fd, 'r', encoding=encoding, closefd=False) as stream:
+            text = stream.read()
+        if identity(opened) != identity(os.fstat(fd)) or identity(opened) != identity(path.stat()):
+            raise OSError(errno.EINVAL, "text input changed", str(path))
+        return text
+    finally:
+        os.close(fd)
 
 
 def sha256_text(text: str) -> str:
@@ -604,7 +634,7 @@ class RunRecord:
     @classmethod
     def read(cls, path: str | os.PathLike) -> "RunRecord":
         p = Path(path)
-        record = cls.loads(p.read_text(encoding="utf-8"), str(p))
+        record = cls.loads(read_regular_text(p, encoding="utf-8"), str(p))
         if record.header.run_kind != "frozen-index" and (p.parent/'run.frozen-index.json').exists():
             raise RunRecordError(f"{p}: frozen evidence cannot be downgraded to an ordinary run")
         if record.header.run_kind == "frozen-index":

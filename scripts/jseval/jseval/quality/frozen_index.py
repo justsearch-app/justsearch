@@ -92,22 +92,80 @@ def checked_path(path: Path, *, missing=False) -> Path:
     return path
 
 
-def read_bytes(path):
-    path = checked_path(Path(path))
-    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+def _file_identity(st):
+    return (st.st_dev, st.st_ino, st.st_mode, st.st_nlink, st.st_size, st.st_mtime_ns, st.st_ctime_ns)
+
+
+def _independent(st, path):
+    require(stat.S_ISREG(st.st_mode) and st.st_nlink == 1,
+            f'not an independent regular file: {path}')
+
+
+def _file_closure(path, fd, before):
+    require(_file_identity(before) == _file_identity(os.fstat(fd)) == _file_identity(path.lstat()),
+            f'file changed while reading: {path}')
+
+
+@contextmanager
+def _regular_file(path, before=None):
+    """Leaf checks under the caller's checked tree; never wait for a stream peer."""
+    path = Path(path)
+    before = path.lstat() if before is None else before
+    _independent(before, path)
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     try:
-        before = os.fstat(fd)
-        require(stat.S_ISREG(before.st_mode) and before.st_nlink == 1,
-                f'not an independent regular file: {path}')
-        with os.fdopen(fd, 'rb', closefd=False) as stream:
-            data = stream.read()
-        after = os.fstat(fd)
-        require((before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns)
-                == (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns)
-                and path.stat().st_ino == before.st_ino, f'input raced while reading: {path}')
-        return data
+        opened = os.fstat(fd)
+        _independent(opened, path)
+        require(_file_identity(before) == _file_identity(opened), f'file raced: {path}')
+        yield fd, opened
+        _file_closure(path, fd, opened)
     finally:
         os.close(fd)
+
+
+def _directory_identity(st):
+    return (st.st_dev, st.st_ino, stat.S_IFMT(st.st_mode), stat.S_IMODE(st.st_mode))
+
+
+def _directory_closure(root, directories):
+    checked_path(root)
+    for path, before in directories.items():
+        after = path.lstat()
+        require(stat.S_ISDIR(after.st_mode) and _directory_identity(before) == _directory_identity(after),
+                f'directory replaced: {path}')
+
+
+def _walk(root):
+    root = checked_path(root)
+    st = root.lstat()
+    require(stat.S_ISDIR(st.st_mode), f'not a directory: {root}')
+    directories = {root: st}
+    def walk_error(error):
+        raise error
+    for parent, dirs, files in os.walk(root, followlinks=False, onerror=walk_error):
+        parent = Path(parent)
+        current = parent.lstat()
+        require(stat.S_ISDIR(current.st_mode)
+                and _directory_identity(current) == _directory_identity(directories[parent]),
+                f'directory replaced: {parent}')
+        for name in sorted(dirs + files):
+            path = parent/name
+            st = path.lstat()
+            require(stat.S_ISDIR(st.st_mode) or stat.S_ISREG(st.st_mode),
+                    f'link or special file in frozen tree: {path}')
+            if stat.S_ISDIR(st.st_mode):
+                directories[path] = st
+            yield path, st
+    _directory_closure(root, directories)
+
+
+def read_bytes(path):
+    path = checked_path(Path(path))
+    with _regular_file(path) as (fd, _):
+        with os.fdopen(fd, 'rb', closefd=False) as stream:
+            data = stream.read()
+    checked_path(path)
+    return data
 
 
 def inventory(root: Path) -> dict:
@@ -117,46 +175,35 @@ def inventory(root: Path) -> dict:
 
 def _inventory(root: Path, *, capture_sqlite=False):
     root = checked_path(root)
-    require(root.is_dir(), f'not a directory: {root}')
-    result, inodes = {'.': {'mode': stat.S_IMODE(root.stat().st_mode), 'kind': 'dir'}}, set()
+    require(stat.S_ISDIR(root.lstat().st_mode), f'not a directory: {root}')
+    root_before = root.lstat()
+    result, inodes = {'.': {'mode': stat.S_IMODE(root_before.st_mode), 'kind': 'dir'}}, set()
     databases, stores = [], {}
-    for parent, dirs, files in os.walk(root, followlinks=False):
-        for name in sorted(dirs + files):
-            path = Path(parent)/name
-            st = path.lstat()
-            rel = path.relative_to(root).as_posix()
-            require(stat.S_ISDIR(st.st_mode) or stat.S_ISREG(st.st_mode),
-                    f'link or special file in frozen tree: {path}')
-            row = {'mode': stat.S_IMODE(st.st_mode), 'kind': 'dir' if stat.S_ISDIR(st.st_mode) else 'file'}
-            if stat.S_ISREG(st.st_mode):
-                inode = (st.st_dev, st.st_ino)
-                require(st.st_nlink == 1 and inode not in inodes, f'mutable inode alias: {path}')
-                inodes.add(inode)
-                # Stream large index files rather than retaining them in Python memory.
-                fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
-                try:
-                    a = os.fstat(fd)
-                    require((a.st_dev, a.st_ino) == inode, f'file raced: {path}')
-                    with os.fdopen(fd, 'rb', closefd=False) as stream:
-                        if capture_sqlite:
-                            prefix = stream.read(100)
-                            sha = hashlib.sha256(prefix)
-                            sha = hashlib.file_digest(stream, lambda: sha).hexdigest()
-                        else:
-                            sha = hashlib.file_digest(stream, 'sha256').hexdigest()
-                    b = os.fstat(fd)
-                    require((a.st_size, a.st_mtime_ns, a.st_ctime_ns) ==
-                            (b.st_size, b.st_mtime_ns, b.st_ctime_ns), f'file changed: {path}')
-                finally:
-                    os.close(fd)
-                row.update(size=st.st_size, sha256=sha)
-                if capture_sqlite:
-                    database = path.suffix != '.log' and prefix.startswith(b'SQLite format 3\0')
-                    if database:
-                        databases.append(rel)
-                    if database or name.endswith(('-wal', '-shm')):
-                        stores[rel] = (row, inode)
-            result[rel] = row
+    for path, st in _walk(root):
+        rel = path.relative_to(root).as_posix()
+        row = {'mode': stat.S_IMODE(st.st_mode), 'kind': 'dir' if stat.S_ISDIR(st.st_mode) else 'file'}
+        if stat.S_ISREG(st.st_mode):
+            inode = (st.st_dev, st.st_ino)
+            require(st.st_nlink == 1 and inode not in inodes, f'mutable inode alias: {path}')
+            inodes.add(inode)
+            # Header discovery and full hashing share this one checked descriptor.
+            with _regular_file(path, st) as (fd, opened):
+                with os.fdopen(fd, 'rb', closefd=False) as stream:
+                    if capture_sqlite:
+                        prefix = stream.read(100)
+                        sha = hashlib.sha256(prefix)
+                        sha = hashlib.file_digest(stream, lambda: sha).hexdigest()
+                    else:
+                        sha = hashlib.file_digest(stream, 'sha256').hexdigest()
+                row.update(size=opened.st_size, sha256=sha)
+            if capture_sqlite:
+                database = path.suffix != '.log' and prefix.startswith(b'SQLite format 3\0')
+                if database:
+                    databases.append(rel)
+                if database or path.name.endswith(('-wal', '-shm')):
+                    stores[rel] = (row, inode)
+        result[rel] = row
+    _directory_closure(root, {root: root_before})
     selected = {name+suffix for name in databases for suffix in ('', '-wal', '-shm')}
     return result, (tuple(sorted(databases)), {k: v for k, v in stores.items() if k in selected})
 
@@ -186,48 +233,65 @@ def source_locks(data: Path):
     data = checked_path(data)
     with ExitStack() as stack:
         quality = data.parent/(data.name+'.quality.lock')
-        qfd = os.open(checked_path(quality), os.O_RDONLY | os.O_NOFOLLOW)
-        stack.callback(os.close, qfd)
-        require(stat.S_ISREG(os.fstat(qfd).st_mode) and os.fstat(qfd).st_nlink == 1, 'invalid data quality lock')
-        fcntl.flock(qfd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         descriptors = []
-        for path in (data/'app.lock', data/'index/default.index.lock'):
-            fd = os.open(checked_path(path), os.O_RDONLY | os.O_NOFOLLOW)
+        for path in (quality, data/'app.lock', data/'index/default.index.lock'):
+            path = checked_path(path)
+            before = path.lstat()
+            _independent(before, path)
+            fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
             stack.callback(os.close, fd)
-            st = os.fstat(fd)
-            require(stat.S_ISREG(st.st_mode) and st.st_nlink == 1, f'invalid Engine lock: {path}')
-            fcntl.fcntl(fd, fcntl.F_OFD_SETLK, bytes(_Flock(fcntl.F_RDLCK, os.SEEK_SET, 0, 0, 0)))
-            descriptors.append((path, fd, st.st_dev, st.st_ino))
-        # Verify every locked name still denotes the locked inode after acquisition.
-        for path, fd, dev, ino in descriptors:
-            require((path.stat().st_dev, path.stat().st_ino) == (dev, ino), f'lock replaced: {path}')
-        yield (qfd, *(row[1] for row in descriptors))
-        for path, fd, dev, ino in descriptors:
-            require((path.stat().st_dev, path.stat().st_ino) == (dev, ino), f'lock replaced: {path}')
+            _lock_closure(path, fd, before)
+            if path == quality:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            else:
+                fcntl.fcntl(fd, fcntl.F_OFD_SETLK, bytes(_Flock(fcntl.F_RDLCK, os.SEEK_SET, 0, 0, 0)))
+            descriptors.append((path, fd, before))
+        for path, fd, before in descriptors:
+            _lock_closure(path, fd, before)
+        try:
+            yield tuple(row[1] for row in descriptors)
+        finally:
+            for path, fd, before in descriptors:
+                _lock_closure(path, fd, before)
 
+
+def _lock_closure(path, fd, before):
+    for st in (os.fstat(fd), path.lstat()):
+        _independent(st, path)
+        require((st.st_dev, st.st_ino) == (before.st_dev, before.st_ino), f'lock replaced: {path}')
+    checked_path(path)
 
 
 def require_guardian_hold(data):
-    """The worker observes real retained locks; no plan boolean grants authority."""
-    for path in (data/'app.lock', data/'index/default.index.lock'):
-        fd = os.open(checked_path(path), os.O_RDONLY | os.O_NOFOLLOW)
-        try:
-            reply = fcntl.fcntl(fd, fcntl.F_OFD_GETLK, bytes(_Flock(fcntl.F_WRLCK, os.SEEK_SET, 0, 0, 0)))
-            held = _Flock.from_buffer_copy(reply)
-            require(held.type == fcntl.F_RDLCK and held.pid == -1,
-                    f'original source has no retained OFD read hold: {path}')
-        finally:
-            os.close(fd)
-    fd = os.open(checked_path(data.parent/(data.name+'.quality.lock')), os.O_RDONLY | os.O_NOFOLLOW)
-    try:
-        try:
-            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
-            return
-        raise FrozenRefused('original source has no retained quality hold')
-    finally:
-        # CLOSE ONLY: no explicit unlock of any shared inherited description.
-        os.close(fd)
+    """Probe real inherited authority; close only, never explicitly unlock it."""
+    data = checked_path(data)
+    with ExitStack() as stack:
+        descriptors = []
+        quality = data.parent/(data.name+'.quality.lock')
+        for path in (data/'app.lock', data/'index/default.index.lock', quality):
+            path = checked_path(path)
+            before = path.lstat()
+            _independent(before, path)
+            fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+            stack.callback(os.close, fd)
+            _lock_closure(path, fd, before)
+            descriptors.append((path, fd, before))
+            if path == quality:
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except BlockingIOError:
+                    pass
+                else:
+                    raise FrozenRefused('original source has no retained quality hold')
+            else:
+                reply = fcntl.fcntl(fd, fcntl.F_OFD_GETLK,
+                    bytes(_Flock(fcntl.F_WRLCK, os.SEEK_SET, 0, 0, 0)))
+                held = _Flock.from_buffer_copy(reply)
+                require(held.type == fcntl.F_RDLCK and held.pid == -1,
+                        f'original source has no retained OFD read hold: {path}')
+        for path, fd, before in descriptors:
+            _lock_closure(path, fd, before)
+
 
 
 @contextmanager
@@ -454,33 +518,34 @@ def materialization(c: Collection, root: Path):
 
 
 def _sqlite_identity(st):
-    return (st.st_dev, st.st_ino, st.st_mode, st.st_nlink, st.st_size, st.st_mtime_ns, st.st_ctime_ns)
+    return _file_identity(st)
+
+
+def _copy_stream(fd, out, expected_size):
+    size, sha = 0, hashlib.sha256()
+    with os.fdopen(fd, 'rb', closefd=False) as stream:
+        while chunk := stream.read(min(1024*1024, expected_size-size+1)):
+            size += len(chunk)
+            require(size <= expected_size, 'frozen copy input grew')
+            sha.update(chunk)
+            out.write(chunk)
+    require(size == expected_size, 'short frozen copy')
+    return size, sha.hexdigest()
 
 
 def _copy_sqlite(source, destination, expected):
     """Copy bounded chunks from an independent checked inode, bound to its inventory."""
     row, inode = expected
     source = checked_path(source)
-    fd = os.open(source, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
-    try:
-        before = os.fstat(fd)
-        require(stat.S_ISREG(before.st_mode) and before.st_nlink == 1
-                and (before.st_dev, before.st_ino) == inode
+    with _regular_file(source) as (fd, before):
+        require((before.st_dev, before.st_ino) == inode
                 and stat.S_IMODE(before.st_mode) == row['mode'], f'SQLite input replaced: {source}')
-        size, sha = 0, hashlib.sha256()
-        with os.fdopen(fd, 'rb', closefd=False) as stream, destination.open('xb') as out:
-            while chunk := stream.read(1024*1024):
-                size += len(chunk)
-                require(size <= row['size'], f'SQLite input grew: {source}')
-                sha.update(chunk)
-                out.write(chunk)
-        after = os.fstat(fd)
-        require(_sqlite_identity(before) == _sqlite_identity(after) == _sqlite_identity(source.lstat())
-                and size == row['size'] and sha.hexdigest() == row['sha256'],
+        with destination.open('xb') as out:
+            size, sha = _copy_stream(fd, out, row['size'])
+        require(size == before.st_size == row['size'] and sha == row['sha256'],
                 f'SQLite input changed: {source}')
-        return _sqlite_identity(after)
-    finally:
-        os.close(fd)
+        observed = _sqlite_identity(before)
+    return observed
 
 
 def payload(data: Path, generation: str) -> dict:
@@ -490,6 +555,7 @@ def payload(data: Path, generation: str) -> dict:
 def _payload(data: Path, generation: str, captured=None) -> dict:
     require(isinstance(generation, str) and re.fullmatch(r'[A-Za-z0-9_-]+', generation),
             'invalid active generation')
+    data = checked_path(data)
     base = data/'index/default'
     state = read_json(base/'state.json')
     require(state.get('active_generation') == generation and state.get('migration_state') == 'IDLE'
@@ -514,33 +580,52 @@ def _payload(data: Path, generation: str, captured=None) -> dict:
             controls[rel] = hashlib.sha256(read_bytes(path)).hexdigest()
     # Schema/header identities are checked separately from SQLite's operational pages/WAL.
     databases = {}
-    paths = (data/rel for rel in captured[0]) if captured is not None else sorted(data.rglob('*'))
-    for path in paths:
-        if captured is None:
-            if not path.is_file() or path.suffix in ('.log',):
-                continue
-            with path.open('rb') as stream:
-                header = stream.read(100)
-            if not header.startswith(b'SQLite format 3\0'):
-                continue
-        # SQLite must see retained WAL schema while originals and byte-identical
-        # clones remain untouched. A tiny isolated database copy is the first rung;
-        # SQLite may create/rewrite only its own temporary SHM bookkeeping there.
-        with tempfile.TemporaryDirectory(prefix='frozen-sqlite-') as scratch:
-            copied = Path(scratch)/path.name
-            observations = {}
-            for suffix in ('', '-wal', '-shm'):
-                original = path.with_name(path.name+suffix)
-                if captured is None:
-                    if original.exists():
-                        shutil.copyfile(original, Path(str(copied)+suffix))
-                else:
-                    expected = captured[1].get(original.relative_to(data).as_posix())
-                    if expected is None:
-                        require(not os.path.lexists(original), f'unexpected SQLite input: {original}')
+    paths = ((data/rel, None) for rel in captured[0]) if captured is not None else _walk(data)
+    for path, initial in paths:
+        if initial is not None and (stat.S_ISDIR(initial.st_mode) or path.suffix == '.log'):
+            continue
+        with ExitStack() as selection:
+            main_fd, selected = None, {}
+            if captured is None:
+                main_fd, before = selection.enter_context(_regular_file(path, initial))
+                with os.fdopen(main_fd, 'rb', closefd=False) as stream:
+                    header = stream.read(100)
+                if not header.startswith(b'SQLite format 3\0'):
+                    continue
+                selected[path] = before
+                for suffix in ('-wal', '-shm'):
+                    original = path.with_name(path.name+suffix)
+                    try:
+                        st = original.lstat()
+                    except FileNotFoundError:
+                        st = None
+                    if st is not None:
+                        _independent(st, original)
+                    selected[original] = st
+            # SQLite may only create/rewrite its isolated scratch bookkeeping.
+            with tempfile.TemporaryDirectory(prefix='frozen-sqlite-') as scratch:
+                copied = Path(scratch)/path.name
+                observations = {}
+                for suffix in ('', '-wal', '-shm'):
+                    original = path.with_name(path.name+suffix)
+                    destination = Path(str(copied)+suffix)
+                    if captured is None:
+                        st = selected[original]
+                        if st is not None:
+                            if not suffix:
+                                os.lseek(main_fd, 0, os.SEEK_SET)
+                                with destination.open('xb') as out:
+                                    _copy_stream(main_fd, out, st.st_size)
+                                _file_closure(original, main_fd, st)
+                            else:
+                                with _regular_file(original, st) as (fd, opened):
+                                    with destination.open('xb') as out:
+                                        _copy_stream(fd, out, opened.st_size)
+                            observations[original] = _sqlite_identity(st)
                     else:
-                        observations[original] = _copy_sqlite(original, Path(str(copied)+suffix), expected)
-            if captured is not None:
+                        expected = captured[1].get(original.relative_to(data).as_posix())
+                        if expected is not None:
+                            observations[original] = _copy_sqlite(original, destination, expected)
                 for suffix in ('', '-wal', '-shm'):
                     original = path.with_name(path.name+suffix)
                     if original in observations:
@@ -548,14 +633,14 @@ def _payload(data: Path, generation: str, captured=None) -> dict:
                                 f'SQLite input changed before interpretation: {original}')
                     else:
                         require(not os.path.lexists(original), f'unexpected SQLite input: {original}')
-            con = sqlite3.connect(copied.as_uri()+'?mode=ro', uri=True)
-            try:
-                databases[path.relative_to(data).as_posix()] = {
-                    'schema': con.execute('SELECT type,name,tbl_name,sql FROM sqlite_master ORDER BY type,name').fetchall(),
-                    'application_id': con.execute('PRAGMA application_id').fetchone()[0],
-                    'user_version': con.execute('PRAGMA user_version').fetchone()[0]}
-            finally:
-                con.close()
+                con = sqlite3.connect(copied.as_uri()+'?mode=ro', uri=True)
+                try:
+                    databases[path.relative_to(data).as_posix()] = {
+                        'schema': con.execute('SELECT type,name,tbl_name,sql FROM sqlite_master ORDER BY type,name').fetchall(),
+                        'application_id': con.execute('PRAGMA application_id').fetchone()[0],
+                        'user_version': con.execute('PRAGMA user_version').fetchone()[0]}
+                finally:
+                    con.close()
     # JSON normalization keeps the SQLite tuples stable after storage/reload.
     return json.loads(canonical_json({'generation': generation, 'state': state,
                                      'indices': tree, 'controls': controls, 'databases': databases}))
@@ -625,7 +710,39 @@ def runtime_agreement(build, current):
 
 def _copy_file(source, target):
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_bytes(read_bytes(source))
+    with _regular_file(checked_path(source)) as (fd, before):
+        with target.open('wb') as out:
+            _copy_stream(fd, out, before.st_size)
+
+
+def _copy_data_file(source, target):
+    source, target = Path(source), Path(target)
+    with _regular_file(source) as (fd, before):
+        with target.open('wb') as out:
+            _copy_stream(fd, out, before.st_size)
+        shutil.copystat(source, target, follow_symlinks=False)
+    return str(target)
+
+
+def _copy_tree(source, target):
+    source = checked_path(source)
+    directories = {source: source.lstat()}
+    def observe(parent, names):
+        parent = Path(parent)
+        current = parent.lstat()
+        require(stat.S_ISDIR(current.st_mode)
+                and _directory_identity(current) == _directory_identity(directories[parent]),
+                f'directory replaced: {parent}')
+        for name in names:
+            path = Path(parent)/name
+            st = path.lstat()
+            require(stat.S_ISDIR(st.st_mode) or stat.S_ISREG(st.st_mode),
+                    f'link or special file in frozen copy: {path}')
+            if stat.S_ISDIR(st.st_mode):
+                directories[path] = st
+        return ()
+    shutil.copytree(source, target, copy_function=_copy_data_file, symlinks=True, ignore=observe)
+    _directory_closure(source, directories)
 
 
 def prepare(baseline_dir: Path, cache_root: Path, output: Path, cfg: index.IndexConfig,
@@ -675,7 +792,7 @@ def prepare(baseline_dir: Path, cache_root: Path, output: Path, cfg: index.Index
                 before = inventory(root/'data')
                 documents = inventory(root/'documents')
                 source_metadata = {name: hashlib.sha256(read_bytes(root/name)).hexdigest() for name in METADATA}
-                shutil.copytree(root/'data', target/'data', copy_function=shutil.copy2)
+                _copy_tree(root/'data', target/'data')
                 require(inventory(target/'data') == before, 'short or changed frozen copy')
                 original_inodes = {(p.stat().st_dev, p.stat().st_ino) for p in (root/'data').rglob('*') if p.is_file()}
                 require(not any((p.stat().st_dev, p.stat().st_ino) in original_inodes
@@ -901,9 +1018,20 @@ def open_handle(output, c, cfg, baseline, run_path):
         _check_source(c, b, Path(item['original_root']), item)
         require(inventory(root/'data') == item['source_data'], 'clone changed before boot')
         # Separate lifecycle lock; the byte-identical index owner remains historical.
-        fd = os.open(root/'clone.quality.lock', os.O_RDONLY | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+        lock = checked_path(root/'clone.quality.lock', missing=True)
+        try:
+            before = lock.lstat()
+        except FileNotFoundError:
+            before = None
+        if before is not None:
+            _independent(before, lock)
+        fd = os.open(lock, os.O_RDONLY | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600)
         stack.callback(os.close, fd)
+        opened = os.fstat(fd)
+        _independent(opened, lock)
+        _lock_closure(lock, fd, opened if before is None else before)
         fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        stack.callback(_lock_closure, lock, fd, opened)
         env = cfg.environment()
         env[index.DISTRIBUTION_ENV] = manifest['distribution']
         index.pin_locations(env)
@@ -916,6 +1044,7 @@ def open_handle(output, c, cfg, baseline, run_path):
         for name in RETAINED:
             _copy_file(root/name, evidence/name)
         index._write(evidence/'runtime-inputs.json', components)
+        _lock_closure(lock, fd, opened)
         return FrozenHandle(c, cfg, root, root/'data', Path(item['original_root']), b, item, env,
                             components, stack, run_path)
     except BaseException:
@@ -1048,7 +1177,8 @@ def _evidence_file(parent, relative):
 def validate_record_evidence(path: Path, record: RunRecord):
     h = record.header
     require(h.run_kind == 'frozen-index', 'not a frozen record')
-    checked_path(path)
+    actual = RunRecord.loads(read_bytes(path).decode('utf-8'), str(path))
+    require(actual.dumps() == record.dumps(), 'frozen candidate bytes/record mismatch')
     if h.ended is None:
         # Partial records are inspectable; validate_run always refuses them.
         require('evidence_sha256' not in h.frozen_index, 'partial frozen record claims finalized evidence')

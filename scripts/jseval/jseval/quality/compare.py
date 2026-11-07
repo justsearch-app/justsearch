@@ -61,6 +61,7 @@ from .types import (
     atomic_write_text,
     is_finite_number,
     sha256_text,
+    read_regular_text,
 )
 
 ALL_GROUP = "all"
@@ -80,7 +81,7 @@ def write_baseline(run_path: str | os.PathLike, c: Collection,
                    out_path: str | os.PathLike | None = None) -> Path:
     """Score a run and store it as a baseline (its run file digest + per-query metrics)."""
     run_path = Path(run_path)
-    text = run_path.read_text(encoding="utf-8")
+    text = read_regular_text(run_path, encoding="utf-8")
     run = RunRecord.loads(text, str(run_path))
     if run.header.run_kind == "frozen-index":
         raise BaselineError("frozen-index run cannot be a baseline")
@@ -104,11 +105,11 @@ def load_baseline(path: str | os.PathLike) -> tuple[RunRecord, dict]:
     if not p.is_file():
         raise BaselineError(f"absent baseline: {p}")
     try:
-        doc = json.loads(p.read_text(encoding="utf-8"))
+        doc = json.loads(read_regular_text(p, encoding="utf-8"))
         if not isinstance(doc, dict) or doc.get("schema") != BASELINE_SCHEMA:
             raise BaselineError(f"{p}: not a {BASELINE_SCHEMA} file")
         run_path = p.parent / doc["run_file"]
-        text = run_path.read_text(encoding="utf-8")
+        text = read_regular_text(run_path, encoding="utf-8")
         recorded = doc["run_sha256"]
     except BaselineError:
         raise

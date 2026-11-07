@@ -28,7 +28,7 @@ from .. import backend
 from .._paths import REPO_ROOT
 from . import collections, compare, distribution, index, inputs, known_answers, report, scoring, sensitivity, frozen_index
 from .types import (Outcome, QueryResult, RunHeader, RunRecord, Served,
-                    atomic_write_text, canonical_json, sha256_text)
+                    atomic_write_text, canonical_json, sha256_text, read_regular_text)
 
 DEFAULT_COLLECTIONS = ('scifact', 'miracl-de', 'enron-email')
 FULL_COLLECTIONS = ('scifact', 'miracl-de', 'miracl-fr', 'enron-email')
@@ -112,7 +112,9 @@ def search_query(client: httpx.Client, handle: index.IndexHandle, qid, query,
         if any(not isinstance(loc, str) or not loc for loc in locations):
             raise ValueError('delivered hit has no full document identity')
         materialized = replace(handle.collection, version='',
-            documents=json.loads((handle.root/'materialized.json').read_text()))
+            documents=(frozen_index.read_json(handle.root/'materialized.json')
+                       if isinstance(handle, frozen_index.FrozenHandle) else
+                       json.loads(read_regular_text(handle.root/'materialized.json'))))
         delivered = [materialized.doc_id_for_location(loc, handle.documents_dir) for loc in locations]
         ranked = tuple(dict.fromkeys(delivered))
         signals = delivered_signals(hits, delivered, ranked)
@@ -164,7 +166,7 @@ def _history(c, request: dict, models: dict, runs: Path):
             elapsed = (datetime.fromisoformat(h.ended) - datetime.fromisoformat(h.started)).total_seconds()
             if elapsed > 0:
                 done_path = path.parent/'done.json'
-                done = json.loads(done_path.read_text()) if done_path.exists() else {}
+                done = json.loads(read_regular_text(done_path)) if done_path.exists() else {}
                 if not isinstance(done, dict) or not isinstance(done.get('phase_seconds', {}), dict):
                     continue
                 query_times = [q.timings.get('elapsed_seconds') for q in r.results]
@@ -415,7 +417,7 @@ def _window(plan: dict) -> None:
             if time.monotonic() >= deadline:
                 raise RunRefused('window deadline during scoring')
             time.sleep(.02)
-        done = json.loads(Path(item['done']).read_text())
+        done = json.loads(read_regular_text(Path(item['done'])))
         if done['error']:
             raise RunRefused(done['error'])
         child = following or (start(items[n+1]) if n+1 < len(items) else None)
@@ -561,7 +563,7 @@ def execute(action: str, refs: tuple[str, ...], *, baseline_dir: Path,
                 raise
     problems = []
     if code != 0:
-        problems.append(f'exclusive window exited {code}: {(out/"window.log").read_text()[-2000:]}')
+        problems.append(f'exclusive window exited {code}: {read_regular_text(out/"window.log")[-2000:]}')
     if backend.source_identity(repo_root) != (commit, dirty):
         problems.append('candidate changed during scoring')
     comparisons, times, records, refusals, measurements = [], {}, [], {}, {}
@@ -594,7 +596,7 @@ def execute(action: str, refs: tuple[str, ...], *, baseline_dir: Path,
             if record.header.commit != commit or record.header.request_config != request:
                 errors.append(f'{c.name}: result is from another candidate or request')
         if Path(item['done']).exists():
-            done = json.loads(Path(item['done']).read_text())
+            done = json.loads(read_regular_text(Path(item['done'])))
             times[c.name] = done['elapsed_seconds']
             if done['error']:
                 errors.append(f"{c.name}: {done['error']}")
@@ -660,7 +662,7 @@ def main():
     parser.add_argument('number', nargs='?', type=int)
     parser.add_argument('deadline', nargs='?', type=float)
     args = parser.parse_args()
-    plan = json.loads(args.plan.read_text())
+    plan = json.loads(read_regular_text(args.plan))
     if args.action == 'window':
         _window(plan)
     else:
