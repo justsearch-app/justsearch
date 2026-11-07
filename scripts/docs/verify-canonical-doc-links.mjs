@@ -31,11 +31,6 @@ function repoRootFromCwd() {
   return cwd;
 }
 
-function isMarkdownOrDocsIndex(p) {
-  const lower = p.toLowerCase();
-  return lower.endsWith(".md") || lower.endsWith(".txt");
-}
-
 function walk(dir) {
   const out = [];
   if (!fs.existsSync(dir)) return out;

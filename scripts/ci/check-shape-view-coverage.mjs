@@ -33,26 +33,6 @@ const __dirname = dirname(__filename);
 const REPO_ROOT = join(__dirname, '..', '..');
 const FE_SRC_DIR = join(REPO_ROOT, 'modules', 'ui-web', 'src', 'shell-v0');
 
-/**
- * Parse BUNDLED_SHAPES out of gen-shape-handlers.mjs by reading the source.
- * We parse rather than `import` to avoid triggering the codegen module's
- * top-level side-effects (which write generated handler files on every
- * invocation).
- */
-function parseBundledShapesFromSource() {
-  const src = readFileSync(
-    join(REPO_ROOT, 'scripts', 'codegen', 'gen-shape-handlers.mjs'),
-    'utf8',
-  );
-  const ids = [];
-  const re = /id:\s*'(core\.[a-z0-9-]+)'/g;
-  let m;
-  while ((m = re.exec(src)) !== null) {
-    ids.push(m[1]);
-  }
-  return ids;
-}
-
 async function fetchLiveShapeIds(port) {
   const url = `http://127.0.0.1:${port}/api/registry/shapes`;
   const res = await fetch(url);

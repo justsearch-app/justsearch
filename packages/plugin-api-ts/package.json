@@ -39,7 +39,9 @@
     "sync-types": "node scripts/sync-types.mjs",
     "build": "node scripts/build.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "prepublishOnly": "npm run sync-types && npm run build && npm run typecheck"
+    "prepublishOnly": "npm run sync-types && npm run build && npm run typecheck",
+    "check": "node --test scripts/check.test.mjs",
+    "check:sync": "node scripts/sync-types.mjs --check"
   },
   "engines": {
     "node": ">=20"

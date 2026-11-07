@@ -1,29 +1,26 @@
 #!/usr/bin/env node
-/**
- * Slice 477 H3.1 — minimum-viable build script for
- * @justsearch/plugin-api.
- *
- * V1.5.1 alpha: runs `tsc` to emit .js + .d.ts under dist/. V1.5.2
- * adds dual ESM/CJS via tsup or rollup; V1.5.1 ships ESM-only.
- */
-
-import { execSync } from 'node:child_process';
-import { existsSync, rmSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+// Prepare both advertised runtime formats and declarations before replacing dist.
+// Uses the repository's pinned, locally installed tools; never downloads tools.
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { build } from 'esbuild';
+import { replaceDirectory } from './replace-directory.mjs';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const PKG_ROOT = resolve(__dirname, '..');
-const DIST = resolve(PKG_ROOT, 'dist');
-
-if (existsSync(DIST)) {
-  rmSync(DIST, { recursive: true, force: true });
-  console.log('cleaned dist/');
+const pkg = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const require = createRequire(import.meta.url);
+const staged = mkdtempSync(join(pkg, '.sdk-dist-'));
+try {
+  const result = spawnSync(process.execPath, [require.resolve('typescript/bin/tsc'), '-p', join(pkg, 'tsconfig.json'), '--emitDeclarationOnly', '--outDir', staged], { cwd: pkg, stdio: 'inherit' });
+  if (result.error) throw result.error;
+  if (result.status !== 0) throw new Error(`Declaration build failed (${result.status})`);
+  for (const [format, filename] of [['esm', 'index.mjs'], ['cjs', 'index.js']]) {
+    await build({ entryPoints: [join(pkg, 'src/index.ts')], outfile: join(staged, filename), bundle: true, platform: 'node', target: 'node20', format, legalComments: 'none' });
+  }
+  replaceDirectory(staged, join(pkg, 'dist'));
+  console.log('Built ESM, CommonJS and declarations');
+} finally {
+  rmSync(staged, { recursive: true, force: true });
 }
-
-execSync('npx tsc -p tsconfig.json', {
-  cwd: PKG_ROOT,
-  stdio: 'inherit',
-});
-
-console.log('build complete.');

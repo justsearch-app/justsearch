@@ -1074,6 +1074,9 @@ jobs:
           npm --prefix packages/runtime-client test
           npm --prefix packages/runtime-client run check:pack
 
+      - name: Check plugin SDK generation and packed consumers
+        run: npm --prefix packages/plugin-api-ts run check
+
   unit-tests-search-worker-1:
     needs: changes
     if: needs.changes.outputs.search != 'false'

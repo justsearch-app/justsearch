@@ -1873,11 +1873,9 @@ function ledgerResolution(view) {
 const TORN_TAIL_SETTLE_MS = 250;
 const EARLIER_TARGETS_RE = /^exit-targets\.(\d+)\.json$/;
 const EARLIER_EXITS_RE = /^process-exits\.(\d+)\.json$/;
-/** One census record (a target, an OS exit) of an earlier census is this one's when it names the same key. */
-const sameIdentity = (a, b) => Boolean(a && b) && namedBy(a, identityKey(b));
-/** The keys of a list's records, for asking sameIdentity of each record against all of them at once. */
+/** The keys of a list's records, for comparing each record against all of them at once. */
 const keysOf = (list) => new Set((list ?? []).filter(Boolean).map(identityKey));
-/** `x` names the same key as one of `keys` (keysOf): sameIdentity against every record of the list. */
+/** `x` names the same key as one of `keys` (keysOf). */
 const namedIn = (keys, x) => Boolean(x) && keys.has(identityKey(x));
 
 /**

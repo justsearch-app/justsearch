@@ -27,7 +27,7 @@ const workValue = process.env.JUSTSEARCH_INSTALLED_API_PORT_WORK?.trim();
 if (!workValue) {
   throw new Error('JUSTSEARCH_INSTALLED_API_PORT_WORK is required');
 }
-const work = path.resolve(workValue);
+path.resolve(workValue);
 const knownAppDataValue = process.env.JUSTSEARCH_INSTALLED_KNOWN_APPDATA?.trim();
 if (!knownAppDataValue) {
   throw new Error('JUSTSEARCH_INSTALLED_KNOWN_APPDATA is required');

@@ -79,7 +79,7 @@ int port = EnvRegistry.API_PORT.getInt(8080);
 boolean prod = EnvRegistry.PROD_MODE.getBoolean(false);
 
 // Check if explicitly set
-if (EnvRegistry.MODEL_PATH.isSet()) { ... }
+if (EnvRegistry.LLM_MODEL_PATH.isSet()) { ... }
 ```
 
 **Registered Variables:**
@@ -90,7 +90,6 @@ if (EnvRegistry.MODEL_PATH.isSet()) { ... }
 | `SSOT_PATH` | `justsearch.ssot.path` | `JUSTSEARCH_SSOT_PATH` | Override SSOT location |
 | `FIELD_CATALOG` | `justsearch.fieldCatalog` | `JUSTSEARCH_FIELD_CATALOG` | Override field catalog path |
 | `API_PORT` | `justsearch.api.port` | `JUSTSEARCH_API_PORT` | HTTP API port |
-| `MODEL_PATH` | `justsearch.model.path` | `JUSTSEARCH_MODEL_PATH` | Embedding model |
 | `PROD_MODE` | `justsearch.prod` | `JUSTSEARCH_PROD` | Production mode flag |
 | `LLM_ENABLED` | `justsearch.llm.enabled` | `JUSTSEARCH_LLM_ENABLED` | Enable LLM features |
 | `LLM_MODEL_PATH` | `justsearch.llm.model_path` | `JUSTSEARCH_LLM_MODEL_PATH` | LLM model path |
@@ -179,7 +178,7 @@ void testProductionSchema() {
 
 ## Related Documentation
 
-- [`AGENT_GUIDE.md`](../../AGENT_GUIDE.md) - Section 3: Configuration & SSOT rules
-- [`docs/tempdocs/ssot_configuration_decoupling.md`](../../docs/tempdocs/ssot_configuration_decoupling.md) - Full implementation details
+- [Environment Variables & System Properties](../../docs/reference/configuration/environment-variables.md) - Supported keys and resolution precedence
+- [Runtime Configuration Ownership Matrix](../../docs/reference/configuration/runtime-config-ownership-matrix.md) - Configuration readers, owners, and lifecycle stages
 - [`SSOT/catalogs/fields.v1.json`](../../SSOT/catalogs/fields.v1.json) - The production field catalog
 

@@ -40,7 +40,7 @@
  */
 
 import { readFileSync, existsSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { resolve } from 'node:path';
 
 import yaml from 'js-yaml';
 import { collectJavaMainSources } from './dead-config.mjs';

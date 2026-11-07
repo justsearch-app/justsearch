@@ -80,7 +80,6 @@ src/shell-v0/components/ContextMenu.ts 1 2026-07-16
 src/shell-v0/components/DeclaredSurface.ts 1 2026-07-16
 src/shell-v0/components/Peek.ts 1 2026-07-16
 src/shell-v0/components/ResolutionStats.ts 1 2026-07-16
-src/shell-v0/components/TaskList.ts 4 2026-09-02
 src/shell-v0/components/WalkthroughCard.ts 1 2026-07-16
 src/shell-v0/components/acceptPendingEffect.ts 1 2026-07-16
 src/shell-v0/components/advisory/AdvisoryStore.ts 1 2026-07-16
@@ -172,7 +171,6 @@ src/shell-v0/views/search-v3/Sv3Sidebar.ts 5 2026-10-28
 src/shell-v0/views/search-v3/fixtures.ts 1 2026-09-02
 src/shell-v0/views/search-v3/sv3-composer-morph.ts 4 2026-09-02
 src/shell-v0/views/search-v3/sv3-record.ts 1 2026-09-02
-src/shell-v0/views/search-v3/sv3-results.ts 2 2026-09-02
 src/shell-v0/views/search-v3/sv3-run.ts 8 2026-09-02
 src/shell-v0/views/searchResultViewModel.ts 1 2026-07-16
 src/shell-v0/views/settingsRegister.ts 1 2026-09-02

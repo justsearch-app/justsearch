@@ -23,11 +23,8 @@ async function __maybeLockdown() {
 
 import './styles/tokens.css'
 // Register local strategies immediately; catalog requests start after API discovery.
-// Slice 449 phase 11 — Lit chrome is the production chrome. The React `<App>`
-// + `<GlassShell>` + `<ActivityRail>` + `<Stage>` and the React rail-view
-// components were decommissioned in this slice; the shell-v0 barrel registers
-// every <jf-*> custom element + the chrome (<jf-shell> + <jf-rail> +
-// <jf-stage>) at module load.
+// Lit chrome is the production chrome. During bootstrap, the shell-v0 barrel
+// registers the custom elements, including <jf-shell>, <jf-top-bar> and <jf-stage>.
 import { appLog } from './utils/logger.ts'
 
 // Global unhandled error capture — log-only, no UI notification

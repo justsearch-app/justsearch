@@ -1,93 +1,77 @@
 # @justsearch/plugin-api
 
-TypeScript SDK for authoring JustSearch plugins (V1.5 contract).
+TypeScript authoring SDK for the frozen JustSearch plugin contract (host contract
+version `1.1`). This maintenance package does not activate future plugin features
+or change the host runtime. Node 20 or newer is supported.
 
-## Status
+## Contents
 
-**1.5.1-alpha** — published-package metadata is in place; the
-package is built locally via `npm run build`. **Actual publish
-to npm is V1.5.2** — requires user-provisioned npm 2FA + access
-token, which is outside the autonomous-implementation scope of
-slice 477 H3.1.
+The package includes ESM (`dist/index.mjs`), CommonJS (`dist/index.js`), and strict,
+self-contained declarations (`dist/index.d.ts`). Import or require the package by
+name; both runtime formats export only `PLUGIN_CONTRACT_VERSION`. The private
+support declarations carry the canonical resource vocabulary without shipping
+host implementations, trust verification code, or schema validators.
 
-## What's in this package
-
-The published types mirror
-`modules/ui-web/src/shell-v0/plugin-api/` from the JustSearch
-monorepo. V1.5.1 alpha syncs types via `npm run sync-types`
-(reads from the monorepo source). V1.5.2 will publish as a
-real package; at that point `npm install @justsearch/plugin-api`
-will pull a versioned snapshot.
-
-Exported types:
-
-- `PluginManifest`, `PluginCapabilities`, `PluginRegisterFn`,
-  `PluginUnregisterFn` — the V1.5 plugin contract shape
-- `PluginHostApi`, `SurfacePortHandler`, `SurfacePortContext` —
-  host-mediated APIs for plugin contributions
-- `PluginSurfaceContribution` — surface manifest entry shape
-- `PLUGIN_CONTRACT_VERSION` — current host contract version
-  (V1.5.1: `'1.1'`)
-- `PluginTrustTier`, `TrustVerdict`, `TrustEvidence` — V1.5.1
-  H2.3 trust model types
-
-## Authoring a plugin
-
-See the
-[how-to guide](https://github.com/justsearch-app/justsearch/blob/main/docs/how-to/write-a-plugin.md)
-for a full walkthrough.
-
-Quick start (TypeScript):
+The original public names remain available: `PLUGIN_CONTRACT_VERSION`,
+`PluginManifest`, `PluginCapabilities`, `PluginRegisterFn`, `PluginUnregisterFn`,
+`PluginHostApi`, `PluginSurfaceContribution`, `SurfacePortHandler`,
+`SurfacePortContext`, `PluginTrustTier`, `TrustVerdict`, `TrustEvidence`, and
+`TrustChannel`. Current canonical declarations also include `PluginContribution`,
+resource contributions, lifecycle hooks, and the grouped host APIs.
 
 ```ts
 import type { PluginManifest } from '@justsearch/plugin-api';
 
-// Define the plugin in TS for editor support; ship the compiled JS.
 const manifest: PluginManifest = {
   id: 'myplugin',
   version: '1.0.0',
   displayName: 'My Plugin',
   contractVersion: '1.1',
   tagNamespace: 'myplugin',
-  capabilities: {
-    surfaces: [/* ... */],
-  },
+  capabilities: {},
   register(host) {
-    // ...
+    host.registration.registerSurfacePort('myplugin.panel', () => null);
+    return { translations: { en: { 'myplugin.title': 'My Plugin' } } };
   },
 };
-
 export default manifest;
 ```
 
-Then compile with `tsc` and wrap the compiled JS in the V1.5.1
-factory shape (see how-to guide §"The plugin source contract").
+Host access is grouped, for example `host.registration.registerSurfacePort`,
+`host.data.fetch`, and `host.search.subscribeSearch`. A register hook may return a
+`PluginContribution`; activate/deactivate hooks are separate lifecycle hooks.
+Resource contributions use the canonical registry shape; the host owns provenance.
 
-## V1.5.1 alpha contract
+See the [plugin authoring guide](https://github.com/justsearch-app/justsearch/blob/main/docs/how-to/write-a-plugin.md)
+for the SES factory-expression source format and host trust rules. SDK runtime
+bundles are authoring conveniences; they do not provide a plugin loader.
 
-The plugin runs in a SES Compartment with explicit endowments.
-Plugin code cannot reach `window`, `fetch`, or other host
-globals unless the host endows them. The plugin source contract
-is an **expression** (not an ES module), evaluating to either:
+## Maintaining the snapshot
 
-- A `PluginManifest` object directly, OR
-- A factory function `(endowments) => PluginManifest`.
+From a monorepo checkout, first install the root dependencies with `npm ci`.
+Scripts resolve the repository's pinned local TypeScript and esbuild; no tool is
+downloaded as a fallback. Run these from the repository root:
 
-See `docs/how-to/write-a-plugin.md` for the migration from V1.5
-alpha (ES module + default export) to V1.5.1 (factory expression).
+```sh
+npm --prefix packages/plugin-api-ts run sync-types
+npm --prefix packages/plugin-api-ts run check:sync
+npm --prefix packages/plugin-api-ts run build
+npm --prefix packages/plugin-api-ts run typecheck
+npm --prefix packages/plugin-api-ts run check
+npm --prefix packages/plugin-api-ts run prepublishOnly
+```
 
-## Tier model
+Sync projects a fixed set of canonical declarations using TypeScript's parser and
+typechecks staged source before replacement. It preserves other source files and
+removes stale generated declarations. `check:sync` is read-only. Build stages both
+runtime formats and declarations before replacing `dist`. Ordinary replacement
+failures restore previous output or identify a recoverable backup in the error;
+these directory swaps do not promise crash-atomic updates.
 
-Plugins run at `UNTRUSTED_PLUGIN` by default. `TRUSTED_PLUGIN`
-requires backend signature verification (V1.5.2+ via Sigstore).
-The default `UNTRUSTED` tier provides:
-
-- `localStorage` writes scoped to `plugin:<id>:` namespace
-- `customElements.define()` rejected for tags outside `<id>-*`
-- All other endowments same as TRUSTED
-
-See `TrustChannel` types in this package + the substrate docs
-for the full model.
+The package check exercises real local packs, both Node loaders, isolated strict
+Bundler/NodeNext consumers, canonical assignability, freshness, and failure
+preservation. `prepublishOnly` prepares and checks artifacts; run it locally
+without publishing. Publication and contract evolution remain separate work.
 
 ## License
 
