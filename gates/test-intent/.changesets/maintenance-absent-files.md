@@ -37,3 +37,25 @@ the enforcer and its failure cases are unchanged.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "source-verifier-70f644bc-20261107-01",
+  "verdict": "accept",
+  "digest": "sha256:7eb50c4a8a1d7672db85462bfa5a22bc6b3c85e5bba8c268de700af23478ae8e",
+  "note": "Independently verified exact absent-path pruning, byte-identical surviving pins, and preserved growth/malformed/whole-file failure checks on before and candidate."
+}
+```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "/root/source_reviewer",
+  "verdict": "accept",
+  "digest": "sha256:7eb50c4a8a1d7672db85462bfa5a22bc6b3c85e5bba8c268de700af23478ae8e",
+  "note": "Independent source audit accepts Structural rule kept: only two absent-path allowances are removed; surviving pins and enforcement predicates are unchanged. Delegation covers this choice, no conflicting decision record was found, and the digest was independently recomputed. Runtime execution remains separately verified."
+}
+```
