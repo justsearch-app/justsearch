@@ -112,9 +112,14 @@ def read_bytes(path):
 
 def inventory(root: Path) -> dict:
     """Complete path/mode/byte inventory; links, special files and inode aliases refuse."""
+    return _inventory(root)[0]
+
+
+def _inventory(root: Path, *, capture_sqlite=False):
     root = checked_path(root)
     require(root.is_dir(), f'not a directory: {root}')
     result, inodes = {'.': {'mode': stat.S_IMODE(root.stat().st_mode), 'kind': 'dir'}}, set()
+    databases, stores = [], {}
     for parent, dirs, files in os.walk(root, followlinks=False):
         for name in sorted(dirs + files):
             path = Path(parent)/name
@@ -133,15 +138,27 @@ def inventory(root: Path) -> dict:
                     a = os.fstat(fd)
                     require((a.st_dev, a.st_ino) == inode, f'file raced: {path}')
                     with os.fdopen(fd, 'rb', closefd=False) as stream:
-                        sha = hashlib.file_digest(stream, 'sha256').hexdigest()
+                        if capture_sqlite:
+                            prefix = stream.read(100)
+                            sha = hashlib.sha256(prefix)
+                            sha = hashlib.file_digest(stream, lambda: sha).hexdigest()
+                        else:
+                            sha = hashlib.file_digest(stream, 'sha256').hexdigest()
                     b = os.fstat(fd)
                     require((a.st_size, a.st_mtime_ns, a.st_ctime_ns) ==
                             (b.st_size, b.st_mtime_ns, b.st_ctime_ns), f'file changed: {path}')
                 finally:
                     os.close(fd)
                 row.update(size=st.st_size, sha256=sha)
+                if capture_sqlite:
+                    database = path.suffix != '.log' and prefix.startswith(b'SQLite format 3\0')
+                    if database:
+                        databases.append(rel)
+                    if database or name.endswith(('-wal', '-shm')):
+                        stores[rel] = (row, inode)
             result[rel] = row
-    return result
+    selected = {name+suffix for name in databases for suffix in ('', '-wal', '-shm')}
+    return result, (tuple(sorted(databases)), {k: v for k, v in stores.items() if k in selected})
 
 
 def disjoint(a: Path, b: Path):
@@ -436,7 +453,41 @@ def materialization(c: Collection, root: Path):
     return m, tree
 
 
+def _sqlite_identity(st):
+    return (st.st_dev, st.st_ino, st.st_mode, st.st_nlink, st.st_size, st.st_mtime_ns, st.st_ctime_ns)
+
+
+def _copy_sqlite(source, destination, expected):
+    """Copy bounded chunks from an independent checked inode, bound to its inventory."""
+    row, inode = expected
+    source = checked_path(source)
+    fd = os.open(source, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    try:
+        before = os.fstat(fd)
+        require(stat.S_ISREG(before.st_mode) and before.st_nlink == 1
+                and (before.st_dev, before.st_ino) == inode
+                and stat.S_IMODE(before.st_mode) == row['mode'], f'SQLite input replaced: {source}')
+        size, sha = 0, hashlib.sha256()
+        with os.fdopen(fd, 'rb', closefd=False) as stream, destination.open('xb') as out:
+            while chunk := stream.read(1024*1024):
+                size += len(chunk)
+                require(size <= row['size'], f'SQLite input grew: {source}')
+                sha.update(chunk)
+                out.write(chunk)
+        after = os.fstat(fd)
+        require(_sqlite_identity(before) == _sqlite_identity(after) == _sqlite_identity(source.lstat())
+                and size == row['size'] and sha.hexdigest() == row['sha256'],
+                f'SQLite input changed: {source}')
+        return _sqlite_identity(after)
+    finally:
+        os.close(fd)
+
+
 def payload(data: Path, generation: str) -> dict:
+    return _payload(data, generation)
+
+
+def _payload(data: Path, generation: str, captured=None) -> dict:
     require(isinstance(generation, str) and re.fullmatch(r'[A-Za-z0-9_-]+', generation),
             'invalid active generation')
     base = data/'index/default'
@@ -463,29 +514,48 @@ def payload(data: Path, generation: str) -> dict:
             controls[rel] = hashlib.sha256(read_bytes(path)).hexdigest()
     # Schema/header identities are checked separately from SQLite's operational pages/WAL.
     databases = {}
-    for path in sorted(data.rglob('*')):
-        if not path.is_file() or path.suffix in ('.log',):
-            continue
-        with path.open('rb') as stream:
-            header = stream.read(100)
-        if header.startswith(b'SQLite format 3\0'):
-            # SQLite must see retained WAL schema while originals and byte-identical
-            # clones remain untouched. A tiny isolated database copy is the first rung;
-            # SQLite may create/rewrite only its own temporary SHM bookkeeping there.
-            with tempfile.TemporaryDirectory(prefix='frozen-sqlite-') as scratch:
-                copied = Path(scratch)/path.name
-                for suffix in ('', '-wal', '-shm'):
-                    original = path.with_name(path.name+suffix)
+    paths = (data/rel for rel in captured[0]) if captured is not None else sorted(data.rglob('*'))
+    for path in paths:
+        if captured is None:
+            if not path.is_file() or path.suffix in ('.log',):
+                continue
+            with path.open('rb') as stream:
+                header = stream.read(100)
+            if not header.startswith(b'SQLite format 3\0'):
+                continue
+        # SQLite must see retained WAL schema while originals and byte-identical
+        # clones remain untouched. A tiny isolated database copy is the first rung;
+        # SQLite may create/rewrite only its own temporary SHM bookkeeping there.
+        with tempfile.TemporaryDirectory(prefix='frozen-sqlite-') as scratch:
+            copied = Path(scratch)/path.name
+            observations = {}
+            for suffix in ('', '-wal', '-shm'):
+                original = path.with_name(path.name+suffix)
+                if captured is None:
                     if original.exists():
                         shutil.copyfile(original, Path(str(copied)+suffix))
-                con = sqlite3.connect(copied.as_uri()+'?mode=ro', uri=True)
-                try:
-                    databases[path.relative_to(data).as_posix()] = {
-                        'schema': con.execute('SELECT type,name,tbl_name,sql FROM sqlite_master ORDER BY type,name').fetchall(),
-                        'application_id': con.execute('PRAGMA application_id').fetchone()[0],
-                        'user_version': con.execute('PRAGMA user_version').fetchone()[0]}
-                finally:
-                    con.close()
+                else:
+                    expected = captured[1].get(original.relative_to(data).as_posix())
+                    if expected is None:
+                        require(not os.path.lexists(original), f'unexpected SQLite input: {original}')
+                    else:
+                        observations[original] = _copy_sqlite(original, Path(str(copied)+suffix), expected)
+            if captured is not None:
+                for suffix in ('', '-wal', '-shm'):
+                    original = path.with_name(path.name+suffix)
+                    if original in observations:
+                        require(_sqlite_identity(checked_path(original).lstat()) == observations[original],
+                                f'SQLite input changed before interpretation: {original}')
+                    else:
+                        require(not os.path.lexists(original), f'unexpected SQLite input: {original}')
+            con = sqlite3.connect(copied.as_uri()+'?mode=ro', uri=True)
+            try:
+                databases[path.relative_to(data).as_posix()] = {
+                    'schema': con.execute('SELECT type,name,tbl_name,sql FROM sqlite_master ORDER BY type,name').fetchall(),
+                    'application_id': con.execute('PRAGMA application_id').fetchone()[0],
+                    'user_version': con.execute('PRAGMA user_version').fetchone()[0]}
+            finally:
+                con.close()
     # JSON normalization keeps the SQLite tuples stable after storage/reload.
     return json.loads(canonical_json({'generation': generation, 'state': state,
                                      'indices': tree, 'controls': controls, 'databases': databases}))
@@ -507,6 +577,10 @@ def floor(c: Collection, baseline: Path, cache: Path):
 
 def validate_origin(c, b, root):
     inventory(root/'data')
+    return _validate_origin(c, b, root)
+
+
+def _validate_origin(c, b, root, captured=None):
     predecessor_ownership(root/'data')
     entry = read_json(root/'entry.json')
     require(entry.get('schema') == index.SCHEMA, 'unsupported frozen entry schema')
@@ -528,7 +602,7 @@ def validate_origin(c, b, root):
     require(entry['attestation']['canary']['required_stages'] == list(index.CANARY_STAGES),
             'missing original canary stages')
     materialization(c, root)
-    payload(root/'data', witness['generation'])
+    _payload(root/'data', witness['generation'], captured)
     return entry
 
 
@@ -665,7 +739,8 @@ def _ready(output: Path, c, cfg, baseline):
 
 
 def _check_source(c, b, root, item):
-    validate_origin(c, b, root)
+    captured = _inventory(root/'data', capture_sqlite=True)[1]
+    _validate_origin(c, b, root, captured)
     require(inventory(root/'data') == item['source_data'] and inventory(root/'documents') == item['source_documents']
             and {name: hashlib.sha256(read_bytes(root/name)).hexdigest() for name in METADATA} == item['source_metadata'],
             'frozen source drifted since copying')
