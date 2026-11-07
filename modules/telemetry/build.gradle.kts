@@ -15,8 +15,8 @@ dependencies {
   api(libs.opentelemetry.api)
   implementation(libs.opentelemetry.sdk)
   api(libs.opentelemetry.sdk.metrics)
-  implementation("io.opentelemetry:opentelemetry-sdk-common:1.60.1")
-  api("io.opentelemetry:opentelemetry-sdk-trace:1.60.1")
+  implementation("io.opentelemetry:opentelemetry-sdk-common:1.67.0")
+  api("io.opentelemetry:opentelemetry-sdk-trace:1.67.0")
   implementation(libs.opentelemetry.exporter.otlp)
   implementation(libs.slf4j.api)
   // Needed at compile time for tests that configure Logback/Logstash programmatically

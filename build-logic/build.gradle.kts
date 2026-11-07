@@ -76,7 +76,7 @@ dependencies {
   // PIT (pitest) Gradle plugin — mutation-testing conventions (tempdoc 555). Gradle 9-compatible refresh.
   implementation("info.solidsoft.gradle.pitest:gradle-pitest-plugin:1.19.0")
   // Jackson on buildscript classpath — used by modules/ui/build.gradle.kts dev-stack tasks
-  implementation("com.fasterxml.jackson.core:jackson-databind:2.18.6")
+  implementation("com.fasterxml.jackson.core:jackson-databind:2.22.4")
 }
 
 // This build cannot apply the convention plugin while compiling it. Keep this isolation block
