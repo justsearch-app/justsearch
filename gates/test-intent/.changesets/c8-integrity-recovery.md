@@ -16,3 +16,13 @@ The original integrity fixture retains its SQL, corrupt-result and empty-result 
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1b432-fcf6-7371-91b3-380f6ff1c1f4",
+  "verdict": "accept",
+  "digest": "sha256:cdfb3b4aaf31fed8aa5dbb8ab809e2e69385772c07c550ab1186d528adab4191"
+}
+```
