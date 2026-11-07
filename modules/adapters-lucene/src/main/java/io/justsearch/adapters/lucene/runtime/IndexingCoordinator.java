@@ -589,7 +589,6 @@ public final class IndexingCoordinator {
         } finally {
           dispatchLock.unlock();
         }
-        session.pendingDocs.incrementAndGet();
         reportDroppedVectors(droppedVectors, 1);
         return acceptedEmbedding;
       } finally {
@@ -648,7 +647,6 @@ public final class IndexingCoordinator {
         } finally {
           dispatchLock.unlock();
         }
-        session.pendingDocs.addAndGet(documents.size());
         reportDroppedVectors(droppedVectors, documents.size());
         TelemetryEvents events = session.telemetryEvents;
         if (events != null) {
