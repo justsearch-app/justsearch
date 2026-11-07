@@ -86,7 +86,7 @@ final class WorkerSearchQueryBudgetTest
     service.setSearchReranker(reranker(counts, runs, () -> cancelled.set(true)));
     var none = CallContext.none();
     var call = new CallContext(null, null, cancelled::get, none.engineContext(), none.provenance(),
-        none.childLifetime(), none.deadlineNanos());
+        none.childLifetime(), none.inferenceRequest().deadlineNanos());
     assertThrows(CancellationException.class, () -> service.rerank(request("long", true, true), call));
     assertEquals(1, counts.get());
     assertEquals(0, runs.get());
