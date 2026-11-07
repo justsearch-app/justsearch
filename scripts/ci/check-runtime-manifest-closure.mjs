@@ -351,9 +351,6 @@ function lineOf(content, idx) {
   return content.slice(0, idx).split('\n').length;
 }
 
-const {createRequire} = await import('node:module');
-const require = createRequire(import.meta.url);
-
 const files = listSourceFiles();
 const allHits = [];
 for (const f of files) {

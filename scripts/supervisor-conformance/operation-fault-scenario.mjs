@@ -28,7 +28,6 @@ const SESSION_HEADER = 'X-JustSearch-Session';
 const INGEST_ROUTE = '/api/knowledge/ingest';
 const SETTINGS_ROUTE = '/api/settings/v2';
 const RECEIPT_CURSOR = /^ingest-receipt:1:[1-9][0-9]*:[0-9a-f]{64}$/;
-const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 /** Installed ingestion/settings fault runner using the real HTTP producers. */
 export async function exerciseOperationFault(c) {

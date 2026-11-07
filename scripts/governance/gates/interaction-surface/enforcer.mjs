@@ -218,7 +218,7 @@ function scanSecondViews(root, feRoots, excludeSuffixes, coreSet, canonicalMount
     }
   }
   const violations = [];
-  for (const [abs, src] of sources) {
+  for (const src of sources.values()) {
     for (const m of src.matchAll(/registerViewFactory\(\s*['"]([^'"]+)['"]\s*,\s*([^)]+?)\s*\)/g)) {
       const shape = m[1];
       if (!coreSet.has(shape)) continue;

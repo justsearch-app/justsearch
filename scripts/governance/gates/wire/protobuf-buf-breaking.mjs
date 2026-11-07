@@ -14,8 +14,8 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync, copyFileSync, statSync, mkdirSync } from 'node:fs';
-import { resolve, relative, basename } from 'node:path';
+import { existsSync, readdirSync, copyFileSync, mkdirSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { tmpdir, platform } from 'node:os';
 import { randomBytes } from 'node:crypto';
 

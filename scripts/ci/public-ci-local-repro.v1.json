@@ -63,7 +63,8 @@
       "mode": "local-subset",
       "commands": [
         "node scripts/lib/tool-invoker.cjs gradle assemble -PskipWebBuild=false",
-        "node scripts/dev/java-prepush.mjs"
+        "node scripts/dev/java-prepush.mjs",
+        "npm --prefix packages/plugin-api-ts run check"
       ],
       "lanes": [
         "build"

@@ -2,6 +2,8 @@
 package io.justsearch.indexerworker.queue;
 
 import io.justsearch.app.api.indexing.AcceptedProjection;
+import io.justsearch.indexerworker.queue.SqliteJobQueue.DbOperation;
+import io.justsearch.indexerworker.queue.SqliteJobQueue.DbRecovery;
 import io.justsearch.telemetry.Telemetry;
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -29,7 +31,7 @@ final class SqliteQueueSwitchBufferOps {
   private final ReentrantLock lock;
   private final Supplier<Connection> connSupplier;
   private final Runnable onWriteFailure;
-  private final Runnable errorRecorder;
+  private final SqliteJobQueue.DbHealthCallbacks health;
   private MigrationJournalWitness admissionWitness;
   private java.util.function.LongSupplier retainedOrderFloor = () -> 0L;
   private Runnable admissionChanged = () -> {};
@@ -74,31 +76,42 @@ final class SqliteQueueSwitchBufferOps {
       ReentrantLock lock,
       Supplier<Connection> connSupplier,
       Runnable onWriteFailure,
-      Runnable errorRecorder) {
+      SqliteJobQueue.DbHealthCallbacks health) {
     this.lock = lock;
     this.connSupplier = connSupplier;
     this.onWriteFailure = onWriteFailure;
-    this.errorRecorder = errorRecorder;
+    this.health = health;
   }
 
   /** Returns the buffered count, or throws when the observation is unavailable. */
   long depth() {
     lock.lock();
+    DbRecovery dbRecovery = health.captureRecovery(DbOperation.SWITCH_BUFFER_DEPTH);
+    boolean dbRecoveryEligible = false;
     try {
       Connection conn = connSupplier.get();
       try (Statement stmt = conn.createStatement();
           ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM switch_buffer")) {
         if (rs.next()) {
-          return rs.getLong(1);
+          {
+        var dbResult = rs.getLong(1);
+        dbRecoveryEligible = true;
+        return dbResult;
+      }
         }
         return 0L;
       }
     } catch (SQLException e) {
-      errorRecorder.run();
+      dbRecoveryEligible = false;
+      health.recordFailure(DbOperation.SWITCH_BUFFER_DEPTH);
       throw new io.justsearch.indexerworker.ingest.IngestionServiceUnavailableException(
           "Cannot read switch buffer depth", e);
+    } catch (RuntimeException | Error failure) {
+      dbRecoveryEligible = false;
+      throw failure;
     } finally {
       lock.unlock();
+      if (dbRecoveryEligible) health.completeObservation(DbOperation.SWITCH_BUFFER_DEPTH, dbRecovery);
     }
   }
 
@@ -110,6 +123,8 @@ final class SqliteQueueSwitchBufferOps {
   /** Exact drain count; SQLite read failures must block generation promotion. */
   JobQueue.JobStateCounts stateCountsStrict() {
     lock.lock();
+    DbRecovery dbRecovery = health.captureRecovery(DbOperation.JOB_STATE_COUNTS);
+    boolean dbRecoveryEligible = false;
     try {
       Connection conn = connSupplier.get();
       long now = System.currentTimeMillis();
@@ -128,21 +143,30 @@ final class SqliteQueueSwitchBufferOps {
         stmt.setLong(1, now);
         try (ResultSet rs = stmt.executeQuery()) {
           if (rs.next()) {
-            return new JobQueue.JobStateCounts(
+            {
+        var dbResult = new JobQueue.JobStateCounts(
                 rs.getLong("pending_count"),
                 rs.getLong("pending_ready_count"),
                 rs.getLong("processing_count"),
                 rs.getLong("done_count"),
                 rs.getLong("failed_count"));
+        dbRecoveryEligible = true;
+        return dbResult;
+      }
           }
           return new JobQueue.JobStateCounts(0L, 0L, 0L, 0L, 0L);
         }
       }
     } catch (SQLException e) {
-      errorRecorder.run();
+      dbRecoveryEligible = false;
+      health.recordFailure(DbOperation.JOB_STATE_COUNTS);
       throw new io.justsearch.indexerworker.ingest.IngestionServiceUnavailableException("Failed to get job state counts", e);
+    } catch (RuntimeException | Error failure) {
+      dbRecoveryEligible = false;
+      throw failure;
     } finally {
       lock.unlock();
+      if (dbRecoveryEligible) health.completeObservation(DbOperation.JOB_STATE_COUNTS, dbRecovery);
     }
   }
 
@@ -160,6 +184,8 @@ final class SqliteQueueSwitchBufferOps {
    */
   JobQueue.PendingBytes pendingBytes() {
     lock.lock();
+    DbRecovery dbRecovery = health.captureRecovery(DbOperation.PENDING_BYTES);
+    boolean dbRecoveryEligible = false;
     try {
       Connection conn = connSupplier.get();
       String sql =
@@ -171,17 +197,26 @@ final class SqliteQueueSwitchBufferOps {
       try (PreparedStatement stmt = conn.prepareStatement(sql);
           ResultSet rs = stmt.executeQuery()) {
         if (rs.next()) {
-          return new JobQueue.PendingBytes(
+          {
+        var dbResult = new JobQueue.PendingBytes(
               rs.getLong("known_bytes"), rs.getLong("unknown_size_jobs"));
+        dbRecoveryEligible = true;
+        return dbResult;
+      }
         }
         return JobQueue.PendingBytes.UNAVAILABLE;
       }
     } catch (Exception e) {
-      errorRecorder.run();
+      dbRecoveryEligible = false;
+      health.recordFailure(DbOperation.PENDING_BYTES);
       log.debug("Failed to get pending job bytes (best-effort): {}", e.getMessage());
       return JobQueue.PendingBytes.UNAVAILABLE;
+    } catch (Error failure) {
+      dbRecoveryEligible = false;
+      throw failure;
     } finally {
       lock.unlock();
+      if (dbRecoveryEligible) health.completeObservation(DbOperation.PENDING_BYTES, dbRecovery);
     }
   }
 
@@ -429,6 +464,8 @@ final class SqliteQueueSwitchBufferOps {
       throw new IllegalArgumentException("Generation must be non-blank when scoped");
     }
     lock.lock();
+    DbRecovery dbRecovery = health.captureRecovery(DbOperation.SWITCH_BUFFER_LIST);
+    boolean dbRecoveryEligible = false;
     try {
       Connection conn = connSupplier.get();
       String sql =
@@ -456,12 +493,21 @@ final class SqliteQueueSwitchBufferOps {
           }
         }
       }
-      return out;
+      {
+        var dbResult = out;
+        dbRecoveryEligible = true;
+        return dbResult;
+      }
     } catch (SQLException e) {
-      errorRecorder.run();
+      dbRecoveryEligible = false;
+      health.recordFailure(DbOperation.SWITCH_BUFFER_LIST);
       throw new io.justsearch.indexerworker.ingest.IngestionServiceUnavailableException("Failed to read switch buffer ops", e);
+    } catch (RuntimeException | Error failure) {
+      dbRecoveryEligible = false;
+      throw failure;
     } finally {
       lock.unlock();
+      if (dbRecoveryEligible) health.completeObservation(DbOperation.SWITCH_BUFFER_LIST, dbRecovery);
     }
   }
 

@@ -12,7 +12,6 @@
 const fs = require('fs');
 const fsp = require('fs/promises');
 const path = require('path');
-const os = require('os');
 const net = require('net');
 const http = require('http');
 const crypto = require('crypto');
@@ -1945,13 +1944,6 @@ function execPowerShell(command) {
       },
     );
   });
-}
-
-function validatePort(port) {
-  if (!Number.isInteger(port) || port < 0 || port > 65535) {
-    throw new Error(`Invalid port: ${port}`);
-  }
-  return port;
 }
 
 function validatePid(pid) {

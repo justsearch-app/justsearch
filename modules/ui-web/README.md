@@ -43,11 +43,14 @@ src/
 
 ```bash
 npm run dev
-# Backend must be running (default port 33221, or set VITE_JUSTSEARCH_API_PORT)
+# Backend must be running; Vite discovers its API port from the runtime manifest
 ```
 
 The Vite dev-server proxy forwards `/api/*` and `/.well-known/justsearch/*`
-requests to the locally-discovered backend.
+requests to the backend discovered from a live runtime manifest, including the
+local `.dev-data` directory and platform data directories. For tests,
+`VITE_JUSTSEARCH_API_PORT` (or `VITE_API_PORT`) overrides discovery; there is no
+fixed-port fallback.
 
 ## Commands
 
