@@ -2,28 +2,28 @@
 title: "Runbook: `queue-db.unhealthy`"
 type: runbook
 status: stable
-description: "Operator response when the Worker queue database reports unhealthy state; ingestion is paused."
+description: "Operator response when the Worker queue database reports unresolved recorded database-operation failures."
 ---
 
 # Runbook: `queue-db.unhealthy`
 
-The Worker queue database (the durable inbox the Worker uses to track pending indexing jobs) is reporting unhealthy. Ingestion is paused; the Worker will not accept new jobs.
+The Worker queue database (the durable inbox the Worker uses to track pending indexing jobs) has unresolved recorded operation failures. This is diagnostic evidence; the health field does not itself pause ingestion or control admission, deletion or recovery. A failing database operation can still prevent the work that requires it.
 
-This is distinct from `queue-db.check-failed`, which reports a soft failure of the most recent integrity probe and does not block ingestion.
+This is distinct from `queue-db.check-failed`, which reports failure of the most recent integrity probe. Only a later complete passing quick-check recovers integrity evidence.
 
 ## Symptoms
 
 - Health view shows the **Queue DB unhealthy** banner.
 - `/api/health/events/stream` emits an `AssertedCondition` with `id="queue-db.unhealthy"` and `status=TRUE`.
-- `/api/status` shows the Worker as reachable but `queueDbHealthy=false`.
-- New ingestion requests are queued in the head but not picked up by the Worker.
+- A fresh `/api/status` sample shows grouped `queueHealth.healthy=false` for a reachable Worker.
+- Logs identify the failing queue operation; the aggregate health field does not expose individual unresolved operation kinds.
 
-## Likely causes (by reason code)
+## Likely causes
 
-| Reason code | Cause | Urgency |
+| Evidence | Cause | Urgency |
 | --- | --- | --- |
-| `IntegrityFailed` | The queue DB's on-disk integrity check failed. | High — durability is at risk. |
-| `DiskFull` | The Worker cannot grow the queue DB because the disk is full. | High — block on free space. |
+| Failed integrity probe | The queue DB's on-disk integrity check failed. | High — durability is at risk. |
+| SQLite disk-full error | The Worker cannot grow the queue DB because the disk is full. | High — block on free space. |
 
 ## Diagnostics
 
@@ -61,15 +61,17 @@ tail -n 500 "$data_dir/logs/engine.log"
 
 ## Remediation
 
-- **`DiskFull`** — free space on the data volume; the condition will clear automatically once the Worker can grow the DB again.
-- **`IntegrityFailed`**:
+- **Disk full** — free space on the data volume. A later complete successful execution of each previously failing operation kind can recover its diagnostic failure. Fixing a dependency does not execute an inactive operation or promise a retry schedule.
+- **Integrity probe failed**:
   1. Stop the Worker.
   2. Back up the queue DB files (do not delete — the audit trail is useful even if the DB is unrecoverable).
-  3. If the DB is recoverable, the Worker may self-repair on the next start. If it isn't, the queue DB can be reset; pending unindexed work will need to be re-submitted.
+  3. Diagnose and restore the database using preserved files and logs. Opening runs the real integrity check; a passing quick-check clears integrity failure only, and cannot certify an unrelated failed query.
 - **Unknown cause** — preserve `engine.log` for diagnosis before any destructive action.
+
+Health history is local to one queue object. Reopening that object retains unresolved nonmatching operation history; creating a new object does not persist it. Successful recovery preserves the historical last-error timestamp. Conditions clear after a fresh healthy sample; stale or unreachable views cannot prove recovery.
 
 ## Related
 
-- `queue-db.check-failed` — soft integrity-check failure that does not pause ingestion.
-- `index.unavailable` — separate condition; if both are asserted, address `queue-db.unhealthy` first since it blocks recovery.
+- `queue-db.check-failed` — result of the latest integrity check.
+- `index.unavailable` — a separate condition; diagnose its evidence independently.
 - Architecture: `docs/explanation/01-system-overview.md` (Worker queue DB role).

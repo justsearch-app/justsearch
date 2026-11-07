@@ -67,6 +67,11 @@ public final class IndexingJobsChangeStream implements IndexingJobChangeFeed, Cl
   private final LinkedHashMap<Long, String> failedRows = new LinkedHashMap<>();
   private boolean pendingResync;
   private boolean resyncRequired;
+
+  /** Existing projection debt; the queue owner reads this under its shared lock. */
+  boolean hasPendingResync() {
+    return pendingResync || resyncRequired;
+  }
   private Set<String> presentStates = Set.of();
   private final Set<String> enteredStates = new HashSet<>();
   private final Set<String> leftStates = new HashSet<>();

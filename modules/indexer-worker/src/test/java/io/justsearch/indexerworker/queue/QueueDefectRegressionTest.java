@@ -202,7 +202,7 @@ final class QueueDefectRegressionTest {
       assertEquals(0, queue.queueDepth());
       assertFalse(queue.queueDbHealthSnapshot().healthy(), "unrelated successful reads cannot prove integrity");
       assertTrue(queue.performIntegrityCheck());
-      assertFalse(queue.queueDbHealthSnapshot().healthy(), "a later passing check does not clear the recorded failure");
+      assertTrue(queue.queueDbHealthSnapshot().healthy(), "a complete actual quick-check recovers integrity failure alone");
       assertEquals(errorAt, queue.queueDbHealthSnapshot().lastDbErrorAtMs());
     }
   }

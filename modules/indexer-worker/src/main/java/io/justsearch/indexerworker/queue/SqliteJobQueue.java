@@ -719,6 +719,69 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
   // QueueDbHealthSnapshot record moved to JobQueue interface (Step 3 module split).
 
+  /** Fixed recording perimeter; health observations never grant queue authority. */
+  enum DbOperation {
+    PROJECTION_ADMISSION,
+    LEGACY_PREFIX_SCOPING,
+    REPLAY_REMOVAL,
+    REPLAY_ALL_REMOVAL,
+    EXPECTED_COLLECTION,
+    NONTERMINAL_PREFIX,
+    OUTSIDE_CERTIFIED_PREFIX,
+    NONTERMINAL_COLLECTION,
+    MAINTENANCE_ADMISSION,
+    CANDIDATE_FILE_ADMISSION,
+    CANDIDATE_MAINTENANCE_ADMISSION,
+    CANDIDATE_ENUMERATION_ADMISSION,
+    ACCEPTED_FILE_PROJECTION,
+    WATCHER_RECONCILIATION,
+    REFUSAL_CLEANUP_OWNERSHIP,
+    SOURCE_FILE_WORK,
+    APPLIED_FILE_PROJECTION,
+    CAPTURED_FILE_DELETION,
+    PENDING_INGEST_READINESS,
+    CLAIM_PUBLICATION_OWNERSHIP,
+    CONNECTION_LIFETIME,
+    PROCESSING_HEARTBEAT,
+    QUEUE_DEPTH,
+    COMPLETED_COUNT,
+    RECENT_INGESTION_EVENTS,
+    INGESTION_OUTCOME_SUMMARY,
+    UNOWNED_FAILURE_COUNT,
+    FAILURE_SUMMARY,
+    FAILED_JOB_LIST,
+    PREFIX_FAILED_JOB_LIST,
+    CLEAR_FAILED_JOBS,
+    CLEAR_ALL_JOBS,
+    PREFIX_DELETE_WITH_SURVIVORS,
+    PREFIX_STATE_COUNTS,
+    INTEGRITY,
+    WAL_CHECKPOINT,
+    SWITCH_BUFFER_DEPTH,
+    JOB_STATE_COUNTS,
+    PENDING_BYTES,
+    SWITCH_BUFFER_LIST;
+
+    boolean requiresProjection() {
+      return switch (this) {
+        case PROJECTION_ADMISSION, LEGACY_PREFIX_SCOPING, REPLAY_REMOVAL, REPLAY_ALL_REMOVAL, MAINTENANCE_ADMISSION, CANDIDATE_FILE_ADMISSION, CANDIDATE_MAINTENANCE_ADMISSION, CANDIDATE_ENUMERATION_ADMISSION, WATCHER_RECONCILIATION, PROCESSING_HEARTBEAT, CLEAR_FAILED_JOBS, CLEAR_ALL_JOBS, PREFIX_DELETE_WITH_SURVIVORS -> true;
+        default -> false;
+      };
+    }
+  }
+
+  record DbRecovery(Object failureIdentity, Connection connection, IndexingJobsChangeStream changeStream) {}
+
+  interface DbHealthCallbacks {
+    DbRecovery captureRecovery(DbOperation operation);
+    void recordFailure(DbOperation operation);
+    void completeObservation(DbOperation operation, DbRecovery recovery);
+  }
+
+  // Owned by lock; only the volatile published snapshot remains lock-free.
+  private final java.util.EnumMap<DbOperation, Object> unresolvedDbFailures =
+      new java.util.EnumMap<>(DbOperation.class);
+
   private volatile boolean dbHealthy = true;
   private volatile long lastQuickCheckAtMs;
   private volatile boolean lastQuickCheckOk;
@@ -835,7 +898,17 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     this.switchBufferOps =
         new SqliteQueueSwitchBufferOps(
             lock, this::ensureOpenAndGetConnection, onSwitchBufferWriteFailure,
-            this::recordDbError);
+            new DbHealthCallbacks() {
+              @Override public DbRecovery captureRecovery(DbOperation operation) {
+                return captureDbRecovery(operation);
+              }
+              @Override public void recordFailure(DbOperation operation) {
+                recordDbError(operation);
+              }
+              @Override public void completeObservation(DbOperation operation, DbRecovery recovery) {
+                completeDbOperation(operation, recovery);
+              }
+            });
   }
 
   private Connection ensureOpenAndGetConnection() {
@@ -895,6 +968,9 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   @Override
   public void open() throws SQLException, IOException {
     lock.lock();
+    Object dbFailure = unresolvedDbFailures.get(DbOperation.CONNECTION_LIFETIME);
+    DbRecovery dbRecovery = null;
+    boolean dbRecoveryEligible = false;
     boolean acquiredConnection = false;
     try {
       if (connectionFailure != null) throw new SQLException(
@@ -974,6 +1050,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       installOutcomeMetrics();
 
       log.info("SqliteJobQueue opened: {}", dbPath);
+      if (dbFailure != null) dbRecovery = new DbRecovery(dbFailure, connection, changeStream);
+      dbRecoveryEligible = true;
     } catch (SQLException | IOException | RuntimeException | Error failure) {
       if (acquiredConnection) {
         try { closeWalkChanges(); }
@@ -999,6 +1077,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       throw failure;
     } finally {
       unlockAfterChanges();
+      if (dbRecoveryEligible) completeDbOperation(DbOperation.CONNECTION_LIFETIME, dbRecovery);
     }
   }
 
@@ -1316,15 +1395,26 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   public ProjectionAdmission admitProjectionForGeneration(String generation, String payload) {
     var projection = io.justsearch.app.api.indexing.AcceptedProjection.decode(payload);
     lock.lock();
+    DbRecovery dbRecovery = captureDbRecovery(DbOperation.PROJECTION_ADMISSION);
+    boolean dbRecoveryEligible = false;
     try {
       ensureOpen();
-      return inTransaction(() -> switchBufferOps.admitProjectionInTransaction(
+      {
+        var dbResult = inTransaction(() -> switchBufferOps.admitProjectionInTransaction(
           connection, generation, projection));
+        dbRecoveryEligible = true;
+        return dbResult;
+      }
     } catch (SQLException failure) {
-      recordDbError();
+      dbRecoveryEligible = false;
+      recordDbError(DbOperation.PROJECTION_ADMISSION);
       throw new IllegalStateException("Generation-scoped projection admission failed", failure);
+    } catch (RuntimeException | Error failure) {
+      dbRecoveryEligible = false;
+      throw failure;
     } finally {
       lock.unlock();
+      if (dbRecoveryEligible) completeDbOperation(DbOperation.PROJECTION_ADMISSION, dbRecovery);
     }
   }
 
@@ -1332,6 +1422,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   public void scopeLegacyPrefixReceipts(
       java.util.function.Function<String, PathPrefixScope> scope) {
     lock.lock();
+    DbRecovery dbRecovery = captureDbRecovery(DbOperation.LEGACY_PREFIX_SCOPING);
+    boolean dbRecoveryEligible = false;
     try {
       ensureOpen();
       inTransaction(() -> {
@@ -1354,11 +1446,17 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         return null;
         } catch (IOException invalid) { throw new SQLException("Legacy conversion checkpoint failed",invalid); }
       });
+      dbRecoveryEligible = true;
     } catch (SQLException failure) {
-      recordDbError();
+      dbRecoveryEligible = false;
+      recordDbError(DbOperation.LEGACY_PREFIX_SCOPING);
       throw new IllegalStateException("Legacy prefix receipts could not be scoped", failure);
+    } catch (RuntimeException | Error failure) {
+      dbRecoveryEligible = false;
+      throw failure;
     } finally {
       lock.unlock();
+      if (dbRecoveryEligible) completeDbOperation(DbOperation.LEGACY_PREFIX_SCOPING, dbRecovery);
     }
   }
 
@@ -2422,14 +2520,25 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       }
     }
     lock.lock();
+    DbRecovery dbRecovery = captureDbRecovery(DbOperation.REPLAY_REMOVAL);
+    boolean dbRecoveryEligible = false;
     try {
       ensureOpen();
-      return inTransaction(() -> switchBufferOps.removeReplayedLocked(snapshot));
+      {
+        var dbResult = inTransaction(() -> switchBufferOps.removeReplayedLocked(snapshot));
+        dbRecoveryEligible = !snapshot.isEmpty();
+        return dbResult;
+      }
     } catch (SQLException failure) {
-      recordDbError();
+      dbRecoveryEligible = false;
+      recordDbError(DbOperation.REPLAY_REMOVAL);
       throw new IllegalStateException("Failed to remove replayed switch-buffer versions", failure);
+    } catch (RuntimeException | Error failure) {
+      dbRecoveryEligible = false;
+      throw failure;
     } finally {
       unlockAfterChanges();
+      if (dbRecoveryEligible) completeDbOperation(DbOperation.REPLAY_REMOVAL, dbRecovery);
     }
   }
 
@@ -2449,14 +2558,25 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       }
     }
     lock.lock();
+    DbRecovery dbRecovery = captureDbRecovery(DbOperation.REPLAY_REMOVAL);
+    boolean dbRecoveryEligible = false;
     try {
       ensureOpen();
-      return inTransaction(() -> switchBufferOps.removeReplayedLocked(snapshot));
+      {
+        var dbResult = inTransaction(() -> switchBufferOps.removeReplayedLocked(snapshot));
+        dbRecoveryEligible = !snapshot.isEmpty();
+        return dbResult;
+      }
     } catch (SQLException failure) {
-      recordDbError();
+      dbRecoveryEligible = false;
+      recordDbError(DbOperation.REPLAY_REMOVAL);
       throw new IllegalStateException("Failed to remove replayed switch-buffer versions", failure);
+    } catch (RuntimeException | Error failure) {
+      dbRecoveryEligible = false;
+      throw failure;
     } finally {
       unlockAfterChanges();
+      if (dbRecoveryEligible) completeDbOperation(DbOperation.REPLAY_REMOVAL, dbRecovery);
     }
   }
 
@@ -2473,20 +2593,27 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       }
     }
     lock.lock();
+    DbRecovery dbRecovery = captureDbRecovery(DbOperation.REPLAY_ALL_REMOVAL);
+    boolean dbRecoveryEligible = false;
     try {
       ensureOpen();
-      return inTransaction(() -> {
+      { dbRecoveryEligible = !snapshot.isEmpty(); return inTransaction(() -> {
         var removal = connection.setSavepoint();
         boolean complete = switchBufferOps.removeReplayedLocked(snapshot) == snapshot.size();
         if (!complete) connection.rollback(removal);
         connection.releaseSavepoint(removal);
         return complete;
-      });
+      }); }
     } catch (SQLException failure) {
-      recordDbError();
+      dbRecoveryEligible = false;
+      recordDbError(DbOperation.REPLAY_ALL_REMOVAL);
       throw new IllegalStateException("Failed to remove replayed switch-buffer versions", failure);
+    } catch (RuntimeException | Error failure) {
+      dbRecoveryEligible = false;
+      throw failure;
     } finally {
       unlockAfterChanges();
+      if (dbRecoveryEligible) completeDbOperation(DbOperation.REPLAY_ALL_REMOVAL, dbRecovery);
     }
   }
 
@@ -2526,20 +2653,31 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     String normalizedCollection =
         expectedCollection == null || expectedCollection.isBlank() ? null : expectedCollection;
     lock.lock();
+    DbRecovery dbRecovery = captureDbRecovery(DbOperation.EXPECTED_COLLECTION);
+    boolean dbRecoveryEligible = false;
     try {
       ensureOpen();
       try (PreparedStatement query = connection.prepareStatement(
           "SELECT collection FROM jobs WHERE path = ?")) {
         query.setString(1, normalizedPath);
         try (ResultSet row = query.executeQuery()) {
-          return !row.next() || Objects.equals(normalizedCollection, row.getString(1));
+          {
+        var dbResult = !row.next() || Objects.equals(normalizedCollection, row.getString(1));
+        dbRecoveryEligible = true;
+        return dbResult;
+      }
         }
       }
     } catch (SQLException unavailable) {
-      recordDbError();
+      dbRecoveryEligible = false;
+      recordDbError(DbOperation.EXPECTED_COLLECTION);
       throw new IllegalStateException("Expected collection row is unreadable", unavailable);
+    } catch (RuntimeException | Error failure) {
+      dbRecoveryEligible = false;
+      throw failure;
     } finally {
       lock.unlock();
+      if (dbRecoveryEligible) completeDbOperation(DbOperation.EXPECTED_COLLECTION, dbRecovery);
     }
   }
 
@@ -2560,6 +2698,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     }
     String upper = upperBoundExclusive(lower);
     lock.lock();
+    DbRecovery dbRecovery = captureDbRecovery(DbOperation.NONTERMINAL_PREFIX);
+    boolean dbRecoveryEligible = false;
     try {
       ensureOpen();
       var parameters = new ArrayList<String>(List.of(lower, upper));
@@ -2569,14 +2709,23 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
               + "AND path >= ? AND path < ?" + predicate + " LIMIT 1")) {
         for (int i = 0; i < parameters.size(); i++) query.setString(i + 1, parameters.get(i));
         try (ResultSet row = query.executeQuery()) {
-          return row.next();
+          {
+        var dbResult = row.next();
+        dbRecoveryEligible = true;
+        return dbResult;
+      }
         }
       }
     } catch (SQLException unavailable) {
-      recordDbError();
+      dbRecoveryEligible = false;
+      recordDbError(DbOperation.NONTERMINAL_PREFIX);
       throw new IllegalStateException("Non-terminal path-prefix scope is unreadable", unavailable);
+    } catch (RuntimeException | Error failure) {
+      dbRecoveryEligible = false;
+      throw failure;
     } finally {
       lock.unlock();
+      if (dbRecoveryEligible) completeDbOperation(DbOperation.NONTERMINAL_PREFIX, dbRecovery);
     }
   }
 
@@ -2600,6 +2749,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     Set<String> excluded = normalizeSurvivorPaths(certifiedReplayPaths);
     var scope = new PathPrefixScope(pathPrefix, excludedSubtrees);
     lock.lock();
+    DbRecovery dbRecovery = captureDbRecovery(DbOperation.OUTSIDE_CERTIFIED_PREFIX);
+    boolean dbRecoveryEligible = false;
     try {
       ensureOpen();
       try (PreparedStatement query = connection.prepareStatement(
@@ -2611,17 +2762,30 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           while (rows.next()) {
             String path = rows.getString("path");
             if (excluded.contains(path) || scope.excludes(path)) continue;
-            return true;
+            {
+        var dbResult = true;
+        dbRecoveryEligible = true;
+        return dbResult;
+      }
           }
-          return false;
+          {
+        var dbResult = false;
+        dbRecoveryEligible = true;
+        return dbResult;
+      }
         }
       }
     } catch (SQLException unavailable) {
-      recordDbError();
+      dbRecoveryEligible = false;
+      recordDbError(DbOperation.OUTSIDE_CERTIFIED_PREFIX);
       throw new IllegalStateException(
           "Path-prefix scope outside certified replay paths is unreadable", unavailable);
+    } catch (RuntimeException | Error failure) {
+      dbRecoveryEligible = false;
+      throw failure;
     } finally {
       lock.unlock();
+      if (dbRecoveryEligible) completeDbOperation(DbOperation.OUTSIDE_CERTIFIED_PREFIX, dbRecovery);
     }
   }
 
@@ -2633,6 +2797,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     }
     String normalizedCollection = collection.trim();
     lock.lock();
+    DbRecovery dbRecovery = captureDbRecovery(DbOperation.NONTERMINAL_COLLECTION);
+    boolean dbRecoveryEligible = false;
     try {
       ensureOpen();
       try (PreparedStatement query = connection.prepareStatement(
@@ -2641,14 +2807,23 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         query.setString(1, IngestCollectionPolicy.DEFAULT_COLLECTION);
         query.setString(2, normalizedCollection);
         try (ResultSet row = query.executeQuery()) {
-          return row.next();
+          {
+        var dbResult = row.next();
+        dbRecoveryEligible = true;
+        return dbResult;
+      }
         }
       }
     } catch (SQLException unavailable) {
-      recordDbError();
+      dbRecoveryEligible = false;
+      recordDbError(DbOperation.NONTERMINAL_COLLECTION);
       throw new IllegalStateException("Non-terminal collection scope is unreadable", unavailable);
+    } catch (RuntimeException | Error failure) {
+      dbRecoveryEligible = false;
+      throw failure;
     } finally {
       lock.unlock();
+      if (dbRecoveryEligible) completeDbOperation(DbOperation.NONTERMINAL_COLLECTION, dbRecovery);
     }
   }
 
@@ -2697,6 +2872,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         ? declaredCollectionRoots.get() : List.<IngestCollectionPolicy.RootBinding>of();
     var sources = unitRevision == null ? observeAdmissionSources(entries, null, collection) : Map.<JobQueue.EnqueueEntry, AdmissionSource>of();
     lockTimed();
+    DbRecovery dbRecovery = preserveRetryWaits ? captureDbRecovery(DbOperation.MAINTENANCE_ADMISSION) : null;
+    boolean dbRecoveryEligible = false;
     try {
       ensureOpen();
 
@@ -2729,16 +2906,25 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
       meters.recordEnqueued(result.enqueued());
       log.debug("Covered {} jobs (collection={}, scanId={})", result.covered(), col, scan);
-      return preserveRetryWaits ? result.enqueued() : result.covered();
+      {
+        var dbResult = preserveRetryWaits ? result.enqueued() : result.covered();
+        dbRecoveryEligible = preserveRetryWaits;
+        return dbResult;
+      }
     } catch (SQLException e) {
+      dbRecoveryEligible = false;
       log.error("Failed to enqueue jobs", e);
       if (preserveRetryWaits) {
-        recordDbError();
+        recordDbError(DbOperation.MAINTENANCE_ADMISSION);
         throw new IngestionServiceUnavailableException("Maintenance admission failed", e);
       }
       return 0;
+    } catch (RuntimeException | Error failure) {
+      dbRecoveryEligible = false;
+      throw failure;
     } finally {
       unlockAfterChanges();
+      if (dbRecoveryEligible) completeDbOperation(DbOperation.MAINTENANCE_ADMISSION, dbRecovery);
     }
   }
 
@@ -3577,6 +3763,10 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     }
 
     lockTimed();
+    DbOperation dbOperation = enumeration ? DbOperation.CANDIDATE_ENUMERATION_ADMISSION
+        : maintenance ? DbOperation.CANDIDATE_MAINTENANCE_ADMISSION : DbOperation.CANDIDATE_FILE_ADMISSION;
+    DbRecovery dbRecovery = captureDbRecovery(dbOperation);
+    boolean dbRecoveryEligible = false;
     try {
       ensureOpen();
       String normalizedCollection = collection == null || collection.isBlank() ? null : collection;
@@ -3613,13 +3803,22 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         return new CandidateFileBatch(accepted + superseded, accepted);
       });
       meters.recordEnqueued(committed.enqueued());
-      return committed.covered();
+      {
+        var dbResult = committed.covered();
+        dbRecoveryEligible = true;
+        return dbResult;
+      }
     } catch (SQLException | RuntimeException failure) {
-      recordDbError();
+      dbRecoveryEligible = false;
+      recordDbError(dbOperation);
       log.error("Failed atomic file batch admission", failure);
       return 0;
+    } catch (Error failure) {
+      dbRecoveryEligible = false;
+      throw failure;
     } finally {
       unlockAfterChanges();
+      if (dbRecoveryEligible) completeDbOperation(dbOperation, dbRecovery);
     }
   }
 
@@ -3747,6 +3946,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         || !JobQueue.IngestionLedgerTransition.isSha256(sourceSha256)
         || !JobQueue.IngestionLedgerTransition.isSha256(indexedSourceSha256)) return false;
     lock.lock();
+    DbRecovery dbRecovery = captureDbRecovery(DbOperation.ACCEPTED_FILE_PROJECTION);
+    boolean dbRecoveryEligible = false;
     try {
       ensureOpen();
       try (PreparedStatement query = connection.prepareStatement(
@@ -3756,21 +3957,38 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         try (ResultSet row = query.executeQuery()) {
           if (!row.next() || !STATE_DONE.equals(row.getString("state"))
               || !unitRevision.equals(row.getString("unit_revision"))
-              || !sourceSha256.equals(row.getString("planned_source_sha256"))) return false;
+              || !sourceSha256.equals(row.getString("planned_source_sha256"))) {
+        var dbResult = false;
+        dbRecoveryEligible = true;
+        return dbResult;
+      }
           String committed = row.getString("content_hash");
           if (sourceSha256.equals(indexedSourceSha256)) {
-            return committed == null || sourceSha256.equals(committed);
+            {
+        var dbResult = committed == null || sourceSha256.equals(committed);
+        dbRecoveryEligible = true;
+        return dbResult;
+      }
           }
-          return indexedSourceSha256.equals(committed)
+          {
+        var dbResult = indexedSourceSha256.equals(committed)
               && matchesCapturedFileProjection(row, path, unitRevision,
                   sourceSha256, indexedSourceSha256, false);
+        dbRecoveryEligible = true;
+        return dbResult;
+      }
         }
       }
     } catch (SQLException unavailable) {
-      recordDbError();
+      dbRecoveryEligible = false;
+      recordDbError(DbOperation.ACCEPTED_FILE_PROJECTION);
       throw new IllegalStateException("Accepted file projection evidence is unreadable", unavailable);
+    } catch (RuntimeException | Error failure) {
+      dbRecoveryEligible = false;
+      throw failure;
     } finally {
       lock.unlock();
+      if (dbRecoveryEligible) completeDbOperation(DbOperation.ACCEPTED_FILE_PROJECTION, dbRecovery);
     }
   }
 
@@ -4051,9 +4269,11 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       Runnable removeIndex) {
     if (file != null && file.policyOmitted()) return tryMatchesWatcherPolicyOmission(file, freshProof);
     lock.lock();
+    DbRecovery dbRecovery = captureDbRecovery(DbOperation.WATCHER_RECONCILIATION);
+    boolean dbRecoveryEligible = false;
     try {
       ensureOpen();
-      return inTransaction(() -> {
+      { dbRecoveryEligible = true; return inTransaction(() -> {
         var journal = switchBufferOps.listAllStrict().stream()
             .filter(op -> op.generation().isEmpty() || file.candidate().equals(op.generation())).toList();
         var root = file.rootReceipt();
@@ -4150,11 +4370,16 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         } else return false;
         freshProof.run();
         return true;
-      });
+      }); }
     } catch (SQLException failure) {
-      recordDbError();
+      dbRecoveryEligible = false;
+      recordDbError(DbOperation.WATCHER_RECONCILIATION);
       throw new IllegalStateException("Conditional watcher reconciliation failed", failure);
-    } finally { unlockAfterChanges(); }
+    } catch (RuntimeException | Error failure) {
+      dbRecoveryEligible = false;
+      throw failure;
+    } finally { unlockAfterChanges();   if (dbRecoveryEligible) completeDbOperation(DbOperation.WATCHER_RECONCILIATION, dbRecovery);
+    }
   }
 
   /** Policy omission is a read, including for encoded watcher predecessor ownership. */
@@ -4323,20 +4548,31 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   public boolean holdsRefusalCleanupAdmission(String path, String admission) {
     if (path == null || !isAdmissionRevision(admission)) return false;
     lock.lock();
+    DbRecovery dbRecovery = captureDbRecovery(DbOperation.REFUSAL_CLEANUP_OWNERSHIP);
+    boolean dbRecoveryEligible = false;
     try {
       ensureOpen();
       try (PreparedStatement query =
           connection.prepareStatement("SELECT unit_revision FROM jobs WHERE path = ?")) {
         query.setString(1, path);
         try (ResultSet row = query.executeQuery()) {
-          return row.next() && admission.equals(row.getString(1));
+          {
+        var dbResult = row.next() && admission.equals(row.getString(1));
+        dbRecoveryEligible = true;
+        return dbResult;
+      }
         }
       }
     } catch (SQLException unavailable) {
-      recordDbError();
+      dbRecoveryEligible = false;
+      recordDbError(DbOperation.REFUSAL_CLEANUP_OWNERSHIP);
       throw new IllegalStateException("Queue admission ownership evidence is unreadable", unavailable);
+    } catch (RuntimeException | Error failure) {
+      dbRecoveryEligible = false;
+      throw failure;
     } finally {
       lock.unlock();
+      if (dbRecoveryEligible) completeDbOperation(DbOperation.REFUSAL_CLEANUP_OWNERSHIP, dbRecovery);
     }
   }
 
@@ -4349,6 +4585,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   public SourceFileWork sourceFileWork(String path, String indexedSourceSha256) {
     if (path == null) return SourceFileWork.NONE;
     lock.lock();
+    DbRecovery dbRecovery = captureDbRecovery(DbOperation.SOURCE_FILE_WORK);
+    boolean dbRecoveryEligible = false;
     try {
       ensureOpen();
       try (PreparedStatement query = connection.prepareStatement(
@@ -4356,36 +4594,65 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
               + " retry_after FROM jobs WHERE path = ?")) {
         query.setString(1, path);
         try (ResultSet row = query.executeQuery()) {
-          if (!row.next()) return SourceFileWork.NONE;
+          if (!row.next()) {
+        var dbResult = SourceFileWork.NONE;
+        dbRecoveryEligible = true;
+        return dbResult;
+      }
           String state = row.getString("state");
           if (endedByPolicy(state, row.getString("last_outcome_class"),
               row.getString("last_reason_code"), row.getString("last_retry_policy"))) {
-            return SourceFileWork.POLICY;
+            {
+        var dbResult = SourceFileWork.POLICY;
+        dbRecoveryEligible = true;
+        return dbResult;
+      }
           }
           if (STATE_FAILED.equals(state) || STATE_RETRY_EXHAUSTED.equals(state)) {
-            return SourceFileWork.FAILED;
+            {
+        var dbResult = SourceFileWork.FAILED;
+        dbRecoveryEligible = true;
+        return dbResult;
+      }
           }
           if (STATE_PENDING.equals(state)) {
             long retryAfter = row.getLong("retry_after");
-            return !row.wasNull() && retryAfter > System.currentTimeMillis()
+            {
+        var dbResult = !row.wasNull() && retryAfter > System.currentTimeMillis()
                 ? SourceFileWork.FAILED : SourceFileWork.OUTSTANDING;
+        dbRecoveryEligible = true;
+        return dbResult;
+      }
           }
-          if (!STATE_DONE.equals(state)) return SourceFileWork.OUTSTANDING;
+          if (!STATE_DONE.equals(state)) {
+        var dbResult = SourceFileWork.OUTSTANDING;
+        dbRecoveryEligible = true;
+        return dbResult;
+      }
           // Only a write records content_hash, and every admission clears it, so a hash here
           // was written by this admission or a later one; a retired, refused or skipped row has
           // none. A later admission's bytes supersede the accepted ones even when they differ
           // from its captured plan, because the file legitimately changed again.
           String committed = row.getString("content_hash");
-          return JobQueue.IngestionLedgerTransition.isSha256(committed)
+          {
+        var dbResult = JobQueue.IngestionLedgerTransition.isSha256(committed)
               && committed.equals(indexedSourceSha256)
               ? SourceFileWork.COMMITTED : SourceFileWork.NONE;
+        dbRecoveryEligible = true;
+        return dbResult;
+      }
         }
       }
     } catch (SQLException unavailable) {
-      recordDbError();
+      dbRecoveryEligible = false;
+      recordDbError(DbOperation.SOURCE_FILE_WORK);
       throw new IllegalStateException("Queue admission ownership evidence is unreadable", unavailable);
+    } catch (RuntimeException | Error failure) {
+      dbRecoveryEligible = false;
+      throw failure;
     } finally {
       lock.unlock();
+      if (dbRecoveryEligible) completeDbOperation(DbOperation.SOURCE_FILE_WORK, dbRecovery);
     }
   }
 
@@ -4394,6 +4661,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       String modifiedAt, String collection) {
     if (path == null) return false;
     lock.lock();
+    DbRecovery dbRecovery = captureDbRecovery(DbOperation.APPLIED_FILE_PROJECTION);
+    boolean dbRecoveryEligible = false;
     try {
       ensureOpen();
       try (var query = connection.prepareStatement("""
@@ -4407,22 +4676,43 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           """)) {
         query.setString(1, sha256(path)); query.setString(2, path); query.setString(3, collection);
         try (var row = query.executeQuery()) {
-          if (!row.next() || endedByPolicy(STATE_DONE, row.getString(2), row.getString(3), row.getString(4))) return false;
+          if (!row.next() || endedByPolicy(STATE_DONE, row.getString(2), row.getString(3), row.getString(4))) {
+        var dbResult = false;
+        dbRecoveryEligible = true;
+        return dbResult;
+      }
           String committed = row.getString(1);
-          if (JobQueue.IngestionLedgerTransition.isSha256(committed) && committed.equals(indexedSourceSha256)) return true;
+          if (JobQueue.IngestionLedgerTransition.isSha256(committed) && committed.equals(indexedSourceSha256)) {
+        var dbResult = true;
+        dbRecoveryEligible = true;
+        return dbResult;
+      }
           if (modifiedAt == null || !"SKIPPED_POLICY".equals(row.getString(2))
-              || !"UNCHANGED".equals(row.getString(3)) || !"NONE".equals(row.getString(4))) return false;
+              || !"UNCHANGED".equals(row.getString(3)) || !"NONE".equals(row.getString(4))) {
+        var dbResult = false;
+        dbRecoveryEligible = true;
+        return dbResult;
+      }
           final long modified;
           try { modified = Long.parseLong(modifiedAt); }
           catch (NumberFormatException invalid) { throw new IllegalStateException("Indexed freshness evidence is unreadable", invalid); }
           long observedModified = row.getLong(5);
-          return !row.wasNull() && observedModified == modified && Objects.equals(collection, row.getString(6));
+          {
+        var dbResult = !row.wasNull() && observedModified == modified && Objects.equals(collection, row.getString(6));
+        dbRecoveryEligible = true;
+        return dbResult;
+      }
         }
       }
     } catch (SQLException unreadable) {
-      recordDbError();
+      dbRecoveryEligible = false;
+      recordDbError(DbOperation.APPLIED_FILE_PROJECTION);
       throw new IllegalStateException("Applied file completion evidence is unreadable", unreadable);
-    } finally { lock.unlock(); }
+    } catch (RuntimeException | Error failure) {
+      dbRecoveryEligible = false;
+      throw failure;
+    } finally { lock.unlock();   if (dbRecoveryEligible) completeDbOperation(DbOperation.APPLIED_FILE_PROJECTION, dbRecovery);
+    }
   }
 
   @Override
@@ -4431,6 +4721,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     if (path == null || path.isBlank() || unitRevision == null || unitRevision.isBlank()
         || !JobQueue.IngestionLedgerTransition.isSha256(plannedSourceSha256)) return false;
     lock.lock();
+    DbRecovery dbRecovery = captureDbRecovery(DbOperation.CAPTURED_FILE_DELETION);
+    boolean dbRecoveryEligible = false;
     try {
       ensureOpen();
       try (PreparedStatement query = connection.prepareStatement(
@@ -4440,26 +4732,47 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         try (ResultSet row = query.executeQuery()) {
           if (!row.next() || !STATE_DONE.equals(row.getString("state"))
               || !unitRevision.equals(row.getString("unit_revision"))
-              || !plannedSourceSha256.equals(row.getString("planned_source_sha256"))) return false;
+              || !plannedSourceSha256.equals(row.getString("planned_source_sha256"))) {
+        var dbResult = false;
+        dbRecoveryEligible = true;
+        return dbResult;
+      }
           String committed = row.getString("content_hash");
-          if (!JobQueue.IngestionLedgerTransition.isSha256(committed)) return false;
+          if (!JobQueue.IngestionLedgerTransition.isSha256(committed)) {
+        var dbResult = false;
+        dbRecoveryEligible = true;
+        return dbResult;
+      }
           var progress = SqliteIngestionWalkOps.find(connection, row.getString("scan_id"))
               .orElse(null);
           if (progress == null || progress.acknowledgedRevision() >= progress.revision()
               || SqliteIngestionWalkOps.sealedReceipt(
                   connection, progress.operationKey(), SqliteJobQueue::sha256).isEmpty()) {
-            return false;
+            {
+        var dbResult = false;
+        dbRecoveryEligible = true;
+        return dbResult;
+      }
           }
-          return matchesCapturedFileProjection(row, path, unitRevision,
+          {
+        var dbResult = matchesCapturedFileProjection(row, path, unitRevision,
               plannedSourceSha256, committed, true);
+        dbRecoveryEligible = true;
+        return dbResult;
+      }
         }
       }
     } catch (SQLException unavailable) {
-      recordDbError();
+      dbRecoveryEligible = false;
+      recordDbError(DbOperation.CAPTURED_FILE_DELETION);
       throw new IllegalStateException("Accepted captured file deletion evidence is unreadable",
           unavailable);
+    } catch (RuntimeException | Error failure) {
+      dbRecoveryEligible = false;
+      throw failure;
     } finally {
       lock.unlock();
+      if (dbRecoveryEligible) completeDbOperation(DbOperation.CAPTURED_FILE_DELETION, dbRecovery);
     }
   }
 
@@ -4602,6 +4915,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   @Override
   public boolean hasPendingIngestWork() {
     lock.lock();
+    DbRecovery dbRecovery = captureDbRecovery(DbOperation.PENDING_INGEST_READINESS);
+    boolean dbRecoveryEligible = false;
     try {
       ensureOpen();
       try (var query = connection.prepareStatement("""
@@ -4609,13 +4924,22 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
             OR EXISTS(SELECT 1 FROM jobs WHERE state='PENDING' AND retry_after<=?)
           """)) {
         query.setLong(1,System.currentTimeMillis());
-        try (var row = query.executeQuery()) { return row.next() && row.getBoolean(1); }
+        try (var row = query.executeQuery()) { {
+        dbRecoveryEligible = row.next();
+        var dbResult = dbRecoveryEligible && row.getBoolean(1);
+        return dbResult;
+      } }
       }
     } catch (SQLException failure) {
-      recordDbError();
+      dbRecoveryEligible = false;
+      recordDbError(DbOperation.PENDING_INGEST_READINESS);
       log.debug("Pending-ingest readiness unavailable", failure);
       return false;
-    } finally { lock.unlock(); }
+    } catch (RuntimeException | Error failure) {
+      dbRecoveryEligible = false;
+      throw failure;
+    } finally { lock.unlock();   if (dbRecoveryEligible) completeDbOperation(DbOperation.PENDING_INGEST_READINESS, dbRecovery);
+    }
   }
 
   @Override
@@ -4926,14 +5250,25 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   @Override
   public boolean ownsClaimForPublication(IndexJob claim) {
     lock.lock();
+    DbRecovery dbRecovery = captureDbRecovery(DbOperation.CLAIM_PUBLICATION_OWNERSHIP);
+    boolean dbRecoveryEligible = false;
     try {
       ensureOpen();
-      return ownsClaim(claim);
+      {
+        var dbResult = ownsClaim(claim);
+        dbRecoveryEligible = isIssuedClaim(claim);
+        return dbResult;
+      }
     } catch (SQLException unavailable) {
-      recordDbError();
+      dbRecoveryEligible = false;
+      recordDbError(DbOperation.CLAIM_PUBLICATION_OWNERSHIP);
       throw new IllegalStateException("Claim publication ownership is unreadable", unavailable);
+    } catch (RuntimeException | Error failure) {
+      dbRecoveryEligible = false;
+      throw failure;
     } finally {
       lock.unlock();
+      if (dbRecoveryEligible) completeDbOperation(DbOperation.CLAIM_PUBLICATION_OWNERSHIP, dbRecovery);
     }
   }
 
@@ -5900,7 +6235,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       } else walkChanges.discardPending();
     }
     if (connectionFailure != null) {
-      recordDbError();
+      recordDbError(DbOperation.CONNECTION_LIFETIME);
       if (changeStream == null) closeFailedConnection();
     }
     if (failure instanceof SQLException sql) throw sql;
@@ -6207,6 +6542,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   @Override
   public void heartbeatProcessing() {
     lock.lock();
+    DbRecovery dbRecovery = captureDbRecovery(DbOperation.PROCESSING_HEARTBEAT);
+    boolean dbRecoveryEligible = false;
     try {
       ensureOpen();
       inTransaction(() -> {
@@ -6227,18 +6564,26 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         }
         return null;
       });
+      dbRecoveryEligible = !activeClaims.isEmpty();
     } catch (SQLException e) {
-      recordDbError();
+      dbRecoveryEligible = false;
+      recordDbError(DbOperation.PROCESSING_HEARTBEAT);
       // Issued claims remain protected from runtime recovery until synchronous work returns.
       log.debug("Heartbeat of PROCESSING jobs failed (best-effort): {}", e.getMessage());
+    } catch (RuntimeException | Error failure) {
+      dbRecoveryEligible = false;
+      throw failure;
     } finally {
       unlockAfterChanges();
+      if (dbRecoveryEligible) completeDbOperation(DbOperation.PROCESSING_HEARTBEAT, dbRecovery);
     }
   }
 
   @Override
   public long queueDepth() {
     lock.lock();
+    DbRecovery dbRecovery = captureDbRecovery(DbOperation.QUEUE_DEPTH);
+    boolean dbRecoveryEligible = false;
     try {
       ensureOpen();
 
@@ -6250,21 +6595,32 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       try (Statement stmt = connection.createStatement();
            ResultSet rs = stmt.executeQuery(sql)) {
         if (rs.next()) {
-          return rs.getLong(1);
+          {
+        var dbResult = rs.getLong(1);
+        dbRecoveryEligible = true;
+        return dbResult;
+      }
         }
         return 0;
       }
     } catch (SQLException e) {
-      recordDbError();
+      dbRecoveryEligible = false;
+      recordDbError(DbOperation.QUEUE_DEPTH);
       throw new IngestionServiceUnavailableException("Failed to get queue depth", e);
+    } catch (RuntimeException | Error failure) {
+      dbRecoveryEligible = false;
+      throw failure;
     } finally {
       unlockAfterChanges();
+      if (dbRecoveryEligible) completeDbOperation(DbOperation.QUEUE_DEPTH, dbRecovery);
     }
   }
 
   @Override
   public long completedCount() {
     lock.lock();
+    DbRecovery dbRecovery = captureDbRecovery(DbOperation.COMPLETED_COUNT);
+    boolean dbRecoveryEligible = false;
     try {
       ensureOpen();
 
@@ -6273,15 +6629,24 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       try (Statement stmt = connection.createStatement();
            ResultSet rs = stmt.executeQuery(sql)) {
         if (rs.next()) {
-          return rs.getLong(1);
+          {
+        var dbResult = rs.getLong(1);
+        dbRecoveryEligible = true;
+        return dbResult;
+      }
         }
         return 0;
       }
     } catch (SQLException e) {
-      recordDbError();
+      dbRecoveryEligible = false;
+      recordDbError(DbOperation.COMPLETED_COUNT);
       throw new IngestionServiceUnavailableException("Failed to get completed count", e);
+    } catch (RuntimeException | Error failure) {
+      dbRecoveryEligible = false;
+      throw failure;
     } finally {
       unlockAfterChanges();
+      if (dbRecoveryEligible) completeDbOperation(DbOperation.COMPLETED_COUNT, dbRecovery);
     }
   }
 
@@ -6449,6 +6814,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   @Override
   public List<JobQueue.IngestionEventView> recentIngestionEvents(int limit) {
     lock.lock();
+    DbRecovery dbRecovery = captureDbRecovery(DbOperation.RECENT_INGESTION_EVENTS);
+    boolean dbRecoveryEligible = false;
     try {
       ensureOpen();
       int cappedLimit = limit <= 0 ? 100 : Math.min(limit, 1000);
@@ -6467,20 +6834,31 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           while (rs.next()) {
             events.add(readIngestionEventView(rs));
           }
-          return List.copyOf(events);
+          {
+        var dbResult = List.copyOf(events);
+        dbRecoveryEligible = true;
+        return dbResult;
+      }
         }
       }
     } catch (SQLException e) {
-      recordDbError();
+      dbRecoveryEligible = false;
+      recordDbError(DbOperation.RECENT_INGESTION_EVENTS);
       throw new IngestionServiceUnavailableException("Failed to list ingestion ledger events", e);
+    } catch (RuntimeException | Error failure) {
+      dbRecoveryEligible = false;
+      throw failure;
     } finally {
       unlockAfterChanges();
+      if (dbRecoveryEligible) completeDbOperation(DbOperation.RECENT_INGESTION_EVENTS, dbRecovery);
     }
   }
 
   @Override
   public List<JobQueue.IngestionOutcomeSummary> ingestionOutcomeSummary(long sinceMs) {
     lock.lock();
+    DbRecovery dbRecovery = captureDbRecovery(DbOperation.INGESTION_OUTCOME_SUMMARY);
+    boolean dbRecoveryEligible = false;
     try {
       ensureOpen();
       String sql = """
@@ -6504,14 +6882,23 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                     rs.getLong("event_count"),
                     rs.getLong("last_observed_at")));
           }
-          return List.copyOf(summaries);
+          {
+        var dbResult = List.copyOf(summaries);
+        dbRecoveryEligible = true;
+        return dbResult;
+      }
         }
       }
     } catch (SQLException e) {
-      recordDbError();
+      dbRecoveryEligible = false;
+      recordDbError(DbOperation.INGESTION_OUTCOME_SUMMARY);
       throw new IngestionServiceUnavailableException("Failed to summarize ingestion ledger outcomes", e);
+    } catch (RuntimeException | Error failure) {
+      dbRecoveryEligible = false;
+      throw failure;
     } finally {
       unlockAfterChanges();
+      if (dbRecoveryEligible) completeDbOperation(DbOperation.INGESTION_OUTCOME_SUMMARY, dbRecovery);
     }
   }
 
@@ -6579,6 +6966,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   @Override
   public long unownedFailureCount() {
     lock.lock();
+    DbRecovery dbRecovery = captureDbRecovery(DbOperation.UNOWNED_FAILURE_COUNT);
+    boolean dbRecoveryEligible = false;
     try {
       ensureOpen();
       // Only the original v13 admissions are exempt; a stale sidecar or a later admission
@@ -6586,20 +6975,32 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       try (Statement stmt = connection.createStatement();
           ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM jobs WHERE ingestion_root IS NULL "
               + "AND state IN ('FAILED','RETRY_EXHAUSTED') AND unit_revision LIKE 'release030/%'")) {
-        return rs.next() ? rs.getLong(1) : 0L;
+        {
+        dbRecoveryEligible = rs.next();
+        var dbResult = dbRecoveryEligible ? rs.getLong(1) : 0L;
+        return dbResult;
+      }
       }
     } catch (SQLException failure) {
-      recordDbError();
+      dbRecoveryEligible = false;
+      recordDbError(DbOperation.UNOWNED_FAILURE_COUNT);
       throw new IllegalStateException("Cannot count legacy unowned failures", failure);
+    } catch (RuntimeException | Error failure) {
+      dbRecoveryEligible = false;
+      throw failure;
     } finally {
       unlockAfterChanges();
+      if (dbRecoveryEligible) completeDbOperation(DbOperation.UNOWNED_FAILURE_COUNT, dbRecovery);
     }
   }
 
   @Override
   public FailureSummary failureSummary() {
     lock.lock();
+    DbRecovery dbRecovery = captureDbRecovery(DbOperation.FAILURE_SUMMARY);
+    boolean dbRecoveryEligible = false;
     try {
+      boolean dbObservationComplete = true;
       ensureOpen();
 
       long failedCount = 0L;
@@ -6613,7 +7014,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
            ResultSet rs = stmt.executeQuery("SELECT COALESCE(SUM(n),0) FROM job_counts WHERE state IN ('FAILED', 'RETRY_EXHAUSTED')")) {
         if (rs.next()) {
           failedCount = rs.getLong(1);
-        }
+        } else { dbObservationComplete = false; }
       }
 
       // 2) Last failed job (most recent last_updated)
@@ -6651,22 +7052,33 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           if (!rs.wasNull() && v > 0) {
             nextRetryAtMs = v;
           }
-        }
+        } else { dbObservationComplete = false; }
       }
 
-      return new FailureSummary(failedCount, lastFailedPath, lastFailedError, lastFailedAtMs, nextRetryAtMs);
+      {
+        var dbResult = new FailureSummary(failedCount, lastFailedPath, lastFailedError, lastFailedAtMs, nextRetryAtMs);
+        dbRecoveryEligible = dbObservationComplete;
+        return dbResult;
+      }
 
     } catch (SQLException e) {
-      recordDbError();
+      dbRecoveryEligible = false;
+      recordDbError(DbOperation.FAILURE_SUMMARY);
       throw new IngestionServiceUnavailableException("Cannot compute failure summary", e);
+    } catch (RuntimeException | Error failure) {
+      dbRecoveryEligible = false;
+      throw failure;
     } finally {
       unlockAfterChanges();
+      if (dbRecoveryEligible) completeDbOperation(DbOperation.FAILURE_SUMMARY, dbRecovery);
     }
   }
 
   @Override
   public List<FailedJobInfo> listFailedJobs(int limit) {
     lock.lock();
+    DbRecovery dbRecovery = captureDbRecovery(DbOperation.FAILED_JOB_LIST);
+    boolean dbRecoveryEligible = false;
     try {
       ensureOpen();
 
@@ -6692,13 +7104,22 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           }
         }
       }
-      return result;
+      {
+        var dbResult = result;
+        dbRecoveryEligible = true;
+        return dbResult;
+      }
 
     } catch (SQLException e) {
-      recordDbError();
+      dbRecoveryEligible = false;
+      recordDbError(DbOperation.FAILED_JOB_LIST);
       throw new IngestionServiceUnavailableException("Failed to list failed jobs", e);
+    } catch (RuntimeException | Error failure) {
+      dbRecoveryEligible = false;
+      throw failure;
     } finally {
       unlockAfterChanges();
+      if (dbRecoveryEligible) completeDbOperation(DbOperation.FAILED_JOB_LIST, dbRecovery);
     }
   }
 
@@ -6722,6 +7143,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   @Override
   public List<FailedJobInfo> listFailedJobsByPathPrefix(String pathPrefix, int limit) {
     lock.lock();
+    DbRecovery dbRecovery = captureDbRecovery(DbOperation.PREFIX_FAILED_JOB_LIST);
+    boolean dbRecoveryEligible = false;
     try {
       ensureOpen();
 
@@ -6755,19 +7178,30 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           }
         }
       }
-      return result;
+      {
+        var dbResult = result;
+        dbRecoveryEligible = true;
+        return dbResult;
+      }
     } catch (SQLException e) {
-      recordDbError();
+      dbRecoveryEligible = false;
+      recordDbError(DbOperation.PREFIX_FAILED_JOB_LIST);
       log.error("Failed to list failed jobs by path prefix: {}", pathPrefix, e);
       return List.of();
+    } catch (RuntimeException | Error failure) {
+      dbRecoveryEligible = false;
+      throw failure;
     } finally {
       unlockAfterChanges();
+      if (dbRecoveryEligible) completeDbOperation(DbOperation.PREFIX_FAILED_JOB_LIST, dbRecovery);
     }
   }
 
   @Override
   public int clearFailedJobs() {
     lock.lock();
+    DbRecovery dbRecovery = captureDbRecovery(DbOperation.CLEAR_FAILED_JOBS);
+    boolean dbRecoveryEligible = false;
     try {
       ensureOpen();
 
@@ -6776,20 +7210,31 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         log.info("Cleared {} failed jobs", affected);
         checkAndVacuum();
       }
-      return affected;
+      {
+        var dbResult = affected;
+        dbRecoveryEligible = true;
+        return dbResult;
+      }
 
     } catch (SQLException e) {
-      recordDbError();
+      dbRecoveryEligible = false;
+      recordDbError(DbOperation.CLEAR_FAILED_JOBS);
       log.error("Failed to clear failed jobs", e);
       return 0;
+    } catch (RuntimeException | Error failure) {
+      dbRecoveryEligible = false;
+      throw failure;
     } finally {
       unlockAfterChanges();
+      if (dbRecoveryEligible) completeDbOperation(DbOperation.CLEAR_FAILED_JOBS, dbRecovery);
     }
   }
 
   @Override
   public int clearAll() {
     lock.lock();
+    DbRecovery dbRecovery = captureDbRecovery(DbOperation.CLEAR_ALL_JOBS);
+    boolean dbRecoveryEligible = false;
     try {
       ensureOpen();
 
@@ -6798,14 +7243,23 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         log.info("Cleared {} jobs (profiling reset)", affected);
         checkAndVacuum();
       }
-      return affected;
+      {
+        var dbResult = affected;
+        dbRecoveryEligible = true;
+        return dbResult;
+      }
 
     } catch (SQLException e) {
-      recordDbError();
+      dbRecoveryEligible = false;
+      recordDbError(DbOperation.CLEAR_ALL_JOBS);
       log.error("Failed to clear all jobs", e);
       throw new IllegalStateException("Failed to clear all jobs", e);
+    } catch (RuntimeException | Error failure) {
+      dbRecoveryEligible = false;
+      throw failure;
     } finally {
       unlockAfterChanges();
+      if (dbRecoveryEligible) completeDbOperation(DbOperation.CLEAR_ALL_JOBS, dbRecovery);
     }
   }
 
@@ -6862,17 +7316,28 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     Set<String> excluded = normalizeSurvivorPaths(survivorPaths);
     String upper = upperBoundExclusive(normalized);
     lock.lock();
+    DbRecovery dbRecovery = captureDbRecovery(DbOperation.PREFIX_DELETE_WITH_SURVIVORS);
+    boolean dbRecoveryEligible = false;
     try {
       ensureOpen();
       var parameters = new ArrayList<String>(List.of(normalized, upper));
       String predicate = "path >= ? AND path < ?" + prefixExclusions(excludedSubtrees, parameters);
-      return removeJobsAdministratively(predicate, parameters, true, excluded);
+      {
+        var dbResult = removeJobsAdministratively(predicate, parameters, true, excluded);
+        dbRecoveryEligible = true;
+        return dbResult;
+      }
     } catch (SQLException failure) {
-      recordDbError();
+      dbRecoveryEligible = false;
+      recordDbError(DbOperation.PREFIX_DELETE_WITH_SURVIVORS);
       throw new IllegalStateException(
           "Strict path-prefix deletion with accepted survivors failed", failure);
+    } catch (RuntimeException | Error failure) {
+      dbRecoveryEligible = false;
+      throw failure;
     } finally {
       unlockAfterChanges();
+      if (dbRecoveryEligible) completeDbOperation(DbOperation.PREFIX_DELETE_WITH_SURVIVORS, dbRecovery);
     }
   }
 
@@ -6906,7 +7371,10 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   @Override
   public JobQueue.JobStateCounts countByPathPrefix(String pathPrefix) {
     lock.lock();
+    DbRecovery dbRecovery = captureDbRecovery(DbOperation.PREFIX_STATE_COUNTS);
+    boolean dbRecoveryEligible = false;
     try {
+      boolean dbObservationComplete = true;
       ensureOpen();
 
       String lower = PathNormalizer.normalizePathPrefix(pathPrefix);
@@ -6942,19 +7410,31 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
               // projection. Leaving it in the `default` arm would have silently dropped those rows
               // out of the per-root totals, so a folder with exhausted files would read "100%".
               case STATE_FAILED, STATE_RETRY_EXHAUSTED -> failed += count;
-              default -> log.debug("countByPathPrefix: unknown state {} ({} rows)", state, count);
+              default -> {
+                dbObservationComplete = false;
+                log.debug("countByPathPrefix: unknown state {} ({} rows)", state, count);
+              }
             }
           }
         }
       }
       // pendingReadyCount: the queue's backoff distinction is not needed for the folder projection
       // (in-flight = pending + processing); report pendingReadyCount == pendingCount.
-      return new JobQueue.JobStateCounts(pending, pending, processing, done, failed);
+      {
+        var dbResult = new JobQueue.JobStateCounts(pending, pending, processing, done, failed);
+        dbRecoveryEligible = dbObservationComplete;
+        return dbResult;
+      }
     } catch (SQLException e) {
-      recordDbError();
+      dbRecoveryEligible = false;
+      recordDbError(DbOperation.PREFIX_STATE_COUNTS);
       throw new IngestionServiceUnavailableException("Cannot count jobs by path prefix", e);
+    } catch (RuntimeException | Error failure) {
+      dbRecoveryEligible = false;
+      throw failure;
     } finally {
       unlockAfterChanges();
+      if (dbRecoveryEligible) completeDbOperation(DbOperation.PREFIX_STATE_COUNTS, dbRecovery);
     }
   }
 
@@ -7017,13 +7497,13 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
   private void ensureOpen() {
     if (connectionFailure != null) {
-      recordDbError();
+      recordDbError(DbOperation.CONNECTION_LIFETIME);
       throw new IngestionServiceUnavailableException(
           "SqliteJobQueue connection cleanup remains unresolved", connectionFailure);
     }
     try { SqliteServiceAvailability.requireOpen(connection, false); }
     catch (SQLException | IngestionServiceUnavailableException failure) {
-      recordDbError();
+      recordDbError(DbOperation.CONNECTION_LIFETIME);
       throw new IngestionServiceUnavailableException("Cannot inspect queue connection", failure);
     }
   }
@@ -7107,7 +7587,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
    *
    * <p>This method should be called after opening an existing database to detect
    * corruption early. It also verifies fresh databases. A passing check does not clear an
-   * earlier recorded database error: structural integrity does not prove the failed query works.
+   * earlier unrelated database error: structural integrity does not prove the failed query works.
    *
    * <p>PRAGMA quick_check returns multiple rows; the database is considered healthy
    * only if ALL rows return exactly "ok". Any other result indicates corruption.
@@ -7117,6 +7597,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
    */
   public boolean performIntegrityCheck() throws SQLException {
     lock.lock();
+    DbRecovery dbRecovery = captureDbRecovery(DbOperation.INTEGRITY);
+    boolean dbRecoveryEligible = false;
     try {
       ensureOpen();
       log.info("Running integrity check on jobs.db...");
@@ -7141,7 +7623,6 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
         if (rowCount == 0 || errors.length() > 0) {
           lastQuickCheckOk = false; // NOPMD - read by health check accessor
-          dbHealthy = false;
           String errorMsg = "Database integrity check failed: " + errors;
           log.error(errorMsg);
           // Use SQLite error code 11 for SQLITE_CORRUPT
@@ -7150,15 +7631,24 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
         lastQuickCheckOk = true;
         log.info("Integrity check passed ({} rows checked)", rowCount);
-        return true;
+        {
+        var dbResult = true;
+        dbRecoveryEligible = true;
+        return dbResult;
+      }
       }
     } catch (SQLException | RuntimeException failure) {
+      dbRecoveryEligible = false;
       lastQuickCheckAtMs = System.currentTimeMillis();
       lastQuickCheckOk = false;
-      recordDbError();
+      recordDbError(DbOperation.INTEGRITY);
+      throw failure;
+    } catch (Error failure) {
+      dbRecoveryEligible = false;
       throw failure;
     } finally {
       unlockAfterChanges();
+      if (dbRecoveryEligible) completeDbOperation(DbOperation.INTEGRITY, dbRecovery);
     }
   }
 
@@ -7197,7 +7687,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         } catch (SQLException | RuntimeException | Error failure) {
           if (connectionFailure == null) connectionFailure = failure;
           else if (connectionFailure != failure) connectionFailure.addSuppressed(failure);
-          recordDbError();
+          recordDbError(DbOperation.CONNECTION_LIFETIME);
           if (failure instanceof SQLException sql) throw new IOException("Failed to close SqliteJobQueue", sql);
           if (failure instanceof RuntimeException runtime) throw runtime;
           throw (Error) failure;
@@ -7226,14 +7716,36 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
   // ==================== Health Observability ====================
 
-  /**
-   * Records a database error for health tracking.
-   *
-   * <p>Called from best-effort status helpers that swallow SQL exceptions.
-   * This allows observability surfaces to detect when the queue DB is unhealthy
-   * without requiring callers to handle exceptions.
-   */
-  private void recordDbError() {
+  /** Capture only existing debt, under the owner lock; healthy calls allocate nothing. */
+  private DbRecovery captureDbRecovery(DbOperation operation) {
+    Object failure = unresolvedDbFailures.get(operation);
+    return failure == null ? null : new DbRecovery(failure, connection, changeStream);
+  }
+
+  /** Called only after normal resource closure and the existing finalization tail. */
+  private void completeDbOperation(DbOperation operation, DbRecovery recovery) {
+    if (recovery == null) return;
+    lock.lock();
+    try {
+      // Check identity and both real owners before consulting any projection state.
+      if (unresolvedDbFailures.get(operation) != recovery.failureIdentity()
+          || connection != recovery.connection() || changeStream != recovery.changeStream()) return;
+      if (operation.requiresProjection()) {
+        try {
+          if (connectionFailure != null || recovery.connection() == null
+              || !recovery.connection().getAutoCommit()
+              || recovery.changeStream() != null && recovery.changeStream().hasPendingResync()) return;
+        } catch (SQLException | RuntimeException | Error unavailable) {
+          return;
+        }
+      }
+      unresolvedDbFailures.remove(operation);
+      dbHealthy = unresolvedDbFailures.isEmpty();
+    } finally { lock.unlock(); }
+  }
+
+  private void recordDbError(DbOperation operation) {
+    unresolvedDbFailures.put(operation, new Object());
     dbHealthy = false;
     lastDbErrorAtMs = System.currentTimeMillis();
   }
@@ -7283,6 +7795,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   @Override
   public boolean checkpointWal() {
     lock.lock();
+    DbRecovery dbRecovery = captureDbRecovery(DbOperation.WAL_CHECKPOINT);
+    boolean dbRecoveryEligible = false;
     try {
       ensureOpen();
       try (Statement statement = connection.createStatement();
@@ -7293,14 +7807,23 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         if (!complete) {
           log.warn("WAL checkpoint could not drain all frames");
         }
-        return complete;
+        {
+        var dbResult = complete;
+        dbRecoveryEligible = complete;
+        return dbResult;
+      }
       }
     } catch (SQLException e) {
-      recordDbError();
+      dbRecoveryEligible = false;
+      recordDbError(DbOperation.WAL_CHECKPOINT);
       log.warn("WAL checkpoint failed: {}", e.getMessage());
       return false;
+    } catch (RuntimeException | Error failure) {
+      dbRecoveryEligible = false;
+      throw failure;
     } finally {
       unlockAfterChanges();
+      if (dbRecoveryEligible) completeDbOperation(DbOperation.WAL_CHECKPOINT, dbRecovery);
     }
   }
 }
