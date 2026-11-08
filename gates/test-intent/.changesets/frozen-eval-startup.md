@@ -35,3 +35,14 @@ author-session: 01a1b880-a623-7580-b591-38506070d7aa
 ## Acceptance records
 
 Pending independent assessment and final-digest acceptance.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "reviewer",
+  "session": "01a1b879-70a2-73f0-9a5e-3231c1e53dae",
+  "verdict": "accept",
+  "digest": "sha256:2b23f457c6ebbbecb95f6fc43473e5ef25023aa612ae9d21782bea0527eef942",
+  "note": "Exact digest explicitly accepted by independent reviewer 01a1b879-70a2-73f0-9a5e-3231c1e53dae on 6ab16f1; covered test and declaration unchanged. CLI transcription by orchestrator 01a1b0c3-481a-7d22-87d4-0ea0ad710b2c preserves the read-only reviewer role. Source and intent only; no runtime or product PASS."
+}
+```
