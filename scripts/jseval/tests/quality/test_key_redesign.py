@@ -182,7 +182,8 @@ def test_kr2_each_index_shaping_input_changes_the_key(checkout, models, installs
     natives = tmp_path / "ort-cuda/lib"
     natives.mkdir(parents=True)
     (natives / "libonnxruntime_providers_cuda.so").write_bytes(b"provider")
-    changed("library path", lambda: monkeypatch.setenv("LD_LIBRARY_PATH", str(natives)))
+    library_path = os.pathsep.join(filter(None, (str(natives), os.environ.get("LD_LIBRARY_PATH", ""))))
+    changed("library path", lambda: monkeypatch.setenv("LD_LIBRARY_PATH", library_path))
     changed("library path native file", lambda: (natives / "libonnxruntime_providers_cuda.so").write_bytes(b"p2"))
     module = sys.modules["jseval.quality.collections"]
     fake = tmp_path / "collections.py"

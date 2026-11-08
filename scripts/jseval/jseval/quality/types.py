@@ -23,6 +23,7 @@ text (a changed document format, a re-extraction) never pass as the same populat
 from __future__ import annotations
 
 import enum
+import errno
 import hashlib
 import json
 import math
@@ -30,6 +31,7 @@ import ntpath
 import os
 import posixpath
 import re
+import stat
 import tempfile
 import unicodedata
 from dataclasses import dataclass, field
@@ -45,6 +47,34 @@ BASELINE_SCHEMA = "jseval.quality.baseline.v1"
 
 
 # --------------------------------------------------------------------------- canonical forms
+
+
+def read_regular_text(path: str | os.PathLike, encoding=None) -> str:
+    """Read ordinary regular text, retaining supported links and universal newlines.
+
+    POSIX nonblocking open prevents a raced FIFO from waiting for a peer. Other
+    platforms retain regular-file compatibility, without that special-file claim.
+    """
+    path = Path(path)
+    before = path.stat()
+    if not stat.S_ISREG(before.st_mode):
+        raise OSError(errno.EINVAL, "not a regular text file", str(path))
+    flags = os.O_RDONLY | getattr(os, 'O_NONBLOCK', 0) | getattr(os, 'O_BINARY', 0)
+    fd = os.open(path, flags)
+    try:
+        def identity(st):
+            return (st.st_dev, st.st_ino, st.st_mode, st.st_nlink, st.st_size,
+                    st.st_mtime_ns, st.st_ctime_ns)
+        opened = os.fstat(fd)
+        if not stat.S_ISREG(opened.st_mode) or identity(before) != identity(opened):
+            raise OSError(errno.EINVAL, "text input replaced", str(path))
+        with os.fdopen(fd, 'r', encoding=encoding, closefd=False) as stream:
+            text = stream.read()
+        if identity(opened) != identity(os.fstat(fd)) or identity(opened) != identity(path.stat()):
+            raise OSError(errno.EINVAL, "text input changed", str(path))
+        return text
+    finally:
+        os.close(fd)
 
 
 def sha256_text(text: str) -> str:
@@ -461,8 +491,31 @@ class RunHeader:
     run_kind: str = "standard"
     sensitivity: Mapping[str, Any] = field(default_factory=dict)
 
+    runtime_identity: Mapping[str, str] = field(default_factory=dict)
+    frozen_index: Mapping[str, str] = field(default_factory=dict)
+
     def __post_init__(self) -> None:
-        _need(self.run_kind in ("standard", "sensitivity"), "unknown run_kind")
+        _need(self.run_kind in ("standard", "sensitivity", "frozen-index"), "unknown run_kind")
+        for name in ("runtime_identity", "frozen_index"):
+            _mapping(getattr(self, name), name)
+        if self.run_kind == "frozen-index":
+            _need(self.index_build == "cached" and self.index_cache_key == self.index_key,
+                  "frozen-index requires the original cached key")
+            _need(bool(self.identity) and set(self.runtime_identity) == set(self.identity),
+                  "frozen-index requires complete runtime_identity")
+            _need(all(isinstance(v, str) and re.fullmatch(r"[0-9a-f]{64}", v)
+                      for v in self.runtime_identity.values()), "invalid runtime_identity digest")
+            _need(set(self.frozen_index) <= {"baseline_run_sha256", "evidence_sha256"}
+                  and "baseline_run_sha256" in self.frozen_index,
+                  "invalid frozen_index fields")
+            _need(all(isinstance(v, str) and re.fullmatch(r"[0-9a-f]{64}", v)
+                      for v in self.frozen_index.values()), "invalid frozen_index digest")
+            _need(self.ended is None or "evidence_sha256" in self.frozen_index,
+                  "completed frozen-index requires evidence_sha256")
+            _need(not self.sensitivity, "frozen-index cannot be sensitivity")
+        else:
+            _need(not self.runtime_identity and not self.frozen_index,
+                  "frozen provenance requires frozen-index run_kind")
         _mapping(self.sensitivity, "sensitivity")
         for name in ("collection", "collection_version", "index_key", "commit", "started"):
             _text(getattr(self, name), name)
@@ -495,7 +548,9 @@ class RunHeader:
         object.__setattr__(self, "request_config_sha256", computed)
 
     def to_dict(self) -> dict:
-        return {"schema": RUN_SCHEMA, "run_kind": self.run_kind,
+        return {**({"runtime_identity": dict(self.runtime_identity),
+                    "frozen_index": dict(self.frozen_index)} if self.run_kind == "frozen-index" else {}),
+                "schema": RUN_SCHEMA, "run_kind": self.run_kind,
                 "sensitivity": dict(self.sensitivity),
                 "collection": {"name": self.collection, "version": self.collection_version},
                 "index_key": self.index_key,
@@ -524,6 +579,7 @@ class RunHeader:
         served = _mapping(d["expected_served"], "expected_served")
         return cls(collection=col["name"], collection_version=col["version"],
                    run_kind=d.get("run_kind", "standard"), sensitivity=d.get("sensitivity", {}),
+                   runtime_identity=d.get("runtime_identity", {}), frozen_index=d.get("frozen_index", {}),
                    index_key=d["index_key"], index_population=d["index_population"],
                    index_build=d["index_build"], index_cache_key=d["index_cache_key"],
                    index_state=d["index_state"] if "index_state" in d else {},
@@ -578,7 +634,16 @@ class RunRecord:
     @classmethod
     def read(cls, path: str | os.PathLike) -> "RunRecord":
         p = Path(path)
-        return cls.loads(p.read_text(encoding="utf-8"), str(p))
+        record = cls.loads(read_regular_text(p, encoding="utf-8"), str(p))
+        if record.header.run_kind != "frozen-index" and (p.parent/'run.frozen-index.json').exists():
+            raise RunRecordError(f"{p}: frozen evidence cannot be downgraded to an ordinary run")
+        if record.header.run_kind == "frozen-index":
+            from .frozen_index import validate_record_evidence
+            try:
+                validate_record_evidence(p, record)
+            except (ValueError, OSError, KeyError, TypeError, AttributeError, IndexError) as e:
+                raise RunRecordError(f"{p}: invalid frozen evidence: {e}") from None
+        return record
 
 
 def atomic_write_text(path: Path, text: str) -> None:

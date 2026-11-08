@@ -60,6 +60,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
   // loop; its writer upgrade inherits this set, so a force admitted before the upgrade survives it.
   private final java.util.Set<String> forcedPaths;
   /** Runtime already owned by {@link #indexingLoop}; null for a deferred/read-only bundle. */
+  private final boolean frozenEval = io.justsearch.configuration.FrozenEvalMode.requested();
   private final RunningRuntime producerRuntime;
   /**
    * Tempdoc 885 item 3: the one pacing policy every indexing/backfill site throttles against.
@@ -1380,6 +1381,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
 
   @Override
   public void startIndexingLoop() {
+    if (frozenEval) return;
     ingestService.reconcilePendingWatcherRoots();
     if (indexingLoop != null) {
       indexingLoop.start();

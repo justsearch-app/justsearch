@@ -40,7 +40,8 @@ function evalLaunch(repoRoot, env = process.env) {
     'justsearch.plugins.manifest': environment.JUSTSEARCH_STAGE_PLUGIN_MANIFEST,
     'justsearch.models.dir': environment.JUSTSEARCH_MODELS_DIR, 'justsearch.eval.mode': 'true',
   };
-  for (const [key, prop] of Object.entries({ JUSTSEARCH_SERVER_EXE: 'justsearch.server.exe',
+  for (const [key, prop] of Object.entries({ JUSTSEARCH_FROZEN_EVAL: 'justsearch.eval.frozen',
+    JUSTSEARCH_SERVER_EXE: 'justsearch.server.exe',
     JUSTSEARCH_ONNXRUNTIME_NATIVE_PATH: 'justsearch.onnxruntime.native_path',
     JUSTSEARCH_LLM_ENABLED: 'justsearch.llm.enabled', JUSTSEARCH_LLM_MODEL_PATH: 'justsearch.llm.model_path' })) {
     if (environment[key]) properties[prop] = environment[key];

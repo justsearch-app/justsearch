@@ -88,6 +88,9 @@ class CrossEncoderSkipReasonTest {
                 MODEL_NOT_CONFIGURED,
                 FUSION_CONFIDENT -> false;
             default -> {
+              if ("QUERY_TOO_LONG".equals(r.name())) {
+                yield false;
+              }
               assertEquals("MODEL_LOADING", r.name(), "any new reason needs an explicit drop decision");
               yield true;
             }

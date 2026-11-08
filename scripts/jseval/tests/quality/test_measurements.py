@@ -72,19 +72,20 @@ def test_elapsed_measures_only_search_request(tmp_path, monkeypatch, failure):
             'searchTrace': {'stages': [{'id': stage, 'status': 'executed'} for stage in
                 ('sparse-retrieval', 'dense-retrieval', 'cross-encoder')]}})
     reads = []
-    read_text = type(tmp_path).read_text
+    read_text = run.read_regular_text
     def read_manifest(path, *a, **kw):
         if path.name == 'materialized.json':
             reads.append(path)
             now[0] += 20  # Manifest validation is harness work, not search latency.
         return read_text(path, *a, **kw)
-    monkeypatch.setattr(type(tmp_path), 'read_text', read_manifest)
+    monkeypatch.setattr(run, 'read_regular_text', read_manifest)
     with httpx.Client(base_url='http://engine', transport=httpx.MockTransport(reply)) as client:
         result = run.search_query(client, h, 'q000', c.queries['q000'], run.refined_request(), 5)
     assert bool(result.error) is failure
     assert result.timings['elapsed_seconds'] == 2.5
+    assert now[0] == (102.5 if failure else 122.5)
+    assert reads == ([] if failure else [tmp_path/'materialized.json'])
     if not failure:
-        assert reads == [tmp_path/'materialized.json']
         assert result.ranked == ('d002',) and result.hit_signals[0]['keyword_rank'] == 1
 
 

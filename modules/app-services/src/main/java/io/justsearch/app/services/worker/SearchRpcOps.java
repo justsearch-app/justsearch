@@ -449,9 +449,19 @@ final class SearchRpcOps {
      * @return rerank response with sorted indices and scores
      */
     RerankResponse rerank(String query, List<String> documentTexts, long deadlineMs, EngineContext engineContext) {
+        return rerank(query, documentTexts, deadlineMs, false, engineContext);
+    }
+
+    RerankResponse rerankSearch(String query, List<String> documentTexts, long deadlineMs, EngineContext engineContext) {
+        return rerank(query, documentTexts, deadlineMs, true, engineContext);
+    }
+
+    private RerankResponse rerank(String query, List<String> documentTexts, long deadlineMs,
+            boolean searchQueryBudgetPolicy, EngineContext engineContext) {
         RerankRequest request = RerankRequest.newBuilder()
                 .setQuery(query)
                 .addAllDocumentTexts(documentTexts)
+                .setSearchQueryBudgetPolicy(searchQueryBudgetPolicy)
                 .setDeadlineMs(deadlineMs)
                 .build();
         return inferenceRpc.execute(

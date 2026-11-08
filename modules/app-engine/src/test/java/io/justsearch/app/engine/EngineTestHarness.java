@@ -518,7 +518,10 @@ final class EngineTestHarness implements AutoCloseable {
   @Override
   public void close() {
     try {
-      if (root != null) root.close();
+      if (root != null) {
+        root.close();
+        root.processResources().close();
+      }
     } finally {
       root = null;
       client = null;

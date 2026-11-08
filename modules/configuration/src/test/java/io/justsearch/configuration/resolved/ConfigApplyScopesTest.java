@@ -26,8 +26,10 @@ final class ConfigApplyScopesTest {
     }
     assertArrayEquals(
         Files.readAllBytes(findRepositoryRoot().resolve(ConfigApplyScopes.RESOURCE_PATH)), packaged);
-    assertEquals(292, ConfigApplyScopes.register().size(),
-        "the additive encoder-device scope and the two canonical enrichment interleave keys are registered");
+    assertEquals(293, ConfigApplyScopes.register().size(),
+        "the governed register includes the frozen-eval launch flag");
+    assertEquals("restart-required",
+        ConfigApplyScopes.scopeFor("justsearch.eval.frozen").wireValue());
     assertEquals("component:encoders",
         ConfigApplyScopes.scopeFor("justsearch.gpu.memory_plan_unplanned_roles").wireValue());
     assertEquals("hot", ConfigApplyScopes.scopeFor("justsearch.gpu.game_detection").wireValue());

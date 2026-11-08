@@ -471,6 +471,7 @@ public final class KnowledgeServer implements Closeable {
    * backup-first rebuild), never cleared within the boot; {@link #bootRebuildHold} says which
    * answer held it.
    */
+  private final boolean frozenEval = io.justsearch.configuration.FrozenEvalMode.requested();
   private volatile boolean rebuildBrakeExhausted;
 
   /**
@@ -1112,6 +1113,24 @@ public final class KnowledgeServer implements Closeable {
         System.currentTimeMillis());
   }
 
+  private IndexGenerationManager.IndexLayout inspectFrozenLayout(IndexGenerationManager manager)
+      throws IOException {
+    if (recoveryStartContext != null && recoveryStartContext.recoveryAttempt()) {
+      throw new IOException("Frozen eval refuses physical recovery");
+    }
+    var layout = manager.inspectCurrentLayoutForBoot().orElseThrow(
+        () -> new IOException("Frozen eval requires existing generation state"));
+    var state = layout.state();
+    if (!"IDLE".equals(state.migration_state()) || state.building_generation() != null
+        || state.previous_generation() != null || Boolean.TRUE.equals(state.migration_paused())
+        || manager.requiresMigrationJournalForBoot()
+        || IndexRecoveryMarker.exists(layout.activeGenerationPath())) {
+      throw new IOException("Frozen eval refuses migration, recovery or retained generation work");
+    }
+    manager.manifestForOwnedPath(layout.activeGenerationPath());
+    return layout;
+  }
+
   /**
    * Starts the Knowledge Server and all its components.
    *
@@ -1311,8 +1330,14 @@ public final class KnowledgeServer implements Closeable {
           effectiveIndexBasePath, dataDir.resolve("jobs.db"));
       IndexGenerationManager genManager = new IndexGenerationManager(effectiveIndexBasePath);
       genManager.inspectNamespace();
-      boolean unfinishedMigration = recordedIngestionLifecycle.generationPendingAtBoot()
-          || genManager.requiresMigrationJournalForBoot();
+      IndexGenerationManager.IndexLayout frozenLayout = frozenEval
+          ? inspectFrozenLayout(genManager) : null;
+      if (frozenEval) {
+        io.justsearch.indexerworker.disambiguation.EntityClusterStore.validateFrozenStartup(
+            dataDir.resolve("entity-clusters.db"));
+      }
+      boolean unfinishedMigration = !frozenEval && (recordedIngestionLifecycle.generationPendingAtBoot()
+          || genManager.requiresMigrationJournalForBoot());
       if (unfinishedMigration) journalWitness.validateUnfinished(dataDir.resolve("jobs.db"));
 
       // 2. Initialize job queue (with corruption triage). Tempdoc 417 Phase 3c: write-failure
@@ -1343,11 +1368,14 @@ public final class KnowledgeServer implements Closeable {
       jobQueue = sqliteQueue;
       var triageReceipt = journalWitness.triageReceipt();
       boolean interruptedTriage = triageReceipt != null && !triageReceipt.complete();
+      if (frozenEval && interruptedTriage) {
+        throw new IOException("Frozen eval refuses pending queue corruption triage");
+      }
       try {
         if (interruptedTriage) handleCorruptDatabase(dbPath, journalWitness);
         else jobQueue.open();
       } catch (SQLException e) {
-        if (interruptedTriage) throw e;
+        if (frozenEval || interruptedTriage) throw e;
         // Check for database corruption (SQLite error code 11 = SQLITE_CORRUPT)
         if (e.getErrorCode() == 11) {
           if (unfinishedMigration) {
@@ -1366,12 +1394,13 @@ public final class KnowledgeServer implements Closeable {
           throw e;
         }
       }
-      sqliteQueue.attachMigrationJournalWitness(journalWitness);
+      if (!frozenEval) sqliteQueue.attachMigrationJournalWitness(journalWitness);
       tPhase = System.nanoTime();
       long jobQueueMs = (tPhase - tPrev) / 1_000_000;
       tPrev = tPhase;
 
-      var bootOwnership = recoveryStartContext != null
+      var bootOwnership = frozenEval ? new IndexGenerationManager.BootOwnership.Native()
+          : recoveryStartContext != null
               && recoveryStartContext.generationState() != null
           ? recoveryStartContext.bootOwnership()
           : recordedIngestionLifecycle.bootOwnership(jobQueue);
@@ -1394,7 +1423,7 @@ public final class KnowledgeServer implements Closeable {
       this.recordedCandidate = candidate.orElse(null);
 
 
-      genManager.reconcileActiveRecoveryOwnership(activeGenerationPath -> {
+      if (!frozenEval) genManager.reconcileActiveRecoveryOwnership(activeGenerationPath -> {
         if (!IndexRecoveryMarker.exists(activeGenerationPath)) {
           IndexRecoveryMarker.write(activeGenerationPath, "interrupted_backup_first");
         }
@@ -1408,7 +1437,10 @@ public final class KnowledgeServer implements Closeable {
         Files.writeString(effectiveIndexBasePath.resolve("state.json"), "{torn native pointer");
       }
       IndexGenerationManager.BootLayout boot;
-      if (recoveryStartContext != null && recoveryStartContext.generationState() != null) {
+      if (frozenEval) {
+        boot = new IndexGenerationManager.BootLayout(frozenLayout,
+            IndexGenerationManager.BootDisposition.NATIVE);
+      } else if (recoveryStartContext != null && recoveryStartContext.generationState() != null) {
         var inspected = genManager.inspectCurrentLayoutForBoot().orElseThrow(
             () -> new IndexRecoverySupersededException(
                 "Recovered generation state is unavailable"));
@@ -1474,7 +1506,7 @@ public final class KnowledgeServer implements Closeable {
               frozen.orElse(null));
         }
       }
-      if (generationBootDisposition == IndexGenerationManager.BootDisposition.NATIVE
+      if (!frozenEval && generationBootDisposition == IndexGenerationManager.BootDisposition.NATIVE
           && jobQueue instanceof SqliteJobQueue) {
         release030Recovery = ((SqliteJobQueue)jobQueue).release030RecoveryState();
         if (release030Recovery != null) {
@@ -1547,6 +1579,19 @@ public final class KnowledgeServer implements Closeable {
                 activeIndexPath, preOpenSource::build,
                 preOpenSource::indeterminateFingerprintInputs);
         preOpenMismatch = ParityDiagnostics.requiresRebuild(preOpenDiffs);
+        if (frozenEval) {
+          if (preOpenMismatch || !preOpenSource.indeterminateFingerprintInputs().isEmpty()
+              || expectedIndexFingerprintOrNull() == null || !hasLuceneSegments(activeIndexPath)) {
+            throw new IOException("Frozen eval requires a committed compatible index with known inputs");
+          }
+          try (var directory = org.apache.lucene.store.FSDirectory.open(activeIndexPath);
+              var reader = org.apache.lucene.index.DirectoryReader.open(directory)) {
+            String stored = reader.getIndexCommit().getUserData().get("index_fingerprint");
+            if (stored == null || stored.isBlank()) {
+              throw new IOException("Frozen eval requires committed index fingerprint");
+            }
+          }
+        }
         if (preOpenMismatch) {
           for (var diff : preOpenDiffs) {
             log.warn("PRE-OPEN {}", diff.marker());
@@ -1561,7 +1606,10 @@ public final class KnowledgeServer implements Closeable {
       // lifetime — in the exhausted-brake state, which is precisely the state that keeps running
       // (tempdoc 915 B5 ride-along).
       LuceneRuntime blueReadOnly = null;
-      if (generationBootDisposition != IndexGenerationManager.BootDisposition.NATIVE) {
+      if (frozenEval) {
+        this.searchLifecycle = buildReadOnlyRuntime(activeIndexPath).withoutRecovery().openReadOnly();
+        publishIngestLifecycle(this.searchLifecycle);
+      } else if (generationBootDisposition != IndexGenerationManager.BootDisposition.NATIVE) {
         if (generationBootDisposition == IndexGenerationManager.BootDisposition.PROMOTED) {
           publishIngestLifecycle(buildIndexRuntime(activeIndexPath).withoutRecovery()
               .withBuildState(LuceneRuntimeTypes.BuildState.COMPLETE).open());
@@ -1906,7 +1954,7 @@ public final class KnowledgeServer implements Closeable {
       this.documentIdentityStore =
           new io.justsearch.indexerworker.queue.SqliteDocumentIdentityStore(
               dbPath, rc.index().identityDeletionGraceMs());
-      importDocumentIdentitiesFromActiveIndex(layout.activeGenerationId());
+      if (!frozenEval) importDocumentIdentitiesFromActiveIndex(layout.activeGenerationId());
 
       // Apply any durable SWITCHING buffer ops. In deferred-writer mode, this is deferred
       // to the background task (after IndexWriter opens). In migration mode, run synchronously.
@@ -1921,7 +1969,7 @@ public final class KnowledgeServer implements Closeable {
         }
         // Root debt needs the live writer and a fresh fenced preflight below, before cleanup.
         if (!rootDebt) replaySettledGeneration = layout.activeGenerationId();
-      } else if (generationBootDisposition == IndexGenerationManager.BootDisposition.NATIVE
+      } else if (!frozenEval && generationBootDisposition == IndexGenerationManager.BootDisposition.NATIVE
           && !rebuildBrakeExhausted && ingestLifecycle instanceof RunningRuntime) {
         drainSwitchBufferBestEffort();
       }
@@ -1964,9 +2012,11 @@ public final class KnowledgeServer implements Closeable {
       // supplier + embedding telemetry at ctor time (last 2 setters eliminated).
       appServices = newAppServices();
       wireAppServicesPostConstruction(appServices);
-      seedRootVolumesAfterUpgrade();
-      prepareRelease030Recovery();
-      if (generationBootDisposition == IndexGenerationManager.BootDisposition.NATIVE) {
+      if (!frozenEval) {
+        seedRootVolumesAfterUpgrade();
+        prepareRelease030Recovery();
+      }
+      if (!frozenEval && generationBootDisposition == IndexGenerationManager.BootDisposition.NATIVE) {
         var nativeState = indexGenerationManager.readStateBestEffort();
         if (nativeState != null && "FAILED".equals(nativeState.migration_state())
             && buildingIndexPath != null && release030Recovery != null
@@ -1993,14 +2043,16 @@ public final class KnowledgeServer implements Closeable {
       appServices.wireEmbeddingProvider(initialEmbeddingProvider());
 
       // Recorded recovery cannot run until the actual serving generation and owner are attached.
-      attachRecordedIngestion();
+      if (!frozenEval) attachRecordedIngestion();
       if (generationBootDisposition == IndexGenerationManager.BootDisposition.BUILDING) {
         if (recordedCandidate != null || !expectedProjectionSourceIds().isEmpty())
           startMigrationEnumeratorBestEffort(rc, false);
         startMigrationCutoverMonitorBestEffort();
       }
-      recoverStuckJobsAdmitted(jobQueue, null);
-      startStuckJobReaper(jobQueue);
+      if (!frozenEval) {
+        recoverStuckJobsAdmitted(jobQueue, null);
+        startStuckJobReaper(jobQueue);
+      }
       if (release030Recovery != null) {
         release030RecoveryTask = stuckJobReaper.scheduleWithFixedDelay(
             this::recoverRelease030RootsSafely, 1_000L, recoveryRetryDelayMillis(10_000L), TimeUnit.MILLISECONDS);
@@ -2008,7 +2060,7 @@ public final class KnowledgeServer implements Closeable {
 
 
       // Dev hot-reload manager (Phase 2, tempdoc 305)
-      if (startupConfiguration.ai().devHotReload()) {
+      if (!frozenEval && startupConfiguration.ai().devHotReload()) {
         devReloadManager = new DevReloadManager(this);
         log.info("Dev hot-reload enabled (justsearch.dev.hotreload=true)");
       }
@@ -2033,7 +2085,9 @@ public final class KnowledgeServer implements Closeable {
       // status surface says why ingestion stopped (BLOCKED_REBUILD_BRAKE ->
       // index.rebuild_brake_exhausted). Recovery is an operator-initiated rebuild, which clears the
       // brake at promotion (IndexGenerationManager.promoteBuildingGenerationToActive).
-      if (generationBootDisposition == IndexGenerationManager.BootDisposition.CAPTURING
+      if (frozenEval) {
+        log.info("Frozen eval serves the existing committed generation without mutation producers");
+      } else if (generationBootDisposition == IndexGenerationManager.BootDisposition.CAPTURING
           || generationBootDisposition == IndexGenerationManager.BootDisposition.FENCED) {
         log.info("Ingestion awaits recorded generation authority; current active index remains read-only");
       } else if (recordedCandidate != null
@@ -2259,6 +2313,7 @@ public final class KnowledgeServer implements Closeable {
 
   /** Opens the server-owned periodic queue producer on its registered background scheduler. */
   void startStuckJobReaper(JobQueue reaperQueue) {
+    if (frozenEval) return;
     Objects.requireNonNull(reaperQueue, "reaperQueue");
     stuckJobReaper = workerExecutors.stuckJobReaper().openScheduled(r -> {
       Thread thread = new Thread(r, "stuck-job-reaper");
@@ -2574,6 +2629,7 @@ public final class KnowledgeServer implements Closeable {
   public java.util.Optional<IndexStartContext> reserveIndexRecovery(
       io.justsearch.core.component.ComponentRecoveryAction.Request request) throws IOException {
     Objects.requireNonNull(request, "request");
+    if (frozenEval) return java.util.Optional.empty();
     synchronized (closeLock) {
       IndexStartContext retained = indexRecoveryReservation;
       if (closeStarted) {
@@ -2626,6 +2682,7 @@ public final class KnowledgeServer implements Closeable {
   public io.justsearch.core.component.ComponentRecoveryAction.Result recoverEncoders(
       io.justsearch.core.component.ComponentRecoveryAction.Request request) {
     Objects.requireNonNull(request, "request");
+    if (frozenEval) return io.justsearch.core.component.ComponentRecoveryAction.Result.REFUSED;
     EncoderRecoveryReservation reservation;
     try {
       reservation = admitEncoderRecovery(request);
@@ -3663,7 +3720,7 @@ public final class KnowledgeServer implements Closeable {
   private void wireAppServicesPostConstruction(WorkerAppServices svc) {
     svc.ingestService().useExclusionRoots(() -> exclusionRoots.get());
     svc.ingestService().useCreatorRootCollection(this::release030Collection);
-    if (svc instanceof DefaultWorkerAppServices producer) {
+    if (!frozenEval && svc instanceof DefaultWorkerAppServices producer) {
       // Configured roots belong to every replacement producer, including the deferred writer.
       var configuration = producer.resolvedConfig();
       svc.ingestService().seedConfiguredRoots(
@@ -3943,6 +4000,7 @@ public final class KnowledgeServer implements Closeable {
       java.util.function.Supplier<RunningRuntime> opener,
       java.time.Duration drainTimeout,
       io.justsearch.adapters.lucene.runtime.SwapReason reason) {
+    if (frozenEval) throw new IllegalStateException("Frozen eval refuses runtime replacement");
     Objects.requireNonNull(opener, "opener");
     Objects.requireNonNull(drainTimeout, "drainTimeout");
     Objects.requireNonNull(reason, "reason");
@@ -6598,6 +6656,7 @@ public final class KnowledgeServer implements Closeable {
   }
 
   private void maybeAutoStartEmbeddingRebuildForBlockedLegacyBestEffort() {
+    if (frozenEval) return;
     if (generationBootDisposition != IndexGenerationManager.BootDisposition.NATIVE) return;
     io.justsearch.indexerworker.loop.ops.EmbeddingRecoveryOps.rescueBlockedLegacyIndex(
         embeddingCompatController, ingestLifecycle, 1000, log);
@@ -6782,6 +6841,7 @@ public final class KnowledgeServer implements Closeable {
 
   private LuceneRuntimeBuilder buildIndexRuntime(Path indexPath,
       java.util.function.Supplier<java.util.Optional<String>> fingerprintSupplier) {
+    if (frozenEval) throw new IllegalStateException("Frozen eval cannot create a writable runtime");
     boolean candidateRuntime = recordedCandidate != null
         && (indexPath.equals(buildingIndexPath)
             || (generationBootDisposition == IndexGenerationManager.BootDisposition.PROMOTED
@@ -8082,6 +8142,7 @@ public final class KnowledgeServer implements Closeable {
 
   /** Reclaim a committed predecessor only after replay and every old view have settled. */
   private void retryCommittedGenerationRetirement() {
+    if (frozenEval) return;
     if (release030Recovery != null && release030Recovery.retiringBuild()) return;
     runtimeSwapLock.lock();
     try {

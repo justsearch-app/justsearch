@@ -292,3 +292,22 @@ def test_forged_or_missing_admission_token_is_refused(tmp_path,monkeypatch):
         monkeypatch.setenv('JS_ADMISSION_TOKEN',token)
         with pytest.raises(run.RunRefused,match='exclusive machine admission'):
             run.require_exclusive(root)
+
+
+def test_collection_retains_primary_error_when_cleanup_also_fails(tmp_path, monkeypatch):
+    import time
+    from jseval.quality import index
+    handle = Mock()
+    handle.wait.side_effect = RuntimeError('primary startup refused')
+    handle.close.side_effect = RuntimeError('owned cleanup refused')
+    c = make_collection()
+    monkeypatch.setattr(run, 'require_exclusive', lambda _: None)
+    monkeypatch.setattr(run.collections, 'load_collection', lambda _: c)
+    monkeypatch.setattr(run.index, 'prepare_index', lambda *a, **kw: handle)
+    item = {'index_config': run._serial_config(index.IndexConfig()),
+            **{k: str(tmp_path/k) for k in ('collection', 'run', 'ready', 'go', 'done')}}
+    run._collection_worker({'request': run.refined_request(), 'commit': 'a'*40,
+                           'dirty_hash': None, 'mode': None, 'hardware': {}, 'budget': 600},
+                           item, time.monotonic()+30)
+    error = json.loads(Path(item['done']).read_text())['error']
+    assert 'primary startup refused' in error and 'owned cleanup refused' in error

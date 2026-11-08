@@ -13,6 +13,7 @@ import io.justsearch.ort.EncoderRole;
 import io.justsearch.ort.ModelCapabilityResolver;
 import io.justsearch.ort.OrtSessionAssembler;
 import io.justsearch.ort.SessionHandle;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
@@ -34,7 +35,7 @@ class InferenceCompositionRootPartialAssemblyTest {
   void postTokenizerFailureRetiresSessionsBeforeTokenizerAndRefusalKeepsBoth(EncoderRole role, boolean refuse,
       @TempDir Path dir) throws Exception {
     Files.writeString(dir.resolve("model.onnx"), "model-witness");
-    Files.writeString(dir.resolve("tokenizer.json"), "tokenizer-witness");
+    Files.writeString(dir.resolve("tokenizer.json"), "{}");
     var entries = new HashMap<String, String>();
     for (var key : new EnvRegistry[] {EnvRegistry.AI_EMBED_ENABLED, EnvRegistry.NER_ENABLED, EnvRegistry.SPLADE_ENABLED,
         EnvRegistry.BGE_M3_ENABLED, EnvRegistry.RERANK_ENABLED, EnvRegistry.CITATION_SCORER_ENABLED}) {
@@ -91,6 +92,8 @@ class InferenceCompositionRootPartialAssemblyTest {
       tokenizers.when(() -> HuggingFaceTokenizer.newInstance(any(Path.class), any(Map.class)))
           .thenReturn(tokenizer);
       tokenizers.when(() -> HuggingFaceTokenizer.newInstance(any(Path.class))).thenReturn(tokenizer);
+      tokenizers.when(() -> HuggingFaceTokenizer.newInstance(any(InputStream.class), isNull()))
+          .thenReturn(tokenizer);
       capabilities.when(() -> ModelCapabilityResolver.resolve(any(), any(), any(), any(),
           anyBoolean(), any())).thenThrow(cause);
       var surface = InferenceCompositionRoot.compose(configuration, HardwareProfile.cpuOnly(),
