@@ -46,3 +46,14 @@ Independent source/intent acceptance is recorded below; execution and gate resul
   "note": "Exact digest explicitly accepted by independent reviewer 01a1b879-70a2-73f0-9a5e-3231c1e53dae on 6ab16f1; covered test and declaration unchanged. CLI transcription by orchestrator 01a1b0c3-481a-7d22-87d4-0ea0ad710b2c preserves the read-only reviewer role. Source and intent only; no runtime or product PASS."
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "01a1b879-70a2-73f0-9a5e-3231c1e53dae",
+  "verdict": "accept",
+  "digest": "sha256:2b23f457c6ebbbecb95f6fc43473e5ef25023aa612ae9d21782bea0527eef942",
+  "note": "Independent source/intent audit: one authorized frozen launch declaration supports 292 to 293; packaged byte equality and prior scope assertions remain, and the new restart-required assertion strengthens the rule. No execution, runtime or product PASS inferred."
+}
+```
