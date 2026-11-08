@@ -907,6 +907,7 @@ class FrozenHandle:
     index_state: dict = field(default_factory=dict)
     observations: dict = field(default_factory=dict)
     stopped: bool = False
+    _runtime_incarnation: tuple | None = field(default=None, init=False, repr=False)
 
     @property
     def index_key(self): return self.baseline.header.index_key
@@ -1081,7 +1082,7 @@ def runtime_process(handle, client):
 def confirm(handle, phase='after'):
     require(phase in ('before', 'after'), 'invalid frozen confirmation phase')
     failures, checks = [], {}
-    process, observed = None, None
+    process, observed, idle_refusal = None, None, None
     try:
         require(handle._backend and handle._backend.proc.poll() is None, 'no live frozen backend')
         current = runtime_components(handle.collection, handle.config, handle.env)
@@ -1090,7 +1091,18 @@ def confirm(handle, phase='after'):
         index._check_owner(read_json(handle.data_dir/'quality-owner.json'), handle.collection, handle.index_key)
         with httpx.Client(base_url=handle.base_url, timeout=30) as client:
             process = runtime_process(handle, client)
-            sensitivity.require_idle(index._get(client, '/api/status'))
+            incarnation = (process['process'], process['manifest']['instanceId'])
+            if handle._runtime_incarnation is None:
+                handle._runtime_incarnation = incarnation
+            require(incarnation == handle._runtime_incarnation, 'Engine incarnation changed')
+            status = index._get(client, '/api/status')
+            try:
+                sensitivity.require_idle(status)
+            except sensitivity.SensitivityRefused as e:
+                idle_refusal = {'status': status, 'reason': str(e)}
+                if phase == 'before':
+                    raise index.TransientIndexRefused(str(e)) from e
+                raise
         if 'before' in handle.observations:
             require(process['process'] == handle.observations['before']['runtime']['process']
                     and process['manifest']['instanceId'] == handle.observations['before']['runtime']['manifest']['instanceId'],
@@ -1116,7 +1128,8 @@ def confirm(handle, phase='after'):
     # Always retain partial interface observations, including refusal evidence.
     index._write(checked_path(handle.run_path.parent/EVIDENCE)/(phase+'.json'), {
         'runtime': process, 'witness': observed, 'checks': checks,
-        'payload_sha256': digest(handle.item['payload']), 'failures': failures})
+        'payload_sha256': digest(handle.item['payload']), 'failures': failures,
+        **({'idle_refusal': idle_refusal} if idle_refusal is not None else {})})
     return index_identity.ConfirmResult(not failures, failures, checks)
 
 
