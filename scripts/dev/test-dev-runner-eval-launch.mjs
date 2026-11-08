@@ -67,3 +67,10 @@ test('Linux eval never selects a Windows ORT DLL directory from a shared checkou
     assert.ok(explicit.jvmArgs.includes('-Djustsearch.onnxruntime.native_path=/explicit/linux/ort'));
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
+
+test('only explicit frozen eval launches carry the internal lifetime flag', () => {
+  assert.ok(!evalLaunch('/fixture', {}).jvmArgs.some(arg => arg.startsWith('-Djustsearch.eval.frozen=')));
+  const launch = evalLaunch('/fixture', { JUSTSEARCH_FROZEN_EVAL: 'true' });
+  assert.ok(launch.jvmArgs.includes('-Djustsearch.eval.mode=true'));
+  assert.ok(launch.jvmArgs.includes('-Djustsearch.eval.frozen=true'));
+});

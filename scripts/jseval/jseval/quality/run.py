@@ -365,7 +365,8 @@ def _collection_worker(plan: dict, item: dict, deadline: float) -> None:
             try:
                 handle.close()
             except BaseException as e:
-                failure = f'cleanup failed: {e}'
+                cleanup = f'cleanup failed: {type(e).__name__}: {e}'
+                failure = f'{failure}; {cleanup}' if failure else cleanup
         # A completion marker is written only after backend teardown succeeded.
         if header and failure is None:
             completed = replace(header, ended=utc(), **({'frozen_index': {

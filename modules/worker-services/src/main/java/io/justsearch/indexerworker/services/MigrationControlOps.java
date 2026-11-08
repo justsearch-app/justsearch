@@ -28,6 +28,7 @@ import io.justsearch.ipc.MigrationStartResponse;
  */
 final class MigrationControlOps {
 
+  private final boolean frozenEval = io.justsearch.configuration.FrozenEvalMode.requested();
   private final IndexGenerationManager indexGenerationManager;
 
   MigrationControlOps(IndexGenerationManager indexGenerationManager) {
@@ -37,6 +38,7 @@ final class MigrationControlOps {
   MigrationStartResponse startMigration(MigrationStartRequest request) {
     String reason = request.getReason();
     try {
+      if (frozenEval) throw new IllegalStateException("Frozen eval refuses migration or index cleanup");
       if (indexGenerationManager == null) {
         return MigrationStartResponse.newBuilder()
             .setAccepted(false)
@@ -89,6 +91,7 @@ final class MigrationControlOps {
 
   MigrationCutoverResponse requestCutover(MigrationCutoverRequest request) {
     try {
+      if (frozenEval) throw new IllegalStateException("Frozen eval refuses migration or index cleanup");
       if (indexGenerationManager == null) {
         return MigrationCutoverResponse.newBuilder()
             .setAccepted(false)
@@ -118,6 +121,7 @@ final class MigrationControlOps {
 
   MigrationPauseResponse pauseMigration(MigrationPauseRequest request) {
     try {
+      if (frozenEval) throw new IllegalStateException("Frozen eval refuses migration or index cleanup");
       if (indexGenerationManager == null) {
         return MigrationPauseResponse.newBuilder()
             .setAccepted(false)
@@ -153,6 +157,7 @@ final class MigrationControlOps {
 
   MigrationResumeResponse resumeMigration(MigrationResumeRequest request) {
     try {
+      if (frozenEval) throw new IllegalStateException("Frozen eval refuses migration or index cleanup");
       if (indexGenerationManager == null) {
         return MigrationResumeResponse.newBuilder()
             .setAccepted(false)
@@ -187,6 +192,7 @@ final class MigrationControlOps {
 
   IndexGcResponse runIndexGc(IndexGcRequest request) {
     try {
+      if (frozenEval) throw new IllegalStateException("Frozen eval refuses migration or index cleanup");
       if (indexGenerationManager == null) {
         return IndexGcResponse.newBuilder()
             .setAccepted(false)

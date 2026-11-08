@@ -490,7 +490,8 @@ public class HeadlessApp {
           () -> settingsStore.inspect().queryRoles()));
       settingsComponents.seal();
       try {
-        if (!engineRoot.operationAttempts().reconcileSettingsAfterComposition()) {
+        if (!io.justsearch.configuration.FrozenEvalMode.requested()
+            && !engineRoot.operationAttempts().reconcileSettingsAfterComposition()) {
           generativeSettingsOwner.markRecoveryUnavailable();
         }
         // Autostart is a settings transaction, so every physical owner and recovery witness
@@ -837,7 +838,8 @@ public class HeadlessApp {
     ResolvedConfig resolvedConfig = rcBuilder.build();
     // A committed recorded generation pointer owns settings roll-forward. Resolve it before any
     // process-wide configuration or native/model path is installed for this incarnation.
-    UiSettings reconciled = io.justsearch.app.engine.EngineRoot.reconcileInstallerGenerationBoot(
+    UiSettings reconciled = io.justsearch.configuration.FrozenEvalMode.requested() ? settings
+        : io.justsearch.app.engine.EngineRoot.reconcileInstallerGenerationBoot(
         operations, settingsStore, settings, resolvedConfig);
     if (reconciled != settings) {
       settings = reconciled;
@@ -1314,6 +1316,7 @@ public class HeadlessApp {
     // every child (nvidia-smi from resolveConfig included) ends with this Engine however it ends.
     // Must stay the first statement (EngineContainmentArchTest). Never throws.
     final EngineContainment containment = EngineContainment.installAtBoot();
+    io.justsearch.configuration.FrozenEvalMode.requested();
     final var signalStop = new io.justsearch.app.engine.EngineSignalStop();
     signalStop.install();
     // Spec F §3.5: register for suspend and resume right after containment, so the consumers that

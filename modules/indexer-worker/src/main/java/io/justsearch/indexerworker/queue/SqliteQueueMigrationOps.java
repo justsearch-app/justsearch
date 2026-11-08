@@ -23,6 +23,28 @@ final class SqliteQueueMigrationOps {
 
   private SqliteQueueMigrationOps() {}
 
+  /** Validate the existing current queue, identity/path stores and absence of owed work. */
+  static void validateFrozenStartup(Path path) throws SQLException, IOException {
+    try (var snapshot = io.justsearch.configuration.persistence.SqliteStoreSnapshot.open(path);
+        var expected = java.sql.DriverManager.getConnection("jdbc:sqlite::memory:")) {
+      try (var statement = expected.createStatement()) {
+        statement.execute(SqliteSchema.CREATE_JOBS_TABLE);
+        statement.execute(SqliteSchema.CREATE_JOBS_STATE_INDEX);
+        statement.execute(SqliteSchema.CREATE_JOBS_STATE_UPDATED_INDEX);
+        statement.execute(SqliteSchema.CREATE_SWITCH_BUFFER_TABLE);
+      }
+      runMigrations(expected, () -> {}, null);
+      snapshot.requireCurrentStructure(SqliteSchema.TARGET_VERSION, expected);
+      try (var statement = snapshot.connection().createStatement(); var row = statement.executeQuery(
+          "SELECT 1 FROM jobs WHERE state IN ('PENDING','PROCESSING') UNION ALL SELECT 1 FROM switch_buffer LIMIT 1")) {
+        if (row.next()) throw new SQLException("Frozen eval refuses pending queue or switch work");
+      }
+    }
+    if (Release030RecoveryState.load(path, 60_000L) != null) {
+      throw new IOException("Frozen eval refuses retained release recovery");
+    }
+  }
+
   /** Callback for creating a pre-migration backup. */
   @FunctionalInterface
   interface BackupAction {

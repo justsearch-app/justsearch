@@ -1268,3 +1268,24 @@ jseval lives at `scripts/jseval/`. Key files:
 - `jseval/result_identity.py` — Collision-safe raw-hit capture, sidecar validation, and reconciliation
 
 When improving jseval, follow existing patterns in these files.
+
+
+### Frozen comparison Engine lifetime
+
+The frozen-index handle supplies the internal `JUSTSEARCH_FROZEN_EVAL=true` launch intent
+(`justsearch.eval.frozen`) through the installed eval launcher. This intent is process-local,
+requires eval mode and is captured when physical owners are constructed. Ordinary prepared-only
+and sensitivity launches retain their writable startup and deferred writer upgrade.
+
+Frozen startup inspects the existing generation pointer and owned manifest without initialization
+or recovery. It requires an IDLE committed generation, known compatible metadata, current complete
+operations/jobs/entity-cluster SQLite structures and no pending preservation or queue/switch work.
+Missing, damaged, incompatible or unfinished stores are refused before repair. Search uses a
+read-only Lucene runtime without recovery; actual query/model composition and persisted cluster
+loading still run. Root replay, enrollment, watchers, synchronization, protected-content removal,
+indexing, enrichment, generation retirement and automatic recovery remain excluded for the lifetime.
+Mutation and migration controls refuse before durable work; read operations and orderly stop remain
+available. The original first error is retained when owned cleanup also fails.
+
+This launch branch does not change frozen preparation ownership, one-use copies, the protected
+payload definition, operational SQLite-page treatment, fingerprint/query witnesses or scoring gates.

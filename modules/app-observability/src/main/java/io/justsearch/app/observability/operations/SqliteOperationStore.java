@@ -74,6 +74,7 @@ public final class SqliteOperationStore implements OperationStore {
   private final ReentrantLock lock = new ReentrantLock();
   private final java.util.concurrent.CopyOnWriteArrayList<java.util.function.Consumer<OperationRecord>>
       completionListeners = new java.util.concurrent.CopyOnWriteArrayList<>();
+  private final boolean frozenEval = io.justsearch.configuration.FrozenEvalMode.requested();
   private final Path path;
   private final Clock clock;
   private final OpenStepHook hook;
@@ -137,8 +138,9 @@ public final class SqliteOperationStore implements OperationStore {
 
   private void initialize() throws IOException, SQLException {
     try {
+      if (frozenEval) validateFrozenStartup();
       Files.createDirectories(path.getParent());
-      resumePendingPreservation();
+      if (!frozenEval) resumePendingPreservation();
       if (Files.exists(this.path) && Files.size(this.path) > 0) {
         try {
           inspectExisting();
@@ -219,6 +221,26 @@ public final class SqliteOperationStore implements OperationStore {
             && store.code() == OperationStoreException.Code.STORAGE_FAILED
             && store.getCause() instanceof SQLException cause ? cause : null;
     return sql != null && (sql.getErrorCode() & 0xff) == 5;
+  }
+
+  /** Admission runs before preservation, writable connection setup or version migration. */
+  private void validateFrozenStartup() throws SQLException, IOException {
+    try (var pending = Files.newDirectoryStream(path.getParent(), path.getFileName() + ".corrupt-*.pending")) {
+      if (pending.iterator().hasNext()) throw new IOException("Frozen eval refuses pending operations preservation");
+    }
+    try (var snapshot = io.justsearch.configuration.persistence.SqliteStoreSnapshot.open(path);
+        var expected = DriverManager.getConnection("jdbc:sqlite::memory:")) {
+      try (var statement = expected.createStatement()) { OperationSchema.createTables(statement); }
+      snapshot.requireCurrentStructure(OperationSchema.VERSION, expected);
+      try (var statement = snapshot.connection().createStatement(); var row = statement.executeQuery(
+          "SELECT 1 FROM operations WHERE state NOT IN ('COMPLETE','FAILED','CANCELLED') LIMIT 1")) {
+        if (row.next()) throw new SQLException("Frozen eval refuses unfinished operations");
+      }
+      try (var statement = snapshot.connection().createStatement(); var row = statement.executeQuery(
+          "SELECT history_since_ms FROM operations_meta WHERE singleton=1")) {
+        if (!row.next()) throw new SQLException("Frozen eval requires operations metadata");
+      }
+    }
   }
 
   private void inspectExisting() throws SQLException, IOException {

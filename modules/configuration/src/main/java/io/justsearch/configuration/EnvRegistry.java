@@ -1429,6 +1429,9 @@ public enum EnvRegistry {
      */
     EVAL_MODE("justsearch.eval.mode", "JUSTSEARCH_EVAL_MODE", LifecycleStage.PERMANENT),
 
+    /** Internal, nonpersisted launch intent for a single owned frozen-eval lifetime. */
+    FROZEN_EVAL("justsearch.eval.frozen", "JUSTSEARCH_FROZEN_EVAL", LifecycleStage.PERMANENT),
+
     /**
      * The supervised Engine incarnation this process is, {@code <session>/<n>} (Spec F section
      * 3.2). A supervisor (the dev runner, the shell) sets {@code JUSTSEARCH_ENGINE_INCARNATION} at

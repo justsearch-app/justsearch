@@ -32,6 +32,7 @@ public final class EntityClusterStore implements Closeable {
   private static final int BUSY_TIMEOUT_MS = 5000;
   public static final int CURRENT_SCHEMA_VERSION = 2;
 
+  private final boolean frozenEval = io.justsearch.configuration.FrozenEvalMode.requested();
   private final Path dbPath;
   private final ConnectionFactory connectionFactory;
   private final ReentrantLock lock = new ReentrantLock();
@@ -59,6 +60,7 @@ public final class EntityClusterStore implements Closeable {
       if (connection != null) {
         throw new SQLException("EntityClusterStore already owns a connection");
       }
+      if (frozenEval) validateFrozenStartup(dbPath);
       Files.createDirectories(dbPath.getParent());
       String jdbcUrl = "jdbc:sqlite:" + dbPath.toAbsolutePath();
       connection = connectionFactory.open(jdbcUrl);
@@ -67,9 +69,10 @@ public final class EntityClusterStore implements Closeable {
           stmt.execute("PRAGMA busy_timeout = " + BUSY_TIMEOUT_MS);
           stmt.execute("PRAGMA journal_mode = WAL");
           stmt.execute("PRAGMA synchronous = NORMAL");
+          if (frozenEval) stmt.execute("PRAGMA query_only = ON");
         }
 
-        initSchema();
+        if (!frozenEval) initSchema();
         log.info("EntityClusterStore opened: {}", dbPath);
         initialized = true;
       } catch (SQLException | RuntimeException | Error failure) {
@@ -83,6 +86,20 @@ public final class EntityClusterStore implements Closeable {
       }
     } finally {
       lock.unlock();
+    }
+  }
+
+  public static void validateFrozenStartup(Path path) throws IOException, SQLException {
+    try (var snapshot = io.justsearch.configuration.persistence.SqliteStoreSnapshot.open(path);
+        var expected = DriverManager.getConnection("jdbc:sqlite::memory:");
+        var statement = expected.createStatement()) {
+      statement.execute(EntityClusterSchema.CREATE_CLUSTERS_TABLE);
+      statement.execute(EntityClusterSchema.CREATE_CLUSTER_ID_INDEX);
+      statement.execute(EntityClusterSchema.CREATE_CANONICAL_INDEX);
+      statement.execute(EntityClusterSchema.CREATE_OVERRIDES_TABLE);
+      statement.execute(EntityClusterSchema.CREATE_MENTIONS_TABLE);
+      statement.execute(EntityClusterSchema.CREATE_MENTION_FORM_INDEX);
+      snapshot.requireCurrentStructure(CURRENT_SCHEMA_VERSION, expected);
     }
   }
 

@@ -931,7 +931,8 @@ class FrozenHandle:
         require(prepared_only and deadline is not None, 'frozen execution needs the admitted deadline')
         port = index._free_port()
         self._backend = backend.start_backend(repo_root=self.config.repo_root, data_dir=self.data_dir,
-            port=port, env_overrides=index._launch_env(self.config, self.data_dir, self.env),
+            port=port, env_overrides={**index._launch_env(self.config, self.data_dir, self.env),
+                           "JUSTSEARCH_FROZEN_EVAL": "true"},
             distribution=distribution.path(self.env[index.DISTRIBUTION_ENV]),
             health_timeout_sec=max(.001, min(180, deadline-time.monotonic())),
             clean=False, index_cache_mode='off', startup_admission=False, prepared_only=True)

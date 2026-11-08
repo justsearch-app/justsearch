@@ -200,6 +200,7 @@ public final class KnowledgeServerBootstrap implements Closeable {
 
     private AppInstanceLock appLock;
     private IpcTelemetry ipcTelemetry;
+    private final boolean frozenEval = io.justsearch.configuration.FrozenEvalMode.requested();
     private final boolean automaticRootProducers;
     private final io.justsearch.core.execution.EngineExecutorRegistry executors;
     private io.justsearch.app.services.encryption.UnlockDeferredScan protectedRemoval;
@@ -221,7 +222,7 @@ public final class KnowledgeServerBootstrap implements Closeable {
         KnowledgeServerConfig config, Telemetry telemetry, EngineComponentRegistry components,
         ComponentHandle indexComponent, WorkerHost workerHost, boolean automaticRootProducers,
         java.util.concurrent.locks.ReentrantReadWriteLock publicationLock) {
-        this.automaticRootProducers = automaticRootProducers;
+        this.automaticRootProducers = automaticRootProducers && !frozenEval;
         this.publicationLock = java.util.Objects.requireNonNull(publicationLock, "publicationLock");
         this.workerHost =
             java.util.Objects.requireNonNull(workerHost, "workerHost (item A11: no spawn fallback)");
@@ -451,6 +452,7 @@ public final class KnowledgeServerBootstrap implements Closeable {
 
     private void startWithRetryLocked(int maxAttempts, long backoffMs)
             throws IOException, InterruptedException {
+        if (frozenEval) maxAttempts = 1;
         Exception last = null;
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             retryPending = attempt < maxAttempts;
@@ -528,6 +530,7 @@ public final class KnowledgeServerBootstrap implements Closeable {
             io.justsearch.core.component.ComponentRecoveryAction.Request request,
             RecoveryOwner owner, Runnable preparePublication) throws Exception {
         java.util.Objects.requireNonNull(request, "request");
+        if (frozenEval) return io.justsearch.core.component.ComponentRecoveryAction.Result.REFUSED;
         java.util.Objects.requireNonNull(owner, "owner");
         java.util.Objects.requireNonNull(preparePublication, "preparePublication");
         initLock.lockInterruptibly();
@@ -588,6 +591,7 @@ public final class KnowledgeServerBootstrap implements Closeable {
     public io.justsearch.core.component.ComponentRecoveryAction.Result recoverEncoders(
             io.justsearch.core.component.ComponentRecoveryAction.Request request) throws Exception {
         java.util.Objects.requireNonNull(request, "request");
+        if (frozenEval) return io.justsearch.core.component.ComponentRecoveryAction.Result.REFUSED;
         initLock.lockInterruptibly();
         try {
             if (request.cancelled() || client == null) {
