@@ -50,3 +50,14 @@ author-session: 01a1b8c1-ef5c-7552-bdbf-8a9e34966de1
   "note": "Independent source/intent audit: fixture-owned process teardown follows successful index close, preserves existing oracles and restart semantics, and has a meaningful executor shutdown regression check. Execution counts were not independently verified here; no runtime or product PASS inferred."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1b8ad-2c61-73f0-b08d-5b72b82a7545",
+  "verdict": "accept",
+  "digest": "sha256:f4fc3ee2cf1e9820e96f37494f97ddfa656f91a93bba6c62bf322cee814237f0",
+  "note": "Independent Incidental acceptance: whole fixture retires owned process resources after successful restartable index close and before unchanged property restoration. I independently observed ECB fail after real executor42 work because the executor stayed live, and verified the corrected helper, ordinary Root lifetime distinction and current90f cleanup case. This accepts fixture intent only; no product-runtime or model-quality PASS."
+}
+```

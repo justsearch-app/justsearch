@@ -57,3 +57,14 @@ Independent source/intent acceptance is recorded below; execution and gate resul
   "note": "Independent source/intent audit: one authorized frozen launch declaration supports 292 to 293; packaged byte equality and prior scope assertions remain, and the new restart-required assertion strengthens the rule. No execution, runtime or product PASS inferred."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1b8ad-2c61-73f0-b08d-5b72b82a7545",
+  "verdict": "accept",
+  "digest": "sha256:2b23f457c6ebbbecb95f6fc43473e5ef25023aa612ae9d21782bea0527eef942",
+  "note": "Independent Structural rule kept acceptance: before-state exact292 declaration guard becomes293 for the single authorized internal frozen launch key; packaged equality and prior scope assertions remain, with explicit restart-required assertion added. I independently executed all6 ConfigApplyScopes cases at exact90f after restoring fixture-owned environment, with no skips. This accepts test intent only; no new installed-runtime, model-quality or scoring PASS."
+}
+```
