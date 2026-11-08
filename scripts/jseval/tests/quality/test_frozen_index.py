@@ -40,7 +40,8 @@ def source(tmp_path, monkeypatch):
     models = tmp_path/'models'
     models.mkdir()
     (models/'embed.onnx').write_bytes(b'model fixture')
-    cfg = index.IndexConfig(models_dir=models, cache_root=tmp_path/'cache')
+    # The fake product does not use the host Python interpreter's loader directories.
+    cfg = index.IndexConfig(models_dir=models, cache_root=tmp_path/'cache', env={'LD_LIBRARY_PATH': ''})
     ready_distribution(monkeypatch)
     monkeypatch.setattr(backend, 'source_identity', lambda *_: ('b'*40, None))
     env = pinned_env(cfg)
@@ -107,6 +108,31 @@ def prepare_source(source, tmp_path):
     out = tmp_path/'copies'
     frozen.prepare(baseline.parent, cfg.cache_root, out, cfg, refs=[c.name])
     return out, out/sha256_text(c.name)
+
+
+@pytest.mark.parametrize('fixture', ['source', 'retained_pair'])
+def test_synthetic_frozen_inputs_exclude_inherited_python_loader(request, monkeypatch, tmp_path, fixture):
+    loader = tmp_path/'python-loader'
+    loader.mkdir()
+    (loader/'lib-host-only.so').write_bytes(b'host Python loader fixture')
+    inherited = os.pathsep.join(filter(None, (os.environ.get('LD_LIBRARY_PATH'), str(loader))))
+    monkeypatch.setenv('LD_LIBRARY_PATH', inherited)
+    visited = []
+    tree_digest = distribution.tree_digest
+
+    def observe(root, *args, **kwargs):
+        visited.append(Path(root).resolve())
+        return tree_digest(root, *args, **kwargs)
+
+    monkeypatch.setattr(distribution, 'tree_digest', observe)
+    request.getfixturevalue(fixture)
+    assert os.environ['LD_LIBRARY_PATH'] == inherited
+    child = subprocess.run([sys.executable, '-c',
+                            'import os; print(os.environ["LD_LIBRARY_PATH"])'],
+                           capture_output=True, text=True, timeout=10)
+    assert child.returncode == 0, child.stderr
+    assert child.stdout.strip() == inherited
+    assert loader.resolve() not in visited
 
 
 def test_prepare_copies_all_bytes_without_booting_or_rewriting_original(source, tmp_path, monkeypatch):
