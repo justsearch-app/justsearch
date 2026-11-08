@@ -22,7 +22,7 @@ final class FrozenOperationAdmissionTest {
   @TempDir Path directory;
 
   @Test void frozenPreparationAndAcceptanceInvokeNoCallbackAndCreateNoRow() throws Exception {
-    try (var store = new SqliteOperationStore(directory.resolve("operations.db")); var mode = frozen()) {
+    try (var store = new SqliteOperationStore(directory.resolve("operations.db")); var _ = frozen()) {
       var runner = new OperationAttemptRunnerImpl(store, Clock.systemUTC(), Set.of());
       var request = request(OperationKind.OPERATION, "core.test");
       var callbacks = new AtomicInteger();
@@ -41,10 +41,10 @@ final class FrozenOperationAdmissionTest {
   }
 
   @Test void frozenAcceptanceLeavesNoDurableOperation() throws Exception {
-    try (var store = new SqliteOperationStore(directory.resolve("operations.db")); var mode = frozen()) {
+    try (var store = new SqliteOperationStore(directory.resolve("operations.db")); var _ = frozen()) {
       var runner = new OperationAttemptRunnerImpl(store, Clock.systemUTC(), Set.of());
       var request = request(OperationKind.OPERATION, "core.test");
-      try { runner.accept(request); } catch (IllegalStateException refused) { }
+      assertThrows(IllegalStateException.class, () -> runner.accept(request));
       assertTrue(store.find(request.key()).isEmpty(), "frozen acceptance cannot create a durable row");
       runner.beginClosing(); assertTrue(runner.awaitDrained(Duration.ofSeconds(1)));
     }
@@ -53,7 +53,7 @@ final class FrozenOperationAdmissionTest {
   @Test void lateResumeAndStartCannotExecuteOrChangeAcceptedRows() throws Exception {
     try (var store = new SqliteOperationStore(directory.resolve("operations.db"))) {
       final OperationAttemptRunnerImpl runner;
-      try (var mode = frozen()) {
+      try (var _ = frozen()) {
         runner = new OperationAttemptRunnerImpl(store, Clock.systemUTC(), Set.of(OperationKind.FORGET));
       }
       // A separately owned producer supplies an accepted row after this owner's empty boot
@@ -79,7 +79,7 @@ final class FrozenOperationAdmissionTest {
   @Test void ordinaryOwnerStillAcceptsAndExecutesAfterAnotherOwnerRequestsFrozen() throws Exception {
     try (var store = new SqliteOperationStore(directory.resolve("operations.db"))) {
       var runner = new OperationAttemptRunnerImpl(store, Clock.systemUTC(), Set.of());
-      try (var mode = frozen()) {
+      try (var _ = frozen()) {
         var accepted = runner.accept(request(OperationKind.OPERATION, "core.test"));
         var callbacks = new AtomicInteger();
         var result = runner.start(accepted, ignored -> { callbacks.incrementAndGet(); return success(); });

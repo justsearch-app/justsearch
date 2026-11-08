@@ -16,7 +16,7 @@ final class FrozenEntityClusterStoreTest {
     try (var store = new EntityClusterStore(path)) {
       store.open(); store.upsert("Witness", "PERSON", "cluster", "Witness", 1.0);
     }
-    try (var mode = frozen(); var store = new EntityClusterStore(path)) {
+    try (var _ = frozen(); var store = new EntityClusterStore(path)) {
       store.open();
       assertEquals(1, store.loadAll().size());
       assertThrows(Exception.class, () -> store.upsert("Other", "PERSON", "other", "Other", 1.0));
@@ -32,13 +32,13 @@ final class FrozenEntityClusterStoreTest {
         statement.execute("PRAGMA user_version=" + version);
       }
       byte[] before = Files.readAllBytes(path);
-      try (var mode = frozen(); var store = new EntityClusterStore(path)) {
+      try (var _ = frozen(); var store = new EntityClusterStore(path)) {
         assertThrows(Exception.class, store::open);
       }
       assertArrayEquals(before, Files.readAllBytes(path));
     }
     Path absent = directory.resolve("absent.db");
-    try (var mode = frozen(); var store = new EntityClusterStore(absent)) { assertThrows(Exception.class, store::open); }
+    try (var _ = frozen(); var store = new EntityClusterStore(absent)) { assertThrows(Exception.class, store::open); }
     assertFalse(Files.exists(absent));
     Path incomplete = directory.resolve("incomplete.db");
     try (var store = new EntityClusterStore(incomplete)) { store.open(); }
@@ -46,7 +46,7 @@ final class FrozenEntityClusterStoreTest {
       statement.execute("DROP TABLE entity_mentions");
     }
     byte[] before = Files.readAllBytes(incomplete);
-    try (var mode = frozen(); var store = new EntityClusterStore(incomplete)) { assertThrows(Exception.class, store::open); }
+    try (var _ = frozen(); var store = new EntityClusterStore(incomplete)) { assertThrows(Exception.class, store::open); }
     assertArrayEquals(before, Files.readAllBytes(incomplete));
   }
 

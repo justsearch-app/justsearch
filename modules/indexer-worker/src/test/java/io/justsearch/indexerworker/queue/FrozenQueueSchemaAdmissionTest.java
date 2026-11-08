@@ -14,7 +14,7 @@ final class FrozenQueueSchemaAdmissionTest {
   @Test void acceptsTheOwnersExplicitAndImplicitNullDefaultsWithoutRewritingSchema() throws Exception {
     Path database = directory.resolve("jobs.db");
     try (var queue = new SqliteJobQueue(database)) { queue.open(); }
-    try (var mode = frozen(); var queue = new SqliteJobQueue(database)) {
+    try (var _ = frozen(); var queue = new SqliteJobQueue(database)) {
       queue.open(); assertEquals(0, queue.queueDepth());
     }
     // The v10 migration owns DEFAULT NULL; fresh base CREATE uses implicit NULL instead.
@@ -24,7 +24,7 @@ final class FrozenQueueSchemaAdmissionTest {
       statement.execute(SqliteSchema.MIGRATE_V9_TO_V10_ADD_FIRST_FAILED_AT);
     }
     String before = schema(database);
-    try (var mode = frozen(); var queue = new SqliteJobQueue(database)) {
+    try (var _ = frozen(); var queue = new SqliteJobQueue(database)) {
       queue.open(); assertEquals(0, queue.queueDepth());
     }
     assertEquals(before, schema(database));
@@ -37,12 +37,12 @@ final class FrozenQueueSchemaAdmissionTest {
       try (var connection = DriverManager.getConnection("jdbc:sqlite:" + database);
           var statement = connection.createStatement()) { statement.execute("PRAGMA user_version=" + version); }
       byte[] before = Files.readAllBytes(database);
-      try (var mode = frozen(); var queue = new SqliteJobQueue(database)) { assertThrows(Exception.class, queue::open); }
+      try (var _ = frozen(); var queue = new SqliteJobQueue(database)) { assertThrows(Exception.class, queue::open); }
       assertArrayEquals(before, Files.readAllBytes(database));
     }
     Files.writeString(database, "not a SQLite database");
     byte[] before = Files.readAllBytes(database);
-    try (var mode = frozen(); var queue = new SqliteJobQueue(database)) { assertThrows(Exception.class, queue::open); }
+    try (var _ = frozen(); var queue = new SqliteJobQueue(database)) { assertThrows(Exception.class, queue::open); }
     assertArrayEquals(before, Files.readAllBytes(database));
   }
 

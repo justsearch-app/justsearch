@@ -47,7 +47,7 @@ final class EngineFrozenEvalCompositionTest {
       }
       Files.createDirectories(data);
       // These stores are created by their real owners, before the frozen physical lifetime.
-      try (var operations = new SqliteOperationStore(data.resolve("operations.db"));
+      try (var _ = new SqliteOperationStore(data.resolve("operations.db"));
           var clusters = new EntityClusterStore(data.resolve("entity-clusters.db"))) {
         clusters.open();
       }
