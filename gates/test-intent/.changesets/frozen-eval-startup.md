@@ -34,7 +34,7 @@ author-session: 01a1b880-a623-7580-b591-38506070d7aa
 
 ## Acceptance records
 
-Pending independent assessment and final-digest acceptance.
+Independent source/intent acceptance is recorded below; execution and gate results are separate.
 
 ```json
 {

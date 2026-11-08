@@ -28,3 +28,14 @@ author-session: 01a1b8c1-ef5c-7552-bdbf-8a9e34966de1
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "reviewer",
+  "session": "01a1b879-70a2-73f0-9a5e-3231c1e53dae",
+  "verdict": "accept",
+  "digest": "sha256:f4fc3ee2cf1e9820e96f37494f97ddfa656f91a93bba6c62bf322cee814237f0",
+  "note": "Exact Incidental proposal accepted by independent reviewer 01a1b879-70a2-73f0-9a5e-3231c1e53dae on 754754ae. CLI transcription by orchestrator 01a1b0c3-481a-7d22-87d4-0ea0ad710b2c. Source and intent only; no execution or product PASS inferred."
+}
+```
