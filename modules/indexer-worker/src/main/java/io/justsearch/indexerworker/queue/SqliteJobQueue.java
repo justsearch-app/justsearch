@@ -682,6 +682,22 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
   private java.time.Clock retentionClock = java.time.Clock.systemUTC();
 
+  private volatile java.util.function.BiPredicate<String, IndexJob> ingestionBoundaryAuthority = (key, claim) -> true;
+  private volatile java.util.function.Function<String, String> importApprovalBinding = key -> null;
+
+  @Override public void useIngestionBoundaryAuthority(java.util.function.BiPredicate<String, IndexJob> authority) {
+    ingestionBoundaryAuthority = Objects.requireNonNull(authority);
+  }
+
+  @Override public void useImportApprovalBinding(java.util.function.Function<String, String> activeBinding) {
+    importApprovalBinding = Objects.requireNonNull(activeBinding);
+  }
+
+  @Override public boolean allowsIngestionBoundary(IngestionBoundary boundary, String key, IndexJob claim) {
+    if (!ingestionBoundaryAuthority.test(key, claim)) throw new IngestionApprovalInterruptedException();
+    return true;
+  }
+
   private volatile java.util.function.UnaryOperator<String> sourceOriginOperation = key -> key;
   private volatile java.util.function.Supplier<List<IngestCollectionPolicy.RootBinding>> sourceOriginRoots;
 
@@ -711,12 +727,13 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   public java.util.Optional<String> sourceOriginId(IndexJob claim) {
     // Never call the operation store or the declaration owner under the queue lock.
     String operation = claim.scanId() == null ? null : sourceOriginOperation.apply(claim.scanId());
+    String activeBinding = operation == null ? null : importApprovalBinding.apply(operation);
     var declarations = sourceOriginRoots;
     var declared = declarations == null ? declaredCollectionRoots.get() : declarations.get();
     lockTimed();
     try {
       ensureOpen();
-      return SqliteSourceOrigins.find(connection, claim, operation, declared, declarations != null);
+      return SqliteSourceOrigins.find(connection, claim, operation, declared, declarations != null, activeBinding);
     } catch (SQLException failure) {
       throw new IllegalStateException("Source origin lookup is unavailable", failure);
     } finally {

@@ -67,6 +67,7 @@ public final class ObservationJustifications {
       Map.entry("GET /api/indexing-roots/substrate", "CONSUMER: ui-web/src/shell-v0/views/LibrarySurface.ts automatic roots refresh on mount and status updates"),
       Map.entry("GET /api/indexing/failed-jobs", "CONSUMER: ui-web/src/shell-v0/views/HealthSurface.ts failed-job mount hydration"),
       Map.entry("GET /api/indexing/excludes", "CONSUMER: ui-web/src/shell-v0/views/LibrarySurface.ts loadExcludesPolicy hydrates the effective exclusion list and its winning source before Preview or Apply"),
+      Map.entry("GET /api/indexing/imports/interrupted", "STATUS: current retained import interruptions, frozen folders and resume availability for reload recovery"),
       Map.entry("GET /api/indexing/forgets", "CONSUMER: ui-web/src/api/domains/forget.ts hydrates Library unfinished intents and Search v3 host capability without replaying effects"),
       Map.entry("GET /api/indexing/forgets/{operationKey}", "STATUS: current exact forget observation for UI lost-response and reload reconciliation"),
       Map.entry("GET /api/indexing/roots", "CONSUMER: ui-web/src/shell-v0/views/BrowseSurface.ts mount hydration via api/domains/indexing.ts"),

@@ -164,11 +164,13 @@ public final class OperationAuthority {
   /** In-process proof owned by this authority, never reconstructed from persisted SESSION text. */
   public final class LiveOriginApproval {
     private final String operationKey;
+    private final String bindingId;
     private final String planHash;
     private final BooleanSupplier acceptedOwnerLive;
 
-    private LiveOriginApproval(String operationKey, String planHash, BooleanSupplier acceptedOwnerLive) {
+    private LiveOriginApproval(String operationKey, String bindingId, String planHash, BooleanSupplier acceptedOwnerLive) {
       this.operationKey = operationKey;
+      this.bindingId = bindingId;
       this.planHash = planHash;
       this.acceptedOwnerLive = acceptedOwnerLive;
     }
@@ -188,9 +190,21 @@ public final class OperationAuthority {
         || !(ingestPolicyBinding(accepted).basis() instanceof OperationAuthorizationBasis.EphemeralCapsule)) {
       throw new IllegalArgumentException("No live accepted session owner");
     }
-    return new LiveOriginApproval(accepted.key(),
+    return new LiveOriginApproval(accepted.key(), accepted.key(),
         io.justsearch.app.api.operations.CanonicalOperationArguments.digest(frozenPlan.toReplayPayload()),
         acceptedOwnerLive);
+  }
+
+  /** Only the winning accepted renewal body can mint this process-local session witness. */
+  public LiveOriginApproval liveImportRenewalApproval(OperationRecord accepted,
+      io.justsearch.app.api.operations.RecordedImportResume renewal, BooleanSupplier acceptedOwnerLive) {
+    if (accepted.state() != OperationState.RUNNING
+        || !io.justsearch.app.api.operations.RecordedImportResume.OPERATION_ID.equals(accepted.descriptor().operationRef())
+        || !(OperationAuthorizationBasis.decode(accepted.context().grantReference().orElse(null))
+            instanceof OperationAuthorizationBasis.EphemeralCapsule)
+        || !acceptedOwnerLive.getAsBoolean()) throw new IllegalArgumentException("No live accepted renewal");
+    return new LiveOriginApproval(renewal.operationKey(), accepted.key(),
+        io.justsearch.app.api.operations.CanonicalOperationArguments.digest(renewal.plan().toReplayPayload()), acceptedOwnerLive);
   }
 
   /**
@@ -225,8 +239,10 @@ public final class OperationAuthority {
             || !binding.parentOperationKey().equals(approval.operationKey())
             || !binding.planHash().equals(restart.planHash())) return false;
       }
-      Operation operation = agentOperations.findByIdValue(approval.producingOperationId()).orElseThrow();
-      if (!AgentToolsOperationCatalog.INGEST_FILES.equals(operation.id())) return false;
+      Operation operation = agentOperations.findByIdValue(approval.producingOperationId())
+          .or(() -> coreOperations.findByIdValue(approval.producingOperationId())).orElseThrow();
+      if (!AgentToolsOperationCatalog.INGEST_FILES.equals(operation.id())
+          && !CoreOperationCatalog.RESUME_IMPORT.equals(operation.id())) return false;
       TransportTag transport = TransportTag.valueOf(approval.transport());
       if (sources.findByTransport(transport).isEmpty()) return false;
       EngineContext context = new EngineContext(EngineContext.ClientKind.valueOf(approval.clientKind()),
@@ -241,6 +257,7 @@ public final class OperationAuthority {
         case OperationAuthorizationBasis.PreparedContinuation ignored -> false;
         case OperationAuthorizationBasis.EphemeralCapsule ignored -> live != null
             && live.owner() == this && live.operationKey.equals(approval.operationKey())
+            && live.bindingId.equals(restart.bindingId())
             && live.planHash.equals(restart.planHash()) && live.acceptedOwnerLive.getAsBoolean();
         case OperationAuthorizationBasis.OperationGrant grant -> grants.isAllowed(
             new DurableGrantStore.DurableGrant(DurableGrantStore.GrantKind.OPERATION,

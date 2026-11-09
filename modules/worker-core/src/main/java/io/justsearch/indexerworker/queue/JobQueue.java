@@ -28,6 +28,15 @@ public interface JobQueue extends Closeable {
     throw new UnsupportedOperationException("Source origin persistence is unavailable");
   }
 
+  /** Revocation releases a claim without recording a source failure or spending a retry. */
+  final class IngestionApprovalInterruptedException extends java.util.concurrent.CancellationException {
+    public IngestionApprovalInterruptedException() { super("Import approval is interrupted"); }
+  }
+
+  default void useIngestionBoundaryAuthority(java.util.function.BiPredicate<String, IndexJob> authority) {}
+
+  default void useImportApprovalBinding(java.util.function.Function<String, String> activeBinding) {}
+
   enum IngestionBoundary { TRAVERSAL, HASHING, EXTRACTION, PUBLICATION }
 
   /** P2a approval seam: today's approval verdict is allow. Consumption activates with Resume. */

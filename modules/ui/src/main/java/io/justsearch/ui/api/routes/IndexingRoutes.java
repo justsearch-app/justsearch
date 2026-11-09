@@ -9,6 +9,7 @@ public final class IndexingRoutes {
   private IndexingRoutes() {}
 
   public static void register(Javalin app, IndexingController indexingController) {
+    app.get("/api/indexing/imports/interrupted", indexingController::handleInterruptedImports, ActivityRole.OBSERVATION);
     app.get("/api/indexing/roots", indexingController::handleListRoots, ActivityRole.OBSERVATION);
     app.get("/api/indexing/suggested-roots", indexingController::handleSuggestedRoots, ActivityRole.OBSERVATION);
     app.post("/api/indexing/roots", indexingController::handleAddRoot, ActivityRole.USER_ACTION);

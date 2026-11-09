@@ -6,6 +6,7 @@ import io.justsearch.app.api.operations.BulkReindexProgress;
 import io.justsearch.app.api.operations.IndexTargetSnapshot;
 import io.justsearch.app.api.operations.RecordedIngestChild;
 import io.justsearch.app.api.operations.RecordedRootPlan;
+import io.justsearch.app.api.operations.CanonicalOperationArguments;
 import io.justsearch.app.api.operations.OperationHistoryMode;
 import io.justsearch.app.api.operations.OperationHistoryRow;
 import io.justsearch.app.api.operations.OperationOutcomeView;
@@ -65,6 +66,10 @@ public final class SqliteOperationStore implements OperationStore {
         AND EXISTS (SELECT 1 FROM operations parent
           WHERE parent.operation_key = json_extract(operations.identity_json, '$.parentOperationKey')
             AND parent.state NOT IN ('COMPLETE', 'FAILED', 'CANCELLED')))
+      AND NOT (COALESCE(operation_ref, '') = 'core.resume-import' AND EXISTS (SELECT 1 FROM operations parent
+        WHERE parent.state NOT IN ('COMPLETE', 'FAILED', 'CANCELLED')
+          AND json_valid(parent.active_approval_binding)
+          AND json_extract(parent.active_approval_binding, '$.id') = operations.operation_key))
       """;
   private static final String INSERT_OPERATION = """
       INSERT INTO operations(operation_key, kind, survival, urgency, state, operation_ref,
@@ -498,8 +503,54 @@ public final class SqliteOperationStore implements OperationStore {
         delete.setString(1, key);
         delete.executeUpdate();
       }
-      return new Acceptance(findRow(key).orElseThrow(() -> new SQLException("Accepted row is missing")), true);
+      var accepted = findRow(key).orElseThrow(() -> new SQLException("Accepted row is missing"));
+      if (pending != null && descriptor.kind() == OperationKind.INGEST
+          && "core.ingest-files".equals(descriptor.operationRef())) {
+        var plan = importPlan(pending);
+        if (plan != null) writeImportBinding(accepted.id(), new io.justsearch.app.api.operations.ImportApprovalBinding(
+            1, key, key, null, CanonicalOperationArguments.digest(plan.toReplayPayload()), 0));
+      }
+      if ("core.resume-import".equals(descriptor.operationRef())) selectImportRenewal(accepted, pending);
+      return new Acceptance(accepted, true);
     }));
+  }
+
+  private static RecordedRootPlan importPlan(Preparation preparation) {
+    if (preparation == null || preparation.payload().sealed()) return null;
+    var metadata = BULK_JSON.readTree(preparation.payload().value()).path("preparation");
+    if (!RecordedRootPlan.SCHEMA.equals(metadata.path("replaySchema").asString())) return null;
+    return RecordedRootPlan.fromReplayPayload(metadata.path("replayPayloadJson").asString());
+  }
+
+  private void writeImportBinding(long id, io.justsearch.app.api.operations.ImportApprovalBinding binding)
+      throws SQLException {
+    try (var update = connection.prepareStatement(
+        "UPDATE operations SET active_approval_binding=?,interruption_reason=NULL WHERE id=?")) {
+      update.setString(1, binding.encode()); update.setLong(2, id);
+      if (update.executeUpdate() != 1) throw new SQLException("Import approval selection disappeared");
+    }
+  }
+
+  /** Both acceptance and selection roll back on a stale interruption or changed frozen plan. */
+  private void selectImportRenewal(OperationRecord accepted, Preparation pending) throws SQLException {
+    if (pending == null || pending.payload().sealed()) throw childRefused();
+    var metadata = BULK_JSON.readTree(pending.payload().value()).path("preparation");
+    if (!io.justsearch.app.api.operations.RecordedImportResume.SCHEMA.equals(metadata.path("replaySchema").asString())) {
+      throw childRefused();
+    }
+    var renewal = io.justsearch.app.api.operations.RecordedImportResume.decode(metadata.path("replayPayloadJson").asString());
+    var parent = findRow(renewal.operationKey()).orElseThrow(SqliteOperationStore::childRefused);
+    var original = importPlan(acceptedPreparationRow(parent.id()).orElseThrow(SqliteOperationStore::childRefused));
+    var active = importApprovalState(parent.id()).orElseThrow(SqliteOperationStore::childRefused);
+    if (parent.state().terminal() || original == null || !original.equals(renewal.plan())
+        || active.interruptionReason() == null || "cancelled".equals(active.interruptionReason())
+        || active.interruptionRevision() != renewal.interruptionRevision()) throw childRefused();
+    // The trusted prepared dispatcher supplies a fresh accepted basis. SESSION text alone is never
+    // replay permission; only the live winning renewal body can supply its in-process witness.
+    io.justsearch.app.api.operations.OperationAuthorizationBasis.decode(accepted.context().grantReference().orElse(null));
+    writeImportBinding(parent.id(), new io.justsearch.app.api.operations.ImportApprovalBinding(1,
+        accepted.key(), parent.key(), active.binding() == null ? null : active.binding().id(),
+        CanonicalOperationArguments.digest(original.toReplayPayload()), active.interruptionRevision()));
   }
 
   @Override
@@ -1586,6 +1637,29 @@ public final class SqliteOperationStore implements OperationStore {
         }
       }
     });
+  }
+
+  @Override
+  public boolean interruptImport(long id, String reason) {
+    if (reason == null || reason.isBlank() || reason.length() > 256) throw new IllegalArgumentException("Invalid interruption reason");
+    return locked(() -> transaction(() -> {
+      try { importApprovalState(id); }
+      catch (RuntimeException malformed) {
+        if (malformed instanceof OperationStoreException) throw malformed;
+        try (var clear = connection.prepareStatement("UPDATE operations SET active_approval_binding=NULL WHERE id=?")) {
+          clear.setLong(1, id); clear.executeUpdate();
+        }
+      }
+      try (var update = connection.prepareStatement("""
+          UPDATE operations SET interruption_revision=interruption_revision+1,interruption_reason=?,updated_at=?
+          WHERE id=? AND kind='ingest' AND operation_ref='core.ingest-files'
+            AND state IN ('ACCEPTED','RUNNING') AND
+            (interruption_reason IS NULL OR (?='cancelled' AND interruption_reason<>'cancelled'))
+          """)) {
+        update.setString(1, reason); update.setLong(2, clock.millis()); update.setLong(3, id); update.setString(4, reason);
+        return update.executeUpdate() == 1;
+      }
+    }));
   }
 
   @Override

@@ -4646,7 +4646,7 @@ public final class WorkerIngestService {
   }
 
   /** Captured bulk records all source identities before any member may be claimed. */
-  public enum RecordedScanMode { STREAMING, CAPTURED }
+  public enum RecordedScanMode { STREAMING, RECOVERED, CAPTURED }
 
   /** Java-only projection of one accepted root; the wire schema never carries operation identity. */
   public record RecordedRootScan(io.justsearch.ipc.ScanRootRequest request,
@@ -4699,7 +4699,27 @@ public final class WorkerIngestService {
     }
     if (!awaitRecordedGenerationBeforeTraversal(recorded, ctx)) return;
     jobQueue.allowsIngestionBoundary(JobQueue.IngestionBoundary.TRAVERSAL, recorded.operationKey(), null);
-    scanRoot(recorded.request(), sink, ctx, recorded);
+    var request = recorded.request();
+    if (recorded.mode() == RecordedScanMode.RECOVERED) {
+      try {
+        Path root = Path.of(request.getRootPath());
+        var progress = jobQueue.recordedWalk(recorded.operationKey()).orElseThrow(
+            () -> new JobQueue.RecordedWalkGapException("Recovered root has no walk binding"));
+        // Opening an enumeration epoch records no traversal. Until the first admission, revision
+        // equals epoch; the volume is recorded before walking, so absence of both witnesses is
+        // the delayed start of the original accepted add (P2 I10), never a re-add of a known root.
+        boolean delayedAdd = !progress.capturedPlan() && progress.enumerationEpoch() == recorded.epoch()
+            && progress.revision() == progress.enumerationEpoch() && progress.enumerationClosedAt() == null
+            && progress.completedUnits() == 0 && progress.failedUnits() == 0
+            && rootVolumes.recordedFor(root).isEmpty()
+            && (!recorded.singleFile() || rootVolumes.recordedFileFolder(root.getParent()).isEmpty());
+        request = request.toBuilder().setRootAdded(delayedAdd).build();
+        if (!Files.exists(root)) throw new JobQueue.RecordedWalkGapException("Accepted import folder is unavailable");
+      } catch (IOException unavailable) {
+        throw new JobQueue.RecordedWalkGapException("Accepted import volume is unavailable", unavailable);
+      }
+    }
+    scanRoot(request, sink, ctx, recorded);
   }
 
   private boolean awaitRecordedGenerationBeforeTraversal(RecordedRootScan recorded, CallContext ctx) {
