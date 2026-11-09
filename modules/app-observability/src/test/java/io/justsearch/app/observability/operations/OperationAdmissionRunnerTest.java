@@ -188,10 +188,9 @@ final class OperationAdmissionRunnerTest {
 
   @Test
   void acceptanceScopeIsSingleUseThreadBoundAndClosedAfterCallback() throws Exception {
+    var completions = new AtomicInteger();
     try (var store = store(); var otherThread = Executors.newSingleThreadExecutor();
-        var _ = store.subscribeCompletions(ignored -> {
-          throw new AssertionError("raw acceptance must not publish completion");
-        })) {
+        var _ = store.subscribeCompletions(ignored -> completions.incrementAndGet())) {
       var runner = runner(store);
       var request = request(OperationKeys.generate(CLOCK), DESCRIPTOR);
       var retained = new AtomicReference<OperationAttemptRunner.AcceptanceScope>();
@@ -215,6 +214,7 @@ final class OperationAdmissionRunnerTest {
       assertNotNull(retained.get());
       assertThrows(IllegalStateException.class, () -> retained.get().accept(CONTEXT));
       assertEquals(1, store.openRecords().size());
+      assertEquals(0, completions.get(), "raw acceptance must not publish completion");
     }
   }
 

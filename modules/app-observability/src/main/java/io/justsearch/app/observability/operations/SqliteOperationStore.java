@@ -1451,7 +1451,7 @@ public final class SqliteOperationStore implements OperationStore {
     for (var listener : completionListeners) {
       try {
         listener.accept(record);
-      } catch (RuntimeException failure) {
+      } catch (RuntimeException | Error failure) {
         LOG.warn("Operations completion observer failed for row {}; retained row remains authoritative",
             record.id(), failure);
       }
