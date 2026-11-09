@@ -2,10 +2,13 @@
 package io.justsearch.agent.tools;
 
 import io.justsearch.core.context.EngineContext;
+import io.justsearch.configuration.PlatformPaths;
 
 import java.io.IOException;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.FileVisitResult;
+import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.LinkOption;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
@@ -31,11 +34,21 @@ final class FileOperationExecutor {
   private final java.util.function.Function<EngineContext, List<Path>> indexedRootsSupplier;
   private final FileOperationsTool.IndexUpdateCallback indexUpdateCallback;
   private final FileOperationLog transactionLog;
+  private final MoveFileSystem moveFiles;
 
   FileOperationExecutor(
       java.util.function.Function<EngineContext, List<Path>> indexedRootsSupplier,
       FileOperationsTool.IndexUpdateCallback indexUpdateCallback,
       FileOperationLog transactionLog) {
+    this(indexedRootsSupplier, indexUpdateCallback, transactionLog, new MoveFileSystem());
+  }
+
+  FileOperationExecutor(
+      java.util.function.Function<EngineContext, List<Path>> indexedRootsSupplier,
+      FileOperationsTool.IndexUpdateCallback indexUpdateCallback,
+      FileOperationLog transactionLog,
+      MoveFileSystem moveFiles) {
+    this.moveFiles = moveFiles;
     this.indexedRootsSupplier = indexedRootsSupplier;
     this.indexUpdateCallback = indexUpdateCallback;
     this.transactionLog = transactionLog;
@@ -64,7 +77,7 @@ final class FileOperationExecutor {
       if (op.source() == null) {
         return ValidationResult.invalid(index, op, "SOURCE_REQUIRED", "Source path is required");
       }
-      if (!Files.exists(op.source())) {
+      if (!Files.exists(op.source(), LinkOption.NOFOLLOW_LINKS)) {
         return ValidationResult.invalid(
             index, op, "SOURCE_MISSING", "Source does not exist: " + op.source());
       }
@@ -99,7 +112,7 @@ final class FileOperationExecutor {
     }
 
     // Destination conflict check (MKDIR is idempotent, so skip it)
-    if (op.op() != FileOperation.OpType.MKDIR && Files.exists(op.destination())) {
+    if (op.op() != FileOperation.OpType.MKDIR && Files.exists(op.destination(), LinkOption.NOFOLLOW_LINKS)) {
       if (strategy == ConflictStrategy.FAIL) {
         return ValidationResult.invalid(
             index, op, "DEST_EXISTS", "Destination already exists: " + op.destination());
@@ -206,7 +219,7 @@ final class FileOperationExecutor {
       try {
         // Handle destination conflicts at execution time for SKIP/AUTO_SUFFIX
         boolean renamed = false;
-        if (op.op() != FileOperation.OpType.MKDIR && Files.exists(op.destination())) {
+        if (op.op() != FileOperation.OpType.MKDIR && Files.exists(op.destination(), LinkOption.NOFOLLOW_LINKS)) {
           if (strategy == ConflictStrategy.SKIP) {
             String reason = "Destination already exists: " + op.destination();
             results.add(ExecutionResult.skipped(i, op, reason));
@@ -267,7 +280,7 @@ final class FileOperationExecutor {
       case MOVE, RENAME -> {
         // For directories, collect all child file paths BEFORE the move so the index
         // can update each document's path individually (not just the top-level directory)
-        boolean isDir = Files.isDirectory(op.source());
+        boolean isDir = Files.isDirectory(op.source(), LinkOption.NOFOLLOW_LINKS);
         if (isDir) {
           try (var stream = Files.walk(op.source())) {
             stream
@@ -278,20 +291,17 @@ final class FileOperationExecutor {
                             file, op.destination().resolve(op.source().relativize(file))));
           }
         }
-        try {
-          Files.move(op.source(), op.destination(), StandardCopyOption.ATOMIC_MOVE);
-        } catch (AtomicMoveNotSupportedException e) {
-          LOG.debug(
-              "ATOMIC_MOVE not supported for {} -> {}, using copy+delete",
-              op.source(),
-              op.destination());
-          if (isDir) {
-            copyDirectory(op.source(), op.destination());
-            deleteDirectory(op.source());
-          } else {
-            Files.copy(op.source(), op.destination(), StandardCopyOption.COPY_ATTRIBUTES);
-            Files.delete(op.source());
+        if (isDir) {
+          try {
+            moveFiles.moveDirectory(op.source(), op.destination());
+          } catch (AtomicMoveNotSupportedException e) {
+            moveDirectoryByCopy(op.source(), op.destination());
           }
+        } else if (PlatformPaths.isWindows()) {
+          // The Windows provider's ordinary move refuses an occupied destination.
+          Files.move(op.source(), op.destination());
+        } else {
+          moveFile(op.source(), op.destination());
         }
         if (!isDir) {
           pathMappings.put(op.source(), op.destination());
@@ -308,6 +318,100 @@ final class FileOperationExecutor {
         }
         // COPY creates new files — no path mapping needed (they'll be picked up by indexing)
       }
+    }
+  }
+
+  private void moveFile(Path source, Path destination) throws IOException {
+    try {
+      moveFiles.createLink(destination, source);
+    } catch (FileAlreadyExistsException e) {
+      throw e;
+    } catch (IOException | RuntimeException e) {
+      LOG.debug("Hard link unavailable for {} -> {}, using copy+delete", source, destination, e);
+      copyMoveEntry(source, destination);
+      moveFiles.delete(source);
+      return;
+    }
+
+    // Compare entries without following symbolic links (including dangling links).
+    // On failure, leave both names in place; deleting either could remove a replacement.
+    try {
+      Object linkedKey = Files.readAttributes(
+          destination, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS).fileKey();
+      Object sourceKey = Files.readAttributes(
+          source, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS).fileKey();
+      if (linkedKey == null || !linkedKey.equals(sourceKey)) {
+        throw new IOException("Source changed before deletion: " + source);
+      }
+      moveFiles.delete(source);
+    } catch (IOException | RuntimeException e) {
+      throw new IOException(
+          "Move incomplete; source " + source + " remains="
+              + Files.exists(source, LinkOption.NOFOLLOW_LINKS)
+              + "; destination " + destination + " remains="
+              + Files.exists(destination, LinkOption.NOFOLLOW_LINKS), e);
+    }
+  }
+
+  private void copyMoveEntry(Path source, Path destination) throws IOException {
+    BasicFileAttributes attrs =
+        Files.readAttributes(source, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+    if (!attrs.isRegularFile() && !attrs.isSymbolicLink()) {
+      throw new IOException("Cannot copy non-regular file during move: " + source);
+    }
+    moveFiles.copy(source, destination);
+  }
+
+  private void moveDirectoryByCopy(Path source, Path destination) throws IOException {
+    List<Path> copied = new ArrayList<>();
+    Files.walkFileTree(
+        source,
+        new SimpleFileVisitor<>() {
+          @Override
+          public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
+              throws IOException {
+            Files.createDirectories(destination.resolve(source.relativize(dir)));
+            copied.add(dir);
+            return FileVisitResult.CONTINUE;
+          }
+
+          @Override
+          public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
+              throws IOException {
+            copyMoveEntry(file, destination.resolve(source.relativize(file)));
+            copied.add(file);
+            return FileVisitResult.CONTINUE;
+          }
+        });
+    // Never re-walk the source for deletion: a new child belongs to the user. Deleting a
+    // non-empty directory fails and reports an incomplete move while leaving that child intact.
+    try {
+      for (int i = copied.size() - 1; i >= 0; i--) {
+        moveFiles.delete(copied.get(i));
+      }
+    } catch (IOException e) {
+      throw new IOException(
+          "Directory move incomplete; source remains at " + source
+              + "; copied entries remain at " + destination, e);
+    }
+  }
+
+  /** Filesystem calls separated only for deterministic failure/interleaving tests. */
+  static class MoveFileSystem {
+    void createLink(Path destination, Path source) throws IOException {
+      Files.createLink(destination, source);
+    }
+
+    void moveDirectory(Path source, Path destination) throws IOException {
+      Files.move(source, destination, StandardCopyOption.ATOMIC_MOVE);
+    }
+
+    void copy(Path source, Path destination) throws IOException {
+      Files.copy(source, destination, StandardCopyOption.COPY_ATTRIBUTES, LinkOption.NOFOLLOW_LINKS);
+    }
+
+    void delete(Path source) throws IOException {
+      Files.delete(source);
     }
   }
 
@@ -330,7 +434,7 @@ final class FileOperationExecutor {
     Path parent = dest.getParent();
     for (int n = 1; n <= MAX_SUFFIX_ATTEMPTS; n++) {
       Path candidate = parent.resolve(baseName + " (" + n + ")" + extension);
-      if (!Files.exists(candidate)) {
+      if (!Files.exists(candidate, LinkOption.NOFOLLOW_LINKS)) {
         return candidate;
       }
     }
