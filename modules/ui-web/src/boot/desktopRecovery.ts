@@ -34,8 +34,9 @@ export function mountBootApplication(root: HTMLElement, application: HTMLElement
   }
   const frame = frames.get(root) ?? root.querySelector<HTMLElement>('#boot-frame');
   const cover = root.querySelector('#boot-failure') ?? (frame?.parentElement === root ? frame : null);
-  if (!cover) { root.replaceChildren(application); return; }
+  if (!cover) { application.inert = false; root.replaceChildren(application); return; }
   // Attach beneath the fixed paint. Lit's first render, including the top bar, owns hand-off.
+  application.inert = true;
   root.appendChild(application);
   const rendered = application as HTMLElement & { updateComplete?: Promise<boolean> };
   if (!rendered.updateComplete) return; // A never-rendering shell remains covered until the deadline.
@@ -49,7 +50,10 @@ export function mountBootApplication(root: HTMLElement, application: HTMLElement
       await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
       if (application.parentElement !== root || owner && needsRecovery(owner.recovery.supervisor)) return;
       // Recovery/reset may have replaced both nodes while Lit was pending. Never reclaim their root.
-      if (root.querySelector('#boot-frame, #boot-failure')) root.replaceChildren(application);
+      if (root.querySelector('#boot-frame, #boot-failure')) {
+        root.replaceChildren(application);
+        application.inert = false;
+      }
     } catch { window.__justsearchBootFailure?.('bootstrap'); }
   })();
 }

@@ -16,8 +16,8 @@ const key = 'justsearch.bootFrame.v1';
 const secret = 'SECRET-token-key /home/person/private https://secret-host.invalid';
 const saved = { mode: 'light', background: 'rgb(248, 249, 252)', raised: 'rgb(241, 242, 248)', text: 'rgb(20, 24, 32)', muted: 'rgb(50, 55, 65)', border: 'rgb(110, 115, 125)', accent: 'rgb(0, 110, 100)' };
 const catalog = { schemaVersion: '1.0', catalogVersion: 1, namespace: 'registry-surface', primitive: 'Surface', entries: [{ id: 'core.library-surface', presentation: { labelKey: 'registry-surface.library-surface.label', descriptionKey: 'registry-surface.library-surface.description', iconHint: null, category: null }, audience: 'USER', placement: 'RAIL', altitude: 'PRODUCT', consumes: { resources: ['core.indexed-roots'], operations: [], prompts: [], diagnosticChannels: [], conversationShapes: [] }, mountTag: 'jf-library-surface', members: [], riskTier: 'LOW', stateSchema: null, provenance: { tier: 'CORE', contributorId: 'core', version: '1.0', identity: null } }] };
-type Harness = { phase?: string; discoveryHold: boolean; hold: boolean; emit: (payload: unknown) => void; samples: string[] };
-declare global { interface Window { frameHarness: Harness; frameProbe: { createProfile: (id: string, label: string) => void; setActiveProfileId: (id: string) => void; applyAppearance: (appearance: { paletteId: string; theme: string }) => Promise<void>; gateFactoryReset: (root: HTMLElement) => Promise<boolean> } } }
+type Harness = { phase?: string; discoveryHold: boolean; hold: boolean; renderHold: boolean; emit: (payload: unknown) => void; samples: string[] };
+declare global { interface Window { frameHarness: Harness; frameProbe: { createProfile: (id: string, label: string) => void; setActiveProfileId: (id: string) => void; dismissWalkthrough: (id: string) => void; applyAppearance: (appearance: { paletteId: string; theme: string }) => Promise<void>; gateFactoryReset: (root: HTMLElement) => Promise<boolean> } } }
 beforeAll(async () => {
   output = await mkdtemp(path.join(tmpdir(), 'boot-frame-'));
   version = (await readFile(path.resolve('../../gradle.properties'), 'utf8')).match(/^version=(.+)$/m)![1]!;
@@ -26,9 +26,9 @@ beforeAll(async () => {
   // it is never included by the normal build. No production hooks or test query parameters.
   const adapter = path.join(output, 'adapter.ts');
   await writeFile(adapter, `import { gateFactoryReset } from ${JSON.stringify(path.join(root, 'src/boot/factoryReset.ts'))};
-import { createProfile, setActiveProfileId } from ${JSON.stringify(path.join(root, 'src/shell-v0/state/UserStateDocument.ts'))};
+import { createProfile, setActiveProfileId, dismissWalkthrough } from ${JSON.stringify(path.join(root, 'src/shell-v0/state/UserStateDocument.ts'))};
 import { applyAppearance } from ${JSON.stringify(path.join(root, 'src/shell-v0/state/themeState.ts'))};
-Object.assign(window, { frameProbe: { createProfile, setActiveProfileId, applyAppearance, gateFactoryReset } });`);
+Object.assign(window, { frameProbe: { createProfile, setActiveProfileId, dismissWalkthrough, applyAppearance, gateFactoryReset } });`);
   const config = path.join(output, 'config.mjs');
   await writeFile(config, `import original from ${JSON.stringify(path.join(root, 'vite.config.js'))};
 import { mergeConfig } from ${JSON.stringify(path.resolve('node_modules/vite/dist/node/index.js'))};
@@ -51,7 +51,7 @@ afterAll(async () => {
   if (server) await new Promise<void>((resolve, reject) => server.httpServer.close(error => error ? reject(error) : resolve()));
   if (output) await rm(output, { recursive: true, force: true });
 });
-type Options = { saved?: unknown; os?: 'light' | 'dark'; storageThrows?: boolean; desktop?: boolean; phase?: string; hold?: boolean; future?: string; settingsFail?: boolean; discoveryHold?: boolean };
+type Options = { saved?: unknown; os?: 'light' | 'dark'; storageThrows?: boolean; desktop?: boolean; phase?: string; hold?: boolean; renderHold?: boolean; future?: string; settingsFail?: boolean; discoveryHold?: boolean };
 async function create(options: Options = {}): Promise<Page> {
   const context = await browser.newContext({ colorScheme: options.os ?? 'dark' });
   contexts.add(context);
@@ -63,7 +63,7 @@ async function create(options: Options = {}): Promise<Page> {
       Storage.prototype.getItem = () => { throw new Error('storage denied'); };
       Storage.prototype.setItem = () => { throw new Error('quota denied'); };
     }
-    const h = window.frameHarness = { discoveryHold: !!options.discoveryHold, hold: !!options.hold, emit: (_payload: unknown) => {}, samples: [] as string[] };
+    const h = window.frameHarness = { discoveryHold: !!options.discoveryHold, hold: !!options.hold, renderHold: !!options.renderHold, emit: (_payload: unknown) => {}, samples: [] as string[] };
     const sample = () => {
       const root = document.getElementById('root');
       if (root) h.samples.push(root.querySelector('#boot-frame, #boot-failure, jf-engine-recovery, jf-factory-reset-recovery') ? 'covered' : root.querySelector('jf-shell')?.shadowRoot?.querySelector('jf-top-bar') ? 'rendered' : 'blank');
@@ -76,7 +76,10 @@ async function create(options: Options = {}): Promise<Page> {
         const perform = ctor.prototype.performUpdate;
         ctor.prototype.performUpdate = async function () {
           while (h.hold) await new Promise(resolve => setTimeout(resolve, 10));
-          return perform.call(this);
+          const result = perform.call(this);
+          // Render real controls beneath the frame, but keep Lit's hand-off promise pending.
+          while (h.renderHold) await new Promise(resolve => setTimeout(resolve, 10));
+          return result;
         };
       }
       define(name, ctor, config);
@@ -136,6 +139,80 @@ it('SA1 SA6 first paint precedes entry and is inert', async () => {
     expect(await page.locator('#root button, #root a, #root input, #root [tabindex], #root jf-top-bar').count()).toBe(0);
     expect(await page.getByRole('status').textContent()).toBe('Starting');
     await page.keyboard.press('Tab'); expect(await page.locator('#boot-frame :focus').count()).toBe(0);
+  } finally { await page.close(); }
+});
+async function watchShellInput(page: Page) {
+  await page.locator('jf-shell').evaluate(shell => {
+    shell.setAttribute('data-clicks', '0'); shell.setAttribute('data-keys', '0');
+    for (const [event, attribute] of [['click', 'data-clicks'], ['keydown', 'data-keys']] as const) {
+      shell.addEventListener(event, () => shell.setAttribute(attribute, String(Number(shell.getAttribute(attribute)) + 1)));
+    }
+  });
+}
+async function tabThroughCover(page: Page) {
+  const focused: string[] = [];
+  for (let i = 0; i < 6; i++) {
+    await page.keyboard.press('Tab');
+    focused.push(await page.evaluate(() => document.activeElement!.localName));
+  }
+  return focused;
+}
+async function shellWorksAfterCover(page: Page) {
+  const more = page.locator('jf-top-bar .more-trigger');
+  for (let i = 0; i < 30 && !await more.evaluate(el => el.getRootNode() instanceof ShadowRoot && (el.getRootNode() as ShadowRoot).activeElement === el); i++) await page.keyboard.press('Tab');
+  expect(await more.evaluate(el => (el.getRootNode() as ShadowRoot).activeElement === el)).toBe(true);
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('jf-top-bar [role="menu"]');
+  await page.keyboard.press('Escape');
+  const box = (await more.boundingBox())!;
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  expect(await page.locator('jf-top-bar [role="menu"]').count()).toBe(1);
+}
+for (const late of [false, true]) it(`SA6 rendered shell rejects input until ${late ? 'late failure-page' : 'frame'} hand-off`, async () => {
+  const page = await create({ renderHold: true });
+  try {
+    await page.clock.install(); await page.goto(url); await page.waitForSelector('jf-top-bar .more-trigger');
+    await page.addScriptTag({ type: 'module', url: new URL(probe, url).href });
+    await page.evaluate(() => window.frameProbe.dismissWalkthrough('welcome'));
+    await watchShellInput(page);
+    expect(await page.locator('#boot-frame').count()).toBe(1);
+    const box = (await page.locator('jf-top-bar .more-trigger').boundingBox())!;
+    const focused = await tabThroughCover(page);
+    // A coordinate click bypasses Playwright's actionability waiting for the cover to leave.
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    expect({ shellFocused: focused.includes('jf-shell'), clicks: await page.locator('jf-shell').getAttribute('data-clicks'),
+      keys: await page.locator('jf-shell').getAttribute('data-keys'), menus: await page.locator('jf-top-bar [role="menu"]').count() })
+      .toEqual({ shellFocused: false, clicks: '0', keys: '0', menus: 0 });
+    if (late) {
+      await page.clock.fastForward(60_001);
+      expect(await page.locator('#boot-failure').count()).toBe(1);
+      expect(await page.locator(':focus').textContent()).toBe('Reload');
+      for (let i = 0; i < 6; i++) {
+        await page.keyboard.press('Tab');
+        expect(await page.evaluate(() => document.activeElement!.localName)).not.toBe('jf-shell');
+      }
+      await page.getByRole('button', { name: 'Reload', exact: true }).focus();
+    }
+    await page.evaluate(() => { window.frameHarness.renderHold = false; }); await page.clock.resume();
+    await expect.poll(() => page.locator('#boot-frame, #boot-failure').count()).toBe(0);
+    expect(await page.evaluate(() => document.activeElement!.localName)).toBe('body');
+    await shellWorksAfterCover(page);
+  } finally { await page.close(); }
+});
+it('SA6 never-rendering shell stays unreachable and deadline Reload takes focus', async () => {
+  const page = await create({ hold: true });
+  try {
+    await page.clock.install(); await page.goto(url); await page.waitForSelector('jf-shell', { state: 'attached' });
+    await watchShellInput(page);
+    const focused = await tabThroughCover(page); await page.mouse.click(20, 20);
+    expect({ shellFocused: focused.includes('jf-shell'), clicks: await page.locator('jf-shell').getAttribute('data-clicks'),
+      keys: await page.locator('jf-shell').getAttribute('data-keys'), inert: await page.locator('jf-shell').evaluate(shell => (shell as HTMLElement).inert) })
+      .toEqual({ shellFocused: false, clicks: '0', keys: '0', inert: true });
+    await page.clock.fastForward(60_001);
+    expect(await page.locator('#boot-failure').count()).toBe(1);
+    expect(await page.locator(':focus').textContent()).toBe('Reload');
+    expect(await page.locator('jf-top-bar').count()).toBe(0);
+    expect(await page.locator('jf-shell').evaluate(shell => (shell as HTMLElement).inert)).toBe(true);
   } finally { await page.close(); }
 });
 for (const [label, value, os, mode] of [

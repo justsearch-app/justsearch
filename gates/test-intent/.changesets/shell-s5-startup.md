@@ -24,6 +24,29 @@ including that existing canonical primitive fixes the Reload button without addi
 allows 15 seconds for two complete fixture boots and their initial settings reads; its cache
 assertions are unchanged by that setup allowance. All nine CI flow names remain unchanged.
 
+SA6 also exercises real shell controls rendered beneath the frame while the first-render
+completion promise is held. The application is inert before attachment, and its hand-off
+releases inert when it removes either the frame or a failure page. Six Tabs and a coordinate
+click reach no shell input during that hold; after hand-off, Tab/Enter and a coordinate click
+open the real More menu. A shell held before rendering remains inert through the deadline,
+and the failure page's Reload takes focus. Late completion replaces that page without
+moving focus into the shell. These three checks fail by assertion on isolated candidate
+`a8bc1ed1f814cee97e3b935356ee6519779a450d`: the rendered shell receives five key events
+and one click, and its More menu opens; the never-rendering shell also receives a click.
+`gates/test-intent/evidence/shell-s5-frame-inert.json` records those fail-before results.
+`shell-s5-new-behavior.json` has been regenerated for every check in the changed file,
+including its recovery/reset takeover, deadline, appearance, accessibility and CSP checks.
+The source is SA6: “The frame is inert: nothing focusable or clickable, keys do nothing,
+and assistive technology hears \"Starting\" once.” (task t-20261103-shell, SA6 repair request).
+
+The serial repair-evidence run passed all 57 frame checks; the same file on `a8bc1ed1`
+passed 54 and failed precisely the three new SA6 checks, by assertion. An earlier overlapping
+evidence invocation reported all three selected checks passing but its full-file subprocess
+exited 1; the producer discarded the unselected case details. The separate whole-file evidence
+run and the serial replay both passed all 57. No test or application change was made between
+these runs. The serial replay retained its raw Vitest reports under the session's temporary
+folder for inspection.
+
 The proportion register's capture-state note deliberately records the transient frame/failure
 coverage at 1280x800, 900x800 and 600x400. Every persistent-chrome floor and ceiling is retained.
 

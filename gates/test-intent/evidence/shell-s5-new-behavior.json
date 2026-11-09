@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-09T21:20:18.140Z",
-  "revision": "e3a479db7d1547a2d31df44c73334c982c31e15d",
-  "tree": "ab5aafac31bb0afd878a746ba339c9d7a57f465e",
+  "createdAt": "2026-11-09T21:55:08.776Z",
+  "revision": "a8bc1ed1f814cee97e3b935356ee6519779a450d",
+  "tree": "d209a2ed332655d0554048a2e9e43614e9cfeffc",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,16 +18,16 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/boot/boot-frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/fda85xea/tmp/test-intent-vitest-4-1794259068307.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/boot/boot-frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/cpdk91_w/tmp/test-intent-vitest-7-1794261139049.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 38975
+      "durationMs": 50536
     },
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/bootAppearanceRestore.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/fda85xea/tmp/test-intent-vitest-4-1794259107285.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/bootAppearanceRestore.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/cpdk91_w/tmp/test-intent-vitest-7-1794261189588.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 1321
+      "durationMs": 1512
     }
   ],
   "checks": [
@@ -35,13 +35,25 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:93332b88e298fd2c9e62819814c259cc57e8ab5616f40ccf48be0925fa1cc598",
+      "contentDigest": "sha256:a9fa7f438e7da9addf60e62d8313667a5670b0922013e9c982a00f037b7d1faa",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
           "name": "SA1 SA6 first paint precedes entry and is inert",
+          "status": "passed"
+        },
+        {
+          "name": "SA6 rendered shell rejects input until frame hand-off",
+          "status": "passed"
+        },
+        {
+          "name": "SA6 rendered shell rejects input until late failure-page hand-off",
+          "status": "passed"
+        },
+        {
+          "name": "SA6 never-rendering shell stays unreachable and deadline Reload takes focus",
           "status": "passed"
         },
         {
@@ -305,32 +317,32 @@
     "patches": [],
     "runs": [
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/boot/boot-frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/fda85xea/tmp/test-intent-vitest-4-1794259110481.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/boot/boot-frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/cpdk91_w/tmp/test-intent-vitest-7-1794261192995.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 105770,
-        "output": "JSON report written to /home/elias/.cache/am/fda85xea/tmp/test-intent-vitest-4-1794259110481.json\n\n"
+        "durationMs": 114083,
+        "output": "JSON report written to /home/elias/.cache/am/cpdk91_w/tmp/test-intent-vitest-7-1794261192995.json\n\n"
       },
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/bootAppearanceRestore.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/fda85xea/tmp/test-intent-vitest-4-1794259216253.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/bootAppearanceRestore.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/cpdk91_w/tmp/test-intent-vitest-7-1794261307079.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 1463,
-        "output": "JSON report written to /home/elias/.cache/am/fda85xea/tmp/test-intent-vitest-4-1794259216253.json\n\n"
+        "durationMs": 1337,
+        "output": "JSON report written to /home/elias/.cache/am/cpdk91_w/tmp/test-intent-vitest-7-1794261307079.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
         "classification": "assertion",
-        "detail": "SA1 SA6 first paint precedes entry and is inert:  AssertionError: expected +0 to be 1 // Object.is equality\n    at /home/elias/.cache/am/fda85xea/tmp/test-intent-before-ODpM2v/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:134:55\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5/modules/ui-web/node_modules/@vitest/runner/dist | SA2 SA3 SA4 saved light over OS dark:  AssertionError: expected +0 to be 1 // Object.is equality\n    at /home/elias/.cache/am/fda85xea/tmp/test-int"
+        "detail": "SA1 SA6 first paint precedes entry and is inert:  AssertionError: expected +0 to be 1 // Object.is equality\n    at /home/elias/.cache/am/cpdk91_w/tmp/test-intent-before-zXTVWm/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:137:55\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5/modules/ui-web/node_modules/@vitest/runner/dist | SA6 rendered shell rejects input until frame hand-off:  AssertionError: expected +0 to be 1 // Object.is equality\n    at /home/elias/.cache/am/cpdk"
       },
       {
         "id": "modules/ui-web/src/shell-v0/state/bootAppearanceRestore.test.ts",
         "classification": "assertion",
-        "detail": "SA5 successful restore reports success:  AssertionError: expected undefined to be true // Object.is equality\n    at /home/elias/.cache/am/fda85xea/tmp/test-intent-before-ODpM2v/modules/ui-web/src/shell-v0/state/bootAppearanceRestore.test.ts:13:50\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///home | SA5 failed settings restore reports failure:  AssertionError: expected undefined to be false // Object.is equality\n    at /home/elias/.cache/am/fda85xea/tmp"
+        "detail": "SA5 successful restore reports success:  AssertionError: expected undefined to be true // Object.is equality\n    at /home/elias/.cache/am/cpdk91_w/tmp/test-intent-before-zXTVWm/modules/ui-web/src/shell-v0/state/bootAppearanceRestore.test.ts:13:50\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///home | SA5 failed settings restore reports failure:  AssertionError: expected undefined to be false // Object.is equality\n    at /home/elias/.cache/am/cpdk91_w/tmp"
       }
     ]
   },
-  "digest": "sha256:da23e77f9365d6703c4a8f84c922239482473e95978f277465265fcb5e120662"
+  "digest": "sha256:9141f5f2200d48e6d873998444b8745354ab10a4365577f5b995326cb03f59fb"
 }
