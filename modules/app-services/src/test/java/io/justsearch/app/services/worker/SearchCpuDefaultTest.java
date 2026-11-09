@@ -7,6 +7,7 @@ import static org.mockito.Mockito.*;
 
 import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.api.knowledge.KnowledgeSearchRequest;
+import io.justsearch.app.api.knowledge.CrossEncoderSkipReason;
 import io.justsearch.app.api.knowledge.PipelineConfig;
 import io.justsearch.app.api.knowledge.SearchTrace;
 import io.justsearch.app.services.TestEngineContexts;
@@ -24,6 +25,8 @@ import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /** Uses metadata-only configuration and mocked transport; never loads a model or starts Engine. */
 final class SearchCpuDefaultTest {
@@ -36,10 +39,14 @@ final class SearchCpuDefaultTest {
   }
 
   private void publish(String choice, boolean gpu, int pathOrdinal) {
+    publish(choice, gpu, pathOrdinal, 0);
+  }
+
+  private void publish(String choice, boolean gpu, int pathOrdinal, long documentCeiling) {
     var builder = new ResolvedConfigBuilder()
         .putDefault("justsearch.models.dir", tmp.resolve("models").toString())
         .putDefault("justsearch.rerank.gpu.enabled", Boolean.toString(gpu))
-        .putDefault("justsearch.rerank.min_hits", "1")
+        .putDefault("justsearch.rerank.max_avg_doc_length_chars", Long.toString(documentCeiling))
         .putDefault("justsearch.search.query_classification.enabled", "false")
         .put("justsearch.rerank.model_path", pathOrdinal, "fixture", "path", tmp.toString());
     if (choice != null) builder.putSettings("justsearch.rerank.enabled", choice);
@@ -128,11 +135,77 @@ final class SearchCpuDefaultTest {
     }
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void automaticPolicyPrecedesDefaultMinimumHitDiagnosticAtLimitOne(boolean detail) {
+    assertPolicyDiagnostic("false", false, 1, 0, 0, detail, "DISABLED");
+    assertPolicyDiagnostic(null, false, 1, 0, 0, detail, "PIPELINE_NOT_ELIGIBLE");
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void automaticPolicyPrecedesConfiguredDocumentCeilingWithoutChangingExplicitOrGpuGates(boolean detail) {
+    assertPolicyDiagnostic("false", false, 6, 100, 200, detail, "DISABLED");
+    assertPolicyDiagnostic(null, true, 6, 100, 200, detail, "DOCS_TOO_LONG");
+    assertPolicyDiagnostic("true", false, 6, 100, 200, detail, "DOCS_TOO_LONG");
+    assertPolicyDiagnostic(null, false, 6, 100, 200, detail, "PIPELINE_NOT_ELIGIBLE");
+  }
+
+  private void assertPolicyDiagnostic(String choice, boolean gpu, int limit, long ceiling,
+      long averageLength, boolean detail, String expectedReason) {
+    publish(choice, gpu, 300, ceiling);
+    assertEquals(5, RerankerConfig.fromEnv().minHitsThreshold(), "use the production default");
+    KnowledgeClient client = mock(KnowledgeClient.class);
+    List<SearchRequest> sent = new ArrayList<>();
+    when(client.search(any(SearchRequest.class), any())).thenAnswer(invocation -> {
+      SearchRequest request = invocation.getArgument(0);
+      if (request.getQuery().equals("*:*")) return SearchResponse.getDefaultInstance();
+      sent.add(request);
+      var response = SearchResponse.newBuilder().setTotalHits(30);
+      for (int i = 0; i < request.getLimit(); i++) {
+        response.addResults(SearchResult.newBuilder().setId("document-" + i).setScore(30 - i));
+      }
+      return response.build();
+    });
+    when(client.getStatus(any())).thenReturn(io.justsearch.ipc.StatusResponse.newBuilder()
+        .setTelemetry(io.justsearch.ipc.TelemetryStatus.newBuilder()
+            .setContentLengthAvgChars(averageLength)).build());
+    var engine = engine(client);
+    var capability = mock(io.justsearch.app.api.lifecycle.Capability.class);
+    when(capability.available()).thenReturn(true);
+    when(capability.health()).thenReturn(io.justsearch.app.api.lifecycle.CapabilityHealth.READY);
+    engine.setWorkerCapability(capability);
+    assertEquals(averageLength,
+        engine.status(TestEngineContexts.internal()).extras().get("contentLengthAvgChars"));
+    var request = request(null, null, null, null);
+    var response = engine.search(new KnowledgeSearchRequest(request.query(), limit,
+        request.mode(), request.sort(), request.cursor(), request.projection(), request.filters(),
+        request.boostFilters(), request.facets(), request.querySyntax(), request.includeExcerpts(),
+        detail, request.pipeline()), TestEngineContexts.internal());
+    boolean off = (choice == null && !gpu) || "false".equals(choice);
+    assertEquals(1, sent.size());
+    assertEquals(off ? limit : 20, sent.getFirst().getLimit());
+    assertEquals(!off, sent.getFirst().getPipeline().getCrossEncoderEnabled());
+    assertEquals(detail, sent.getFirst().getIncludeDetail());
+    assertEquals(30, response.totalHits(), "the fixture contains multiple matching documents");
+    assertEquals(limit, response.results().size(), "nonempty ordinary multi-document retrieval");
+    assertTrue(response.results().stream().allMatch(hit -> hit.trace() == null), "no CE scores");
+    verify(client, never()).rerankSearch(anyString(), anyList(), anyLong(), any());
+    var ce = response.searchTrace().stages().stream()
+        .filter(stage -> stage.id() == SearchTrace.StageId.CROSS_ENCODER).findFirst().orElseThrow();
+    assertEquals(SearchTrace.StageStatus.SKIPPED, ce.status());
+    assertFalse(CrossEncoderSkipReason.valueOf(expectedReason).isDrop());
+    assertTrue(response.searchTrace().stages().stream()
+        .noneMatch(stage -> stage.status() == SearchTrace.StageStatus.FAILED));
+    assertEquals(expectedReason, ce.reason(), "policy skip must own automatic-Off diagnostics");
+  }
+
   private KnowledgeSearchEngine engine(KnowledgeClient client) {
     var bootstrap = mock(KnowledgeServerBootstrap.class);
     var lease = mock(KnowledgeServerBootstrap.ClientLease.class);
     when(bootstrap.publicationLock()).thenReturn(ConfigStore.global().publicationLock());
     when(bootstrap.acquireClientLease()).thenReturn(lease);
+    when(bootstrap.captureClient()).thenReturn(lease);
     when(lease.withClient(any())).thenAnswer(invocation ->
         ((java.util.function.Function<KnowledgeClient, ?>) invocation.getArgument(0)).apply(client));
     return new KnowledgeSearchEngine(bootstrap, mock(SearchPerSourceExecutor.class),

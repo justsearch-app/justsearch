@@ -45,10 +45,6 @@ final class SearchPipelinePresets {
    * backwards-compatibility translation layer for searches that arrive with only a {@code mode}
    * string. Package-private for contract testing.
    */
-  static PipelineConfig expandPreset(SearchMode mode, RerankerConfig rerankConfig) {
-    return expandPreset(mode, rerankConfig.enabled());
-  }
-
   static PipelineConfig expandPreset(SearchMode mode, boolean ce) {
     return switch (mode) {
       case SEARCH_MODE_TEXT -> new PipelineConfig(true, false, false, "none", true, ce, 0, true, true);
@@ -80,10 +76,6 @@ final class SearchPipelinePresets {
    * <p>{@code dense_enabled} stays false on the app-api record; the proto marker is set via
    * {@link #toProtoPipelineConfig(PipelineConfig, boolean)}.
    */
-  static PipelineConfig autoPreset(RerankerConfig rerankConfig) {
-    return autoPreset(rerankConfig.enabled());
-  }
-
   static PipelineConfig autoPreset(boolean ce) {
     return new PipelineConfig(true, false, false, "rrf", true, ce, 0, true, true);
   }

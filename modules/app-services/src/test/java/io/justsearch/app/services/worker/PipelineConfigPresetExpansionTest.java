@@ -36,7 +36,7 @@ class PipelineConfigPresetExpansionTest {
     @DisplayName("enables sparse retrieval, disables dense and SPLADE")
     void retrieval() {
       PipelineConfig cfg =
-          SearchPipelinePresets.expandPreset(SearchMode.SEARCH_MODE_TEXT, ENABLED);
+          SearchPipelinePresets.expandPreset(SearchMode.SEARCH_MODE_TEXT, ENABLED.enabled());
       assertTrue(cfg.sparseEnabled());
       assertFalse(cfg.denseEnabled());
       assertFalse(cfg.spladeEnabled());
@@ -46,7 +46,7 @@ class PipelineConfigPresetExpansionTest {
     @DisplayName("enables cross-encoder when reranker config is enabled")
     void crossEncoderEnabled() {
       PipelineConfig cfg =
-          SearchPipelinePresets.expandPreset(SearchMode.SEARCH_MODE_TEXT, ENABLED);
+          SearchPipelinePresets.expandPreset(SearchMode.SEARCH_MODE_TEXT, ENABLED.enabled());
       assertTrue(cfg.crossEncoderEnabled());
     }
 
@@ -55,7 +55,7 @@ class PipelineConfigPresetExpansionTest {
     void crossEncoderDisabledWhenConfigDisabled() {
       PipelineConfig cfg =
           SearchPipelinePresets.expandPreset(
-              SearchMode.SEARCH_MODE_TEXT, RerankerConfig.DISABLED);
+              SearchMode.SEARCH_MODE_TEXT, RerankerConfig.DISABLED.enabled());
       assertFalse(cfg.crossEncoderEnabled());
     }
 
@@ -63,7 +63,7 @@ class PipelineConfigPresetExpansionTest {
     @DisplayName("sets fusion to none and lambdamart to true")
     void fusionAndLambdamart() {
       PipelineConfig cfg =
-          SearchPipelinePresets.expandPreset(SearchMode.SEARCH_MODE_TEXT, ENABLED);
+          SearchPipelinePresets.expandPreset(SearchMode.SEARCH_MODE_TEXT, ENABLED.enabled());
       assertEquals("none", cfg.fusionAlgorithm());
       assertTrue(cfg.lambdamartEnabled());
     }
@@ -77,7 +77,7 @@ class PipelineConfigPresetExpansionTest {
     @DisplayName("enables dense only, cross-encoder eligible when reranker enabled")
     void retrieval() {
       PipelineConfig cfg =
-          SearchPipelinePresets.expandPreset(SearchMode.SEARCH_MODE_VECTOR, ENABLED);
+          SearchPipelinePresets.expandPreset(SearchMode.SEARCH_MODE_VECTOR, ENABLED.enabled());
       assertFalse(cfg.sparseEnabled());
       assertTrue(cfg.denseEnabled());
       assertFalse(cfg.spladeEnabled());
@@ -91,7 +91,7 @@ class PipelineConfigPresetExpansionTest {
     void crossEncoderOffWhenDisabled() {
       PipelineConfig cfg =
           SearchPipelinePresets.expandPreset(
-              SearchMode.SEARCH_MODE_VECTOR, RerankerConfig.DISABLED);
+              SearchMode.SEARCH_MODE_VECTOR, RerankerConfig.DISABLED.enabled());
       assertFalse(cfg.crossEncoderEnabled());
     }
   }
@@ -104,7 +104,7 @@ class PipelineConfigPresetExpansionTest {
     @DisplayName("enables sparse + dense retrieval with RRF fusion")
     void retrieval() {
       PipelineConfig cfg =
-          SearchPipelinePresets.expandPreset(SearchMode.SEARCH_MODE_HYBRID, ENABLED);
+          SearchPipelinePresets.expandPreset(SearchMode.SEARCH_MODE_HYBRID, ENABLED.enabled());
       assertTrue(cfg.sparseEnabled());
       assertTrue(cfg.denseEnabled());
       assertFalse(cfg.spladeEnabled());
@@ -116,7 +116,7 @@ class PipelineConfigPresetExpansionTest {
     @DisplayName("256-F1: cross-encoder enabled when reranker config is enabled")
     void crossEncoderEnabled() {
       PipelineConfig cfg =
-          SearchPipelinePresets.expandPreset(SearchMode.SEARCH_MODE_HYBRID, ENABLED);
+          SearchPipelinePresets.expandPreset(SearchMode.SEARCH_MODE_HYBRID, ENABLED.enabled());
       assertTrue(cfg.crossEncoderEnabled(), "256-F1: all presets get CE when reranker enabled");
     }
 
@@ -125,7 +125,7 @@ class PipelineConfigPresetExpansionTest {
     void crossEncoderOffWhenGloballyDisabled() {
       PipelineConfig cfg =
           SearchPipelinePresets.expandPreset(
-              SearchMode.SEARCH_MODE_HYBRID, RerankerConfig.DISABLED);
+              SearchMode.SEARCH_MODE_HYBRID, RerankerConfig.DISABLED.enabled());
       assertFalse(cfg.crossEncoderEnabled());
     }
   }
@@ -138,7 +138,7 @@ class PipelineConfigPresetExpansionTest {
     @DisplayName("enables SPLADE only, cross-encoder eligible when reranker enabled")
     void retrieval() {
       PipelineConfig cfg =
-          SearchPipelinePresets.expandPreset(SearchMode.SEARCH_MODE_SPLADE, ENABLED);
+          SearchPipelinePresets.expandPreset(SearchMode.SEARCH_MODE_SPLADE, ENABLED.enabled());
       assertFalse(cfg.sparseEnabled());
       assertFalse(cfg.denseEnabled());
       assertTrue(cfg.spladeEnabled());
@@ -152,7 +152,7 @@ class PipelineConfigPresetExpansionTest {
     void crossEncoderOffWhenDisabled() {
       PipelineConfig cfg =
           SearchPipelinePresets.expandPreset(
-              SearchMode.SEARCH_MODE_SPLADE, RerankerConfig.DISABLED);
+              SearchMode.SEARCH_MODE_SPLADE, RerankerConfig.DISABLED.enabled());
       assertFalse(cfg.crossEncoderEnabled());
     }
   }
@@ -165,7 +165,7 @@ class PipelineConfigPresetExpansionTest {
     @DisplayName("'hybrid' string produces HYBRID preset with dense + sparse")
     void hybridRoundTrip() {
       SearchMode mode = SearchPipelinePresets.parseModeOrDefault("hybrid");
-      PipelineConfig cfg = SearchPipelinePresets.expandPreset(mode, ENABLED);
+      PipelineConfig cfg = SearchPipelinePresets.expandPreset(mode, ENABLED.enabled());
       assertTrue(cfg.sparseEnabled());
       assertTrue(cfg.denseEnabled());
       assertEquals("rrf", cfg.fusionAlgorithm());
@@ -175,7 +175,7 @@ class PipelineConfigPresetExpansionTest {
     @DisplayName("null mode string defaults to TEXT preset")
     void nullDefaultsToText() {
       SearchMode mode = SearchPipelinePresets.parseModeOrDefault(null);
-      PipelineConfig cfg = SearchPipelinePresets.expandPreset(mode, ENABLED);
+      PipelineConfig cfg = SearchPipelinePresets.expandPreset(mode, ENABLED.enabled());
       assertTrue(cfg.sparseEnabled());
       assertFalse(cfg.denseEnabled());
     }
@@ -184,7 +184,7 @@ class PipelineConfigPresetExpansionTest {
     @DisplayName("unknown mode string defaults to TEXT preset")
     void unknownDefaultsToText() {
       SearchMode mode = SearchPipelinePresets.parseModeOrDefault("bogus");
-      PipelineConfig cfg = SearchPipelinePresets.expandPreset(mode, ENABLED);
+      PipelineConfig cfg = SearchPipelinePresets.expandPreset(mode, ENABLED.enabled());
       assertTrue(cfg.sparseEnabled());
       assertFalse(cfg.denseEnabled());
     }
@@ -193,7 +193,7 @@ class PipelineConfigPresetExpansionTest {
     @DisplayName("'lexical' string remains a TEXT alias for compatibility callers")
     void lexicalAliasDefaultsToText() {
       SearchMode mode = SearchPipelinePresets.parseModeOrDefault("lexical");
-      PipelineConfig cfg = SearchPipelinePresets.expandPreset(mode, ENABLED);
+      PipelineConfig cfg = SearchPipelinePresets.expandPreset(mode, ENABLED.enabled());
       assertTrue(cfg.sparseEnabled());
       assertFalse(cfg.denseEnabled());
       assertTrue(cfg.expansionEnabled());
@@ -246,7 +246,7 @@ class PipelineConfigPresetExpansionTest {
     @Test
     @DisplayName("autoPreset: sparse on, dense NOT asserted on the record, rrf fusion, expansion ON (Fix C)")
     void autoPresetFlags() {
-      PipelineConfig cfg = SearchPipelinePresets.autoPreset(ENABLED);
+      PipelineConfig cfg = SearchPipelinePresets.autoPreset(ENABLED.enabled());
       assertTrue(cfg.sparseEnabled());
       // Dense is deferred to the Worker (carried as the proto dense_auto marker), so the app-api
       // record does NOT assert dense_enabled.
@@ -263,7 +263,7 @@ class PipelineConfigPresetExpansionTest {
     @DisplayName("toProtoPipelineConfig(cfg, true) sets dense_auto on the wire, dense_enabled stays false")
     void autoMarkerOnWire() {
       io.justsearch.ipc.PipelineConfig proto =
-          SearchPipelinePresets.toProtoPipelineConfig(SearchPipelinePresets.autoPreset(ENABLED), true);
+          SearchPipelinePresets.toProtoPipelineConfig(SearchPipelinePresets.autoPreset(ENABLED.enabled()), true);
       assertTrue(proto.getDenseAuto());
       assertFalse(proto.getDenseEnabled());
       assertTrue(proto.getSparseEnabled());
@@ -274,7 +274,7 @@ class PipelineConfigPresetExpansionTest {
     @DisplayName("non-auto presets leave dense_auto false on the wire")
     void nonAutoLeavesMarkerFalse() {
       io.justsearch.ipc.PipelineConfig proto =
-          toProtoPipelineConfig(SearchPipelinePresets.expandPreset(SearchMode.SEARCH_MODE_HYBRID, ENABLED));
+          toProtoPipelineConfig(SearchPipelinePresets.expandPreset(SearchMode.SEARCH_MODE_HYBRID, ENABLED.enabled()));
       assertFalse(proto.getDenseAuto());
       assertTrue(proto.getDenseEnabled());
     }

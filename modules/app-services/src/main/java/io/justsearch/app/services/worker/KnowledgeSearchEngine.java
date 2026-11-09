@@ -1177,7 +1177,7 @@ final class KnowledgeSearchEngine {
 
     // 256-F2: LambdaMART + cross-encoder co-execution — cross-encoder runs on LambdaMART's
     // reordered output (standard 2-stage cascaded reranking pattern).
-    if (!relevanceSort) {
+    if (!relevanceSort || automaticRerankOff) {
       crossEncoderSkipReason = CrossEncoderSkipReason.PIPELINE_NOT_ELIGIBLE;
     } else if (!isRerankerEligible(
         pipelineConfig, rerankConfig, results.size(), statusCache.avgContentLengthChars(), effectiveQueryType)) {
