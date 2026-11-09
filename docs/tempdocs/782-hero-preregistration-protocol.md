@@ -17,7 +17,7 @@ related:
 
 ## §A. Purpose
 
-**Agent campaign freeze (2026-11-09):** Fresh and resumed live agent campaigns are frozen. Campaign commands and runbooks are retained for historical reproduction and offline analysis; published evidence and offline replay remain available. The campaign plans and launch/resume instructions below are historical and do not authorize campaign work. One document that makes the hero run auditable before it is expensive: every rule that could
+**Agent-utility campaign freeze (2026-11-09):** Fresh and resumed live agent-utility campaigns are frozen. Their commands and runbooks remain available for historical reproduction and offline analysis, along with published evidence and offline replay. Neighboring experiments retain their existing status. The campaign plans and launch/resume instructions below are historical and do not authorize campaign work. One document that makes the hero run auditable before it is expensive: every rule that could
 be bent after seeing results is written and frozen before any paid call. Precedent: the 624
 relaunch pre-registration (adoption-only target, budget guard, honest-abort semantics) — this
 protocol inherits that shape and adds what 624's post-mortem and the 767/774 leak history

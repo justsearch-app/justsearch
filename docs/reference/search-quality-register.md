@@ -9,7 +9,7 @@ description: "Shared decision register for search quality. Read before starting 
 
 # Search Quality Register
 
-**Agent campaign freeze (2026-11-09):** Fresh and resumed live agent campaigns are frozen. Campaign commands and runbooks are retained for historical reproduction and offline analysis; published evidence and offline replay remain available.
+**Agent-utility campaign freeze (2026-11-09):** Fresh and resumed live agent-utility campaigns are frozen. Their commands and runbooks remain available for historical reproduction and offline analysis, along with published evidence and offline replay. Neighboring experiments retain their existing status.
 
 Coordination register for search quality work. Every search-quality
 tempdoc agent must read this before starting and update it before closing.
