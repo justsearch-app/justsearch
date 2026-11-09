@@ -89,3 +89,14 @@ The separate preservation receipt executes the unchanged admission scenario with
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1be2a-2660-7430-b421-4a919546faad",
+  "verdict": "accept",
+  "digest": "sha256:f9c94c766a663fc193dedab24e86f90fdbc92813c78ce2721e6059cde3799ffa",
+  "note": "Independent test-intent acceptance only: all three complete entries accepted; five observer regressions fail by assertion on exact baseline and pass candidate, preservation and standalone real public store/runner SQLite probes pass. Overall verification is separate: original full test gate reported the root-image sibling UNCHANGED/null assertion and baseline comparison is pending. See immutable verifier packet report/evidence."
+}
+```
