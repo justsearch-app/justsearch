@@ -70,6 +70,24 @@ caller. Neither mode is the launcher's cheap `.agents/preflight` hook.
 For a focused manual build: `node scripts/lib/tool-invoker.cjs gradle build -x test`
 from the candidate worktree.
 
+## Required quality check for search behavior
+
+Before merging a change to **ranking, query handling, chunking, extraction or models**,
+including configuration that changes any of those behaviors, require a complete, valid
+**PASS for the exact final candidate** from the default quality check. From a clean,
+committed candidate with inputs and baselines already prepared, run:
+
+```bash
+python -m jseval quality check --window-seconds 600
+```
+
+The required default quick-check collection set is **SciFact300, MIRACL-de305,
+real-use309 and Enron50**. A proper subset is insufficient. Dirty, stale, incomplete
+or confounded runs, `INVALID` or `INCONCLUSIVE` results, baseline-creation runs,
+ablations and sensitivity runs do not qualify, even if an individual result says
+PASS. Re-evaluate after any candidate change; an earlier candidate's PASS is insufficient.
+Tooling-only and documentation-only changes do not automatically require a quality run.
+
 ## Checks by edited subject
 
 | Edited subject | Check(s) |

@@ -7,6 +7,8 @@ description: "Methodology, evidence contract, replay path, and current publicati
 
 # Agent-Utility Benchmark
 
+**Agent-utility campaign freeze (2026-11-09):** Fresh and resumed live agent-utility campaigns are frozen. Their commands and runbooks remain available for historical reproduction and offline analysis, along with published evidence and offline replay. Neighboring experiments retain their existing status.
+
 The agent-utility benchmark measures the marginal effect of giving the same agent access to
 JustSearch in addition to ordinary file tools. Condition A uses file tools only. Condition B uses
 the same file tools plus the captured JustSearch MCP surface. Conditions are paired by corpus,

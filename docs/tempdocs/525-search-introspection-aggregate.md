@@ -4,7 +4,7 @@ title: "525 — Search introspection as a wire aggregate"
 
 # 525 — Search introspection as a wire aggregate
 
-**Date**: 2026-05-18 (design) / 2026-05-19 (implementation closure)
+**Historical projections (2026-11-09):** `bootstrap_ci`, `rank_diff` and `stratified_metrics` generators/tests are retired; references below describe past implementations and captured evidence. **Date**: 2026-05-18 (design) / 2026-05-19 (implementation closure)
 **Status**: done
 **Related**:
 - Tempdoc 517 (search execution refactor — the implementation this rides on)
