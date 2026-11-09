@@ -22,7 +22,7 @@ it('shows retry waiting with the backlog and deadline then follows the worker li
   expect(waiting.activity.summary).toBe('Waiting to retry');
   expect(waiting.activity.detail).toContain('7 files');
   const deadline = new Date(1792600000000);
-  expect(waiting.activity.detail).toContain(`Next retry at ${deadline.toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' })}.`);
+  expect(waiting.activity.detail).toContain(`Next retry at ${new Intl.DateTimeFormat(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' }).format(deadline)}.`);
   expect(waiting.etaSeconds).toBeNull();
   expect(waiting.indexingPercent).toBeNull();
   for (const [state, backlog, phase] of [
@@ -69,5 +69,5 @@ it('L1 uses hours and minutes without a weekday for a retry today', () => {
   const deadline = new Date(2026, 2, 4, 23, 59);
   today.worker!.failure!.nextRetryAtMs = deadline.getTime();
   expect(selectIndexingProgress(today, true, 10, []).activity.detail)
-    .toBe(`1 file waiting. Next retry at ${deadline.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}.`);
+    .toBe(`1 file waiting. Next retry at ${new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }).format(deadline)}.`);
 });

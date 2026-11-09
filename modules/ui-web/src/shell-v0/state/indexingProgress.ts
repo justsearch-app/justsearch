@@ -18,7 +18,7 @@
  */
 
 import type { StatusResponse } from '../../api/generated/index.js';
-import { formatCount } from '../display/format.js';
+import { formatCount, formatDeadline } from '../display/format.js';
 
 /**
  * The 813 §3a phase model, index-wide scope. `Scanning` is per-scan (the scan SSE) and is therefore
@@ -664,7 +664,7 @@ export function selectIndexingProgress(
           ? 'Embedding cannot run right now. Keyword search remains available.'
           : 'Some enrichment cannot run right now. Keyword search remains available.' : '',
       (pause.reasons ?? [pause.reason]).includes('user_paused') && pause.untilEpochMs != null
-        ? `Until ${new Date(pause.untilEpochMs).toLocaleString()}.` : '',
+        ? `Until ${formatDeadline(new Date(pause.untilEpochMs))}.` : '',
       pause.waiting && pause.reason !== 'settings_recovery'
         ? pause.reasons?.includes('schedule') || pause.reasons?.includes('on_battery')
           ? ''
@@ -737,12 +737,6 @@ export function indexingTaskStatus(
     : task.status;
 }
 
-/** Local clock time; the short weekday appears only when the deadline is not today. */
-function retryClockTime(deadline: Date): string {
-  const today = deadline.toDateString() === new Date().toDateString();
-  return deadline.toLocaleString(undefined, { ...(today ? {} : { weekday: 'short' }), hour: '2-digit', minute: '2-digit' });
-}
-
 /** Automatic reasons describe the work they hold, never the broad wire state's name. */
 function indexingActivity(
   status: StatusResponse,
@@ -788,7 +782,7 @@ function indexingActivity(
     const retry = count(status.worker?.failure?.nextRetryAtMs);
     const deadline = retry > 0 ? new Date(retry) : null;
     const nextRetry = deadline && Number.isFinite(deadline.getTime())
-      ? ` Next retry at ${retryClockTime(deadline)}.` : '';
+      ? ` Next retry at ${formatDeadline(deadline)}.` : '';
     return { summary: 'Waiting to retry',
       detail: `${formatCount(jobs)} ${jobs === 1 ? 'file' : 'files'} waiting.${nextRetry}`,
       confirmed: true, enrichmentDeferred };
