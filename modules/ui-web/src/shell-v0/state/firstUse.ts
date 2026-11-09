@@ -68,7 +68,9 @@ export function firstUseFacts(ai: AiState): FirstUseFacts {
   return { roots: roots === null ? null : roots.length,
     searchable: count !== null && Number.isInteger(count) && count >= 0 ? count : null,
     waiting: queueKnown ? progress.jobsQueued : null,
-    reading: progress.activity.confirmed && progress.phase === 'indexing',
+    // A scan can still be finding files while its observed queue is empty or absent.
+    reading: progress.activity.confirmed && !progress.pause
+      && (progress.phase === 'indexing' || ai.status?.worker?.core?.indexState === 'INDEXING'),
     aiActive: ai.snapshotLive && ai.runtime.mode === 'online' && ai.capabilities.chat,
   };
 }

@@ -522,55 +522,185 @@ cannot recognise as an assertion failure. The rejection contract is unchanged.
       "items": [
         "modules/ui/src/test/java/io/justsearch/ui/api/DeclaredRequestActivityTest.java"
       ],
-      "class": "Adaptation",
-      "moved": [
-        "instrumentation"
-      ],
-      "whatMoved": "Only GET /api/indexing/suggested-roots moves from deliberate user activity to unattended observation: it reads which suggested folders exist and is fetched automatically for the first-use view. All other route expectations remain unchanged.",
+      "class": "Obsolete",
       "sources": [
         {
           "kind": "owner-words",
-          "location": "task t-20261103-shell request",
-          "quote": "GET /api/indexing/suggested-roots is read-only and is now fetched automatically when Search shows the first-use view, so it must not count as user input."
+          "quote": "i agree, proceed",
+          "location": "task t-20261103-shell agreement"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell request",
+          "delegationScope": "How the frame is built, including the agreed empty Search folder prompt with suggestions.",
+          "choice": "An automatic read of suggested folders is an observation, not user input. GET /api/indexing/suggested-roots must leave the user-activity boundary unchanged.",
+          "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/shell-s5-route-activity.json"
+      "conflictSearch": "Searched docs/decisions with rg -n \"suggested-roots|activity|observation|user input\" and read the matching pacing decision docs/decisions/0048-extraction-isolation-and-indexing-pacing.md. No decision requires automatic suggested-folder reads to count as user input. Only the old GET /api/indexing/suggested-roots activity-advances expectation is retired; all other routes and assertions are preserved."
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/DeclaredRequestActivityTest.java"
+      ],
+      "class": "New",
+      "behaviour": "GET /api/indexing/suggested-roots is an automatic observation and does not advance user activity. All other route expectations, attribution hints, admission conditions and existing assertions remain unchanged.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "i agree, proceed",
+          "location": "task t-20261103-shell agreement"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell request",
+          "delegationScope": "How the frame is built, including the agreed empty Search folder prompt with suggestions.",
+          "choice": "An automatic read of suggested folders is an observation, not user input. GET /api/indexing/suggested-roots must leave the user-activity boundary unchanged.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s5-route-activity.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/DeclaredRequestActivityTest.java"
+      ]
     },
     {
       "items": [
         "modules/ui/src/test/java/io/justsearch/ui/api/IndependentDeclaredActivityTest.java"
       ],
-      "class": "Adaptation",
-      "moved": [
-        "instrumentation"
-      ],
-      "whatMoved": "Only GET /api/indexing/suggested-roots moves from deliberate user activity to unattended observation: it reads which suggested folders exist and is fetched automatically for the first-use view. All other route expectations remain unchanged. The existing declaration helper also pins its OBSERVATION role with one assertion.",
+      "class": "Obsolete",
       "sources": [
         {
           "kind": "owner-words",
-          "location": "task t-20261103-shell request",
-          "quote": "GET /api/indexing/suggested-roots is read-only and is now fetched automatically when Search shows the first-use view, so it must not count as user input."
+          "quote": "i agree, proceed",
+          "location": "task t-20261103-shell agreement"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell request",
+          "delegationScope": "How the frame is built, including the agreed empty Search folder prompt with suggestions.",
+          "choice": "An automatic read of suggested folders is an observation, not user input. GET /api/indexing/suggested-roots must leave the user-activity boundary unchanged.",
+          "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/shell-s5-route-activity.json"
+      "conflictSearch": "Searched docs/decisions with rg -n \"suggested-roots|activity|observation|user input\" and read the matching pacing decision docs/decisions/0048-extraction-isolation-and-indexing-pacing.md. No decision requires automatic suggested-folder reads to count as user input. Only the old GET /api/indexing/suggested-roots activity-advances expectation is retired; all other routes and assertions are preserved."
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/IndependentDeclaredActivityTest.java"
+      ],
+      "class": "New",
+      "behaviour": "GET /api/indexing/suggested-roots is an automatic observation and does not advance user activity. All other route expectations, attribution hints, admission conditions and existing assertions remain unchanged. The literal production declaration is also required to be OBSERVATION.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "i agree, proceed",
+          "location": "task t-20261103-shell agreement"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell request",
+          "delegationScope": "How the frame is built, including the agreed empty Search folder prompt with suggestions.",
+          "choice": "An automatic read of suggested folders is an observation, not user input. GET /api/indexing/suggested-roots must leave the user-activity boundary unchanged.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s5-route-activity.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/IndependentDeclaredActivityTest.java"
+      ]
     },
     {
       "items": [
         "modules/ui/src/test/java/io/justsearch/ui/api/VerifierRoundFourActivityTest.java"
       ],
-      "class": "Adaptation",
-      "moved": [
-        "instrumentation"
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "i agree, proceed",
+          "location": "task t-20261103-shell agreement"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell request",
+          "delegationScope": "How the frame is built, including the agreed empty Search folder prompt with suggestions.",
+          "choice": "An automatic read of suggested folders is an observation, not user input. GET /api/indexing/suggested-roots must leave the user-activity boundary unchanged.",
+          "label": "agent choice"
+        }
       ],
-      "whatMoved": "Only GET /api/indexing/suggested-roots moves from deliberate user activity to unattended observation: it reads which suggested folders exist and is fetched automatically for the first-use view. All other route expectations remain unchanged.",
+      "conflictSearch": "Searched docs/decisions with rg -n \"suggested-roots|activity|observation|user input\" and read the matching pacing decision docs/decisions/0048-extraction-isolation-and-indexing-pacing.md. No decision requires automatic suggested-folder reads to count as user input. Only the old GET /api/indexing/suggested-roots activity-advances expectation is retired; all other routes and assertions are preserved."
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/VerifierRoundFourActivityTest.java"
+      ],
+      "class": "New",
+      "behaviour": "GET /api/indexing/suggested-roots is an automatic observation and does not advance user activity. All other route expectations, attribution hints, admission conditions and existing assertions remain unchanged.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "i agree, proceed",
+          "location": "task t-20261103-shell agreement"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell request",
+          "delegationScope": "How the frame is built, including the agreed empty Search folder prompt with suggestions.",
+          "choice": "An automatic read of suggested folders is an observation, not user input. GET /api/indexing/suggested-roots must leave the user-activity boundary unchanged.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s5-route-activity.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/VerifierRoundFourActivityTest.java"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/firstUse.reading.test.ts",
+        "modules/ui-web/src/shell-v0/components/GettingStarted.reading-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "SB6: live INDEXING with an absent or zero queue reports still reading, in the shared projection and the production card in headless Chromium.",
       "sources": [
         {
           "kind": "owner-words",
           "location": "task t-20261103-shell request",
-          "quote": "GET /api/indexing/suggested-roots is read-only and is now fetched automatically when Search shows the first-use view, so it must not count as user input."
+          "quote": "observed queue greater than zero gives \"m waiting to be read\"; work under way with the queue absent, or zero while a scan is still running, gives \"still reading\"; paused or idle with no work gives neither; stale or unknown gives nothing."
         }
       ],
-      "evidence": "gates/test-intent/evidence/shell-s5-route-activity.json"
+      "evidence": "gates/test-intent/evidence/shell-s5-reading-repaired.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/state/firstUse.reading.test.ts#reports still reading during INDEXING with queue undefined",
+        "modules/ui-web/src/shell-v0/state/firstUse.reading.test.ts#reports still reading during INDEXING with queue 0",
+        "modules/ui-web/src/shell-v0/components/GettingStarted.reading-lockdown.test.ts"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/firstUse.reading.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "SB6 preservation: a positive observed queue reports waiting files, idle/paused without work adds neither suffix, stale/unknown/unavailable and expired observations show no progress. Pausing does not erase an observed positive queue.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "location": "task t-20261103-shell request",
+          "quote": "observed queue greater than zero gives \"m waiting to be read\"; work under way with the queue absent, or zero while a scan is still running, gives \"still reading\"; paused or idle with no work gives neither; stale or unknown gives nothing."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s5-reading-preserved.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/state/firstUse.reading.test.ts"
+      ]
     }
   ]
 }

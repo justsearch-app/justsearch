@@ -1,0 +1,124 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-09T23:18:44.421Z",
+  "revision": "dee85d879421f47ddf87721668c03e1edeee3c6f",
+  "tree": "c88e505196e85c132816eda61a2a304c085831fd",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/firstUse.reading.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/y1m5zvtd/tmp/test-intent-vitest-4-1794266314164.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 700
+    },
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/GettingStarted.reading-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/y1m5zvtd/tmp/test-intent-vitest-4-1794266314865.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2208
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/state/firstUse.reading.test.ts#reports still reading during INDEXING with queue undefined",
+      "file": "modules/ui-web/src/shell-v0/state/firstUse.reading.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:89e01af4afd155b8daf7a9dca1484f397d0a2893073c11d90544e5c83808189b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SB6 live reading observations reports still reading during INDEXING with queue undefined",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/firstUse.reading.test.ts#reports still reading during INDEXING with queue 0",
+      "file": "modules/ui-web/src/shell-v0/state/firstUse.reading.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:89e01af4afd155b8daf7a9dca1484f397d0a2893073c11d90544e5c83808189b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SB6 live reading observations reports still reading during INDEXING with queue 0",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/GettingStarted.reading-lockdown.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/GettingStarted.reading-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:682a1945bb516fcd7d658c30497f13f4a5a2c1ffeec2e9b0e9ae1eca87ff5a79",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "renders still reading with live INDEXING and queue null",
+          "status": "passed"
+        },
+        {
+          "name": "renders still reading with live INDEXING and queue 0",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "dee85d879421f47ddf87721668c03e1edeee3c6f",
+    "revision": "dee85d879421f47ddf87721668c03e1edeee3c6f",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/firstUse.reading.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/y1m5zvtd/tmp/test-intent-vitest-4-1794266319076.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 715,
+        "output": "JSON report written to /home/elias/.cache/am/y1m5zvtd/tmp/test-intent-vitest-4-1794266319076.json\n\n"
+      },
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/GettingStarted.reading-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/y1m5zvtd/tmp/test-intent-vitest-4-1794266319791.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 4216,
+        "output": "JSON report written to /home/elias/.cache/am/y1m5zvtd/tmp/test-intent-vitest-4-1794266319791.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/state/firstUse.reading.test.ts#reports still reading during INDEXING with queue undefined",
+        "classification": "assertion",
+        "detail": "SB6 live reading observations reports still reading during INDEXING with queue undefined:  AssertionError: expected '3 files searchable so far' to be '3 files searchable so far · still rea…' // Object.is equality\n    at /home/elias/.cache/am/y1m5zvtd/tmp/test-intent-before-Vf8T6e/modules/ui-web/src/shell-v0/state/firstUse.reading.test.ts:24:36\n    at file:///home/elias/.cache/am/y1m5zvtd/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/firstUse.reading.test.ts#reports still reading during INDEXING with queue 0",
+        "classification": "assertion",
+        "detail": "SB6 live reading observations reports still reading during INDEXING with queue 0:  AssertionError: expected '3 files searchable so far' to be '3 files searchable so far · still rea…' // Object.is equality\n    at /home/elias/.cache/am/y1m5zvtd/tmp/test-intent-before-Vf8T6e/modules/ui-web/src/shell-v0/state/firstUse.reading.test.ts:24:36\n    at file:///home/elias/.cache/am/y1m5zvtd/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/GettingStarted.reading-lockdown.test.ts",
+        "classification": "assertion",
+        "detail": "renders still reading with live INDEXING and queue null:  Error: expected '3 files searchable so far' to be '3 files searchable so far · still rea…' // Object.is equality\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/.cache/am/y1m5zvtd/tmp/test-intent-before-Vf8T6e/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3748:47)\n    at /ho | renders still reading with live INDEXING and queue 0:  Error: expected '3 files searchable so far' to be '3 files searchable so far · still"
+      }
+    ]
+  },
+  "digest": "sha256:dbad62410b6ca47830c9da58904ef601f9aaf7c96722879caf82e8660de7efac"
+}

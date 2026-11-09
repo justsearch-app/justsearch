@@ -1,0 +1,90 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-09T23:19:08.481Z",
+  "revision": "dee85d879421f47ddf87721668c03e1edeee3c6f",
+  "tree": "e6cab9c0f90a9b2e1b384d0b516763600e7119c7",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/firstUse.reading.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/y1m5zvtd/tmp/test-intent-vitest-3-1794266346804.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1674
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/state/firstUse.reading.test.ts",
+      "file": "modules/ui-web/src/shell-v0/state/firstUse.reading.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:89e01af4afd155b8daf7a9dca1484f397d0a2893073c11d90544e5c83808189b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SB6 live reading observations reports still reading during INDEXING with queue undefined",
+          "status": "passed"
+        },
+        {
+          "name": "SB6 live reading observations reports still reading during INDEXING with queue 0",
+          "status": "passed"
+        },
+        {
+          "name": "SB6 live reading observations reports the observed queue ahead of indeterminate work",
+          "status": "passed"
+        },
+        {
+          "name": "SB6 live reading observations idle with queue undefined reports no reading",
+          "status": "passed"
+        },
+        {
+          "name": "SB6 live reading observations idle with queue 0 reports no reading",
+          "status": "passed"
+        },
+        {
+          "name": "SB6 live reading observations paused with queue undefined reports no reading despite the last INDEXING state",
+          "status": "passed"
+        },
+        {
+          "name": "SB6 live reading observations paused with queue 0 reports no reading despite the last INDEXING state",
+          "status": "passed"
+        },
+        {
+          "name": "SB6 live reading observations a paused observed queue still describes waiting files",
+          "status": "passed"
+        },
+        {
+          "name": "SB6 live reading observations stale counts show no progress even with observed work",
+          "status": "passed"
+        },
+        {
+          "name": "SB6 live reading observations unknown counts show no progress even with observed work",
+          "status": "passed"
+        },
+        {
+          "name": "SB6 live reading observations an expired status shows no retained progress",
+          "status": "passed"
+        },
+        {
+          "name": "SB6 live reading observations an unavailable worker shows no progress",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:ddb4f71cb961d70733e65a1426a7163e6488f0e37def6594b799de6c00e30e97"
+}

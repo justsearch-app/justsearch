@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-09T22:46:29.171Z",
-  "revision": "e3a479db7d1547a2d31df44c73334c982c31e15d",
-  "tree": "7bd26bd009093285eaccfba7a20a5d2321b9fe18",
+  "createdAt": "2026-11-09T23:18:23.959Z",
+  "revision": "dee85d879421f47ddf87721668c03e1edeee3c6f",
+  "tree": "9cbb4bd9366e9372a039e352117d3b86e61d1e0c",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.DeclaredRequestActivityTest\" --tests \"io.justsearch.ui.api.IndependentDeclaredActivityTest\" --tests \"io.justsearch.ui.api.VerifierRoundFourActivityTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 12647
+      "durationMs": 11881
     }
   ],
   "checks": [
@@ -292,5 +292,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:94e9c3433e64f3edb3848aea05c421608e0ca976b735208b4bf07e4b3a6c3b74"
+  "digest": "sha256:ff4537093c6aa485a9f8bfd06717bfa83f9918615dfec3b40b226e9383bf85a8"
 }
