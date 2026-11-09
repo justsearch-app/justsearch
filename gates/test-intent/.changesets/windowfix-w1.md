@@ -89,3 +89,13 @@ These are agent technical choices under the quoted owner decision, not owner-ado
   "digest": "sha256:9e08dda44a84c5767860d6c2fd9612467ca48f5d2672103f3058bb89e15691a0"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1c273-39d9-7452-a8a1-a9306f821163",
+  "verdict": "accept",
+  "digest": "sha256:d0f0c8f5d0d94c67f7dce4335947325647d292f4775b8b71db51ed510f5a489c"
+}
+```
