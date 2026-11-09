@@ -1,0 +1,107 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-09T21:07:14.403Z",
+  "revision": "e3a479db7d1547a2d31df44c73334c982c31e15d",
+  "tree": "98287aeddb86a79a4d66281941caad1bfcf8a1b3",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/indexingWaiting.test.ts\" \"src/shell-v0/views/LibrarySurface.render.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/zflisg68/tmp/test-intent-vitest-18066-1794258429546.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1626
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/state/indexingWaiting.test.ts#shows retry waiting with the backlog and deadline then follows the worker lifecycle",
+      "file": "modules/ui-web/src/shell-v0/state/indexingWaiting.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7a027eeb7aa5c0b68707a391aafbf564112552c952efb535d7eb3f2a23e13a1a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "shows retry waiting with the backlog and deadline then follows the worker lifecycle",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/indexingWaiting.test.ts#L1 uses hours and minutes without a weekday for a retry today",
+      "file": "modules/ui-web/src/shell-v0/state/indexingWaiting.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7a027eeb7aa5c0b68707a391aafbf564112552c952efb535d7eb3f2a23e13a1a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L1 uses hours and minutes without a weekday for a retry today",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.render.test.ts#L1 library retry waiting appears once outside folder rows",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.render.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:72822163d200ee9d95a58611beaada35696e711f1a023d159603577f683b458f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L1 library retry waiting appears once outside folder rows",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "e3a479db7d",
+    "revision": "e3a479db7d1547a2d31df44c73334c982c31e15d",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/indexingWaiting.test.ts\" \"src/shell-v0/views/LibrarySurface.render.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/zflisg68/tmp/test-intent-vitest-18066-1794258432488.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1664,
+        "output": "JSON report written to /home/elias/.cache/am/zflisg68/tmp/test-intent-vitest-18066-1794258432488.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/state/indexingWaiting.test.ts#shows retry waiting with the backlog and deadline then follows the worker lifecycle",
+        "classification": "assertion",
+        "detail": "shows retry waiting with the backlog and deadline then follows the worker lifecycle:  AssertionError: expected '7 files waiting. Next retry: 10/21/20…' to contain 'Next retry at Wed 06:26 PM.'\n    at /home/elias/.cache/am/zflisg68/tmp/test-intent-before-khZ0Yf/modules/ui-web/src/shell-v0/state/indexingWaiting.test.ts:25:35\n    at file:///home/elias/dev/justsearch/.claude/worktrees/wi"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/indexingWaiting.test.ts#L1 uses hours and minutes without a weekday for a retry today",
+        "classification": "assertion",
+        "detail": "L1 uses hours and minutes without a weekday for a retry today:  AssertionError: expected '1 file waiting. Next retry: 3/4/2026,…' to be '1 file waiting. Next retry at 11:59 P…' // Object.is equality\n    at /home/elias/.cache/am/zflisg68/tmp/test-intent-before-khZ0Yf/modules/ui-web/src/shell-v0/state/indexingWaiting.test.ts:72:6\n    at file:///home/elias/dev/just"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.render.test.ts#L1 library retry waiting appears once outside folder rows",
+        "classification": "assertion",
+        "detail": "L1 library retry waiting appears once outside folder rows:  AssertionError: expected '\\n    \\n  \\n        Waiting to retry …' not to contain 'files waiting'\n    at /home/elias/.cache/am/zflisg68/tmp/test-intent-before-khZ0Yf/modules/ui-web/src/shell-v0/views/LibrarySurface.render.test.ts:423:35\n    at file:///home/elias/dev/justsearch/.claude/worktrees/windo"
+      }
+    ]
+  },
+  "digest": "sha256:0ebf810663c8b9508eb7596f25fdf343cced6cc051bb1159a03214a690a03336"
+}

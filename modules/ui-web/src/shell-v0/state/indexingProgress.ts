@@ -737,6 +737,12 @@ export function indexingTaskStatus(
     : task.status;
 }
 
+/** Local clock time; the short weekday appears only when the deadline is not today. */
+function retryClockTime(deadline: Date): string {
+  const today = deadline.toDateString() === new Date().toDateString();
+  return deadline.toLocaleString(undefined, { ...(today ? {} : { weekday: 'short' }), hour: '2-digit', minute: '2-digit' });
+}
+
 /** Automatic reasons describe the work they hold, never the broad wire state's name. */
 function indexingActivity(
   status: StatusResponse,
@@ -782,7 +788,7 @@ function indexingActivity(
     const retry = count(status.worker?.failure?.nextRetryAtMs);
     const deadline = retry > 0 ? new Date(retry) : null;
     const nextRetry = deadline && Number.isFinite(deadline.getTime())
-      ? ` Next retry: ${deadline.toLocaleString()}.` : '';
+      ? ` Next retry at ${retryClockTime(deadline)}.` : '';
     return { summary: 'Waiting to retry',
       detail: `${formatCount(jobs)} ${jobs === 1 ? 'file' : 'files'} waiting.${nextRetry}`,
       confirmed: true, enrichmentDeferred };

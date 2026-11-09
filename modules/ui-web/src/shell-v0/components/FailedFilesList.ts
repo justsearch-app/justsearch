@@ -273,9 +273,11 @@ export class FailedFilesList extends JfElement {
     }
     /* ActionButton's :host carries a form-control bottom margin sized for stacked form fields; in a
        list row that is dead space under the buttons. Withdrawn through its own token, not by
-       overriding the component's rule. */
+       overriding the component's rule. The padding and text size match the compact Try again beside it. */
     .row jf-row-actions {
       --justsearch-shell-form-control-spacing: 0;
+      --justsearch-shell-action-button-padding: 0.4rem 0.75rem;
+      font-size: var(--font-size-sm);
       max-inline-size: 100%;
     }
     .row-path {
