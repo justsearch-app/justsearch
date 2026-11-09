@@ -10,7 +10,7 @@ related:
   - 618-agent-developer-velocity-friction         # Seam C: the isolate-and-reconcile / single-writer-shard principle this conforms to
 ---
 
-> **Design settled (2026-06-29).** The idea + purpose (below) stand; the design pass at the foot of this file
+> **Historical projections (2026-11-09):** `bootstrap_ci`, `rank_diff` and `stratified_metrics` generators/tests are retired; references below describe past implementations and captured evidence. **Design settled (2026-06-29).** The idea + purpose (below) stand; the design pass at the foot of this file
 > picks the structure: **conform to the registry-of-self-registering-modules seam jseval already runs in
 > `projections/`** rather than invent a CLI-specific mechanism. Implementation is deferred to user green-light
 > (it touches every command's home — a shared-substrate change, `ask-when-uncertain`). The earlier
