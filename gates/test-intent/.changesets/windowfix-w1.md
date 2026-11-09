@@ -62,3 +62,13 @@ These are agent technical choices under the quoted owner decision, not owner-ado
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "windowfix-w1-verifier-u11v9mt8",
+  "verdict": "accept",
+  "digest": "sha256:9e08dda44a84c5767860d6c2fd9612467ca48f5d2672103f3058bb89e15691a0"
+}
+```
