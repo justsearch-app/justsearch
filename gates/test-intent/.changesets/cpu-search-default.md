@@ -26,3 +26,16 @@ Existing preset tests keep their full cases and assertions while passing the sam
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "c1-final-verifier-20261109-c20ce777",
+  "verdict": "accept",
+  "digest": "sha256:a607defb2c6c8bf1f9fc8582293c0f9a544f5c4442559a93bd0a8636772264db",
+  "note": "Independently reviewed the whole changeset and both covered existing test files against 3d21137a48511877301888dc52d9f37ab1e09437: identical configurations, cases, assertions and expected results; only existing enabled() input encoding changes with the package-private adapter removal. Original-interface baseline tests and adapted candidate tests pass. Selected preservation and regression before/after evidence retained separately; this acceptance covers test intent and grants no semantic runtime or publication authority."
+}
+```
