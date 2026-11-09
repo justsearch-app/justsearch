@@ -138,3 +138,13 @@ Pending independent acceptance; the builder does not accept its own work.
   "digest": "sha256:bc70c19fd8cf2ca6e31dedf2be836073bd50bcc1d142ae2f8340984a53d38925"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1c261-e2cd-7540-9e2c-b7b2ee1acaaa",
+  "verdict": "accept",
+  "digest": "sha256:4fc7536c4b7b2854d2ee99462d6004957d17e27c71776cf4850c5f27b30cdeb6"
+}
+```
