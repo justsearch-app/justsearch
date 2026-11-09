@@ -1,0 +1,197 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-09T20:58:39.955Z",
+  "revision": "e3a479db7d1547a2d31df44c73334c982c31e15d",
+  "tree": "81c4d500fa384f64b2bbb7b4e5d0d86cac2b6068",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/boot/desktopRecovery.test.ts\" \"src/shell-v0/state/themeState.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/fda85xea/tmp/test-intent-vitest-3-1794257919102.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 851
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/boot/desktopRecovery.test.ts",
+      "file": "modules/ui-web/src/boot/desktopRecovery.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:dc03533bf84e1d7b74d801cbb1df5d5edda00bda20d0fe89cb6a216345606f58",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "desktop boot recovery subscribes before API discovery and exposes host installation without an API",
+          "status": "passed"
+        },
+        {
+          "name": "desktop boot recovery words an escalated Engine exit from the supervisor observation while the API is down",
+          "status": "passed"
+        },
+        {
+          "name": "desktop boot recovery removes the recovery surface when the real API is available",
+          "status": "passed"
+        },
+        {
+          "name": "desktop boot recovery replaces a running shell with terminal recovery without a successor binding",
+          "status": "passed"
+        },
+        {
+          "name": "desktop boot recovery preserves exhaustion that arrives while the application is still mounting",
+          "status": "passed"
+        },
+        {
+          "name": "desktop boot recovery keeps an update failure visible and allows checking again",
+          "status": "passed"
+        },
+        {
+          "name": "desktop boot recovery shows administrator refusal for Check for updates with the Engine down",
+          "status": "passed"
+        },
+        {
+          "name": "desktop boot recovery shows administrator refusal for Install update with the Engine down",
+          "status": "passed"
+        },
+        {
+          "name": "desktop boot recovery restarts through the host and shows a refused restart reason without losing controls",
+          "status": "passed"
+        },
+        {
+          "name": "desktop boot recovery shows the spawn obstacle, retained crash evidence, and the count across budget resets",
+          "status": "passed"
+        },
+        {
+          "name": "desktop boot recovery keeps the running-but-not-ready explanation visible when the API answers",
+          "status": "passed"
+        },
+        {
+          "name": "desktop boot recovery explains a locked data folder without suggesting an automatic retry",
+          "status": "passed"
+        },
+        {
+          "name": "desktop boot recovery keeps browser unresolved behavior and never invokes native recovery commands",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/themeState.test.ts",
+      "file": "modules/ui-web/src/shell-v0/state/themeState.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7ba7b10638518f0457d22085838cf6d983e1302f4227624436ade4232b38431a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "themeState (slice 474 alpha) applyTheme injects a <style id=\"jf-active-theme\"> element",
+          "status": "passed"
+        },
+        {
+          "name": "themeState (slice 474 alpha) applyTheme replaces the existing element on subsequent calls (one style at a time)",
+          "status": "passed"
+        },
+        {
+          "name": "themeState (slice 474 alpha) clearActiveTheme removes the element and resets state",
+          "status": "passed"
+        },
+        {
+          "name": "themeState (slice 474 alpha) subscribers receive initial state (null) on subscribe",
+          "status": "passed"
+        },
+        {
+          "name": "themeState (slice 474 alpha) subscribers receive change notifications",
+          "status": "passed"
+        },
+        {
+          "name": "themeState (slice 474 alpha) subscribers do not double-fire when applyTheme called with same id",
+          "status": "passed"
+        },
+        {
+          "name": "themeState (slice 474 alpha) loadAndApplyTheme fetches /themes/<id>.css and applies",
+          "status": "passed"
+        },
+        {
+          "name": "themeState (slice 474 alpha) loadAndApplyTheme throws on non-2xx response (both .json and .css fail)",
+          "status": "passed"
+        },
+        {
+          "name": "themeState (slice 474 alpha) encodes theme id safely in the URL",
+          "status": "passed"
+        },
+        {
+          "name": "themeState — §2.C / C5 single appearance writer applyAppearance sets data-theme=light and toggles high-contrast",
+          "status": "passed"
+        },
+        {
+          "name": "themeState — §2.C / C5 single appearance writer applyAppearance resolves system to light on a light-mode OS (tempdoc 727 F-5)",
+          "status": "passed"
+        },
+        {
+          "name": "themeState — §2.C / C5 single appearance writer applyAppearance resolves system to dark on a dark-mode OS (tempdoc 727 F-5)",
+          "status": "passed"
+        },
+        {
+          "name": "themeState — §2.C / C5 single appearance writer system live-follows an OS preference change without re-calling applyAppearance (tempdoc 727 F-5)",
+          "status": "passed"
+        },
+        {
+          "name": "themeState — §2.C / C5 single appearance writer an explicit light/dark choice stops following subsequent OS preference changes",
+          "status": "passed"
+        },
+        {
+          "name": "themeState — §2.C / C5 single appearance writer applyAppearance sets data-surface-mode=solid and removes it for glass (§9.4)",
+          "status": "passed"
+        },
+        {
+          "name": "themeState — §2.C / C5 single appearance writer setSurfaceMode applies live AND persists; getSurfaceMode reads it back (default glass) (§9.4)",
+          "status": "passed"
+        },
+        {
+          "name": "themeState — §2.C / C5 single appearance writer restoreAppearanceOnBoot replays the persisted solid surface mode (§9.4)",
+          "status": "passed"
+        },
+        {
+          "name": "themeState — §2.C / C5 single appearance writer restoreAppearanceOnBoot replays the persisted appearance from /api/settings/v2",
+          "status": "passed"
+        },
+        {
+          "name": "themeState — §2.C / C5 single appearance writer restoreAppearanceOnBoot is a no-op (no throw) when settings are unreachable",
+          "status": "passed"
+        },
+        {
+          "name": "themeState — §2.C / C5 single appearance writer C1: restoreAppearanceOnBoot replays BOTH layers from ONE call (settings + persisted palette)",
+          "status": "passed"
+        },
+        {
+          "name": "themeState — V1.5.1 persistence applyTheme persists themeId to localStorage (consolidated document)",
+          "status": "passed"
+        },
+        {
+          "name": "themeState — V1.5.1 persistence clearActiveTheme clears the persisted themeId",
+          "status": "passed"
+        },
+        {
+          "name": "themeState — V1.5.1 persistence __resetThemeStateForTest clears localStorage",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:49837b0bdae61aa2f65192cb45564ec1ae47719e9ebb48133526b1f097dd3341"
+}

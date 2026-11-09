@@ -6,6 +6,8 @@ import { installBackendRestartBridge } from '../api/backendRestart.js';
 import { resolveBootApiBase } from './apiBase.js';
 import { gateFactoryReset } from './factoryReset.js';
 
+const frames = new WeakMap<HTMLElement, HTMLElement>();
+
 const recoverySurfaces = new WeakMap<HTMLElement, {
   recovery: EngineRecovery;
   teardown: () => void;
@@ -26,7 +28,30 @@ export function mountBootApplication(root: HTMLElement, application: HTMLElement
     owner.teardown();
     presentation = owner.recovery;
   }
-  if (root.childNodes.length !== 1 || root.firstChild !== presentation) root.replaceChildren(presentation);
+  if (presentation !== application) {
+    if (root.firstChild !== presentation || root.childNodes.length !== 1) root.replaceChildren(presentation);
+    return;
+  }
+  const frame = frames.get(root) ?? root.querySelector<HTMLElement>('#boot-frame');
+  const cover = root.querySelector('#boot-failure') ?? (frame?.parentElement === root ? frame : null);
+  if (!cover) { root.replaceChildren(application); return; }
+  // Attach beneath the fixed paint. Lit's first render, including the top bar, owns hand-off.
+  root.appendChild(application);
+  const rendered = application as HTMLElement & { updateComplete?: Promise<boolean> };
+  if (!rendered.updateComplete) return; // A never-rendering shell remains covered until the deadline.
+  void (async () => {
+    try {
+      while (await rendered.updateComplete === false) { /* Lit scheduled a subsequent render. */ }
+      const bar = application.shadowRoot?.querySelector('jf-top-bar') as (HTMLElement & { updateComplete?: Promise<boolean> }) | null;
+      if (!bar) return;
+      if (bar.updateComplete) await bar.updateComplete;
+      // Two animation frames let the first rendered surface paint before its cover leaves.
+      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+      if (application.parentElement !== root || owner && needsRecovery(owner.recovery.supervisor)) return;
+      // Recovery/reset may have replaced both nodes while Lit was pending. Never reclaim their root.
+      if (root.querySelector('#boot-frame, #boot-failure')) root.replaceChildren(application);
+    } catch { window.__justsearchBootFailure?.('bootstrap'); }
+  })();
 }
 
 /** Resolve the API only after desktop recovery events can reach the boot surface. */
@@ -34,14 +59,12 @@ export async function resolveBootWithRecovery(
   root: HTMLElement,
   teardown: () => void = () => {},
 ): Promise<string | null> {
+  const frame = root.querySelector<HTMLElement>('#boot-frame');
+  if (frame) frames.set(root, frame);
   if (!isTauriRuntime()) {
     const base = await resolveBootApiBase();
     if (!base) {
-      const alert = document.createElement('div');
-      alert.setAttribute('role', 'alert');
-      alert.style.cssText = 'padding:24px;font:14px system-ui,sans-serif';
-      alert.textContent = 'Unable to connect to the JustSearch backend.';
-      root.replaceChildren(alert);
+      window.__justsearchBootFailure?.('no-engine-address');
     }
     return base;
   }
@@ -67,7 +90,13 @@ export async function resolveBootWithRecovery(
   });
   await installBackendRestartBridge(() => window.location.reload());
   const base = await resolveBootApiBase();
-  if (base && !needsRecovery(recovery.supervisor)) recovery.remove();
+  if (base && !needsRecovery(recovery.supervisor)) {
+    if (recovery.parentElement === root) {
+      recovery.remove();
+      const frame = frames.get(root);
+      if (frame && !root.hasChildNodes()) root.appendChild(frame);
+    }
+  }
   else waitingForApi = true;
   return base;
 }
