@@ -66,6 +66,225 @@ final class RecordedIngestionCoordinatorTest {
   private static final Clock CLOCK = Clock.systemUTC();
   @TempDir Path temp;
 
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void twoInterruptedImportsDoNotBlockFreshDispatch(boolean reindex) throws Exception {
+    try (Fixture f = new Fixture(temp, 3)) {
+      var dispatcher = capacityDispatcher(f);
+      var reads = new ArrayList<Path>();
+      bindProducer(f.coordinator, (plan, key, epoch, context, cancellation) -> {
+        Path root = plan.roots().getFirst().path();
+        reads.add(root);
+        f.queue.enqueueRecordedEntries(key, epoch,
+            List.of(JobQueue.EnqueueEntry.ofUnknownSize(root.resolve("pending.txt"))), null);
+        return CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.COMPLETE);
+      });
+      String first = dispatchImport(f, dispatcher, f.plan.roots().get(0).path());
+      String second = dispatchImport(f, dispatcher, f.plan.roots().get(1).path());
+      assertEquals(2, f.admission.activeWorkCount());
+      f.authority.grants().revoke("core.ingest-files", SourceTier.UNTRUSTED);
+      f.coordinator.maintain();
+      assertRetainedImport(f.coordinator, f.operations, first, "RECOVERY_AUTHORIZATION_REFUSED");
+      assertRetainedImport(f.coordinator, f.operations, second, "RECOVERY_AUTHORIZATION_REFUSED");
+      f.authority.grants().grantAllowAlways("core.ingest-files", SourceTier.UNTRUSTED);
+      if (reindex) {
+        var seed = f.request();
+        var operation = new CoreOperationCatalog().findByIdValue(CoreOperationCatalog.REINDEX.value()).orElseThrow();
+        assertTrue(dispatcher.dispatch(operation, "{\"force\":false}", seed.provenance(), Optional.empty(),
+            seed.context(), OperationKeys.generate(CLOCK)).success());
+      } else {
+        dispatchImport(f, dispatcher, f.plan.roots().get(2).path());
+      }
+      assertEquals(f.plan.roots().stream().map(RecordedRootPlan.Root::path).toList(), reads);
+      assertEquals(1, f.admission.activeWorkCount(), "only the fresh dispatch consumes capacity");
+      assertEquals(Set.of(first, second), f.coordinator.interruptedImports().stream()
+          .map(item -> item.operationKey()).collect(java.util.stream.Collectors.toSet()));
+    }
+  }
+
+  @Test
+  void resumeRefusedAtFullCapacityKeepsTheImportVisible() throws Exception {
+    try (Fixture f = new Fixture(temp, 3)) {
+      var dispatcher = capacityDispatcher(f);
+      bindProducer(f.coordinator, (plan, key, epoch, context, cancellation) -> {
+        f.queue.enqueueRecordedEntries(key, epoch, List.of(JobQueue.EnqueueEntry.ofUnknownSize(
+            plan.roots().getFirst().path().resolve("pending.txt"))), null);
+        return CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.COMPLETE);
+      });
+      String key = dispatchImport(f, dispatcher, f.plan.roots().getFirst().path());
+      f.authority.grants().revoke("core.ingest-files", SourceTier.UNTRUSTED);
+      f.coordinator.maintain();
+      var before = f.operations.importApprovalState(f.operations.find(key).orElseThrow().id()).orElseThrow();
+      f.authority.grants().grantAllowAlways("core.ingest-files", SourceTier.UNTRUSTED);
+      dispatchImport(f, dispatcher, f.plan.roots().get(1).path());
+      dispatchImport(f, dispatcher, f.plan.roots().get(2).path());
+      var context = EngineProvenance.context(EngineContext.ClientKind.WEBVIEW, "resume-capacity", Optional.empty(),
+          Optional.empty(), TransportTag.BUTTON, EngineContext.Survival.DURABLE, EngineContext.Urgency.BACKGROUND);
+      var provenance = EngineProvenance.invocation(context, ExecutorTag.UI, Instant.now(CLOCK), Optional.empty());
+      var operation = new CoreOperationCatalog().findByIdValue(CoreOperationCatalog.RESUME_IMPORT.value()).orElseThrow();
+      String arguments = new tools.jackson.databind.ObjectMapper().writeValueAsString(
+          Map.of("operationKey", key, "interruptionRevision", before.interruptionRevision()));
+      var refused = assertThrows(io.justsearch.app.api.EngineAdmissionException.class,
+          () -> dispatcher.dispatch(operation, arguments, provenance, Optional.empty(), context, OperationKeys.generate(CLOCK)));
+      assertEquals(io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT, refused.reason());
+      assertEquals(before, f.operations.importApprovalState(f.operations.find(key).orElseThrow().id()).orElseThrow());
+      assertRetainedImport(f.coordinator, f.operations, key, "RECOVERY_AUTHORIZATION_REFUSED");
+      assertEquals(2, f.admission.activeWorkCount());
+    }
+  }
+
+  @Test
+  void acceptedResumeWithoutWorkCapacityRelatchesTheSameImport() throws Exception {
+    try (Fixture f = new Fixture(temp, 1)) {
+      var dispatcher = capacityDispatcher(f);
+      var starts = new AtomicInteger();
+      bindProducer(f.coordinator, (plan, key, epoch, context, cancellation) -> {
+        starts.incrementAndGet();
+        f.queue.enqueueRecordedEntries(key, epoch, List.of(JobQueue.EnqueueEntry.ofUnknownSize(
+            plan.roots().getFirst().path().resolve("pending.txt"))), null);
+        return CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.COMPLETE);
+      });
+      String key = dispatchImport(f, dispatcher, f.plan.roots().getFirst().path());
+      var parent = f.operations.find(key).orElseThrow();
+      var prepared = f.operations.acceptedPreparation(parent.id()).orElseThrow();
+      var plan = new RecordedIngestPlanResolver().resolve(parent, prepared);
+      var child = f.operations.findIngestChild(key, plan).orElseThrow();
+      f.authority.grants().revoke("core.ingest-files", SourceTier.UNTRUSTED);
+      f.coordinator.maintain();
+      assertEquals(0, f.admission.activeWorkCount());
+      try (var other = f.admission.admit(f.request().context(), false)) {
+        assertNotNull(other);
+        // The renewal occupies the last admission slot while its handler asks the import to run.
+        dispatchResume(f, dispatcher, key);
+        assertRetainedImport(f.coordinator, f.operations, key, "ENGINE_LIMIT");
+        assertEquals(1, f.admission.activeWorkCount());
+        assertEquals(1, starts.get());
+      }
+      f.coordinator.maintain();
+      assertRetainedImport(f.coordinator, f.operations, key, "ENGINE_LIMIT");
+      dispatchResume(f, dispatcher, key);
+      assertTrue(f.coordinator.interruptedImports().isEmpty());
+      assertEquals(1, f.admission.activeWorkCount());
+      assertEquals(parent.id(), f.operations.find(key).orElseThrow().id());
+      assertEquals(prepared, f.operations.acceptedPreparation(parent.id()).orElseThrow());
+      assertEquals(child.id(), f.operations.findIngestChild(key, plan).orElseThrow().id());
+      assertEquals(1, starts.get(), "closed enumeration resumes claims without a new producer");
+      var claims = f.queue.pollPending(1);
+      assertEquals(1, claims.size());
+      f.queue.returnUnfinishedClaims(claims);
+    }
+  }
+
+  private static void dispatchResume(Fixture f, OperationExecutorImpl dispatcher, String key) {
+    var state = f.operations.importApprovalState(f.operations.find(key).orElseThrow().id()).orElseThrow();
+    var context = EngineProvenance.context(EngineContext.ClientKind.WEBVIEW, "resume-capacity", Optional.empty(),
+        Optional.empty(), TransportTag.BUTTON, EngineContext.Survival.DURABLE, EngineContext.Urgency.BACKGROUND);
+    var provenance = EngineProvenance.invocation(context, ExecutorTag.UI, Instant.now(CLOCK), Optional.empty());
+    var operation = new CoreOperationCatalog().findByIdValue(CoreOperationCatalog.RESUME_IMPORT.value()).orElseThrow();
+    String arguments = new tools.jackson.databind.ObjectMapper().writeValueAsString(
+        Map.of("operationKey", key, "interruptionRevision", state.interruptionRevision()));
+    assertTrue(dispatcher.dispatch(operation, arguments, provenance, Optional.empty(), context, OperationKeys.generate(CLOCK)).success());
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void interruptedImportKeepsCapacityUntilProducerAndIssuedClaimsDrain(boolean delayedExit) throws Exception {
+    try (Fixture f = new Fixture(temp, 3)) {
+      var dispatcher = capacityDispatcher(f);
+      var exit = new CompletableFuture<JobQueue.WalkEnumerationOutcome>();
+      bindProducer(f.coordinator, (plan, key, epoch, context, cancellation) -> {
+        f.queue.enqueueRecordedEntries(key, epoch, List.of(JobQueue.EnqueueEntry.ofUnknownSize(
+            plan.roots().getFirst().path().resolve("issued.txt"))), null);
+        return delayedExit ? exit : CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.COMPLETE);
+      });
+      String key = dispatchImport(f, dispatcher, f.plan.roots().getFirst().path());
+      var issued = f.queue.pollPending(1);
+      assertEquals(1, issued.size());
+      f.authority.grants().revoke("core.ingest-files", SourceTier.UNTRUSTED);
+      f.coordinator.maintain();
+      assertRetainedImport(f.coordinator, f.operations, key, "RECOVERY_AUTHORIZATION_REFUSED");
+      try (var other = f.admission.admit(f.request().context(), false)) {
+        assertNotNull(other);
+        assertEquals(2, f.admission.activeWorkCount());
+        f.authority.grants().grantAllowAlways("core.ingest-files", SourceTier.UNTRUSTED);
+        var refused = assertThrows(io.justsearch.app.api.EngineAdmissionException.class,
+            () -> dispatchImport(f, dispatcher, f.plan.roots().get(1).path()));
+        assertEquals(io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT, refused.reason());
+        f.queue.returnUnfinishedClaims(issued);
+        f.coordinator.maintain();
+        assertEquals(delayedExit ? 2 : 1, f.admission.activeWorkCount());
+        exit.complete(JobQueue.WalkEnumerationOutcome.CANCELLED);
+        f.coordinator.maintain();
+        assertEquals(1, f.admission.activeWorkCount(), "drained interruption releases its work reference");
+        assertTrue(f.queue.pollPending(1).isEmpty(), "returned claims remain retained and denied");
+      }
+      assertEquals(0, f.admission.activeWorkCount());
+      assertRetainedImport(f.coordinator, f.operations, key, "RECOVERY_AUTHORIZATION_REFUSED");
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void overlappingImportCannotTakeRetainedWalkMembers(boolean interrupted) throws Exception {
+    try (Fixture f = new Fixture(temp, 1)) {
+      var dispatcher = capacityDispatcher(f);
+      var firstChild = new AtomicReference<String>();
+      var collisions = new AtomicInteger();
+      Path root = f.plan.roots().getFirst().path();
+      Path file = root.resolve("same.txt");
+      bindProducer(f.coordinator, (plan, key, epoch, context, cancellation) -> {
+        var entries = List.of(JobQueue.EnqueueEntry.ofUnknownSize(file));
+        if (firstChild.compareAndSet(null, key)) f.queue.enqueueRecordedEntries(key, epoch, entries, null);
+        else {
+          var refusal = assertThrows(IllegalStateException.class,
+              () -> f.queue.enqueueRecordedEntries(key, epoch, entries, null));
+          assertEquals("Path belongs to another active recorded walk", refusal.getMessage());
+          collisions.incrementAndGet();
+        }
+        return CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.COMPLETE);
+      });
+      String first = dispatchImport(f, dispatcher, root);
+      if (interrupted) {
+        f.authority.grants().revoke("core.ingest-files", SourceTier.UNTRUSTED);
+        f.coordinator.maintain();
+        assertEquals(0, f.admission.activeWorkCount());
+        f.authority.grants().grantAllowAlways("core.ingest-files", SourceTier.UNTRUSTED);
+      }
+      String second = dispatchImport(f, dispatcher, root);
+      assertEquals(1, collisions.get());
+      assertEquals(OperationState.COMPLETE, f.operations.find(second).orElseThrow().state());
+      assertEquals(1, f.queue.jobStateCounts().pendingCount());
+      assertNull(f.queue.recordedWalk(firstChild.get()).orElseThrow().sealedAt());
+      assertFalse(f.operations.find(first).orElseThrow().state().terminal());
+      if (interrupted) assertRetainedImport(f.coordinator, f.operations, first, "RECOVERY_AUTHORIZATION_REFUSED");
+    }
+  }
+
+  private static OperationExecutorImpl capacityDispatcher(Fixture f) {
+    var handlers = new HandlerRegistry();
+    handlers.register(AgentToolsOperationCatalog.INGEST_FILES, new IngestTool(f.coordinator,
+        context -> f.plan.roots().stream().map(root -> new RootBinding(root.path(), null)).toList(),
+        context -> GENERATION, List::of));
+    handlers.register(CoreOperationCatalog.REINDEX, new ReindexHandler(f.coordinator,
+        context -> List.of(new RootBinding(f.plan.roots().getLast().path(), null)), context -> GENERATION, List::of));
+    handlers.register(CoreOperationCatalog.RESUME_IMPORT,
+        new io.justsearch.app.services.registry.operations.handlers.ResumeImportHandler(f.coordinator));
+    var dispatcher = new OperationExecutorImpl(f.runner, f.admission, handlers, null, Map.of(),
+        CLOCK, new CoreTrustEvaluator(), CoreIntentSourceCatalog.catalog());
+    f.authority.grants().grantAllowAlways("core.ingest-files", SourceTier.UNTRUSTED);
+    dispatcher.setDurableGrantStore(f.authority.grants(), f.authority.scope());
+    return dispatcher;
+  }
+
+  private static String dispatchImport(Fixture f, OperationExecutorImpl dispatcher, Path root) {
+    var seed = f.mcpRequest();
+    var operation = new AgentToolsOperationCatalog().findByIdValue(AgentToolsOperationCatalog.INGEST_FILES.value()).orElseThrow();
+    String key = OperationKeys.generate(CLOCK);
+    String arguments = new tools.jackson.databind.ObjectMapper().writeValueAsString(Map.of("paths", List.of(root.toString())));
+    assertTrue(dispatcher.dispatch(operation, arguments, seed.provenance(), Optional.empty(), seed.context(), key).success());
+    return key;
+  }
+
   @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings = {"auto", "family", "session"})
   void acceptedPartitionedImportsRetainOriginAndApprovalAfterHistoryExpiry(String approval) throws Exception {
@@ -482,6 +701,7 @@ final class RecordedIngestionCoordinatorTest {
           assertRetainedImport(recovered, operations, parent.key(), RecordedIngestionSettlement.UNAVAILABLE);
           assertEquals(originalChild.id(), child.id());
           assertEquals(originalParent.id(), parent.id());
+          assertEquals(0, admission.activeWorkCount());
           if (fault.startsWith("missing-")) assertTrue(queue.recordedWalk(child.key()).isEmpty());
           else assertEquals(1L, queue.recordedWalk(child.key()).orElseThrow().enumerationEpoch());
           assertEquals(JobQueue.RecordedClaimDecision.DENY, recovered.recordedClaimDecision(child.key()));
@@ -1440,6 +1660,7 @@ final class RecordedIngestionCoordinatorTest {
               assertEquals(1, queue.jobStateCounts().pendingCount());
               assertTrue(queue.pollPending(1).isEmpty());
               assertNull(queue.recordedWalk(child.key()).orElseThrow().enumerationClosedAt());
+              assertEquals(0, admission.activeWorkCount());
               return;
             }
             assertEquals(OperationState.FAILED, parent.state());
@@ -1564,7 +1785,8 @@ final class RecordedIngestionCoordinatorTest {
     try (var operations = new SqliteOperationStore(temp.resolve("operations.db"))) {
       var runner = new OperationAttemptRunnerImpl(operations, CLOCK,
           Set.of(OperationKind.INGEST, OperationKind.REINDEX, OperationKind.ACCEPT_GAPS), null, new RecordedIngestPlanResolver());
-      var recovered = new RecordedIngestionCoordinator(operations, runner, new EngineAdmissionController(2, 2, 1),
+      var admission = new EngineAdmissionController(2, 2, 1);
+      var recovered = new RecordedIngestionCoordinator(operations, runner, admission,
           OperationAuthority.load(temp.resolve("authority")));
       try (var queue = new SqliteJobQueue(temp.resolve("jobs.db"), recovered::recordedClaimDecision)) {
         queue.open();
@@ -1582,6 +1804,7 @@ final class RecordedIngestionCoordinatorTest {
           assertTrue(queue.pollPending(1).isEmpty());
           assertNull(queue.recordedWalk(childKey).orElseThrow().sealedAt());
           assertEquals(0, queue.recordedWalk(childKey).orElseThrow().acknowledgedRevision());
+          assertEquals(0, admission.activeWorkCount());
         }
       }
     }
@@ -1627,6 +1850,7 @@ final class RecordedIngestionCoordinatorTest {
         assertEquals(1, f.queue.jobStateCounts().pendingCount());
         assertTrue(f.queue.pollPending(1).isEmpty());
       }
+      assertEquals(0, f.admission.activeWorkCount());
     }
   }
 

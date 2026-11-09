@@ -386,7 +386,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
       var plan = resolver.resolve(row, stored);
       if (parents.containsKey(row.key())) throw new IllegalStateException("Recorded parent already has an owner");
       if (plan.roots().isEmpty()) return OperationExecution.finished(OperationResult.success("No ingestion roots"));
-      if (parents.size() >= admission.limits().aggregateLimit()) {
+      if (activeParentCount() >= admission.limits().aggregateLimit()) {
         throw new EngineAdmissionException(EngineAdmissionException.Reason.ENGINE_LIMIT, admission.retryAfterSeconds());
       }
       // This private runner check precedes retention of any caller-supplied handle or fresh origin.
@@ -801,11 +801,31 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
         parent.child.retryEnumeration = true;
       }
     }
+    if (parent != null) releaseInterruptedWork(parent);
     unsavedInterruptions.put(row.key(), reason);
     try { operations.interruptImport(row.id(), reason); unsavedInterruptions.remove(row.key()); }
     catch (io.justsearch.app.api.operations.OperationStoreException unavailable) {
       log.warn("Import {} remains interrupted; its latch write will retry", row.key(), unavailable);
     }
+  }
+
+  private int activeParentCount() {
+    return (int) parents.values().stream().filter(parent -> !parent.interrupted || parent.work != null).count();
+  }
+
+  /** Keep the durable runner owner, but relinquish capacity only after physical work drains. */
+  private void releaseInterruptedWork(Parent parent) {
+    if (!parent.interrupted || parent.work == null) return;
+    Child child = parent.child;
+    if (child != null && (child.exit != null && !child.exit.isDone()
+        || parent.physical.queue.hasIssuedRecordedClaims(child.row.key()))) return;
+    if (parent.cancellationSubscription != null) {
+      parent.cancellationSubscription.close();
+      parent.cancellationSubscription = null;
+    }
+    parent.work.close();
+    parent.work = null;
+    advanced = true;
   }
 
   private void refreshImportApproval(Parent parent) {
@@ -885,8 +905,10 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
       interrupt(row, RecordedIngestionSettlement.EXHAUSTED);
       return new Reconciliation.Wait();
     }
-    if (decision instanceof RecordedIngestRecoveryDecision.Wait || physical.stopping
-        || parents.size() >= admission.limits().aggregateLimit()) return new Reconciliation.Wait();
+    if (decision instanceof RecordedIngestRecoveryDecision.Wait || physical.stopping) return new Reconciliation.Wait();
+    if (activeParentCount() >= admission.limits().aggregateLimit()) {
+      return new Reconciliation.Wait();
+    }
     return new Reconciliation.Resume(handle -> {
       var parent = new Parent(row, stored, plan, handle, false);
       parent.physical = physical;
@@ -940,10 +962,15 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
       }
       return true;
     }
-    if (parent.interrupted && decision instanceof RecordedIngestRecoveryDecision.Wait) return true;
+    if (parent.interrupted && decision instanceof RecordedIngestRecoveryDecision.Wait) {
+      releaseInterruptedWork(parent);
+      return true;
+    }
     if (parent.interrupted) {
       Child child = parent.child;
       if (child != null && child.exit != null && !child.exit.isDone()) return true;
+      acquireWork(parent);
+      if (parent.work == null) return true;
       parent.interrupted = false;
       parent.refusal = null;
       if (child != null) child.retryEnumeration = true;
@@ -1088,7 +1115,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
       return unknownChild || openChildParents.contains(row.key()) ? new Reconciliation.Wait() : outcome;
     }
     if (decision instanceof RecordedIngestRecoveryDecision.Wait || physical.stopping
-        || parents.size() >= admission.limits().aggregateLimit()) return new Reconciliation.Wait();
+        || activeParentCount() >= admission.limits().aggregateLimit()) return new Reconciliation.Wait();
     return new Reconciliation.Resume(handle -> {
       Parent parent = new Parent(row, stored, plan, handle, false);
       parent.physical = physical;
@@ -1399,6 +1426,11 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     }
     catch (EngineAdmissionException refused) {
       if (refused.reason() == EngineAdmissionException.Reason.WORK_FINISHED) throw refused;
+      if (isImport(parent.row) && !parent.cancelled
+          && (refused.reason() == EngineAdmissionException.Reason.ENGINE_LIMIT
+              || refused.reason() == EngineAdmissionException.Reason.CONTEXT_LIMIT)) {
+        interrupt(parent.row, refused.reason().name());
+      }
     }
   }
 
