@@ -50,7 +50,7 @@ import {
   type UiMode,
 } from '../state/uiModeState.js';
 // Tempdoc 657 — pre-install per-tier weight breakdown (GET /api/ai/install/plan-preview).
-import { refreshAiInstallNow, type InstallPlanPreview } from '../utils/aiInstallPoll.js';
+import { aiRuntimeReadStart, markAiReadOrder, refreshAiInstallNow, type InstallPlanPreview } from '../utils/aiInstallPoll.js';
 import {
   aiEngineBody,
   aiEngineHeadline,
@@ -85,7 +85,7 @@ import '../components/chat/PulseDots.js';
 import { confirmAsync } from '../components/ConfirmDialog.js';
 import { ModalController } from '../primitives/modalController.js';
 import { TransientController } from '../primitives/transientController.js';
-import { composeBrainSentence, type BrainFeature, type BrainFeatureId } from '../state/brainPage.js';
+import { composeBrainSentence, PICTURES_NOT_AVAILABLE_WITH_MODEL, type BrainFeature, type BrainFeatureId } from '../state/brainPage.js';
 import { emitEphemeralToast } from '../components/advisory/ephemeralToast.js';
 import type { PluginHostApi } from '../plugin-api/plugin-types.js';
 // Sandbox round 7 — the install consent dialog names the real packages, licences and terms links
@@ -668,6 +668,8 @@ export class BrainSurface extends JfElement {
   private pictureUncertain = false;
   private pictureAttempt: SettingsAttempt | null = null;
   private pictureApplied: boolean | null = null;
+  /** Read order of the last picture reading change; a runtime read started earlier may predate it. */
+  private pictureChangeOrder = 0;
   private pictureTargetEnabled = false;
   declare featureInfo: BrainFeatureId | null;
   declare planLoading: boolean;
@@ -1301,7 +1303,7 @@ export class BrainSurface extends JfElement {
         const changed = s.runtimeStatus !== this.runtimeStatus;
         this.runtimeStatus = s.runtimeStatus;
         if (changed && !this.pendingActions.has('reranker-switch')) this.rerankerApplied = null;
-        if (changed && !this.pendingActions.has('picture-switch')) this.pictureApplied = null;
+        if (!this.pendingActions.has('picture-switch') && this.runtimeReadFollowsPictureChange()) this.pictureApplied = null;
         const reranker = s.runtimeStatus.onnxFeatures?.find(feature => feature.id === 'reranker');
         if (changed && !this.pendingActions.has('reranker-switch')
             && reranker?.status !== 'unknown' && reranker?.modelActive != null
@@ -1400,6 +1402,7 @@ export class BrainSurface extends JfElement {
           (path, init) => authorizedFetch(this.base() + path, init), attempt);
         if (!this.isConnected || revision !== this.refreshRevision || choice !== this.choiceRevision) return;
         this.pictureApplied = JSON.parse(attempt.body).pictureReadingEnabled as boolean;
+        this.pictureChangeOrder = markAiReadOrder();
         this.rerankerSettings = { ...this.rerankerSettings, witness: result.witness };
         this.runtimeError = null;
       } catch (error) {
@@ -1420,11 +1423,20 @@ export class BrainSurface extends JfElement {
       this.rerankerApplied = null;
       this.pictureApplied = null;
     }
+    // Another window or a later read can reveal a change this one never received a receipt for.
+    if (this.rerankerSettings?.witness && settings.pictureReadingEnabled !== this.rerankerSettings.pictureReadingEnabled) {
+      this.pictureChangeOrder = markAiReadOrder();
+    }
     this.rerankerSettings = settings;
     this.settings = { ...(settings.ui ?? {}), mode: getUiMode() } as UiSettings;
     // Drafts own their values even after focus moves to another surface. Revisions
     // also cover edits and witnessed saves completed while this read was pending.
     if (llmRevision === this.llmRevision && this.llmPending === 0 && this.llmDrafts.size === 0) this.llm = (settings.llm ?? {}) as LlmSettings;
+  }
+
+  /** Only a runtime read started after the last picture change speaks for it; unknown order never does. */
+  private runtimeReadFollowsPictureChange(): boolean {
+    return (aiRuntimeReadStart(this.runtimeStatus) ?? 0) > this.pictureChangeOrder;
   }
 
   private async refreshAll(): Promise<void> {
@@ -1553,9 +1565,10 @@ export class BrainSurface extends JfElement {
     const pictureFiles = this.modelPresence?.packages?.find(p => p.id === 'chat')?.complete
       ?? this.planPreview?.components?.find(c => c.id === 'chat')?.state === 'installed';
     const pictureMismatch = mmproj === true && pictureChoice === false && this.pictureApplied === null;
+    const pictureModelCannotRead = mmproj === false && this.pictureApplied === null && this.runtimeReadFollowsPictureChange();
     features.pictures = {
       id: 'pictures', label: 'Text in scans and images', selected: this.settingsRead && !!this.rerankerSettings?.witness && (pictureMismatch || pictureChoice),
-      installed: features.chat.installed, active: this.pictureApplied ?? mmproj,
+      installed: features.chat.installed, active: live ? this.pictureApplied ?? mmproj : null,
       availability: features.chat.availability,
       state: !live ? 'Unknown — checking AI status' : !installed ? features.chat.availability === 'unavailable'
         ? 'Text in scans and images is unavailable on this computer'
@@ -1569,6 +1582,7 @@ export class BrainSurface extends JfElement {
         : pictureMismatch ? 'On — the saved Off choice is not applied'
         : !pictureChoice ? 'Off - files and read text kept'
         : !pictureFiles ? 'Unavailable — picture reading files are missing'
+        : pictureModelCannotRead ? PICTURES_NOT_AVAILABLE_WITH_MODEL
         : 'On',
       size: null, switchable: installed,
       blockedReason: !live ? 'Checking AI status before changing features.'
@@ -2309,6 +2323,7 @@ export class BrainSurface extends JfElement {
         const result = await executeSettingsAttempt(
           (path, init) => authorizedFetch(this.base() + path, init), attempt, { timeoutMs: 240_000 });
         this.pictureApplied = enabled;
+        this.pictureChangeOrder = markAiReadOrder();
         this.rerankerSettings = { ...this.rerankerSettings, pictureReadingEnabled: enabled, witness: result.witness };
         this.pictureUncertain = false;
       } catch (error) {

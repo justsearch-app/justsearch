@@ -1,0 +1,387 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-09T21:27:39.182Z",
+  "revision": "e3a479db7d1547a2d31df44c73334c982c31e15d",
+  "tree": "be73aa00ecdc930a9a9a5f5b5c4b863a1d4602e1",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.picture-availability.test.ts\" \"src/shell-v0/state/brainPage.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/1p2h8u55/tmp/test-intent-vitest-5775-1794259650746.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2968
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts#P1 agrees in both switch locations and the sentence on first load",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f06a43d01308e6f13be668ad6e9b0889d0d386a05724dad41138c26c1aa29435",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "saved picture reading with an answer model that cannot read pictures deliver P1 agrees in both switch locations and the sentence on first load",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts#P2 updates live through text-only, picture-reading and text-only models without a reload",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f06a43d01308e6f13be668ad6e9b0889d0d386a05724dad41138c26c1aa29435",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "saved picture reading with an answer model that cannot read pictures deliver P2 updates live through text-only, picture-reading and text-only models without a reload",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts#P2 holds after reopening the surface",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f06a43d01308e6f13be668ad6e9b0889d0d386a05724dad41138c26c1aa29435",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "saved picture reading with an answer model that cannot read pictures deliver P2 holds after reopening the surface",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts#P2 holds across an engine restart once the engine reports the model again",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f06a43d01308e6f13be668ad6e9b0889d0d386a05724dad41138c26c1aa29435",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "saved picture reading with an answer model that cannot read pictures deliver P2 holds across an engine restart once the engine reports the model again",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts#P5 a read started before an On receipt cannot show not available or clear the transition",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f06a43d01308e6f13be668ad6e9b0889d0d386a05724dad41138c26c1aa29435",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "saved picture reading with an answer model that cannot read pictures deliver P5 a read started before an On receipt cannot show not available or clear the transition",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts#P5 a read started after the receipt does show not available in both presentations",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f06a43d01308e6f13be668ad6e9b0889d0d386a05724dad41138c26c1aa29435",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "saved picture reading with an answer model that cannot read pictures deliver P5 a read started after the receipt does show not available in both presentations",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts#P5 a read started before an Off receipt keeps Off instead of the saved-Off mismatch",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f06a43d01308e6f13be668ad6e9b0889d0d386a05724dad41138c26c1aa29435",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "saved picture reading with an answer model that cannot read pictures deliver P5 a read started before an Off receipt keeps Off instead of the saved-Off mismatch",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts#P5 repeated switching judges a delayed read against the latest receipt",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f06a43d01308e6f13be668ad6e9b0889d0d386a05724dad41138c26c1aa29435",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "saved picture reading with an answer model that cannot read pictures deliver P5 repeated switching judges a delayed read against the latest receipt",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts#P5 leaving the screen mid-operation keeps the ordering",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f06a43d01308e6f13be668ad6e9b0889d0d386a05724dad41138c26c1aa29435",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "saved picture reading with an answer model that cannot read pictures deliver P5 leaving the screen mid-operation keeps the ordering",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts#P5 a second window that learns the choice from settings ignores a read started before it did",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f06a43d01308e6f13be668ad6e9b0889d0d386a05724dad41138c26c1aa29435",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "saved picture reading with an answer model that cannot read pictures deliver P5 a second window that learns the choice from settings ignores a read started before it did",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts#P6 receipt then offline stops claiming the transition and recovers truthfully",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f06a43d01308e6f13be668ad6e9b0889d0d386a05724dad41138c26c1aa29435",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "saved picture reading with an answer model that cannot read pictures deliver P6 receipt then offline stops claiming the transition and recovers truthfully",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts#P6 receipt then a failed restart ends unconfirmed and recovers with a fresh read",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f06a43d01308e6f13be668ad6e9b0889d0d386a05724dad41138c26c1aa29435",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "saved picture reading with an answer model that cannot read pictures deliver P6 receipt then a failed restart ends unconfirmed and recovers with a fresh read",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts#P6 a failed restart that still committed the choice converges on a later settings read",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f06a43d01308e6f13be668ad6e9b0889d0d386a05724dad41138c26c1aa29435",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "saved picture reading with an answer model that cannot read pictures deliver P6 a failed restart that still committed the choice converges on a later settings read",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts#P6 a refused change keeps the saved choice and the next read still reports the model",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f06a43d01308e6f13be668ad6e9b0889d0d386a05724dad41138c26c1aa29435",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "saved picture reading with an answer model that cannot read pictures deliver P6 a refused change keeps the saved choice and the next read still reports the model",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts#P6 an interrupted change reports uncertainty, then ends on what a fresh read shows",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f06a43d01308e6f13be668ad6e9b0889d0d386a05724dad41138c26c1aa29435",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "saved picture reading with an answer model that cannot read pictures deliver P6 an interrupted change reports uncertainty, then ends on what a fresh read shows",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts#P6 a reconciled receipt is ordered like a direct one",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f06a43d01308e6f13be668ad6e9b0889d0d386a05724dad41138c26c1aa29435",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "saved picture reading with an answer model that cannot read pictures deliver P6 a reconciled receipt is ordered like a direct one",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/brainPage.test.ts#says picture reading is on but not available with this answer model when the feature state does",
+      "file": "modules/ui-web/src/shell-v0/state/brainPage.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ebf82091b09b0c824f0e137b85d338eca519b9dd4d34db740b37bdae0fbf2164",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Brain sentence from observed state and saved choice says picture reading is on but not available with this answer model when the feature state does",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "e3a479db7d",
+    "revision": "e3a479db7d1547a2d31df44c73334c982c31e15d",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.picture-availability.test.ts\" \"src/shell-v0/state/brainPage.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/1p2h8u55/tmp/test-intent-vitest-5775-1794259655777.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 3078,
+        "output": "JSON report written to /home/elias/.cache/am/1p2h8u55/tmp/test-intent-vitest-5775-1794259655777.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts#P1 agrees in both switch locations and the sentence on first load",
+        "classification": "assertion",
+        "detail": "saved picture reading with an answer model that cannot read pictures deliver P1 agrees in both switch locations and the sentence on first load:  AssertionError: expected { path: 'On', …(3) } to match object { …(4) }\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/windowfix-w2/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:10)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/work"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts#P2 updates live through text-only, picture-reading and text-only models without a reload",
+        "classification": "assertion",
+        "detail": "saved picture reading with an answer model that cannot read pictures deliver P2 updates live through text-only, picture-reading and text-only models without a reload:  AssertionError: expected { path: 'On', …(3) } to match object { …(4) }\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/windowfix-w2/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:10)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/work"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts#P2 holds after reopening the surface",
+        "classification": "assertion",
+        "detail": "saved picture reading with an answer model that cannot read pictures deliver P2 holds after reopening the surface:  AssertionError: expected { path: 'On', …(3) } to match object { …(4) }\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/windowfix-w2/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:10)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/work"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts#P2 holds across an engine restart once the engine reports the model again",
+        "classification": "assertion",
+        "detail": "saved picture reading with an answer model that cannot read pictures deliver P2 holds across an engine restart once the engine reports the model again:  AssertionError: expected { path: 'On', …(3) } to match object { …(4) }\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/windowfix-w2/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:10)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/work"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts#P5 a read started before an On receipt cannot show not available or clear the transition",
+        "classification": "assertion",
+        "detail": "saved picture reading with an answer model that cannot read pictures deliver P5 a read started before an On receipt cannot show not available or clear the transition:  AssertionError: expected { path: 'On', …(3) } to match object { path: 'On', …(3) }\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/windowfix-w2/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:10)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts#P5 a read started after the receipt does show not available in both presentations",
+        "classification": "assertion",
+        "detail": "saved picture reading with an answer model that cannot read pictures deliver P5 a read started after the receipt does show not available in both presentations:  AssertionError: expected { path: 'On', …(3) } to match object { …(4) }\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/windowfix-w2/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:10)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/work"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts#P5 a read started before an Off receipt keeps Off instead of the saved-Off mismatch",
+        "classification": "assertion",
+        "detail": "saved picture reading with an answer model that cannot read pictures deliver P5 a read started before an Off receipt keeps Off instead of the saved-Off mismatch:  AssertionError: expected { …(4) } to match object { …(2) }\n(2 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/windowfix-w2/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:10)\n    at Proxy.<anonymous> (file:///home/e"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts#P5 repeated switching judges a delayed read against the latest receipt",
+        "classification": "assertion",
+        "detail": "saved picture reading with an answer model that cannot read pictures deliver P5 repeated switching judges a delayed read against the latest receipt:  AssertionError: expected { path: 'On', …(3) } to match object { path: 'On', …(3) }\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/windowfix-w2/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:10)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts#P5 leaving the screen mid-operation keeps the ordering",
+        "classification": "assertion",
+        "detail": "saved picture reading with an answer model that cannot read pictures deliver P5 leaving the screen mid-operation keeps the ordering:  AssertionError: expected { path: 'On', …(3) } to match object { path: 'On', …(3) }\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/windowfix-w2/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:10)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts#P5 a second window that learns the choice from settings ignores a read started before it did",
+        "classification": "assertion",
+        "detail": "saved picture reading with an answer model that cannot read pictures deliver P5 a second window that learns the choice from settings ignores a read started before it did:  AssertionError: expected { path: 'On', …(3) } to match object { …(4) }\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/windowfix-w2/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:10)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/work"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts#P6 receipt then offline stops claiming the transition and recovers truthfully",
+        "classification": "assertion",
+        "detail": "saved picture reading with an answer model that cannot read pictures deliver P6 receipt then offline stops claiming the transition and recovers truthfully:  AssertionError: expected 'true' to be 'false' // Object.is equality\n    at /home/elias/.cache/am/1p2h8u55/tmp/test-intent-before-w3TqL7/modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts:233:28\n    at file:///home/elias/dev/justsearch/.claude/worktrees/windowfix-w2/modules/u"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts#P6 receipt then a failed restart ends unconfirmed and recovers with a fresh read",
+        "classification": "assertion",
+        "detail": "saved picture reading with an answer model that cannot read pictures deliver P6 receipt then a failed restart ends unconfirmed and recovers with a fresh read:  AssertionError: expected { path: 'On', …(3) } to match object { …(4) }\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/windowfix-w2/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:10)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/work"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts#P6 a failed restart that still committed the choice converges on a later settings read",
+        "classification": "assertion",
+        "detail": "saved picture reading with an answer model that cannot read pictures deliver P6 a failed restart that still committed the choice converges on a later settings read:  AssertionError: expected { path: 'On', …(3) } to match object { …(4) }\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/windowfix-w2/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:10)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/work"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts#P6 a refused change keeps the saved choice and the next read still reports the model",
+        "classification": "assertion",
+        "detail": "saved picture reading with an answer model that cannot read pictures deliver P6 a refused change keeps the saved choice and the next read still reports the model:  AssertionError: expected { path: 'On', …(3) } to match object { …(4) }\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/windowfix-w2/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:10)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/work"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts#P6 an interrupted change reports uncertainty, then ends on what a fresh read shows",
+        "classification": "assertion",
+        "detail": "saved picture reading with an answer model that cannot read pictures deliver P6 an interrupted change reports uncertainty, then ends on what a fresh read shows:  AssertionError: expected { path: 'On', …(3) } to match object { …(4) }\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/windowfix-w2/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:10)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/work"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts#P6 a reconciled receipt is ordered like a direct one",
+        "classification": "assertion",
+        "detail": "saved picture reading with an answer model that cannot read pictures deliver P6 a reconciled receipt is ordered like a direct one:  AssertionError: expected { …(4) } to match object { path: 'On', …(1) }\n(2 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/windowfix-w2/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:10)\n    at Proxy.<anonymous> (fi"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/brainPage.test.ts#says picture reading is on but not available with this answer model when the feature state does",
+        "classification": "assertion",
+        "detail": "Brain sentence from observed state and saved choice says picture reading is on but not available with this answer model when the feature state does:  AssertionError: expected '. It doesn\\'t read text in scans and …' to be '. Text in scans and images: On — not …' // Object.is equality\n    at /home/elias/.cache/am/1p2h8u55/tmp/test-intent-before-w3TqL7/modules/ui-web/src/shell-v0/state/brainPage.test.ts:47:67\n    at file:///home/elias/dev/justsearc"
+      }
+    ]
+  },
+  "digest": "sha256:f27d753c3cb6e6e5f1a861f72aed79ca2fe292d5ad30484619386c271f74b2d3"
+}
