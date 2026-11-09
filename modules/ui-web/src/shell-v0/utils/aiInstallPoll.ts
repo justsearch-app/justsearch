@@ -137,6 +137,9 @@ let inFlight: Promise<void> | null = null;
 let queuedRefresh: Promise<void> | null = null;
 let apiBase = '';
 let last: AiInstallSnapshot = { install: null, runtime: null, packs: null };
+// In-page read order only: never persisted, sent, or reset, so it stays comparable across restarts of the poller.
+let readOrder = 0;
+const runtimeReadStarts = new WeakMap<AiRuntimeStatus, number>();
 
 // Matches the original per-operation pollers' cadence (1s) while something is actually happening —
 // this poller is always-on rather than conditionally-armed, but that must not make download /
@@ -169,6 +172,16 @@ export function pollIntervalFor(snapshot: AiInstallSnapshot): number {
   if (snapshot.runtime?.activation?.state === 'running') return FAST_INTERVAL_MS;
   if (snapshot.packs?.state === 'running') return FAST_INTERVAL_MS;
   return SLOW_INTERVAL_MS;
+}
+
+/** A position in read-start order: only reads started after this call sort above it. */
+export function markAiReadOrder(): number {
+  return ++readOrder;
+}
+
+/** Where the read that produced this runtime object started; undefined means its order is unknown. */
+export function aiRuntimeReadStart(runtime: AiRuntimeStatus | null): number | undefined {
+  return runtime ? runtimeReadStarts.get(runtime) : undefined;
 }
 
 /** Completed reads own observation validity; pending reads defer to app-wide liveness. */
@@ -221,8 +234,10 @@ function publish(current: AbortController): void {
 }
 
 async function readStatus(key: 'install' | 'runtime' | 'packs', current: AbortController): Promise<void> {
+  const startedAt = markAiReadOrder();
   const value = await fetchJson<NonNullable<AiInstallSnapshot[typeof key]>>(`/api/ai/${key}/status`, current.signal);
   if (controller !== current) return;
+  if (key === 'runtime' && typeof value === 'object' && value !== null) runtimeReadStarts.set(value as AiRuntimeStatus, startedAt);
   // A failed read retains history but immediately invalidates its observation.
   const observationKey = `${key}Observation` as const;
   last = { ...last, [key]: value ?? last[key], [observationKey]: {
