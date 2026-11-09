@@ -12,7 +12,7 @@ related:
 
 ## §A. Problem
 
-The Release Scorecard states its own boundary: it measures retrieval ranking quality and
+**Historical projections (2026-11-09):** `bootstrap_ci`, `rank_diff` and `stratified_metrics` generators/tests are retired; references below describe past implementations and captured evidence. The Release Scorecard states its own boundary: it measures retrieval ranking quality and
 "does NOT measure document extraction / OCR / VDU routing quality" (623 §F). But the
 product's promise is search over real, messy files — PDFs, scans, office docs — where
 extraction quality upper-bounds everything downstream. The measurement assets exist and are

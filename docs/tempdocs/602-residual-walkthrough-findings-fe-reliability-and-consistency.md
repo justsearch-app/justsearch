@@ -8,7 +8,7 @@ author: agent
 
 # 602 — Residual 593-walkthrough findings (the un-homed remainder)
 
-> **Scope of this doc (for now):** a CATALOG only — each item is a one/two-sentence problem
+> **Historical projections (2026-11-09):** `bootstrap_ci`, `rank_diff` and `stratified_metrics` generators/tests are retired; references below describe past implementations and captured evidence. **Scope of this doc (for now):** a CATALOG only — each item is a one/two-sentence problem
 > statement with a severity and a `593` citation. **No design, no implementation detail.** Several
 > clusters could each spin into their own focused doc later; this exists so the findings are not
 > lost when 593's coverage map goes stale.
