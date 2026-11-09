@@ -1,0 +1,105 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-09T02:24:12.432Z",
+  "revision": "f0c67d9652ac5b6ac6a88084ce0810f9a6fc073c",
+  "tree": "0988dbb85ffbd32fa7f79a6c160dc54f1ad34a7d",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-observability:test --tests \"io.justsearch.app.observability.operations.OperationAdmissionRunnerTest\" --tests \"io.justsearch.app.observability.operations.SqliteOperationStoreTransactionFailureTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3652
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationAdmissionRunnerTest.java",
+      "file": "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationAdmissionRunnerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:514a5bb486c2fd25504d37255d1048c6fb095262b90698194f1c5ecc6440c162",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "preparedAdmissionConsumesTheExactPendingNonce()",
+          "status": "passed"
+        },
+        {
+          "name": "acceptanceScopeIsSingleUseThreadBoundAndClosedAfterCallback()",
+          "status": "passed"
+        },
+        {
+          "name": "terminalRetryAndChangedInputNeverReserveAndCompletionCanReenter()",
+          "status": "passed"
+        },
+        {
+          "name": "reservationRefusalLeavesNoRowAndTheKeyCanRetry()",
+          "status": "passed"
+        },
+        {
+          "name": "concurrentSameKeyReservesAndAcceptsExactlyOnce()",
+          "status": "passed"
+        },
+        {
+          "name": "recoveryOwnerRequirementAcceptsOnlyDeclaredKinds()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/SqliteOperationStoreTransactionFailureTest.java",
+      "file": "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/SqliteOperationStoreTransactionFailureTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:04d371f8e15c1b4c44452b6000f2a34115cbae6398cf207d7f700c3c2e488d65",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] sql",
+          "status": "passed"
+        },
+        {
+          "name": "[2] runtime",
+          "status": "passed"
+        },
+        {
+          "name": "[3] error",
+          "status": "passed"
+        },
+        {
+          "name": "terminalWriteErrorEscapesWithoutPublishingSuccess()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] sql",
+          "status": "passed"
+        },
+        {
+          "name": "[2] runtime",
+          "status": "passed"
+        },
+        {
+          "name": "[3] error",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:456dc6d6b3e1e82abc89e9df897fb19fbf52d89488355eb64fd63cdd4b2463ce"
+}

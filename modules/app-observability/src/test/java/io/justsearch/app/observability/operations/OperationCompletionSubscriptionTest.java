@@ -19,6 +19,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -33,6 +35,7 @@ final class OperationCompletionSubscriptionTest {
     Path path = temp.resolve("operations.db");
     try (var store = new SqliteOperationStore(path); var reader = Executors.newSingleThreadExecutor()) {
       List<OperationRecord> observed = new ArrayList<>();
+      var verificationFailure = new AtomicReference<Throwable>();
       try (var _ = store.subscribeCompletions(row -> {
         try {
           // A second connection proves the transition is committed, not just visible to its writer.
@@ -47,8 +50,8 @@ final class OperationCompletionSubscriptionTest {
           // A different thread using the same owner proves its lock is no longer held.
           assertEquals(row, reader.submit(() -> store.find(row.key()).orElseThrow()).get(2, TimeUnit.SECONDS));
           observed.add(row);
-        } catch (Exception failure) {
-          throw new AssertionError("Completion must be committed and unlocked", failure);
+        } catch (Throwable failure) {
+          verificationFailure.compareAndSet(null, failure);
         }
       })) {
         for (var kind : List.of(OperationKind.MEMORY, OperationKind.NOTE)) {
@@ -57,6 +60,7 @@ final class OperationCompletionSubscriptionTest {
           assertTrue(store.start(row.id()));
           assertEquals(before, observed.size(), "acceptance/start are not terminal notifications");
           var completed = store.finish(row.id(), OperationState.COMPLETE, receipt()).orElseThrow();
+          assertNull(verificationFailure.get(), "Completion must be committed and unlocked");
           assertEquals(completed, observed.getLast());
           assertTrue(store.finish(row.id(), OperationState.COMPLETE, receipt()).isEmpty());
         }
@@ -65,6 +69,96 @@ final class OperationCompletionSubscriptionTest {
       var later = accept(store, OperationKind.MEMORY);
       store.finish(later.id(), OperationState.COMPLETE, receipt());
       assertEquals(2, observed.size(), "closing a subscription removes it");
+    }
+  }
+
+  @Test
+  void observerAssertionCannotChangeDirectCompletionOrPreventHealthyObservers() throws Exception {
+    assertObserverAssertionIsolated(false);
+  }
+
+  @Test
+  void observerAssertionCannotChangeWinningRejectionOrPreventHealthyObservers() throws Exception {
+    assertObserverAssertionIsolated(true);
+  }
+
+  private void assertObserverAssertionIsolated(boolean rejection) throws Exception {
+    Path path = temp.resolve("observer-assertion.db");
+    List<OperationRecord> before = new ArrayList<>();
+    List<OperationRecord> after = new ArrayList<>();
+    OperationRecord terminal;
+    OperationRecord returned = null;
+    AssertionError publicationFailure = null;
+    var expectedReceipt = new OperationReceipt(rejection ? "CAPACITY" : "SUCCESS", "committed-effect");
+    try (var store = new SqliteOperationStore(path);
+        var _ = store.subscribeCompletions(before::add);
+        var _ = store.subscribeCompletions(row -> { throw new AssertionError("observer assertion"); });
+        var _ = store.subscribeCompletions(after::add)) {
+      var accepted = accept(store, OperationKind.NOTE);
+      if (!rejection) {
+        assertTrue(store.start(accepted.id()));
+        assertTrue(store.checkpoint(accepted.id(), "unit-7", 7, 2));
+      }
+      try {
+        returned = rejection ? store.rejectBeforeStart(accepted.id(), expectedReceipt)
+            : store.finish(accepted.id(), OperationState.COMPLETE, expectedReceipt).orElseThrow();
+      } catch (AssertionError failure) {
+        publicationFailure = failure;
+      }
+      terminal = store.find(accepted.key()).orElseThrow();
+      assertEquals(rejection ? OperationState.FAILED : OperationState.COMPLETE, terminal.state());
+      assertEquals(expectedReceipt, terminal.receipt());
+      assertEquals(rejection ? 0 : 7, terminal.unitsCompleted());
+      assertEquals(rejection ? 0 : 2, terminal.unitsFailed());
+      assertEquals(rejection ? 0 : 1, terminal.attempts());
+      assertCommitted(path, terminal);
+      assertEquals(terminal, store.rejectBeforeStart(accepted.id(), receipt()));
+      assertTrue(store.finish(accepted.id(), OperationState.CANCELLED, receipt()).isEmpty());
+      assertEquals(terminal, store.find(accepted.key()).orElseThrow());
+    }
+    try (var reopened = new SqliteOperationStore(path)) {
+      assertEquals(terminal, reopened.find(terminal.key()).orElseThrow());
+    }
+    assertNull(publicationFailure, "Observer escaped after durable terminal commit: " + terminal);
+    assertEquals(terminal, returned);
+    assertEquals(List.of(terminal), before);
+    assertEquals(List.of(terminal), after);
+  }
+
+  @Test
+  void capturedObserverVerificationRejectsADeliberatelyWrongCommittedState() throws Exception {
+    var verificationFailure = new AtomicReference<Throwable>();
+    try (var store = new SqliteOperationStore(temp.resolve("oracle.db"));
+        var _ = store.subscribeCompletions(row -> {
+          try {
+            assertEquals(OperationState.RUNNING, row.state(), "deliberately violated terminal oracle");
+          } catch (Throwable failure) {
+            verificationFailure.compareAndSet(null, failure);
+          }
+        })) {
+      var accepted = accept(store, OperationKind.NOTE);
+      assertDoesNotThrow(() -> store.finish(accepted.id(), OperationState.COMPLETE, receipt()));
+      assertInstanceOf(AssertionError.class, verificationFailure.get());
+      assertThrows(AssertionError.class,
+          () -> assertNull(verificationFailure.get(), "Completion must be committed and unlocked"));
+    }
+  }
+
+  private static void assertCommitted(Path path, OperationRecord expected) throws Exception {
+    try (var db = DriverManager.getConnection("jdbc:sqlite:" + path);
+        var query = db.prepareStatement("SELECT * FROM operations WHERE id = ?")) {
+      query.setLong(1, expected.id());
+      try (var row = query.executeQuery()) {
+        assertTrue(row.next());
+        assertEquals(expected.key(), row.getString("operation_key"));
+        assertEquals(expected.state().name(), row.getString("state"));
+        assertEquals(expected.receipt(), new ObjectMapper().readValue(row.getString("result_json"), OperationReceipt.class));
+        assertEquals(expected.unitsCompleted(), row.getLong("units_completed"));
+        assertEquals(expected.unitsFailed(), row.getLong("units_failed"));
+        assertEquals(expected.attempts(), row.getInt("attempts"));
+        assertEquals(expected.completedAt().longValue(), row.getLong("completed_at"));
+        assertFalse(row.next());
+      }
     }
   }
 
