@@ -12,7 +12,7 @@ related:
   - 741-eval-corpora-are-derived-artifacts
 ---
 
-> Charter. Execute after 766 §B (D2/D3/D4/D5/D8) and 762 §X.6.1/.3. The
+> **Agent campaign freeze (2026-11-09):** Fresh and resumed live agent campaigns are frozen. Campaign commands and runbooks are retained for historical reproduction and offline analysis; published evidence and offline replay remain available. The campaign plans and launch/resume instructions below are historical and do not authorize campaign work. Charter. Execute after 766 §B (D2/D3/D4/D5/D8) and 762 §X.6.1/.3. The
 > injection machinery, determinism proofs, and certification framework
 > already exist — this lane replaces the PAYLOAD and adds GATES.
 

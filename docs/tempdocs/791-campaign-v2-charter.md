@@ -1,5 +1,5 @@
 ---
-status: "chartered (2026-07-28) as the SINGLE design home for the next agent-utility campaign. Design work licensed; ALL measured spend founder-gated. Nothing here is frozen — this charter collects the design axes so the eventual preregistration (a successor to 782 §E) freezes ONE coherent protocol instead of five conflicting ones. Source evidence: register F-043, 782 §I/§J, tmp/hero-arc-analysis/."
+status: "Historical/frozen 2026-11-09 — next agent-utility campaign charter retained for reference; fresh and resumed live campaigns are frozen. Original charter dated 2026-07-28; source evidence: register F-043, 782 §I/§J, tmp/hero-arc-analysis/."
 created: 2026-07-28
 ---
 
@@ -7,7 +7,7 @@ created: 2026-07-28
 
 ## What v1 (782) established, in campaign-design terms
 
-Accepted/adoption-only at sonnet, addition arm, 1k–10k fabricated 2-hop corpora, $0.80/cell:
+**Agent campaign freeze (2026-11-09):** Fresh and resumed live agent campaigns are frozen. Campaign commands and runbooks are retained for historical reproduction and offline analysis; published evidence and offline replay remain available. The campaign plans and launch/resume instructions below are historical and do not authorize campaign work. Accepted/adoption-only at sonnet, addition arm, 1k–10k fabricated 2-hop corpora, $0.80/cell:
 adoption 1.0; no accuracy benefit; question-level negative NOT significant anywhere; the
 mechanism is delivery-shape (hop-1 satisficing + abstention miscalibration), not retrieval;
 the baseline arm degrades −5.8 pts under 10× scale while the tool arm is flat; exhaustion

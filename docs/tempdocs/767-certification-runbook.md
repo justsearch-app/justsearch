@@ -7,7 +7,7 @@ companion-to: 767-camouflaged-injection-corpus-lane.md
 
 # 767 — Certification runbook: the paid and GPU-backed gates
 
-Working appendix to `767-camouflaged-injection-corpus-lane.md` §N.4. Covers the only remaining
+**Agent campaign freeze (2026-11-09):** Fresh and resumed live agent campaigns are frozen. Campaign commands and runbooks are retained for historical reproduction and offline analysis; published evidence and offline replay remain available. The campaign plans and launch/resume instructions below are historical and do not authorize campaign work. Working appendix to `767-camouflaged-injection-corpus-lane.md` §N.4. Covers the only remaining
 certification work for `en-legal-clerc` and `en-email-enron-raw`: the paid `closed_book` gate and
 the three backend-bound gates (`retrieval_calibration`, `union_recall`, `leak_floor`).
 

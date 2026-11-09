@@ -15,7 +15,7 @@ related:
   - 625-asserted-measurement-provenance            # the generalized projection-not-fork principle; 719 builds only this concrete instance
 ---
 
-> NOTE: Noncanonical working tempdoc. The opening stub is retained as history but is superseded by the
+> **Agent campaign freeze (2026-11-09):** Fresh and resumed live agent campaigns are frozen. Campaign commands and runbooks are retained for historical reproduction and offline analysis; published evidence and offline replay remain available. The campaign plans and launch/resume instructions below are historical and do not authorize campaign work. NOTE: Noncanonical working tempdoc. The opening stub is retained as history but is superseded by the
 > takeover, research, and settled-design sections below. Verify every cited number against the named
 > records before building on it. Historical proposal language below is retained for auditability;
 > the current implementation authority is the fold immediately below.

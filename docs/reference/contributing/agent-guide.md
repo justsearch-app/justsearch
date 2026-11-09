@@ -7,6 +7,8 @@ description: "Development workflows, static analysis, and testing reference for 
 
 # Development Guide
 
+**Agent campaign freeze (2026-11-09):** Fresh and resumed live agent campaigns are frozen. Campaign commands and runbooks are retained for historical reproduction and offline analysis; published evidence and offline replay remain available.
+
 ## 1. Configuration & Single Source of Truth (SSOT)
 
 ### 1.1. The Golden Rule: Inversion of Control
@@ -531,12 +533,15 @@ gate:
 - `onramp-smoke.yml` for the model-less Tier 0 first-success proof;
   `ci-walltime-trend.yml` for CI wall-time trend reporting.
 
-After changes to query orchestration, fusion weights, reranking, or anything
-that could shift nDCG@10, re-run the arm and compare (no workflow wraps it):
-`python -m jseval run --start-backend --dataset <slug> --modes full`, then
-`python -m jseval relevance-gate --dataset <slug>` against its pinned floor.
-There is no calibrated σ to compare against — tempdoc 930 §18.1 row 7 removed
-the cohort-envelope machinery, which never produced a baseline.
+Before merging changes to ranking, query handling, chunking, extraction or models,
+including configuration that changes those behaviors, require a complete valid default
+quality-check PASS for the exact final clean, committed candidate:
+`python -m jseval quality check --window-seconds 600` with prepared inputs and baselines.
+Run the full default quick-check set: SciFact300, MIRACL-de305, real-use309 and Enron50.
+A proper subset, dirty/stale/incomplete/confounded run, `INVALID`/`INCONCLUSIVE` result,
+baseline creation, ablation or sensitivity PASS is insufficient. Re-evaluate after any
+candidate change. See [pre-merge checks](pre-merge-checks.md#required-quality-check-for-search-behavior).
+Tooling-only and documentation-only changes do not automatically require this run.
 
 The `agent-live-eval-nightly.yml`, `rr219-resilience-governance-nightly.yml`,
 `rr219-resilience-soak-weekly.yml`, `track-g-report-win.yml`, and

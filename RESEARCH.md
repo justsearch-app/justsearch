@@ -1,5 +1,7 @@
 # Research
 
+**Agent campaign freeze (2026-11-09):** Fresh and resumed live agent campaigns are frozen. Campaign commands and runbooks are retained for historical reproduction and offline analysis; published evidence and offline replay remain available.
+
 JustSearch is also a research project about how people and AI agents find, read and use
 what is in their files. Its purpose is findings that make JustSearch better: every question
 is tested in JustSearch itself, and its answer could change it.

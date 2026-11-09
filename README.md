@@ -188,6 +188,8 @@ For what JustSearch's research project studies and the evidence published so far
 
 ### Agent-utility publication status
 
+**Agent campaign freeze (2026-11-09):** Fresh and resumed live agent campaigns are frozen. Campaign commands and runbooks are retained for historical reproduction and offline analysis; published evidence and offline replay remain available.
+
 Separate from retrieval quality above, we also measure *agent utility* (does an agent with JustSearch tools
 answer better than one without?) under a fail-closed publication policy:
 

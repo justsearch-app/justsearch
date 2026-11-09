@@ -23,7 +23,7 @@ related:
   - 674-cross-family-grader-local-model-infrastructure  # prices and designs the real engineering cost of the local-model path for §M.8 item 3, previously recorded as a free footnote in this tempdoc
 ---
 
-> NOTE: Noncanonical working tempdoc. Originated as a **STUB** capturing an idea identified in
+> **Agent campaign freeze (2026-11-09):** Fresh and resumed live agent campaigns are frozen. Campaign commands and runbooks are retained for historical reproduction and offline analysis; published evidence and offline replay remain available. The campaign plans and launch/resume instructions below are historical and do not authorize campaign work. **Historical projections (2026-11-09):** `bootstrap_ci`, `rank_diff` and `stratified_metrics` generators/tests are retired; references below describe past implementations and captured evidence. NOTE: Noncanonical working tempdoc. Originated as a **STUB** capturing an idea identified in
 > `docs/business/research-channel/plan.md` (decision 1 + deferred work). **Investigated 2026-06-21**
 > (§Investigation below) — primary-source verification against `main` + external-landscape research.
 > The §Problem…§Next-step above is the original stub; the §Investigation that follows verifies its
