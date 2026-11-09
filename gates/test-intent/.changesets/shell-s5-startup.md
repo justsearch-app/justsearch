@@ -27,7 +27,9 @@ assertions are unchanged by that setup allowance. All nine CI flow names remain 
 
 SA6 exercises real shell controls rendered beneath the frame while the first-render
 completion promise is held. Inert remains on the application; a window capture guard,
-registered before attachment, stops immediate propagation without preventing browser defaults.
+registered before attachment, stops immediate propagation. The input checks require no
+application effect for every covered event; only F5 and Ctrl+R are required to retain
+uncancelled browser defaults. Other covered defaults may be cancelled by a correct implementation.
 The listener inventory in `modules/ui-web/src` confirms the specified key, pointer, mouse,
 wheel, touch, input and drag events, including document mouseenter/mouseleave in
 `HoverPreviewHost.ts`, window scroll there, mouse Back/Forward in `Shell.ts`, window
@@ -58,8 +60,8 @@ the page; Reload starts again. What happens after that first render (navigation 
 Search loading) is the shell's own loading state, a named limit here.”
 
 The complete frame file passed all 67 checks on the repaired tree. Against isolated
-candidate `5ef0ec6cc32d53dfadc84f12ced4e43b7335d979`, the same checks passed 60 and failed
-seven by assertion: every input path leaked at window/document, shortcuts reached the
+candidate `5ef0ec6cc32d53dfadc84f12ced4e43b7335d979`, all seven named regression checks still
+failed by assertion: every input path leaked at window/document, shortcuts reached the
 shell, pointer events reached global listeners, failure retained rendered or unrendered
 shells, and late mounting waited for rendering. `shell-s5-frame-inert.json` records the
 whole-file result and each of these seven named assertion failures. It replaces the older
@@ -84,14 +86,16 @@ runs received `--maxWorkers=4`; before checkouts were shared clones under TMPDIR
 worktrees registered in the source repository. Dependencies were linked package by package,
 leaving each clone its own writable cache directories. No test or result was intercepted.
 
-Final validation for this repair: `npm run typecheck` and `npm run lint` exited 0.
+Final validation after removing the extra default-cancellation constraints:
+`npm run typecheck` and `npm run lint` exited 0.
 The single final-tree `npx vitest run --maxWorkers=4` passed 735 files / 9,354 tests
-in 139.12 seconds. Each boot suite ran separately with `vitest.config.lockdown.ts`
-against its own production build: frame 67/67, original boot lockdown 5/5. Both official
-evidence producer invocations exited 0; the unchanged appearance-restoration file passed
-7/7. The initial producer attempt exited 2 because the temporary Git wrapper did not
-recognise leading Git configuration arguments; correcting that wrapper allowed the shared
-clone run to complete, with no application or check change. `.agents/preflight` is absent.
+in 153.05 seconds. Both official evidence producer invocations exited 0. Each ran the
+frame suite with `vitest.config.lockdown.ts` against its own production build: 67/67
+passed in both runs. The unchanged appearance-restoration file passed 7/7. The before
+run on `5ef0ec6cc32d53dfadc84f12ced4e43b7335d979` retained assertion failures in all seven
+named regression checks, including application input reaching window/document listeners.
+The F5 and Ctrl+R default assertions remain unchanged and passed at all three stages.
+`.agents/preflight` is absent. No product file changed.
 All browser runs were headless. Checks owned their preview servers, browser contexts and
 HTTP fixtures; no shared dev stack was started or used, and no dependency cache was cleared.
 The governance check against `276da8de3f` reports only the missing independent acceptance

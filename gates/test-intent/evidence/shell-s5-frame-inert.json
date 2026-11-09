@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-09T22:29:33.643Z",
-  "revision": "5ef0ec6cc32d53dfadc84f12ced4e43b7335d979",
-  "tree": "ad8d7451b1cdae21f2d485dc2e6bb99779a0595c",
+  "createdAt": "2026-11-09T23:04:59.164Z",
+  "revision": "425fb82607f6c0bf8ceb0614dcaa46a43c219fa1",
+  "tree": "079922afaf653c3d8d6a5476e6da15f6f408c6d3",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/boot/boot-frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/6m4wk3h8/tmp/test-intent-vitest-5-1794263241597.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/boot/boot-frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/91eedicj/tmp/test-intent-vitest-6-1794265358609.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 62058
+      "durationMs": 73886
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:32f55b9ec992d9e0b927c7d9e0fc3bf5e7e814a19164a3fe6988f42f38330d7c",
+      "contentDigest": "sha256:f1d6856c9834080c2ff354740f9f89aff1764c3ad4a768f9bdccff50a3b3060c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -308,7 +308,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SA6 never-rendering shell stays unreachable and deadline Reload takes focus",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:32f55b9ec992d9e0b927c7d9e0fc3bf5e7e814a19164a3fe6988f42f38330d7c",
+      "contentDigest": "sha256:f1d6856c9834080c2ff354740f9f89aff1764c3ad4a768f9bdccff50a3b3060c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -323,7 +323,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SA6 every input path is stopped at window capture under the frame and released after paint",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:32f55b9ec992d9e0b927c7d9e0fc3bf5e7e814a19164a3fe6988f42f38330d7c",
+      "contentDigest": "sha256:f1d6856c9834080c2ff354740f9f89aff1764c3ad4a768f9bdccff50a3b3060c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -338,7 +338,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SA6 shell shortcuts neither run nor queue beneath the frame, then normal shortcuts work",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:32f55b9ec992d9e0b927c7d9e0fc3bf5e7e814a19164a3fe6988f42f38330d7c",
+      "contentDigest": "sha256:f1d6856c9834080c2ff354740f9f89aff1764c3ad4a768f9bdccff50a3b3060c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -353,7 +353,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SA6 pointer hover wheel context menu and mouse Back/Forward cannot reach the covered shell",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:32f55b9ec992d9e0b927c7d9e0fc3bf5e7e814a19164a3fe6988f42f38330d7c",
+      "contentDigest": "sha256:f1d6856c9834080c2ff354740f9f89aff1764c3ad4a768f9bdccff50a3b3060c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -368,7 +368,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SA6 SA17 deadline discards rendered controls; failure page alone handles input and keyboard actions",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:32f55b9ec992d9e0b927c7d9e0fc3bf5e7e814a19164a3fe6988f42f38330d7c",
+      "contentDigest": "sha256:f1d6856c9834080c2ff354740f9f89aff1764c3ad4a768f9bdccff50a3b3060c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -383,7 +383,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SA10 SA17 60-second deadline discards an attached shell even when rendering later completes",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:32f55b9ec992d9e0b927c7d9e0fc3bf5e7e814a19164a3fe6988f42f38330d7c",
+      "contentDigest": "sha256:f1d6856c9834080c2ff354740f9f89aff1764c3ad4a768f9bdccff50a3b3060c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -398,7 +398,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SA10 stalled catalog discovery raises failure and late mount replaces it before rendering",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:32f55b9ec992d9e0b927c7d9e0fc3bf5e7e814a19164a3fe6988f42f38330d7c",
+      "contentDigest": "sha256:f1d6856c9834080c2ff354740f9f89aff1764c3ad4a768f9bdccff50a3b3060c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -417,55 +417,55 @@
     "patches": [],
     "runs": [
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/boot/boot-frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/6m4wk3h8/tmp/test-intent-vitest-5-1794263305381.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/boot/boot-frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/91eedicj/tmp/test-intent-vitest-6-1794265435423.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 67891,
-        "output": "JSON report written to /home/elias/.cache/am/6m4wk3h8/tmp/test-intent-vitest-5-1794263305381.json\n\n"
+        "durationMs": 63472,
+        "output": "JSON report written to /home/elias/.cache/am/91eedicj/tmp/test-intent-vitest-6-1794265435423.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
         "classification": "assertion",
-        "detail": "SA6 never-rendering shell stays unreachable and deadline Reload takes focus:  AssertionError: expected 1 to be +0 // Object.is equality\n    at /home/elias/.cache/am/6m4wk3h8/tmp/test-intent-before-c0KOR6/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:222:52\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5/modules/ui-web/node_modules/@vitest/runner/dist | SA6 every input path is stopped at window capture under the frame and released after paint:  AssertionError: expected ["
+        "detail": "SA6 never-rendering shell stays unreachable and deadline Reload takes focus:  AssertionError: expected 1 to be +0 // Object.is equality\n    at /home/elias/.cache/am/91eedicj/tmp/test-intent-before-zfKkE1/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:222:52\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5/modules/ui-web/node_modules/@vitest/runner/dist | SA6 every input path is stopped at window capture under the frame and released after paint:  AssertionError: expected ["
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SA6 never-rendering shell stays unreachable and deadline Reload takes focus",
         "classification": "assertion",
-        "detail": "SA6 never-rendering shell stays unreachable and deadline Reload takes focus:  AssertionError: expected 1 to be +0 // Object.is equality\n    at /home/elias/.cache/am/6m4wk3h8/tmp/test-intent-before-c0KOR6/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:222:52\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5/modules/ui-web/node_modules/@vitest/runner/dist"
+        "detail": "SA6 never-rendering shell stays unreachable and deadline Reload takes focus:  AssertionError: expected 1 to be +0 // Object.is equality\n    at /home/elias/.cache/am/91eedicj/tmp/test-intent-before-zfKkE1/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:222:52\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5/modules/ui-web/node_modules/@vitest/runner/dist"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SA6 every input path is stopped at window capture under the frame and released after paint",
         "classification": "assertion",
-        "detail": "SA6 every input path is stopped at window capture under the frame and released after paint:  AssertionError: expected [ { type: 'keydown', …(3) }, …(43) ] to deeply equal []\n    at /home/elias/.cache/am/6m4wk3h8/tmp/test-intent-before-c0KOR6/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:264:78\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5/modules/ui-web/node_modu"
+        "detail": "SA6 every input path is stopped at window capture under the frame and released after paint:  AssertionError: expected [ { type: 'keydown', …(3) }, …(43) ] to deeply equal []\n    at /home/elias/.cache/am/91eedicj/tmp/test-intent-before-zfKkE1/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:264:58\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5/modules/ui-web/node_modu"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SA6 shell shortcuts neither run nor queue beneath the frame, then normal shortcuts work",
         "classification": "assertion",
-        "detail": "SA6 shell shortcuts neither run nor queue beneath the frame, then normal shortcuts work:  AssertionError: expected { chord: 'Control+k', …(2) } to deeply equal { chord: 'Control+k', seen: [], …(1) }\n    at /home/elias/.cache/am/6m4wk3h8/tmp/test-intent-before-c0KOR6/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:278:107\n    at runNextTicks (node:internal/process/task_queues:65:5)"
+        "detail": "SA6 shell shortcuts neither run nor queue beneath the frame, then normal shortcuts work:  AssertionError: expected { chord: 'Control+k', …(2) } to deeply equal { chord: 'Control+k', seen: [], …(1) }\n    at /home/elias/.cache/am/91eedicj/tmp/test-intent-before-zfKkE1/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:278:107\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shel"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SA6 pointer hover wheel context menu and mouse Back/Forward cannot reach the covered shell",
         "classification": "assertion",
-        "detail": "SA6 pointer hover wheel context menu and mouse Back/Forward cannot reach the covered shell:  AssertionError: expected [ 'window:mouseenter', …(37) ] to deeply equal []\n    at /home/elias/.cache/am/6m4wk3h8/tmp/test-intent-before-c0KOR6/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:309:67\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5/modules/ui-web/node_modules/@v"
+        "detail": "SA6 pointer hover wheel context menu and mouse Back/Forward cannot reach the covered shell:  AssertionError: expected [ 'window:mouseenter', …(37) ] to deeply equal []\n    at /home/elias/.cache/am/91eedicj/tmp/test-intent-before-zfKkE1/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:309:67\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5/modules/ui-web/node_modules/@v"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SA6 SA17 deadline discards rendered controls; failure page alone handles input and keyboard actions",
         "classification": "assertion",
-        "detail": "SA6 SA17 deadline discards rendered controls; failure page alone handles input and keyboard actions:  AssertionError: expected 1 to be +0 // Object.is equality\n    at /home/elias/.cache/am/6m4wk3h8/tmp/test-intent-before-c0KOR6/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:321:52\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5/modules/ui-web/node_modules/@vitest/runner/dist"
+        "detail": "SA6 SA17 deadline discards rendered controls; failure page alone handles input and keyboard actions:  AssertionError: expected 1 to be +0 // Object.is equality\n    at /home/elias/.cache/am/91eedicj/tmp/test-intent-before-zfKkE1/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:320:52\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5/modules/ui-web/node_modules/@vitest/runner/dist"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SA10 SA17 60-second deadline discards an attached shell even when rendering later completes",
         "classification": "assertion",
-        "detail": "SA10 SA17 60-second deadline discards an attached shell even when rendering later completes:  AssertionError: expected 1 to be +0 // Object.is equality\n    at /home/elias/.cache/am/6m4wk3h8/tmp/test-intent-before-c0KOR6/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:406:52\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5/modules/ui-web/node_modules/@vitest/runner/dist"
+        "detail": "SA10 SA17 60-second deadline discards an attached shell even when rendering later completes:  AssertionError: expected 1 to be +0 // Object.is equality\n    at /home/elias/.cache/am/91eedicj/tmp/test-intent-before-zfKkE1/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:403:95\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at processImmediate (node:internal/timers:541:9)"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SA10 stalled catalog discovery raises failure and late mount replaces it before rendering",
         "classification": "assertion",
-        "detail": "SA10 stalled catalog discovery raises failure and late mount replaces it before rendering:  Error: expected 1 to be +0 // Object.is equality\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3748:47)\n    at /home/elias/.cache/am/6m4wk3h8/tmp/test-intent-before-c0KOR6/modules/ui-we"
+        "detail": "SA10 stalled catalog discovery raises failure and late mount replaces it before rendering:  Error: expected 1 to be +0 // Object.is equality\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3748:47)\n    at /home/elias/.cache/am/91eedicj/tmp/test-intent-before-zfKkE1/modules/ui-we"
       }
     ]
   },
-  "digest": "sha256:d7d220aef0e5c203630151aaf8522a7b52d110cd8ab21b1a9c74fca4f7f23d8f"
+  "digest": "sha256:047bbbae5fde1ebbf2fc9c9c0f3ebbc74a68a7229d030b71ef2731833e7f91c6"
 }
