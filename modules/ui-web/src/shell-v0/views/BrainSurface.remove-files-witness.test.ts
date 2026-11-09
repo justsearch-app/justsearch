@@ -54,7 +54,8 @@ async function mount() {
 const section = (el: Brain) => el.shadowRoot!.querySelector<HTMLElement>('[data-testid="downloaded-files"]')!;
 async function confirmRemoval(el: Brain) {
   section(el).querySelector<HTMLButtonElement>('[data-remove="chat"]')!.click(); await settle(el);
-  section(el).querySelector<HTMLButtonElement>('.confirm-remove')!.click(); await settle(el);
+  section(el).querySelector('jf-confirm-band')!.shadowRoot!
+    .querySelector<HTMLElement & { onActivate(): void }>('jf-button.confirm')!.onActivate(); await settle(el);
 }
 async function saveBestMatchFirst(el: Brain) {
   el.shadowRoot!.querySelector<HTMLButtonElement>('[role="switch"][aria-label="Use Best match first"]')!.click();
