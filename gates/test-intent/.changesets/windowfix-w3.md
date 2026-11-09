@@ -10,18 +10,19 @@ author-session: windowfix-w3-builder
 The sole quoted owner decision is the selection relayed in the task request. All technical
 scenarios, design and test choices are delegated choices from the orchestrator brief.
 
-The isolated `BrainSurface.removalBand-lockdown.test.ts` retains its 24 D1-D7 checks and adds
-seven durable D9 checks. The operation acknowledges running while the row stays disabled;
-a later poll supplies success, partial removal or an outcome without a row action. Poll closure
-and deliberate focus moves elsewhere are covered separately. No existing oracle was weakened.
-D8 and the settings witness keep using the two unchanged files in the original entry.
+The isolated `BrainSurface.removalBand-lockdown.test.ts` retains all 31 existing checks and adds
+two durable D9 cases for polling that closes a focused confirmation without a row action or
+removal outcome: not-downloaded with declined=false, and downloaded with removable=false.
+The final focus fallback is the Downloaded files section with tabindex="-1". Nothing else in
+the focus logic changes. D8 and the settings witness retain the unchanged unit-file coverage.
 
-Execution evidence is regenerated for all 31 checks in the edited file. The repair evidence
-records five assertion failures on 6e78066eaa and five passes after the change; all 24 prior
-checks and both focus-preservation cases also pass. The manual before-state was a shared clone
-inside the session temporary directory with its own copied dependencies. Automated fail-before
-evidence ran from that clone, keeping its temporary Git checkout registration out of the source
-repository. `tmp/windowfix-w3/` holds command logs and the initial before/after reports.
+Execution evidence is regenerated for all 33 checks in the edited file. The original five
+repair checks retain assertion fail-before evidence on 6e78066eaa. Both new cases fail at the
+section-focus assertion on 1a0b2be2dc and pass after the fallback. The before states use shared
+clones inside the session temporary directory with their own copied dependencies; automated
+before worktrees are registered only in that clone. Scratch logs and axe/tab-order comparison
+scaffolding are under `tmp/windowfix-w3/`. Adding tabindex="-1" leaves axe results and complete
+keyboard tab cycles unchanged in downloaded, not-downloaded and not-removable fixture states.
 No persisted-format changes. The acceptance record below is retained unchanged for independent
 review; this repair makes it stale and the builder does not accept its own work.
 
@@ -81,7 +82,30 @@ review; this repair makes it stale and the builder does not accept its own work.
         "modules/ui-web/src/shell-v0/views/BrainSurface.removalBand-lockdown.test.ts"
       ],
       "class": "New",
-      "behaviour": "Retain all 24 D1-D7 Chromium checks without changing their expectations, and add two D9 preservation checks: polling and delayed completion keep focus deliberately moved elsewhere. The evidence reruns every check in the edited file (31 total). Existing D8 consent and settings-witness checks remain in the unchanged unit files covered above.",
+      "behaviour": "D9: polling closes a focused confirmation onto the Downloaded files section when the package becomes not-downloaded with declined=false or remains downloaded with removable=false, and no row action or removal outcome exists. Both checks fail at the focus assertion on 1a0b2be2dc and pass after the section fallback.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "Issues in the windows (Recommended)",
+          "delegationLocation": "task t-20261109-windowfix request",
+          "delegationScope": "The owner selected fixing issues encountered in Library and AI Brain, including similar recorded issues, with rechecks before fixing. The orchestrator bounded this repair to the final D9 focus fallback, preserving D1-D8 and all existing focus logic.",
+          "choice": "Delegated design: make the Downloaded files section, with tabindex=\"-1\", the final focusPartAction fallback after enabled row actions and removal outcome. Add the two independently reported polling cases with focus on Keep it, no row action and no outcome; assert section focus, persistence on another refresh and no removal request. Scenarios and test choices are delegated choices, not owner-authored scenarios.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/windowfix-w3-brain-removal-section-focus.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.removalBand-lockdown.test.ts#D9 polling closes a focused band onto Downloaded files when not-downloaded leaves no action or outcome",
+        "modules/ui-web/src/shell-v0/views/BrainSurface.removalBand-lockdown.test.ts#D9 polling closes a focused band onto Downloaded files when not-removable leaves no action or outcome"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.removalBand-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Retain all 31 existing D1-D7/D9 Chromium checks without changing their expectations, including both D9 focus-preservation checks. Evidence reruns every check in the edited file (33 total), including the two new section-fallback cases. Existing D8 consent and settings-witness checks remain in the unchanged unit files covered above.",
       "sources": [
         {
           "kind": "delegated-choice",

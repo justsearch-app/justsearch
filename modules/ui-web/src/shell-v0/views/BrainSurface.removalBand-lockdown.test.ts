@@ -297,6 +297,21 @@ it.each(['row', 'outcome', 'elsewhere'])('D9 polling closes a focused band onto 
   expect(await target.evaluate(el => el.matches(':focus'))).toBe(true);
 }, 60_000);
 
+it.each(['not-downloaded', 'not-removable'])('D9 polling closes a focused band onto Downloaded files when %s leaves no action or outcome', async state => {
+  const { page, view } = await open(); await opener(page).click();
+  expect(await keep(page).evaluate(el => el.matches(':focus'))).toBe(true);
+  view.parts = state === 'not-downloaded' ? [{ ...part(), state: 'missing', declined: false }]
+    : [{ ...part(), removable: false }];
+  await page.evaluate(() => window.removalFixture('refresh'));
+  expect(await band(page).count()).toBe(0);
+  expect(await page.locator('[data-remove="chat"], [data-download-again="chat"], [data-testid="removal-outcome"]').count()).toBe(0);
+  const section = page.locator('[data-testid="downloaded-files"]');
+  expect(await section.evaluate(el => el.matches(':focus')), 'Downloaded files receives focus instead of BODY').toBe(true);
+  await page.evaluate(() => window.removalFixture('refresh'));
+  expect(await section.evaluate(el => el.matches(':focus')), 'a later render preserves useful focus').toBe(true);
+  expect(await page.evaluate(() => window.removalCalls.length)).toBe(0);
+}, 60_000);
+
 it('D9 a later removal outcome keeps focus deliberately moved elsewhere while running', async () => {
   const { page, view } = await open(); await opener(page).click();
   view.removal = { state: 'running', packageId: 'chat', label: 'Chat model' };

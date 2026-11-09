@@ -1892,11 +1892,12 @@ export class BrainSurface extends JfElement {
     this.removalOpener = null;
   }
 
-  /** Focus returns to the row's own action, or to the outcome when the row changed. */
+  /** Focus returns to the row's own action, the outcome, or the Downloaded files section. */
   private focusPartAction(id: string): void {
     const target = this.shadowRoot?.querySelector<HTMLElement>(`[data-remove="${id}"]:not(:disabled)`)
       ?? this.shadowRoot?.querySelector<HTMLElement>(`[data-download-again="${id}"]:not(:disabled)`)
-      ?? this.shadowRoot?.querySelector<HTMLElement>('[data-testid="removal-outcome"]');
+      ?? this.shadowRoot?.querySelector<HTMLElement>('[data-testid="removal-outcome"]')
+      ?? this.shadowRoot?.querySelector<HTMLElement>('[data-testid="downloaded-files"]');
     target?.focus({ preventScroll: true });
   }
 
@@ -1934,7 +1935,7 @@ export class BrainSurface extends JfElement {
     const rows = (view.parts ?? []).filter(p => p.state === 'downloaded' || p.state === 'incomplete'
       || (REMOVABLE_PARTS.has(p.id ?? '') && p.declined === true));
     const removal = view.removal;
-    return html`<div class="downloaded-files" data-testid="downloaded-files">
+    return html`<div class="downloaded-files" data-testid="downloaded-files" tabindex="-1">
       ${rows.length === 0 ? html`<p class="advanced-note">No downloaded model files.</p>`
         : rows.map(part => this.renderDownloadedPart(part, running))}
       ${running ? html`<p role="status">Removing files…</p>` : nothing}

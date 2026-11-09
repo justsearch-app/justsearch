@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-09T21:45:01.183Z",
-  "revision": "6e78066eaa0214cfc67eccc431a1547f45dc8a59",
-  "tree": "c880fb8774dcce2b815e93fcf62ccb049a38f4d6",
+  "createdAt": "2026-11-09T22:11:32.241Z",
+  "revision": "1a0b2be2dcaedd048281c5f4c5ff76591fb9e8cf",
+  "tree": "3ac8313189b237f65347f0c60db6084f44653091",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.removalBand-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/windowfix-w3/tmp/windowfix-w3/test-intent-vitest-64-1794260650995.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.removalBand-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/windowfix-w3/tmp/windowfix-w3/test-intent-vitest-782-1794262246709.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 24021
+      "durationMs": 21393
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.removalBand-lockdown.test.ts#D9 removed waits for a later removal poll and focuses the settled row action or outcome",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.removalBand-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:110dacfcf09e98cefbb0aab438952a9ee4d38687a8b11638c2bc6bea2f89bb38",
+      "contentDigest": "sha256:8b603a28765b52653a1675981590a22f0b69806ac93a803dfc956579f091eec6",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.removalBand-lockdown.test.ts#D9 partial waits for a later removal poll and focuses the settled row action or outcome",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.removalBand-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:110dacfcf09e98cefbb0aab438952a9ee4d38687a8b11638c2bc6bea2f89bb38",
+      "contentDigest": "sha256:8b603a28765b52653a1675981590a22f0b69806ac93a803dfc956579f091eec6",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -59,7 +59,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.removalBand-lockdown.test.ts#D9 no-action waits for a later removal poll and focuses the settled row action or outcome",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.removalBand-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:110dacfcf09e98cefbb0aab438952a9ee4d38687a8b11638c2bc6bea2f89bb38",
+      "contentDigest": "sha256:8b603a28765b52653a1675981590a22f0b69806ac93a803dfc956579f091eec6",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -74,7 +74,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.removalBand-lockdown.test.ts#D9 polling closes a focused band onto row without stealing focus elsewhere",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.removalBand-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:110dacfcf09e98cefbb0aab438952a9ee4d38687a8b11638c2bc6bea2f89bb38",
+      "contentDigest": "sha256:8b603a28765b52653a1675981590a22f0b69806ac93a803dfc956579f091eec6",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -89,7 +89,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.removalBand-lockdown.test.ts#D9 polling closes a focused band onto outcome without stealing focus elsewhere",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.removalBand-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:110dacfcf09e98cefbb0aab438952a9ee4d38687a8b11638c2bc6bea2f89bb38",
+      "contentDigest": "sha256:8b603a28765b52653a1675981590a22f0b69806ac93a803dfc956579f091eec6",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -108,40 +108,40 @@
     "patches": [],
     "runs": [
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.removalBand-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/windowfix-w3/tmp/windowfix-w3/test-intent-vitest-64-1794260678292.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.removalBand-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/windowfix-w3/tmp/windowfix-w3/test-intent-vitest-782-1794262270696.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 22425,
-        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/windowfix-w3/tmp/windowfix-w3/test-intent-vitest-64-1794260678292.json\n\n"
+        "durationMs": 21037,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/windowfix-w3/tmp/windowfix-w3/test-intent-vitest-782-1794262270696.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.removalBand-lockdown.test.ts#D9 removed waits for a later removal poll and focuses the settled row action or outcome",
         "classification": "assertion",
-        "detail": "D9 removed waits for a later removal poll and focuses the settled row action or outcome:  Error: expected false to be true // Object.is equality\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/.cache/am/z2fe1vkw/tmp/test-intent-before-K9GwHW/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3748:47)\n    at /home/elias/.cache/am/z2fe1vkw/tmp/test-intent-before-K9GwHW/"
+        "detail": "D9 removed waits for a later removal poll and focuses the settled row action or outcome:  Error: expected false to be true // Object.is equality\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/.cache/am/ordb5fse/tmp/test-intent-before-Btna7U/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3748:47)\n    at /home/elias/.cache/am/ordb5fse/tmp/test-intent-before-Btna7U/"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.removalBand-lockdown.test.ts#D9 partial waits for a later removal poll and focuses the settled row action or outcome",
         "classification": "assertion",
-        "detail": "D9 partial waits for a later removal poll and focuses the settled row action or outcome:  Error: expected false to be true // Object.is equality\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/.cache/am/z2fe1vkw/tmp/test-intent-before-K9GwHW/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3748:47)\n    at /home/elias/.cache/am/z2fe1vkw/tmp/test-intent-before-K9GwHW/"
+        "detail": "D9 partial waits for a later removal poll and focuses the settled row action or outcome:  Error: expected false to be true // Object.is equality\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/.cache/am/ordb5fse/tmp/test-intent-before-Btna7U/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3748:47)\n    at /home/elias/.cache/am/ordb5fse/tmp/test-intent-before-Btna7U/"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.removalBand-lockdown.test.ts#D9 no-action waits for a later removal poll and focuses the settled row action or outcome",
         "classification": "assertion",
-        "detail": "D9 no-action waits for a later removal poll and focuses the settled row action or outcome:  Error: expected false to be true // Object.is equality\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/.cache/am/z2fe1vkw/tmp/test-intent-before-K9GwHW/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3748:47)\n    at /home/elias/.cache/am/z2fe1vkw/tmp/test-intent-before-K9GwHW/"
+        "detail": "D9 no-action waits for a later removal poll and focuses the settled row action or outcome:  Error: expected false to be true // Object.is equality\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/.cache/am/ordb5fse/tmp/test-intent-before-Btna7U/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3748:47)\n    at /home/elias/.cache/am/ordb5fse/tmp/test-intent-before-Btna7U/"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.removalBand-lockdown.test.ts#D9 polling closes a focused band onto row without stealing focus elsewhere",
         "classification": "assertion",
-        "detail": "D9 polling closes a focused band onto row without stealing focus elsewhere:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/z2fe1vkw/tmp/test-intent-before-K9GwHW/modules/ui-web/src/shell-v0/views/BrainSurface.removalBand-lockdown.test.ts:297:61\n    at file:///home/elias/.cache/am/z2fe1vkw/tmp/test-intent-before-K9GwHW/modules/ui"
+        "detail": "D9 polling closes a focused band onto row without stealing focus elsewhere:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/ordb5fse/tmp/test-intent-before-Btna7U/modules/ui-web/src/shell-v0/views/BrainSurface.removalBand-lockdown.test.ts:297:61\n    at file:///home/elias/.cache/am/ordb5fse/tmp/test-intent-before-Btna7U/modules/ui"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.removalBand-lockdown.test.ts#D9 polling closes a focused band onto outcome without stealing focus elsewhere",
         "classification": "assertion",
-        "detail": "D9 polling closes a focused band onto outcome without stealing focus elsewhere:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/z2fe1vkw/tmp/test-intent-before-K9GwHW/modules/ui-web/src/shell-v0/views/BrainSurface.removalBand-lockdown.test.ts:297:61\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at processImmediate"
+        "detail": "D9 polling closes a focused band onto outcome without stealing focus elsewhere:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/ordb5fse/tmp/test-intent-before-Btna7U/modules/ui-web/src/shell-v0/views/BrainSurface.removalBand-lockdown.test.ts:297:61\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at processImmediate"
       }
     ]
   },
-  "digest": "sha256:ef33263dda1640cf5a45536d1e687fd061966add96f65237c746cd08c1d3bec4"
+  "digest": "sha256:b11f51de3eef5de41841a1ea0b9f8d623b8d18c6ceb01e6d1d59a1d9473127c3"
 }

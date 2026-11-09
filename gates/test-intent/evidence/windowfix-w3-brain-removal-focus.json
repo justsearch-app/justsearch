@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-09T21:44:00.010Z",
-  "revision": "6e78066eaa0214cfc67eccc431a1547f45dc8a59",
-  "tree": "c880fb8774dcce2b815e93fcf62ccb049a38f4d6",
+  "createdAt": "2026-11-09T22:10:38.985Z",
+  "revision": "1a0b2be2dcaedd048281c5f4c5ff76591fb9e8cf",
+  "tree": "3ac8313189b237f65347f0c60db6084f44653091",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.removalBand-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/windowfix-w3/tmp/windowfix-w3/test-intent-vitest-6-1794260610088.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.removalBand-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/windowfix-w3/tmp/windowfix-w3/test-intent-vitest-4-1794262216620.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 29917
+      "durationMs": 22363
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.removalBand-lockdown.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.removalBand-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:110dacfcf09e98cefbb0aab438952a9ee4d38687a8b11638c2bc6bea2f89bb38",
+      "contentDigest": "sha256:8b603a28765b52653a1675981590a22f0b69806ac93a803dfc956579f091eec6",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -155,6 +155,14 @@
           "status": "passed"
         },
         {
+          "name": "D9 polling closes a focused band onto Downloaded files when not-downloaded leaves no action or outcome",
+          "status": "passed"
+        },
+        {
+          "name": "D9 polling closes a focused band onto Downloaded files when not-removable leaves no action or outcome",
+          "status": "passed"
+        },
+        {
           "name": "D9 a later removal outcome keeps focus deliberately moved elsewhere while running",
           "status": "passed"
         }
@@ -162,5 +170,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:e27a334ac60748a3255c532a29e2fdba322aa73322f08e1c7d6056306548970e"
+  "digest": "sha256:473800c36f39c6ff72312d54620f53bbc3c7f34aebb95ffd95441bc39fa8ef7f"
 }
