@@ -105,3 +105,15 @@ The expectations are agent choices under the quoted delegation, not owner-agreed
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "fm861n5p-verifier",
+  "verdict": "accept",
+  "digest": "sha256:1f1bd478f281fa57beff1bc6c054b165ac2cbc5f9542fb6e82630cbe5b20acb3"
+}
+```
