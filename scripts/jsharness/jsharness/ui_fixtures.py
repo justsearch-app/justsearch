@@ -198,6 +198,11 @@ def _indexed_roots_body(variant: str) -> str:
     `enriching` arm), never from the row — the wire row carries counts only.
 
     Every other variant keeps `_BODY_INDEXED_ROOTS` (the empty list), unchanged."""
+    if variant == "first-use-reading":
+        return json.dumps({"items": [{"pathHash": "first-use-documents", "collection": "default",
+            "status": "indexing", "inFlightCount": 8, "failedCount": 0, "walkCompleted": False}], "count": 1})
+    if variant == "first-use":
+        return json.dumps({"items": [], "count": 0})
     if variant != "enriching":
         return _BODY_INDEXED_ROOTS
     return json.dumps({
@@ -377,14 +382,14 @@ _GAP_OUTCOME = json.dumps({
     },
 })
 
-# Seed: dismiss the first-run 'welcome' walkthrough (id per canonicalManifest.ts) so
-# the overlay never clutters the deterministic capture, and pin the inspector tab.
+# SB14: existing structural captures deliberately hide Getting started so their prior
+# composition stays stable. First-use variants skip this seed entirely; old welcome stays untouched.
 WALKTHROUGH_SEED = (
     "try {"
     "localStorage.setItem('justsearch-inspector-tab','ai');"
     "localStorage.setItem('justsearch.userState.v2', JSON.stringify({"
     "  version: 2, activeProfileId: 'default', profiles: {},"
-    "  walkthroughState: { welcome: { activeStepIndex: 0, completedStepIds: [], dismissed: true } }"
+    "  walkthroughState: { 'core.getting-started': { activeStepIndex: 0, completedStepIds: [], dismissed: true } }"
     "}));"
     "} catch (e) {}"
 )
@@ -632,6 +637,16 @@ def _status_body(variant: str) -> str:
     Degraded variants have a real warning code, indexed content, and authoritative READY
     chat operation; only those variants claim that a human Ask or Delegate is available.
     """
+    if variant.startswith("first-use"):
+        d = json.loads(_BODY_STATUS)
+        reading = variant == "first-use-reading"
+        d["meta"]["workerRpcAtMs"] = int(datetime.now(timezone.utc).timestamp() * 1000)
+        d["worker"]["core"].update({"indexState": "INDEXING" if reading else "IDLE", "indexHealthy": True,
+            "indexedDocuments": 2 if reading else 0, "searchableDocuments": 2 if reading else 0,
+            "indexedDocumentsUnknown": False, "pendingJobs": 8 if reading else 0})
+        d["worker"].pop("countObservations", None)
+        d["worker"]["migration"].update({"processingJobsCount": 0, "migrationState": "IDLE"})
+        return json.dumps(d)
     if variant == "indexing-rules":
         d = json.loads(_status_body("indexing"))
         d["operating"]["indexing"].update({"state": "PAUSED", "reasons": ["schedule", "on_battery"],
@@ -658,7 +673,10 @@ def _status_body(variant: str) -> str:
         # SERVING in the historical payload is not a worker-reported index state.
         # Model the readable keyword index this scenario requires, rather than the
         # fallback/unconfirmed core projection that masks its readiness notice.
-        d["worker"]["core"].update({"indexState": "IDLE", "indexHealthy": True, "indexedDocuments": 1})
+        # S5 consumes the live searchable count, not the settled indexed count. Both must
+        # describe the readable keyword index this preserved journey is exercising.
+        d["worker"]["core"].update({"indexState": "IDLE", "indexHealthy": True,
+            "indexedDocuments": 1, "searchableDocuments": 1})
         d["worker"]["compatibility"]["embeddingCompatState"] = "INITIALIZING"
         d["components"]["encoders"]["state"] = "RELOADING"
         d["readiness"]["engineComponents"]["encoders"]["state"] = "RELOADING"
@@ -822,6 +840,11 @@ def fixture_body(url: str, variant: str = "default") -> str:
         messages = dict(line.split("=", 1) for line in catalog.read_text().splitlines()
                         if line and not line.startswith("#") and "=" in line)
         return json.dumps({"locale": "en", "messages": messages})
+    if "/api/indexing/suggested-roots" in url:
+        return json.dumps({"suggestions": [{"label": "Documents", "path": "/home/user/Documents"},
+            {"label": "Downloads", "path": "/home/user/Downloads"}]})
+    if variant.startswith("first-use") and "/api/path-hash/resolve" in url:
+        return json.dumps({"path": "/home/user/Documents"})
     if "/api/inference/status" in url:
         return _inference_body(variant)
     if "/api/status" in url:
@@ -1012,14 +1035,15 @@ def agent_fixture(ctx) -> AgentUIFixture:
 
 
 async def install_fixtures(ctx, variant: str = "default", color_scheme: str = "dark") -> None:
-    """Make a browser context deterministic: seed the dismissed walkthrough and
+    """Make a browser context deterministic: hide Getting started (except first-use variants) and
     serve fixtures for every `/api/*` call (so the no-backend 502 storm can't occur).
     ``variant`` selects a per-route transform: `_search_body` (GENERATE data-extreme,
     'empty') and `_status_body` (readiness state, 'degraded' — tempdoc 697) both key off
     the same ``variant`` string. ``color_scheme`` selects the initial theme returned by
     `/api/settings/v2` for this context and defaults to dark. Call once on a fresh
     context, before `new_page`."""
-    await ctx.add_init_script(WALKTHROUGH_SEED)
+    if not variant.startswith("first-use"):
+        await ctx.add_init_script(WALKTHROUGH_SEED)
     # Variant-gated: only the record-bearing variants want a cold chat surface to auto-restore
     # the fixture conversation (`_thread_body`), so no other step's boot changes.
     if variant in _THREAD_RECORD_VARIANTS:

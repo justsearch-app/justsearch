@@ -2159,6 +2159,31 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         await page.get_by_text("Copy Diagnostic Summary", exact=True).scroll_into_view_if_needed()
         await asyncio.sleep(0.3)
 
+    def first_use_setup(reading=False):
+        async def setup(page):
+            # Unlike ordinary fixture captures, these variants seed no user-state document.
+            # Remove demo flags: the production demo contract deliberately hides onboarding.
+            parsed = urlparse(ui_url)
+            params = parse_qs(parsed.query)
+            params.pop("demo", None)
+            params.pop("demoMode", None)
+            await page.set_viewport_size({"width": 1280, "height": 800})
+            await page.goto(urlunparse(parsed._replace(query=urlencode(params, doseq=True), fragment="")),
+                            wait_until="domcontentloaded", timeout=timeout_ms)
+            await _await_app_ready(page)
+            await page.locator('jf-getting-started .card').wait_for(state="visible", timeout=timeout_ms)
+            progress = await page.evaluate("""() => JSON.parse(localStorage.getItem('justsearch.userState.v2') || '{}').walkthroughState""")
+            assert not progress, "first-use capture must have no seeded walkthrough progress"
+            if reading:
+                await page.get_by_text("2 files searchable so far · 8 waiting to be read", exact=True).wait_for()
+                await page.locator('jf-sv3-composer textarea').wait_for(state="visible")
+            else:
+                await page.get_by_text("Nothing to search yet", exact=True).wait_for()
+                await page.get_by_text("/home/user/Documents", exact=True).wait_for()
+            if cooldown_ms > 0:
+                await asyncio.sleep(cooldown_ms / 1000)
+        return setup
+
     views = [
         "home",
         "search",
@@ -2175,6 +2200,8 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
     ]
 
     steps = [
+        Step("first-use", setup=first_use_setup(), isolated=True, fixtures_variant="first-use"),
+        Step("first-use-reading", setup=first_use_setup(True), isolated=True, fixtures_variant="first-use-reading"),
         Step("engine-recovery", setup=setup_engine_recovery, isolated=True),
         Step("engine-admission-wait", setup=setup_engine_admission_wait, isolated=True),
         Step("health-completion", setup=setup_health_completion, isolated=True),

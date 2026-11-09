@@ -164,6 +164,8 @@ import {
 } from './sv3-honesty.js';
 import { sv3RunReceiptLabel } from './sv3-run.js';
 import { retrievalFallbackPhrase } from '../../aggregate-substrate/strategies/searchTraceExplain.js';
+import type { PluginHostApi } from '../../plugin-api/plugin-types.js';
+import '../../components/GettingStarted.js';
 import type { Sv3RunFeedItem, Sv3RunPrompt, Sv3RunView } from './sv3-run.js';
 import { STATUS_REVIEW_EVENT } from '../../state/frameStatus.js';
 
@@ -1344,6 +1346,7 @@ export class Sv3Main extends JfElement {
   ];
 
   static properties = {
+    host_: { attribute: false },
     state: { type: String, reflect: true },
     view: { attribute: false },
     forgetAvailable: { type: Boolean, attribute: false },
@@ -1397,6 +1400,7 @@ export class Sv3Main extends JfElement {
   declare turns: readonly Sv3Turn[];
   declare conversationId: string;
   declare apiBase: string;
+  declare host_: PluginHostApi | undefined;
   declare modelAnswerUnavailableReason: string;
   declare modelAnswerBusy: boolean;
   /**
@@ -1896,6 +1900,10 @@ export class Sv3Main extends JfElement {
     return this.state === 'docked' && (this.view ?? SV3_RESULTS_IDLE).status !== 'idle';
   }
 
+  private gettingStarted(): TemplateResult | typeof nothing {
+    return this.state === 'hero' ? nothing : html`<jf-getting-started .intro=${false} .host_=${this.host_} .apiBase=${this.apiBase}></jf-getting-started>`;
+  }
+
   render(): TemplateResult {
     const view = this.view ?? SV3_RESULTS_IDLE;
     const turns = this.turns ?? [];
@@ -1904,6 +1912,7 @@ export class Sv3Main extends JfElement {
     // Same scroller, same occlusion padding: its last row clears the floating composer (S1.12).
     if (this.resultsArmRendered) {
       return html`<div class="scroller sv3-scroller" data-testid="sv3-main-scroller">
+        ${this.gettingStarted()}
         <jf-sv3-results .view=${view} .forgetAvailable=${this.forgetAvailable}></jf-sv3-results>
       </div>`;
     }
@@ -1918,7 +1927,7 @@ export class Sv3Main extends JfElement {
     if (this.transcriptArmRendered) return this.transcript(turns);
     // Nothing but the composer belongs in the region otherwise: an untouched window's emptiness is
     // the composer's to speak for, not a state to announce.
-    return html`<div class="scroller sv3-scroller" data-testid="sv3-main-scroller"></div>`;
+    return html`<div class="scroller sv3-scroller" data-testid="sv3-main-scroller">${this.gettingStarted()}</div>`;
   }
 
   /**
@@ -1940,6 +1949,7 @@ export class Sv3Main extends JfElement {
         @cite-ref-leave=${this.onCiteRefLeave}
       >
         <div class="transcript" data-testid="sv3-transcript">
+          ${this.gettingStarted()}
           ${this.recordNotice
             ? html`<div class="record-notice" role="status" data-testid="sv3-record-notice">
                 <p class="record-notice-title">${RECORD_UNREACHABLE.title}</p>

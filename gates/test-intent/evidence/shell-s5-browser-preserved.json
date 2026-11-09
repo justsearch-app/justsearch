@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-09T22:20:29.387Z",
+  "revision": "e3a479db7d1547a2d31df44c73334c982c31e15d",
+  "tree": "637016fb859781c7041780a8b25b66ef68131a46",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/FirstUse.app-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/k5yzey4h/tmp/test-intent-vitest-3-1794262802407.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 26968
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/FirstUse.app-lockdown.test.ts#explicit addresses and the saved journal win without an onboarding history entry",
+      "file": "modules/ui-web/src/shell-v0/chrome/FirstUse.app-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:69c8764996be581d261da66767a69936a7a613f294293ba2822bea149e29013f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "first use through the real frame explicit addresses and the saved journal win without an onboarding history entry",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:4a9ab8e07e98b63b624ca1dc47afdfefc9bfc5624f1fa48dc67c9619d19948e4"
+}

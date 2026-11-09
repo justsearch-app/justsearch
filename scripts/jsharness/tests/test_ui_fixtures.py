@@ -8,6 +8,7 @@ the 502-storm / boot-break / module-load failure.
 from __future__ import annotations
 
 import json
+import asyncio
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
@@ -41,6 +42,7 @@ class TestFixtureBodies:
                 assert status["worker"]["core"]["indexState"] == "IDLE"
                 assert status["worker"]["core"]["indexHealthy"] is True
                 assert status["worker"]["core"]["indexedDocuments"] > 0
+                assert status["worker"]["core"]["searchableDocuments"] > 0
                 assert status["readiness"]["composites"]["retrieval"]["reasonCodes"] == [
                     "index.embedding_rebuilding",
                 ]
@@ -113,9 +115,33 @@ class TestFixtureBodies:
         body = json.loads(ui_fixtures.fixture_body("http://x/api/indexing-roots/substrate"))
         assert body == {"items": [], "count": 0}
 
-    def test_walkthrough_seed_dismisses_welcome(self):
-        assert "welcome" in ui_fixtures.WALKTHROUGH_SEED
+    def test_walkthrough_seed_hides_getting_started(self):
+        # SB14: retain the old captures' composition after retiring the core welcome.
+        assert "core.getting-started" in ui_fixtures.WALKTHROUGH_SEED
         assert "dismissed: true" in ui_fixtures.WALKTHROUGH_SEED
+        assert "welcome" not in ui_fixtures.WALKTHROUGH_SEED
+
+    def test_first_use_variants_leave_walkthrough_progress_unseeded(self):
+        class Context:
+            def __init__(self):
+                self.scripts = []
+
+            async def add_init_script(self, script):
+                self.scripts.append(script)
+
+            async def route(self, *_args):
+                pass
+
+        for variant in ("first-use", "first-use-reading"):
+            ctx = Context()
+            asyncio.run(ui_fixtures.install_fixtures(ctx, variant))
+            assert not any("walkthroughState" in script for script in ctx.scripts)
+            status = json.loads(ui_fixtures.fixture_body("http://x/api/status", variant))
+            roots = json.loads(ui_fixtures.fixture_body("http://x/api/indexing-roots/substrate", variant))
+            reading = variant == "first-use-reading"
+            assert status["worker"]["core"]["searchableDocuments"] == (2 if reading else 0)
+            assert status["worker"]["core"]["pendingJobs"] == (8 if reading else 0)
+            assert len(roots["items"]) == (1 if reading else 0)
 
 
 class TestWitnessedSettingsFixture:

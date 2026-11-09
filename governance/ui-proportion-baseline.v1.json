@@ -2631,6 +2631,34 @@
         "[data-testid=\"sv3-column\"]",
         "[data-testid=\"sv3-composer-band\"]"
       ]
+    },
+    {
+      "$comment": "S5: deliberately added unseeded first-use states at 1280x800. The setup card uses the existing notice reading measure; a width floor and required content prevent a hidden card from passing. No existing ceiling is raised.",
+      "uiShotStep": "first-use",
+      "elements": [
+        {
+          "selector": "[data-testid=\"getting-started-card\"]",
+          "inlineSizeRole": "notice",
+          "minWidthPx": 320
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"first-use-headline\"]"
+      ]
+    },
+    {
+      "$comment": "S5: deliberately added unseeded first-use states at 1280x800. The setup card uses the existing notice reading measure; a width floor and required content prevent a hidden card from passing. No existing ceiling is raised.",
+      "uiShotStep": "first-use-reading",
+      "elements": [
+        {
+          "selector": "[data-testid=\"getting-started-card\"]",
+          "inlineSizeRole": "notice",
+          "minWidthPx": 320
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"first-use-progress\"]"
+      ]
     }
   ]
 }

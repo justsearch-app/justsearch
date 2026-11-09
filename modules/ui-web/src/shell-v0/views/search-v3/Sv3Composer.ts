@@ -35,6 +35,9 @@
  *
  * Side-effect registers <jf-sv3-composer>.
  */
+import { getFirstUse, subscribeFirstUse } from '../../state/firstUse.js';
+import type { PluginHostApi } from '../../plugin-api/plugin-types.js';
+import '../../components/GettingStarted.js';
 import { html, css, nothing, type TemplateResult, type PropertyValues } from 'lit';
 import { JfElement } from '../../primitives/JfElement.js';
 import { icon, type IconName } from '../../components/Icon.js';
@@ -1153,7 +1156,12 @@ export class Sv3Composer extends JfElement {
     `,
   ];
 
+  declare host_: PluginHostApi | undefined;
+  declare apiBase: string;
+  private stopFirstUse: (() => void) | undefined;
   static properties = {
+    host_: { attribute: false },
+    apiBase: { type: String },
     state: { type: String, reflect: true },
     slotKind: { type: String, reflect: true, attribute: 'slot-kind' },
     slotReason: { type: String, attribute: 'slot-reason' },
@@ -1293,10 +1301,12 @@ export class Sv3Composer extends JfElement {
 
   override connectedCallback(): void {
     super.connectedCallback();
+    this.stopFirstUse = subscribeFirstUse(() => this.requestUpdate());
     this.catalogUnsubscribe = onCatalogUpdated(() => this.requestUpdate());
   }
 
   override disconnectedCallback(): void {
+    this.stopFirstUse?.(); this.stopFirstUse = undefined;
     this.catalogUnsubscribe?.();
     this.catalogUnsubscribe = null;
     this.closeRecents();
@@ -1626,6 +1636,9 @@ export class Sv3Composer extends JfElement {
   }
 
   render(): TemplateResult {
+    const setup = getFirstUse();
+    if (this.state === 'hero' && setup.empty) return html`<div class="band">
+      <jf-getting-started .host_=${this.host_} .apiBase=${this.apiBase ?? ''}></jf-getting-started></div>`;
     const empty = this.draft.trim().length === 0;
     // WHICHEVER TIER THE READER CHOSE is the one whose refusal must be on screen (852 S4). Before the
     // mode control, the notice was deliberately the ASK tier's — Enter's refusal was the one that
@@ -1731,6 +1744,7 @@ export class Sv3Composer extends JfElement {
       <div class="disclosures"><jf-sv3-filters id="sv3-filters" .open=${this.filtersOpen} .note=${this.filterNote} .serverError=${this.filterError}
         @sv3-filters-close=${() => { this.filtersOpen = false; this.focusTrigger('sv3-filters-trigger'); }}></jf-sv3-filters>
       ${this.recentList()}</div>
+      ${this.state === 'hero' ? html`<jf-getting-started .intro=${false} .host_=${this.host_} .apiBase=${this.apiBase ?? ''}></jf-getting-started>` : nothing}
       </div>
     `;
   }

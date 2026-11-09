@@ -175,11 +175,6 @@ import '../substrates/actions/index.js';
 // Operation strategy + flips 'hover-preview' policy to 'merge'.
 import '../hover/HoverPreviewHost.js';
 import { bootstrapAggregateSubstrate } from '../aggregate-substrate/bootstrap.js';
-// Tempdoc 543 §13.2.3 — ContributionManifest substrate. The canonical
-// first-party manifest installs at boot via the declarative path,
-// proving the substrate end-to-end (vs the imperative registerAction
-// from Slice 7's canonical Action).
-import { installCoreWalkthroughManifest } from '../substrates/manifest/canonicalManifest.js';
 // Tempdoc 543 §13.6 — Workspace Profiles substrate. Boot restores
 // the persisted profile registry + auto-mirrors UserStateDocument
 // profiles + re-applies the active profile's Scope snapshot.
@@ -961,13 +956,6 @@ export class Shell extends JfElement {
     // strategy + flip 'hover-preview' dispatch policy to 'merge'.
     // Idempotent (bootstrap.ts internal guard).
     bootstrapAggregateSubstrate();
-
-    // 548 §4.3(d) — the welcome walkthrough now ships as a ContributionManifest
-    // (migrated out of CorePlugin.register), proving the manifest is the
-    // canonical declaration root for a real first-party feature.
-    installCoreWalkthroughManifest().catch((err) => {
-      console.warn('[Shell] installCoreWalkthroughManifest failed', err);
-    });
 
     // Tempdoc 543 §20.7 A1 — jf-open-pane / jf-close-pane listeners.
     // Slice 7's applyEffect emits these custom events for the

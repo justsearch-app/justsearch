@@ -13,6 +13,9 @@
  * pulls this file into the boot graph automatically.
  */
 
+import { reopenGettingStarted } from '../state/firstUse.js';
+import { requestSurfaceNavigation } from '../controllers/navigateRequest.js';
+import '../components/Button.js';
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
 import { surfaceScrollLayoutStyles } from '../primitives/surfaceLayout.js';
@@ -168,6 +171,7 @@ export class HelpSurface extends JfElement {
     const body = activeBodyFor(HELP_REFERENCE_REGION);
     if (!body) {
       return html`
+        <jf-button label="Getting started" .onActivate=${() => { reopenGettingStarted(); requestSurfaceNavigation('core.search-v3-surface'); }}>Getting started</jf-button>
         ${this.renderShortcuts()}
         <section style="margin-top: 1rem">
           <div class="panel">
@@ -187,7 +191,7 @@ export class HelpSurface extends JfElement {
         </section>
       `;
     }
-    return html`<jf-declared-surface
+    return html`<jf-button label="Getting started" .onActivate=${() => { reopenGettingStarted(); requestSurfaceNavigation('core.search-v3-surface'); }}>Getting started</jf-button><jf-declared-surface
       .declaration=${body}
       .data=${{ shortcuts: SHORTCUTS, troubleshooting: TROUBLESHOOTING, network: NETWORK }}
       .enabled=${true}

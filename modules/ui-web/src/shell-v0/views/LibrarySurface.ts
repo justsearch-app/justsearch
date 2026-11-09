@@ -31,7 +31,6 @@ import '../components/OpButton.js';
 import { OperationError, type OperationInvocationSuccess } from '../operations/OperationClient.js';
 import type { OpSuccessEventDetail, OpErrorEventDetail } from '../components/OpButton.js';
 import '../components/Button.js';
-import type { JfButton } from '../components/Button.js';
 import '../components/IngestionSummary.js';
 // Tempdoc 571 §11 / 578 — Library ⊇ Browse: Library hosts the Browse file-tree as a tab.
 import '../components/SurfaceTabs.js';
@@ -89,7 +88,6 @@ import {
   EMPTY_OTHER_SOURCES,
   // Tempdoc 914 D4 — the FE mirror of IngestCollectionPolicy's reserved names, so the Add Folder
   // collection field refuses one with a reachable reason instead of creating the root.
-  isReservedCollection,
   type OtherSource,
   type OtherSourcesSnapshot,
 } from '../state/otherSources.js';
@@ -98,30 +96,9 @@ import {
 import { fetchCollectionFacet } from '../state/searchState.js';
 import { UNKNOWN, type Maybe } from '../state/known.js';
 // Tempdoc 599 §9.4 — gate the Add button with a reachable reason (596 operability authority).
-import { unavailableBecause, AVAILABLE } from '../state/availability.js';
+import { FolderAddFlow, focusFolderAdd, type FolderPreview } from '../controllers/FolderAddFlow.js';
 // Tempdoc 914 D3 — the failed chip's shared look (one authority for both render sites).
 import { failedChipStyles } from '../components/failedChipPresentation.js';
-
-/** Tempdoc 599 §9.4 — add-time path validation result from /api/indexing-roots/preview. */
-interface FolderPreview {
-  readonly path: string;
-  readonly exists: boolean;
-  readonly isDir: boolean;
-  readonly fileCount: number;
-  /** Tempdoc 599 Fix 3 — the count walk hit its cap; fileCount is a lower bound ("N+"). */
-  readonly capped: boolean;
-  readonly alreadyWatched: boolean;
-  /** Optional for older Engines; exact membership still uses alreadyWatched. */
-  readonly overlap?: { readonly path: string; readonly relationship: 'inside' | 'containing' };
-}
-
-function overlapExplanation(preview: FolderPreview): string | null {
-  const overlap = preview.overlap;
-  if (!overlap) return null;
-  return overlap.relationship === 'inside'
-    ? `This folder is inside the watched folder “${overlap.path}” and is already covered by it. Choose a separate folder.`
-    : `This folder contains the watched folder “${overlap.path}”. Choose a separate folder.`;
-}
 
 // The substrate list response: a thin {items, count} envelope around the generated IndexedRootView.
 const listResponseSchema = z
@@ -437,8 +414,6 @@ export class LibrarySurface extends JfElement {
    */
   private lastKnownFailed: Record<string, number> = {};
   // Tempdoc 599 §9.4 — debounce the add-time preview while typing.
-  private previewTimer: number | null = null;
-  private previewSeq = 0;
 
   constructor() {
     super();
@@ -895,10 +870,7 @@ export class LibrarySurface extends JfElement {
     this.memberTabUnsub = null;
     this.aiUnsub?.();
     this.aiUnsub = null;
-    if (this.previewTimer !== null) {
-      window.clearTimeout(this.previewTimer);
-      this.previewTimer = null;
-    }
+    this.addFlow.dispose();
   }
 
   private focusedFolderToggle: HTMLElement | null = null;
@@ -1637,165 +1609,20 @@ export class LibrarySurface extends JfElement {
     });
   }
 
-  /**
-   * The HEADER's "Add Folder" — open the add flow. Distinct from {@link handleAddRoot}, which is the
-   * form's submit (tempdoc 914 D4): with one method for both, the header button submitted whenever
-   * the form happened to be open, and in Tauri mode it would then never re-open the picker.
-   *
-   * The native picker answers WHICH folder, not which collection, so it now fills the same add form
-   * the browser flow uses (path pre-filled, preview fetched) and the user confirms with Add — that is
-   * where the collection field lives, in both modes. Cancelling the picker leaves the form unchanged.
-   */
-  private async handleAddFolderClick(): Promise<void> {
-    const serial = this.surfaceSerial;
-    if (this.host_.platform.capabilities.has('folder-picker')) {
-      const picked = await this.host_.platform.pickFolder();
-      if (!picked || serial !== this.surfaceSerial || !this.isConnected) return;
-      this.pendingPath = picked;
-      this.pendingPreview = null;
-      void this.fetchPreview(picked);
-    }
-    this.activeTab = 'folders';
-    this.showManualInput = true;
-    await this.updateComplete;
-    await this.shadowRoot?.querySelector<SurfaceTabs>('jf-surface-tabs')?.updateComplete;
-    if (serial === this.surfaceSerial && this.isConnected && this.activeTab === 'folders') {
-      this.renderRoot.querySelector<HTMLInputElement>('[aria-label="Folder path"]')?.focus();
-    }
-  }
+  private readonly addFlow = new FolderAddFlow({
+    state: this,
+    api: () => this.host_,
+    changed: () => this.requestUpdate(),
+    current: () => { const serial = this.surfaceSerial; return () => serial === this.surfaceSerial && this.isConnected; },
+    open: async () => {
+      this.activeTab = 'folders'; await this.updateComplete;
+      await this.shadowRoot?.querySelector<SurfaceTabs>('jf-surface-tabs')?.updateComplete;
+    },
+    focus: async target => { await this.updateComplete; await focusFolderAdd(this.renderRoot, target); },
+    added: async () => { await this.refresh({ live: true, force: true }); },
+  });
 
-  private async cancelAddFolder(): Promise<void> {
-    if (this.addBusy) return;
-    this.showManualInput = false;
-    await this.updateComplete;
-    const button = this.renderRoot.querySelector<JfButton>('[data-add-folder]');
-    await button?.updateComplete;
-    button?.focus();
-  }
-
-  /** Submit the add form (its Add button, or Enter in either field). */
-  private async handleAddRoot(): Promise<void> {
-    const path = this.pendingPath.trim();
-    if (!path) return;
-    // Tempdoc 599 §9.4 — don't create the job if the preview already says it can't be added.
-    if (this.addAvailability().kind !== 'available') return;
-    const serial = this.surfaceSerial;
-    this.addBusy = true;
-    this.error = null;
-    this.actionMessage = 'Adding folder…';
-    try {
-      const result = await this.host_.data.invokeOperation(OP_ADD, this.addRootArgs(path));
-      if (serial !== this.surfaceSerial) return;
-      if (!result.success) throw new Error(result.message || 'Add refused');
-      this.pendingPath = '';
-      this.pendingCollection = '';
-      this.pendingPreview = null;
-      this.showManualInput = false;
-      this.actionMessage = 'Folder added. Indexing activity is shown below.';
-      await this.refresh({ live: true, force: true });
-      if (serial === this.surfaceSerial) {
-        this.addBusy = false;
-        await this.updateComplete;
-        const addButton = this.renderRoot.querySelector<JfButton>('[data-add-folder]');
-        await addButton?.updateComplete;
-        if (serial === this.surfaceSerial) addButton?.focus();
-      }
-    } catch (err) {
-      if (serial !== this.surfaceSerial) return;
-      this.actionMessage = null;
-      this.addBusy = false;
-      this.error = `Folder was not added. ${err instanceof Error ? err.message : String(err)} Correct the path or retry Add.`;
-      await this.updateComplete;
-      this.renderRoot.querySelector<HTMLInputElement>('[aria-label="Folder path"]')?.focus();
-    } finally {
-      if (serial === this.surfaceSerial) this.addBusy = false;
-    }
-  }
-
-  /**
-   * Tempdoc 914 D4 — the `core.add-watched-root` arguments.
-   *
-   * `collection` is OMITTED when blank rather than sent as `""` or as a literal `"default"`. Not
-   * because the stored result would differ — `AddWatchedRootHandler` and `RootLifecycleOps` both
-   * normalize absent/blank to `DEFAULT_COLLECTION`, so all three spellings converge (review nit) —
-   * but because the request should say what the USER said. Omitting keeps the backend's default the
-   * backend's to choose; hard-coding `"default"` here would pin another component's decision in the
-   * FE, and `""` is a value `IngestCollectionPolicy.normalizeRequested` explicitly rejects.
-   */
-  private addRootArgs(path: string): Record<string, unknown> {
-    const collection = this.pendingCollection.trim();
-    return collection ? { path, collection } : { path };
-  }
-
-  /** Tempdoc 599 §9.4 — typed-path input: update the path + (debounced) validate it. */
-  private onPendingPathInput(value: string): void {
-    this.pendingPath = value;
-    this.pendingPreview = null;
-    if (this.previewTimer !== null) {
-      window.clearTimeout(this.previewTimer);
-      this.previewTimer = null;
-    }
-    const path = value.trim();
-    if (!path) return;
-    this.previewTimer = window.setTimeout(() => void this.fetchPreview(path), 350);
-  }
-
-  /** Tempdoc 599 §9.4 — fetch add-time validation for a typed path; last-write-wins via previewSeq. */
-  private async fetchPreview(path: string): Promise<void> {
-    const seq = ++this.previewSeq;
-    try {
-      const res = await this.doFetch('/api/indexing-roots/preview', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ path }),
-      });
-      if (!res.ok) return;
-      const body = await res.json();
-      if (seq !== this.previewSeq) return; // a newer keystroke superseded this result
-      this.pendingPreview = {
-        path,
-        exists: Boolean(body?.exists),
-        isDir: Boolean(body?.isDir),
-        fileCount: typeof body?.fileCount === 'number' ? body.fileCount : -1,
-        capped: Boolean(body?.capped),
-        alreadyWatched: Boolean(body?.alreadyWatched),
-        ...(typeof body?.overlap?.path === 'string' && body.overlap.path.trim()
-          && (body.overlap.relationship === 'inside' || body.overlap.relationship === 'containing')
-          ? { overlap: { path: body.overlap.path, relationship: body.overlap.relationship } } : {}),
-      };
-    } catch {
-      // Silent: preview is advisory; the Add path still validates server-side.
-    }
-  }
-
-  /**
-   * Tempdoc 599 §9.4 — the Add button's availability, gated on the preview (596 reachable reason).
-   * Available while still typing/checking (so the button isn't dead before the preview lands); a
-   * settled preview that can't be added yields a soft `unavailable` with a reachable reason.
-   */
-  private addAvailability() {
-    if (this.addBusy) return unavailableBecause('Adding folder…', true);
-    const path = this.pendingPath.trim();
-    if (!path) return unavailableBecause('Enter a folder path', true);
-    // Tempdoc 914 D4 — a supplied collection must not name an app-internal corpus. The AUTHORITY is
-    // `IngestCollectionPolicy`, enforced by the REST route and, since tempdoc 913 D6, by the
-    // Operation handler this surface actually invokes (`AddWatchedRootHandler.java:72-77` routes the
-    // value through `normalizeRequested` and returns INVALID_REQUEST). This check is defence in
-    // depth, not the enforcement: it gives the reason at the keystroke, in the field, with Add
-    // disabled — instead of a round trip that returns an error banner after the user has committed.
-    const collection = this.pendingCollection.trim();
-    if (collection && isReservedCollection(collection)) {
-      return unavailableBecause(`"${collection}" is reserved for JustSearch's own documents`);
-    }
-    const p = this.pendingPreview;
-    if (!p || p.path !== path) return AVAILABLE; // checking — don't block prematurely
-    if (!p.exists) return unavailableBecause('Path not found');
-    if (!p.isDir) return unavailableBecause('Not a folder');
-    if (p.alreadyWatched) return unavailableBecause('Already watched');
-    const overlap = overlapExplanation(p);
-    if (overlap) return unavailableBecause(overlap);
-    return AVAILABLE;
-  }
+  private handleAddFolderClick(): Promise<void> { return this.addFlow.open(); }
 
   /**
    * DE6/L1 — removal is reversed by adding the same folder again (its files are read again). The
@@ -2335,31 +2162,6 @@ export class LibrarySurface extends JfElement {
     `;
   }
 
-  /** Tempdoc 599 §9.4 — the add-time preview status line below the path input. */
-  private renderPreviewLine(): TemplateResult {
-    const path = this.pendingPath.trim();
-    const p = this.pendingPreview;
-    if (!path || !p || p.path !== path) return html``;
-    if (!p.exists) {
-      return html`<div class="add-preview err">${icon({ name: 'alert-circle', size: 14 })} Path not found</div>`;
-    }
-    if (!p.isDir) {
-      return html`<div class="add-preview err">${icon({ name: 'alert-circle', size: 14 })} Not a folder</div>`;
-    }
-    if (p.alreadyWatched) {
-      return html`<div class="add-preview warn">${icon({ name: 'alert-circle', size: 14 })} Already watched</div>`;
-    }
-    const overlap = overlapExplanation(p);
-    if (overlap) {
-      return html`<div class="add-preview warn" role="status">${icon({ name: 'alert-circle', size: 14 })} ${overlap}</div>`;
-    }
-    const files =
-      p.fileCount >= 0
-        ? ` · ${p.fileCount.toLocaleString()}${p.capped ? '+' : ''} ${p.fileCount === 1 && !p.capped ? 'file' : 'files'}`
-        : '';
-    return html`<div class="add-preview ok">${icon({ name: 'check-circle-2', size: 14 })} Folder found${files}</div>`;
-  }
-
   private renderFolders(): TemplateResult {
     return html`
       ${this.renderHeader()}
@@ -2397,51 +2199,7 @@ export class LibrarySurface extends JfElement {
           </div>`
         : nothing}
 
-      ${this.showManualInput
-        ? html`
-            <div class="add-row">
-              <input
-                type="text"
-                aria-label="Folder path"
-                ?disabled=${this.addBusy}
-                placeholder="C:\\path\\to\\folder"
-                .value=${this.pendingPath}
-                @keydown=${(e: KeyboardEvent) => {
-                  if (e.key === 'Enter') void this.handleAddRoot();
-                }}
-                @input=${(e: Event) =>
-                  this.onPendingPathInput((e.target as HTMLInputElement).value)}
-              />
-              <!-- Tempdoc 914 D4 — the collection this folder's documents are tagged with. Optional:
-                   left blank, the argument is omitted and the backend applies its own default. -->
-              <input
-                class="add-collection"
-                type="text"
-                aria-label="Collection (optional)"
-                ?disabled=${this.addBusy}
-                data-testid="library-add-collection"
-                placeholder="Collection (optional)"
-                .value=${this.pendingCollection}
-                @keydown=${(e: KeyboardEvent) => {
-                  if (e.key === 'Enter') void this.handleAddRoot();
-                }}
-                @input=${(e: Event) =>
-                  (this.pendingCollection = (e.target as HTMLInputElement).value)}
-              />
-              <jf-button
-                variant="primary"
-                label="Add"
-                .availability=${this.addAvailability()}
-                .onActivate=${() => this.handleAddRoot()}
-                >Add</jf-button
-              >
-              <jf-button label="Cancel" .disabled=${this.addBusy} .onActivate=${() => void this.cancelAddFolder()}
-                >Cancel</jf-button
-              >
-            </div>
-            ${this.renderPreviewLine()}
-          `
-        : nothing}
+      ${this.addFlow.renderForm()}
 
       ${this.loading
         ? html`<div class="empty">Loading…</div>`

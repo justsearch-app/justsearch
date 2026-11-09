@@ -37,16 +37,17 @@ public class IndependentDeclaredActivityTest {
      }
    }finally{app.stop();ex.shutdownNow();}
  }
- @ParameterizedTest @ValueSource(strings={"/api/diagnostics/traces","/api/inference/transitions","/api/conversations/encryption","/api/chat/agent/tools","/api/indexing/failed-jobs","/api/runtime/manifest"})
+ @ParameterizedTest @ValueSource(strings={"/api/diagnostics/traces","/api/inference/transitions","/api/conversations/encryption","/api/chat/agent/tools","/api/indexing/failed-jobs","/api/runtime/manifest","/api/indexing/suggested-roots"})
  void unattendedReadDoesNotAdvanceCapturedBoundary(String p)throws Exception{http("get",p,false);}
  @ParameterizedTest @ValueSource(strings={"/api/knowledge/suggest","/api/preview","/api/operations/{id}/preview"})
  void personRequestedReadAdvancesBoundary(String p)throws Exception{http("get",p,true);}
  @ParameterizedTest @ValueSource(strings={"/api/knowledge/folders","/api/knowledge/folder-files","/api/conversations/encryption/unlock","/api/conversations/encryption/lock","/api/ui/activity"})
  void personRequestedActionAdvancesBoundary(String p)throws Exception{http("post",p,true);}
- @ParameterizedTest @ValueSource(strings={"/api/chat/sessions/last","/api/chat/sessions/{id}/transcript","/api/chat/agent/history","/api/chat/agent/history/{batchId}","/api/debug/events","/api/debug/engine-log","/api/debug/chunks","/api/indexing/suggested-roots","/api/registry/prompts","/api/meta/openapi.json","/api/knowledge/search"})
+ @ParameterizedTest @ValueSource(strings={"/api/chat/sessions/last","/api/chat/sessions/{id}/transcript","/api/chat/agent/history","/api/chat/agent/history/{batchId}","/api/debug/events","/api/debug/engine-log","/api/debug/chunks","/api/registry/prompts","/api/meta/openapi.json","/api/knowledge/search"})
  void auditedDeliberateReadAdvancesBoundary(String p)throws Exception{http("get",p,true);}
  @Test void automaticLockIsNotExplicitLock()throws Exception{http("post","/api/conversations/encryption/auto-lock",false);}
  @Test void undeclaredAndAmbiguousRoutesCannotShip()throws Exception{
+   assertArrayEquals(new RouteRole[]{ActivityRole.OBSERVATION},declared("get","/api/indexing/suggested-roots"));
    Class<?> role;try{role=Class.forName("io.justsearch.ui.api.ActivityRole");}catch(ClassNotFoundException old){fail("No declared activity wiring guard on baseline");return;}
    var validate=role.getDeclaredMethod("validate",Javalin.class);validate.setAccessible(true);
    for(boolean ambiguous:new boolean[]{false,true}){

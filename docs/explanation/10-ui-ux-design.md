@@ -57,6 +57,40 @@ These are window-composition rules. A conversation's reading measure and a docum
 are content layouts within a window, not a narrow container for the whole application.
 Some floating panels use blur; backdrop blur and a glass aesthetic are not UI requirements.
 
+### First use and Getting started
+
+Search shows **Nothing to search yet** only after a successful folder-list answer and a
+fresh, confirmed zero searchable-document count. Unknown, stale and failed observations
+leave the ordinary composer in place. The empty state offers **Add a folder** and suggested
+folders by name and path, with no estimated file counts. Both use Library's existing add
+operation: a native picker on desktop and manual path entry in a browser. Registration does
+not mean files are searchable.
+
+The Getting started card has three steps: add folders, try a search, and optional answers
+and search by meaning. Folder and AI completion come from current facts. Only a search
+response received while files are searchable saves the search-completed mark. While files
+are being read, the live count says “n files searchable so far”, with “m waiting to be read”
+when the queue is known, or “still reading” when only activity is known. There is no promised
+total or time estimate. A watched folder with no searchable files points to Library.
+
+The core card finishes after adding content and trying a search; AI is optional. **Hide**
+also removes its calm-status pill. **Help → Getting started** reopens the card until hidden.
+Progress is cross-profile and shared across windows, using `walkthroughState['core.getting-started']`
+in `justsearch.userState.v2`: `completedStepIds` holds `try-search` and, after Help reopening,
+`reopened-from-help`; `dismissed` records Hide. The old welcome record is read without being
+changed. Finished or dismissed old welcomes suppress the core card when folders are watched;
+partial old progress completes no new step. A completed factory reset clears the state.
+
+Plugin walkthroughs retain their registry, completion triggers and saved progress. Pending
+plugin steps appear as a section of Getting started, including a plugin-only card once the
+core steps finish. The old four-step core welcome contribution is retired. The pill says
+“Getting started · n of 3” only at the calm status level; every higher status keeps precedence.
+The card never navigates on its own or changes restored destinations or browser history.
+
+Ordinary demo and fixture captures suppress the card so their established composition stays
+stable. The `first-use` and `first-use-reading` captures deliberately seed no walkthrough
+state and cover a fresh empty engine and a folder with files partly read.
+
 ## 2. Shell structure
 
 `chrome/Shell.ts` renders one top bar over the window area. The page has three landmarks:

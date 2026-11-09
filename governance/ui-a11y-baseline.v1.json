@@ -560,6 +560,18 @@
       "surface": "search-filters",
       "uiShotStep": "sv3-filters-docked-600x400-forced",
       "knownRules": []
+    },
+    {
+      "surface": "search",
+      "uiShotStep": "first-use",
+      "knownRules": [],
+      "note": "S5: unseeded cross-profile walkthrough state; live empty or partly read corpus."
+    },
+    {
+      "surface": "search",
+      "uiShotStep": "first-use-reading",
+      "knownRules": [],
+      "note": "S5: unseeded cross-profile walkthrough state; live empty or partly read corpus."
     }
   ]
 }
