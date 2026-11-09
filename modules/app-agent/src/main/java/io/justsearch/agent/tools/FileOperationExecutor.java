@@ -328,9 +328,9 @@ final class FileOperationExecutor {
       throw e;
     } catch (IOException | RuntimeException e) {
       LOG.debug("Hard link unavailable for {} -> {}, using copy+delete", source, destination, e);
-      BasicFileAttributes copied = copyMoveEntry(source, destination);
+      copyMoveEntry(source, destination);
       try {
-        deleteCopiedEntry(source, copied);
+        deleteCopiedEntry(source, destination);
       } catch (IOException | RuntimeException deletionFailure) {
         throw new IOException(
             "Move incomplete; source " + source + " remains="
@@ -361,31 +361,35 @@ final class FileOperationExecutor {
     }
   }
 
-  private BasicFileAttributes copyMoveEntry(Path source, Path destination) throws IOException {
+  private void copyMoveEntry(Path source, Path destination) throws IOException {
     BasicFileAttributes attrs =
         Files.readAttributes(source, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
     if (!attrs.isRegularFile() && !attrs.isSymbolicLink()) {
       throw new IOException("Cannot copy non-regular file during move: " + source);
     }
     moveFiles.copy(source, destination);
-    return attrs;
   }
 
-  private void deleteCopiedEntry(Path source, BasicFileAttributes copied) throws IOException {
-    if (!copied.isDirectory()) {
-      BasicFileAttributes current =
-          Files.readAttributes(source, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
-      if ((copied.fileKey() != null && !copied.fileKey().equals(current.fileKey()))
-          || !copied.lastModifiedTime().equals(current.lastModifiedTime())
-          || copied.size() != current.size()) {
-        throw new IOException("Source changed before deletion: " + source);
-      }
+  private void deleteCopiedEntry(Path source, Path destination) throws IOException {
+    BasicFileAttributes current =
+        Files.readAttributes(source, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+    BasicFileAttributes copied =
+        Files.readAttributes(destination, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+    // Check both entry types before comparing; never follow a replacement symbolic link.
+    boolean unchanged =
+        (current.isDirectory() && copied.isDirectory())
+            || (current.isRegularFile() && copied.isRegularFile()
+                && Files.mismatch(source, destination) == -1)
+            || (current.isSymbolicLink() && copied.isSymbolicLink()
+                && Files.readSymbolicLink(source).equals(Files.readSymbolicLink(destination)));
+    if (!unchanged) {
+      throw new IOException("Source changed before deletion: " + source);
     }
     moveFiles.delete(source);
   }
 
   private void moveDirectoryByCopy(Path source, Path destination) throws IOException {
-    List<CopiedMoveEntry> copied = new ArrayList<>();
+    List<Path> copied = new ArrayList<>();
     Files.walkFileTree(
         source,
         new SimpleFileVisitor<>() {
@@ -393,16 +397,15 @@ final class FileOperationExecutor {
           public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
               throws IOException {
             Files.createDirectories(destination.resolve(source.relativize(dir)));
-            copied.add(new CopiedMoveEntry(dir, attrs));
+            copied.add(dir);
             return FileVisitResult.CONTINUE;
           }
 
           @Override
           public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
               throws IOException {
-            BasicFileAttributes copiedAttributes =
-                copyMoveEntry(file, destination.resolve(source.relativize(file)));
-            copied.add(new CopiedMoveEntry(file, copiedAttributes));
+            copyMoveEntry(file, destination.resolve(source.relativize(file)));
+            copied.add(file);
             return FileVisitResult.CONTINUE;
           }
         });
@@ -410,17 +413,15 @@ final class FileOperationExecutor {
     // non-empty directory fails and reports an incomplete move while leaving that child intact.
     try {
       for (int i = copied.size() - 1; i >= 0; i--) {
-        CopiedMoveEntry entry = copied.get(i);
-        deleteCopiedEntry(entry.source(), entry.attributes());
+        Path entry = copied.get(i);
+        deleteCopiedEntry(entry, destination.resolve(source.relativize(entry)));
       }
-    } catch (IOException e) {
+    } catch (IOException | RuntimeException e) {
       throw new IOException(
           "Directory move incomplete; source remains at " + source
               + "; copied entries remain at " + destination + "; " + e.getMessage(), e);
     }
   }
-
-  private record CopiedMoveEntry(Path source, BasicFileAttributes attributes) {}
 
   /** Filesystem calls separated only for deterministic failure/interleaving tests. */
   static class MoveFileSystem {

@@ -561,7 +561,7 @@ class FileOperationExecutorTest {
   }
 
   @Test
-  void d11DirectoryCopyPreservesChildEditedInPlaceWhileSiblingCopies() throws IOException {
+  void d11DirectoryCopyPreservesSameSizeAndMtimeEditWhileSiblingCopies() throws IOException {
     assertDirectoryCopyPreservesChangedChild(false);
   }
 
@@ -572,7 +572,7 @@ class FileOperationExecutorTest {
     Path destination = root.resolve("destination");
     Path retained = root.resolve("retained-original");
     String siblingBytes = "longer sibling bytes".repeat(4096);
-    String changedBytes = replace ? "replaced bytes" : "edited bytes";
+    String changedBytes = replace ? "replaced bytes" : "edited source!";
     var moveFiles = new FileOperationExecutor.MoveFileSystem() {
       private Path copiedChild;
 
@@ -608,7 +608,7 @@ class FileOperationExecutorTest {
             assertNotEquals(before.fileKey(), after.fileKey());
           } else {
             assertEquals(before.fileKey(), after.fileKey(), "Editing preserves the inode");
-            assertNotEquals(before.size(), after.size(), "Size detects a timestamp-preserving edit");
+            assertEquals(before.size(), after.size(), "Editing preserves the size too");
           }
           input.transferTo(output);
         }
@@ -636,7 +636,7 @@ class FileOperationExecutorTest {
   }
 
   @Test
-  void d11SingleFileCopyPreservesSourceChangedDuringCopy() throws IOException {
+  void d11SingleFileCopyPreservesSameSizeAndMtimeEditDuringCopy() throws IOException {
     assumeFalse(PlatformPaths.isWindows(), "Hard-link route is Unix-only");
     Path source = Files.writeString(root.resolve("source"), "original bytes");
     Path destination = root.resolve("destination");
@@ -651,11 +651,11 @@ class FileOperationExecutorTest {
         super.copy(from, to);
         var before = Files.readAttributes(from, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
         Files.writeString(from, "edited source!");
-        Files.setLastModifiedTime(from, FileTime.fromMillis(before.lastModifiedTime().toMillis() + 2000));
+        Files.setLastModifiedTime(from, before.lastModifiedTime());
         var after = Files.readAttributes(from, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
         assertEquals(before.fileKey(), after.fileKey());
-        assertEquals(before.size(), after.size(), "Only the modification time changes");
-        assertNotEquals(before.lastModifiedTime(), after.lastModifiedTime());
+        assertEquals(before.size(), after.size(), "Editing preserves the size too");
+        assertEquals(before.lastModifiedTime(), after.lastModifiedTime());
       }
     });
 
@@ -669,6 +669,111 @@ class FileOperationExecutorTest {
     assertFalse(report.allSucceeded(), "A changed source makes the move incomplete");
     String error = report.results().getFirst().errorMessage();
     assertTrue(error.contains("Move incomplete"), error);
+    assertTrue(error.contains("source " + source + " remains=true"), error);
+    assertTrue(error.contains("destination " + destination + " remains=true"), error);
+    assertEquals(0, indexUpdateCount);
+    assertNull(capturedPathMappings);
+  }
+
+  @Test
+  void d11CopyPreservesSourceUnreadableAtComparison() throws IOException {
+    assumeFalse(PlatformPaths.isWindows(), "POSIX permissions and Unix copy fallback required");
+    Path source = Files.writeString(root.resolve("source"), "original bytes");
+    Path destination = root.resolve("destination");
+    var permissions = Files.getPosixFilePermissions(source);
+    useMoveFiles(new FileOperationExecutor.MoveFileSystem() {
+      @Override
+      void createLink(Path to, Path from) {
+        throw new UnsupportedOperationException("Hard links unavailable");
+      }
+
+      @Override
+      void copy(Path from, Path to) throws IOException {
+        super.copy(from, to);
+        Files.setPosixFilePermissions(from, PosixFilePermissions.fromString("---------"));
+        assertThrows(AccessDeniedException.class, () -> Files.readString(from),
+            "The source must really be unreadable before comparison");
+      }
+    });
+
+    try {
+      var report = executor.execute(
+          List.of(new FileOperation(FileOperation.OpType.MOVE, source, destination)), "Unreadable source",
+          EngineContextTestFixtures.AGENT_LOOP);
+
+      assertTrue(Files.exists(source), "An unreadable source must not be deleted");
+      assertFalse(report.allSucceeded());
+      String error = report.results().getFirst().errorMessage();
+      assertTrue(error.contains("source " + source + " remains=true"), error);
+      assertTrue(error.contains("destination " + destination + " remains=true"), error);
+      assertEquals("original bytes", Files.readString(destination));
+      assertEquals(0, indexUpdateCount);
+      assertNull(capturedPathMappings);
+    } finally {
+      if (Files.exists(source)) {
+        Files.setPosixFilePermissions(source, permissions);
+      }
+    }
+    assertEquals("original bytes", Files.readString(source));
+  }
+
+  @Test
+  void d11CopyDeletesSourceWithUnchangedBytesDespiteChangedMtime() throws IOException {
+    assumeFalse(PlatformPaths.isWindows(), "Hard-link route is Unix-only");
+    Path source = Files.writeString(root.resolve("source"), "original bytes");
+    Path destination = root.resolve("destination");
+    useMoveFiles(new FileOperationExecutor.MoveFileSystem() {
+      @Override
+      void createLink(Path to, Path from) {
+        throw new UnsupportedOperationException("Hard links unavailable");
+      }
+
+      @Override
+      void copy(Path from, Path to) throws IOException {
+        super.copy(from, to);
+        Files.setLastModifiedTime(from, FileTime.fromMillis(Files.getLastModifiedTime(from).toMillis() + 2000));
+      }
+    });
+
+    var report = executor.execute(
+        List.of(new FileOperation(FileOperation.OpType.MOVE, source, destination)), "Unchanged bytes",
+        EngineContextTestFixtures.AGENT_LOOP);
+
+    assertTrue(report.allSucceeded(), report.summary());
+    assertFalse(Files.exists(source));
+    assertEquals("original bytes", Files.readString(destination));
+    assertEquals(Map.of(source, destination), capturedPathMappings);
+  }
+
+  @Test
+  void d11CopyPreservesChangedSymbolicLinkTarget() throws IOException {
+    assumeFalse(PlatformPaths.isWindows(), "Symbolic links and Unix copy fallback required");
+    Path originalTarget = Path.of("original-target");
+    Path changedTarget = Path.of("changed-target!");
+    Path source = Files.createSymbolicLink(root.resolve("source"), originalTarget);
+    Path destination = root.resolve("destination");
+    useMoveFiles(new FileOperationExecutor.MoveFileSystem() {
+      @Override
+      void createLink(Path to, Path from) {
+        throw new UnsupportedOperationException("Hard links unavailable");
+      }
+
+      @Override
+      void copy(Path from, Path to) throws IOException {
+        super.copy(from, to);
+        Files.delete(from);
+        Files.createSymbolicLink(from, changedTarget);
+      }
+    });
+
+    var report = executor.execute(
+        List.of(new FileOperation(FileOperation.OpType.MOVE, source, destination)), "Changed link",
+        EngineContextTestFixtures.AGENT_LOOP);
+
+    assertEquals(changedTarget, Files.readSymbolicLink(source));
+    assertEquals(originalTarget, Files.readSymbolicLink(destination));
+    assertFalse(report.allSucceeded());
+    String error = report.results().getFirst().errorMessage();
     assertTrue(error.contains("source " + source + " remains=true"), error);
     assertTrue(error.contains("destination " + destination + " remains=true"), error);
     assertEquals(0, indexUpdateCount);

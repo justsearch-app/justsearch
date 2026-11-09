@@ -8,6 +8,9 @@ import io.justsearch.agent.api.registry.OperationResult;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
+import io.justsearch.configuration.PlatformPaths;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
@@ -68,6 +71,36 @@ class FileOperationsToolTest {
     assertFalse(Files.exists(src));
     assertTrue(Files.exists(dest));
     assertNotNull(capturedMappings.get(), "Index update should have been called");
+  }
+
+  @Test
+  void d6DeleteFailureNamesBothRemainingPathsInToolResult() throws IOException {
+    assumeFalse(PlatformPaths.isWindows(), "POSIX permissions and Unix hard links required");
+    Path sourceParent = Files.createDirectory(root.resolve("source-parent"));
+    Path source = Files.writeString(sourceParent.resolve("source"), "source bytes");
+    Path destination = root.resolve("destination");
+    var permissions = Files.getPosixFilePermissions(sourceParent);
+    Files.setPosixFilePermissions(sourceParent, PosixFilePermissions.fromString("r-x------"));
+    try {
+      String json =
+          """
+          {"operations": [{"op": "MOVE", "source": "%s", "destination": "%s"}]}
+          """
+              .formatted(source.toString().replace("\\", "\\\\"), destination.toString().replace("\\", "\\\\"));
+
+      OperationResult result = tool.execute(json, EngineContextTestFixtures.AGENT_LOOP);
+
+      assertFalse(result.success(), result.message());
+      assertEquals("source bytes", Files.readString(source));
+      assertEquals("source bytes", Files.readString(destination));
+      assertTrue(Files.isSameFile(source, destination), "Deletion failed after linking");
+      assertTrue(result.message().contains("Move incomplete"), result.message());
+      assertTrue(result.message().contains("source " + source + " remains=true"), result.message());
+      assertTrue(result.message().contains("destination " + destination + " remains=true"), result.message());
+      assertNull(capturedMappings.get());
+    } finally {
+      Files.setPosixFilePermissions(sourceParent, permissions);
+    }
   }
 
   @Test
