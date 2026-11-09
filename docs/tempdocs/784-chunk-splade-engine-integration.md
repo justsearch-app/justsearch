@@ -13,7 +13,7 @@ related:
 
 ## §A. Problem
 
-The SPLADE leg is effectively dead on long documents: 512-token encoder truncation means a
+**Historical projections (2026-11-09):** `bootstrap_ci`, `rank_diff` and `stratified_metrics` generators/tests are retired; references below describe past implementations and captured evidence. The SPLADE leg is effectively dead on long documents: 512-token encoder truncation means a
 legal doc's sparse representation covers its head only (register F-033). Measured: legal
 splade-mode 0.059 at defaults, while offline per-chunk SPLADE over the whole doc revives it
 to **0.327 (max-pool merge) / 0.545 (chunk-MaxP)** — the largest measured, unclaimed

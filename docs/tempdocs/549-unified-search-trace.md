@@ -21,7 +21,7 @@ related:
 
 # 549 — Unified search trace
 
-> **What this document is.** A theorization of the *correct long-term
+> **Historical projections (2026-11-09):** `bootstrap_ci`, `rank_diff` and `stratified_metrics` generators/tests are retired; references below describe past implementations and captured evidence. **What this document is.** A theorization of the *correct long-term
 > structure* for search explainability — not an implementation plan. It
 > describes what the design should look like and the failure mode it must
 > prevent. It deliberately omits implementation specifics (no code, no

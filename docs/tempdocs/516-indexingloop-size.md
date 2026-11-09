@@ -4,7 +4,7 @@ title: "516 — IndexingLoop: finish the loop/ops decomposition, type the state 
 
 # 516 — IndexingLoop: finish the loop/ops decomposition, type the state machine, externalize construction, enforce the ceiling
 
-**Date**: 2026-05-18
+**Historical projections (2026-11-09):** `bootstrap_ci`, `rank_diff` and `stratified_metrics` generators/tests are retired; references below describe past implementations and captured evidence. **Date**: 2026-05-18
 **Status**: done
 **Source path**: `modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/IndexingLoop.java`
 **Related**:

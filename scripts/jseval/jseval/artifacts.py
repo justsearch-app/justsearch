@@ -125,9 +125,8 @@ def write_run(
     if isinstance(manifest, dict):
         _write_json(run_dir / "manifest.json", manifest)
 
-    # qrels.json (tempdoc 400 LR4-e) — LR4-e + LR4-c need the relevance
-    # judgments to annotate rank-diff projections; also useful for any
-    # offline re-scoring against the exact query set this run used.
+    # qrels.json — preserve relevance judgments for offline re-scoring
+    # against the exact query set this run used.
     _write_json(run_dir / "qrels.json", qrels)
 
     # Per-mode artifacts
