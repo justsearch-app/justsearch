@@ -167,6 +167,7 @@ public final class WorkerIngestService {
       java.util.stream.IntStream.range(0, 64)
           .mapToObj(ignored -> new java.util.concurrent.locks.ReentrantLock())
           .toArray(java.util.concurrent.locks.ReentrantLock[]::new);
+  private final boolean frozenEval = io.justsearch.configuration.FrozenEvalMode.requested();
   private WorkerMutationAdmission mutationAdmission;
   private Object mutationOwner;
   private java.util.function.BooleanSupplier projectionSemanticDeferral = () -> false;
@@ -376,6 +377,7 @@ public final class WorkerIngestService {
   }
 
   private WorkerMutationAdmission.Lease mutationLease() {
+    if (frozenEval) throw WorkerServiceException.failedPrecondition("Frozen eval refuses index mutation");
     if (mutationAdmission == null) return null; // isolated service fixtures
     try { return mutationAdmission.enter(mutationOwner); }
     catch (IllegalStateException retired) {
@@ -1408,6 +1410,7 @@ public final class WorkerIngestService {
    * A failure to start records nothing: every root stays unproven and nothing is deleted.
    */
   public void seedRootVolumesAfterUpgrade(java.util.Collection<Path> declared) {
+    if (frozenEval) return;
     List<Path> roots = new ArrayList<>();
     for (Path root : declared) {
       roots.add(root.toAbsolutePath().normalize());
@@ -1430,6 +1433,7 @@ public final class WorkerIngestService {
 
   /** Configured roots use the same one-time evidence rule, including roots outside watches. */
   public void seedConfiguredRoots(java.util.Collection<Path> configured) {
+    if (frozenEval) return;
     synchronized (rootVolumeInitialization) {
       configuredRecoveryRootsBound = true;
       configuredRecoveryRoots = configured.stream().filter(Objects::nonNull)
@@ -1440,6 +1444,7 @@ public final class WorkerIngestService {
 
   /** Retry unfinished boot work through the existing periodic recovery producer. */
   public void retryRootVolumeSeeding() {
+    if (frozenEval) return;
     synchronized (rootVolumeInitialization) {
       if (!retryRootVolumeEnrollment()) return;
       for (Path root : currentBootSeedingRoots()) seedPendingRootVolume(root);

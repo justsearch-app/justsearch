@@ -214,9 +214,11 @@ final class ChatLaunchCompatibilityTest {
   /** Prints each argument it receives, bracketed, for comparison. */
   public static final class Args {
     private Args() {}
-    public static void main(String[] args) {
+    public static void main(String[] args) throws java.io.IOException {
       System.out.println("ARGC=" + args.length);
       for (String argument : args) System.out.println("[" + argument + "]");
+      // The parent closes stdin after registration has captured this process's identity.
+      System.in.transferTo(java.io.OutputStream.nullOutputStream());
     }
   }
 

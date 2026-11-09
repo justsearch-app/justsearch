@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -123,8 +124,13 @@ class ForgetOperationStoreTest {
       var attempt = runner.accept(request(kind, OPERATION));
       var outer = new java.util.concurrent.locks.ReentrantLock();
       var observed = new AtomicInteger();
+      var verificationFailure = new AtomicReference<Throwable>();
       try (var ignoredSubscription = store.subscribeCompletions(row -> {
-        assertFalse(outer.isHeldByCurrentThread(), "completion cannot acquire arbitrary owners inside the physical fence");
+        try {
+          assertFalse(outer.isHeldByCurrentThread(), "completion cannot acquire arbitrary owners inside the physical fence");
+        } catch (Throwable failure) {
+          verificationFailure.compareAndSet(null, failure);
+        }
         observed.incrementAndGet();
       })) {
         runner.start(attempt, handle -> {
@@ -141,10 +147,63 @@ class ForgetOperationStoreTest {
           call(completion, "publish", new Class<?>[0]);
           return OperationExecution.finished(OperationResult.success("removed"));
         });
+        assertNull(verificationFailure.get(), "completion must be outside the physical fence");
         assertEquals(1, observed.get(), "publication is idempotent");
         assertEquals(OperationState.COMPLETE, attempt.completion().toCompletableFuture().join().state());
       }
     }
+  }
+
+  @Test
+  void deferredForgetPublicationIsIsolatedFromObserverAssertionAndRemainsIdempotent() throws Exception {
+    var kind = forgetKind();
+    var before = new java.util.ArrayList<io.justsearch.app.api.operations.OperationRecord>();
+    var after = new java.util.ArrayList<io.justsearch.app.api.operations.OperationRecord>();
+    var path = directory.resolve("observer.db");
+    io.justsearch.app.api.operations.OperationRecord terminal;
+    AssertionError publicationFailure = null;
+    try (var store = new SqliteOperationStore(path, clock, step -> {});
+        var ignoredBefore = store.subscribeCompletions(before::add);
+        var ignoredFailure = store.subscribeCompletions(row -> { throw new AssertionError("observer assertion"); });
+        var ignoredAfter = store.subscribeCompletions(after::add)) {
+      var request = request(kind, OPERATION);
+      var accepted = store.accept(request.key(), request.descriptor(), request.context(), null).record();
+      assertTrue(store.start(accepted.id()));
+      assertTrue(store.checkpointForget(accepted.id(),
+          (io.justsearch.app.api.operations.ForgetProgress) progress("READY", "NONE")));
+      var receipt = new OperationReceipt("SUCCESS", "removed-effect");
+      var deferred = store.finishForget(accepted.id(), sequence(snapshot(store)), OperationState.COMPLETE, receipt);
+      terminal = deferred.record().orElseThrow();
+      assertEquals(OperationState.COMPLETE, terminal.state());
+      assertEquals(receipt, terminal.receipt());
+      assertTrue(before.isEmpty());
+      assertTrue(after.isEmpty());
+      assertEquals(terminal, store.find(terminal.key()).orElseThrow());
+      try (var db = java.sql.DriverManager.getConnection("jdbc:sqlite:" + path);
+          var query = db.prepareStatement("SELECT state, result_json FROM operations WHERE id = ?")) {
+        query.setLong(1, terminal.id());
+        try (var row = query.executeQuery()) {
+          assertTrue(row.next());
+          assertEquals("COMPLETE", row.getString("state"));
+          assertEquals(receipt, JSON.readValue(row.getString("result_json"), OperationReceipt.class));
+        }
+      }
+      try { deferred.publish(); }
+      catch (AssertionError failure) { publicationFailure = failure; }
+      deferred.publish();
+      var repeated = store.finishForget(accepted.id(), sequence(snapshot(store)),
+          OperationState.COMPLETE, new OperationReceipt("OTHER", null));
+      assertTrue(repeated.record().isEmpty());
+      repeated.publish();
+      assertEquals(terminal, store.rejectBeforeStart(accepted.id(), new OperationReceipt("LATE", null)));
+      assertEquals(terminal, store.find(terminal.key()).orElseThrow());
+    }
+    try (var reopened = new SqliteOperationStore(path, clock, step -> {})) {
+      assertEquals(terminal, reopened.find(terminal.key()).orElseThrow());
+    }
+    assertNull(publicationFailure, "Observer escaped after durable deferred Forget commit: " + terminal);
+    assertEquals(List.of(terminal), before);
+    assertEquals(List.of(terminal), after);
   }
 
   @Test

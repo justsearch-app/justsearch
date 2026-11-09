@@ -40,6 +40,7 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
       java.util.stream.IntStream.range(0, 256)
           .mapToObj(ignored -> new java.util.concurrent.locks.ReentrantLock())
           .toArray(java.util.concurrent.locks.ReentrantLock[]::new);
+  private final boolean frozenEval = io.justsearch.configuration.FrozenEvalMode.requested();
   private final OperationStore store;
   private final Clock clock;
   private final SettingsCommitOwner settingsOwner;
@@ -144,6 +145,7 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
 
   @Override public Result resumeForget(String key,
       Function<OperationRecordHandle, OperationExecution> body) {
+    requireMutableLifetime();
     requireRecoveryOwner(OperationKind.FORGET);
     OperationRecord row = store.find(key).orElseThrow(() -> new IllegalArgumentException("Forget intent is unavailable"));
     if (row.descriptor().kind() != OperationKind.FORGET
@@ -156,6 +158,7 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
   }
 
   @Override public Optional<OperationRecord> requestForgetWithdrawal(String key) {
+    requireMutableLifetime();
     requireRecoveryOwner(OperationKind.FORGET);
     var row = store.requestForgetWithdrawal(key);
     row.ifPresent(found -> publishIfTerminal(controlFor(found), found));
@@ -267,7 +270,10 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
     this.clock = Objects.requireNonNull(clock, "clock");
     this.ownedKinds = Set.copyOf(ownedKinds);
     interrupted = store.openRecords();
-    if (settingsOwner != null) {
+    if (frozenEval && !interrupted.isEmpty()) {
+      throw new IllegalStateException("Frozen eval refuses unfinished operation recovery");
+    }
+    if (!frozenEval && settingsOwner != null) {
       if (!this.ownedKinds.containsAll(Set.of(OperationKind.SETTINGS_APPLY, OperationKind.RECONFIGURE))) {
         throw new IllegalArgumentException("Settings owner requires both settings kinds");
       }
@@ -289,6 +295,7 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
 
   /** Called once by the composition root after fixed component owners are sealed, before API bind. */
   @Override public boolean reconcileSettingsAfterComposition() {
+    if (frozenEval) return false;
     if (settingsOwner == null) return true;
     if (!settingsOwner.recoverCommittedComposition()) return false;
     reconcileOwned(OperationKind.SETTINGS_APPLY, settingsOwner::reconcile);
@@ -323,7 +330,12 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
         new PreparationScope(stable, store.lookup(stable.key(), stable.descriptor()))));
   }
 
+  private void requireMutableLifetime() {
+    if (frozenEval) throw new IllegalStateException("Frozen eval refuses operation mutation");
+  }
+
   private <T> T withKey(Request request, Function<Request, T> prepare) {
+    requireMutableLifetime();
     Objects.requireNonNull(request, "request");
     Objects.requireNonNull(prepare, "prepare");
     String key = request.key() == null ? OperationKeys.generate(clock) : request.key();
@@ -426,6 +438,7 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
   @Override
   public PreparedAttempt acceptIngestChild(OperationRecordHandle parent,
       io.justsearch.app.api.operations.RecordedRootPlan.Root root) {
+    requireMutableLifetime();
     if (!(parent instanceof OperationAttemptRunnerImpl.Control control) || control.owner != this
         || control.done.isCompletedExceptionally() || ingestPlanResolver == null) {
       throw new OperationStoreException(OperationStoreException.Code.CHILD_ACCEPTANCE_REFUSED, null);
@@ -649,6 +662,7 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
 
   @Override
   public Result start(PreparedAttempt attempt, Function<OperationRecordHandle, OperationExecution> body) {
+    requireMutableLifetime();
     Prepared prepared = requirePrepared(attempt);
     if (prepared.existing || !prepared.control.started.compareAndSet(false, true)) {
       return existingResult(prepared.control);
@@ -657,6 +671,7 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
   }
 
   private Result execute(Control control, Function<OperationRecordHandle, OperationExecution> body, boolean resume) {
+    requireMutableLifetime();
     synchronized (executionLock) {
       if (closing) throw new IllegalStateException("Operation execution refused during process shutdown");
       liveExecutions++;
@@ -1001,6 +1016,7 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
 
   @Override
   public void rejectBeforeStart(PreparedAttempt attempt, String reason) {
+    requireMutableLifetime();
     Prepared prepared = requirePrepared(attempt);
     if (prepared.existing) return;
     if (prepared.control.done.isDone()) {
@@ -1026,6 +1042,8 @@ public final class OperationAttemptRunnerImpl implements OperationAttemptRunner 
   }
 
   private void reconcileOwned(OperationKind kind, Function<OperationRecord, Reconciliation> reconciler) {
+    // Frozen boot admitted no interrupted work; registering a reconciler cannot grant effects.
+    if (frozenEval) return;
     if (!ownedKinds.contains(kind)) throw new IllegalArgumentException("Kind has no declared owner");
     for (OperationRecord previous : interrupted) {
       if (previous.descriptor().kind() != kind) continue;

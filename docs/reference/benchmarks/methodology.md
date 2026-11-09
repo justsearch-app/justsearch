@@ -7,6 +7,8 @@ description: "How JustSearch measures retrieval quality: the reproducible single
 
 # Benchmark Methodology
 
+**Agent-utility campaign freeze (2026-11-09):** Fresh and resumed live agent-utility campaigns are frozen. Their commands and runbooks remain available for historical reproduction and offline analysis, along with published evidence and offline replay. Neighboring experiments retain their existing status.
+
 This doc answers: *"What do JustSearch's retrieval-quality numbers mean, how were they produced, and how
 do I reproduce them?"* It is the standalone methodology behind the README's benchmark table. The numbers
 are a **projection** of one canonical, reproducible release object (`scripts/jseval/release.v1.json`),

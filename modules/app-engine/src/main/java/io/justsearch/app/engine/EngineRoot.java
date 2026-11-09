@@ -661,6 +661,7 @@ public final class EngineRoot implements WorkerHost {
     }
   }
   private final ServerFactory serverFactory;
+  private final boolean frozenEval = io.justsearch.configuration.FrozenEvalMode.requested();
   private boolean clientReady;
   private final RecordedIngestionCoordinator recordedIngestion;
 
@@ -1152,20 +1153,25 @@ public final class EngineRoot implements WorkerHost {
                 () -> requestRestart(started))));
     this.client = built;
     try {
-      recordedIngestion.bindProducer(built::enumerateRecordedRoot,
-          built::enumerateRecoveredRecordedRoot, built::enumerateWatchedRecordedRoot);
-      recordedIngestion.bindBulkProducer(built::enumerateWatchedCapturedRoots, built,
-          () -> requestRestart(started),
-          operationKey -> {
-            try {
-              liveMigrationStartAttempt = new LiveMigrationStartAttempt(
-                  IndexGenerationManager.recordedGenerationId(operationKey),
-                  started.beginRecordedBuildingLiveAsync(
-                      operationKey, () -> requestRestart(started)));
-            } catch (IOException invalid) {
-              throw new IllegalStateException("Recorded bulk operation key is noncanonical", invalid);
-            }
-          });
+      // Frozen Worker composition deliberately owns no recorded-ingestion attachment. Binding
+      // either producer would require that attachment and can start durable maintenance work.
+      // Ordinary read-only serving phases still keep their legitimate producer composition.
+      if (!frozenEval) {
+        recordedIngestion.bindProducer(built::enumerateRecordedRoot,
+            built::enumerateRecoveredRecordedRoot, built::enumerateWatchedRecordedRoot);
+        recordedIngestion.bindBulkProducer(built::enumerateWatchedCapturedRoots, built,
+            () -> requestRestart(started),
+            operationKey -> {
+              try {
+                liveMigrationStartAttempt = new LiveMigrationStartAttempt(
+                    IndexGenerationManager.recordedGenerationId(operationKey),
+                    started.beginRecordedBuildingLiveAsync(
+                        operationKey, () -> requestRestart(started)));
+              } catch (IOException invalid) {
+                throw new IllegalStateException("Recorded bulk operation key is noncanonical", invalid);
+              }
+            });
+      }
       clientReady = true;
     } catch (RuntimeException | Error failure) {
       try { close(); }

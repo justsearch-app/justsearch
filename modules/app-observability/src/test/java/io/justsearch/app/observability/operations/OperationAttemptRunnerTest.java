@@ -10,6 +10,7 @@ import io.justsearch.app.api.operations.OperationDescriptor;
 import io.justsearch.app.api.operations.OperationKeys;
 import io.justsearch.agent.api.registry.OperationKind;
 import io.justsearch.app.api.operations.OperationReceipt;
+import io.justsearch.app.api.operations.OperationRecord;
 import io.justsearch.app.api.operations.OperationState;
 import io.justsearch.app.api.operations.OperationStoreException;
 import io.justsearch.app.api.settings.CompositionV2;
@@ -164,6 +165,110 @@ final class OperationAttemptRunnerTest {
       assertEquals(OperationState.COMPLETE, complete.state());
       assertEquals(1, complete.unitsCompleted());
       assertEquals(new OperationReceipt("SUCCESS", "batch-123"), complete.receipt());
+    }
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void observerAssertionCannotContradictCommittedRunnerCompletion(boolean asynchronous) throws Exception {
+    var before = new java.util.ArrayList<OperationRecord>();
+    var after = new java.util.ArrayList<OperationRecord>();
+    var bodyProgress = new AtomicInteger();
+    OperationRecord terminal;
+    Throwable publicFailure = null;
+    try (var store = store();
+        var ignoredBefore = store.subscribeCompletions(before::add);
+        var ignoredFailure = store.subscribeCompletions(row -> { throw new AssertionError("observer assertion"); });
+        var ignoredAfter = store.subscribeCompletions(after::add)) {
+      var runner = new OperationAttemptRunnerImpl(store, CLOCK, Set.of());
+      var attempt = runner.accept(request(OperationKind.OPERATION, EngineContext.Survival.INTERACTIVE));
+      var actual = new CompletableFuture<OperationResult>();
+      var outcome = OperationResult.success("effect completed", "effect-7");
+      try {
+        var result = runner.start(attempt, handle -> {
+          bodyProgress.incrementAndGet();
+          handle.checkpoint("effect-7", 7, 2);
+          bodyProgress.incrementAndGet();
+          return asynchronous ? new OperationExecution(OperationResult.success("started"), actual)
+              : OperationExecution.finished(outcome);
+        });
+        assertTrue(result.response().success());
+        if (asynchronous) {
+          assertFalse(result.completion().toCompletableFuture().isDone());
+          assertEquals(OperationState.RUNNING, store.find(attempt.accepted().key()).orElseThrow().state());
+          assertTrue(actual.complete(outcome));
+        }
+        assertEquals(store.find(attempt.accepted().key()).orElseThrow(),
+            result.completion().toCompletableFuture().get(2, TimeUnit.SECONDS));
+      } catch (AssertionError | java.util.concurrent.ExecutionException failure) {
+        publicFailure = failure;
+      }
+      assertEquals(2, bodyProgress.get(), "the actual body entered and returned its execution");
+      terminal = store.find(attempt.accepted().key()).orElseThrow();
+      assertEquals(OperationState.COMPLETE, terminal.state());
+      assertEquals(new OperationReceipt("SUCCESS", "effect-7"), terminal.receipt());
+      assertEquals(7, terminal.unitsCompleted());
+      assertEquals(2, terminal.unitsFailed());
+      assertEquals(1, terminal.attempts());
+      try (var db = DriverManager.getConnection("jdbc:sqlite:" + temp.resolve("operations.db"));
+          var query = db.prepareStatement("SELECT state, result_json, units_completed, units_failed, attempts FROM operations WHERE id = ?")) {
+        query.setLong(1, terminal.id());
+        try (var row = query.executeQuery()) {
+          assertTrue(row.next());
+          assertEquals("COMPLETE", row.getString("state"));
+          assertEquals(terminal.receipt(), new tools.jackson.databind.ObjectMapper()
+              .readValue(row.getString("result_json"), OperationReceipt.class));
+          assertEquals(7, row.getLong("units_completed"));
+          assertEquals(2, row.getLong("units_failed"));
+          assertEquals(1, row.getInt("attempts"));
+        }
+      }
+      assertFalse(runner.persistenceFailure().toCompletableFuture().isDone(), "no persistence write failed");
+      runner.beginClosing();
+      assertTrue(runner.awaitDrained(Duration.ZERO));
+    }
+    try (var reopened = store()) {
+      assertEquals(terminal, reopened.find(terminal.key()).orElseThrow());
+    }
+    assertNull(publicFailure, "Public completion contradicted durable terminal commit: " + terminal);
+    assertEquals(java.util.List.of(terminal), before);
+    assertEquals(java.util.List.of(terminal), after);
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void bodyAndAsyncEffectErrorsRemainFatalAndLeaveTheDurableRowForRecovery(boolean asynchronous) throws Exception {
+    try (var store = store()) {
+      var runner = new OperationAttemptRunnerImpl(store, CLOCK, Set.of());
+      var attempt = runner.accept(request(OperationKind.OPERATION, EngineContext.Survival.INTERACTIVE));
+      var fatal = new AssertionError("actual effect failed");
+      var actual = new CompletableFuture<OperationResult>();
+      var bodyEntered = new AtomicInteger();
+      var observed = new AtomicInteger();
+      try (var ignoredSubscription = store.subscribeCompletions(row -> observed.incrementAndGet())) {
+        if (asynchronous) {
+          var result = runner.start(attempt, handle -> {
+            bodyEntered.incrementAndGet();
+            return new OperationExecution(OperationResult.success("started"), actual);
+          });
+          assertFalse(result.completion().toCompletableFuture().isDone());
+          assertTrue(actual.completeExceptionally(fatal));
+        } else {
+          assertSame(fatal, assertThrows(AssertionError.class, () -> runner.start(attempt, handle -> {
+            bodyEntered.incrementAndGet();
+            throw fatal;
+          })));
+        }
+        assertEquals(1, bodyEntered.get());
+        assertSame(fatal, assertThrows(CompletionException.class,
+            () -> attempt.completion().toCompletableFuture().join()).getCause());
+        assertEquals(OperationState.RUNNING, store.find(attempt.accepted().key()).orElseThrow().state());
+        assertNull(store.find(attempt.accepted().key()).orElseThrow().receipt());
+        assertEquals(0, observed.get());
+        assertFalse(runner.persistenceFailure().toCompletableFuture().isDone());
+        runner.beginClosing();
+        assertTrue(runner.awaitDrained(Duration.ZERO));
+      }
     }
   }
 
@@ -504,7 +609,7 @@ final class OperationAttemptRunnerTest {
             try { result = method.invoke(store, args); }
             catch (java.lang.reflect.InvocationTargetException failure) { throw failure.getCause(); }
             if (prune && method.getName().equals("find") && result instanceof Optional<?> optional
-                && optional.orElse(null) instanceof io.justsearch.app.api.operations.OperationRecord row
+                && optional.orElse(null) instanceof OperationRecord row
                 && row.state().terminal()) {
               clock.setMillis(CLOCK.millis() + Duration.ofDays(31).toMillis());
               store.pruneHistory();

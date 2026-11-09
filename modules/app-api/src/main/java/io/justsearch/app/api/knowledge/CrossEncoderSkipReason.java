@@ -7,10 +7,9 @@ package io.justsearch.app.api.knowledge;
  *
  * <p>The Head owns this vocabulary: the cross-encoder is orchestrated in {@code
  * KnowledgeSearchEngine}, so unlike the Worker-owned {@code SearchReasonCode} (which populates the
- * three query-level degradation fields) these codes are emitted head-side. Four of them
- * ({@link #DEADLINE_EXCEEDED}, {@link #MODEL_NOT_LOADED}, {@link #INFERENCE_FAILED}, and {@link
- * #SEARCH_DEADLINE_EXCEEDED}, which the Head also produces) can originate in
- * the Worker's {@code RerankResponse.skip_reason} and are normalised in through {@link
+ * three query-level degradation fields) these codes are emitted head-side. Runtime skip reasons
+ * and the search-only {@link #QUERY_TOO_LONG} policy reason can originate in the Worker's
+ * {@code RerankResponse.skip_reason} and are normalised in through {@link
  * #fromWorkerSkipReason(String)} — an unrecognised Worker string resolves to {@link #UNKNOWN}
  * rather than passing through raw, so a code with no FE wording can never reach a user.
  *
@@ -45,6 +44,8 @@ public enum CrossEncoderSkipReason {
   MODEL_NOT_CONFIGURED,
   /** Tempdoc 643 perf-skip: leg agreement alone was decisive, so the RPC was not worth paying. */
   FUSION_CONFIDENT,
+  /** The search query exceeds half the active tokenizer's effective pair-token budget. */
+  QUERY_TOO_LONG,
 
   // === drops (the relevance model should have run) ===
   /**
@@ -104,7 +105,8 @@ public enum CrossEncoderSkipReason {
           DOCS_TOO_LONG,
           PIPELINE_NOT_ELIGIBLE,
           MODEL_NOT_CONFIGURED,
-          FUSION_CONFIDENT -> false;
+          FUSION_CONFIDENT,
+          QUERY_TOO_LONG -> false;
     };
   }
 

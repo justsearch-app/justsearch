@@ -104,7 +104,7 @@ final class KnowledgeSearchEnginePagingTest {
       int count = invocation.getArgument(3);
       return IntStream.range(0, count).map(i -> count - i - 1).boxed().toList();
     });
-    when(client.rerank(any(), any(), anyLong(), any())).thenReturn(
+    when(client.rerankSearch(any(), any(), anyLong(), any())).thenReturn(
         RerankResponse.newBuilder().setSkipped(true).setSkipReason("MODEL_NOT_LOADED").build());
     var engine = new KnowledgeSearchEngine(bootstrap, mock(SearchPerSourceExecutor.class),
         OnlineAiService.unavailable(), lambdaMart, ConfigStore.global());
@@ -134,7 +134,7 @@ final class KnowledgeSearchEnginePagingTest {
       assertEquals(expectedSort, request.getSort());
     }
     verify(lambdaMart, never()).rerank(any(), any(), any(), anyInt());
-    verify(client, never()).rerank(any(), any(), anyLong(), any());
+    verify(client, never()).rerankSearch(any(), any(), anyLong(), any());
   }
 
   private static KnowledgeSearchRequest request(String sort, String cursor) {

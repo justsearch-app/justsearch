@@ -36,9 +36,6 @@ def _build_layout(
     projections = projections if projections is not None else [
         "contract_violations",
         "rate_timeline",
-        "stratified_metrics",
-        "bootstrap_ci",
-        "rank_diff",
         "cpu_fallback_counts",
     ]
 
@@ -90,15 +87,22 @@ class TestEvaluate:
         report = gate.evaluate(tmp_path)
         assert report["exit_code"] == 1
 
-    def test_fails_when_required_projection_missing(self, gate, tmp_path):
+    @pytest.mark.parametrize("missing_projection", [
+        "contract_violations", "rate_timeline",
+    ])
+    def test_fails_when_required_projection_missing(
+        self, gate, tmp_path, missing_projection,
+    ):
         _build_layout(tmp_path,
-                      projections=["contract_violations", "rate_timeline"])
+                      projections=[name for name in
+                                   ["contract_violations", "rate_timeline"]
+                                   if name != missing_projection])
         report = gate.evaluate(tmp_path)
         assert report["exit_code"] == 1
         missing = next(c for c in report["checks"]
                        if c["name"] == "required-projections-present")
         assert missing["status"] == "fail"
-        assert "stratified_metrics" in missing["detail"]
+        assert missing_projection in missing["detail"]
 
     def test_passes_with_extra_projections(self, gate, tmp_path):
         _build_layout(tmp_path,

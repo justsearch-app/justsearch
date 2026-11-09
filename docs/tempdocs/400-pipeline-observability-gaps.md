@@ -6,7 +6,7 @@ title: "400 — Pipeline observability: deltas on the existing telemetry stack (
 
 ## 0. Status
 
-**Scoped for implementation.** This tempdoc captures the observability gaps
+**Historical projections (2026-11-09):** `bootstrap_ci`, `rank_diff` and `stratified_metrics` generators/tests are retired; references below describe past implementations and captured evidence. **Scoped for implementation.** This tempdoc captures the observability gaps
 surfaced by a post-§14.28 end-to-end analysis run (commit `0ed0321ce`,
 2026-04-21), the delta architecture that answers them on top of the
 existing `modules/telemetry` stack documented in

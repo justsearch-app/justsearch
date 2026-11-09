@@ -44,6 +44,7 @@ from .types import (
     parse_content_text,
     parse_qrels_text,
     sha256_text,
+    read_regular_text,
 )
 
 CONFIG_SCHEMA = "jseval.quality.config.v1"
@@ -153,7 +154,7 @@ def load_config(alias_or_path: str | os.PathLike) -> QualityConfig:
             raise CollectionError(f"unknown collection alias {str(alias_or_path)!r} "
                                   f"(known: {', '.join(known_aliases())})")
     try:
-        return QualityConfig.from_dict(json.loads(p.read_text(encoding="utf-8")))
+        return QualityConfig.from_dict(json.loads(read_regular_text(p, encoding="utf-8")))
     except CollectionError:
         raise
     except (OSError, ValueError, KeyError, TypeError, AttributeError) as e:
@@ -186,11 +187,11 @@ def load_collection(path: str | os.PathLike) -> Collection:
     """Load a stored collection, refusing any file that disagrees with the recorded digests."""
     d = Path(path)
     try:
-        meta = json.loads((d / "collection.v1.json").read_text(encoding="utf-8"))
-        qrels_text = (d / "qrels.tsv").read_text(encoding="utf-8")
-        manifest_text = (d / "manifest.tsv").read_text(encoding="utf-8")
-        content_text = (d / "content.tsv").read_text(encoding="utf-8")
-        query_lines = (d / "queries.jsonl").read_text(encoding="utf-8").splitlines()
+        meta = json.loads(read_regular_text(d / "collection.v1.json", encoding="utf-8"))
+        qrels_text = read_regular_text(d / "qrels.tsv", encoding="utf-8")
+        manifest_text = read_regular_text(d / "manifest.tsv", encoding="utf-8")
+        content_text = read_regular_text(d / "content.tsv", encoding="utf-8")
+        query_lines = read_regular_text(d / "queries.jsonl", encoding="utf-8").splitlines()
     except (OSError, ValueError) as e:
         raise CollectionError(f"{d}: incomplete collection: {e}") from None
     if not isinstance(meta, dict) or meta.get("schema") != COLLECTION_SCHEMA:
@@ -422,7 +423,7 @@ def from_beir_dir(dataset_dir: str | os.PathLike, cfg: QualityConfig) -> Collect
                 raise ValueError(f"queries.jsonl line {n}: query {qid} has no text")
             queries[qid] = QueryText(row["text"], {**cfg.labels, **(row.get("groups") or {})})
         judgments: dict[str, dict[str, int]] = {}
-        for n, line in enumerate((d / "qrels" / "test.tsv").read_text(encoding="utf-8")
+        for n, line in enumerate(read_regular_text(d / "qrels" / "test.tsv", encoding="utf-8")
                                  .splitlines(), 1):
             parts = line.split("\t")
             if n == 1 and parts[0] == "query-id":
@@ -455,7 +456,7 @@ def from_beir_dir(dataset_dir: str | os.PathLike, cfg: QualityConfig) -> Collect
 
 
 def _jsonl_rows(path: Path):
-    for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+    for n, line in enumerate(read_regular_text(path, encoding="utf-8").splitlines(), 1):
         if not line.strip():
             continue
         try:

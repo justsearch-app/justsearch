@@ -42,12 +42,71 @@ public final class SqliteStoreSnapshot implements AutoCloseable {
 
   public Connection connection() { return connection; }
 
+  /** Require the current owner-defined shape without allowing CREATE/repair on the source. */
+  public void requireCurrentStructure(int version, Connection expected) throws SQLException {
+    try (var query = connection.createStatement(); var row = query.executeQuery("PRAGMA user_version")) {
+      if (!row.next() || row.getInt(1) != version) {
+        throw new SQLException("Frozen eval requires current SQLite schema version " + version);
+      }
+    }
+    try (var query = connection.createStatement(); var rows = query.executeQuery("PRAGMA quick_check")) {
+      if (!rows.next() || !"ok".equals(rows.getString(1)) || rows.next()) {
+        throw new SQLException("Frozen eval SQLite integrity check failed");
+      }
+    }
+    try (var query = expected.createStatement(); var rows = query.executeQuery(
+        "SELECT type,name,tbl_name FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'")) {
+      while (rows.next()) {
+        String type = rows.getString(1), name = rows.getString(2);
+        try (var actual = connection.prepareStatement(
+            "SELECT tbl_name FROM sqlite_master WHERE type=? AND name=?")) {
+          actual.setString(1, type); actual.setString(2, name);
+          try (var row = actual.executeQuery()) {
+            if (!row.next() || !rows.getString(3).equals(row.getString(1))) {
+              throw new SQLException("Frozen eval requires SQLite " + type + " " + name);
+            }
+          }
+        }
+        if ("table".equals(type)) {
+          if (!columns(expected, name).equals(columns(connection, name))) {
+            throw new SQLException("Frozen eval requires current SQLite columns for " + name);
+          }
+        }
+      }
+    }
+  }
+
+  private static java.util.Map<String, String> columns(Connection database, String table)
+      throws SQLException {
+    var columns = new java.util.TreeMap<String, String>();
+    try (var query = database.createStatement(); var rows = query.executeQuery(
+        "PRAGMA table_info(\"" + table.replace("\"", "\"\"") + "\")")) {
+      while (rows.next()) {
+        String value = rows.getString("dflt_value");
+        String name = rows.getString("name");
+        // The base jobs owner and its v10 ALTER use these two equivalent NULL spellings.
+        if ("jobs".equals(table) && "first_failed_at".equals(name)
+            && (value == null || "NULL".equalsIgnoreCase(value.trim()))) value = "NULL";
+        columns.put(name, rows.getString("type")
+            + "/" + rows.getInt("notnull") + "/" + rows.getInt("pk") + "/" + value);
+      }
+    }
+    return columns;
+  }
+
   @Override
   public void close() throws SQLException, IOException {
+    Throwable failure = null;
     try {
       connection.close();
+    } catch (SQLException | RuntimeException | Error closeFailure) {
+      failure = closeFailure;
+      throw closeFailure;
     } finally {
-      removeCopies(directory);
+      try { removeCopies(directory); } catch (IOException | RuntimeException | Error cleanupFailure) {
+        if (failure == null) throw cleanupFailure;
+        if (cleanupFailure != failure) failure.addSuppressed(cleanupFailure);
+      }
     }
   }
 

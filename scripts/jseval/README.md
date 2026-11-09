@@ -123,6 +123,38 @@ through pausable background admission and may wait for the Gradle slot. Scoring
 never builds or repairs an index and refuses missing, corrupt or stale inputs
 as **not ready**. Re-run preparation outside the exclusive window.
 
+An explicit frozen-index comparison uses the unchanged original baseline's cached
+indexes with the current clean committed runtime. Prepare owned ordinary byte
+copies without starting Engine, then check all default collections in one admitted
+window:
+
+```sh
+python -m jseval quality prepare-frozen --baseline-dir ORIGINAL_BASELINES --cache-root ORIGINAL_CACHE --output OWN_COPIES --models-dir MODELS
+python -m jseval quality check --frozen-indexes OWN_COPIES --baseline-dir ORIGINAL_BASELINES --runs-dir OWN_RUNS --models-dir MODELS --window-seconds 600
+```
+
+Optional positional aliases may explicitly order the complete current default set,
+each exactly once, with Enron last (for example, `real-use scifact miracl-de enron-email`
+when real-use is fully labelled). Frozen selections always use packaged canonical
+recipes and comparison settings. The same measured estimate and single window
+deadline apply; choosing an order does not establish that it fits.
+
+This mode requires Linux x86_64 and stopped original indexes. Read-only OFD locks
+protect their existing Engine lock files; original document paths remain in use.
+Missing ownership, source drift, runtime input mismatch, payload changes or budget
+failure refuse without rebuilding or repairing the original. Copies, including
+SQLite WAL/SHM, remain under the chosen output for inspection; they are never
+published into the shared cache. Runtime and historical index-build identities are
+separate in each `frozen-index` record and report. Present payload hashes do not
+retroactively establish a full payload inventory at historical baseline time.
+
+Retain each `run.jsonl` with its fixed `run.frozen-index.json` and `frozen-evidence/`
+siblings. Stored compare uses the original `--baseline`; frozen score also requires
+`--baseline`. Their fixed relative evidence references survive moving that folder.
+Frozen records cannot replace baselines or seed ordinary/sensitivity history;
+direct Python comparisons require `frozen_index.validated_pair(candidate, baseline)`
+and its returned `frozen_context`. Text-only parsing grants inspection only.
+
 An index is owned by the collection's document identity: population (count,
 manifest and content digests), layout and witness formats. Editing queries or
 judgments therefore reuses the prepared index; changing a document, the layout

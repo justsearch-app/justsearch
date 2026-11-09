@@ -1,0 +1,207 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-07T09:06:29.219Z",
+  "revision": "295cb1b705a88cb6834add3c5093bb88ea9d9d66",
+  "tree": "a0f9a5ccd8dfd67e21547665eca89898f125b58d",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.api.runtime.child.ChatLaunchCompatibilityTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 10066
+    },
+    {
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.InferenceCompositionRootPartialAssemblyTest\" --tests \"io.justsearch.indexerworker.server.PlannedCpuCompositionTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 8868
+    },
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchQueryBudgetTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 6467
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatLaunchCompatibilityTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/api/runtime/child/ChatLaunchCompatibilityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b208669c5655c66014dd75490313aac9f1e5afdfcae0932016e5ce3aec66a603",
+      "executed": false,
+      "skipped": true,
+      "outcome": "partly-skipped",
+      "cases": [
+        {
+          "name": "aFailureBeforeResumeLeavesNoProcessBehind()",
+          "status": "passed"
+        },
+        {
+          "name": "aCmdLauncherSeesTheSameArgumentsAsUnderTheJdk()",
+          "status": "skipped"
+        },
+        {
+          "name": "aFailureJoiningTheJobLeavesNoProcessBehind()",
+          "status": "skipped"
+        },
+        {
+          "name": "chatLaunchPreservesPipesArgumentsEnvironmentAndWorkingDirectory()",
+          "status": "passed"
+        },
+        {
+          "name": "embeddedQuotesReachAnExecutableAsUnderTheJdk()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootPartialAssemblyTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootPartialAssemblyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e07506ed01f1abfb936cecd13272571aa9557806311e7fcc25f46794e95de88f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] EMBEDDING, false",
+          "status": "passed"
+        },
+        {
+          "name": "[2] EMBEDDING, true",
+          "status": "passed"
+        },
+        {
+          "name": "[3] NER, false",
+          "status": "passed"
+        },
+        {
+          "name": "[4] NER, true",
+          "status": "passed"
+        },
+        {
+          "name": "[5] BGE_M3, false",
+          "status": "passed"
+        },
+        {
+          "name": "[6] BGE_M3, true",
+          "status": "passed"
+        },
+        {
+          "name": "[7] SPLADE, false",
+          "status": "passed"
+        },
+        {
+          "name": "[8] SPLADE, true",
+          "status": "passed"
+        },
+        {
+          "name": "[9] RERANKER, false",
+          "status": "passed"
+        },
+        {
+          "name": "[10] RERANKER, true",
+          "status": "passed"
+        },
+        {
+          "name": "[11] CITATION, false",
+          "status": "passed"
+        },
+        {
+          "name": "[12] CITATION, true",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PlannedCpuCompositionTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/PlannedCpuCompositionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:34ef59bd09f5a720fbab754e142968830bfe0a32118f9dc95df1abb2a367abb1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "cudaPublicationRemainsStrictForUnknownOrPositivePolicy(false)",
+          "status": "passed"
+        },
+        {
+          "name": "cudaPublicationRemainsStrictForUnknownOrPositivePolicy(true)",
+          "status": "passed"
+        },
+        {
+          "name": "plannedFp32QueryPreparesAndValidatesItsIntentionalCpuSession(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "cudaWarmupRemainsStrictForUnknownOrPositivePolicy(false)",
+          "status": "passed"
+        },
+        {
+          "name": "cudaWarmupRemainsStrictForUnknownOrPositivePolicy(true)",
+          "status": "passed"
+        },
+        {
+          "name": "capturedNonFp16ModelRemainsComposableOnCpu(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchQueryBudgetTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchQueryBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d7ab4231408386800cf433b528ee3d5eca3036ede1572c11dd77cc86f80adfc1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "cancellationDuringCountCannotBecomePolicySkipOrInference()",
+          "status": "passed"
+        },
+        {
+          "name": "defaultOffAndEmptyCandidatesDoNotCountAndRetainExistingRerankBehavior()",
+          "status": "passed"
+        },
+        {
+          "name": "expiryDuringCountCannotBecomeSuccessfulPolicySkip()",
+          "status": "passed"
+        },
+        {
+          "name": "optedInLongQuerySkipsOnceWithoutScoringAndNextShortQueryStillRuns()",
+          "status": "passed"
+        },
+        {
+          "name": "genuineCountingFailureKeepsWorkerFailureSemantics()",
+          "status": "passed"
+        },
+        {
+          "name": "selectedRerankerDoesNotChangeBetweenCountAndInference()",
+          "status": "passed"
+        },
+        {
+          "name": "coldOwnerKeepsLoadingReasonAndLaterWarmOwnerEnablesPolicy()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:e54b0feef95a19a1980b346dea283635b2c6b9db03ea0f07f3bcdaa514a41e4e"
+}

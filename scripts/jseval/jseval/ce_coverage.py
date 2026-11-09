@@ -44,7 +44,7 @@ DETERMINISTIC_SKIP_REASONS = frozenset({
     "NAVIGATIONAL_QUERY",    # :949 — queryType == NAVIGATIONAL
     "BELOW_MIN_THRESHOLD",   # :953 — results.size() < rerankConfig.minHitsThreshold()
     "DOCS_TOO_LONG",         # :956 — avgContentLengthChars > maxAvgDocLengthChars
-    "FUSION_CONFIDENT",      # :979 — tempdoc 643 perf-skip, decided from leg agreement alone
+    "FUSION_CONFIDENT", "QUERY_TOO_LONG",      # :979 — tempdoc 643 perf-skip, decided from leg agreement alone
 })
 
 # The CE was never in play for this query — a configuration state, not a skip decision. These do

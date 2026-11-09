@@ -2,6 +2,7 @@
 package io.justsearch.app.services.worker;
 
 import io.justsearch.app.api.knowledge.PipelineConfig;
+import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.ipc.SearchMode;
 import io.justsearch.ipc.SearchQuerySyntax;
 import io.justsearch.ipc.SearchSort;
@@ -44,8 +45,7 @@ final class SearchPipelinePresets {
    * backwards-compatibility translation layer for searches that arrive with only a {@code mode}
    * string. Package-private for contract testing.
    */
-  static PipelineConfig expandPreset(SearchMode mode, RerankerConfig rerankConfig) {
-    boolean ce = rerankConfig.enabled();
+  static PipelineConfig expandPreset(SearchMode mode, boolean ce) {
     return switch (mode) {
       case SEARCH_MODE_TEXT -> new PipelineConfig(true, false, false, "none", true, ce, 0, true, true);
       case SEARCH_MODE_VECTOR ->
@@ -76,8 +76,7 @@ final class SearchPipelinePresets {
    * <p>{@code dense_enabled} stays false on the app-api record; the proto marker is set via
    * {@link #toProtoPipelineConfig(PipelineConfig, boolean)}.
    */
-  static PipelineConfig autoPreset(RerankerConfig rerankConfig) {
-    boolean ce = rerankConfig.enabled();
+  static PipelineConfig autoPreset(boolean ce) {
     return new PipelineConfig(true, false, false, "rrf", true, ce, 0, true, true);
   }
 
@@ -105,8 +104,9 @@ final class SearchPipelinePresets {
    * {@code false}) prevents that drift from silently reoccurring.
    */
   static io.justsearch.ipc.PipelineConfig defaultHybridProtoConfig() {
-    return toProtoPipelineConfig(
-        expandPreset(SearchMode.SEARCH_MODE_HYBRID, RerankerConfig.fromEnv()), false);
+    var config = ConfigStore.global().get();
+    boolean ce = RerankerConfig.from(config).enabled() && !RerankerConfig.searchDefaultOff(config);
+    return toProtoPipelineConfig(expandPreset(SearchMode.SEARCH_MODE_HYBRID, ce), false);
   }
 
   /**

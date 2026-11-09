@@ -360,7 +360,7 @@ final class KnowledgeSearchEngineClassificationDispatchTest {
         requests.add(invocation.getArgument(0));
         return baseHits();
       });
-      when(client.rerank(anyString(), anyList(), anyLong(), any())).thenAnswer(invocation -> {
+      when(client.rerankSearch(anyString(), anyList(), anyLong(), any())).thenAnswer(invocation -> {
         reranks.add(invocation.getArgument(0));
         return RerankResponse.newBuilder().addSortedIndices(1).addSortedIndices(0)
             .addScores(1f).addScores(2f).build();

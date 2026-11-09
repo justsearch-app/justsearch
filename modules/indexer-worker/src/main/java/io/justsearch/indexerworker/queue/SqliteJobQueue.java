@@ -797,6 +797,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     void afterStep(int version) throws SQLException;
   }
 
+  private final boolean frozenEval = io.justsearch.configuration.FrozenEvalMode.requested();
   private final MigrationStepHook migrationStepHook;
   private final java.util.function.Function<String, RecordedClaimDecision> recordedClaimPolicy;
   private final SqliteQueueSwitchBufferOps switchBufferOps;
@@ -976,6 +977,9 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       if (connectionFailure != null) throw new SQLException(
           "Queue connection cleanup requires successful close before open", connectionFailure);
       if (connection != null) throw new SQLException("Queue is already open; close before reopening");
+      if (frozenEval) {
+        SqliteQueueMigrationOps.validateFrozenStartup(dbPath);
+      }
       Files.createDirectories(dbPath.getParent());
 
       // Capture whether DB existed BEFORE opening (JDBC will create empty file if missing)
@@ -1000,7 +1004,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         stmt.execute("PRAGMA auto_vacuum = 2");
       }
 
-      initSchema();
+      if (!frozenEval) initSchema();
       switchBufferOps.retirementAdmissions(() -> {
         try { return releaseRecovery != null && releaseRecovery.retiringBuild() ? releaseRecovery.retainedOrderFloor() : 0; }
         catch (IOException invalid) { throw new IllegalStateException("Retained admission order unavailable",invalid); }
@@ -1049,6 +1053,9 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       installClaimCursorInvalidation();
       installOutcomeMetrics();
 
+      if (frozenEval) {
+        try (var statement = connection.createStatement()) { statement.execute("PRAGMA query_only = ON"); }
+      }
       log.info("SqliteJobQueue opened: {}", dbPath);
       if (dbFailure != null) dbRecovery = new DbRecovery(dbFailure, connection, changeStream);
       dbRecoveryEligible = true;

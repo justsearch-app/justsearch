@@ -802,6 +802,20 @@ public final class WorkerSearchService {
       try {
         List<String> docTexts = request.getDocumentTextsList();
         long deadlineMs = request.getDeadlineMs();
+        // A cold selected owner retains ordinary loading/deferred-CPU behavior. Observing a
+        // warm owner permits a policy skip without acquiring a native inference session.
+        if (request.getSearchQueryBudgetPolicy() && !docTexts.isEmpty() && reranker.isQueryWarm()) {
+          call.remainingNanos();
+          boolean queryTooLong = reranker.exceedsSearchQueryBudget(request.getQuery());
+          // Counting cannot turn cancellation/expiry into a successful policy skip.
+          call.remainingNanos();
+          if (queryTooLong) {
+            return RerankResponse.newBuilder()
+                .setSkipped(true)
+                .setSkipReason("QUERY_TOO_LONG")
+                .build();
+          }
+        }
         // REQUIRED: this call has no answer of its own without the model, and asks to be
         // released at its deadline; the deadline and cancellation are the call's own.
         CrossEncoderReranker.RerankedResult result = reranker.rerank(

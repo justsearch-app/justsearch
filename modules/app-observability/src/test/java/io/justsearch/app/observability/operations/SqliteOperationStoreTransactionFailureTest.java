@@ -17,6 +17,8 @@ import io.justsearch.agent.api.registry.OperationKind;
 import io.justsearch.app.api.operations.OperationDescriptor;
 import io.justsearch.app.api.operations.OperationKeys;
 import io.justsearch.app.api.operations.OperationPreparedPayload;
+import io.justsearch.app.api.operations.OperationReceipt;
+import io.justsearch.app.api.operations.OperationState;
 import io.justsearch.app.api.operations.OperationStore;
 import io.justsearch.app.api.operations.OperationStoreException;
 import io.justsearch.core.context.EngineContext;
@@ -33,6 +35,7 @@ import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -166,6 +169,39 @@ final class SqliteOperationStoreTransactionFailureTest {
           store.close();
         }
       }
+    }
+  }
+
+  @Test
+  void terminalWriteErrorEscapesWithoutPublishingSuccess() throws Exception {
+    var dbPath = temp.resolve("terminal-error.db");
+    String key = OperationKeys.generate(CLOCK);
+    var notifications = new java.util.concurrent.atomic.AtomicInteger();
+    try (var store = new SqliteOperationStore(dbPath, CLOCK, ignored -> {});
+        var ignoredSubscription = store.subscribeCompletions(row -> notifications.incrementAndGet())) {
+      var accepted = store.accept(key, IDENTITY, CONTEXT, null).record();
+      assertTrue(store.start(accepted.id()));
+      Connection realConnection = connection(store);
+      var fatal = new AssertionError("actual terminal write failed");
+      Connection faulting = mock(Connection.class, AdditionalAnswers.delegatesTo(realConnection));
+      doAnswer(invocation -> {
+        String sql = invocation.getArgument(0, String.class);
+        if (sql.contains("UPDATE operations SET state = ?")) throw fatal;
+        return realConnection.prepareStatement(sql);
+      }).when(faulting).prepareStatement(anyString());
+      setConnection(store, faulting);
+      try {
+        assertSame(fatal, assertThrows(AssertionError.class,
+            () -> store.finish(accepted.id(), OperationState.COMPLETE, new OperationReceipt("SUCCESS", null))));
+        assertEquals(OperationState.RUNNING, store.find(key).orElseThrow().state());
+        assertEquals(0, notifications.get());
+      } finally {
+        setConnection(store, realConnection);
+      }
+    }
+    try (var reopened = new SqliteOperationStore(dbPath, CLOCK, ignored -> {})) {
+      assertEquals(OperationState.RUNNING, reopened.find(key).orElseThrow().state());
+      assertEquals(0, notifications.get());
     }
   }
 

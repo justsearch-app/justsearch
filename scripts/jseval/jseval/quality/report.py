@@ -97,6 +97,14 @@ def render(cmp: Comparison) -> str:
            f"Exit code {v.exit_code}. Collection version `{c.version[:16]}`, "
            f"{len(c.queries)} queries, {len(c.documents)} documents; numpy {v.numpy_version}.",
            ""]
+    if cmp.candidate and cmp.candidate.header.run_kind == 'frozen-index':
+        h = cmp.candidate.header
+        out += [f"Frozen-index comparison: current source `{h.commit}`, runtime snapshot "
+                f"`{h.runtime_identity['distribution']}`; original index-build snapshot "
+                f"`{h.identity['distribution']}`, index key `{h.index_key}`, historical baseline "
+                f"run SHA-256 `{h.frozen_index['baseline_run_sha256']}`.", "",
+                "Payload hashes bind the present cached index and this copy; no complete historical "
+                "payload inventory was recorded at baseline time.", ""]
     if v.reasons:
         out += ["## Reasons", ""] + [f"- {r}" for r in v.reasons] + [""]
     for arm, record in (("baseline", cmp.baseline), ("candidate", cmp.candidate)):

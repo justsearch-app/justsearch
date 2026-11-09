@@ -17,6 +17,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  * and commitment.
  */
 public final class WorkerMutationAdmission {
+  private final boolean frozenEval = io.justsearch.configuration.FrozenEvalMode.requested();
   private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock(true);
   private final ReentrantLock routingLock = new ReentrantLock(true);
   private final Object replayCertificateMonitor = new Object();
@@ -77,6 +78,7 @@ public final class WorkerMutationAdmission {
   }
 
   public Lease enter(Object expectedOwner) {
+    if (frozenEval) throw new IllegalStateException("Frozen eval refuses mutation");
     Objects.requireNonNull(expectedOwner, "expectedOwner");
     lock.readLock().lock();
     routingLock.lock();

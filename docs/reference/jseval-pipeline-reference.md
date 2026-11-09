@@ -7,6 +7,8 @@ description: "CLI reference for the jseval evaluation, pipeline profiling, and t
 
 # jseval Pipeline Reference
 
+**Agent-utility campaign freeze (2026-11-09):** Fresh and resumed live agent-utility campaigns are frozen. Their commands and runbooks remain available for historical reproduction and offline analysis, along with published evidence and offline replay. Neighboring experiments retain their existing status.
+
 `python -m jseval` is the canonical **agent-only** tool for dataset
 evaluation, pipeline profiling, and throughput benchmarking. It is not
 designed for human developers — all output and progress reporting is
@@ -1268,3 +1270,32 @@ jseval lives at `scripts/jseval/`. Key files:
 - `jseval/result_identity.py` — Collision-safe raw-hit capture, sidecar validation, and reconciliation
 
 When improving jseval, follow existing patterns in these files.
+
+
+### Frozen comparison Engine lifetime
+
+The frozen-index handle supplies the internal `JUSTSEARCH_FROZEN_EVAL=true` launch intent
+(`justsearch.eval.frozen`) through the installed eval launcher. This intent is process-local,
+requires eval mode and is captured when physical owners are constructed, including the Engine root.
+The installed frozen comparison invocation remains bounded to at most 600 seconds; this is not an
+unbounded manual launch mode. Ordinary prepared-only and sensitivity launches retain their writable
+startup and deferred writer upgrade.
+
+Frozen startup inspects the existing generation pointer and owned manifest without initialization
+or recovery. It requires an IDLE committed generation, known compatible metadata, current complete
+operations/jobs/entity-cluster SQLite structures and no pending preservation or queue/switch work.
+Missing, damaged, incompatible or unfinished stores are refused before repair. Search uses a
+read-only Lucene runtime without recovery; actual query/model composition and persisted cluster
+loading still run. Root replay, enrollment, watchers, synchronization, protected-content removal,
+indexing, enrichment, generation retirement and automatic recovery remain excluded for the lifetime.
+After genuine Worker startup, the Engine publishes its real client without binding either recorded
+or bulk ingestion producers. The recorded coordinator stays unattached and refusing. Mutation and
+migration controls refuse before durable work. Canonical direct evaluation HTTP reads remain available:
+status and runtime binding, document IDs, stored preview/chunks, commit metadata/debug state and text
+search, followed by orderly stop. Registry and MCP reads are unsupported during this frozen lifetime;
+their ordinary composition is unchanged. The original first error is retained when owned cleanup
+also fails.
+
+This launch branch does not change frozen preparation ownership, one-use copies, the protected
+payload definition, operational SQLite-page treatment, fingerprint/query witnesses or scoring gates.
+It makes no whole-SQLite-row immutability guarantee.

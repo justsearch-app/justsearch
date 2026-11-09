@@ -50,6 +50,7 @@ import io.justsearch.configuration.model.InstallContractIO;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.configuration.resolved.ResolvedPathResolver;
+import io.justsearch.reranker.RerankerConfig;
 import io.justsearch.configuration.PlatformPaths;
 import io.justsearch.configuration.persistence.AtomicFileWrites;
 import io.justsearch.configuration.RepoRootLocator;
@@ -599,7 +600,7 @@ public final class RuntimeActivationService
     Map<String, String> byPackage = new LinkedHashMap<>();
     for (FeatureRow row : resolveOnnxFeatureRows()) {
       String packageId = row.role().packageId();
-      String verdict = functionalVerdict(row.status());
+      String verdict = functionalVerdict(row.role(), row.status());
       // Two roles can share a package (EMBEDDING / BGE_M3): an active one wins, because the
       // capability IS observably running whichever role delivered it.
       if (!"active".equals(byPackage.get(packageId))) {
@@ -609,11 +610,15 @@ public final class RuntimeActivationService
     return byPackage;
   }
 
-  private static String functionalVerdict(AiRuntimeStatusResponse.OnnxFeatureStatus f) {
+  private static String functionalVerdict(
+      EncoderRole role, AiRuntimeStatusResponse.OnnxFeatureStatus f) {
     if ("unknown".equals(f.status())) {
       return "unknown";
     }
-    return "active".equals(f.status()) && f.modelActive() ? "active" : "inactive";
+    // Automatic search Off retains the same observed physical capability for repair messaging.
+    boolean policyOff = role == EncoderRole.RERANKER && "inactive".equals(f.status())
+        && "cpu_default_off".equals(f.reason());
+    return ("active".equals(f.status()) || policyOff) && f.modelActive() ? "active" : "inactive";
   }
 
   /** One resolved ONNX feature together with the encoder role that produced it. */
@@ -637,7 +642,7 @@ public final class RuntimeActivationService
                 EnvRegistry.RERANK_MODEL_PATH.envVar(),
                 EnvRegistry.RERANK_MODEL_PATH.sysProp(),
                 resolvedPath(config, EnvRegistry.RERANK_MODEL_PATH.sysProp()),
-                EncoderRole.RERANKER)),
+                EncoderRole.RERANKER, config)),
         new FeatureRow(
             EncoderRole.CITATION,
             resolveOneOnnxFeature(
@@ -648,7 +653,7 @@ public final class RuntimeActivationService
                 EnvRegistry.CITATION_SCORER_MODEL_PATH.envVar(),
                 EnvRegistry.CITATION_SCORER_MODEL_PATH.sysProp(),
                 resolvedPath(config, EnvRegistry.CITATION_SCORER_MODEL_PATH.sysProp()),
-                EncoderRole.CITATION)),
+                EncoderRole.CITATION, config)),
         new FeatureRow(
             EncoderRole.EMBEDDING,
             resolveWorkerEncoderFeature("embed", "Semantic embedding", EncoderRole.EMBEDDING)),
@@ -695,7 +700,8 @@ public final class RuntimeActivationService
       String pathEnv,
       String pathProp,
       String configuredPath,
-      EncoderRole role) {
+      EncoderRole role,
+      ResolvedConfig config) {
     // The Worker's model name for this feature IS the registry package id carried by the role —
     // one identity, not a second hardcoded pair (EncoderRole.packageId).
     String modelName = role.packageId();
@@ -707,8 +713,7 @@ public final class RuntimeActivationService
     EncoderRuntimeExplainer.ObservedExecutionProvider observed = resolveObservedEp(role);
 
     // 1. Check if explicitly disabled (Head-owned: uses Head-side env vars)
-    ConfigStore published = ConfigStore.globalOrNull();
-    var enabled = published == null ? null : published.get().resolution(enabledProp);
+    var enabled = config == null ? null : config.resolution(enabledProp);
     String enabledStr = enabled != null && enabled.isResolved()
         ? enabled.value() : resolveEnvOrProp(enabledEnv, enabledProp);
     io.justsearch.app.api.settings.QueryRoleSelection queryRoles = null;
@@ -720,7 +725,7 @@ public final class RuntimeActivationService
       }
     }
     if ("false".equalsIgnoreCase(enabledStr)) {
-      var pathSource = published == null ? null : published.get().resolution(pathProp);
+      var pathSource = config == null ? null : config.resolution(pathProp);
       if ("reranker".equals(id) && sessionActive && pathSource != null
           && pathSource.isResolved() && pathSource.sourceOrdinal()
               >= io.justsearch.configuration.resolved.ResolvedConfigBuilder.ORDINAL_ENV_VAR) {
@@ -729,7 +734,7 @@ public final class RuntimeActivationService
       return onnxFeature(id, label, "inactive", "disabled", null, sessionActive, observed);
     }
     if ("reranker".equals(id)) {
-      var pathSource = published == null ? null : published.get().resolution(pathProp);
+      var pathSource = config == null ? null : config.resolution(pathProp);
       boolean operatorPath = pathSource != null && pathSource.isResolved()
           && pathSource.sourceOrdinal()
               >= io.justsearch.configuration.resolved.ResolvedConfigBuilder.ORDINAL_ENV_VAR;
@@ -739,10 +744,16 @@ public final class RuntimeActivationService
       }
     }
 
+    // Project search intent only after the existing authority checks and a positive session.
+    boolean cpuDefaultOff = role == EncoderRole.RERANKER && sessionActive && config != null
+        && RerankerConfig.searchDefaultOff(config);
+    String activeStatus = cpuDefaultOff ? "inactive" : "active";
+
     // 2. Published configuration includes the accepted installer settings at their true ordinal.
     String explicitPath = configuredPath == null ? resolveEnvOrProp(pathEnv, pathProp) : configuredPath;
     if (explicitPath != null && !explicitPath.isBlank()) {
-      return onnxFeature(id, label, "active", "explicit_path", explicitPath, sessionActive, observed);
+      return onnxFeature(id, label, activeStatus, cpuDefaultOff ? "cpu_default_off" : "explicit_path",
+          explicitPath, sessionActive, observed);
     }
 
     // 3. Worker-reported discovery (includes both auto-discovery and explicit-path results)
@@ -750,7 +761,8 @@ public final class RuntimeActivationService
       for (OnnxModelStatus status : workerFeatureCache.getOnnxModels()) {
         if (modelName.equals(status.modelName()) && status.found()) {
           return onnxFeature(
-              id, label, "active", "auto_discovered", status.path(), sessionActive, observed);
+              id, label, activeStatus, cpuDefaultOff ? "cpu_default_off" : "auto_discovered",
+              status.path(), sessionActive, observed);
         }
       }
     }

@@ -31,6 +31,7 @@ import io.justsearch.ort.RuntimePolicy;
 import io.justsearch.ort.SessionAcquisitionRequest;
 import io.justsearch.ort.SessionHandle;
 import io.justsearch.ort.telemetry.OrtSessionTelemetryEvents;
+import java.io.InputStream;
 import java.lang.reflect.Method;
 import java.nio.LongBuffer;
 import java.nio.charset.StandardCharsets;
@@ -89,7 +90,7 @@ final class PlannedCpuCompositionTest {
     Path pack = Files.createDirectories(dir.resolve("planned-fp32-reranker"));
     Files.write(pack.resolve("model.onnx"), new byte[128]);
     Files.write(pack.resolve("model_cuda.onnx"), new byte[256]);
-    Files.writeString(pack.resolve("tokenizer.json"), "mocked tokenizer", StandardCharsets.UTF_8);
+    Files.writeString(pack.resolve("tokenizer.json"), "{}", StandardCharsets.UTF_8);
     Files.writeString(pack.resolve("model_manifest.json"), """
         {"cpu":"model.onnx","gpu":"model_cuda.onnx",
          "capabilities":{"cpu_precision":"fp32","gpu_precision":"fp32"}}
@@ -130,6 +131,8 @@ final class PlannedCpuCompositionTest {
         contracts.when(() -> InstallContractIO.read(any(Path.class))).thenReturn(new InstallContract(
             2, 0, HardwareProfile.gpuFull(12_282L * 1024 * 1024), null, Map.of()));
         tokenizers.when(() -> HuggingFaceTokenizer.newInstance(any(Path.class))).thenReturn(tokenizer);
+        tokenizers.when(() -> HuggingFaceTokenizer.newInstance(any(InputStream.class), isNull()))
+            .thenReturn(tokenizer);
         tensors.when(() -> OnnxTensor.createTensor(any(OrtEnvironment.class),
             any(LongBuffer.class), any(long[].class))).thenReturn(mock(OnnxTensor.class));
         // Mockito's native static seams belong to this thread. Keep the real warm-up factory
