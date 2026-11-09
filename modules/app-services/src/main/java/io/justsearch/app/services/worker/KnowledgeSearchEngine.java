@@ -763,7 +763,11 @@ final class KnowledgeSearchEngine {
       KnowledgeClient client, boolean includePrivateData, io.justsearch.configuration.resolved.ResolvedConfig capturedConfig,
       OptionalLong head) {
     long doSearchStartNs = System.nanoTime();
-    RerankerConfig rerankConfig = RerankerConfig.fromEnv();
+    var rerankerSnapshot = ConfigStore.global().get();
+    RerankerConfig rerankConfig = RerankerConfig.from(rerankerSnapshot);
+    boolean automaticRerankOff = req.pipeline() == null
+        && RerankerConfig.searchDefaultOff(rerankerSnapshot);
+    boolean presetCrossEncoder = rerankConfig.enabled() && !automaticRerankOff;
 
     // 363: Refresh facet snapshot for QU grounding (non-blocking, cached with TTL)
     statusCache.refreshFacetSnapshotIfStale(engineContext, client);
@@ -773,7 +777,8 @@ final class KnowledgeSearchEngine {
     boolean relevanceSort = searchSort == SearchSort.SEARCH_SORT_RELEVANCE;
     // Field-sorted pages must keep the worker's page boundary: overfetching then trimming
     // either loses the lookahead cursor or leaves it positioned after undisplayed candidates.
-    int searchLimit = relevanceSort && rerankConfig.isReady()
+    // Automatic CPU Off uses the same retrieval window as an ordinary saved Off choice.
+    int searchLimit = relevanceSort && rerankConfig.isReady() && !automaticRerankOff
         ? Math.max(requestedLimit, rerankConfig.topK())
         : requestedLimit;
 
@@ -799,8 +804,8 @@ final class KnowledgeSearchEngine {
             : req.pipeline() != null
             ? req.pipeline()
             : denseAuto
-                ? SearchPipelinePresets.autoPreset(rerankConfig)
-                : SearchPipelinePresets.expandPreset(searchMode, rerankConfig);
+                ? SearchPipelinePresets.autoPreset(presetCrossEncoder)
+                : SearchPipelinePresets.expandPreset(searchMode, presetCrossEncoder);
 
     // 306: Pre-retrieval query classification for CE/expansion gating.
     // Keep raw diagnostics separate from policy. Disabled classification has no detected type;
@@ -1172,7 +1177,7 @@ final class KnowledgeSearchEngine {
 
     // 256-F2: LambdaMART + cross-encoder co-execution — cross-encoder runs on LambdaMART's
     // reordered output (standard 2-stage cascaded reranking pattern).
-    if (!relevanceSort) {
+    if (!relevanceSort || automaticRerankOff) {
       crossEncoderSkipReason = CrossEncoderSkipReason.PIPELINE_NOT_ELIGIBLE;
     } else if (!isRerankerEligible(
         pipelineConfig, rerankConfig, results.size(), statusCache.avgContentLengthChars(), effectiveQueryType)) {

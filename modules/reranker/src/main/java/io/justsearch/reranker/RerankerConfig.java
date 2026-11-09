@@ -1,8 +1,10 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.reranker;
 
+import io.justsearch.configuration.EnvRegistry;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfig;
+import io.justsearch.configuration.resolved.ResolvedConfigBuilder;
 import java.nio.file.Path;
 import java.util.Locale;
 
@@ -146,6 +148,19 @@ public record RerankerConfig(
         reranker.judgeBlendEnabled(), reranker.judgeBlendAlpha(),
         reranker.judgeArbitrationEnabled(), reranker.judgeArbitrationAlphaDiverge(),
         reranker.judgeArbitrationSkipEnabled());
+  }
+
+  /**
+   * Whether automatic search presets default to no cross-encoder on this snapshot's CPU plan.
+   * Explicit enable choices and operator model paths retain their existing authority. This does
+   * not disable the physical model or other reranker consumers.
+   */
+  public static boolean searchDefaultOff(ResolvedConfig config) {
+    var reranker = config.ai().reranker();
+    var path = config.resolution(EnvRegistry.RERANK_MODEL_PATH.sysProp());
+    boolean operatorPath = path != null && path.isResolved()
+        && path.sourceOrdinal() >= ResolvedConfigBuilder.ORDINAL_ENV_VAR;
+    return reranker.enabled() == null && !operatorPath && !reranker.gpuEnabled();
   }
 
   /** Returns true if reranking is enabled and model path is configured. */

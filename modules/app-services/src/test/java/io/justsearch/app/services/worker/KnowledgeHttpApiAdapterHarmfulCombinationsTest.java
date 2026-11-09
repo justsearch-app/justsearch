@@ -73,7 +73,7 @@ class KnowledgeHttpApiAdapterHarmfulCombinationsTest {
             + " — 2-stage reranking (LambdaMART → cross-encoder) is now the standard pattern")
     void hybridMode_rerankerEligible() {
       PipelineConfig hybrid =
-          SearchPipelinePresets.expandPreset(SearchMode.SEARCH_MODE_HYBRID, ENABLED);
+          SearchPipelinePresets.expandPreset(SearchMode.SEARCH_MODE_HYBRID, ENABLED.enabled());
       assertTrue(KnowledgeSearchEngine.isRerankerEligible(hybrid, ENABLED, 100, 0, QueryType.INFORMATIONAL));
     }
 
@@ -81,7 +81,7 @@ class KnowledgeHttpApiAdapterHarmfulCombinationsTest {
     @DisplayName("reranker is applied for TEXT mode when enabled and result count >= threshold")
     void textMode_appliesReranker() {
       PipelineConfig text =
-          SearchPipelinePresets.expandPreset(SearchMode.SEARCH_MODE_TEXT, ENABLED);
+          SearchPipelinePresets.expandPreset(SearchMode.SEARCH_MODE_TEXT, ENABLED.enabled());
       assertTrue(KnowledgeSearchEngine.isRerankerEligible(text, ENABLED, 100, 0, QueryType.INFORMATIONAL));
     }
 
@@ -89,7 +89,7 @@ class KnowledgeHttpApiAdapterHarmfulCombinationsTest {
     @DisplayName("reranker is skipped when result count is below minHitsThreshold")
     void belowThreshold_skipsReranker() {
       PipelineConfig text =
-          SearchPipelinePresets.expandPreset(SearchMode.SEARCH_MODE_TEXT, ENABLED);
+          SearchPipelinePresets.expandPreset(SearchMode.SEARCH_MODE_TEXT, ENABLED.enabled());
       assertFalse(KnowledgeSearchEngine.isRerankerEligible(text, ENABLED, 3, 0, QueryType.INFORMATIONAL));
     }
 
@@ -98,7 +98,7 @@ class KnowledgeHttpApiAdapterHarmfulCombinationsTest {
     void disabledConfig_alwaysSkips() {
       PipelineConfig text =
           SearchPipelinePresets.expandPreset(
-              SearchMode.SEARCH_MODE_TEXT, RerankerConfig.DISABLED);
+              SearchMode.SEARCH_MODE_TEXT, RerankerConfig.DISABLED.enabled());
       assertFalse(KnowledgeSearchEngine.isRerankerEligible(text, RerankerConfig.DISABLED, 100, 0, QueryType.INFORMATIONAL));
     }
   }
@@ -113,7 +113,7 @@ class KnowledgeHttpApiAdapterHarmfulCombinationsTest {
             + " — expansion addresses sparse recall gaps, not needed when dense leg is active")
     void hybridMode_silentlySkipsExpansion() {
       PipelineConfig hybrid =
-          SearchPipelinePresets.expandPreset(SearchMode.SEARCH_MODE_HYBRID, ENABLED);
+          SearchPipelinePresets.expandPreset(SearchMode.SEARCH_MODE_HYBRID, ENABLED.enabled());
       assertFalse(
           KnowledgeSearchEngine.isExpansionEligible(
               hybrid,
@@ -128,7 +128,7 @@ class KnowledgeHttpApiAdapterHarmfulCombinationsTest {
     @DisplayName("expansion fires for TEXT + SIMPLE mode with non-blank query when AI is available")
     void textSimpleMode_aiAvailable_fires() {
       PipelineConfig text =
-          SearchPipelinePresets.expandPreset(SearchMode.SEARCH_MODE_TEXT, ENABLED);
+          SearchPipelinePresets.expandPreset(SearchMode.SEARCH_MODE_TEXT, ENABLED.enabled());
       assertTrue(
           KnowledgeSearchEngine.isExpansionEligible(
               text,
@@ -144,7 +144,7 @@ class KnowledgeHttpApiAdapterHarmfulCombinationsTest {
         "LUCENE syntax blocks expansion in TEXT mode — avoids interfering with explicit operators")
     void luceneSyntax_blocksExpansion() {
       PipelineConfig text =
-          SearchPipelinePresets.expandPreset(SearchMode.SEARCH_MODE_TEXT, ENABLED);
+          SearchPipelinePresets.expandPreset(SearchMode.SEARCH_MODE_TEXT, ENABLED.enabled());
       assertFalse(
           KnowledgeSearchEngine.isExpansionEligible(
               text,
@@ -159,7 +159,7 @@ class KnowledgeHttpApiAdapterHarmfulCombinationsTest {
     @DisplayName("blank query blocks expansion")
     void blankQuery_blocksExpansion() {
       PipelineConfig text =
-          SearchPipelinePresets.expandPreset(SearchMode.SEARCH_MODE_TEXT, ENABLED);
+          SearchPipelinePresets.expandPreset(SearchMode.SEARCH_MODE_TEXT, ENABLED.enabled());
       assertFalse(
           KnowledgeSearchEngine.isExpansionEligible(
               text,
@@ -174,7 +174,7 @@ class KnowledgeHttpApiAdapterHarmfulCombinationsTest {
     @DisplayName("paginated request (cursor present) blocks expansion")
     void cursorPresent_blocksExpansion() {
       PipelineConfig text =
-          SearchPipelinePresets.expandPreset(SearchMode.SEARCH_MODE_TEXT, ENABLED);
+          SearchPipelinePresets.expandPreset(SearchMode.SEARCH_MODE_TEXT, ENABLED.enabled());
       assertFalse(
           KnowledgeSearchEngine.isExpansionEligible(
               text,
@@ -189,7 +189,7 @@ class KnowledgeHttpApiAdapterHarmfulCombinationsTest {
     @DisplayName("unavailable AI service blocks expansion regardless of mode")
     void aiUnavailable_blocksExpansion() {
       PipelineConfig text =
-          SearchPipelinePresets.expandPreset(SearchMode.SEARCH_MODE_TEXT, ENABLED);
+          SearchPipelinePresets.expandPreset(SearchMode.SEARCH_MODE_TEXT, ENABLED.enabled());
       assertFalse(
           KnowledgeSearchEngine.isExpansionEligible(
               text,
@@ -225,7 +225,7 @@ class KnowledgeHttpApiAdapterHarmfulCombinationsTest {
         "LUCENE syntax disables query expansion in Head (proxy for stemming+fuzzy Worker gate)")
     void luceneSyntax_disablesExpansionAndStemmingFeatures() {
       PipelineConfig text =
-          SearchPipelinePresets.expandPreset(SearchMode.SEARCH_MODE_TEXT, ENABLED);
+          SearchPipelinePresets.expandPreset(SearchMode.SEARCH_MODE_TEXT, ENABLED.enabled());
       assertFalse(
           KnowledgeSearchEngine.isExpansionEligible(
               text,
@@ -243,7 +243,7 @@ class KnowledgeHttpApiAdapterHarmfulCombinationsTest {
             + " — expansion blocked (same semantic as stemming+fuzzy Worker gate)")
     void hybridPreset_expansionDisabled_blocksExpansionAndStemmingFeatures() {
       PipelineConfig hybrid =
-          SearchPipelinePresets.expandPreset(SearchMode.SEARCH_MODE_HYBRID, ENABLED);
+          SearchPipelinePresets.expandPreset(SearchMode.SEARCH_MODE_HYBRID, ENABLED.enabled());
       assertFalse(
           KnowledgeSearchEngine.isExpansionEligible(
               hybrid,
@@ -308,7 +308,7 @@ class KnowledgeHttpApiAdapterHarmfulCombinationsTest {
         "258-B1: cross-encoder is auto-disabled when avg doc length exceeds threshold")
     void longDocs_autoDisablesCrossEncoder() {
       PipelineConfig hybrid =
-          SearchPipelinePresets.expandPreset(SearchMode.SEARCH_MODE_HYBRID, ENABLED);
+          SearchPipelinePresets.expandPreset(SearchMode.SEARCH_MODE_HYBRID, ENABLED.enabled());
       // 25000 chars (~6K tokens) exceeds the 16000 char threshold
       assertFalse(KnowledgeSearchEngine.isRerankerEligible(hybrid, ENABLED, 100, 25_000, QueryType.INFORMATIONAL));
     }
@@ -318,7 +318,7 @@ class KnowledgeHttpApiAdapterHarmfulCombinationsTest {
         "258-B1: cross-encoder remains eligible when avg doc length is below threshold")
     void shortDocs_crossEncoderStaysEligible() {
       PipelineConfig hybrid =
-          SearchPipelinePresets.expandPreset(SearchMode.SEARCH_MODE_HYBRID, ENABLED);
+          SearchPipelinePresets.expandPreset(SearchMode.SEARCH_MODE_HYBRID, ENABLED.enabled());
       // 5000 chars (~1.2K tokens) is below the 16000 char threshold
       assertTrue(KnowledgeSearchEngine.isRerankerEligible(hybrid, ENABLED, 100, 5_000, QueryType.INFORMATIONAL));
     }
@@ -331,7 +331,7 @@ class KnowledgeHttpApiAdapterHarmfulCombinationsTest {
           new RerankerConfig(
               true, null, 20, 200L, 5, 512, false, 0, 0, false, 0.5, false, 0.85, false);
       PipelineConfig hybrid =
-          SearchPipelinePresets.expandPreset(SearchMode.SEARCH_MODE_HYBRID, noGate);
+          SearchPipelinePresets.expandPreset(SearchMode.SEARCH_MODE_HYBRID, noGate.enabled());
       // Even very long docs should pass when gate is disabled (maxAvgDocLengthChars=0)
       assertTrue(KnowledgeSearchEngine.isRerankerEligible(hybrid, noGate, 100, 100_000, QueryType.INFORMATIONAL));
     }
