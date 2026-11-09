@@ -54,3 +54,13 @@ its separate dependencies/build cache belong to the session temporary directory.
 ## Acceptance records
 
 Pending independent acceptance; the builder does not accept its own work.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1c210-eda7-7153-a9ec-2aa730ce0b2d",
+  "verdict": "accept",
+  "digest": "sha256:bc70c19fd8cf2ca6e31dedf2be836073bd50bcc1d142ae2f8340984a53d38925"
+}
+```
