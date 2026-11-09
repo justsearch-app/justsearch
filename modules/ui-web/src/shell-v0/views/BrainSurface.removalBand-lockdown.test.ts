@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// D1-D7: real Chromium with isolated fixture responses; no engine, shared stack or GPU.
+// D1-D7/D9: real Chromium with isolated fixture responses; no engine, shared stack or GPU.
 import { afterAll, afterEach, beforeAll, expect, it } from 'vitest';
 import { createServer, type ViteDevServer } from 'vite';
 import { chromium, type Browser, type BrowserContext, type BrowserServer, type Page } from 'playwright-core';
@@ -12,7 +12,7 @@ const part = (incomplete = false) => ({ id: 'chat', label: 'Chat model', state: 
   sizeOnDiskBytes: incomplete ? null : 3145728, removable: true, previewDigest: digest,
   unavailableAfter: 'Answers and Text in scans and images', delete: [{ path: 'answer.gguf', sizeBytes: incomplete ? null : 3145728 }],
   kept: [{ path: longPath, sizeBytes: null, reason: 'not verified as JustSearch’s download' }] });
-interface FixtureView { parts: ReturnType<typeof part>[]; removal: Record<string, unknown> | null }
+interface FixtureView { parts: Array<ReturnType<typeof part> & { declined?: boolean }>; removal: Record<string, unknown> | null }
 declare global {
   interface Window {
     prepareRemovalBrain(): Promise<void>;
@@ -265,4 +265,44 @@ it('D7 a backend refusal before another removal is observed stays visible', asyn
   await confirm(page).click();
   await expect.poll(() => page.locator('[data-part="chat"] [role="alert"]').textContent()).toBe('Another removal is running');
   expect(await page.evaluate(() => window.removalCalls.length)).toBe(1);
+}, 60_000);
+
+it.each(['removed', 'partial', 'no-action'])('D9 %s waits for a later removal poll and focuses the settled row action or outcome', async state => {
+  const { page, view } = await open(); await opener(page).click();
+  view.removal = { state: 'running', packageId: 'chat', label: 'Chat model' };
+  // The operation acknowledges running before the Engine finishes. The old focus attempt
+  // therefore hits a disabled row; only a later, real poll exposes the final action.
+  await Promise.all([page.waitForResponse(response => response.url().includes('/settings/v2')), confirm(page).click()]);
+  await page.evaluate(() => window.removalFixture('settle'));
+  expect(await opener(page).isDisabled()).toBe(true);
+  view.parts = state === 'removed' ? [{ ...part(), state: 'missing', declined: true }]
+    : [{ ...part(true), removable: state !== 'no-action' }];
+  view.removal = { state: state === 'removed' ? 'removed' : 'partial', packageId: 'chat', label: 'Chat model' };
+  const target = state === 'removed' ? page.locator('[data-download-again="chat"]')
+    : state === 'partial' ? opener(page) : page.locator('[data-testid="removal-outcome"]');
+  await expect.poll(() => target.evaluateAll(elements => elements.some(el => el.matches(':focus')))).toBe(true);
+  await page.evaluate(() => window.removalFixture('refresh'));
+  expect(await target.evaluate(el => el.matches(':focus')), 'a later render preserves useful focus').toBe(true);
+}, 60_000);
+
+it.each(['row', 'outcome', 'elsewhere'])('D9 polling closes a focused band onto %s without stealing focus elsewhere', async destination => {
+  const { page, view } = await open(); await opener(page).click();
+  if (destination === 'elsewhere') await page.locator('#other-opener').focus();
+  view.parts = destination === 'outcome' ? [] : [{ ...part(), state: 'missing', declined: true }];
+  view.removal = { state: 'removed', packageId: 'chat', label: 'Chat model' };
+  await page.evaluate(() => window.removalFixture('refresh'));
+  expect(await band(page).count()).toBe(0);
+  const target = destination === 'elsewhere' ? page.locator('#other-opener')
+    : destination === 'row' ? page.locator('[data-download-again="chat"]') : page.locator('[data-testid="removal-outcome"]');
+  expect(await target.evaluate(el => el.matches(':focus'))).toBe(true);
+}, 60_000);
+
+it('D9 a later removal outcome keeps focus deliberately moved elsewhere while running', async () => {
+  const { page, view } = await open(); await opener(page).click();
+  view.removal = { state: 'running', packageId: 'chat', label: 'Chat model' };
+  await Promise.all([page.waitForResponse(response => response.url().includes('/settings/v2')), confirm(page).click()]);
+  await page.locator('#other-opener').focus();
+  view.parts = []; view.removal = { state: 'removed', packageId: 'chat', label: 'Chat model' };
+  await page.locator('[data-testid="removal-outcome"]').waitFor();
+  expect(await page.locator('#other-opener').evaluate(el => el.matches(':focus'))).toBe(true);
 }, 60_000);

@@ -84,6 +84,7 @@ import { icon } from '../components/Icon.js';
 // Tempdoc 586 §F-1a — reuse the existing pulse-dots primitive for the first-paint skeleton.
 import '../components/chat/PulseDots.js';
 import { confirmAsync } from '../components/ConfirmDialog.js';
+import { deepActiveElement } from '../utils/keyboardHandler.js';
 import { ModalController } from '../primitives/modalController.js';
 import { TransientController } from '../primitives/transientController.js';
 import { composeBrainSentence, type BrainFeature, type BrainFeatureId } from '../state/brainPage.js';
@@ -665,6 +666,7 @@ export class BrainSurface extends JfElement {
   /** The part whose "Remove files" confirmation is open. */
   declare removalConfirm: string | null;
   private removalOpener: HTMLElement | null = null;
+  private pendingRemovalFocus: string | null = null;
   declare removalError: { id: string; message: string } | null;
   private removalPoll: number | null = null;
   private pictureUncertain = false;
@@ -1333,6 +1335,7 @@ export class BrainSurface extends JfElement {
     // An open "Remove files" confirmation and its refusal are answers to this visit only.
     this.removalConfirm = null;
     this.removalOpener = null;
+    this.pendingRemovalFocus = null;
     this.removalError = null;
     this.closeFeatureInfo();
   }
@@ -1343,6 +1346,10 @@ export class BrainSurface extends JfElement {
     if (this.removalConfirm && (this.activeTab !== 'runtime' || !this.expanded.advanced
       || !this.downloadedFiles?.parts?.some(part => part.id === this.removalConfirm
         && part.removable && (part.state === 'downloaded' || part.state === 'incomplete')))) {
+      if (changed.has('downloadedFiles') && this.activeTab === 'runtime' && this.expanded.advanced
+        && this.shadowRoot?.querySelector('[data-testid="removal-confirm"]')?.contains(this.shadowRoot.activeElement)) {
+        this.pendingRemovalFocus = this.removalConfirm;
+      }
       this.closeRemoval();
     }
   }
@@ -1350,6 +1357,16 @@ export class BrainSurface extends JfElement {
   /** 574 §22.G — drive the modal contract from the declarative `installConsentOpen` state. */
   protected override updated(changed: Map<string, unknown>): void {
     super.updated(changed);
+    if (this.pendingRemovalFocus) {
+      const active = deepActiveElement();
+      // A later poll may settle the operation. Restore only the focus lost with the band;
+      // a person who has since focused something else keeps that focus.
+      if (active && active !== this.ownerDocument.body) this.pendingRemovalFocus = null;
+      else if (!this.removalRunning()) {
+        this.focusPartAction(this.pendingRemovalFocus);
+        this.pendingRemovalFocus = null;
+      }
+    }
     if (!changed.has('installConsentOpen')) return;
     if (this.installConsentOpen) this.consentModal.open();
     else {
@@ -1877,8 +1894,8 @@ export class BrainSurface extends JfElement {
 
   /** Focus returns to the row's own action, or to the outcome when the row changed. */
   private focusPartAction(id: string): void {
-    const target = this.shadowRoot?.querySelector<HTMLElement>(`[data-remove="${id}"]`)
-      ?? this.shadowRoot?.querySelector<HTMLElement>(`[data-download-again="${id}"]`)
+    const target = this.shadowRoot?.querySelector<HTMLElement>(`[data-remove="${id}"]:not(:disabled)`)
+      ?? this.shadowRoot?.querySelector<HTMLElement>(`[data-download-again="${id}"]:not(:disabled)`)
       ?? this.shadowRoot?.querySelector<HTMLElement>('[data-testid="removal-outcome"]');
     target?.focus({ preventScroll: true });
   }
@@ -1886,6 +1903,9 @@ export class BrainSurface extends JfElement {
   private async confirmRemoval(part: DownloadedPart): Promise<void> {
     const id = part.id ?? '';
     if (this.removalRunning() || !part.previewDigest) return;
+    if (this.shadowRoot?.querySelector('[data-testid="removal-confirm"]')?.contains(this.shadowRoot.activeElement)) {
+      this.pendingRemovalFocus = id;
+    }
     this.closeRemoval();
     await this.withBusy('remove-files', async () => {
       this.removalError = null;
@@ -1899,8 +1919,6 @@ export class BrainSurface extends JfElement {
     // The removal saved settings, so the next switch needs the witness it left behind.
     await Promise.all([this.refreshInstallPlanPreview(), this.refreshSettings()]);
     void refreshAiInstallNow();
-    await this.updateComplete;
-    this.focusPartAction(id);
   }
 
   /** Asks first, with the download size and licence; only the accepted install withdraws the decline. */
