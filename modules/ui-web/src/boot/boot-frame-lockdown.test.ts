@@ -16,7 +16,11 @@ const key = 'justsearch.bootFrame.v1';
 const secret = 'SECRET-token-key /home/person/private https://secret-host.invalid';
 const saved = { mode: 'light', background: 'rgb(248, 249, 252)', raised: 'rgb(241, 242, 248)', text: 'rgb(20, 24, 32)', muted: 'rgb(50, 55, 65)', border: 'rgb(110, 115, 125)', accent: 'rgb(0, 110, 100)' };
 const catalog = { schemaVersion: '1.0', catalogVersion: 1, namespace: 'registry-surface', primitive: 'Surface', entries: [{ id: 'core.library-surface', presentation: { labelKey: 'registry-surface.library-surface.label', descriptionKey: 'registry-surface.library-surface.description', iconHint: null, category: null }, audience: 'USER', placement: 'RAIL', altitude: 'PRODUCT', consumes: { resources: ['core.indexed-roots'], operations: [], prompts: [], diagnosticChannels: [], conversationShapes: [] }, mountTag: 'jf-library-surface', members: [], riskTier: 'LOW', stateSchema: null, provenance: { tier: 'CORE', contributorId: 'core', version: '1.0', identity: null } }] };
-type Harness = { phase?: string; discoveryHold: boolean; hold: boolean; renderHold: boolean; emit: (payload: unknown) => void; samples: string[] };
+type Harness = { phase?: string; discoveryHold: boolean; hold: boolean; renderHold: boolean; emit: (payload: unknown) => void; samples: string[]; inputs: string[]; calls: string[] };
+// Independent inventory of native input paths, including document/window capture listeners.
+const inputTypes = ['keydown', 'keyup', 'keypress', 'pointerdown', 'pointerup', 'pointermove', 'pointercancel',
+  'mousedown', 'mouseup', 'click', 'wheel', 'touchstart', 'input', 'dragenter', 'dragover', 'dragleave', 'drop',
+  'mouseenter', 'mouseleave', 'scroll', 'contextmenu', 'paste'];
 declare global { interface Window { frameHarness: Harness; frameProbe: { createProfile: (id: string, label: string) => void; setActiveProfileId: (id: string) => void; dismissWalkthrough: (id: string) => void; applyAppearance: (appearance: { paletteId: string; theme: string }) => Promise<void>; gateFactoryReset: (root: HTMLElement) => Promise<boolean> } } }
 beforeAll(async () => {
   output = await mkdtemp(path.join(tmpdir(), 'boot-frame-'));
@@ -56,14 +60,14 @@ async function create(options: Options = {}): Promise<Page> {
   const context = await browser.newContext({ colorScheme: options.os ?? 'dark' });
   contexts.add(context);
   const page = await context.newPage();
-  await page.addInitScript(({ options, key }) => {
+  await page.addInitScript(({ options, key, inputTypes }) => {
     if (options.saved !== undefined && !localStorage.getItem(key)) localStorage.setItem(key, JSON.stringify(options.saved));
     if (options.future && !localStorage.getItem('justsearch.userState.v2')) localStorage.setItem('justsearch.userState.v2', options.future);
     if (options.storageThrows) {
       Storage.prototype.getItem = () => { throw new Error('storage denied'); };
       Storage.prototype.setItem = () => { throw new Error('quota denied'); };
     }
-    const h = window.frameHarness = { discoveryHold: !!options.discoveryHold, hold: !!options.hold, renderHold: !!options.renderHold, emit: (_payload: unknown) => {}, samples: [] as string[] };
+    const h = window.frameHarness = { discoveryHold: !!options.discoveryHold, hold: !!options.hold, renderHold: !!options.renderHold, emit: (_payload: unknown) => {}, samples: [] as string[], inputs: [] as string[], calls: [] as string[] };
     const sample = () => {
       const root = document.getElementById('root');
       if (root) h.samples.push(root.querySelector('#boot-frame, #boot-failure, jf-engine-recovery, jf-factory-reset-recovery') ? 'covered' : root.querySelector('jf-shell')?.shadowRoot?.querySelector('jf-top-bar') ? 'rendered' : 'blank');
@@ -73,6 +77,18 @@ async function create(options: Options = {}): Promise<Page> {
     const define = customElements.define.bind(customElements);
     customElements.define = (name, ctor, config) => {
       if (name === 'jf-shell') {
+        // Install observers at attachment, ahead of the shell's own listeners but after the
+        // boot guard. A document-only guard cannot hide a leak at window capture from these.
+        const connected = ctor.prototype.connectedCallback, disconnected = ctor.prototype.disconnectedCallback;
+        let controller: AbortController;
+        ctor.prototype.connectedCallback = function () {
+          controller = new AbortController();
+          for (const [target, name] of [[window, 'window'], [document, 'document']] as const) {
+            for (const type of inputTypes) target.addEventListener(type, () => h.inputs.push(`${name}:${type}`), { capture: true, signal: controller.signal });
+          }
+          return connected.call(this);
+        };
+        ctor.prototype.disconnectedCallback = function () { controller.abort(); return disconnected.call(this); };
         const perform = ctor.prototype.performUpdate;
         ctor.prototype.performUpdate = async function () {
           while (h.hold) await new Promise(resolve => setTimeout(resolve, 10));
@@ -91,6 +107,7 @@ async function create(options: Options = {}): Promise<Page> {
     Object.assign(window, { __TAURI_INTERNALS__: {
       transformCallback: (callback: (event: unknown) => void) => { callbacks.set(++next, callback); return next; },
       invoke: async (command: string, args: { event: string; handler: number }) => {
+        h.calls.push(command);
         if (command === 'factory_reset_status') return { phase: window.frameHarness.phase ?? options.phase ?? 'idle', remaining: [] };
         if (command === 'plugin:event|listen') { listeners.set(args.event, args.handler); return args.handler; }
         if (command === 'supervisor_state') return { schemaVersion: 1, kind: 'engine-supervisor-state.v1', supervisor: 'tauri', state: 'running', incarnation: 1, restartCount: 0, maxRestartAttempts: 3 };
@@ -103,7 +120,7 @@ async function create(options: Options = {}): Promise<Page> {
         return null;
       },
     } });
-  }, { options, key });
+  }, { options, key, inputTypes });
   await page.route(/\/(api|infra|registry)\//, route => {
     const pathname = new URL(route.request().url()).pathname;
     return route.fulfill({ status: options.settingsFail && pathname === '/api/settings/v2' ? 503 : 200, json: pathname === '/api/registry/surfaces' ? catalog : pathname === '/api/settings/v2' ? { ui: { theme: 'light', highContrast: false } } : {} });
@@ -168,7 +185,7 @@ async function shellWorksAfterCover(page: Page) {
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
   expect(await page.locator('jf-top-bar [role="menu"]').count()).toBe(1);
 }
-for (const late of [false, true]) it(`SA6 rendered shell rejects input until ${late ? 'late failure-page' : 'frame'} hand-off`, async () => {
+it('SA6 rendered shell rejects input until frame hand-off', async () => {
   const page = await create({ renderHold: true });
   try {
     await page.clock.install(); await page.goto(url); await page.waitForSelector('jf-top-bar .more-trigger');
@@ -183,16 +200,6 @@ for (const late of [false, true]) it(`SA6 rendered shell rejects input until ${l
     expect({ shellFocused: focused.includes('jf-shell'), clicks: await page.locator('jf-shell').getAttribute('data-clicks'),
       keys: await page.locator('jf-shell').getAttribute('data-keys'), menus: await page.locator('jf-top-bar [role="menu"]').count() })
       .toEqual({ shellFocused: false, clicks: '0', keys: '0', menus: 0 });
-    if (late) {
-      await page.clock.fastForward(60_001);
-      expect(await page.locator('#boot-failure').count()).toBe(1);
-      expect(await page.locator(':focus').textContent()).toBe('Reload');
-      for (let i = 0; i < 6; i++) {
-        await page.keyboard.press('Tab');
-        expect(await page.evaluate(() => document.activeElement!.localName)).not.toBe('jf-shell');
-      }
-      await page.getByRole('button', { name: 'Reload', exact: true }).focus();
-    }
     await page.evaluate(() => { window.frameHarness.renderHold = false; }); await page.clock.resume();
     await expect.poll(() => page.locator('#boot-frame, #boot-failure').count()).toBe(0);
     expect(await page.evaluate(() => document.activeElement!.localName)).toBe('body');
@@ -212,7 +219,143 @@ it('SA6 never-rendering shell stays unreachable and deadline Reload takes focus'
     expect(await page.locator('#boot-failure').count()).toBe(1);
     expect(await page.locator(':focus').textContent()).toBe('Reload');
     expect(await page.locator('jf-top-bar').count()).toBe(0);
-    expect(await page.locator('jf-shell').evaluate(shell => (shell as HTMLElement).inert)).toBe(true);
+    expect(await page.locator('jf-shell').count()).toBe(0);
+    await page.evaluate(() => { window.frameHarness.hold = false; }); await page.clock.resume();
+    await page.waitForTimeout(100);
+    expect(await page.locator('#boot-failure').count()).toBe(1);
+    await Promise.all([page.waitForEvent('framenavigated'), page.keyboard.press('Enter')]);
+    await page.waitForSelector('jf-shell', { state: 'attached' });
+  } finally { await page.close(); }
+});
+const shellShortcuts = ['Control+k', 'Control+,', 'Control+1', 'Control+2', 'Control+3', 'F1', 'F6', 'Escape', 'Alt+ArrowLeft', 'Alt+ArrowRight', 'Space'];
+async function heldShell() {
+  const page = await create({ renderHold: true });
+  await page.clock.install(); await page.goto(url); await page.waitForSelector('jf-top-bar .more-trigger');
+  await page.addScriptTag({ type: 'module', url: new URL(probe, url).href });
+  await page.evaluate(() => window.frameProbe.dismissWalkthrough('welcome'));
+  await page.waitForLoadState('networkidle');
+  return page;
+}
+async function releaseShell(page: Page) {
+  await page.evaluate(() => { window.frameHarness.renderHold = false; }); await page.clock.resume();
+  await expect.poll(() => page.locator('#boot-frame').count()).toBe(0);
+}
+async function dispatchInputs(page: Page) {
+  return page.evaluate(types => types.map(type => {
+    // Test both the document path and direct window dispatch (mouse navigation/drag listeners).
+    return [document, window].map(target => {
+      window.frameHarness.inputs.length = 0;
+      const init = { bubbles: true, cancelable: true, composed: true };
+      const event = type.startsWith('key') ? new KeyboardEvent(type, { ...init, key: 'Unidentified' })
+        : type.startsWith('pointer') ? new PointerEvent(type, init)
+          : type.startsWith('mouse') || ['click', 'contextmenu'].includes(type) ? new MouseEvent(type, init)
+            : type === 'wheel' ? new WheelEvent(type, init)
+              : type.startsWith('drag') || type === 'drop' ? new DragEvent(type, { ...init, dataTransfer: new DataTransfer() })
+                : type === 'paste' ? new ClipboardEvent(type, { ...init, clipboardData: new DataTransfer() }) : new Event(type, init);
+      target.dispatchEvent(event);
+      return { type, target: target === window ? 'window' : 'document', seen: [...window.frameHarness.inputs], prevented: event.defaultPrevented };
+    });
+  }).flat(), inputTypes);
+}
+it('SA6 every input path is stopped at window capture under the frame and released after paint', async () => {
+  const page = await heldShell();
+  try {
+    const blocked = await dispatchInputs(page);
+    expect(blocked.filter(result => result.seen.length || result.prevented)).toEqual([]);
+    await releaseShell(page);
+    const released = await dispatchInputs(page);
+    expect(released.filter(result => !result.seen.includes(`window:${result.type}`))).toEqual([]);
+    expect(released.filter(result => result.target === 'document' && !result.seen.includes(`document:${result.type}`))).toEqual([]);
+  } finally { await page.close(); }
+});
+it('SA6 shell shortcuts neither run nor queue beneath the frame, then normal shortcuts work', async () => {
+  const page = await heldShell();
+  try {
+    const address = page.url();
+    for (const chord of [...shellShortcuts, 'Tab', 'Shift+Tab']) {
+      await page.evaluate(() => { window.frameHarness.inputs.length = 0; });
+      await page.keyboard.press(chord);
+      expect({ chord, seen: await page.evaluate(() => window.frameHarness.inputs), address: page.url() }).toEqual({ chord, seen: [], address });
+    }
+    await releaseShell(page);
+    expect(page.url()).toBe(address);
+    expect(await page.locator('jf-top-bar [role="menu"], jf-command-palette[open], jf-settings-window[open]').count()).toBe(0);
+    // Every chord again reaches the real application's window listener after hand-off.
+    for (const chord of shellShortcuts) {
+      await page.evaluate(() => { window.frameHarness.inputs.length = 0; });
+      await page.keyboard.press(chord);
+      expect(await page.evaluate(() => window.frameHarness.inputs)).toContain('window:keydown');
+      await page.keyboard.press('Escape');
+    }
+    await page.keyboard.press('Control+2');
+    await expect.poll(() => page.url()).toContain('core.library-surface');
+    await page.keyboard.press('F1');
+    await expect.poll(() => page.url()).toContain('core.help-surface');
+  } finally { await page.close(); }
+});
+it('SA6 pointer hover wheel context menu and mouse Back/Forward cannot reach the covered shell', async () => {
+  const page = await heldShell();
+  try {
+    const address = page.url(), box = (await page.locator('jf-top-bar .more-trigger').boundingBox())!;
+    await page.evaluate(() => { window.frameHarness.inputs.length = 0; });
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.wheel(0, 200);
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2, { button: 'right' });
+    const navigation = await page.evaluate(() => [3, 4].map(button => {
+      const event = new MouseEvent('mouseup', { button, cancelable: true });
+      window.dispatchEvent(event); return event.defaultPrevented;
+    }));
+    expect(await page.evaluate(() => window.frameHarness.inputs)).toEqual([]);
+    expect(navigation).toEqual([false, false]);
+    expect(page.url()).toBe(address);
+    expect(await page.locator('jf-top-bar [role="menu"]').count()).toBe(0);
+    await releaseShell(page); await shellWorksAfterCover(page);
+  } finally { await page.close(); }
+});
+it('SA6 SA17 deadline discards rendered controls; failure page alone handles input and keyboard actions', async () => {
+  const page = await heldShell();
+  try {
+    await page.clock.fastForward(60_001);
+    expect(await page.locator('#boot-failure').count()).toBe(1);
+    expect(await page.locator('jf-shell').count()).toBe(0);
+    const address = page.url();
+    await page.evaluate(() => { window.frameHarness.inputs.length = 0; });
+    for (const chord of shellShortcuts.filter(chord => chord !== 'Space')) await page.keyboard.press(chord);
+    expect(page.url()).toBe(address);
+    expect(await page.evaluate(() => window.frameHarness.inputs)).toEqual([]);
+    expect((await dispatchInputs(page)).filter(result => result.seen.length)).toEqual([]);
+    await page.getByRole('button', { name: 'Reload', exact: true }).focus();
+    await page.keyboard.press('Tab'); expect(await page.locator(':focus').textContent()).toBe('Copy report');
+    await page.keyboard.press('Shift+Tab'); expect(await page.locator(':focus').textContent()).toBe('Reload');
+    await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined }));
+    for (const key of ['Enter', 'Space']) {
+      await page.getByRole('button', { name: 'Copy report' }).focus(); await page.keyboard.press(key);
+      expect(JSON.parse(await page.locator('#boot-report').inputValue()).failureKind).toBe('stalled');
+      expect(await page.locator(':focus').getAttribute('id')).toBe('boot-report');
+    }
+    // Finishing the discarded render cannot remove the failure page or reclaim focus.
+    await page.evaluate(() => { window.frameHarness.renderHold = false; }); await page.clock.resume();
+    await page.waitForTimeout(100);
+    expect(await page.locator('#boot-failure').count()).toBe(1);
+    for (const key of ['Enter', 'Space']) {
+      await page.getByRole('button', { name: 'Reload', exact: true }).focus();
+      await Promise.all([page.waitForEvent('framenavigated'), page.keyboard.press(key)]);
+      await page.waitForSelector('jf-top-bar'); await page.clock.fastForward(60_001);
+      expect(await page.locator('#boot-failure').count()).toBe(1);
+    }
+  } finally { await page.close(); }
+}, 15_000);
+for (const stage of ['frame', 'failure', 'painted']) it(`SA6 browser reload keys retain their native default at ${stage}`, async () => {
+  const page = await heldShell();
+  try {
+    if (stage === 'failure') await page.clock.fastForward(60_001);
+    if (stage === 'painted') await releaseShell(page);
+    const defaults = await page.evaluate(() => ['F5', 'r'].map(key => {
+      const event = new KeyboardEvent('keydown', { key, ctrlKey: key === 'r', bubbles: true, cancelable: true });
+      return { key, allowed: document.activeElement!.dispatchEvent(event), prevented: event.defaultPrevented };
+    }));
+    expect(defaults).toEqual([{ key: 'F5', allowed: true, prevented: false }, { key: 'r', allowed: true, prevented: false }]);
   } finally { await page.close(); }
 });
 for (const [label, value, os, mode] of [
@@ -253,15 +396,17 @@ for (const fault of ['entry', 'parse', 'dependency', 'evaluation', 'bootstrap', 
     await failure(page, fault === 'entry' || fault === 'dependency' ? 'entry' : fault === 'evaluation' || fault === 'parse' ? 'evaluation' : fault);
   } finally { await page.close(); }
 });
-it('SA10 60-second deadline and late mount', async () => {
+it('SA10 SA17 60-second deadline discards an attached shell even when rendering later completes', async () => {
   const page = await create({ hold: true });
   try {
     await page.clock.install(); await page.goto(url); await page.waitForSelector('jf-shell', { state: 'attached' });
     expect(await page.locator('#boot-frame').count()).toBe(1);
     await page.clock.fastForward(59_000); expect(await page.locator('#boot-failure').count()).toBe(0);
     await page.clock.fastForward(1_001); await failure(page, 'stalled');
+    expect(await page.locator('jf-shell').count()).toBe(0);
     await page.evaluate(() => { window.frameHarness.hold = false; }); await page.clock.resume();
-    await page.waitForSelector('jf-top-bar'); await expect.poll(() => page.locator('#boot-failure, #boot-frame').count()).toBe(0);
+    await page.waitForTimeout(100);
+    expect(await page.locator('#boot-failure').count()).toBe(1);
   } finally { await page.close(); }
 });
 it('SA7 SA17 no blank interval through recovery removal and delayed render', async () => {
@@ -363,8 +508,8 @@ it('SA5 a second window saves its look without an incidental stale overwrite', a
     expect(await first.evaluate(key => localStorage.getItem(key), key)).toBe(before);
   } finally { await second.close(); await first.close(); }
 }, 15_000);
-it('SA10 stalled catalog discovery raises failure and late completion paints the shell', async () => {
-  const page = await create();
+it('SA10 stalled catalog discovery raises failure and late mount replaces it before rendering', async () => {
+  const page = await create({ hold: true });
   let release!: () => void;
   const waiting = new Promise<void>(resolve => { release = resolve; });
   try {
@@ -374,8 +519,11 @@ it('SA10 stalled catalog discovery raises failure and late completion paints the
     await page.goto(url); await request;
     expect(await page.locator('#boot-frame').count()).toBe(1);
     await page.clock.fastForward(60_001); await failure(page, 'stalled');
-    release(); await page.clock.resume(); await page.waitForSelector('jf-top-bar');
+    release(); await page.clock.resume(); await page.waitForSelector('jf-shell', { state: 'attached' });
     await expect.poll(() => page.locator('#boot-failure').count()).toBe(0);
+    expect(await page.locator('jf-shell').evaluate(shell => (shell as HTMLElement).inert)).toBe(false);
+    expect(await page.locator('jf-top-bar').count()).toBe(0);
+    await page.evaluate(() => { window.frameHarness.hold = false; }); await page.waitForSelector('jf-top-bar');
   } finally { release(); await page.close(); }
 }, 15_000);
 it('SA9 optional theme and lazy chunk failures stay optional', async () => {
@@ -473,6 +621,25 @@ it('SA14 factory reset taking over during hand-off beats the pending first rende
     await page.clock.fastForward(60_001);
     expect(await page.locator('#root > jf-factory-reset-recovery').count()).toBe(1);
     expect(await page.locator('#boot-frame, #boot-failure, jf-shell').count()).toBe(0);
+  } finally { await page.close(); }
+});
+for (const cover of ['frame', 'failure']) for (const takeover of ['recovery', 'reset']) it(`SA6 SA14 ${takeover} replaces ${cover} and its keyboard action works`, async () => {
+  const page = await heldShell();
+  try {
+    if (cover === 'failure') await page.clock.fastForward(60_001);
+    if (takeover === 'recovery') await page.evaluate(() => window.frameHarness.emit({ schemaVersion: 1,
+      kind: 'engine-supervisor-state.v1', supervisor: 'tauri', state: 'exhausted', incarnation: 1, restartCount: 3, maxRestartAttempts: 3 }));
+    else await page.evaluate(async () => {
+      window.frameHarness.phase = 'incomplete';
+      await window.frameProbe.gateFactoryReset(document.getElementById('root')!);
+    });
+    expect(await page.locator('#boot-frame, #boot-failure, jf-shell').count()).toBe(0);
+    const button = page.getByRole('button', { name: takeover === 'recovery' ? 'Restart JustSearch' : 'Retry reset', exact: true });
+    await button.focus(); await page.keyboard.press('Enter');
+    await expect.poll(() => page.evaluate(() => window.frameHarness.calls)).toContain(takeover === 'recovery' ? 'restart_engine' : 'retry_factory_reset');
+    await page.evaluate(() => { window.frameHarness.renderHold = false; }); await page.clock.resume();
+    await page.waitForTimeout(100);
+    expect(await page.locator(takeover === 'recovery' ? '#root > jf-engine-recovery' : '#root > jf-factory-reset-recovery').count()).toBe(1);
   } finally { await page.close(); }
 });
 it('SA12 refused clipboard reveals only the fixed report ready to select', async () => {

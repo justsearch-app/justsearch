@@ -133,7 +133,7 @@
             try { if (!navigator.clipboard) { selectReport(); return; } Promise.resolve(navigator.clipboard.writeText(report)).catch(selectReport); }
             catch (_) { selectReport(); }
           };
-          frame.replaceWith(page);
+          root.replaceChildren(page);
           // The cached accent can be any palette colour. Pick its contrast-safe ink from the
           // existing neutral primitives, without loading the application's role projection.
           try {

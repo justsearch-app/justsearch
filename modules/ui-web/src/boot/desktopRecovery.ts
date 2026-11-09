@@ -33,10 +33,31 @@ export function mountBootApplication(root: HTMLElement, application: HTMLElement
     return;
   }
   const frame = frames.get(root) ?? root.querySelector<HTMLElement>('#boot-frame');
-  const cover = root.querySelector('#boot-failure') ?? (frame?.parentElement === root ? frame : null);
-  if (!cover) { application.inert = false; root.replaceChildren(application); return; }
+  if (root.querySelector('#boot-failure') || frame?.parentElement !== root) {
+    application.inert = false;
+    root.replaceChildren(application);
+    return;
+  }
   // Attach beneath the fixed paint. Lit's first render, including the top bar, owns hand-off.
   application.inert = true;
+  // Inert excludes element targets, but shell shortcuts and drag/navigation listeners also
+  // run on window/document. Capture at window before attachment registers those listeners.
+  const inputTypes = ['keydown', 'keyup', 'keypress', 'pointerdown', 'pointerup', 'pointermove', 'pointercancel',
+    'mousedown', 'mouseup', 'click', 'wheel', 'touchstart', 'input', 'dragenter', 'dragover', 'dragleave', 'drop',
+    'mouseenter', 'mouseleave', 'scroll', 'contextmenu', 'paste'] as const;
+  const releaseInput = (): void => {
+    for (const type of inputTypes) window.removeEventListener(type, guardInput, true);
+    observer.disconnect();
+  };
+  const stillCovered = (): boolean => frame.parentElement === root && application.parentElement === root;
+  const guardInput = (event: Event): void => {
+    if (!stillCovered()) { releaseInput(); return; }
+    // Keep browser/OS defaults (including reload); nothing under the frame receives input.
+    event.stopImmediatePropagation();
+  };
+  const observer = new MutationObserver(() => { if (!stillCovered()) releaseInput(); });
+  observer.observe(root, { childList: true });
+  for (const type of inputTypes) window.addEventListener(type, guardInput, true);
   root.appendChild(application);
   const rendered = application as HTMLElement & { updateComplete?: Promise<boolean> };
   if (!rendered.updateComplete) return; // A never-rendering shell remains covered until the deadline.
@@ -50,8 +71,9 @@ export function mountBootApplication(root: HTMLElement, application: HTMLElement
       await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
       if (application.parentElement !== root || owner && needsRecovery(owner.recovery.supervisor)) return;
       // Recovery/reset may have replaced both nodes while Lit was pending. Never reclaim their root.
-      if (root.querySelector('#boot-frame, #boot-failure')) {
+      if (frame.parentElement === root) {
         root.replaceChildren(application);
+        releaseInput();
         application.inert = false;
       }
     } catch { window.__justsearchBootFailure?.('bootstrap'); }

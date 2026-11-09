@@ -12,7 +12,8 @@ The two isolated new test sources are exempt from entries. They are durable chec
 real production assets and hashed inline CSP in Chromium; `bootAppearanceRestore.test.ts`
 covers restore success/failure, forward-schema preservation, migration and history.
 `gates/test-intent/evidence/shell-s5-new-behavior.json` records every check in both files,
-including assertion failures on the isolated baseline and passing preservation cases.
+including passing preservation cases. Current assertion fail-before evidence is recorded in
+`shell-s5-frame-inert.json`.
 The extra production-build entry, native IPC and HTTP doubles, blocked resources and fake
 clock are test scaffolding only. The deadline also survives a connecting interval longer than
 60 seconds: it cannot replace connecting, but still applies when the frame returns. This check
@@ -24,28 +25,56 @@ including that existing canonical primitive fixes the Reload button without addi
 allows 15 seconds for two complete fixture boots and their initial settings reads; its cache
 assertions are unchanged by that setup allowance. All nine CI flow names remain unchanged.
 
-SA6 also exercises real shell controls rendered beneath the frame while the first-render
-completion promise is held. The application is inert before attachment, and its hand-off
-releases inert when it removes either the frame or a failure page. Six Tabs and a coordinate
-click reach no shell input during that hold; after hand-off, Tab/Enter and a coordinate click
-open the real More menu. A shell held before rendering remains inert through the deadline,
-and the failure page's Reload takes focus. Late completion replaces that page without
-moving focus into the shell. These three checks fail by assertion on isolated candidate
-`a8bc1ed1f814cee97e3b935356ee6519779a450d`: the rendered shell receives five key events
-and one click, and its More menu opens; the never-rendering shell also receives a click.
-`gates/test-intent/evidence/shell-s5-frame-inert.json` records those fail-before results.
-`shell-s5-new-behavior.json` has been regenerated for every check in the changed file,
-including its recovery/reset takeover, deadline, appearance, accessibility and CSP checks.
-The source is SA6: “The frame is inert: nothing focusable or clickable, keys do nothing,
-and assistive technology hears \"Starting\" once.” (task t-20261103-shell, SA6 repair request).
+SA6 exercises real shell controls rendered beneath the frame while the first-render
+completion promise is held. Inert remains on the application; a window capture guard,
+registered before attachment, stops immediate propagation without preventing browser defaults.
+The listener inventory in `modules/ui-web/src` confirms the specified key, pointer, mouse,
+wheel, touch, input and drag events, including document mouseenter/mouseleave in
+`HoverPreviewHost.ts`, window scroll there, mouse Back/Forward in `Shell.ts`, window
+keydown in `KeybindingRegistry.ts`, and window drag/drop in `dragDetect.ts`. There are no
+additional native input types in document/window listeners. Contextmenu and paste have no
+current document/window listener but are also guarded to cover the requested input table.
+Lifecycle, storage and application CustomEvents remain outside this input inventory.
 
-The serial repair-evidence run passed all 57 frame checks; the same file on `a8bc1ed1`
-passed 54 and failed precisely the three new SA6 checks, by assertion. An earlier overlapping
-evidence invocation reported all three selected checks passing but its full-file subprocess
-exited 1; the producer discarded the unselected case details. The separate whole-file evidence
-run and the serial replay both passed all 57. No test or application change was made between
-these runs. The serial replay retained its raw Vitest reports under the session's temporary
-folder for inspection.
+The failure function replaces every root child: a shell that attached but never completed
+its first render is discarded at the unchanged deadline. No live shell sits beneath the
+failure page. A shell mounting after failure replaces that page immediately, without inert,
+a guard or a render wait. Recovery/reset replacements remove the guard; its per-event
+attachment check also releases it synchronously if a replacement has just happened.
+The frame markup, deadline and recovery/reset implementations are unchanged.
+
+The earlier “late failure-page hand-off” branch was retired because it required a shell
+finishing beneath that page, a state the binding redesign forbids. The never-rendering
+check now requires no shell at the deadline, working Reload and no reclamation by a late
+render. The earlier SA10 attached-shell deadline check likewise requires disposal, while
+the stalled-catalog check now holds rendering and requires a genuinely late mount to
+replace failure before its first render. These expectations implement the settled wording:
+SA10: “A boot that stalls with the frame still showing raises the failure page after
+60 seconds. If boot then finishes and mounts the shell, the shell replaces the page at once.”
+SA17: “The frame stays until the shell has painted its first render, so no blank interval
+opens between frame and shell. If the shell attaches but never renders, the 60-second
+deadline discards that shell and raises the failure page, so no live shell ever sits beneath
+the page; Reload starts again. What happens after that first render (navigation stuck,
+Search loading) is the shell's own loading state, a named limit here.”
+
+The complete frame file passed all 67 checks on the repaired tree. Against isolated
+candidate `5ef0ec6cc32d53dfadc84f12ced4e43b7335d979`, the same checks passed 60 and failed
+seven by assertion: every input path leaked at window/document, shortcuts reached the
+shell, pointer events reached global listeners, failure retained rendered or unrendered
+shells, and late mounting waited for rendering. `shell-s5-frame-inert.json` records the
+whole-file result and each of these seven named assertion failures. It replaces the older
+inert-only evidence, whose scenarios allowed an attached shell beneath failure.
+`shell-s5-new-behavior.json` records fresh execution of every check in the changed frame
+file and the unchanged appearance-restoration checks.
+
+The input checks include all requested shell shortcuts, Tab and Shift+Tab; trusted pointer
+movement/click/wheel/context menu; mouse Back/Forward; document and direct-window dispatch
+of every inventoried event, drag/drop and paste; failure-page Tab/Shift+Tab, Enter and Space
+on Copy report and Reload; and recovery/reset keyboard actions after replacing either cover.
+After normal hand-off, every chord reaches the shell again, real Library/Help navigation
+works, and Tab/Enter and a coordinate click open More. F5 and Ctrl+R retain uncancelled
+native-event defaults in the frame, failure and painted states; these browser checks do
+not claim to exercise an operating system's physical keyboard routing.
 
 The proportion register's capture-state note deliberately records the transient frame/failure
 coverage at 1280x800, 900x800 and 600x400. Every persistent-chrome floor and ceiling is retained.
@@ -54,6 +83,21 @@ Evidence used the unchanged official producer through temporary command wrappers
 runs received `--maxWorkers=4`; before checkouts were shared clones under TMPDIR rather than
 worktrees registered in the source repository. Dependencies were linked package by package,
 leaving each clone its own writable cache directories. No test or result was intercepted.
+
+Final validation for this repair: `npm run typecheck` and `npm run lint` exited 0.
+The single final-tree `npx vitest run --maxWorkers=4` passed 735 files / 9,354 tests
+in 139.12 seconds. Each boot suite ran separately with `vitest.config.lockdown.ts`
+against its own production build: frame 67/67, original boot lockdown 5/5. Both official
+evidence producer invocations exited 0; the unchanged appearance-restoration file passed
+7/7. The initial producer attempt exited 2 because the temporary Git wrapper did not
+recognise leading Git configuration arguments; correcting that wrapper allowed the shared
+clone run to complete, with no application or check change. `.agents/preflight` is absent.
+All browser runs were headless. Checks owned their preview servers, browser contexts and
+HTTP fixtures; no shared dev stack was started or used, and no dependency cache was cleared.
+The governance check against `276da8de3f` reports only the missing independent acceptance
+record. Its non-blocking reconsider-rate warning reports reviewer disagreements or third
+reviewer tie-breaks in 12/48 audited PRs (25.0%); the orchestrator must carry that finding
+into delivery. Independent verification and acceptance remain the orchestrator's work.
 
 ```json
 {

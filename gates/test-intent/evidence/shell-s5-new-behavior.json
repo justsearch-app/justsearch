@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-09T21:55:08.776Z",
-  "revision": "a8bc1ed1f814cee97e3b935356ee6519779a450d",
-  "tree": "d209a2ed332655d0554048a2e9e43614e9cfeffc",
+  "createdAt": "2026-11-09T22:30:51.136Z",
+  "revision": "5ef0ec6cc32d53dfadc84f12ced4e43b7335d979",
+  "tree": "fdad7131d580c1b89cef2fd8941f6aa3607f210b",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,16 +18,16 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/boot/boot-frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/cpdk91_w/tmp/test-intent-vitest-7-1794261139049.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/boot/boot-frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/6m4wk3h8/tmp/test-intent-vitest-6-1794263399346.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 50536
+      "durationMs": 50575
     },
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/bootAppearanceRestore.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/cpdk91_w/tmp/test-intent-vitest-7-1794261189588.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/bootAppearanceRestore.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/6m4wk3h8/tmp/test-intent-vitest-6-1794263449922.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 1512
+      "durationMs": 1213
     }
   ],
   "checks": [
@@ -35,7 +35,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:a9fa7f438e7da9addf60e62d8313667a5670b0922013e9c982a00f037b7d1faa",
+      "contentDigest": "sha256:32f55b9ec992d9e0b927c7d9e0fc3bf5e7e814a19164a3fe6988f42f38330d7c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -49,11 +49,35 @@
           "status": "passed"
         },
         {
-          "name": "SA6 rendered shell rejects input until late failure-page hand-off",
+          "name": "SA6 never-rendering shell stays unreachable and deadline Reload takes focus",
           "status": "passed"
         },
         {
-          "name": "SA6 never-rendering shell stays unreachable and deadline Reload takes focus",
+          "name": "SA6 every input path is stopped at window capture under the frame and released after paint",
+          "status": "passed"
+        },
+        {
+          "name": "SA6 shell shortcuts neither run nor queue beneath the frame, then normal shortcuts work",
+          "status": "passed"
+        },
+        {
+          "name": "SA6 pointer hover wheel context menu and mouse Back/Forward cannot reach the covered shell",
+          "status": "passed"
+        },
+        {
+          "name": "SA6 SA17 deadline discards rendered controls; failure page alone handles input and keyboard actions",
+          "status": "passed"
+        },
+        {
+          "name": "SA6 browser reload keys retain their native default at frame",
+          "status": "passed"
+        },
+        {
+          "name": "SA6 browser reload keys retain their native default at failure",
+          "status": "passed"
+        },
+        {
+          "name": "SA6 browser reload keys retain their native default at painted",
           "status": "passed"
         },
         {
@@ -105,7 +129,7 @@
           "status": "passed"
         },
         {
-          "name": "SA10 60-second deadline and late mount",
+          "name": "SA10 SA17 60-second deadline discards an attached shell even when rendering later completes",
           "status": "passed"
         },
         {
@@ -189,7 +213,7 @@
           "status": "passed"
         },
         {
-          "name": "SA10 stalled catalog discovery raises failure and late completion paints the shell",
+          "name": "SA10 stalled catalog discovery raises failure and late mount replaces it before rendering",
           "status": "passed"
         },
         {
@@ -253,6 +277,22 @@
           "status": "passed"
         },
         {
+          "name": "SA6 SA14 recovery replaces frame and its keyboard action works",
+          "status": "passed"
+        },
+        {
+          "name": "SA6 SA14 reset replaces frame and its keyboard action works",
+          "status": "passed"
+        },
+        {
+          "name": "SA6 SA14 recovery replaces failure and its keyboard action works",
+          "status": "passed"
+        },
+        {
+          "name": "SA6 SA14 reset replaces failure and its keyboard action works",
+          "status": "passed"
+        },
+        {
           "name": "SA12 refused clipboard reveals only the fixed report ready to select",
           "status": "passed"
         },
@@ -310,39 +350,6 @@
       ]
     }
   ],
-  "failBefore": {
-    "ref": "e3a479db7d",
-    "revision": "e3a479db7d1547a2d31df44c73334c982c31e15d",
-    "overlays": [],
-    "patches": [],
-    "runs": [
-      {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/boot/boot-frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/cpdk91_w/tmp/test-intent-vitest-7-1794261192995.json\"",
-        "cwd": "<before-worktree>",
-        "exitCode": 1,
-        "durationMs": 114083,
-        "output": "JSON report written to /home/elias/.cache/am/cpdk91_w/tmp/test-intent-vitest-7-1794261192995.json\n\n"
-      },
-      {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/bootAppearanceRestore.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/cpdk91_w/tmp/test-intent-vitest-7-1794261307079.json\"",
-        "cwd": "<before-worktree>",
-        "exitCode": 1,
-        "durationMs": 1337,
-        "output": "JSON report written to /home/elias/.cache/am/cpdk91_w/tmp/test-intent-vitest-7-1794261307079.json\n\n"
-      }
-    ],
-    "checks": [
-      {
-        "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
-        "classification": "assertion",
-        "detail": "SA1 SA6 first paint precedes entry and is inert:  AssertionError: expected +0 to be 1 // Object.is equality\n    at /home/elias/.cache/am/cpdk91_w/tmp/test-intent-before-zXTVWm/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:137:55\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5/modules/ui-web/node_modules/@vitest/runner/dist | SA6 rendered shell rejects input until frame hand-off:  AssertionError: expected +0 to be 1 // Object.is equality\n    at /home/elias/.cache/am/cpdk"
-      },
-      {
-        "id": "modules/ui-web/src/shell-v0/state/bootAppearanceRestore.test.ts",
-        "classification": "assertion",
-        "detail": "SA5 successful restore reports success:  AssertionError: expected undefined to be true // Object.is equality\n    at /home/elias/.cache/am/cpdk91_w/tmp/test-intent-before-zXTVWm/modules/ui-web/src/shell-v0/state/bootAppearanceRestore.test.ts:13:50\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///home | SA5 failed settings restore reports failure:  AssertionError: expected undefined to be false // Object.is equality\n    at /home/elias/.cache/am/cpdk91_w/tmp"
-      }
-    ]
-  },
-  "digest": "sha256:9141f5f2200d48e6d873998444b8745354ab10a4365577f5b995326cb03f59fb"
+  "failBefore": null,
+  "digest": "sha256:676f14796139cf9d0b056c4ddc806a0cd71c99a0dcd0ea5dd0836f7e42b47675"
 }
