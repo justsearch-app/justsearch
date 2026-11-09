@@ -9,6 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.AccessDeniedException;
 import java.nio.file.LinkOption;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.FileTime;
 import java.nio.file.attribute.PosixFilePermissions;
 import io.justsearch.configuration.PlatformPaths;
@@ -552,6 +553,126 @@ class FileOperationExecutorTest {
     assertEquals("second bytes", Files.readString(destination.resolve("nested/second")));
     assertEquals(Map.of(first, destination.resolve("first"), second, destination.resolve("nested/second")),
         capturedPathMappings);
+  }
+
+  @Test
+  void d11DirectoryCopyPreservesChildReplacedWhileSiblingCopies() throws IOException {
+    assertDirectoryCopyPreservesChangedChild(true);
+  }
+
+  @Test
+  void d11DirectoryCopyPreservesChildEditedInPlaceWhileSiblingCopies() throws IOException {
+    assertDirectoryCopyPreservesChangedChild(false);
+  }
+
+  private void assertDirectoryCopyPreservesChangedChild(boolean replace) throws IOException {
+    Path source = Files.createDirectory(root.resolve("source"));
+    Files.writeString(source.resolve("first"), "original bytes");
+    Files.writeString(source.resolve("second"), "original bytes");
+    Path destination = root.resolve("destination");
+    Path retained = root.resolve("retained-original");
+    String siblingBytes = "longer sibling bytes".repeat(4096);
+    String changedBytes = replace ? "replaced bytes" : "edited bytes";
+    var moveFiles = new FileOperationExecutor.MoveFileSystem() {
+      private Path copiedChild;
+
+      @Override
+      void moveDirectory(Path from, Path to) throws IOException {
+        throw new AtomicMoveNotSupportedException(from.toString(), to.toString(), "Cross-volume");
+      }
+
+      @Override
+      void copy(Path from, Path to) throws IOException {
+        if (copiedChild == null) {
+          super.copy(from, to);
+          copiedChild = from;
+          // Prepare the not-yet-copied sibling without depending on directory iteration order.
+          Path sibling = source.resolve(from.getFileName().toString().equals("first") ? "second" : "first");
+          Files.writeString(sibling, siblingBytes);
+          return;
+        }
+        try (var input = Files.newInputStream(from); var output = Files.newOutputStream(to)) {
+          output.write(input.readNBytes(1024));
+          assertEquals("original bytes", Files.readString(destination.resolve(copiedChild.getFileName())));
+          var before = Files.readAttributes(copiedChild, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+          if (replace) {
+            Files.move(copiedChild, retained);
+          }
+          Files.writeString(copiedChild, changedBytes);
+          Files.setLastModifiedTime(copiedChild, before.lastModifiedTime());
+          var after = Files.readAttributes(copiedChild, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+          assertEquals(before.lastModifiedTime(), after.lastModifiedTime());
+          if (replace) {
+            assertEquals(before.size(), after.size(), "Replacement differs only by file identity");
+            assertNotNull(before.fileKey(), "This filesystem supplies file identity");
+            assertNotEquals(before.fileKey(), after.fileKey());
+          } else {
+            assertEquals(before.fileKey(), after.fileKey(), "Editing preserves the inode");
+            assertNotEquals(before.size(), after.size(), "Size detects a timestamp-preserving edit");
+          }
+          input.transferTo(output);
+        }
+      }
+    };
+    useMoveFiles(moveFiles);
+
+    var report = executor.execute(
+        List.of(new FileOperation(FileOperation.OpType.MOVE, source, destination)), "Changed child",
+        EngineContextTestFixtures.AGENT_LOOP);
+
+    assertTrue(Files.exists(moveFiles.copiedChild), "The changed source child must not be deleted");
+    assertEquals(changedBytes, Files.readString(moveFiles.copiedChild));
+    assertFalse(report.allSucceeded(), "A changed source makes the move incomplete");
+    String error = report.results().getFirst().errorMessage();
+    assertTrue(error.contains("Directory move incomplete"), error);
+    assertTrue(error.contains(source.toString()), error);
+    assertTrue(error.contains(destination.toString()), error);
+    assertTrue(error.contains(moveFiles.copiedChild.toString()), error);
+    assertEquals("original bytes", Files.readString(destination.resolve(moveFiles.copiedChild.getFileName())));
+    Path sibling = destination.resolve(moveFiles.copiedChild.getFileName().toString().equals("first") ? "second" : "first");
+    assertEquals(siblingBytes, Files.readString(sibling));
+    assertEquals(0, indexUpdateCount);
+    assertNull(capturedPathMappings);
+  }
+
+  @Test
+  void d11SingleFileCopyPreservesSourceChangedDuringCopy() throws IOException {
+    assumeFalse(PlatformPaths.isWindows(), "Hard-link route is Unix-only");
+    Path source = Files.writeString(root.resolve("source"), "original bytes");
+    Path destination = root.resolve("destination");
+    useMoveFiles(new FileOperationExecutor.MoveFileSystem() {
+      @Override
+      void createLink(Path to, Path from) {
+        throw new UnsupportedOperationException("Hard links unavailable");
+      }
+
+      @Override
+      void copy(Path from, Path to) throws IOException {
+        super.copy(from, to);
+        var before = Files.readAttributes(from, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+        Files.writeString(from, "edited source!");
+        Files.setLastModifiedTime(from, FileTime.fromMillis(before.lastModifiedTime().toMillis() + 2000));
+        var after = Files.readAttributes(from, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+        assertEquals(before.fileKey(), after.fileKey());
+        assertEquals(before.size(), after.size(), "Only the modification time changes");
+        assertNotEquals(before.lastModifiedTime(), after.lastModifiedTime());
+      }
+    });
+
+    var report = executor.execute(
+        List.of(new FileOperation(FileOperation.OpType.MOVE, source, destination)), "Changed file",
+        EngineContextTestFixtures.AGENT_LOOP);
+
+    assertTrue(Files.exists(source), "The changed source file must not be deleted");
+    assertEquals("edited source!", Files.readString(source));
+    assertEquals("original bytes", Files.readString(destination));
+    assertFalse(report.allSucceeded(), "A changed source makes the move incomplete");
+    String error = report.results().getFirst().errorMessage();
+    assertTrue(error.contains("Move incomplete"), error);
+    assertTrue(error.contains("source " + source + " remains=true"), error);
+    assertTrue(error.contains("destination " + destination + " remains=true"), error);
+    assertEquals(0, indexUpdateCount);
+    assertNull(capturedPathMappings);
   }
 
   // ===== Validation tests =====

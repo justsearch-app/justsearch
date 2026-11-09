@@ -328,8 +328,16 @@ final class FileOperationExecutor {
       throw e;
     } catch (IOException | RuntimeException e) {
       LOG.debug("Hard link unavailable for {} -> {}, using copy+delete", source, destination, e);
-      copyMoveEntry(source, destination);
-      moveFiles.delete(source);
+      BasicFileAttributes copied = copyMoveEntry(source, destination);
+      try {
+        deleteCopiedEntry(source, copied);
+      } catch (IOException | RuntimeException deletionFailure) {
+        throw new IOException(
+            "Move incomplete; source " + source + " remains="
+                + Files.exists(source, LinkOption.NOFOLLOW_LINKS)
+                + "; destination " + destination + " remains="
+                + Files.exists(destination, LinkOption.NOFOLLOW_LINKS), deletionFailure);
+      }
       return;
     }
 
@@ -353,17 +361,31 @@ final class FileOperationExecutor {
     }
   }
 
-  private void copyMoveEntry(Path source, Path destination) throws IOException {
+  private BasicFileAttributes copyMoveEntry(Path source, Path destination) throws IOException {
     BasicFileAttributes attrs =
         Files.readAttributes(source, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
     if (!attrs.isRegularFile() && !attrs.isSymbolicLink()) {
       throw new IOException("Cannot copy non-regular file during move: " + source);
     }
     moveFiles.copy(source, destination);
+    return attrs;
+  }
+
+  private void deleteCopiedEntry(Path source, BasicFileAttributes copied) throws IOException {
+    if (!copied.isDirectory()) {
+      BasicFileAttributes current =
+          Files.readAttributes(source, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+      if ((copied.fileKey() != null && !copied.fileKey().equals(current.fileKey()))
+          || !copied.lastModifiedTime().equals(current.lastModifiedTime())
+          || copied.size() != current.size()) {
+        throw new IOException("Source changed before deletion: " + source);
+      }
+    }
+    moveFiles.delete(source);
   }
 
   private void moveDirectoryByCopy(Path source, Path destination) throws IOException {
-    List<Path> copied = new ArrayList<>();
+    List<CopiedMoveEntry> copied = new ArrayList<>();
     Files.walkFileTree(
         source,
         new SimpleFileVisitor<>() {
@@ -371,15 +393,16 @@ final class FileOperationExecutor {
           public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
               throws IOException {
             Files.createDirectories(destination.resolve(source.relativize(dir)));
-            copied.add(dir);
+            copied.add(new CopiedMoveEntry(dir, attrs));
             return FileVisitResult.CONTINUE;
           }
 
           @Override
           public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
               throws IOException {
-            copyMoveEntry(file, destination.resolve(source.relativize(file)));
-            copied.add(file);
+            BasicFileAttributes copiedAttributes =
+                copyMoveEntry(file, destination.resolve(source.relativize(file)));
+            copied.add(new CopiedMoveEntry(file, copiedAttributes));
             return FileVisitResult.CONTINUE;
           }
         });
@@ -387,14 +410,17 @@ final class FileOperationExecutor {
     // non-empty directory fails and reports an incomplete move while leaving that child intact.
     try {
       for (int i = copied.size() - 1; i >= 0; i--) {
-        moveFiles.delete(copied.get(i));
+        CopiedMoveEntry entry = copied.get(i);
+        deleteCopiedEntry(entry.source(), entry.attributes());
       }
     } catch (IOException e) {
       throw new IOException(
           "Directory move incomplete; source remains at " + source
-              + "; copied entries remain at " + destination, e);
+              + "; copied entries remain at " + destination + "; " + e.getMessage(), e);
     }
   }
+
+  private record CopiedMoveEntry(Path source, BasicFileAttributes attributes) {}
 
   /** Filesystem calls separated only for deterministic failure/interleaving tests. */
   static class MoveFileSystem {
