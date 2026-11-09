@@ -823,11 +823,8 @@ every registered projection against the run artifacts via
 | Name | Commit | Purpose |
 |---|---|---|
 | `contract_violations` | LR6-c | Aggregate `contract.violation` events by tempdoc + tier (Phase 1) |
-| `bootstrap_ci` | LR4-b | 95% CI per mode × metric (1000-resample bootstrap) |
 | `rate_timeline` | LR4-d | Per-tick rate for 4 worker counters + stall tagging |
-| `rank_diff` | LR4-e | Auto rank-diff vs latest prior in-cohort sibling run |
 | `cpu_fallback_counts` | LR4-f | `cpu_fallback.triggered` aggregation by encoder + cause |
-| `stratified_metrics` | LR4-c | 2-dim stratified metrics (query-length × first-relevant-rank) |
 
 Projections are pure functions from `run_dir` to a JSON document;
 failures are quarantined so a broken projection cannot abort
@@ -844,8 +841,10 @@ export + adding its filename to `_PROJECTION_MODULE_NAMES` in
   (§26.6 Decision 3).
 
 **Projection-presence gate (manual).** `jseval run` + `jseval gate` asserts the
-latest run directory has a readable `manifest.json` and the four required LR4
-projection outputs. (Phase 6 / 6.13: relocated from
+latest run directory has a readable `manifest.json` and both required diagnostic
+outputs, `contract_violations.json` and `rate_timeline.json`. Ranking comparisons
+and uncertainty are handled by the quality core; the replaced legacy ranking
+projections and their dedicated tests were retired on 2026-11-09. (Phase 6 / 6.13: relocated from
 `scripts/ci/phase3_observability_gate.py` into the jseval package; tempdoc 930
 §18.1 row 7 removed its σ(nDCG@10) band arm along with the envelope it read.)
 This was previously wrapped by

@@ -13,14 +13,10 @@ Sub-modules:
   ``run_all`` dispatcher (LR4-a).
 - :mod:`jseval.projections.contract_violations` — LR6-c aggregator
   (Phase 1 shipped; unchanged).
-- :mod:`jseval.projections.bootstrap_ci` — LR4-b paired-bootstrap CI.
 - :mod:`jseval.projections.rate_timeline` — LR4-d rate + stall
   tagging.
-- :mod:`jseval.projections.rank_diff` — LR4-e auto rank-diff.
 - :mod:`jseval.projections.cpu_fallback_counts` — LR4-f fallback
   aggregator.
-- :mod:`jseval.projections.stratified_metrics` — LR4-c 2-dim
-  stratification.
 """
 
 from __future__ import annotations
@@ -48,11 +44,8 @@ _PROJECTION_MODULE_NAMES = (
     # Phase 3 (LR4-*); modules land incrementally. Listing them here
     # ensures each new module self-registers on the next bootstrap
     # without further __init__.py edits.
-    "bootstrap_ci",
     "cpu_fallback_counts",
-    "rank_diff",
     "rate_timeline",
-    "stratified_metrics",
     # Tempdoc 406: Lucene runtime substrate observability.
     "lucene_runtime_telemetry",
     # Tempdoc 636 / D-005: recall-funnel decomposition.

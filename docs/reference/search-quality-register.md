@@ -9,6 +9,8 @@ description: "Shared decision register for search quality. Read before starting 
 
 # Search Quality Register
 
+**Agent-utility campaign freeze (2026-11-09):** Fresh and resumed live agent-utility campaigns are frozen. Their commands and runbooks remain available for historical reproduction and offline analysis, along with published evidence and offline replay. Neighboring experiments retain their existing status.
+
 Coordination register for search quality work. Every search-quality
 tempdoc agent must read this before starting and update it before closing.
 
@@ -2052,15 +2054,15 @@ above)*
   configurations, not a causal attribution. F-009's lexical-only rows stand as their own
   measurement; they are not superseded, they are a different cell.
 - **Conditions/caveats:** one corpus family (OHR-Bench, 7 domains, extractive queries); single run
-  per arm, no multi-seed. **Per-domain breakdown is NOT available** — `stratified_metrics.json`
+  per arm, no multi-seed. **Per-domain breakdown is NOT available** — the historical `stratified_metrics.json`
   buckets by `decision_kind`/`first_relevant_rank`/`query_length`, not by OHR domain, so "where the
   shipped path loses (tables? scanned? multi-column?)" is unmeasured and needs a domain-labelled
-  stratification the projection does not emit. VDU-routing correlation (786 §B.3) not run. Arms
+  stratification the historical projection did not emit (generator retired 2026-11-09). VDU-routing correlation (786 §B.3) not run. Arms
   verified to be four genuinely different corpora via pairwise-distinct `corpus_identity.signature`
   (`641ec0b7ae96` / `ea1dd54da222` / `f306dc80d5e6` / `f90ba56d8e73`), not one corpus re-measured.
 - **Evidence:** tempdoc 786 §E (table, CIs, routed conclusion, scope-honesty list); artifacts
   `tmp/786-sweep/ohr-bench-{clean,got-moderate,mineru-moderate,tika-pdf}/` — per-arm
-  `summary.json` + `projections/bootstrap_ci.json` (95%, 1000 resamples) + `hybrid_per_query.json`
+  `summary.json` + historical `projections/bootstrap_ci.json` (95%, 1000 resamples; generator retired 2026-11-09) + `hybrid_per_query.json`
   + `hybrid_run.trec`.
 - **Follow-up (tempdoc 790, 2026-07-28) — where the tax lives, and what shipped against it:** the
   per-query decomposition puts 83% of the −0.1307 on the 12.4% of queries that drop to zero, and 13
