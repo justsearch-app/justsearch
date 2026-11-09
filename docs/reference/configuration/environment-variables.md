@@ -304,7 +304,7 @@ older releases ignore it. The first enforcing release will be named in its relea
 | | `onnxruntime.native.path` | Path | Legacy. The historical WorkerSpawner forwarder and child process were removed; set this directly on the Engine process if needed. |
 | `JUSTSEARCH_ONNXRUNTIME_VARIANT_ID` | `justsearch.onnxruntime.variantId` | String | Optional ORT variant id (defaults to the active llama-server runtime variant id when using v3 runtime variants). |
 | **Search reranker** | | | |
-| `JUSTSEARCH_RERANK_ENABLED` | `justsearch.rerank.enabled` | Bool | Enables cross-encoder reranking for interactive search. Auto-enabled when a model is discovered (see below). Set explicitly to `false` to force-disable. |
+| `JUSTSEARCH_RERANK_ENABLED` | `justsearch.rerank.enabled` | Bool | Enables cross-encoder reranking for interactive search. Automatic search presets default off when the effective reranker plan is CPU and no enable choice or operator model-path override is set; installed model files remain available. Set explicitly to `true` to opt in or `false` to force-disable. |
 | `JUSTSEARCH_RERANK_MODEL_PATH` | `justsearch.rerank.model_path` | Path | Path to the reranker model directory. Read in process by the index half via `ResolvedConfig`. If unset, auto-discovery checks (via `ResolvedPathResolver`): `<modelsDir>/onnx/reranker/`, `<dataDir>/models/onnx/reranker/`, `<repoRoot>/models/onnx/reranker/`, then dev fallback. |
 | `JUSTSEARCH_RERANK_TOP_K` | `justsearch.rerank.top_k` | Int | Documents to rerank (default 20). |
 | `JUSTSEARCH_RERANK_DEADLINE_MS` | `justsearch.rerank.deadline_ms` | Long | Time budget for reranking (default 200ms). |
