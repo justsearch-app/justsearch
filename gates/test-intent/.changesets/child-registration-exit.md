@@ -118,3 +118,15 @@ information, JDK exit status and the exit callback. No running application or sh
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "hp17ybrn",
+  "verdict": "accept",
+  "digest": "sha256:6dd5ab8d404e166336d589e34e72b07ae320b44d4f5ed57b56520e7c0e77410a"
+}
+```
