@@ -355,6 +355,7 @@ public final class DefaultChildControl implements ChildControl {
     }
     if (exitedWhileStarting) {
       recordExit(held, ExitOutcome.Phase.STARTING);
+      awaitRegistrationExit(held);
       return held;
     }
     if (!register(held, manifest)) return held;
@@ -572,6 +573,7 @@ public final class DefaultChildControl implements ChildControl {
       } catch (IOException | RuntimeException captureFailure) {
         if (!confirmRegistrationExit(held.process)) throw captureFailure;
         recordExit(held, ExitOutcome.Phase.STARTING);
+        awaitRegistrationExit(held);
         return false;
       }
       registry.register(entry);
@@ -584,6 +586,7 @@ public final class DefaultChildControl implements ChildControl {
       // the id was known, so that exit could not remove the entry: remove it here (removal is
       // idempotent, so an exit that saw the id as well does no harm).
       if (exitedWhileRegistering) {
+        awaitRegistrationExit(held);
         try {
           registry.remove(entry.id());
         } catch (IOException | RuntimeException retained) {
@@ -608,6 +611,27 @@ public final class DefaultChildControl implements ChildControl {
           new ChildRegistrationRefusedException(failure, held);
       if (suppressed != null) refused.addSuppressed(suppressed);
       throw refused;
+    }
+  }
+
+  /** The watcher claims EXITED before writing; a registration exit must include its outcome. */
+  private static void awaitRegistrationExit(Held held) throws IOException {
+    boolean interrupted = Thread.interrupted();
+    long deadline = System.nanoTime() + STOP_BOUND.toNanos();
+    try {
+      while (true) {
+        try {
+          held.exit.get(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS);
+          return;
+        } catch (InterruptedException interrupt) {
+          interrupted = true;
+        } catch (ExecutionException | TimeoutException unpublished) {
+          throw new IOException("child exited during registration but its outcome was not published",
+              unpublished);
+        }
+      }
+    } finally {
+      if (interrupted) Thread.currentThread().interrupt();
     }
   }
 

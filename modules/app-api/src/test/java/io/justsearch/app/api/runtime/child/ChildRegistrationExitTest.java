@@ -151,6 +151,63 @@ final class ChildRegistrationExitTest {
     }
   }
 
+  @Test
+  void captureFailureWaitsForTheWatchersSinglePublication() throws Exception {
+    assertPendingPublication(false);
+  }
+
+  @Test
+  void completedRegistryWriteWaitsForTheWatchersSinglePublication() throws Exception {
+    assertPendingPublication(true);
+  }
+
+  private static void assertPendingPublication(boolean registered) throws Exception {
+    var publishing = new java.util.concurrent.CountDownLatch(1);
+    var release = new java.util.concurrent.CountDownLatch(1);
+    ControlledProcess process = new ControlledProcess(registered ? Loss.NONE : Loss.START);
+    try (Fixture fixture = new Fixture(process);
+        var executor = java.util.concurrent.Executors.newSingleThreadExecutor()) {
+      fixture.beforeExit = () -> {
+        publishing.countDown();
+        awaitLatch(release);
+      };
+      Runnable exit = () -> {
+        process.exited = true;
+        Thread.ofPlatform().daemon().start(() -> process.callback.complete(process));
+        awaitLatch(publishing);
+      };
+      if (registered) fixture.registry.duringRegister = entry -> exit.run();
+      else process.duringCapture = exit;
+      var result = executor.submit(() -> fixture.control.start(ChildControlHarness.spec("sleep")));
+      assertTrue(publishing.await(5, TimeUnit.SECONDS));
+      try {
+        assertThrows(java.util.concurrent.TimeoutException.class,
+            () -> result.get(200, TimeUnit.MILLISECONDS), "start must wait for the exit outcome");
+      } finally {
+        release.countDown();
+      }
+      ChildHandle child = result.get(5, TimeUnit.SECONDS);
+      ExitOutcome outcome = child.exit().toCompletableFuture().getNow(null);
+      assertEquals(OptionalInt.of(23), java.util.Objects.requireNonNull(outcome).code());
+      assertEquals(ChildHandle.State.EXITED, child.state());
+      assertTrue(fixture.registry.snapshot().isEmpty());
+      assertEquals(List.of(outcome), fixture.control.recentExits(32));
+      assertEquals(1, fixture.exitFields.size());
+      assertEquals(1, fixture.types.stream().filter(LedgerRecordType.CHILD_EXIT::equals).count());
+    } finally {
+      release.countDown();
+    }
+  }
+
+  private static void awaitLatch(java.util.concurrent.CountDownLatch latch) {
+    try {
+      if (!latch.await(5, TimeUnit.SECONDS)) throw new AssertionError("exit publication timed out");
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      throw new AssertionError(interrupted);
+    }
+  }
+
   private static void assertEarlyExit(ControlledProcess process) throws Exception {
     try (Fixture fixture = new Fixture(process)) {
       ChildHandle child = assertDoesNotThrow(() -> fixture.control.start(ChildControlHarness.spec("sleep")));
@@ -182,11 +239,15 @@ final class ChildRegistrationExitTest {
     final List<LedgerRecordType> types = new ArrayList<>();
     final List<Map<String, ?>> exitFields = new ArrayList<>();
     final DefaultChildControl control;
+    Runnable beforeExit = () -> {};
 
     Fixture(ControlledProcess process) {
       LedgerSink ledger = (type, fields) -> {
         types.add(type);
-        if (type == LedgerRecordType.CHILD_EXIT) exitFields.add(fields);
+        if (type == LedgerRecordType.CHILD_EXIT) {
+          exitFields.add(fields);
+          beforeExit.run();
+        }
         return true;
       };
       control = new DefaultChildControl(ledger, new PosixProcessTerminator(137), VramProbe.none(),
@@ -215,6 +276,7 @@ final class ChildRegistrationExitTest {
     boolean publishDuringWait;
     boolean interruptWait;
     volatile boolean exited;
+    Runnable duringCapture = () -> {};
     int infoReads;
     int terminations;
 
@@ -225,6 +287,7 @@ final class ChildRegistrationExitTest {
     @Override public ProcessHandle.Info info() {
       if (++infoReads < 3 || loss == Loss.NONE) return initial;
       if (exitDuringCapture && !reaperLag) exited = true;
+      duringCapture.run();
       return new ProcessHandle.Info() {
         @Override public Optional<Instant> startInstant() {
           return loss == Loss.START ? Optional.empty() : initial.startInstant();

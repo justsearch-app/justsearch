@@ -44,6 +44,53 @@ final class RegistrationExitExtractionTest {
     assertFailureAndReplacement("java.lang.OutOfMemoryError: fixture startup heap", true);
   }
 
+  @Test
+  void realRegistrationCrashWaitsForPublishedStatusAndGetsAReplacement() throws Exception {
+    assertRealFailureAndReplacement("fixture startup crash", false);
+  }
+
+  @Test
+  void realRegistrationHeapExitWaitsForPublishedStatusAndGetsAReplacement() throws Exception {
+    assertRealFailureAndReplacement("java.lang.OutOfMemoryError: fixture startup heap", true);
+  }
+
+  private void assertRealFailureAndReplacement(String diagnostic, boolean oom) throws Exception {
+    try (var fixture = new io.justsearch.app.api.runtime.child.RegistrationPublicationFixture(tmp, diagnostic);
+        var replacement = DefaultChildControl.unrecorded(ManagedChildRegistry.noop());
+        var executor = java.util.concurrent.Executors.newSingleThreadExecutor()) {
+      ChildControl control = mock(ChildControl.class, delegatesTo(replacement));
+      AtomicInteger launches = new AtomicInteger();
+      doAnswer(call -> launches.getAndIncrement() == 0
+          ? fixture.control.start(call.getArgument(0), call.getArgument(1))
+          : replacement.start(call.getArgument(0), call.getArgument(1)))
+          .when(control).start(any(), any());
+      var command = javaCommand(PersistentExtractionSandboxTest.ScriptedChild.class);
+      try (var sandbox = ChildControlFixtures.pool(command, Duration.ofSeconds(10), 500, null, control)) {
+        Path input = Files.writeString(tmp.resolve("ok-replacement.txt"), "test input");
+        var result = executor.submit(() -> assertThrows(ContentExtractor.ExtractionException.class,
+            () -> sandbox.extract(input)));
+        assertTrue(fixture.publishing.await(10, TimeUnit.SECONDS));
+        boolean returnedBeforePublication;
+        try {
+          returnedBeforePublication = fixture.returned.await(200, TimeUnit.MILLISECONDS);
+        } finally {
+          fixture.release();
+        }
+        var failure = result.get(10, TimeUnit.SECONDS);
+        assertAll(
+            () -> assertFalse(returnedBeforePublication, "extraction registration returned without its exit outcome"),
+            () -> assertEquals(oom ? ContentExtractor.ExtractionException.class : SandboxExtractionException.class,
+                failure.getClass()),
+            () -> assertTrue(failure.getMessage().contains("37"), failure.getMessage()),
+            () -> assertTrue(failure.getMessage().contains(diagnostic), failure.getMessage()));
+        assertEquals("ok-replacement.txt", sandbox.extract(input).result().content());
+        assertEquals(2, launches.get());
+        assertEquals(1, fixture.exitRecords.get());
+        assertEquals(1, fixture.real.recentExits(32).size());
+      }
+    }
+  }
+
   private void assertFailureAndReplacement(String diagnostic, boolean oom) throws Exception {
     CountDownLatch requestWritten = new CountDownLatch(1);
     try (DefaultChildControl real = DefaultChildControl.unrecorded(ManagedChildRegistry.noop())) {
