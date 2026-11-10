@@ -13,6 +13,7 @@ vi.mock('../state/aiStateStore.js', async original => ({
   },
 }));
 import './BrainSurface.js';
+import type { ConfirmBand } from '../components/ConfirmBand.js';
 
 // Advanced settings > Downloaded files (design D4): rows with measured sizes, Remove files with an
 // inline confirmation, Download again through the existing consent, and switch-on paths that save
@@ -74,6 +75,11 @@ async function mount(openAdvanced = true) {
 }
 const section = (el: Brain) => el.shadowRoot!.querySelector<HTMLElement>('[data-testid="downloaded-files"]')!;
 const row = (el: Brain, id: string) => section(el).querySelector<HTMLElement>(`[data-part="${id}"]`)!;
+function answer(el: Brain, kind: 'confirm' | 'keep') {
+  const button = section(el).querySelector('jf-confirm-band')!.shadowRoot!
+    .querySelector<HTMLElement & { onActivate(): void }>(`jf-button.${kind}`)!;
+  button.onActivate();
+}
 const text = (node: Element | null | undefined) => node?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
 function switches(el: Brain, label: string) {
   return [...el.shadowRoot!.querySelectorAll<HTMLButtonElement>(`[role="switch"][aria-label="Use ${label}"]`)];
@@ -127,22 +133,22 @@ describe('Advanced settings - Downloaded files', () => {
     expect(row(el, 'splade').querySelector('[data-remove]')).toBeNull();
   });
 
-  it('confirms inline with exactly what is deleted, its size and what is kept; Cancel deletes nothing', async () => {
+  it('confirms inline with exactly what is deleted, its size and what is kept; Keep it deletes nothing', async () => {
     const el = await mount();
     const remove = row(el, 'chat').querySelector<HTMLButtonElement>('[data-remove="chat"]')!;
     remove.click(); await settle(el);
 
     const confirm = section(el).querySelector<HTMLElement>('[data-testid="removal-confirm"]')!;
-    expect(confirm.getAttribute('role')).toBe('group');
-    expect(el.shadowRoot!.getElementById(confirm.getAttribute('aria-labelledby')!)!.textContent).toBe('Remove Chat model files?');
-    expect(text(confirm)).toContain('This deletes 2 files (3.0 MB) from this computer.');
+    const band = confirm.querySelector<ConfirmBand>('jf-confirm-band')!;
+    expect(band.shadowRoot!.querySelector('[role="group"]')!.getAttribute('aria-label')).toBe('Remove Chat model files?');
+    expect(band.consequence).toBe('This deletes 2 files (3.0 MB) from this computer.');
     expect(text(confirm)).toContain("Answers and Text in scans and images won't work until you download it again.");
     expect([...confirm.querySelectorAll('li')].map(text)).toEqual([
       'answer.gguf · 2.0 MB', 'mmproj-F16.gguf · 1.0 MB',
       "custom.gguf · 2.0 KB · kept - not verified as JustSearch's download"]);
     expect(remove.getAttribute('aria-expanded')).toBe('true');
 
-    [...confirm.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent === 'Cancel')!.click();
+    answer(el, 'keep');
     await settle(el);
     expect(section(el).querySelector('[data-testid="removal-confirm"]')).toBeNull();
     expect(el.shadowRoot!.activeElement).toBe(row(el, 'chat').querySelector('[data-remove="chat"]'));
@@ -152,7 +158,7 @@ describe('Advanced settings - Downloaded files', () => {
   it('removes through the HIGH-risk operation with the part id and preview, then offers Download again', async () => {
     const el = await mount();
     row(el, 'chat').querySelector<HTMLButtonElement>('[data-remove="chat"]')!.click(); await settle(el);
-    section(el).querySelector<HTMLButtonElement>('.confirm-remove')!.click(); await settle(el);
+    answer(el, 'confirm'); await settle(el);
 
     expect(operations).toEqual([{ id: 'core.remove-ai-files', args: { packageId: 'chat', previewDigest: DIGEST } }]);
     expect(text(section(el).querySelector('[data-testid="removal-outcome"] p'))).toBe('Chat model: Files removed. 2 files removed');
@@ -165,7 +171,7 @@ describe('Advanced settings - Downloaded files', () => {
     refusal = 'Switch answers off first';
     const el = await mount();
     row(el, 'chat').querySelector<HTMLButtonElement>('[data-remove="chat"]')!.click(); await settle(el);
-    section(el).querySelector<HTMLButtonElement>('.confirm-remove')!.click(); await settle(el);
+    answer(el, 'confirm'); await settle(el);
 
     expect(text(row(el, 'chat').querySelector('[role="alert"]'))).toBe('Switch answers off first');
     expect(text(row(el, 'chat'))).toContain('3.0 MB on disk');
@@ -274,7 +280,7 @@ describe('after Remove files (repair round 1)', () => {
   it('lists the deleted files with their sizes in the finished outcome', async () => {
     const el = await mount();
     row(el, 'chat').querySelector<HTMLButtonElement>('[data-remove="chat"]')!.click(); await settle(el);
-    section(el).querySelector<HTMLButtonElement>('.confirm-remove')!.click(); await settle(el);
+    answer(el, 'confirm'); await settle(el);
 
     const outcome = section(el).querySelector('[data-testid="removal-outcome"]');
     expect([...(outcome?.querySelectorAll('[data-testid="removal-deleted"] li') ?? [])].map(text))

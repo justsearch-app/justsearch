@@ -29,6 +29,7 @@ import { projectFact } from '../display/facts.js';
 import { takeMemberTabIntent, subscribeMemberTab, requestMemberTab } from '../router/memberTabIntent.js';
 import '../components/OpButton.js';
 import '../components/Button.js';
+import '../components/ConfirmBand.js';
 import '../components/ErrorAlert.js';
 import '../components/OperationOutcomeDetail.js';
 import type { OpSuccessEventDetail, OpErrorEventDetail } from '../components/OpButton.js';
@@ -83,6 +84,7 @@ import { icon } from '../components/Icon.js';
 // Tempdoc 586 §F-1a — reuse the existing pulse-dots primitive for the first-paint skeleton.
 import '../components/chat/PulseDots.js';
 import { confirmAsync } from '../components/ConfirmDialog.js';
+import { deepActiveElement } from '../utils/keyboardHandler.js';
 import { ModalController } from '../primitives/modalController.js';
 import { TransientController } from '../primitives/transientController.js';
 import { composeBrainSentence, PICTURES_NOT_AVAILABLE_WITH_MODEL, type BrainFeature, type BrainFeatureId } from '../state/brainPage.js';
@@ -663,6 +665,8 @@ export class BrainSurface extends JfElement {
   declare downloadedFiles: DownloadedFilesView | null;
   /** The part whose "Remove files" confirmation is open. */
   declare removalConfirm: string | null;
+  private removalOpener: HTMLElement | null = null;
+  private pendingRemovalFocus: string | null = null;
   declare removalError: { id: string; message: string } | null;
   private removalPoll: number | null = null;
   private pictureUncertain = false;
@@ -1199,6 +1203,7 @@ export class BrainSurface extends JfElement {
     .advanced-heading { margin: 1.5rem 0 0; padding-bottom: 0.5rem; color: var(--text-secondary); font-size: var(--font-size-xs); font-weight: 400; }
     .advanced-row { display: grid; grid-template-columns: minmax(10rem, 28%) minmax(0, 1fr); align-items: center; gap: 1.5rem; padding: 0.9rem 0; border-top: 1px solid var(--border-subtle); font-size: var(--font-size-sm); }
     .advanced-row > div { min-width: 0; overflow-wrap: anywhere; }
+    .removal-confirm { min-width: 0; overflow-wrap: anywhere; }
     .advanced-row p, .advanced-note, .runtime-observation { margin: 0.25rem 0 0; color: var(--text-secondary); font-size: var(--font-size-xs); }
     .brain-advanced button:not(.component-toggle) { border: 0; border-radius: 0; background: transparent; padding: 0; color: var(--text-secondary); }
     .advanced-row button { margin-left: 0.75rem; }
@@ -1331,13 +1336,39 @@ export class BrainSurface extends JfElement {
     this.installConsentOpen = false;
     // An open "Remove files" confirmation and its refusal are answers to this visit only.
     this.removalConfirm = null;
+    this.removalOpener = null;
+    this.pendingRemovalFocus = null;
     this.removalError = null;
     this.closeFeatureInfo();
+  }
+
+  protected override willUpdate(changed: Map<string, unknown>): void {
+    super.willUpdate(changed);
+    // An unanswered question belongs to this visible visit and this row only.
+    if (this.removalConfirm && (this.activeTab !== 'runtime' || !this.expanded.advanced
+      || !this.downloadedFiles?.parts?.some(part => part.id === this.removalConfirm
+        && part.removable && (part.state === 'downloaded' || part.state === 'incomplete')))) {
+      if (changed.has('downloadedFiles') && this.activeTab === 'runtime' && this.expanded.advanced
+        && this.shadowRoot?.querySelector('[data-testid="removal-confirm"]')?.contains(this.shadowRoot.activeElement)) {
+        this.pendingRemovalFocus = this.removalConfirm;
+      }
+      this.closeRemoval();
+    }
   }
 
   /** 574 §22.G — drive the modal contract from the declarative `installConsentOpen` state. */
   protected override updated(changed: Map<string, unknown>): void {
     super.updated(changed);
+    if (this.pendingRemovalFocus) {
+      const active = deepActiveElement();
+      // A later poll may settle the operation. Restore only the focus lost with the band;
+      // a person who has since focused something else keeps that focus.
+      if (active && active !== this.ownerDocument.body) this.pendingRemovalFocus = null;
+      else if (!this.removalRunning()) {
+        this.focusPartAction(this.pendingRemovalFocus);
+        this.pendingRemovalFocus = null;
+      }
+    }
     if (!changed.has('installConsentOpen')) return;
     if (this.installConsentOpen) this.consentModal.open();
     else {
@@ -1863,30 +1894,34 @@ export class BrainSurface extends JfElement {
     }, 1000);
   }
 
-  private openRemoval(id: string): void {
+  private openRemoval(id: string, opener: HTMLElement): void {
+    if (this.removalRunning()) return;
     this.removalError = null;
+    this.removalOpener = opener;
     this.removalConfirm = id;
-    void this.updateComplete.then(() => this.shadowRoot
-      ?.querySelector<HTMLElement>(`#remove-files-title-${id}`)?.focus({ preventScroll: true }));
   }
 
-  private closeRemoval(id: string): void {
+  private closeRemoval(): void {
     this.removalConfirm = null;
-    void this.updateComplete.then(() => this.focusPartAction(id));
+    this.removalOpener = null;
   }
 
-  /** Focus returns to the row's own action, or to the outcome when the row changed. */
+  /** Focus returns to the row's own action, the outcome, or the Downloaded files section. */
   private focusPartAction(id: string): void {
-    const target = this.shadowRoot?.querySelector<HTMLElement>(`[data-remove="${id}"]`)
-      ?? this.shadowRoot?.querySelector<HTMLElement>(`[data-download-again="${id}"]`)
-      ?? this.shadowRoot?.querySelector<HTMLElement>('[data-testid="removal-outcome"]');
+    const target = this.shadowRoot?.querySelector<HTMLElement>(`[data-remove="${id}"]:not(:disabled)`)
+      ?? this.shadowRoot?.querySelector<HTMLElement>(`[data-download-again="${id}"]:not(:disabled)`)
+      ?? this.shadowRoot?.querySelector<HTMLElement>('[data-testid="removal-outcome"]')
+      ?? this.shadowRoot?.querySelector<HTMLElement>('[data-testid="downloaded-files"]');
     target?.focus({ preventScroll: true });
   }
 
   private async confirmRemoval(part: DownloadedPart): Promise<void> {
     const id = part.id ?? '';
     if (this.removalRunning() || !part.previewDigest) return;
-    this.removalConfirm = null;
+    if (this.shadowRoot?.querySelector('[data-testid="removal-confirm"]')?.contains(this.shadowRoot.activeElement)) {
+      this.pendingRemovalFocus = id;
+    }
+    this.closeRemoval();
     await this.withBusy('remove-files', async () => {
       this.removalError = null;
       try {
@@ -1899,8 +1934,6 @@ export class BrainSurface extends JfElement {
     // The removal saved settings, so the next switch needs the witness it left behind.
     await Promise.all([this.refreshInstallPlanPreview(), this.refreshSettings()]);
     void refreshAiInstallNow();
-    await this.updateComplete;
-    this.focusPartAction(id);
   }
 
   /** Asks first, with the download size and licence; only the accepted install withdraws the decline. */
@@ -1916,7 +1949,7 @@ export class BrainSurface extends JfElement {
     const rows = (view.parts ?? []).filter(p => p.state === 'downloaded' || p.state === 'incomplete'
       || (REMOVABLE_PARTS.has(p.id ?? '') && p.declined === true));
     const removal = view.removal;
-    return html`<div class="downloaded-files" data-testid="downloaded-files">
+    return html`<div class="downloaded-files" data-testid="downloaded-files" tabindex="-1">
       ${rows.length === 0 ? html`<p class="advanced-note">No downloaded model files.</p>`
         : rows.map(part => this.renderDownloadedPart(part, running))}
       ${running ? html`<p role="status">Removing files…</p>` : nothing}
@@ -1937,7 +1970,7 @@ export class BrainSurface extends JfElement {
         <div>
           ${onDisk && part.removable ? html`<button type="button" data-remove=${id}
             aria-expanded=${this.removalConfirm === id ? 'true' : 'false'} ?disabled=${running}
-            @click=${() => this.openRemoval(id)}>${icon({ name: 'trash-2', size: 14 })} Remove files</button>` : nothing}
+            @click=${(event: Event) => this.openRemoval(id, event.currentTarget as HTMLElement)}>${icon({ name: 'trash-2', size: 14 })} Remove files</button>` : nothing}
           ${onDisk && !part.removable && part.reason ? html`<span class="removal-reason">${part.reason}</span>` : nothing}
           ${!downloaded && REMOVABLE_PARTS.has(id) && part.declined === true ? html`<button type="button"
             data-download-again=${id} ?disabled=${running} @click=${() => void this.downloadAgain(id)}>
@@ -1954,21 +1987,21 @@ export class BrainSurface extends JfElement {
     const kept = part.kept ?? [];
     const known = deleted.every(f => f.sizeBytes != null);
     const total = known ? formatBytes(deleted.reduce((sum, f) => sum + (f.sizeBytes ?? 0), 0)) : 'size unknown';
-    return html`<div class="removal-confirm" role="group" aria-labelledby=${`remove-files-title-${id}`}
+    return html`<div class="removal-confirm" role="region" aria-label=${`Remove ${part.label ?? id} files?`}
         data-testid="removal-confirm">
-      <strong id=${`remove-files-title-${id}`} tabindex="-1">Remove ${part.label ?? id} files?</strong>
-      <p>This deletes ${deleted.length} ${deleted.length === 1 ? 'file' : 'files'} (${total}) from this computer.
-        ${part.unavailableAfter ? `${part.unavailableAfter} won't work until you download it again. ` : ''}Each
+      <p>${part.unavailableAfter ? `${part.unavailableAfter} won't work until you download it again. ` : ''}Each
         file is checked first; a file JustSearch can't confirm it downloaded is kept. Your documents, the
         index and conversations are not touched.</p>
       <p>Deleted:</p>
       <ul class="removal-files">${deleted.map(f => html`<li><code>${f.path}</code> · ${measuredSize(f.sizeBytes)}</li>`)}</ul>
       ${kept.length > 0 ? html`<p>Kept:</p>
         <ul class="removal-files">${kept.map(f => html`<li><code>${f.path}</code> · ${measuredSize(f.sizeBytes)} · ${f.reason}</li>`)}</ul>` : nothing}
-      <div class="row">
-        <button type="button" class="confirm-remove" @click=${() => void this.confirmRemoval(part)}>Remove files</button>
-        <button type="button" @click=${() => this.closeRemoval(id)}>Cancel</button>
-      </div>
+      <jf-confirm-band heading=${`Remove ${part.label ?? id} files?`}
+        consequence=${`This deletes ${deleted.length} ${deleted.length === 1 ? 'file' : 'files'} (${total}) from this computer.`}
+        action-label=${`Remove ${part.label ?? id} files`}
+        .opener=${this.removalOpener} .busy=${this.removalRunning()}
+        @confirm-band-confirm=${() => void this.confirmRemoval(part)}
+        @confirm-band-cancel=${() => this.closeRemoval()}></jf-confirm-band>
     </div>`;
   }
 
