@@ -95,7 +95,7 @@ final class OrdinaryScanOriginTest {
     }
   }
 
-  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.MethodSource("ordinaryScanKeys")
   void nonImportScanKeysRetainUnknownOriginAndAllowEveryBoundary(String key) throws Exception {
     try (var f = new Environment()) {
@@ -123,7 +123,7 @@ final class OrdinaryScanOriginTest {
             .mapToObj(version -> "00000000-0000-" + version + "000-8000-000000000001"));
   }
 
-  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @org.junit.jupiter.params.provider.EnumSource(value = OperationKind.class, names = {"INGEST", "REINDEX"})
   void nonImportRecordedParentsAndChildrenKeepTheirBoundaryRules(OperationKind kind) throws Exception {
     try (var f = new Environment()) {

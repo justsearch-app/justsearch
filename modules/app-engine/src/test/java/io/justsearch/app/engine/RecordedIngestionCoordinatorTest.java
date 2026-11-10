@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.engine;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -66,7 +67,7 @@ final class RecordedIngestionCoordinatorTest {
   private static final Clock CLOCK = Clock.systemUTC();
   @TempDir Path temp;
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(booleans = {false, true})
   void twoInterruptedImportsDoNotBlockFreshDispatch(boolean reindex) throws Exception {
     try (Fixture f = new Fixture(temp, 3)) {
@@ -186,7 +187,7 @@ final class RecordedIngestionCoordinatorTest {
     assertTrue(dispatcher.dispatch(operation, arguments, provenance, Optional.empty(), context, OperationKeys.generate(CLOCK)).success());
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(booleans = {false, true})
   void interruptedImportKeepsCapacityUntilProducerAndIssuedClaimsDrain(boolean delayedExit) throws Exception {
     try (Fixture f = new Fixture(temp, 3)) {
@@ -223,7 +224,7 @@ final class RecordedIngestionCoordinatorTest {
     }
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(booleans = {false, true})
   void overlappingImportCannotTakeRetainedWalkMembers(boolean interrupted) throws Exception {
     try (Fixture f = new Fixture(temp, 1)) {
@@ -624,7 +625,7 @@ final class RecordedIngestionCoordinatorTest {
     }
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings = {"missing-checkpointed-walk", "missing-unit-walk", "missing-receipted-walk", "mismatched-plan", "decreased-completed", "decreased-failed"})
   void recoveryCannotRecreateOrEnumerateContradictoryChildEvidence(String fault) throws Exception {
     OperationRecord originalParent;
@@ -1051,7 +1052,7 @@ final class RecordedIngestionCoordinatorTest {
     }
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(booleans = {false, true})
   void bootFailedChildRepairsMissingOrStaleParentCheckpointBeforeFailure(
       boolean staleParentCheckpoint) throws Exception {
@@ -1451,7 +1452,8 @@ final class RecordedIngestionCoordinatorTest {
       var request = f.request();
       var accepted = f.accept(request);
       try (var work = f.admission.admit(request.context(), false)) {
-        var result = f.runner.start(accepted, handle -> f.coordinator.execute(handle, work.context()));
+        var result = assertDoesNotThrow(
+            () -> f.runner.start(accepted, handle -> f.coordinator.execute(handle, work.context())));
         assertFalse(result.completion().toCompletableFuture().isDone());
         assertEquals(OperationState.RUNNING, f.operations.find(request.key()).orElseThrow().state());
         assertTrue(f.operations.findIngestChild(request.key(), f.plan).isPresent());
@@ -1564,7 +1566,7 @@ final class RecordedIngestionCoordinatorTest {
     }
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @CsvSource({"false,false", "true,false", "false,true", "true,true"})
   void bothStoresReopenUnderNewOwnersAndResumeTheOriginalPreparedOperation(
       boolean reindex, boolean changedGeneration) throws Exception {
@@ -1744,7 +1746,7 @@ final class RecordedIngestionCoordinatorTest {
     }
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings = {"none", "before-marker", "after-marker", "after-retirement", "after-terminal", "exhausted"})
   void refusedRecoveryRetainsUnsettledUnitsAfterEnumerationAlreadyCompleted(String cut) throws Exception {
     String parentKey;
@@ -1854,7 +1856,7 @@ final class RecordedIngestionCoordinatorTest {
     }
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings = {"ingest-refusal:2:RECOVERY_GENERATION_MISMATCH", "ingest-refusal:1:UNKNOWN", "ingest-refusal:1:RECOVERY_GENERATION_MISMATCH"})
   void malformedRefusalWitnessCannotFallBackToCurrentAuthority(String marker) throws Exception {
     try (Fixture f = new Fixture(temp, 1)) {
@@ -2302,7 +2304,7 @@ final class RecordedIngestionCoordinatorTest {
     }
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @EnumSource(RegisteredRecoveryRefusalCase.class)
   void registeredPreparedRecoveryRefusesStaleGenerationAndRevokedAuthorityWithoutEffect(
       RegisteredRecoveryRefusalCase scenario) throws Exception {
