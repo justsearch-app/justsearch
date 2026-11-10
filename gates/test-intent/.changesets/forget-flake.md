@@ -149,3 +149,13 @@ author-session: forget-flake-builder-7lnojjvf
   "digest": "sha256:c0b60fc17ed905b5af431c64149392a568dd200a136fc4c1c76ba4b3a324dd93"
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "01a1c5c8-8634-7b72-a36b-87f4d1e9c7f1",
+  "verdict": "accept",
+  "digest": "sha256:c0b60fc17ed905b5af431c64149392a568dd200a136fc4c1c76ba4b3a324dd93"
+}
+```
