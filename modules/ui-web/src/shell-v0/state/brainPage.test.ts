@@ -40,6 +40,12 @@ describe('Brain sentence from observed state and saved choice', () => {
     const text = composeBrainSentence(verdict('connecting'), false, features(null, null, null), false).map(part => part.text).join('');
     expect(text).toBe('AI status and feature availability are still being checked. Everything runs on this computer.');
   });
+  it('says picture reading is on but not available with this answer model when the feature state does', () => {
+    const state = features(true, true, false);
+    state.pictures.state = 'On — not available with this answer model';
+    const parts = composeBrainSentence(verdict('online'), true, state, false);
+    expect(parts.find(part => part.feature === 'pictures')?.text).toBe('. Text in scans and images: On — not available with this answer model');
+  });
   it('answers-off takes precedence over a picture-reading hold', () => {
     const parts = composeBrainSentence(verdict('background'), true, features(true, false, true), true);
     expect(parts.find(part => part.feature === 'chat')?.text).toBe('. Answers are off; background work can continue');
