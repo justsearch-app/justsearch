@@ -8,11 +8,12 @@ import { promisify } from 'node:util';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright-core';
 import { mkdtemp, readFile, readdir, writeFile, rm } from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
-import { homedir, tmpdir } from 'node:os';
+import { tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 let browser: Browser, server: PreviewServer, output: string, url: string, entry: string, builtHtml: string, probe: string, version: string, dragScript: string;
 const contexts = new Set<BrowserContext>();
+const dragFixture = path.resolve('src/boot/__fixtures__/tauri-drag.js.txt'), dragMarker = '// ---- upstream file below, byte-identical ----\n';
 const key = 'justsearch.bootFrame.v1';
 const secret = 'SECRET-token-key /home/person/private https://secret-host.invalid';
 const saved = { mode: 'light', background: 'rgb(248, 249, 252)', raised: 'rgb(241, 242, 248)', text: 'rgb(20, 24, 32)', muted: 'rgb(50, 55, 65)', border: 'rgb(110, 115, 125)', accent: 'rgb(0, 110, 100)' };
@@ -46,13 +47,10 @@ export default env => mergeConfig(original(env), {build:{rollupOptions:{input:{m
   server = await preview({ root, build: { outDir: path.join(output, 'dist') }, preview: { host: '127.0.0.1', port: 0 }, logLevel: 'silent' });
   url = server.resolvedUrls!.local[0]!;
   browser = await chromium.launch({ headless: true });
-  // The native double includes Tauri's own drag-region script from the locked dependency, as the
-  // desktop runtime injects it, so drag regions are exercised by the code that serves them.
-  const tauri = (await readFile(path.resolve('../shell/src-tauri/Cargo.lock'), 'utf8')).match(/name = "tauri"\nversion = "([^"]+)"/)![1]!;
-  const registry = path.join(process.env.CARGO_HOME ?? path.join(homedir(), '.cargo'), 'registry/src');
-  const index = (await readdir(registry)).find(name => name.startsWith('index.crates.io-'));
-  if (!index) throw new Error(`Tauri ${tauri} sources are missing from ${registry}; run cargo fetch for modules/shell/src-tauri`);
-  dragScript = (await readFile(path.join(registry, index, `tauri-${tauri}/src/window/scripts/drag.js`), 'utf8')).replace('__TEMPLATE_os_name__', JSON.stringify('linux'));
+  // The native double includes Tauri's own drag-region script (vendored copy of the locked
+  // dependency's file), as the desktop runtime injects it, so drag regions are exercised by the
+  // code that serves them.
+  dragScript = (await readFile(dragFixture, 'utf8')).split(dragMarker)[1]!.replace('__TEMPLATE_os_name__', JSON.stringify('linux'));
 }, 120_000);
 afterEach(async () => {
   // One owner closes each context once, after the test has closed its pages.
@@ -885,6 +883,12 @@ for (const surface of surfaces) it(`SW1 SW2 top area of ${surface.name} moves th
   } finally { await page.close(); }
 }, 20_000);
 
+it('SW2 the vendored Tauri drag script is the tauri version Cargo.lock pins, unchanged', async () => {
+  const [header, upstream] = (await readFile(dragFixture, 'utf8')).split(dragMarker);
+  const locked = (await readFile(path.resolve('../shell/src-tauri/Cargo.lock'), 'utf8')).match(/name = "tauri"\nversion = "([^"]+)"/)![1];
+  expect(header!.match(/^\/\/ Version: tauri (\S+)$/m)?.[1]).toBe(locked);
+  expect(createHash('sha256').update(upstream!).digest('hex')).toBe(header!.match(/^\/\/ Upstream sha256: ([0-9a-f]{64})$/m)?.[1]);
+});
 it('SW2 controls and moving keep working after the hand-off releases the app', async () => {
   const page = await heldShell();
   try {

@@ -104,6 +104,24 @@ else in those checks changed. All three evidence files citing this test file wer
 `shell-s5w-window-controls.json` (67 pass; 67 fail by assertion on `origin/main`),
 `shell-s5w-browser.json` and `shell-s5w-frame-colours.json` (candidate runs).
 
+Repair after hosted CI (Unit tests (app-ui-ui)). The whole suite failed with `ENOENT ...
+scandir '/home/runner/.cargo/registry/src'`: it read Tauri's drag-region script from the local
+Cargo registry, which the frontend CI job does not have. The script is now vendored as
+`src/boot/__fixtures__/tauri-drag.js.txt`: below a header naming its source, version (tauri 2.11.5,
+the version `modules/shell/src-tauri/Cargo.lock` pins), license (Apache-2.0 OR MIT) and upstream
+sha256, the file is byte-identical to `tauri-2.11.5/src/window/scripts/drag.js`. The `.txt`
+extension keeps the third-party file out of lint and type checking. Its MIT notice is in
+`THIRD-PARTY-NOTICES.md` beside it, as for `search-v3/`; the root `THIRD_PARTY_NOTICES` projection
+already lists `tauri 2.11.5` and the fixture is not shipped. The suite injects the part below the
+header exactly as before. The new browser-entry check `SW2 the vendored Tauri drag script is the
+tauri version Cargo.lock pins, unchanged` fails when Cargo.lock pins another version (seen with
+2.11.6 in a scratch clone: expected '2.11.5' to be '2.11.6') or the copy no longer matches its
+hash; it needs no registry. No other assertion changed. With HOME pointed at an empty folder the
+suite passes 135/135. All three evidence files citing this test file were regenerated:
+`shell-s5w-window-controls.json` (67 pass; 67 fail by assertion on `origin/main` `9accf3787e`, with
+the fixture overlaid as a test input), `shell-s5w-browser.json` (3 pass, including the new check)
+and `shell-s5w-frame-colours.json` (2 pass).
+
 Evidence used the unchanged official producer. Its before-state was a shared clone under TMPDIR,
 not a worktree registered in the source repository: a temporary `git` wrapper on PATH turned the
 producer's `worktree add --detach <dir> <ref>` into `git clone --shared --no-checkout` plus a
@@ -289,10 +307,12 @@ CI runs no clippy step.
     },
     {
       "items": [
-        "modules/ui-web/src/boot/boot-frame-lockdown.test.ts"
+        "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
+        "modules/ui-web/src/boot/__fixtures__/tauri-drag.js.txt",
+        "modules/ui-web/src/boot/__fixtures__/THIRD-PARTY-NOTICES.md"
       ],
       "class": "New",
-      "behaviour": "Browser runtime: on every surface there is no window layer, no Window region, no drag-region attribute in any tree, no reserved width for controls and no native window command or error. SA6 (desktop runtime): Tab during the held frame reaches only the desktop window controls or nothing, and the hand-off leaves focus on the element focused before it; every SA6 input assertion is unchanged.",
+      "behaviour": "Browser runtime: on every surface there is no window layer, no Window region, no drag-region attribute in any tree, no reserved width for controls and no native window command or error. SA6 (desktop runtime): Tab during the held frame reaches only the desktop window controls or nothing, and the hand-off leaves focus on the element focused before it; every SA6 input assertion is unchanged. The drag-region script the desktop double injects is a vendored copy of Tauri's src/window/scripts/drag.js (fixture tauri-drag.js.txt, notice beside it), so the suite needs no Cargo registry; SW2 fails when the tauri version the shell's Cargo.lock pins differs from the fixture's stated version, or when the copy below its header no longer matches the upstream sha256 the header records.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -314,12 +334,21 @@ CI runs no clippy step.
           "scenario": "SW5",
           "quote": "Keyboard and assistive technology: each control is reachable, named, has a visible focus ring, works in forced colours and both themes, and the area stays usable at 600x400 and enlarged text without covering existing navigation or recovery actions.",
           "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "The frame-build plan, S5w repair after hosted CI: the frontend CI job has no Cargo registry, so the drag checks must not read Tauri's drag script from it.",
+          "choice": "Vendor the script byte-identical to the version Cargo.lock pins, as a test fixture with a header naming source, version, license and upstream sha256 and a notice beside it; one check fails when Cargo.lock pins another tauri version than the fixture states or the copy no longer matches its recorded hash. No assertion is skipped or weakened.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/shell-s5w-browser.json",
       "newChecks": [
         "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW6 browser runtime has no window layer, drag regions or native commands on any surface",
-        "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SA6 rendered shell rejects input until frame hand-off"
+        "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SA6 rendered shell rejects input until frame hand-off",
+        "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW2 the vendored Tauri drag script is the tauri version Cargo.lock pins, unchanged"
       ]
     },
     {
