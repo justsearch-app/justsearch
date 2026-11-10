@@ -970,7 +970,7 @@ progress-bar witnesses. Independent acceptance remains pending.
       "moved": [
         "input re-encoding"
       ],
-      "whatMoved": "The schema-valid live synthetic status fixture supplies ownSearchableDocuments beside searchableDocuments, both 0, matching its known empty index (indexedDocumentsUnknown false). No other fixture expectation changes; schema and frontend suites execute against it.",
+      "whatMoved": "The schema-valid status fixture serializes WorkerOperationalView.fallback(\"SERVING\"), the status path used before the worker answers or when it fails. It has ownSearchableDocuments null, searchableDocuments 0 and indexedDocumentsUnknown false. The zero counts marked known are pre-existing fallback placeholders, not evidence of an empty index; the null own count safely keeps first use unknown. No other fixture expectation changes; schema and frontend suites execute against it.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -980,6 +980,27 @@ progress-bar witnesses. Independent acceptance remains pending.
           "choice": "2026-11-10 SB16/SB17 redesign: the Engine reports own searchable documents in the same serving-reader snapshot as searchable documents, excluding InternalCollections. First use reads only that nullable field. The facet request, cache, timers and their tests are retired. Unknown is never zero; Hide affects the card, not the factual empty view. Card and pill share the current step and a progress bar; the first-use count replaces the corpus line; a new add attempt clears an old error.",
           "label": "agent choice"
         }
+      ]
+    },
+    {
+      "items": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/status/WorkerOperationalFallbackTest.java"
+      ],
+      "class": "New",
+      "behaviour": "SB16 preservation: WorkerOperationalView.fallback(\"SERVING\") keeps ownSearchableDocuments null in the Java view and serialized status, so unavailable worker observations cannot establish an empty own corpus.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "design decisions of the frame build, within the canonical design",
+          "choice": "Preserve the SB16 unknown own count in WorkerOperationalView.fallback(\"SERVING\"), the real status path before the worker answers or when it fails. The fallback own count remains null in Java and JSON; placeholder zero totals cannot establish an empty own corpus. Add an explicit regression check and prove it rejects a numeric fallback count, as directed in the PR #1192 CI repair builder brief.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s5-fallback-own-count.json",
+      "newChecks": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/status/WorkerOperationalFallbackTest.java#fallbackOwnCountStaysUnknownInStatusJson"
       ]
     }
   ]

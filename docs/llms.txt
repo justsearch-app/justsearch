@@ -65,6 +65,7 @@ halves share objects.
 - [Cut a JustSearch release](how-to/cut-a-release.md): Prepare one immutable Windows/Linux draft, qualify its bytes, and publish after the owner's final validation.
 - [Developing the UI](how-to/develop-ui.md): Layout work without a backend, deterministic fixture captures, real backend development, and frontend verification.
 - [Export a conversation](how-to/export-conversation.md): Copy or download a conversation as Markdown or versioned JSON, with answer sources and outcome labels.
+- [Get started with JustSearch](how-to/getting-started.md): Add a folder, search while files are being read, and reopen Getting started.
 - [Summon JustSearch from the desktop](how-to/global-search-shortcut.md): Use the global shortcut or --focus-search to bring JustSearch forward and focus the default search bar.
 - [Interpret `jseval bisect` Output (LR5-d)](how-to/interpret-bisect-output.md): Reading the manifest-hash bisection report — single-axis, multi-axis, MULTI_AXIS_INTERACTION, no-cached-run, and identical-cohort paths.
 - [Bound a search-quality scoring window](how-to/machine-admission.md): Give a short search-quality scoring run the machine to itself: heavy work waits or pauses, and everything resumes when the window ends.
