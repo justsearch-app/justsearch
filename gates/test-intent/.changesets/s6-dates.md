@@ -94,3 +94,13 @@ author-session: codex-s6-dates-builder
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1c687-252d-7063-84fc-d050ced05d79",
+  "verdict": "accept",
+  "digest": "sha256:013a191c712e172bbf273950bf2a26c6ef53f07f227214687cd5bf9f8e9e380a"
+}
+```
