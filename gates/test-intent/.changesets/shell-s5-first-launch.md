@@ -1020,3 +1020,13 @@ Independent acceptance is pending.
   "digest": "sha256:11e10b484270e14591cbaad77e133072085bc6806a7e54a41ddd8aef9f24af5f"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1c392-733b-74e0-b09a-796fc80cbf0f",
+  "verdict": "accept",
+  "digest": "sha256:b09ca501205e4379241c2d8f6976e3aa5cfa0938a1835a40b3ca585a242bb2f7"
+}
+```
