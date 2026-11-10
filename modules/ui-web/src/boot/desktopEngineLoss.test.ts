@@ -36,10 +36,16 @@ function backendRestartEvent(): void {
   onRestart({ payload: {} });
 }
 
+/** The engine is gone: no request answers, so nothing counts as contact with it. */
+function engineGone(): void {
+  vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch'); }));
+}
+
 async function resetEngineLoss(): Promise<void> {
-  const store = '../shell-v0/state/engineLoss.js';
-  await import(/* @vite-ignore */ store).then((m: { __resetEngineLossForTest(): void }) => m.__resetEngineLossForTest())
-    .catch(() => undefined);
+  // Found by glob: before S5c the store does not exist, nothing matches and the checks fail by
+  // assertion, not at import.
+  const store = import.meta.glob<typeof import('../shell-v0/state/engineLoss.js')>('../shell-v0/state/engineLoss.ts');
+  for (const load of Object.values(store)) (await load()).__resetEngineLossForTest();
 }
 
 beforeEach(async () => {
@@ -197,6 +203,7 @@ describe('SC3 Restart the engine', () => {
     const reload = vi.spyOn(window.location, 'reload').mockImplementation(() => {});
     const { shell } = await bootApp();
     supervisorEvent({ state: 'exhausted', restartCount: 3 });
+    engineGone();
     await settle(shell);
     let accept!: () => void;
     mocks.restart.mockImplementation(() => new Promise<void>(resolve => { accept = resolve; }));
@@ -223,6 +230,7 @@ describe('SC3 Restart the engine', () => {
   it('says when the restarted engine fails again, and a later restart is offered again', async () => {
     const { shell } = await bootApp();
     supervisorEvent({ state: 'exhausted', restartCount: 3 });
+    engineGone();
     await settle(shell);
     click(shell, /^Restart the engine$/);
     await settle(shell);
@@ -232,6 +240,83 @@ describe('SC3 Restart the engine', () => {
     await settle(shell);
     expect(deepText(treatment(shell))).toContain('The engine stopped again.');
     expect(button(shell, /^Restart the engine$/), 'offered again').not.toBeNull();
+  });
+
+  /** Lost on exhausted restarts with no engine answering, then Restart the engine accepted. */
+  async function acceptedRestart(): Promise<Updating> {
+    const { shell } = await bootApp();
+    supervisorEvent({ state: 'exhausted', restartCount: 3 });
+    engineGone();
+    await settle(shell);
+    click(shell, /^Restart the engine$/);
+    await settle(shell);
+    expect(mocks.invoke.mock.calls.filter(([command]) => command === 'restart_engine')).toHaveLength(1);
+    supervisorEvent({ state: 'starting', restartCount: 0 });
+    await settle(shell);
+    return shell;
+  }
+  const underWay = (shell: Updating, when: string): void => {
+    expect(treatment(shell), `${when}: the treatment stays`).not.toBeNull();
+    expect(deepText(treatment(shell)), `${when}: a restart is under way`).toContain('Restarting the engine… This window stays open.');
+    expect(button(shell, /^Restarting the engine…$/), `${when}: the button says so`).not.toBeNull();
+    expect(shell.shadowRoot!.querySelector<HTMLElement>('.stage')!.inert, `${when}: the window area waits`).toBe(true);
+  };
+
+  it('a running report without contact keeps the restart under way; contact with the engine ends it', async () => {
+    const reload = vi.spyOn(window.location, 'reload').mockImplementation(() => {});
+    const shell = await acceptedRestart();
+    supervisorEvent({ state: 'running', restartCount: 0 });
+    await settle(shell);
+    underWay(shell, 'running, no contact yet');
+    await pass(30_000);
+    await settle(shell);
+    underWay(shell, 'running, still no contact');
+    expect(deepText(treatment(shell)), 'no claim that the engine stopped while it restarts').not.toContain('The engine stopped');
+    __feedContactForTest();
+    await settle(shell);
+    expect(treatment(shell), 'the engine answers: the treatment leaves').toBeNull();
+    expect(shell.shadowRoot!.querySelector<HTMLElement>('.stage')!.inert).toBe(false);
+    expect(reload, 'restarting the engine never reloads the window by itself').not.toHaveBeenCalled();
+  });
+
+  it('contact from before the restart does not end it', async () => {
+    const shell = await acceptedRestart();
+    __feedContactForTest(Date.now() - 5_000);
+    supervisorEvent({ state: 'running', restartCount: 0 });
+    await settle(shell);
+    underWay(shell, 'an older contact stamp');
+  });
+
+  it('a restart that reports running and then fails again says so and offers the restart again', async () => {
+    const shell = await acceptedRestart();
+    supervisorEvent({ state: 'running', restartCount: 0 });
+    await settle(shell);
+    underWay(shell, 'running, no contact');
+    supervisorEvent({ state: 'exhausted', restartCount: 3 });
+    await settle(shell);
+    expect(deepText(treatment(shell))).toContain('The engine stopped again.');
+    expect(button(shell, /^Restart the engine$/), 'offered again').not.toBeNull();
+  });
+
+  it('a restart that reports running but not ready says so', async () => {
+    const shell = await acceptedRestart();
+    supervisorEvent({ state: 'running', restartCount: 0 });
+    await settle(shell);
+    supervisorEvent({ state: 'running', restartCount: 0, notReady: 'Index: UNAVAILABLE (index.failed)' });
+    await settle(shell);
+    expect(deepText(treatment(shell))).toContain('The engine started again, but its index is not ready.');
+    expect(button(shell, /^Restart the engine$/), 'offered again').not.toBeNull();
+  });
+
+  it('a new engine identity after the restart rebinds by reloading the window, with the restart still shown until then', async () => {
+    const reload = vi.spyOn(window.location, 'reload').mockImplementation(() => {});
+    const shell = await acceptedRestart();
+    supervisorEvent({ state: 'running', restartCount: 0, incarnation: 2 });
+    await settle(shell);
+    underWay(shell, 'before the rebind');
+    expect(reload).not.toHaveBeenCalled();
+    backendRestartEvent();
+    expect(reload, 'the window rebinds once').toHaveBeenCalledOnce();
   });
 
   it.each([

@@ -18,12 +18,15 @@ import { isTerminal, type SupervisorState } from '../../api/supervisorState.js';
 import { isTauriRuntime } from '../../utils/tauriRuntime.js';
 import { createObservableStore } from './createObservableStore.js';
 
-export type EngineLossCause = 'unreachable' | 'not-ready' | 'stopped';
+type EngineLossCause = 'unreachable' | 'not-ready' | 'stopped';
 
 /** What the person's last request in the treatment is doing. */
-export type EngineLossAction =
+type EngineLossAction =
   | { readonly kind: 'idle' }
-  /** Desktop: the host accepted a restart; shown until the engine answers or fails again. */
+  /**
+   * Desktop: a restart was asked for. Shown until the app is in contact with the engine again, or the
+   * engine fails again; a supervisor report of "running" alone does not end it.
+   */
   | { readonly kind: 'restarting' }
   /** Desktop: the host refused the restart; `message` says why in plain words. */
   | { readonly kind: 'refused'; readonly message: string }
@@ -60,6 +63,8 @@ const store = createObservableStore<EngineLoss>(INITIAL);
 let healthViewers = 0;
 /** During an accepted restart: the supervisor has left its failed state since the request. */
 let restartLeftFailure = false;
+/** When the restart under way was asked for: only contact after it is contact with the restarted engine. */
+let restartAskedAtMs: number | null = null;
 
 function supervisorLoss(state: SupervisorState | null): EngineLossCause | null {
   if (isTerminal(state)) return 'stopped';
@@ -92,9 +97,15 @@ export function subscribeEngineLoss(listener: (loss: EngineLoss) => void): () =>
   return store.subscribe(listener, { immediate: true });
 }
 
-/** The pill's decision, after its grace. Called on every status refresh; repeated values are free. */
-export function reportEngineReachability(unreachable: boolean): void {
-  update({ unreachable });
+/**
+ * The pill's decision, after its grace, and the app's last contact with the engine (any answer or
+ * stream frame). Called on every status refresh; repeated values are free. Contact after a restart
+ * was asked for ends it: the app reaches the engine again.
+ */
+export function reportEngineReachability(unreachable: boolean, lastContactMs: number | null): void {
+  const reached = store.get().action.kind === 'restarting' && restartAskedAtMs !== null
+    && lastContactMs !== null && lastContactMs > restartAskedAtMs;
+  update(reached ? { unreachable, action: IDLE } : { unreachable });
 }
 
 /** The supervisor's state as the desktop host announced it. */
@@ -104,8 +115,7 @@ export function reportSupervisorState(state: SupervisorState): void {
   if (action.kind === 'restarting') {
     const failure = supervisorLoss(state);
     if (!failure) restartLeftFailure = true;
-    if (state.state === 'running' && !state.notReady) action = IDLE;
-    else if (failure && restartLeftFailure) action = { kind: 'failed', message: failure === 'not-ready'
+    else if (restartLeftFailure) action = { kind: 'failed', message: failure === 'not-ready'
       ? 'The engine started again, but its index is not ready.' : 'The engine stopped again.' };
   }
   update({ supervisor: state, supervisorAtMs: Date.now(), action });
@@ -118,7 +128,7 @@ export function noteHealthOnScreen(onScreen: boolean): void {
 }
 
 /** The host's refusal, in plain words. The host's own text is never shown or copied. */
-export function restartRefusalWords(error: unknown): string {
+function restartRefusalWords(error: unknown): string {
   const text = error instanceof Error ? error.message : String(error);
   if (/update holds Engine replacement/i.test(text)) return 'An update is being installed. The engine starts again when it finishes.';
   if (/quit or upgrade/i.test(text)) return 'JustSearch is quitting or installing an update, so the engine can’t be restarted now.';
@@ -134,6 +144,7 @@ export function restartRefusalWords(error: unknown): string {
 export async function restartEngine(): Promise<void> {
   if (!isTauriRuntime() || store.get().action.kind === 'restarting') return;
   restartLeftFailure = supervisorLoss(store.get().supervisor) === null;
+  restartAskedAtMs = Date.now();
   update({ action: { kind: 'restarting' } });
   try {
     const { invoke } = await import('@tauri-apps/api/core');
@@ -159,6 +170,8 @@ export async function tryEngineAgain(): Promise<void> {
 /** The supervisor's reason for the treatment, in plain words; empty when it has none to give. */
 export function engineLossReason(loss: EngineLoss): string {
   const supervisor = loss.supervisor;
+  // A restart is under way: the earlier failure is no longer the story, and the progress line tells it.
+  if (loss.action.kind === 'restarting') return '';
   if (loss.cause === 'not-ready') return 'The engine is running, but its index is not ready.';
   if (loss.cause === 'stopped') {
     const exit = supervisor?.lastExit?.reason ?? '';
@@ -184,5 +197,6 @@ export function engineLossReason(loss: EngineLoss): string {
 export function __resetEngineLossForTest(): void {
   healthViewers = 0;
   restartLeftFailure = false;
+  restartAskedAtMs = null;
   store.set(INITIAL);
 }

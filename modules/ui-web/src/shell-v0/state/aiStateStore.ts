@@ -1272,6 +1272,14 @@ export function refreshStatusNow(): Promise<void> {
   return refreshStatusPollNow();
 }
 
+/**
+ * When the status body now held arrived (`null` while none is held): the observation time of every
+ * fact read from it. Unlike `connection.lastSuccessMs`, inference answers and stream frames never move it.
+ */
+export function getStatusReceivedAtMs(): number | null {
+  return statusSig.get() ? lastStatusSuccessSig.get() : null;
+}
+
 /** When the last status or inference read finished, answered or not (`null` before the first). */
 export function getLastContactAttemptMs(): number | null {
   return lastAttemptMs;

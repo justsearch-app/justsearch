@@ -47,6 +47,10 @@ const engine = {
   statusOnly: false,
   /** The `/api/status` body; `epoch` and `change` are its producer identity and revision headers. */
   status: statusFixture as Record<string, unknown>, epoch: '', change: 0,
+  /** Only `/api/status` fails; inference and the rest keep answering. */
+  statusDown: false,
+  /** When `/api/status` last answered. */
+  statusAnsweredAt: null as number | null,
 };
 const statusBody = (core: Record<string, unknown>, extra: Record<string, unknown> = {}): Record<string, unknown> => ({
   ...statusFixture, ...extra, worker: { ...statusFixture.worker, core: { ...statusFixture.worker.core, ...core } },
@@ -57,6 +61,8 @@ function respond(input: RequestInfo | URL, init?: RequestInit): Promise<Response
   if (url.includes('/api/registry/surfaces')) return Promise.resolve(new Response(JSON.stringify({ entries: [] }), { status: 200 }));
   if (engine.down || (engine.statusOnly && !url.includes('/api/status'))) return Promise.reject(new TypeError('Failed to fetch'));
   if (url.includes('/api/status')) {
+    if (engine.statusDown) return Promise.reject(new TypeError('Failed to fetch'));
+    engine.statusAnsweredAt = Date.now();
     const headers: Record<string, string> = engine.epoch ? { 'X-JustSearch-Status-Epoch': engine.epoch,
       'X-JustSearch-Status-Change': String(engine.change), 'X-JustSearch-Status-Reflected': String(engine.change) } : {};
     return Promise.resolve(new Response(JSON.stringify(engine.status), { status: 200, headers }));
@@ -65,16 +71,16 @@ function respond(input: RequestInfo | URL, init?: RequestInit): Promise<Response
 }
 
 async function resetEngineLoss(): Promise<void> {
-  // The engine-loss store is module state; its reset seam does not exist before S5c, so the name
-  // is not resolved ahead of time.
-  const store = '../state/engineLoss.js';
-  await import(/* @vite-ignore */ store).then((m: { __resetEngineLossForTest(): void }) => m.__resetEngineLossForTest())
-    .catch(() => undefined);
+  // The engine-loss store is module state. It does not exist before S5c: found by glob, nothing
+  // matches there and the checks fail by assertion rather than at import.
+  const store = import.meta.glob<typeof import('../state/engineLoss.js')>('../state/engineLoss.ts');
+  for (const load of Object.values(store)) (await load()).__resetEngineLossForTest();
 }
 
 beforeEach(async () => {
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date'] });
   engine.down = false; engine.statusOnly = false; engine.calls = []; engine.status = statusFixture; engine.epoch = ''; engine.change = 0;
+  engine.statusDown = false; engine.statusAnsweredAt = null;
   vi.stubGlobal('fetch', vi.fn(respond));
   __resetAiStateForTest(); __resetStatusPollForTest(); __resetInferencePollForTest();
   await resetEngineLoss();
@@ -308,6 +314,97 @@ describe('SC4 Open Health', () => {
     await restoreEngine();
     await health!.updateComplete;
     expect(deepText(health!.shadowRoot)).not.toContain('Nothing here is live.');
+  });
+});
+
+/** Open Health from the treatment and return it. */
+async function openHealth(shell: Updating): Promise<Updating> {
+  const open = button(shell, 'Open Health');
+  expect(open, 'Open Health is offered').not.toBeNull();
+  open!.onActivate();
+  await pass(1_000); await shell.updateComplete;
+  const find = (root: ParentNode): Element | null => {
+    for (const el of root.querySelectorAll('*')) {
+      if (el.localName === 'jf-health-surface') return el;
+      const inner = el.shadowRoot && find(el.shadowRoot); if (inner) return inner;
+    }
+    return null;
+  };
+  const health = find(shell.shadowRoot!) as Updating | null;
+  expect(health, 'Health opened').not.toBeNull();
+  await health!.updateComplete;
+  return health!;
+}
+
+/** The age a Health fact states, as the range of seconds its words allow. */
+function factAge(health: Updating, label: string): { words: string; range: [number, number] } {
+  const words = health.shadowRoot!.querySelector(`[data-fact="${label}"] .when`)?.textContent ?? '';
+  const match = /(just now)|(\d+) s ago|(\d+) min ago|(\d+) h ago/.exec(words);
+  if (!match) return { words, range: [Number.NaN, Number.NaN] };
+  if (match[1]) return { words, range: [0, 2] };
+  if (match[2]) return { words, range: [Number(match[2]) - 1, Number(match[2]) + 1] };
+  if (match[3]) return { words, range: [Number(match[3]) * 60, Number(match[3]) * 60 + 59] };
+  return { words, range: [Number(match[4]) * 3600, Number(match[4]) * 3600 + 3599] };
+}
+
+/** Each fact states the age of its own observation. */
+function expectAge(health: Updating, label: string, observedAt: number | null): void {
+  expect(observedAt, `${label} was observed`).not.toBeNull();
+  const age = (Date.now() - observedAt!) / 1000;
+  const { words, range } = factAge(health, label);
+  expect(age >= range[0] && age <= range[1], `${label} says "${words}", observed ${Math.round(age)} s ago`).toBe(true);
+}
+
+const STATUS_FACTS = ['Index', 'Searchable files', 'Files waiting'];
+
+describe('SC4 each Health fact carries the time it was itself observed', () => {
+  it('status failing while inference answers: the index facts keep the status answer’s age, not the newer contact', async () => {
+    engine.status = statusBody({ indexState: 'SERVING', searchableDocuments: 1234, pendingJobs: 7 });
+    const shell = await mountShell();
+    await goTo(shell, SEARCH);
+    await pass(10_000);
+    engine.statusDown = true;
+    await pass(120_000);
+    expect(treatment(shell), 'inference answers: no outage yet').toBeNull();
+    const { getAiState } = await import('../state/aiStateStore.js');
+    expect(getAiState().connection.lastSuccessMs! - engine.statusAnsweredAt!, 'inference contact is newer than status').toBeGreaterThan(100_000);
+    await outage(shell);
+    const health = await openHealth(shell);
+    for (const label of STATUS_FACTS) expectAge(health, label, engine.statusAnsweredAt);
+    expectAge(health, 'Engine', getAiState().connection.lastContactMs);
+  });
+
+  it('polls failing while live streams keep arriving: the index facts keep the last status answer’s age', async () => {
+    engine.status = statusBody({ indexState: 'SERVING', searchableDocuments: 1234, pendingJobs: 7 });
+    const shell = await mountShell();
+    await goTo(shell, SEARCH);
+    await pass(10_000);
+    loseEngine();
+    for (let second = 0; second < 180; second += 15) {
+      await pass(15_000);
+      __feedContactForTest();
+    }
+    expect(treatment(shell), 'streams arrive: no outage yet').toBeNull();
+    await outage(shell);
+    const health = await openHealth(shell);
+    const { getAiState } = await import('../state/aiStateStore.js');
+    for (const label of STATUS_FACTS) expectAge(health, label, engine.statusAnsweredAt);
+    expectAge(health, 'Engine', getAiState().connection.lastContactMs);
+  });
+
+  it('everything lost at once: every fact states the same age, its own', async () => {
+    engine.status = statusBody({ indexState: 'SERVING', searchableDocuments: 1234, pendingJobs: 7 });
+    const shell = await mountShell();
+    await goTo(shell, SEARCH);
+    await pass(10_000);
+    await outage(shell);
+    await pass(120_000);
+    const health = await openHealth(shell);
+    const { getAiState } = await import('../state/aiStateStore.js');
+    for (const label of STATUS_FACTS) expectAge(health, label, engine.statusAnsweredAt);
+    expectAge(health, 'Engine', getAiState().connection.lastContactMs);
+    expect(new Set(['Engine', ...STATUS_FACTS].map(label => factAge(health, label).words.replace(/^.*?(\d+ \w+ ago|just now)$/, '$1'))).size,
+      'equally stale facts read alike').toBe(1);
   });
 });
 

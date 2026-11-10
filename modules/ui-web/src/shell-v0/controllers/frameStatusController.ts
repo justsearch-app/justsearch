@@ -487,8 +487,9 @@ export class FrameStatusController implements ReactiveController {
       ...(this.presenceLive && this.ai?.snapshotLive ? ['presence'] : []),
       ...[...this.operations.values()].filter(o => o.fresh && o.outcome).map(o => `operation:${o.id}`)]);
     this.model = next;
-    // S5c — the engine-loss treatment follows this pill's own decision, after the same grace.
-    reportEngineReachability(next.pill.kind === 'unreachable');
+    // S5c — the engine-loss treatment follows this pill's own decision, after the same grace, and
+    // ends a restart on the first contact with the engine after it was asked for.
+    reportEngineReachability(next.pill.kind === 'unreachable', this.ai?.connection.lastContactMs ?? null);
     this.host.requestUpdate();
   }
 }

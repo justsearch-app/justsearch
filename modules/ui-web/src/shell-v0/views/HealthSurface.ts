@@ -50,6 +50,7 @@ import '../aggregate-substrate/components/JfOperation.js';
 import {
   subscribeAiState,
   hasLiveDocumentCount,
+  getStatusReceivedAtMs,
   type AiState,
   type StatusSnapshot,
   type InferenceSnapshot,
@@ -1952,7 +1953,8 @@ export class HealthSurface extends JfElement {
     };
     const ai = this.aiState;
     const core = ai?.status?.worker?.core;
-    const observed = ai?.connection.lastSuccessMs ?? null;
+    // Each fact is dated by its own observation: these come from the held status body.
+    const observed = getStatusReceivedAtMs();
     const count = core?.ownSearchableDocuments ?? core?.searchableDocuments;
     const reason = engineLossReason(loss);
     const supervisorWords: Record<string, string> = {
@@ -1960,7 +1962,7 @@ export class HealthSurface extends JfElement {
       exhausted: 'Stopped after repeated failures', stopped: 'Stopped',
     };
     const facts: { label: string; value: string; when: string }[] = [
-      { label: 'Engine', value: loss.cause === 'not-ready' ? 'Not ready' : 'Can’t be reached', when: `last connected ${engineLossAge(ai?.connection.lastContactMs ?? null, now) ?? 'never'}` },
+      { label: 'Engine', value: loss.action.kind === 'restarting' ? 'Restarting' : loss.cause === 'not-ready' ? 'Not ready' : 'Can’t be reached', when: `last connected ${engineLossAge(ai?.connection.lastContactMs ?? null, now) ?? 'never'}` },
       ...(loss.supervisor ? [{ label: 'Engine process', value: supervisorWords[loss.supervisor.state] ?? loss.supervisor.state,
         when: `reported ${engineLossAge(loss.supervisorAtMs, now) ?? ''}`.trim() }] : []),
       ...(loss.supervisor?.notReady ? [{ label: 'Engine said', value: loss.supervisor.notReady, when: `reported ${engineLossAge(loss.supervisorAtMs, now) ?? ''}`.trim() }] : []),

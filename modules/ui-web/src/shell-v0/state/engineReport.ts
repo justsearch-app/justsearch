@@ -14,7 +14,7 @@ const SUPERVISOR_STATES = ['starting', 'running', 'stopping', 'restarting', 'exh
 const EXIT_REASONS = ['requested_restart', 'ok', 'fatal_or_uncaught', 'data_dir_locked', 'out_of_memory',
   'escalated_restart', 'supervisor_forced', 'hang', 'quit', 'upgrade', 'restart'] as const;
 
-export interface EngineReport {
+interface EngineReport {
   readonly productVersion: string;
   readonly runtimeKind: 'desktop' | 'browser';
   readonly operatingSystem: 'Windows' | 'macOS' | 'Linux' | 'Other';
@@ -52,7 +52,7 @@ function exitCodes(loss: EngineLoss): Record<string, number> {
   return codes;
 }
 
-export function buildEngineReport(now: number = Date.now()): EngineReport {
+function buildEngineReport(now: number = Date.now()): EngineReport {
   const loss = getEngineLoss();
   const platform = typeof navigator === 'undefined' ? '' : navigator.platform;
   const version = typeof document === 'undefined' ? null

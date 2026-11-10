@@ -418,14 +418,16 @@ safe, and offers **Restart the engine** (desktop) or **Try again** (browser), **
 and its panel, Settings, More and the window controls stay usable; the window area beneath is
 inert and keeps its state, so drafts, the selected conversation and an interrupted request
 survive and nothing is sent again. Restart the engine asks the host's existing restart, shows
-“Restarting the engine…” until the engine answers or stops again, ignores repeated clicks, and
+“Restarting the engine…” until the app reaches the engine again or it stops again (the
+supervisor saying it runs is not yet an answer), ignores repeated clicks, and
 says in plain words why the host refused (quitting or an update, already starting or running,
 still shutting down). The browser cannot restart the engine: it says to restart it where it
 runs, and Try again reads the status once. No wording speaks of reloading the window.
 
 Open Health shows Health as a band-topped page instead of the dimmed one: “JustSearch can't
 reach its engine” and the last facts seen (engine, engine process and its own words on the
-desktop, index state, searchable files, files waiting), each with how long ago it was seen;
+desktop, index state, searchable files, files waiting), each with how long ago it was itself
+seen: the index facts date from the last status answer, not from a newer answer of another kind;
 live controls and cards are not shown. Copy report copies a fixed set of fields, never text the
 engine, host or an error wrote: product version, desktop/browser, OS family, time, seconds since
 the last contact, supervisor state, a reason code from a closed list and the recent exit codes.
