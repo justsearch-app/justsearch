@@ -1,0 +1,114 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-10T02:22:28.320Z",
+  "revision": "8531170e065ad25495dd62c3d4ff1136b883a25d",
+  "tree": "5d23965afe5f8fc63dad957962acdd2c02cb8c31",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.searchSummon.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/6y65_3xb/tmp/test-intent-vitest-2-1794277342737.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 5581
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.searchSummon.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c760016c1aa4a8911e6649b70cc3ab6f7dd77861dda3f06391d2c48432f7223e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "native search summon shared destination SC2 SC3 focuses the current default once without changing draft, URL or journal",
+          "status": "passed"
+        },
+        {
+          "name": "native search summon shared destination SC4 leaves a modal and an ordinary field in charge, including a modal button",
+          "status": "passed"
+        },
+        {
+          "name": "native search summon shared destination SC4 navigates from a non-modal view once with the prior view one Back away",
+          "status": "passed"
+        },
+        {
+          "name": "native search summon shared destination SC5 drains a request already pending before subscription and never replays it on reconnect",
+          "status": "passed"
+        },
+        {
+          "name": "native search summon shared destination SC2 preserves a composer override and uses it as the destination",
+          "status": "passed"
+        },
+        {
+          "name": "native search summon shared destination SC2 falls back temporarily for an override without a composer and preserves the saved override",
+          "status": "passed"
+        },
+        {
+          "name": "native search summon shared destination SC2 respects a changed override after a temporary core fallback",
+          "status": "passed"
+        },
+        {
+          "name": "native search summon shared destination SC2 ignores a missing override target without changing the saved override",
+          "status": "passed"
+        },
+        {
+          "name": "native search summon shared destination SC2 targets the real Search v3 composer with no chat model and preserves its draft",
+          "status": "passed"
+        },
+        {
+          "name": "native search summon shared destination SC2 reuses a secondary search pane and never focuses the other composer",
+          "status": "passed"
+        },
+        {
+          "name": "native search summon shared destination SC9 a pending explicit deep link keeps its destination instead of focusing Search",
+          "status": "passed"
+        },
+        {
+          "name": "native search summon shared destination SC5 does not wait for the Engine schema request before consuming a ready focus request",
+          "status": "passed"
+        },
+        {
+          "name": "native search summon shared destination SC5 SC6 late subscription cleanup cannot disable the reloaded view shortcut guard",
+          "status": "passed"
+        },
+        {
+          "name": "native search summon shared destination SC11 native registration takes precedence without activating previously inert space bindings",
+          "status": "passed"
+        },
+        {
+          "name": "native search summon shared destination C5 W5 Ctrl Shift A prepares Ask when chat is ready (true), otherwise Search",
+          "status": "passed"
+        },
+        {
+          "name": "native search summon shared destination C5 W5 Ctrl Shift A prepares Ask when chat is ready (false), otherwise Search",
+          "status": "passed"
+        },
+        {
+          "name": "native search summon shared destination C5 W5 the Ask chord works from the focused composer (true)",
+          "status": "passed"
+        },
+        {
+          "name": "native search summon shared destination C5 W5 the Ask chord works from the focused composer (false)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:e90b1c3f53cf80e0d8c9a1dc18bc41fe527b061552c9ebc567446d8e27d4fb2e"
+}
