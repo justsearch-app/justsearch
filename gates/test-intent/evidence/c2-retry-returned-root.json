@@ -1,0 +1,194 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-10T23:16:29.806Z",
+  "revision": "d45201e7ff37be7772c29113880351e0b1105001",
+  "tree": "0279dfad4f6bc1a87d7c69c03b9f86b26cd3d17b",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.services.ReturnedRootCurrentByteReplayTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 47990
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/ReturnedRootCurrentByteReplayTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/ReturnedRootCurrentByteReplayTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:54fe74c51730a6d7fc618c72a3e7cf41ff7453d91385cf5ad762fd869e74cfcb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "reconciliationExcludesTheActualLoopWriterUntilConditionalAdmissionFinishes()",
+          "status": "passed"
+        },
+        {
+          "name": "unavailablePredecessorConvergesThroughTheProductionExtractor(modified)",
+          "status": "passed"
+        },
+        {
+          "name": "unavailablePredecessorConvergesThroughTheProductionExtractor(same-stamp)",
+          "status": "passed"
+        },
+        {
+          "name": "unavailablePredecessorConvergesThroughTheProductionExtractor(pristine)",
+          "status": "passed"
+        },
+        {
+          "name": "freshFileSuccessorCannotHandOffAcrossAnInterveningPathReceipt()",
+          "status": "passed"
+        },
+        {
+          "name": "preparedCurrentBytesKeepTheOriginalBroadDeleteOrder(prefix-before)",
+          "status": "passed"
+        },
+        {
+          "name": "preparedCurrentBytesKeepTheOriginalBroadDeleteOrder(prefix-after)",
+          "status": "passed"
+        },
+        {
+          "name": "preparedCurrentBytesKeepTheOriginalBroadDeleteOrder(collection-before)",
+          "status": "passed"
+        },
+        {
+          "name": "preparedCurrentBytesKeepTheOriginalBroadDeleteOrder(collection-after)",
+          "status": "passed"
+        },
+        {
+          "name": "returnedRootReplayRetriesRealExtractionFailureOnceAfterPolicyChange(boolean) [1] false",
+          "status": "passed"
+        },
+        {
+          "name": "returnedRootReplayRetriesRealExtractionFailureOnceAfterPolicyChange(boolean) [2] true",
+          "status": "passed"
+        },
+        {
+          "name": "absentPreparationPreservesDoneFailedAndIssuedWaits(DONE)",
+          "status": "passed"
+        },
+        {
+          "name": "absentPreparationPreservesDoneFailedAndIssuedWaits(FAILED)",
+          "status": "passed"
+        },
+        {
+          "name": "absentPreparationPreservesDoneFailedAndIssuedWaits(PROCESSING)",
+          "status": "passed"
+        },
+        {
+          "name": "C11ReturnedRootRechecksAbsenceUnderThePublicationFence()",
+          "status": "passed"
+        },
+        {
+          "name": "staleFrozenExpectationsRefuseBeforeAnyConditionalMutation(journal)",
+          "status": "passed"
+        },
+        {
+          "name": "staleFrozenExpectationsRefuseBeforeAnyConditionalMutation(full-row)",
+          "status": "passed"
+        },
+        {
+          "name": "ordinaryScanPendingH2RepairsH3AndPreservesScanAttribution()",
+          "status": "passed"
+        },
+        {
+          "name": "changedBytesDuringIssuedWorkWaitForPhysicalCompletionThenRepairH3(extraction)",
+          "status": "passed"
+        },
+        {
+          "name": "changedBytesDuringIssuedWorkWaitForPhysicalCompletionThenRepairH3(commit)",
+          "status": "passed"
+        },
+        {
+          "name": "laterIndependentPendingRevisionAndItsWaitRemainUntouched()",
+          "status": "passed"
+        },
+        {
+          "name": "committedOwnedH2RepairsH3AfterIdenticalDebtReplacementAndQueueRestart()",
+          "status": "passed"
+        },
+        {
+          "name": "failedPostMutationRootProofRollsBackSqlAndRetainsDebtForRetry()",
+          "status": "passed"
+        },
+        {
+          "name": "provenAbsentUnavailablePredecessorWakesWithoutARegularSourceHash()",
+          "status": "passed"
+        },
+        {
+          "name": "unknownOrConflictingDebtLineageCannotReadmitOwnedDoneWork(reverse)",
+          "status": "passed"
+        },
+        {
+          "name": "unknownOrConflictingDebtLineageCannotReadmitOwnedDoneWork(conflict)",
+          "status": "passed"
+        },
+        {
+          "name": "unknownOrConflictingDebtLineageCannotReadmitOwnedDoneWork(payload)",
+          "status": "passed"
+        },
+        {
+          "name": "unknownOrConflictingDebtLineageCannotReadmitOwnedDoneWork(candidate)",
+          "status": "passed"
+        },
+        {
+          "name": "unknownOrConflictingDebtLineageCannotReadmitOwnedDoneWork(malformed)",
+          "status": "passed"
+        },
+        {
+          "name": "ordinaryScanOwnedH2RepairsH3AfterIdenticalDebtReplacementAndQueueRestart()",
+          "status": "passed"
+        },
+        {
+          "name": "freshRootFileIsInsertedOnlyByOrderedApply()",
+          "status": "passed"
+        },
+        {
+          "name": "preparationPreservesDoneIssuedUnknownAndProtectedRows(DONE)",
+          "status": "passed"
+        },
+        {
+          "name": "preparationPreservesDoneIssuedUnknownAndProtectedRows(FAILED)",
+          "status": "passed"
+        },
+        {
+          "name": "preparationPreservesDoneIssuedUnknownAndProtectedRows(PROCESSING)",
+          "status": "passed"
+        },
+        {
+          "name": "preparationPreservesDoneIssuedUnknownAndProtectedRows(foreign)",
+          "status": "passed"
+        },
+        {
+          "name": "preparationPreservesDoneIssuedUnknownAndProtectedRows(release030)",
+          "status": "passed"
+        },
+        {
+          "name": "preparationPreservesDoneIssuedUnknownAndProtectedRows(recorded)",
+          "status": "passed"
+        },
+        {
+          "name": "preparationPreservesDoneIssuedUnknownAndProtectedRows(parser-wait)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:0a1edff4b2c692fbd63b30283378e322263600445cdb11b7d4e8ce304a0f0ac5"
+}

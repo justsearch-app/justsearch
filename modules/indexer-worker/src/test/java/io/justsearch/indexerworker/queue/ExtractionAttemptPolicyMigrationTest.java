@@ -27,7 +27,8 @@ final class ExtractionAttemptPolicyMigrationTest {
     List<List<String>> before;
     try (var connection = DriverManager.getConnection("jdbc:sqlite:" + db);
         var statement = connection.createStatement()) {
-      statement.execute("ALTER TABLE jobs DROP COLUMN extraction_policy_id");
+      assertDoesNotThrow(() -> statement.execute("ALTER TABLE jobs DROP COLUMN extraction_policy_id"),
+          "the queue stores each attempt's extraction policy on its job (C9)");
       for (var state : List.of("PENDING", "PROCESSING", "DONE", "FAILED", "RETRY_EXHAUSTED")) {
         try (var insert = connection.prepareStatement("""
             INSERT INTO jobs(path,state,attempts,last_updated,collection,size_bytes,scan_id,unit_revision,
@@ -86,7 +87,8 @@ final class ExtractionAttemptPolicyMigrationTest {
             observed_at,source_kind,artifact_status,policy_id,parser_id,operation_key,unit_revision
           FROM ingestion_ledger WHERE outcome_class='PARSER_FAILED'
           """);
-      statement.execute("ALTER TABLE jobs DROP COLUMN extraction_policy_id");
+      assertDoesNotThrow(() -> statement.execute("ALTER TABLE jobs DROP COLUMN extraction_policy_id"),
+          "the queue stores each attempt's extraction policy on its job (C9)");
       statement.execute("PRAGMA user_version=28");
     }
     try (var queue = new SqliteJobQueue(db)) {

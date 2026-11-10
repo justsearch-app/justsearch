@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.server;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -118,8 +119,8 @@ final class Release030UpgradeCharacterizationTest {
                 + " AND last_outcome_class IN ('PARSER_TIMEOUT','IO_FAILED')"), "U18: unrelated waits survive");
             assertEquals(1, count(root, "state='FAILED' AND path='" + key(root.resolve("orphan/failed.bin")) + "'"),
                 "U12: the unwatched terminal failure remains protected");
-            assertEquals(1, count(root, "state='DONE' AND extraction_policy_id IS NOT NULL AND path='"
-                + key(root.resolve("roots/alpha/failed.bin")) + "'"),
+            assertEquals(1L, assertDoesNotThrow(() -> count(root, "state='DONE' AND extraction_policy_id IS NOT NULL AND path='"
+                + key(root.resolve("roots/alpha/failed.bin")) + "'"), "the queue stores each attempt's extraction policy on its job (C9)"),
                 "C3: the watched legacy extraction failure gets one durable current-policy attempt");
             assertTrue(search(server, "copper").contains(key(root.resolve("roots/alpha/failed.bin"))),
                 "the retry publishes the real source text");

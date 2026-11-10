@@ -1,0 +1,94 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-10T23:14:47.865Z",
+  "revision": "d45201e7ff37be7772c29113880351e0b1105001",
+  "tree": "052054267ef9157d715852826a8a10bb8308dff0",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.queue.JobCountsMigrationTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 9049
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobCountsMigrationTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobCountsMigrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:818dde7829fb20a5b93d6af37d4cff80534cf63e3d7e56cca260a38f4c1daee1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "everySupportedVersionMigratesToV24WithoutChangingSavedRows(int) [1] 13",
+          "status": "passed"
+        },
+        {
+          "name": "everySupportedVersionMigratesToV24WithoutChangingSavedRows(int) [2] 14",
+          "status": "passed"
+        },
+        {
+          "name": "everySupportedVersionMigratesToV24WithoutChangingSavedRows(int) [3] 15",
+          "status": "passed"
+        },
+        {
+          "name": "everySupportedVersionMigratesToV24WithoutChangingSavedRows(int) [4] 16",
+          "status": "passed"
+        },
+        {
+          "name": "everySupportedVersionMigratesToV24WithoutChangingSavedRows(int) [5] 17",
+          "status": "passed"
+        },
+        {
+          "name": "everySupportedVersionMigratesToV24WithoutChangingSavedRows(int) [6] 18",
+          "status": "passed"
+        },
+        {
+          "name": "everySupportedVersionMigratesToV24WithoutChangingSavedRows(int) [7] 19",
+          "status": "passed"
+        },
+        {
+          "name": "everySupportedVersionMigratesToV24WithoutChangingSavedRows(int) [8] 20",
+          "status": "passed"
+        },
+        {
+          "name": "everySupportedVersionMigratesToV24WithoutChangingSavedRows(int) [9] 21",
+          "status": "passed"
+        },
+        {
+          "name": "everySupportedVersionMigratesToV24WithoutChangingSavedRows(int) [10] 22",
+          "status": "passed"
+        },
+        {
+          "name": "everySupportedVersionMigratesToV24WithoutChangingSavedRows(int) [11] 23",
+          "status": "passed"
+        },
+        {
+          "name": "failedV24MigrationRollsBackTableTriggersIndexesCountsAndVersion()",
+          "status": "passed"
+        },
+        {
+          "name": "unreleasedQueueV23GainsMainAdmissionFenceWithoutLosingCounts()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:ee5c74b3aa08e7b6a37eaf7662a5aa1c6e4738afc9ec676ad0d528e665c01e7a"
+}

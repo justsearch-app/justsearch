@@ -41,7 +41,7 @@ import tools.jackson.databind.ObjectMapper;
 final class ReturnedRootCurrentByteReplayTest extends LuceneExecutorTestBase {
   @TempDir Path temporary;
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(booleans = {false, true})
   void returnedRootReplayRetriesRealExtractionFailureOnceAfterPolicyChange(boolean capturedRebuild) throws Exception {
     var limited = io.justsearch.indexerworker.extract.TikaExtractionPolicy.fromWorkerLimits(
