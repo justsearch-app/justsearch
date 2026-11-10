@@ -190,3 +190,13 @@ into delivery. Independent verification and acceptance remain the orchestrator's
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1c293-f36f-7ab1-b5e0-d663a75de0ae",
+  "verdict": "accept",
+  "digest": "sha256:1cd4073433f1cb6c1d80ecf82ed5c5a9dcd1e846d08e5935d78c9bd68c624640"
+}
+```
