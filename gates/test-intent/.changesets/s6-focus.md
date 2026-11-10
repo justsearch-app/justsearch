@@ -89,3 +89,16 @@ A separate shared baseline clone also reproduced those same two failures. No oth
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "orchestrator",
+  "session": "orchestrator-16ceef6e-20261110",
+  "verdict": "accept",
+  "digest": "sha256:6e22c2f21a645d0c1ba73e10a942350c83e89aada7f7152967fe55333a098358",
+  "note": "Classes judged correct by independent verifier round 3 (verifier-3, candidate 3ad4c81be4: New, repaired defect; fail-before shown for all three checks). Delegated-choice source checked by the orchestrator against the task record's user turn of 2026-11-03, which the sandboxed verifier could not read."
+}
+```
