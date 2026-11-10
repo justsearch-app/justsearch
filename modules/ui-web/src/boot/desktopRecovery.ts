@@ -5,6 +5,7 @@ import type { EngineRecovery } from '../shell-v0/components/EngineRecovery.js';
 import { installBackendRestartBridge } from '../api/backendRestart.js';
 import { resolveBootApiBase } from './apiBase.js';
 import { gateFactoryReset } from './factoryReset.js';
+import { reportSupervisorState } from '../shell-v0/state/engineLoss.js';
 
 const frames = new WeakMap<HTMLElement, HTMLElement>();
 
@@ -12,12 +13,27 @@ const recoverySurfaces = new WeakMap<HTMLElement, {
   recovery: EngineRecovery;
   teardown: () => void;
 }>();
+/** The application `mountBootApplication` presented in each root. */
+const applications = new WeakMap<HTMLElement, HTMLElement>();
+
+/** Linux keeps this webview alive while apt runs, including its lock wait: the app gives way to it. */
+function holdsLinuxUpdate(state: SupervisorState | null): boolean {
+  return /Linux/.test(navigator.platform) && state?.state === 'stopped' && state.reason === 'upgrade';
+}
 
 function needsRecovery(state: SupervisorState | null): boolean {
-  // Linux keeps this webview alive while apt runs, including its lock wait. Windows hands
-  // presentation to NSIS and exits, so preserve its existing upgrade-stop presentation.
-  return isTerminal(state) || !!state?.notReady
-    || (/Linux/.test(navigator.platform) && state?.state === 'stopped' && state.reason === 'upgrade');
+  // Windows hands presentation to NSIS and exits, so preserve its existing upgrade-stop presentation.
+  return isTerminal(state) || !!state?.notReady || holdsLinuxUpdate(state);
+}
+
+/**
+ * S5c — once the application is on screen and takes input, engine loss is shown inside it (the
+ * engine-loss treatment keeps the top bar, Health and the report), except for the Linux update hold.
+ * While the start-up frame still covers it, the recovery page owns loss, as before the app loaded.
+ */
+function presentsApplication(root: HTMLElement): boolean {
+  const application = applications.get(root);
+  return !!application && application.parentElement === root && !application.inert;
 }
 
 /** Keep supervisor recovery presentation authoritative while asynchronous shell boot finishes. */
@@ -32,6 +48,7 @@ export function mountBootApplication(root: HTMLElement, application: HTMLElement
     if (root.firstChild !== presentation || root.childNodes.length !== 1) root.replaceChildren(presentation);
     return;
   }
+  applications.set(root, application);
   const frame = frames.get(root) ?? root.querySelector<HTMLElement>('#boot-frame');
   if (root.querySelector('#boot-failure') || frame?.parentElement !== root) {
     application.inert = false;
@@ -104,7 +121,8 @@ export async function resolveBootWithRecovery(
   let waitingForApi = false;
   await installSupervisorStateBridge((state) => {
     recovery.supervisor = state;
-    if (needsRecovery(state)) {
+    reportSupervisorState(state);
+    if (needsRecovery(state) && !(presentsApplication(root) && !holdsLinuxUpdate(state))) {
       // Store-owned subscriptions outlive shell listeners, so release them explicitly.
       teardown();
       if (recovery.parentElement !== root) root.replaceChildren(recovery);

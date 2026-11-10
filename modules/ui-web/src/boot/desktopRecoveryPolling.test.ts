@@ -39,6 +39,7 @@ beforeEach(() => {
   document.body.innerHTML = '<div id="root"></div>';
 });
 afterEach(() => {
+  vi.restoreAllMocks();
   document.body.innerHTML = '';
   __resetAiStateForTest();
   __resetStatusPollForTest();
@@ -46,13 +47,16 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-function supervisorEvent(state: string): void {
+function supervisorEvent(state: string, reason?: string): void {
   const onState = mocks.listen.mock.calls.find(([name]) => name === 'justsearch://supervisor-state')![1];
-  onState({ payload: { ...terminal, state } });
+  onState({ payload: { ...terminal, state, reason } });
 }
 
 describe('terminal recovery application polling teardown', () => {
+  // S5c SC2: once the app is presented, a terminal stop keeps it (the in-shell treatment); the Linux
+  // update hold is what still replaces the presented app, so it is the trigger here.
   it.each(['pending', 'scheduled'])('stops all real store pollers with %s requests', async (phase) => {
+    vi.spyOn(window.navigator, 'platform', 'get').mockReturnValue('Linux x86_64');
     const finish: Array<(response: Response) => void> = [];
     mocks.send.mockImplementation(() => new Promise<Response>((resolve) => { finish.push(resolve); }));
     const root = document.getElementById('root')!;
@@ -70,7 +74,7 @@ describe('terminal recovery application polling teardown', () => {
     }
     supervisorEvent('restarting');
     expect(signals.every((signal) => !signal?.aborted)).toBe(true);
-    supervisorEvent('exhausted');
+    supervisorEvent('stopped', 'upgrade');
     expect(root.querySelector('jf-engine-recovery')).not.toBeNull();
     expect(signals.every((signal) => signal?.aborted === true)).toBe(true);
     if (phase === 'pending') finish.forEach((resolve) => resolve(new Response('{}')));

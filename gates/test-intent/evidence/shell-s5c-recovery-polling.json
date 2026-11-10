@@ -1,0 +1,91 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
+  },
+  "createdAt": "2026-11-10T13:41:50.702Z",
+  "revision": "21fe180483bce1f3f197c008f47b760136604e56",
+  "tree": "2ec09b52d6456c7bbf10737fadb1b3bf389f0203",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/boot/desktopRecoveryPolling.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/plyo8mkb/tmp/test-intent-vitest-16211-1794318109793.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 908
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/boot/desktopRecoveryPolling.test.ts#stops all real store pollers with pending requests",
+      "file": "modules/ui-web/src/boot/desktopRecoveryPolling.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c9765e215ad3b9d50e10a9680b86d1f8626b9405650ff06461e79e1bd800c5b0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "terminal recovery application polling teardown stops all real store pollers with pending requests",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/desktopRecoveryPolling.test.ts#stops all real store pollers with scheduled requests",
+      "file": "modules/ui-web/src/boot/desktopRecoveryPolling.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c9765e215ad3b9d50e10a9680b86d1f8626b9405650ff06461e79e1bd800c5b0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "terminal recovery application polling teardown stops all real store pollers with scheduled requests",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/desktopRecoveryPolling.test.ts#aborts admission retry waits owned by all five store requests",
+      "file": "modules/ui-web/src/boot/desktopRecoveryPolling.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c9765e215ad3b9d50e10a9680b86d1f8626b9405650ff06461e79e1bd800c5b0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "terminal recovery application polling teardown aborts admission retry waits owned by all five store requests",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/desktopRecoveryPolling.test.ts#tears down a late store start when terminal recovery prevents application mounting",
+      "file": "modules/ui-web/src/boot/desktopRecoveryPolling.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c9765e215ad3b9d50e10a9680b86d1f8626b9405650ff06461e79e1bd800c5b0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "terminal recovery application polling teardown tears down a late store start when terminal recovery prevents application mounting",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:3770dc8cc7c7f46f74191c729a0dd0048cd2aa6af89cea96cdd74f8c5acfdc44"
+}

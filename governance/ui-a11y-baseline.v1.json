@@ -572,6 +572,18 @@
       "uiShotStep": "first-use-reading",
       "knownRules": [],
       "note": "S5: unseeded cross-profile walkthrough state; live empty or partly read corpus."
+    },
+    {
+      "surface": "engine-loss",
+      "uiShotStep": "engine-loss",
+      "knownRules": [],
+      "note": "S5c: the loaded app has lost its engine (every engine request fails past the contact window and the pill's grace); Search dimmed behind the treatment, browser runtime, 1280x800 dark."
+    },
+    {
+      "surface": "engine-loss",
+      "uiShotStep": "engine-loss-600x400-forced",
+      "knownRules": [],
+      "note": "S5c: the same at 600x400 in forced colours."
     }
   ]
 }

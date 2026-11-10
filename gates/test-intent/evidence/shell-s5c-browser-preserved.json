@@ -1,0 +1,61 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
+  },
+  "createdAt": "2026-11-10T14:33:04.457Z",
+  "revision": "d1c2ffd940359180c10b2f54031fa18160308691",
+  "tree": "e37e784e34b8f1c170e1ec4d8ba9bb9e1b6a0d42",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.engineLoss.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/0mde8r1a/tmp/test-intent-vitest-25079-1794321179832.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 4623
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts#a contact gap shorter than the grace shows nothing",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:08f7a636d48c076cb749e671acfce5be7781266da494197af14d760c6d66f99b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SC1 SC7 what is not an outage a contact gap shorter than the grace shows nothing",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts#polls failing while live streams keep arriving is not an outage",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:08f7a636d48c076cb749e671acfce5be7781266da494197af14d760c6d66f99b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SC1 SC7 what is not an outage polls failing while live streams keep arriving is not an outage",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:b9fc679ea54648ccb8c6d944a9e584845a2da86dc8c1b67bf306c567d7e82022"
+}
