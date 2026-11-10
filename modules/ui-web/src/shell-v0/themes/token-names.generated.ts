@@ -152,6 +152,10 @@ export type TokenName =
   | '--frame-status-panel-width'
   | '--frame-status-ring'
   | '--frame-topbar-height'
+  | '--frame-window-control-gap'
+  | '--frame-window-control-glyph'
+  | '--frame-window-control-inset'
+  | '--frame-window-control-size'
   | '--glass-blur'
   | '--glass-blur-elevated'
   | '--glass-blur-scale'
@@ -400,6 +404,10 @@ export const TOKEN_NAMES: readonly TokenName[] = [
   '--frame-status-panel-width',
   '--frame-status-ring',
   '--frame-topbar-height',
+  '--frame-window-control-gap',
+  '--frame-window-control-glyph',
+  '--frame-window-control-inset',
+  '--frame-window-control-size',
   '--glass-blur',
   '--glass-blur-elevated',
   '--glass-blur-scale',

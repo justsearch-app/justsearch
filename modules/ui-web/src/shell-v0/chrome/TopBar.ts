@@ -10,14 +10,20 @@
  * address, the journal and the stage stay one flow. Area buttons and menu destinations carry
  * `data-surface-id` (the harness and saved selectors address windows by it; one element per id).
  *
- * Sizes: below 1000 px only the active area keeps its visible label (the others keep their name as
- * the accessible name and tooltip); below 720 px the minimal bar shows the brand dot, one button
- * naming the active area that opens the area menu, the pill as an icon, Settings and More.
+ * Sizes, read from the bar's own room (after the desktop window controls) in rem, so enlarged text
+ * counts: below 62.5rem only the active area keeps its visible label (the others keep their name as
+ * the accessible name and tooltip); below 45rem the minimal bar shows the brand dot, one button
+ * naming the active area that opens the area menu, the pill as an icon, Settings and More; below
+ * 30rem that button keeps only its icon and the switcher leaves the centre.
+ *
+ * Desktop: the bar's background moves the window (Tauri drag region) and its end keeps room for the
+ * window layer's controls beside it; the switcher, the status slot and the menus never start a drag.
  */
 import { html, css, nothing, type TemplateResult, type PropertyValues } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
 import { TransientController } from '../primitives/transientController.js';
 import { icon, type IconName } from '../components/Icon.js';
+import { hasWindowLayer } from '../../utils/windowLayer.js';
 
 /** One place the bar can open: an area in the switcher, or a window listed in the More menu. */
 export interface TopBarDestination {
@@ -96,20 +102,30 @@ export class TopBar extends JfElement {
   }
 
   static override styles = css`
-    /* Equal side tracks keep the switcher centred; the status notice gives way inside its track. */
+    /* The bar is the container its layout reads: the room left after the desktop window controls,
+       in rem so enlarged text picks a smaller layout. In the browser that room is the window width. */
     :host {
+      display: block;
+      container-type: inline-size;
+      box-sizing: border-box;
+      min-width: 0;
+      height: var(--frame-topbar-height);
+      padding-inline-end: var(--window-controls-inline, 0rem);
+      background: var(--surface-1);
+      border-bottom: var(--frame-hairline) solid var(--border-subtle);
+      color: var(--text-secondary);
+      font-size: var(--font-size-sm);
+    }
+    /* Equal side tracks keep the switcher centred; the status notice gives way inside its track. */
+    .bar {
+      --top-bar-padding: var(--jf-space-6);
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
       align-items: center;
       gap: var(--jf-space-3);
       box-sizing: border-box;
-      min-width: 0;
-      height: var(--frame-topbar-height);
-      padding-inline: var(--jf-space-6);
-      background: var(--surface-1);
-      border-bottom: var(--frame-hairline) solid var(--border-subtle);
-      color: var(--text-secondary);
-      font-size: var(--font-size-sm);
+      height: 100%;
+      padding-inline: var(--top-bar-padding);
     }
     .start, .end { display: flex; align-items: center; min-width: 0; }
     .start { gap: var(--jf-space-3); }
@@ -162,21 +178,30 @@ export class TopBar extends JfElement {
     .visually-hidden { position: absolute; inline-size: var(--frame-hairline); block-size: var(--frame-hairline);
       overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
     [hidden] { display: none !important; }
-    /* Below 1000 px only the active area keeps its visible label. */
-    @media (max-width: 999px) {
-      :host { padding-inline: var(--jf-space-4); }
+    /* Below 1000 px of room (62.5rem) only the active area keeps its visible label. */
+    @container (max-width: 62.4375rem) {
+      .bar { --top-bar-padding: var(--jf-space-4); }
       .segment:not([aria-current='page']) .label { position: absolute; inline-size: var(--frame-hairline);
         block-size: var(--frame-hairline); overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
       .segment:not([aria-current='page']) { padding-inline: var(--jf-space-3); }
     }
-    /* Minimal bar (600 × 400): brand dot, the active area as a menu, pill icon, Settings, More. */
-    @media (max-width: 719px) {
-      :host { gap: var(--jf-space-2); padding-inline: var(--jf-space-3); }
+    /* Minimal bar below 720 px of room (45rem; 600 × 400): brand dot, the active area as a menu, pill
+       icon, Settings, More. */
+    @container (max-width: 44.9375rem) {
+      .bar { gap: var(--jf-space-2); --top-bar-padding: var(--jf-space-3); }
       .brand .name { position: absolute; inline-size: var(--frame-hairline); block-size: var(--frame-hairline);
         overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
       .segments { display: none; }
       .area-trigger { display: inline-flex; }
       .end { gap: var(--jf-space-1); }
+    }
+    /* Smallest bar below 30rem of room (600 px window with enlarged text): the switcher leaves the
+       centre and its button keeps the icon; the area's name stays its accessible name. */
+    @container (max-width: 29.9375rem) {
+      .bar { grid-template-columns: auto auto minmax(0, 1fr); }
+      .area-trigger { padding-inline: var(--jf-space-2); }
+      .area-trigger .trigger-label { position: absolute; inline-size: var(--frame-hairline); block-size: var(--frame-hairline);
+        overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
     }
     @media (forced-colors: active) {
       :host { border-bottom-color: CanvasText; }
@@ -190,27 +215,41 @@ export class TopBar extends JfElement {
     }
   `;
 
-  /** The minimal bar (below 720 px) is the only one with the area menu's button. */
-  private minimal: MediaQueryList | null = null;
+  /** The minimal bar is the only one with the area menu's button; this watches it come and go. */
+  private triggerSize: ResizeObserver | null = null;
+  /** Interactive parts opt out of the bar's drag region (only present with the window layer). */
+  private readonly noDrag = hasWindowLayer() ? 'false' : nothing;
 
   override connectedCallback(): void {
     super.connectedCallback();
-    this.minimal = typeof window.matchMedia === 'function' ? window.matchMedia('(max-width: 719px)') : null;
-    this.minimal?.addEventListener('change', this.minimalChange);
+    if (hasWindowLayer()) this.setAttribute('data-tauri-drag-region', 'deep');
+    this.triggerSize = typeof ResizeObserver === 'function' ? new ResizeObserver(this.minimalChange) : null;
+    if (this.hasUpdated) this.observeTrigger();
   }
 
   override disconnectedCallback(): void {
-    this.minimal?.removeEventListener('change', this.minimalChange);
-    this.minimal = null;
+    this.triggerSize?.disconnect();
+    this.triggerSize = null;
     super.disconnectedCallback();
   }
 
+  protected override firstUpdated(): void {
+    this.observeTrigger();
+  }
+
+  private observeTrigger(): void {
+    const trigger = this.shadowRoot?.querySelector('.area-trigger');
+    if (trigger) this.triggerSize?.observe(trigger);
+  }
+
   /**
-   * The window widened past the minimal bar: the area menu's button is gone, so its menu closes rather
-   * than staying open apart from it. Focus inside it moves to the active area in the switcher.
+   * The bar gained room past the minimal layout (a wider window or smaller text): the area menu's
+   * button is gone, so its menu closes rather than staying open apart from it. Focus inside it moves
+   * to the active area in the switcher.
    */
   private readonly minimalChange = (): void => {
-    if (this.minimal?.matches || this.openMenu !== 'areas') return;
+    const trigger = this.shadowRoot?.querySelector('.area-trigger');
+    if (this.openMenu !== 'areas' || !trigger || trigger.getClientRects().length > 0) return;
     const focusInside = this.shadowRoot?.activeElement?.closest('[role="menu"]') != null;
     this.closeMenu(false);
     if (focusInside) this.shadowRoot?.querySelector<HTMLButtonElement>('.segment[aria-current="page"]')?.focus();
@@ -298,7 +337,7 @@ export class TopBar extends JfElement {
 
   private renderMoreMenu(): TemplateResult {
     const primary = [this.system, this.help, this.about].filter((d): d is TopBarDestination => d !== null);
-    return html`<div class="menu more" role="menu" aria-label="More" @keydown=${this.onMenuKeydown}>
+    return html`<div class="menu more" role="menu" aria-label="More" data-tauri-drag-region=${this.noDrag} @keydown=${this.onMenuKeydown}>
       <div class="group" role="group" aria-label="App">${primary.map(d => this.menuRow(d, 'window'))}</div>
       ${this.windows.length ? html`<div class="group" role="group" aria-labelledby="more-windows-label">
         <div class="group-label" id="more-windows-label">More</div>
@@ -317,23 +356,23 @@ export class TopBar extends JfElement {
 
   override render(): TemplateResult {
     const active = this.areas.find(a => a.id === this.activeId);
-    return html`
+    return html`<div class="bar">
       <div class="start">
         <span class="brand"><span class="dot" aria-hidden="true"></span><span class="name">JustSearch</span></span>
       </div>
-      <nav aria-label="Areas" ?hidden=${!this.switcherVisible || this.areas.length === 0}>
+      <nav aria-label="Areas" data-tauri-drag-region=${this.noDrag} ?hidden=${!this.switcherVisible || this.areas.length === 0}>
         <div class="segments">${this.areas.map(a => this.segment(a))}</div>
         <span class="menu-anchor">
           <button type="button" class="area-trigger" aria-haspopup="menu" aria-expanded=${String(this.openMenu === 'areas')}
             aria-label=${active ? `${active.label}, choose area` : 'Choose area'} @click=${() => this.toggleMenu('areas')}>
-            ${active ? html`${icon({ name: active.icon, size: 16 })}<span>${active.label}</span>` : html`<span>Areas</span>`}
+            ${active ? html`${icon({ name: active.icon, size: 16 })}<span class="trigger-label">${active.label}</span>` : html`<span class="trigger-label">Areas</span>`}
             ${icon({ name: 'chevron-down', size: 14 })}</button>
-          ${this.openMenu === 'areas' ? html`<div class="menu areas" role="menu" aria-label="Areas" @keydown=${this.onMenuKeydown}>
+          ${this.openMenu === 'areas' ? html`<div class="menu areas" role="menu" aria-label="Areas" data-tauri-drag-region=${this.noDrag} @keydown=${this.onMenuKeydown}>
             ${this.areas.map(a => this.menuRow(a, 'area'))}</div>` : nothing}
         </span>
       </nav>
       <div class="end">
-        <slot name="status"></slot>
+        <slot name="status" data-tauri-drag-region=${this.noDrag}></slot>
         <button type="button" class="icon-button settings-trigger" data-surface-id="core.settings-surface"
           aria-label="Settings" title="Settings" aria-haspopup="dialog"
           @click=${() => this.select({ kind: 'settings' })}>${icon({ name: 'settings', size: 18 })}</button>
@@ -343,7 +382,8 @@ export class TopBar extends JfElement {
             @click=${() => this.toggleMenu('more')}>${icon({ name: 'more-horizontal', size: 18 })}</button>
           ${this.openMenu === 'more' ? this.renderMoreMenu() : nothing}
         </span>
-      </div>`;
+      </div>
+    </div>`;
   }
 }
 

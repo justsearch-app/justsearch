@@ -18,8 +18,10 @@
       :is(#boot-frame, #boot-failure) * { box-sizing: border-box; }
       #boot-frame { pointer-events: none; }
       .boot-topbar {
+        --boot-topbar-padding: var(--jf-space-6);
         display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center;
-        min-height: var(--frame-topbar-height); padding: var(--jf-space-2) var(--jf-space-6); gap: var(--jf-space-3);
+        min-height: var(--frame-topbar-height); gap: var(--jf-space-3); padding-block: var(--jf-space-2);
+        padding-inline: var(--boot-topbar-padding) calc(var(--boot-topbar-padding) + var(--window-controls-inline, 0rem));
         background: var(--boot-frame-raised, var(--surface-1)); border-bottom: var(--frame-hairline) solid var(--boot-frame-border, var(--border-subtle));
         color: var(--boot-frame-muted, var(--text-secondary)); font-size: var(--font-size-sm);
       }
@@ -47,7 +49,39 @@
       #boot-report { width: 100%; min-height: var(--frame-topbar-height); margin-top: var(--jf-space-4); font: inherit;
         color: inherit; background: var(--boot-frame-raised, var(--surface-2)); border: var(--frame-hairline) solid var(--boot-frame-border, var(--border-subtle)); }
       @media (max-width: 900px) { .boot-topbar { display: flex; justify-content: space-between; flex-wrap: wrap; } }
-      @media (max-width: 600px) { .boot-topbar { padding-inline: var(--jf-space-3); } .boot-areas { gap: var(--jf-space-3); } }
+      @media (max-width: 600px) { .boot-topbar { --boot-topbar-padding: var(--jf-space-3); } .boot-areas { gap: var(--jf-space-3); } }
+      /* Desktop window layer (decorations are off): outside #root, so every root replacement keeps it. */
+      :root[data-window-controls] { --window-controls-inline: calc(3 * var(--frame-window-control-size) + 2 * var(--frame-window-control-gap) + var(--frame-window-control-inset)); }
+      #window-controls {
+        position: fixed; inset-block-start: 0; inset-inline-end: 0; z-index: var(--z-overlay-top);
+        display: flex; align-items: center; gap: var(--frame-window-control-gap); box-sizing: border-box;
+        block-size: var(--frame-topbar-height); padding-inline-end: var(--frame-window-control-inset);
+        pointer-events: none; color: var(--window-control-ink);
+        /* The colours of the surface beneath: the app's tokens, or the saved frame colours below. */
+        --window-control-ink: var(--text-secondary); --window-control-strong: var(--text-primary); --window-control-fill: var(--surface-2);
+      }
+      :root:has(#root > :is(#boot-frame, #boot-failure)) #window-controls {
+        --window-control-ink: var(--boot-frame-muted, var(--text-secondary)); --window-control-strong: var(--boot-frame-text, var(--text-primary));
+      }
+      /* The frame's bar is raised and the failure page is not: the hover fill is the other surface. */
+      :root:has(#root > #boot-frame) #window-controls { --window-control-fill: var(--boot-frame-background, var(--surface-0)); }
+      :root:has(#root > #boot-failure) #window-controls { --window-control-fill: var(--boot-frame-raised, var(--surface-1)); }
+      #window-controls button {
+        display: inline-grid; place-items: center; box-sizing: border-box; inline-size: var(--frame-window-control-size); block-size: var(--frame-window-control-size);
+        margin: 0; padding: 0; border: 0; border-radius: var(--frame-control-radius); color: inherit; background: transparent; font: inherit;
+        pointer-events: auto; cursor: default;
+      }
+      #window-controls button:is(:hover, :active) { color: var(--window-control-strong); background: var(--window-control-fill); }
+      /* Text ink, not the accent: some palettes' accents are below 4.5:1 on their own surfaces. Drawn
+         outside the control, against the surface, so a hover or pressed fill never hides it. */
+      #window-controls button:focus-visible { outline: var(--frame-focus-width) solid var(--window-control-strong); outline-offset: var(--frame-hairline); }
+      #window-controls svg { inline-size: var(--frame-window-control-glyph); block-size: var(--frame-window-control-glyph); fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; }
+      #window-controls[data-maximized] .window-maximize-icon, #window-controls:not([data-maximized]) .window-restore-icon { display: none; }
+      /* Top areas of the static surfaces move the window. The frame paints no other input target. */
+      #boot-frame .boot-topbar[data-tauri-drag-region] { pointer-events: auto; }
+      [data-window-controls] #boot-failure { grid-template-rows: auto minmax(0, 1fr); padding-block-start: 0; }
+      .boot-window-top { position: sticky; inset-block-start: 0; justify-self: stretch; align-self: start;
+        block-size: var(--frame-topbar-height); margin-inline: calc(-1 * var(--jf-space-6)); background: inherit; }
       @media (forced-colors: active) {
         :is(#boot-frame, #boot-failure) { color: CanvasText; background: Canvas; }
         .boot-topbar, .boot-actions button, #boot-reload, #boot-report { color: ButtonText; background: ButtonFace; border-color: ButtonText; }
@@ -55,6 +89,10 @@
         .boot-areas, .boot-pill { border-color: ButtonText; }
         .boot-dot { background: Highlight; }
         .boot-actions button:focus-visible, #boot-report:focus-visible { outline-color: Highlight; }
+        #window-controls button { color: ButtonText; background: transparent; }
+        /* The ring is the surface's text colour; the fill is a pair that ring stays distinct from (Highlight is not). */
+        #window-controls button:is(:hover, :active) { forced-color-adjust: none; color: SelectedItemText; background: SelectedItem; }
+        #window-controls button:focus-visible { outline-color: CanvasText; }
       }
     </style>
   </head>
@@ -82,6 +120,20 @@
         </main>
       </div>
     </template>
+    <template id="window-controls-template">
+      <div id="window-controls" role="region" aria-label="Window">
+        <button type="button" data-window-command="minimize" aria-label="Minimize" title="Minimize">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8h9" /></svg>
+        </button>
+        <button type="button" data-window-command="toggle_maximize" aria-label="Maximize" title="Maximize">
+          <svg class="window-maximize-icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="3.5" y="3.5" width="9" height="9" rx="1" /></svg>
+          <svg class="window-restore-icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="3.5" y="5.5" width="7" height="7" rx="1" /><path d="M5.5 3.5h6a1 1 0 0 1 1 1v6" /></svg>
+        </button>
+        <button type="button" data-window-command="close" aria-label="Close" title="Close">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7" /></svg>
+        </button>
+      </div>
+    </template>
     <script>
       (function () {
         var root = document.getElementById('root');
@@ -97,7 +149,8 @@
               return typeof value === 'string' && value.length <= 120 && /^[a-zA-Z0-9#.,%() /+\-]+$/.test(value)
                 && !/var\(|env\(|currentcolor/i.test(value) && CSS.supports('color', value);
             })) {
-              fields.forEach(function (field) { frame.style.setProperty('--boot-frame-' + field, saved[field]); });
+              // On the root, so the window layer beside #root and the failure page read them too.
+              fields.forEach(function (field) { document.documentElement.style.setProperty('--boot-frame-' + field, saved[field]); });
               mode = saved.mode;
             }
           }
@@ -109,13 +162,73 @@
         var status = frame.querySelector('[role="status"]');
         status.style.cssText = 'position:absolute;clip-path:inset(50%);overflow:hidden;';
         status.textContent = 'Starting';
+        var layer = windowLayer();
+        // Desktop only: the persistent window layer. It uses the native bridge directly and no
+        // application module, and lives beside #root, so recovery, reset and the failure page keep it.
+        function windowLayer() {
+          var internals = window.__TAURI_INTERNALS__;
+          if (!internals || typeof internals.invoke !== 'function') return null;
+          var bar = frame.querySelector('.boot-topbar');
+          var element = document.getElementById('window-controls-template').content.firstElementChild.cloneNode(true);
+          var maximize = element.querySelector('[data-window-command="toggle_maximize"]');
+          function run(name) {
+            // A compositor may refuse an operation (tiling window managers): nothing to do then.
+            try { return Promise.resolve(internals.invoke('plugin:window|' + name)).catch(function () { return null; }); }
+            catch (_) { return Promise.resolve(null); }
+          }
+          var reading = false, again = false;
+          function sync() {
+            if (reading) { again = true; return; }
+            reading = true;
+            run('is_maximized').then(function (maximized) {
+              if (maximized === true || maximized === false) {
+                element.toggleAttribute('data-maximized', maximized);
+                var label = maximized ? 'Restore' : 'Maximize';
+                maximize.setAttribute('aria-label', label);
+                maximize.title = label;
+              }
+              reading = false;
+              if (again) { again = false; sync(); }
+            });
+          }
+          var settle;
+          function changed() { sync(); clearTimeout(settle); settle = setTimeout(sync, 250); }
+          // Registered before any application listener, so these run ahead of the hand-off input
+          // guard: the controls and the frame's top strip work while the app beneath stays blocked.
+          window.addEventListener('click', function (event) {
+            var button = event.target instanceof Element && element.contains(event.target) ? event.target.closest('[data-window-command]') : null;
+            if (button) run(button.getAttribute('data-window-command')).then(changed);
+          }, true);
+          window.addEventListener('mousedown', function (event) {
+            if (event.button !== 0 || (event.detail !== 1 && event.detail !== 2) || frame.parentElement !== root
+              || event.composedPath().indexOf(bar) < 0) return;
+            // Tauri's drag-region handler, for the strip that paints before the app.
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            run(event.detail === 2 ? 'internal_toggle_maximize' : 'start_dragging');
+          }, true);
+          // Maximized state changes by any means (keyboard, desktop, double-click) resize the window.
+          window.addEventListener('resize', changed);
+          window.addEventListener('focus', changed);
+          document.addEventListener('visibilitychange', changed);
+          bar.setAttribute('data-tauri-drag-region', 'deep');
+          document.documentElement.setAttribute('data-window-controls', '');
+          root.after(element);
+          sync();
+          return element;
+        }
         function fail(kind) {
           // Recovery/reset own #root as soon as they replace it. Never steal it back or refocus it.
           if (frame.parentElement !== root) return;
           if (['entry', 'evaluation', 'bootstrap', 'no-engine-address', 'stalled'].indexOf(kind) < 0) kind = 'bootstrap';
           var page = document.getElementById('boot-failure-template').content.firstElementChild.cloneNode(true);
-          fields.forEach(function (field) { var value = frame.style.getPropertyValue('--boot-frame-' + field); if (value) page.style.setProperty('--boot-frame-' + field, value); });
           page.style.colorScheme = mode;
+          if (layer) {
+            var top = document.createElement('div');
+            top.className = 'boot-window-top';
+            top.setAttribute('data-tauri-drag-region', '');
+            page.prepend(top);
+          }
           var now = new Date().toISOString();
           var platform = navigator.platform;
           var report = JSON.stringify({

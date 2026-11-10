@@ -47,6 +47,12 @@
   --frame-control-size: 2.25rem;
   --frame-control-radius: 0.5rem;
   --frame-menu-width: 18rem;
+  /* Desktop window controls (decorations off): icon buttons named for assistive technology, so they
+     keep one size at any text size (px, at least the 24 px target) and the bar's reserve stays fixed. */
+  --frame-window-control-size: 32px;
+  --frame-window-control-glyph: 16px;
+  --frame-window-control-gap: 4px;
+  --frame-window-control-inset: 8px;
   /* Frame dialog (design system §2/§7): must-stop decisions, centred, 480-560 px, over a 55 % dim. */
   --frame-dialog-width: 32rem;
   --frame-dialog-dim: rgba(var(--p-shadow), 0.55);
