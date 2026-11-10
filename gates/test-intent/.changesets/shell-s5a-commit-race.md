@@ -160,3 +160,13 @@ this explicit base. No fetch or rebase is performed.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1c352-3071-75f1-9482-524ec8fae4a2",
+  "verdict": "accept",
+  "digest": "sha256:d80a797269d54974fe07a55f195582b060de66f0f3868b99cf79fe9c26a325ea"
+}
+```
