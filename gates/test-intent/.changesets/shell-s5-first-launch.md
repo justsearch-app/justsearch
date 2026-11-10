@@ -173,6 +173,188 @@ Vitest formats a resolved `.rejects.toThrow()` as a plain Error, which the evide
 cannot recognise as an assertion failure. The rejection contract is unchanged.
 
 
+## Real Engine Help repair (2026-11-10)
+
+The repair projects the person's own searchable count as the live searchable count minus an exact
+`justsearch-help` facet count. The frame requests the existing observation endpoint while first use matters. An exact Help
+count is independent of status snapshots and remains available during a refresh. Successful
+observations refresh no sooner than 60 seconds after the answer; failed or truncated answers
+become unknown and retry no sooner than 15 seconds later. Status polls do not abort an in-flight
+request; ending first use or disconnecting the controller does. A capped or failed facet scan, malformed Help count, or absent Help in a full top-100
+response means unknown. An untruncated response with fewer than 100 collections can establish absent
+Help as zero. No Help document count is hard-coded and the backend is unchanged.
+
+Step 1 now requires the person's searchable documents; a watched folder alone cannot finish it.
+Reading with no searchable own files is under way, and an idle empty folder points to Library.
+The pill names the current step (1, 2 or 3) in calm or merely unknown states once first-use facts
+are known. Higher states and an observed completion retain precedence. The accepted-folder note
+is cleared once reading is no longer observed. All first-use test inputs and captures now include
+bundled Help. The capture fixtures also represent absent AI models, rather than inheriting the
+unrelated general fixture's loaded model and incomplete enrichment.
+
+Final repair validation:
+
+- No `.agents/preflight` exists. `npm run typecheck`, `npm run lint`, and the 31 UI-web gates exit 0.
+- Focused production-card/frame Chromium: 20 passed, exit 0. The four unchanged pill suites also
+  pass all 101 checks after the observer was made to wait for an index projection.
+- Every edited frontend test file has refreshed script-produced evidence. Six focused repair
+  checks in `shell-s5-help-repaired.json` pass and fail with assertions on shared-clone candidate
+  `612a406fbf577784d86e1f1259f1d09a63c21628`. Existing entry classes are retained. Original feature
+  and reading evidence was also regenerated on final test-file bytes against its original bases.
+- The harness fixture check failed before the Help facet existed, then separately failed because
+  the fresh fixture inherited `ONLINE`; its final fixture-file run passes all 23 checks.
+- Measured axe exits 0: all 112 surfaces pass, no new or serious/critical violations. Both fresh
+  captures under ignored `tmp/s5-help/captures/` have zero axe violations, zero real console errors
+  and no horizontal overflow. Fresh Search visibly shows `Getting started · 1 of 3` in the pill.
+- The exact nine fixture journeys from `.github/workflows/ci.yml` all exit 0. Their logs and
+  captures are under ignored `tmp/s5-help/ui-run-flows/`.
+- The final full Vitest run exits 1 despite **742 files / 9,400 tests passing**, because of one
+  unhandled rejection from an unchanged timer after test teardown:
+
+```text
+ReferenceError: window is not defined
+  runSearch src/shell-v0/state/searchState.ts:641:27
+  Timeout._onTimeout src/shell-v0/state/searchState.ts:615:10
+Origin: src/shell-v0/chrome/Shell.searchSummon.test.ts
+```
+
+The first full run exposed the repair's own missing-index assumption (37 failures, 17 errors).
+That defect was fixed without changing the existing pill tests; all 101 affected checks then
+passed. No timer repair or test relaxation was attempted for the final unrelated rejection.
+
+- The initial harness full run passed **473 tests, 1 skipped**. After the final no-model fixture
+  correction, its required rerun exits 1: **472 passed, 1 failed, 1 skipped**, with the existing
+  pytest deprecation warning. The unchanged foreign-listener test fails as follows:
+
+```text
+FAILED scripts/jsharness/tests/test_ui_serve.py::test_start_vite_server_never_adopts_foreign_listener[False-0]
+jsharness.ui_shot.ServeStartError: Vite exited with code 1 on :38536; no stderr captured
+scripts/jsharness/jsharness/ui_shot.py:487
+```
+
+The test substitutes a private Python strict-port server; neither that test nor `ui_shot.py` was
+edited. The full failure output was read. Both unrelated failures are returned to the orchestrator
+under the builder's come-back rule, rather than repaired outside this assignment.
+
+`node scripts/governance/gates/test-intent/cli.mjs --base 2263fde3ac` reports every item covered,
+with only independent acceptance missing. Its full output was read. The advisory remains
+**12 of 48 audited PRs (25%)** with reviewer disagreement or tie-break; the orchestrator must
+include this finding in delivery.
+
+Checks used private ports, contexts and temporary shared clones with copied dependencies and
+separate build/cache folders. Shared resources touched: read the installed Chromium cache and
+used this worktree's Node dependencies. No shared dev stack, owner application, inference or GPU
+workload was used. Browser-test servers close in their teardown. No commit, push, fetch, rebase,
+cache clearing or browser installation occurred. The isolated Python 3.13 environment uses
+Playwright 1.61.0 and the already installed Chromium.
+
+## Help polling correction (2026-11-10)
+
+This bounded correction replaces the earlier status-keyed Help observation. The existing one-second
+frame cadence schedules the requests; no additional poller or backend change was introduced.
+Negative own counts and the exact-count validation remain unknown as before. Two existing browser
+checks now advance the browser clock through the refresh interval after changing Help's size;
+their assertions are unchanged.
+
+Checks were written first. On the original uncommitted tree, the focused unit run exited 1:
+5 assertion failures and 4 passes. Both new real-Chromium checks failed with assertions: a landed
+first-use view disappeared on the next poll, and a slow initial response produced five scans
+instead of one. The corrected candidate passes all 9 focused unit checks and all 22 focused
+production-frame/card Chromium checks. One newly written browser assertion initially stopped at
+exactly 60 seconds from page startup, before the frame tick after the response deadline; advancing
+through the next frame cadence resolved that check's timing assumption without changing its view
+or request-count assertions. No existing assertion, timeout, or production behavior was relaxed.
+
+Acceptance on this correction:
+
+- `npm run typecheck`: exit 0; repeated after the final test-file edit, exit 0.
+- `npm run lint`: exit 0.
+- Full `npx vitest run --maxWorkers=4`, run once: **743 files, 9,405 tests passed**, exit 0,
+  156.91 seconds. The reported unhandled `window is not defined` rejection did not recur.
+- `Shell.searchSummon.test.ts` alone, three serial runs on shared-clone baseline `2263fde3ac`
+  and three on the candidate: **18 passed, exit 0 in all six runs**. The previous timer failure
+  was not reproduced on either tree; this comparison found no evidence of causation by this
+  correction. Search timers and the summon test were not changed.
+- `node scripts/ci/run-ui-web-gates.mjs`, from repository root where the script resides:
+  **31/31 passed**, exit 0.
+- All six generated/refreshed evidence records exit 0. All seven new polling repair checks
+  pass on the candidate and fail with assertions against the starting behavior.
+- Final `node scripts/governance/gates/test-intent/cli.mjs --base 2263fde3ac`: exit 1,
+  all **16 flagged items covered**, with **only independent acceptance missing**. The full output
+  was read. The advisory remains **12 of 48 audited PRs (25%)** with reviewer disagreement or
+  tie-break; the orchestrator must include that finding in delivery.
+- No `.agents/preflight` exists in this checkout.
+- Focused Chromium uses `vitest.config.lockdown.ts`, headless installed Chromium, private Vite
+  ports/caches and owned browser contexts. Every server/browser started by these checks closed
+  through its teardown.
+
+Evidence is produced by the unchanged `run-evidence.mjs`. A temporary Node adapter substitutes
+owned shared clones for its worktree create/remove calls; `VITEST_MAX_WORKERS=4` caps its workers.
+Each before checkout has copied dependencies and separate caches. The new cadence fail-before
+record applies a temporary compatibility patch containing the two original uncommitted Help
+implementation files from this assignment's starting snapshot; that preserves the exact faulty
+status-keyed behavior while making its previously uncommitted APIs available on `612a406fbf`.
+The producer records that patch's digest and the assertion failures. Existing feature and Help
+records retain their prior bases; all records that name either changed existing test file are
+regenerated for its final bytes. The abort/late-answer preservation case also passed in the
+original fail-before unit run.
+
+Shared resources touched: this worktree's installed Node dependencies and the installed Chromium
+cache. The comparison used copied baseline dependencies. No shared dev stack, owner app, GPU
+workload, browser installation, cache clearing, commit, push, fetch or rebase was used.
+
+## Zero searchable correction (2026-11-10)
+
+A confirmed total searchable count of zero now establishes zero own searchable documents without
+a Help observation: Help is a subset of that total. Unknown totals and positive totals with
+unknown Help remain unknown. The production correction is one expression in `firstUse.ts`;
+the frame observer, stored state and other first-use behavior are unchanged.
+
+Three checks were written before the correction. On the starting uncommitted implementation,
+`npx vitest run src/shell-v0/state/firstUse.test.ts --maxWorkers=4` exited 1: **1 failed,
+19 passed**. The zero/no-Help/no-folders case failed with `searchable: null`, `known: false`,
+`empty: false` and `visible: false`, instead of zero, known, empty and visible with step 1 current.
+The unknown-total and positive-total/no-Help preservation cases already passed. After the
+one-line correction all **20 passed**, exit 0.
+
+Final checks for this bounded correction:
+
+- No `.agents/preflight` exists.
+- `npm run typecheck`: exit 0.
+- `npm run lint`: exit 0.
+- Full `npx vitest run --maxWorkers=4`, once: **743 files, 9,408 tests passed**, exit 0,
+  154.27 seconds.
+- `npx vitest run --config vitest.config.lockdown.ts
+  src/shell-v0/chrome/FirstUse.app-lockdown.test.ts
+  src/shell-v0/components/GettingStarted.reading-lockdown.test.ts --maxWorkers=4`:
+  **22 passed in 2 files**, exit 0, 29.95 seconds.
+
+- Regenerated `shell-s5-repaired.json` and `shell-s5-help-repaired.json` for the final test-file
+  bytes: both producer runs exit 0, candidate checks pass and all selected baseline checks fail
+  with assertions on their original bases.
+- New `shell-s5-zero-searchable-repaired.json`: producer exit 0; the zero/no-Help check passes
+  after and fails with an assertion on the starting uncommitted behavior preserved by the
+  compatibility patch. New `shell-s5-zero-searchable-preserved.json`: producer exit 0; both
+  unknown-count preservation checks pass.
+- `node scripts/governance/gates/test-intent/cli.mjs --base 2263fde3ac`: exit 1, all **16 flagged
+  items covered**, with **only independent acceptance missing**. The whole output was read.
+  Its advisory is **12 of 48 audited PRs (25%)** with reviewer disagreement or tie-break; the
+  orchestrator must report this finding in delivery.
+
+Evidence uses the unchanged `run-evidence.mjs`, a temporary Git command adapter that creates
+shared clones under the assigned temporary directory, and copied dependencies with separate
+caches. Its initial adapter invocation missed Git's leading `-c` options and exited 2 before
+creating a before checkout because source Git metadata is read-only. The adapter was corrected;
+no repository metadata permission or test was changed. The dedicated zero fail-before applies
+a compatibility patch containing `firstUse.ts` exactly as observed at the start of this correction
+to `612a406fbf577784d86e1f1259f1d09a63c21628`. It includes the preceding uncommitted Help repair
+and omits the zero shortcut; its content digest is recorded by the producer.
+
+Shared resources touched: this worktree's installed Node dependencies and installed Chromium
+cache. Chromium was headless, with private Vite servers, ports, caches and browser contexts.
+No shared dev stack, owner application, GPU workload, browser install, cache clearing, commit,
+push, fetch or rebase was used.
+
 ```json
 {
   "entries": [
@@ -190,8 +372,8 @@ cannot recognise as an assertion failure. The rejection contract is unchanged.
         },
         {
           "kind": "owner-words",
-          "location": "task t-20261103-shell request",
-          "quote": "Steps come from facts: step 1 is done when a folder is watched or documents are searchable; step 3 when AI is active; step 2 when a search returned while documents were searchable (a search with nothing searchable does not count). Only step 2 needs a saved mark."
+          "location": "task t-20261103-shell user turn 2",
+          "quote": "Step 1 is done when the person has searchable documents of their own; a folder being read shows step 1 as under way. Step 3 is done when AI is active. Step 2 is done when a search returned while the person's own documents were searchable; a search over Help alone does not count. Only step 2 needs a saved mark."
         },
         {
           "kind": "owner-words",
@@ -244,8 +426,8 @@ cannot recognise as an assertion failure. The rejection contract is unchanged.
         },
         {
           "kind": "owner-words",
-          "location": "task t-20261103-shell request",
-          "quote": "Steps come from facts: step 1 is done when a folder is watched or documents are searchable; step 3 when AI is active; step 2 when a search returned while documents were searchable (a search with nothing searchable does not count). Only step 2 needs a saved mark."
+          "location": "task t-20261103-shell user turn 2",
+          "quote": "Step 1 is done when the person has searchable documents of their own; a folder being read shows step 1 as under way. Step 3 is done when AI is active. Step 2 is done when a search returned while the person's own documents were searchable; a search over Help alone does not count. Only step 2 needs a saved mark."
         },
         {
           "kind": "owner-words",
@@ -303,12 +485,12 @@ cannot recognise as an assertion failure. The rejection contract is unchanged.
         "modules/ui-web/src/shell-v0/state/firstUse.pill.test.ts"
       ],
       "class": "New",
-      "behaviour": "SB9: setup replaces only calm; unreachable, limited, needs, problems, working and finished statuses keep precedence.",
+      "behaviour": "SB9: current step number replaces calm or merely unknown only once first-use facts are known; unreachable, limited, needs, problems, working and finished statuses retain precedence.",
       "sources": [
         {
           "kind": "owner-words",
-          "location": "task t-20261103-shell request",
-          "quote": "The pill shows \"Getting started \u00b7 n of 3\" only where it would otherwise be calm; every higher status (unreachable, limited, needs you, problems, working) still wins."
+          "location": "task t-20261103-shell user turn 2",
+          "quote": "The pill shows \"Getting started \u00b7 n of 3\", where n is the step the person is on (1 at first launch, as in ref-01), only where it would otherwise be calm or merely unknown, once the first-use state is known. A fresh install without AI models must not sit at \"Checking search status\" instead. Every higher status (unreachable, limited, needs you, problems, working) still wins."
         }
       ],
       "evidence": "gates/test-intent/evidence/shell-s5-repaired.json",
@@ -433,8 +615,8 @@ cannot recognise as an assertion failure. The rejection contract is unchanged.
         },
         {
           "kind": "owner-words",
-          "location": "task t-20261103-shell request",
-          "quote": "Steps come from facts: step 1 is done when a folder is watched or documents are searchable; step 3 when AI is active; step 2 when a search returned while documents were searchable (a search with nothing searchable does not count). Only step 2 needs a saved mark."
+          "location": "task t-20261103-shell user turn 2",
+          "quote": "Step 1 is done when the person has searchable documents of their own; a folder being read shows step 1 as under way. Step 3 is done when AI is active. Step 2 is done when a search returned while the person's own documents were searchable; a search over Help alone does not count. Only step 2 needs a saved mark."
         },
         {
           "kind": "owner-words",
@@ -701,9 +883,206 @@ cannot recognise as an assertion failure. The rejection contract is unchanged.
       "newChecks": [
         "modules/ui-web/src/shell-v0/state/firstUse.reading.test.ts"
       ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/firstUse.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "SB1/SB5/SB7: bundled Help is subtracted in the projection; unknown Help with a positive total means unknown own count; empty watched folders do not complete step 1 and reading is under way.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "location": "task t-20261103-shell user turn 2",
+          "quote": "Step 1 is done when the person has searchable documents of their own; a folder being read shows step 1 as under way. Step 3 is done when AI is active. Step 2 is done when a search returned while the person's own documents were searchable; a search over Help alone does not count. Only step 2 needs a saved mark."
+        },
+        {
+          "kind": "owner-words",
+          "location": "task t-20261103-shell user turn 2",
+          "quote": "The person's own count is searchable documents minus the Help collection's count, computed in the firstUse projection."
+        },
+        {
+          "kind": "owner-words",
+          "location": "task t-20261103-shell user turn 2",
+          "quote": "Help count unknown or its request failing | no setup advice and no count: unknown, not zero"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s5-help-repaired.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/state/firstUse.test.ts#bundled Help never licenses setup completion, and unknown Help never licenses advice",
+        "modules/ui-web/src/shell-v0/state/firstUse.test.ts#a watched folder with zero searchable documents points to Library and does not finish"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/firstUse.observations.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "SB1/SB2/SB5/SB6: unavailable, malformed, scan-truncated and top-100-omitted Help counts remain unknown; exact Help counts survive status polls; Help-only searches cannot complete step 2.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "location": "task t-20261103-shell user turn 2",
+          "quote": "Step 1 is done when the person has searchable documents of their own; a folder being read shows step 1 as under way. Step 3 is done when AI is active. Step 2 is done when a search returned while the person's own documents were searchable; a search over Help alone does not count. Only step 2 needs a saved mark."
+        },
+        {
+          "kind": "owner-words",
+          "location": "task t-20261103-shell user turn 2",
+          "quote": "The person's own count is searchable documents minus the Help collection's count, computed in the firstUse projection."
+        },
+        {
+          "kind": "owner-words",
+          "location": "task t-20261103-shell user turn 2",
+          "quote": "Help count unknown or its request failing | no setup advice and no count: unknown, not zero"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s5-help-repaired.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/state/firstUse.observations.test.ts#only an exact Help facet permits a count or setup advice, independently of status polls"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/chrome/FirstUse.app-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "SB1/SB5/SB6/SB7/SB8/SB9 through Chromium: fresh Help-only boot, no-model pill, Help-only search, changed Help size, facet failure, reading/empty watched folder, and own ad-hoc content.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "location": "task t-20261103-shell user turn 2",
+          "quote": "Step 1 is done when the person has searchable documents of their own; a folder being read shows step 1 as under way. Step 3 is done when AI is active. Step 2 is done when a search returned while the person's own documents were searchable; a search over Help alone does not count. Only step 2 needs a saved mark."
+        },
+        {
+          "kind": "owner-words",
+          "location": "task t-20261103-shell user turn 2",
+          "quote": "The person's own count is searchable documents minus the Help collection's count, computed in the firstUse projection."
+        },
+        {
+          "kind": "owner-words",
+          "location": "task t-20261103-shell user turn 2",
+          "quote": "Help count unknown or its request failing | no setup advice and no count: unknown, not zero"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s5-help-repaired.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/chrome/FirstUse.app-lockdown.test.ts#Help alone keeps setup current, and missing Help observations stay unknown",
+        "modules/ui-web/src/shell-v0/chrome/FirstUse.app-lockdown.test.ts#a folder is under way until own documents exist; empty folders point to Library"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/firstUse.pill.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "SB9 repair: first-use known replaces merely unknown without AI models; current step 1, 2 or 3 replaces the completed-step count. Unknown first-use facts keep the ordinary unknown pill.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "location": "task t-20261103-shell user turn 2",
+          "quote": "The pill shows \"Getting started \u00b7 n of 3\", where n is the step the person is on (1 at first launch, as in ref-01), only where it would otherwise be calm or merely unknown, once the first-use state is known. A fresh install without AI models must not sit at \"Checking search status\" instead. Every higher status (unreachable, limited, needs you, problems, working) still wins."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s5-help-repaired.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/state/firstUse.pill.test.ts"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/controllers/frameStatusController.firstUse.test.ts",
+        "modules/ui-web/src/shell-v0/state/firstUse.observations.test.ts",
+        "modules/ui-web/src/shell-v0/chrome/FirstUse.app-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "SB2: status polls retain a successful Help count; slow answers survive newer snapshots; successful observations refresh no sooner than 60 seconds, failed or truncated observations become unknown and retry no sooner than 15 seconds. Chromium keeps the first-use view stable across several polls.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "location": "task t-20261103-shell agreement",
+          "quote": "The Help count is held independently of the status snapshot. Fetch it once when first use starts needing it. Keep the last successful value while a refresh is pending. Refresh at most once per 60 seconds while first use still needs it. After a failed or truncated answer, the count is unknown until a successful answer, and retry no sooner than 15 seconds later."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s5-help-cadence-repaired.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/controllers/frameStatusController.firstUse.test.ts#keeps a landed count through status polls and a pending refresh, with at most one scan per minute",
+        "modules/ui-web/src/shell-v0/controllers/frameStatusController.firstUse.test.ts#accepts a slow facet response after newer status snapshots without aborting or duplicating it",
+        "modules/ui-web/src/shell-v0/controllers/frameStatusController.firstUse.test.ts#a failure refresh makes the count unknown and waits 15 seconds before retrying",
+        "modules/ui-web/src/shell-v0/controllers/frameStatusController.firstUse.test.ts#a truncated refresh makes the count unknown and waits 15 seconds before retrying",
+        "modules/ui-web/src/shell-v0/state/firstUse.observations.test.ts#only an exact Help facet permits a count or setup advice, independently of status polls",
+        "modules/ui-web/src/shell-v0/chrome/FirstUse.app-lockdown.test.ts#keeps the first-use view across polls and a slow refresh without repeated facet scans",
+        "modules/ui-web/src/shell-v0/chrome/FirstUse.app-lockdown.test.ts#lets a slow initial Help response land after several real frame status polls"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/controllers/frameStatusController.firstUse.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "An in-flight Help request is aborted when first use stops needing it or the controller disconnects, and late aborted responses never land.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "location": "task t-20261103-shell agreement",
+          "quote": "An in-flight request is not aborted just because a new status snapshot arrived; it is aborted only when first use stops needing it or the controller disconnects."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s5-help-cadence-preserved.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/controllers/frameStatusController.firstUse.test.ts#aborts only when Help is no longer needed or the controller disconnects, ignoring late answers"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/firstUse.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "SB1: a known total searchable count of zero with no Help observation and no folders is known, empty and visible, with step 1 current and no step completed.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "location": "task t-20261103-shell user turn zero-searchable correction",
+          "quote": "when searchable is a known zero, the own count is zero without any Help count, because Help documents are part of searchable. An unknown searchable stays unknown. Nothing else changes."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s5-zero-searchable-repaired.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/state/firstUse.test.ts#zero searchable documents confirms first use without Help"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/firstUse.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Preservation: an unknown total searchable count stays unknown; a positive total of five with unknown Help stays unknown. Neither offers an empty view or setup advice.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "location": "task t-20261103-shell user turn zero-searchable correction",
+          "quote": "when searchable is a known zero, the own count is zero without any Help count, because Help documents are part of searchable. An unknown searchable stays unknown. Nothing else changes."
+        },
+        {
+          "kind": "owner-words",
+          "location": "task t-20261103-shell user turn zero-searchable correction",
+          "quote": "searchable unknown stays unknown; searchable 5 with Help count unknown stays unknown."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s5-zero-searchable-preserved.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/state/firstUse.test.ts#unknown searchable documents stay unknown without Help",
+        "modules/ui-web/src/shell-v0/state/firstUse.test.ts#positive searchable documents stay unknown without Help"
+      ]
     }
   ]
 }
+
 ```
 
 ## Acceptance records

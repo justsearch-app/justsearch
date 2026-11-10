@@ -14,10 +14,11 @@ const firstUse = await import('/src/shell-v0/state/firstUse.ts');
 const ai = await import('/src/shell-v0/state/aiStateStore.ts');
 firstUse.setFirstUseRoots([{ pathHash: 'notes' }], new Map([['notes', '/notes']]));
 window.observe = (indexState, pendingJobs, paused = false, state = 'fresh') => {
-  ai.__feedForTest({ status: { worker: { core: { indexState, indexedDocuments: 3, searchableDocuments: 3,
-    ...(pendingJobs === null ? {} : { pendingJobs }) }, countObservations: { searchable: { state, value: 3 } } },
+  ai.__feedForTest({ status: { worker: { core: { indexState, indexedDocuments: 8, searchableDocuments: 8,
+    ...(pendingJobs === null ? {} : { pendingJobs }) }, countObservations: { searchable: { state, value: 8 } } },
     ...(paused ? { operating: { indexing: { state: 'PAUSED', reasons: ['user_paused'], untilEpochMs: null, waitingForResume: true } } } : {}) } });
   ai.__feedContactForTest();
+  firstUse.setFirstUseHelpFacet?.({ facets: { collection: { 'justsearch-help': 5 } }, facetsTruncated: false });
 };
 window.observe('IDLE', 0);
 document.body.append(document.createElement('jf-getting-started'));

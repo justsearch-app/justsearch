@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-10T00:39:26.956Z",
+  "revision": "612a406fbf577784d86e1f1259f1d09a63c21628",
+  "tree": "d8e04ab16ae39954c4760980bbf7f6ee73db7604",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/controllers/frameStatusController.firstUse.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/m73l76iw/tmp/test-intent-vitest-1345-1794271165679.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1276
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/controllers/frameStatusController.firstUse.test.ts#aborts only when Help is no longer needed or the controller disconnects, ignoring late answers",
+      "file": "modules/ui-web/src/shell-v0/controllers/frameStatusController.firstUse.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a1d3dd29aab0d9084b7d4f58538177a33b99ce950c749a8a35be25688f81c49c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "first-use Help observation cadence (SB2) aborts only when Help is no longer needed or the controller disconnects, ignoring late answers",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:30f10cc64ec3d7f2e43e3bcb76c3c4ef7ee95f22fbbff511d9c86d76e02c0d55"
+}

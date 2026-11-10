@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-09T22:24:57.761Z",
-  "revision": "e3a479db7d1547a2d31df44c73334c982c31e15d",
-  "tree": "ddf4f84c7dbe895028be4915d90b12b4273fac37",
+  "createdAt": "2026-11-10T00:55:46.009Z",
+  "revision": "612a406fbf577784d86e1f1259f1d09a63c21628",
+  "tree": "7b2754a49843b6e57f44435f50311692714d79dd",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,87 +18,40 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/GettingStarted.test.ts\" \"src/shell-v0/state/firstUse.test.ts\" \"src/shell-v0/state/firstUse.persistence.test.ts\" \"src/shell-v0/state/firstUse.pill.test.ts\" \"src/shell-v0/state/firstUse.observations.test.ts\" \"src/shell-v0/state/firstUse.reset.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/k5yzey4h/tmp/test-intent-vitest-3-1794263083624.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/firstUse.test.ts\" \"src/shell-v0/components/GettingStarted.test.ts\" \"src/shell-v0/state/firstUse.persistence.test.ts\" \"src/shell-v0/state/firstUse.pill.test.ts\" \"src/shell-v0/state/firstUse.observations.test.ts\" \"src/shell-v0/state/firstUse.reset.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/l584px1q/tmp/test-intent-vitest-4-1794272137798.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 5761
+      "durationMs": 1767
     }
   ],
   "checks": [
     {
-      "id": "modules/ui-web/src/shell-v0/components/GettingStarted.test.ts",
-      "file": "modules/ui-web/src/shell-v0/components/GettingStarted.test.ts",
-      "runner": "vitest",
-      "contentDigest": "sha256:1f32888b2f4897dd121b98351cb7c579412d3bcf1af344f5541c17ee02898ffa",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "Getting started interactions a pending plugin tour appears on its own after core completion and keeps saved progress on removal",
-          "status": "passed"
-        },
-        {
-          "name": "Getting started interactions suggestions are deduplicated and watched paths are excluded even without a worker",
-          "status": "passed"
-        },
-        {
-          "name": "Getting started interactions missing suggestions (empty) leave Add a folder usable",
-          "status": "passed"
-        },
-        {
-          "name": "Getting started interactions missing suggestions (failure) leave Add a folder usable",
-          "status": "passed"
-        },
-        {
-          "name": "Getting started interactions a suggestion repeated during and after acceptance adds exactly once",
-          "status": "passed"
-        },
-        {
-          "name": "Getting started interactions adds through the Library operation, guards duplicate activation and never calls acceptance ready",
-          "status": "passed"
-        },
-        {
-          "name": "Getting started interactions desktop cancel leaves facts alone and restores focus to Add a folder",
-          "status": "passed"
-        },
-        {
-          "name": "Getting started interactions failure stays actionable after leaving and returning during the pending add",
-          "status": "passed"
-        },
-        {
-          "name": "Getting started interactions suggested folder refusal: Path not found",
-          "status": "passed"
-        },
-        {
-          "name": "Getting started interactions suggested folder refusal: Already watched",
-          "status": "passed"
-        },
-        {
-          "name": "Getting started interactions suggested folder refusal: This folder contains a watched folder",
-          "status": "passed"
-        },
-        {
-          "name": "Getting started interactions zero searchable, a returned search, then a first document does not finish until another search returns",
-          "status": "passed"
-        },
-        {
-          "name": "Getting started interactions reload during indexing uses the live count and a watched folder, not saved step counters",
-          "status": "passed"
-        }
-      ]
-    },
-    {
       "id": "modules/ui-web/src/shell-v0/state/firstUse.test.ts",
       "file": "modules/ui-web/src/shell-v0/state/firstUse.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:c2ef3a2b4475319fa4e1630945f736a31a6f57efe7c19bbd9b7ea66ed1e151ed",
+      "contentDigest": "sha256:b898fd1b5248759ace125437e6d030869d50aeba27ed765dc2aa8aede32b87c8",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
+          "name": "Getting started facts (SB1–SB11) zero searchable documents confirms first use without Help",
+          "status": "passed"
+        },
+        {
+          "name": "Getting started facts (SB1–SB11) unknown searchable documents stay unknown without Help",
+          "status": "passed"
+        },
+        {
+          "name": "Getting started facts (SB1–SB11) positive searchable documents stay unknown without Help",
+          "status": "passed"
+        },
+        {
           "name": "Getting started facts (SB1–SB11) unknown → zero → positive never presents unknown as empty",
+          "status": "passed"
+        },
+        {
+          "name": "Getting started facts (SB1–SB11) bundled Help never licenses setup completion, and unknown Help never licenses advice",
           "status": "passed"
         },
         {
@@ -164,10 +117,73 @@
       ]
     },
     {
+      "id": "modules/ui-web/src/shell-v0/components/GettingStarted.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/GettingStarted.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:bcffdae3a9c7397208822d7513cfc229b4825b101959744a41ec301623dd340a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Getting started interactions a pending plugin tour appears on its own after core completion and keeps saved progress on removal",
+          "status": "passed"
+        },
+        {
+          "name": "Getting started interactions suggestions are deduplicated and watched paths are excluded even without a worker",
+          "status": "passed"
+        },
+        {
+          "name": "Getting started interactions missing suggestions (empty) leave Add a folder usable",
+          "status": "passed"
+        },
+        {
+          "name": "Getting started interactions missing suggestions (failure) leave Add a folder usable",
+          "status": "passed"
+        },
+        {
+          "name": "Getting started interactions a suggestion repeated during and after acceptance adds exactly once",
+          "status": "passed"
+        },
+        {
+          "name": "Getting started interactions adds through the Library operation, guards duplicate activation and never calls acceptance ready",
+          "status": "passed"
+        },
+        {
+          "name": "Getting started interactions desktop cancel leaves facts alone and restores focus to Add a folder",
+          "status": "passed"
+        },
+        {
+          "name": "Getting started interactions failure stays actionable after leaving and returning during the pending add",
+          "status": "passed"
+        },
+        {
+          "name": "Getting started interactions suggested folder refusal: Path not found",
+          "status": "passed"
+        },
+        {
+          "name": "Getting started interactions suggested folder refusal: Already watched",
+          "status": "passed"
+        },
+        {
+          "name": "Getting started interactions suggested folder refusal: This folder contains a watched folder",
+          "status": "passed"
+        },
+        {
+          "name": "Getting started interactions zero searchable, a returned search, then a first document does not finish until another search returns",
+          "status": "passed"
+        },
+        {
+          "name": "Getting started interactions reload during indexing uses the live count and a watched folder, not saved step counters",
+          "status": "passed"
+        }
+      ]
+    },
+    {
       "id": "modules/ui-web/src/shell-v0/state/firstUse.persistence.test.ts",
       "file": "modules/ui-web/src/shell-v0/state/firstUse.persistence.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:500e60e0552f719362922e50b27e34fc6b47e793ab04c94088730d790356c871",
+      "contentDigest": "sha256:925ff8026e266bb3486b5fc3a50042098109fbd4ba4a2dfd170028f2b46a9f04",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -186,7 +202,7 @@
       "id": "modules/ui-web/src/shell-v0/state/firstUse.pill.test.ts",
       "file": "modules/ui-web/src/shell-v0/state/firstUse.pill.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:da959dc524132f4ea512e5b2175042f70600d07e139293aa3aa7922b98171d17",
+      "contentDigest": "sha256:139c4cab54995baeffdb28fd2fbf8ff5afc650fd8da8b2ec8feb041fc7d24ca6",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -201,7 +217,7 @@
       "id": "modules/ui-web/src/shell-v0/state/firstUse.observations.test.ts",
       "file": "modules/ui-web/src/shell-v0/state/firstUse.observations.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:ef68279f33c160efb4e1cae97fe9541592762ca469cd8b31875ddd718cfef86f",
+      "contentDigest": "sha256:91f26e5af7b7587ef761aaa0d48830915059c47cb45fb7bd7b031f74597bfbaa",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -215,6 +231,10 @@
           "status": "passed"
         },
         {
+          "name": "first-use observation freshness only an exact Help facet permits a count or setup advice, independently of status polls",
+          "status": "passed"
+        },
+        {
           "name": "first-use observation freshness positive observations age out without a guessed zero or a retained progress count",
           "status": "passed"
         }
@@ -224,7 +244,7 @@
       "id": "modules/ui-web/src/shell-v0/state/firstUse.reset.test.ts",
       "file": "modules/ui-web/src/shell-v0/state/firstUse.reset.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:89a1d5c2f2382ebbd178d75cc22bcd703fdc40fb578ebbd3db64c716ad77be1b",
+      "contentDigest": "sha256:b79fc58c9a4c367d3d8f344f590f2ab969e4d3892eb34e42bd6f21ba7e3a417f",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -237,51 +257,51 @@
     }
   ],
   "failBefore": {
-    "ref": "e3a479db7d",
+    "ref": "e3a479db7d1547a2d31df44c73334c982c31e15d",
     "revision": "e3a479db7d1547a2d31df44c73334c982c31e15d",
     "overlays": [],
     "patches": [],
     "runs": [
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/GettingStarted.test.ts\" \"src/shell-v0/state/firstUse.test.ts\" \"src/shell-v0/state/firstUse.persistence.test.ts\" \"src/shell-v0/state/firstUse.pill.test.ts\" \"src/shell-v0/state/firstUse.observations.test.ts\" \"src/shell-v0/state/firstUse.reset.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/k5yzey4h/tmp/test-intent-vitest-3-1794263094519.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/firstUse.test.ts\" \"src/shell-v0/components/GettingStarted.test.ts\" \"src/shell-v0/state/firstUse.persistence.test.ts\" \"src/shell-v0/state/firstUse.pill.test.ts\" \"src/shell-v0/state/firstUse.observations.test.ts\" \"src/shell-v0/state/firstUse.reset.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/l584px1q/tmp/test-intent-vitest-4-1794272143960.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 2601,
-        "output": "JSON report written to /home/elias/.cache/am/k5yzey4h/tmp/test-intent-vitest-3-1794263094519.json\n\n"
+        "durationMs": 1465,
+        "output": "JSON report written to /home/elias/.cache/am/l584px1q/tmp/test-intent-vitest-4-1794272143960.json\n\n"
       }
     ],
     "checks": [
       {
-        "id": "modules/ui-web/src/shell-v0/components/GettingStarted.test.ts",
-        "classification": "assertion",
-        "detail": "Getting started interactions a pending plugin tour appears on its own after core completion and keeps saved progress on removal:  AssertionError: pending plugin must remain discoverable without Help: expected undefined to be truthy\n    at /home/elias/.cache/am/k5yzey4h/tmp/test-intent-before-8ZR241/modules/ui-web/src/shell-v0/components/GettingStarted.test.ts:62:76\n    at processTicksAndRejections (node:internal/process/task_q | Getting started interactions suggestions are deduplicated and watch"
-      },
-      {
         "id": "modules/ui-web/src/shell-v0/state/firstUse.test.ts",
         "classification": "assertion",
-        "detail": "Getting started facts (SB1–SB11) unknown → zero → positive never presents unknown as empty:  AssertionError: expected {} to match object { empty: false, visible: false }\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/k5yzey4h/tmp/test-intent-before-8ZR241/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:10)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/k5yzey4h | Getting started facts (SB1–SB11) live progress names observed searchable and waiting counts, with no inv"
+        "detail": "Getting started facts (SB1–SB11) zero searchable documents confirms first use without Help:  AssertionError: expected {} to match object { searchable: +0, known: true, …(4) }\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/l584px1q/tmp/test-intent-before-gTM3qf/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:10)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/l58 | Getting started facts (SB1–SB11) unknown searchable documents stay unknown without Help:  AssertionError"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/GettingStarted.test.ts",
+        "classification": "assertion",
+        "detail": "Getting started interactions a pending plugin tour appears on its own after core completion and keeps saved progress on removal:  AssertionError: pending plugin must remain discoverable without Help: expected undefined to be truthy\n    at /home/elias/.cache/am/l584px1q/tmp/test-intent-before-gTM3qf/modules/ui-web/src/shell-v0/components/GettingStarted.test.ts:63:76\n    at processTicksAndRejections (node:internal/process/task_q | Getting started interactions suggestions are deduplicated and watch"
       },
       {
         "id": "modules/ui-web/src/shell-v0/state/firstUse.persistence.test.ts",
         "classification": "assertion",
-        "detail": "Getting started shared document Hide in another window survives a co-resident save and Help reopening propagates back:  AssertionError: Getting started must use the existing shared document: expected undefined to be defined\n    at openWindow (/home/elias/.cache/am/k5yzey4h/tmp/test-intent-before-8ZR241/modules/ui-web/src/shell-v0/state/firstUse.persistence.test.ts:11:72)\n    at processTicksAndRejections (node:interna | Getting started shared document malformed legacy storage is ignored without o"
+        "detail": "Getting started shared document Hide in another window survives a co-resident save and Help reopening propagates back:  AssertionError: Getting started must use the existing shared document: expected undefined to be defined\n    at openWindow (/home/elias/.cache/am/l584px1q/tmp/test-intent-before-gTM3qf/modules/ui-web/src/shell-v0/state/firstUse.persistence.test.ts:11:72)\n    at processTicksAndRejections (node:interna | Getting started shared document malformed legacy storage is ignored without o"
       },
       {
         "id": "modules/ui-web/src/shell-v0/state/firstUse.pill.test.ts",
         "classification": "assertion",
-        "detail": "Getting started calm pill uses the calm slot only; all urgent states and finished work keep precedence:  AssertionError: expected 'Up to date' to be 'Getting started · 1 of 3' // Object.is equality\n    at /home/elias/.cache/am/k5yzey4h/tmp/test-intent-before-8ZR241/modules/ui-web/src/shell-v0/state/firstUse.pill.test.ts:16:28\n    at file:///home/elias/.cache/am/k5yzey4h/tmp/test-intent-before-8ZR241/mo"
+        "detail": "Getting started calm pill uses the calm slot only; all urgent states and finished work keep precedence:  AssertionError: expected 'Checking search status · last seen ju…' to be 'Getting started · 1 of 3' // Object.is equality\n    at /home/elias/.cache/am/l584px1q/tmp/test-intent-before-gTM3qf/modules/ui-web/src/shell-v0/state/firstUse.pill.test.ts:16:128\n    at file:///home/elias/.cache/am/l584px1q/tmp"
       },
       {
         "id": "modules/ui-web/src/shell-v0/state/firstUse.observations.test.ts",
         "classification": "assertion",
-        "detail": "first-use observation freshness rejects malformed suggested-root items at the wire boundary:  AssertionError: expected null to be an instance of Error\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/k5yzey4h/tmp/test-intent-before-8ZR241/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1386:15)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/k5yzey4h/tmp/test-intent-bef | first-use observation freshness unavailable, explicitly stale and explicitly unknown counts never licen"
+        "detail": "first-use observation freshness rejects malformed suggested-root items at the wire boundary:  AssertionError: expected null to be an instance of Error\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/l584px1q/tmp/test-intent-before-gTM3qf/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1386:15)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/l584px1q/tmp/test-intent-bef | first-use observation freshness unavailable, explicitly stale and explicitly unknown counts never licen"
       },
       {
         "id": "modules/ui-web/src/shell-v0/state/firstUse.reset.test.ts",
         "classification": "assertion",
-        "detail": "completed factory-reset storage cleanup clears Hide and Help marks before a fresh launch:  AssertionError: Getting started must participate in the existing reset format: expected undefined to be defined\n    at /home/elias/.cache/am/k5yzey4h/tmp/test-intent-before-8ZR241/modules/ui-web/src/shell-v0/state/firstUse.reset.test.ts:12:80\n    at file:///home/elias/.cache/am/k5yzey4h/tmp/test-int"
+        "detail": "completed factory-reset storage cleanup clears Hide and Help marks before a fresh launch:  AssertionError: Getting started must participate in the existing reset format: expected undefined to be defined\n    at /home/elias/.cache/am/l584px1q/tmp/test-intent-before-gTM3qf/modules/ui-web/src/shell-v0/state/firstUse.reset.test.ts:12:80\n    at file:///home/elias/.cache/am/l584px1q/tmp/test-int"
       }
     ]
   },
-  "digest": "sha256:df1252965f12b801d15fab5d057fc7053f40f1dd07c4fd8df68f2836f75aa31a"
+  "digest": "sha256:e4b19a1030c32405326a2a6719804fdaccb60d0f2e8cd2f418044dcc60402ae4"
 }

@@ -1,0 +1,180 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-10T01:02:24.818Z",
+  "revision": "612a406fbf577784d86e1f1259f1d09a63c21628",
+  "tree": "25a2b7689bfe5dde251d498fbcbd396410b891d7",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/firstUse.pill.test.ts\" \"src/shell-v0/state/firstUse.test.ts\" \"src/shell-v0/state/firstUse.observations.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/l584px1q/tmp/test-intent-vitest-242-1794272154576.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1013
+    },
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/FirstUse.app-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/l584px1q/tmp/test-intent-vitest-242-1794272155591.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 29480
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/state/firstUse.pill.test.ts",
+      "file": "modules/ui-web/src/shell-v0/state/firstUse.pill.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:139c4cab54995baeffdb28fd2fbf8ff5afc650fd8da8b2ec8feb041fc7d24ca6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Getting started calm pill uses the calm slot only; all urgent states and finished work keep precedence",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/firstUse.test.ts#bundled Help never licenses setup completion, and unknown Help never licenses advice",
+      "file": "modules/ui-web/src/shell-v0/state/firstUse.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b898fd1b5248759ace125437e6d030869d50aeba27ed765dc2aa8aede32b87c8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Getting started facts (SB1–SB11) bundled Help never licenses setup completion, and unknown Help never licenses advice",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/firstUse.test.ts#a watched folder with zero searchable documents points to Library and does not finish",
+      "file": "modules/ui-web/src/shell-v0/state/firstUse.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b898fd1b5248759ace125437e6d030869d50aeba27ed765dc2aa8aede32b87c8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Getting started facts (SB1–SB11) a watched folder with zero searchable documents points to Library and does not finish",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/firstUse.observations.test.ts#only an exact Help facet permits a count or setup advice, independently of status polls",
+      "file": "modules/ui-web/src/shell-v0/state/firstUse.observations.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:91f26e5af7b7587ef761aaa0d48830915059c47cb45fb7bd7b031f74597bfbaa",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "first-use observation freshness only an exact Help facet permits a count or setup advice, independently of status polls",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/FirstUse.app-lockdown.test.ts#Help alone keeps setup current, and missing Help observations stay unknown",
+      "file": "modules/ui-web/src/shell-v0/chrome/FirstUse.app-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9cd87a55639f5ea7e903065c00973d98c3e62c9dfb3e01bd92b10f4bf6880886",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "first use through the real frame Help alone keeps setup current, and missing Help observations stay unknown",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/FirstUse.app-lockdown.test.ts#a folder is under way until own documents exist; empty folders point to Library",
+      "file": "modules/ui-web/src/shell-v0/chrome/FirstUse.app-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9cd87a55639f5ea7e903065c00973d98c3e62c9dfb3e01bd92b10f4bf6880886",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "first use through the real frame a folder is under way until own documents exist; empty folders point to Library",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "612a406fbf577784d86e1f1259f1d09a63c21628",
+    "revision": "612a406fbf577784d86e1f1259f1d09a63c21628",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/firstUse.pill.test.ts\" \"src/shell-v0/state/firstUse.test.ts\" \"src/shell-v0/state/firstUse.observations.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/l584px1q/tmp/test-intent-vitest-242-1794272187661.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1060,
+        "output": "JSON report written to /home/elias/.cache/am/l584px1q/tmp/test-intent-vitest-242-1794272187661.json\n\n"
+      },
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/FirstUse.app-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/l584px1q/tmp/test-intent-vitest-242-1794272188722.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 355432,
+        "output": "JSON report written to /home/elias/.cache/am/l584px1q/tmp/test-intent-vitest-242-1794272188722.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/state/firstUse.pill.test.ts",
+        "classification": "assertion",
+        "detail": "Getting started calm pill uses the calm slot only; all urgent states and finished work keep precedence:  AssertionError: expected 'Checking search status · last seen ju…' to be 'Getting started · 1 of 3' // Object.is equality\n    at /home/elias/.cache/am/l584px1q/tmp/test-intent-before-bkFkih/modules/ui-web/src/shell-v0/state/firstUse.pill.test.ts:16:128\n    at file:///home/elias/.cache/am/l584px1q/tmp"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/firstUse.test.ts#bundled Help never licenses setup completion, and unknown Help never licenses advice",
+        "classification": "assertion",
+        "detail": "Getting started facts (SB1–SB11) bundled Help never licenses setup completion, and unknown Help never licenses advice:  AssertionError: expected { roots: +0, searchable: 5, …(12) } to match object { searchable: +0, …(2) }\n(12 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/l584px1q/tmp/test-intent-before-bkFkih/modules/ui-web/node_modules/@vitest/expect/dist/index.js:12"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/firstUse.test.ts#a watched folder with zero searchable documents points to Library and does not finish",
+        "classification": "assertion",
+        "detail": "Getting started facts (SB1–SB11) a watched folder with zero searchable documents points to Library and does not finish:  AssertionError: expected { roots: 1, searchable: 5, …(12) } to match object { visible: true, …(2) }\n(11 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/l584px1q/tmp/test-intent-before-bkFkih/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/firstUse.observations.test.ts#only an exact Help facet permits a count or setup advice, independently of status polls",
+        "classification": "assertion",
+        "detail": "first-use observation freshness only an exact Help facet permits a count or setup advice, independently of status polls:  AssertionError: expected { roots: +0, searchable: 5, …(11) } to match object { Object (searchable, empty, ...) }\n(9 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/l584px1q/tmp/test-intent-before-bkFkih/modules/ui-web/node_modules/@vitest/expect/dist/i"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/FirstUse.app-lockdown.test.ts#Help alone keeps setup current, and missing Help observations stay unknown",
+        "classification": "assertion",
+        "detail": "first use through the real frame Help alone keeps setup current, and missing Help observations stay unknown:  AssertionError: expected +0 to be 1 // Object.is equality\n    at /home/elias/.cache/am/l584px1q/tmp/test-intent-before-bkFkih/modules/ui-web/src/shell-v0/chrome/FirstUse.app-lockdown.test.ts:174:84\n    at file:///home/elias/.cache/am/l584px1q/tmp/test-intent-before-bkFkih/modules/ui-web/node_modules"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/FirstUse.app-lockdown.test.ts#a folder is under way until own documents exist; empty folders point to Library",
+        "classification": "assertion",
+        "detail": "first use through the real frame a folder is under way until own documents exist; empty folders point to Library:  AssertionError: expected 1 to be +0 // Object.is equality\n    at /home/elias/.cache/am/l584px1q/tmp/test-intent-before-bkFkih/modules/ui-web/src/shell-v0/chrome/FirstUse.app-lockdown.test.ts:189:82\n    at file:///home/elias/.cache/am/l584px1q/tmp/test-intent-before-bkFkih/modules/ui-web/node_modules"
+      }
+    ]
+  },
+  "digest": "sha256:bdb49ed914af34684b75ed89781794a83583b305b72385c68879b8d6fe9035d8"
+}

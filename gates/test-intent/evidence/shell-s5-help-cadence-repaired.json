@@ -1,0 +1,205 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-10T00:39:16.938Z",
+  "revision": "612a406fbf577784d86e1f1259f1d09a63c21628",
+  "tree": "32dac7babea5aa3dcc3f8b2b6a45a441a67306a1",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/controllers/frameStatusController.firstUse.test.ts\" \"src/shell-v0/state/firstUse.observations.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/m73l76iw/tmp/test-intent-vitest-4-1794271096976.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1110
+    },
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/FirstUse.app-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/m73l76iw/tmp/test-intent-vitest-4-1794271098087.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 29389
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/controllers/frameStatusController.firstUse.test.ts#keeps a landed count through status polls and a pending refresh, with at most one scan per minute",
+      "file": "modules/ui-web/src/shell-v0/controllers/frameStatusController.firstUse.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a1d3dd29aab0d9084b7d4f58538177a33b99ce950c749a8a35be25688f81c49c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "first-use Help observation cadence (SB2) keeps a landed count through status polls and a pending refresh, with at most one scan per minute",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/controllers/frameStatusController.firstUse.test.ts#accepts a slow facet response after newer status snapshots without aborting or duplicating it",
+      "file": "modules/ui-web/src/shell-v0/controllers/frameStatusController.firstUse.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a1d3dd29aab0d9084b7d4f58538177a33b99ce950c749a8a35be25688f81c49c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "first-use Help observation cadence (SB2) accepts a slow facet response after newer status snapshots without aborting or duplicating it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/controllers/frameStatusController.firstUse.test.ts#a failure refresh makes the count unknown and waits 15 seconds before retrying",
+      "file": "modules/ui-web/src/shell-v0/controllers/frameStatusController.firstUse.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a1d3dd29aab0d9084b7d4f58538177a33b99ce950c749a8a35be25688f81c49c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "first-use Help observation cadence (SB2) a failure refresh makes the count unknown and waits 15 seconds before retrying",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/controllers/frameStatusController.firstUse.test.ts#a truncated refresh makes the count unknown and waits 15 seconds before retrying",
+      "file": "modules/ui-web/src/shell-v0/controllers/frameStatusController.firstUse.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a1d3dd29aab0d9084b7d4f58538177a33b99ce950c749a8a35be25688f81c49c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "first-use Help observation cadence (SB2) a truncated refresh makes the count unknown and waits 15 seconds before retrying",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/firstUse.observations.test.ts#only an exact Help facet permits a count or setup advice, independently of status polls",
+      "file": "modules/ui-web/src/shell-v0/state/firstUse.observations.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:91f26e5af7b7587ef761aaa0d48830915059c47cb45fb7bd7b031f74597bfbaa",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "first-use observation freshness only an exact Help facet permits a count or setup advice, independently of status polls",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/FirstUse.app-lockdown.test.ts#keeps the first-use view across polls and a slow refresh without repeated facet scans",
+      "file": "modules/ui-web/src/shell-v0/chrome/FirstUse.app-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9cd87a55639f5ea7e903065c00973d98c3e62c9dfb3e01bd92b10f4bf6880886",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "first use through the real frame keeps the first-use view across polls and a slow refresh without repeated facet scans",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/FirstUse.app-lockdown.test.ts#lets a slow initial Help response land after several real frame status polls",
+      "file": "modules/ui-web/src/shell-v0/chrome/FirstUse.app-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9cd87a55639f5ea7e903065c00973d98c3e62c9dfb3e01bd92b10f4bf6880886",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "first use through the real frame lets a slow initial Help response land after several real frame status polls",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "612a406fbf577784d86e1f1259f1d09a63c21628",
+    "revision": "612a406fbf577784d86e1f1259f1d09a63c21628",
+    "overlays": [],
+    "patches": [
+      {
+        "path": "/home/elias/.cache/am/m73l76iw/tmp/help-count-before.patch",
+        "contentDigest": "sha256:1316e233b98341dd459414bacb760ea3842edcecf0bdfe754abfdb04e80086c9"
+      }
+    ],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/controllers/frameStatusController.firstUse.test.ts\" \"src/shell-v0/state/firstUse.observations.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/m73l76iw/tmp/test-intent-vitest-4-1794271130248.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1273,
+        "output": "JSON report written to /home/elias/.cache/am/m73l76iw/tmp/test-intent-vitest-4-1794271130248.json\n\n"
+      },
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/FirstUse.app-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/m73l76iw/tmp/test-intent-vitest-4-1794271131522.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 24966,
+        "output": "JSON report written to /home/elias/.cache/am/m73l76iw/tmp/test-intent-vitest-4-1794271131522.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/controllers/frameStatusController.firstUse.test.ts#keeps a landed count through status polls and a pending refresh, with at most one scan per minute",
+        "classification": "assertion",
+        "detail": "first-use Help observation cadence (SB2) keeps a landed count through status polls and a pending refresh, with at most one scan per minute:  AssertionError: expected { roots: +0, searchable: null, …(15) } to match object { known: true, searchable: 2, …(1) }\n(14 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/m73l76iw/tmp/test-intent-before-6n1qNG/modules/ui-web/node_modules/@vitest/expect/d"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/controllers/frameStatusController.firstUse.test.ts#accepts a slow facet response after newer status snapshots without aborting or duplicating it",
+        "classification": "assertion",
+        "detail": "first-use Help observation cadence (SB2) accepts a slow facet response after newer status snapshots without aborting or duplicating it:  AssertionError: expected [ { …(3) }, { …(3) }, { …(3) }, …(2) ] to have a length of 1 but got 5\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/m73l76iw/tmp/test-intent-before-6n1qNG/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///home/elias"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/controllers/frameStatusController.firstUse.test.ts#a failure refresh makes the count unknown and waits 15 seconds before retrying",
+        "classification": "assertion",
+        "detail": "first-use Help observation cadence (SB2) a failure refresh makes the count unknown and waits 15 seconds before retrying:  AssertionError: expected null to be 2 // Object.is equality\n    at /home/elias/.cache/am/m73l76iw/tmp/test-intent-before-6n1qNG/modules/ui-web/src/shell-v0/controllers/frameStatusController.firstUse.test.ts:73:38\n    at file:///home/elias/.cache/am/m73l76iw/tmp/test-intent-before-6n1qNG/modules/ui-w"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/controllers/frameStatusController.firstUse.test.ts#a truncated refresh makes the count unknown and waits 15 seconds before retrying",
+        "classification": "assertion",
+        "detail": "first-use Help observation cadence (SB2) a truncated refresh makes the count unknown and waits 15 seconds before retrying:  AssertionError: expected null to be 2 // Object.is equality\n    at /home/elias/.cache/am/m73l76iw/tmp/test-intent-before-6n1qNG/modules/ui-web/src/shell-v0/controllers/frameStatusController.firstUse.test.ts:73:38\n    at file:///home/elias/.cache/am/m73l76iw/tmp/test-intent-before-6n1qNG/modules/ui-w"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/firstUse.observations.test.ts#only an exact Help facet permits a count or setup advice, independently of status polls",
+        "classification": "assertion",
+        "detail": "first-use observation freshness only an exact Help facet permits a count or setup advice, independently of status polls:  AssertionError: expected { roots: +0, searchable: null, …(15) } to match object { searchable: 3, empty: false, …(1) }\n(14 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/m73l76iw/tmp/test-intent-before-6n1qNG/modules/ui-web/node_modules/@vitest/expect/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/FirstUse.app-lockdown.test.ts#keeps the first-use view across polls and a slow refresh without repeated facet scans",
+        "classification": "assertion",
+        "detail": "first use through the real frame keeps the first-use view across polls and a slow refresh without repeated facet scans:  AssertionError: expected +0 to be 1 // Object.is equality\n    at /home/elias/.cache/am/m73l76iw/tmp/test-intent-before-6n1qNG/modules/ui-web/src/shell-v0/chrome/FirstUse.app-lockdown.test.ts:134:86\n    at file:///home/elias/.cache/am/m73l76iw/tmp/test-intent-before-6n1qNG/modules/ui-web/node_modules"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/FirstUse.app-lockdown.test.ts#lets a slow initial Help response land after several real frame status polls",
+        "classification": "assertion",
+        "detail": "first use through the real frame lets a slow initial Help response land after several real frame status polls:  AssertionError: expected 5 to be 1 // Object.is equality\n    at /home/elias/.cache/am/m73l76iw/tmp/test-intent-before-6n1qNG/modules/ui-web/src/shell-v0/chrome/FirstUse.app-lockdown.test.ts:156:83\n    at file:///home/elias/.cache/am/m73l76iw/tmp/test-intent-before-6n1qNG/modules/ui-web/node_modules/"
+      }
+    ]
+  },
+  "digest": "sha256:c012699ff7e125ca9716050efcf89f99b5cf450ff4d0cf33aafeef9085f4336b"
+}

@@ -642,9 +642,21 @@ def _status_body(variant: str) -> str:
         reading = variant == "first-use-reading"
         d["meta"]["workerRpcAtMs"] = int(datetime.now(timezone.utc).timestamp() * 1000)
         d["worker"]["core"].update({"indexState": "INDEXING" if reading else "IDLE", "indexHealthy": True,
-            "indexedDocuments": 2 if reading else 0, "searchableDocuments": 2 if reading else 0,
+            "indexedDocuments": 7 if reading else 5, "searchableDocuments": 7 if reading else 5,
             "indexedDocumentsUnknown": False, "pendingJobs": 8 if reading else 0})
         d["worker"].pop("countObservations", None)
+        # A fresh keyword-only install has neither loaded AI nor failed optional enrichment.
+        d["inference"].update({"phase": "OFFLINE",
+            "engineState": "Down", "engineReason": "not-installed", "chatEnabledSpec": False})
+        d["inference"].pop("identity", None)
+        d["aiReady"] = False
+        d["worker"]["enrichment"].update({"embeddingEnabled": False, "spladeEnabled": False, "nerEnabled": False,
+            "embeddingAvailable": False, "spladeAvailable": False, "nerAvailable": False})
+        d["operating"]["chat"].update({"state": "OFF", "reason": None, "reasonCode": None,
+            "detail": None, "load": None, "queued": 0})
+        d["operating"]["indexing"].update({"state": "RUNNING" if reading else "IDLE",
+            "reasons": [], "reasonCode": None, "pendingJobs": 8 if reading else 0})
+        d["operating"]["degradations"] = []
         d["worker"]["migration"].update({"processingJobsCount": 0, "migrationState": "IDLE"})
         return json.dumps(d)
     if variant == "indexing-rules":
@@ -851,6 +863,9 @@ def fixture_body(url: str, variant: str = "default") -> str:
         return _status_body(variant)
     if "/api/settings" in url:
         return _settings_body(variant)
+    if "/api/knowledge/collection-facet" in url and variant.startswith("first-use"):
+        return json.dumps({"facets": {"collection": {"justsearch-help": 5,
+            **({"default": 2} if variant == "first-use-reading" else {})}}, "facetsTruncated": False})
     if "/api/knowledge/search" in url:
         return _search_body(variant)
     if "/api/indexing-roots/substrate" in url:

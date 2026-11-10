@@ -110,6 +110,7 @@ export class GettingStarted extends JfElement {
   }
   override render() {
     const view = getFirstUse();
+    if (!view.reading && !(view.waiting ?? 0)) addState.actionMessage = null;
     // An in-flight add/error is kept accessible even while a new observation is settling.
     const pending = addState.showManualInput || addState.addBusy || !!addState.error;
     if (!view.visible && !pending && !(this.intro && view.empty)) return nothing;
@@ -131,14 +132,14 @@ export class GettingStarted extends JfElement {
         </div>` : nothing}
       </section>` : nothing}
       ${view.coreVisible && view.progress && !empty ? html`<p class="progress" data-testid="first-use-progress" role="status" aria-live="polite">${view.progress}</p>` : nothing}
-      <div class="message" role="status" aria-live="polite">${addState.actionMessage ?? ''}</div>
+      <div class="message" role="status" aria-live="polite">${view.reading || (view.waiting ?? 0) > 0 ? addState.actionMessage ?? '' : ''}</div>
       ${addState.error ? html`<p class="error" role="alert">${addState.error}</p>` : nothing}
       ${flow().renderForm()}
       ${view.visible ? html`<section class="card" data-testid="getting-started-card" aria-label="Getting started">
         <header><h2>Getting started</h2>${view.coreVisible ? html`<p role="status" aria-live="polite">${view.completed} of 3 · the last step is optional</p>` : nothing}
           <jf-button variant="ghost" label="Hide Getting started" .onActivate=${hideGettingStarted}>Hide</jf-button></header>
         ${view.coreVisible ? html`<ol>${[
-          { title: 'Add folders to search', body: view.folderNeedsAttention
+          { title: 'Add folders to search', body: view.folderUnderWay ? 'Under way. Your folder is being read; search works as soon as the first files are searchable.' : view.folderNeedsAttention
             ? 'No files are searchable yet. Open Library to check what is being read or skipped.'
             : view.done[0] ? 'Your files stay where they are.' : 'Pick what JustSearch should read. Files stay where they are.',
             action: view.folderNeedsAttention ? 'Open Library' : view.done[0] ? 'Add another' : 'Add a folder',
@@ -147,7 +148,7 @@ export class GettingStarted extends JfElement {
             action: '', run: () => {} },
           { title: 'Optional: answers and search by meaning', body: 'Adds AI models that run on this computer.',
             action: 'Open AI Brain', run: () => requestSurfaceNavigation('core.brain-surface') },
-        ].map((step, i) => html`<li><span class="mark" role="img" aria-label=${view.done[i] ? 'Done' : `Step ${i + 1}`}>${view.done[i] ? icon({ name: 'check-circle-2' }) : i + 1}</span>
+        ].map((step, i) => html`<li><span class="mark" role="img" aria-label=${view.done[i] ? 'Done' : i === 0 && view.folderUnderWay ? 'Under way' : `Step ${i + 1}`}>${view.done[i] ? icon({ name: 'check-circle-2' }) : i + 1}</span>
           <div class="step">${step.title}<p>${step.body}</p></div>
           ${step.action ? html`<jf-button variant="ghost" label=${step.action} ?data-add-folder=${i === 0 && !empty}
             .disabled=${i === 0 && addState.addBusy} .onActivate=${step.run}>${step.action}</jf-button>` : nothing}</li>`)}

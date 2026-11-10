@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-09T23:19:08.481Z",
-  "revision": "dee85d879421f47ddf87721668c03e1edeee3c6f",
-  "tree": "e6cab9c0f90a9b2e1b384d0b516763600e7119c7",
+  "createdAt": "2026-11-10T00:23:33.893Z",
+  "revision": "612a406fbf577784d86e1f1259f1d09a63c21628",
+  "tree": "dc0d3e26bb4d966e32fc734d22a5052919d963f3",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/firstUse.reading.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/y1m5zvtd/tmp/test-intent-vitest-3-1794266346804.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/firstUse.reading.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/ymmo0lds/tmp/test-intent-vitest-2584-1794270212918.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 1674
+      "durationMs": 974
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/state/firstUse.reading.test.ts",
       "file": "modules/ui-web/src/shell-v0/state/firstUse.reading.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:89e01af4afd155b8daf7a9dca1484f397d0a2893073c11d90544e5c83808189b",
+      "contentDigest": "sha256:71bb19601820192af0f6887720bcc968c59f1d7fcf2cafae65321bbbc463d541",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -86,5 +86,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:ddb4f71cb961d70733e65a1426a7163e6488f0e37def6594b799de6c00e30e97"
+  "digest": "sha256:f76b90ab4a7901bd3bb8298f01c593a7a59d7ff606aefbb3f6834ca0fc9bb963"
 }

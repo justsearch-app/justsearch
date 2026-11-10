@@ -3,7 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { __feedForTest, __feedContactForTest, __resetAiStateForTest, __tickClockForTest } from './aiStateStore.js';
 import { __resetUserStateForTest } from './UserStateDocument.js';
-import { getFirstUse, setFirstUseRoots } from './firstUse.js';
+import { getFirstUse, setFirstUseRoots, setFirstUseHelpFacet } from './firstUse.js';
 
 beforeEach(() => {
   __resetUserStateForTest(); __resetAiStateForTest();
@@ -12,11 +12,12 @@ beforeEach(() => {
 afterEach(() => { __resetAiStateForTest(); vi.useRealTimers(); });
 function observe(indexState: string, pendingJobs?: number, paused = false, state: 'fresh' | 'stale' | 'unknown' = 'fresh') {
   __feedForTest({ status: {
-    worker: { core: { indexState, indexedDocuments: 3, searchableDocuments: 3,
-      ...(pendingJobs === undefined ? {} : { pendingJobs }) }, countObservations: { searchable: { state, value: 3 } } },
+    worker: { core: { indexState, indexedDocuments: 8, searchableDocuments: 8,
+      ...(pendingJobs === undefined ? {} : { pendingJobs }) }, countObservations: { searchable: { state, value: 8 } } },
     ...(paused ? { operating: { indexing: { state: 'PAUSED', reasons: ['user_paused'], untilEpochMs: null, waitingForResume: true } } } : {}),
   } as never });
   __feedContactForTest();
+  setFirstUseHelpFacet?.({ facets: { collection: { 'justsearch-help': 5 } }, facetsTruncated: false });
 }
 describe('SB6 live reading observations', () => {
   it.each([undefined, 0])('reports still reading during INDEXING with queue %s', pending => {

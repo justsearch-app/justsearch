@@ -2179,6 +2179,7 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
                 await page.locator('jf-sv3-composer textarea').wait_for(state="visible")
             else:
                 await page.get_by_text("Nothing to search yet", exact=True).wait_for()
+                await page.get_by_role("button", name="Getting started · 1 of 3", exact=True).wait_for()
                 await page.get_by_text("/home/user/Documents", exact=True).wait_for()
             if cooldown_ms > 0:
                 await asyncio.sleep(cooldown_ms / 1000)

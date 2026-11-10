@@ -29,7 +29,7 @@ describe('Getting started shared document', () => {
     stored.walkthroughState = { welcome: { activeStepIndex: 'broken', completedStepIds: null, dismissed: 'yes' } };
     const raw = JSON.stringify(stored); localStorage.setItem(key, raw); a.doc.__resetInMemoryStateForTest();
     expect(a.doc.getWalkthroughProgress('welcome')).toBeUndefined();
-    expect(a.api.projectFirstUse({ roots: 0, searchable: 0, waiting: 0, reading: false, aiActive: false }, undefined, a.doc.getWalkthroughProgress('welcome')).visible).toBe(true);
+    expect(a.api.projectFirstUse({ roots: 0, searchable: 5, helpSearchable: 5, waiting: 0, reading: false, aiActive: false }, undefined, a.doc.getWalkthroughProgress('welcome')).visible).toBe(true);
     expect(localStorage.getItem(key)).toBe(raw);
   });
 });

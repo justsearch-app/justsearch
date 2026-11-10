@@ -26,8 +26,9 @@ async function mount() {
   card.host_ = host; document.body.append(card); await pump(card); return card;
 }
 function feed(count: number, pending = 0) {
-  __feedForTest({ status: { worker: { core: { indexState: pending ? 'INDEXING' : 'IDLE', indexedDocuments: count, searchableDocuments: count, pendingJobs: pending } } } as never });
+  __feedForTest({ status: { worker: { core: { indexState: pending ? 'INDEXING' : 'IDLE', indexedDocuments: count + 5, searchableDocuments: count + 5, pendingJobs: pending } } } as never });
   __feedContactForTest();
+  state?.setFirstUseHelpFacet?.({ facets: { collection: { 'justsearch-help': 5 } }, facetsTruncated: false });
 }
 async function activate(card: Card, label: string) {
   const action = [...card.shadowRoot?.querySelectorAll('jf-button') ?? []].find(b => b.getAttribute('label') === label) as HTMLElement & { onActivate?: () => unknown };
