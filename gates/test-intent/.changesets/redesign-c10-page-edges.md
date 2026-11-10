@@ -333,3 +333,14 @@ actual-old-binary or installed HTTP proof. Its fixture exemption is not behavior
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1c576-f119-7830-bc6b-d0a6788b56b8",
+  "verdict": "accept",
+  "digest": "sha256:101fd380901c342488b5b4412393a9f1eb43057266093debeb1d086e6e71a2f3",
+  "note": "Independent fresh Codex verifier on 9d03a842a9: all 13 entries within the cited delegation; 24 checks/157 cases pass after, assertion failures before (case loss; v8 identity). C10's 17 changed paths byte-identical to 7d6b53c167's delta. Build passes; module test failures all shared with baseline (sandbox: headless, no volume UUIDs). Real upgrade, quality check and CI not claimed by this acceptance."
+}
+```
