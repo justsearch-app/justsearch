@@ -1,0 +1,187 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
+  },
+  "createdAt": "2026-11-10T22:42:01.988Z",
+  "revision": "50c26d710c5f2a9223623c46516285881970a4ff",
+  "tree": "c8bccef8adc0801c3ae2631e72e181146c8563c9",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/a7ihowt2/tmp/test-intent-vitest-38522-1794350203898.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 165035
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SG3 dismissal by Escape preserves the real Search window current conversation and reload address",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0021a93b7c44f4a492297bde1a9ebf9580d026a29ef5cbb8d86c4c89446811c6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SG3 dismissal by Escape preserves the real Search window current conversation and reload address",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SG3 dismissal by Back preserves the real Search window current conversation and reload address",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0021a93b7c44f4a492297bde1a9ebf9580d026a29ef5cbb8d86c4c89446811c6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SG3 dismissal by Back preserves the real Search window current conversation and reload address",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SG3 dismissal by Close preserves the real Search window current conversation and reload address",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0021a93b7c44f4a492297bde1a9ebf9580d026a29ef5cbb8d86c4c89446811c6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SG3 dismissal by Close preserves the real Search window current conversation and reload address",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SG4 member core.security-surface arrivals replace the address before and after Settings mounts without another history entry",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0021a93b7c44f4a492297bde1a9ebf9580d026a29ef5cbb8d86c4c89446811c6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SG4 member core.security-surface arrivals replace the address before and after Settings mounts without another history entry",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SG4 member core.presentation-gallery-surface arrivals replace the address before and after Settings mounts without another history entry",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0021a93b7c44f4a492297bde1a9ebf9580d026a29ef5cbb8d86c4c89446811c6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SG4 member core.presentation-gallery-surface arrivals replace the address before and after Settings mounts without another history entry",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SG4 member core.presentation-editor-surface arrivals replace the address before and after Settings mounts without another history entry",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0021a93b7c44f4a492297bde1a9ebf9580d026a29ef5cbb8d86c4c89446811c6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SG4 member core.presentation-editor-surface arrivals replace the address before and after Settings mounts without another history entry",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SG8 at 600x400 and 200 percent text every section and enabled control is in view on keyboard focus, no button is clipped sideways, one scroller when short",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0021a93b7c44f4a492297bde1a9ebf9580d026a29ef5cbb8d86c4c89446811c6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SG8 at 600x400 and 200 percent text every section and enabled control is in view on keyboard focus, no button is clipped sideways, one scroller when short",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "50c26d710c",
+    "revision": "50c26d710c5f2a9223623c46516285881970a4ff",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/a7ihowt2/tmp/test-intent-vitest-38522-1794350370452.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 151255,
+        "output": "JSON report written to /home/elias/.cache/am/a7ihowt2/tmp/test-intent-vitest-38522-1794350370452.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SG3 dismissal by Escape preserves the real Search window current conversation and reload address",
+        "classification": "assertion",
+        "detail": "SG3 dismissal by Escape preserves the real Search window current conversation and reload address:  AssertionError: expected 'settings-conversation-A' to be 'settings-conversation-B' // Object.is equality\n    at /home/elias/.cache/am/a7ihowt2/tmp/test-intent-before-9RnOyM/modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts:679:26\n    at file:///home/elias/dev/justsearch/.claude/worktre"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SG3 dismissal by Back preserves the real Search window current conversation and reload address",
+        "classification": "assertion",
+        "detail": "SG3 dismissal by Back preserves the real Search window current conversation and reload address:  AssertionError: expected 'settings-conversation-A' to be 'settings-conversation-B' // Object.is equality\n    at /home/elias/.cache/am/a7ihowt2/tmp/test-intent-before-9RnOyM/modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts:679:26\n    at file:///home/elias/dev/justsearch/.claude/worktre"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SG3 dismissal by Close preserves the real Search window current conversation and reload address",
+        "classification": "assertion",
+        "detail": "SG3 dismissal by Close preserves the real Search window current conversation and reload address:  AssertionError: expected 'settings-conversation-A' to be 'settings-conversation-B' // Object.is equality\n    at /home/elias/.cache/am/a7ihowt2/tmp/test-intent-before-9RnOyM/modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts:679:26\n    at file:///home/elias/dev/justsearch/.claude/worktre"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SG4 member core.security-surface arrivals replace the address before and after Settings mounts without another history entry",
+        "classification": "assertion",
+        "detail": "SG4 member core.security-surface arrivals replace the address before and after Settings mounts without another history entry:  AssertionError: expected 3 to be 2 // Object.is equality\n    at /home/elias/.cache/am/a7ihowt2/tmp/test-intent-before-9RnOyM/modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts:701:53\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-settings/modules/ui-web/node_modules/@vite"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SG4 member core.presentation-gallery-surface arrivals replace the address before and after Settings mounts without another history entry",
+        "classification": "assertion",
+        "detail": "SG4 member core.presentation-gallery-surface arrivals replace the address before and after Settings mounts without another history entry:  AssertionError: expected 3 to be 2 // Object.is equality\n    at /home/elias/.cache/am/a7ihowt2/tmp/test-intent-before-9RnOyM/modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts:701:53\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-settings/modules/ui-web/node_modules/@vite"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SG4 member core.presentation-editor-surface arrivals replace the address before and after Settings mounts without another history entry",
+        "classification": "assertion",
+        "detail": "SG4 member core.presentation-editor-surface arrivals replace the address before and after Settings mounts without another history entry:  AssertionError: expected 3 to be 2 // Object.is equality\n    at /home/elias/.cache/am/a7ihowt2/tmp/test-intent-before-9RnOyM/modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts:701:53\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-settings/modules/ui-web/node_modules/@vite"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SG8 at 600x400 and 200 percent text every section and enabled control is in view on keyboard focus, no button is clipped sideways, one scroller when short",
+        "classification": "assertion",
+        "detail": "SG8 at 600x400 and 200 percent text every section and enabled control is in view on keyboard focus, no button is clipped sideways, one scroller when short:  AssertionError: general: {\"el\":\"<button type=\\\"button\\\" role=\\\"radio\\\" class=\\\"option-btn  selected\\\" aria-checked=\\\"true\\\" tabindex=\\\"0\\\">\\n              <!--?lit$621531901$-->\\n              <span class\",\"rect\":[302,438,224,376],\"caret\":[302,438],\"viewport\":[370,370,24,576]}: expected false to be"
+      }
+    ]
+  },
+  "digest": "sha256:c711389217ae8cb5053286b5d032917575283de40785911678cf23f98c4b4991"
+}

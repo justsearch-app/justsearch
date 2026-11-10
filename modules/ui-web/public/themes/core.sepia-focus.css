@@ -36,6 +36,7 @@
 
   /* === Semantic colors (muted + warm) === */
   --accent-tint: #b88a3e;        /* aged amber */
+  --focus-ring-color: #79551f;   /* deep amber — ≥3:1 against every cream surface */
   --accent-command: #94681c;     /* deeper amber */
   --accent-chat: #8b6332;        /* coffee-amber */
   --accent-success: #5d6e2c;     /* moss green (warm) */

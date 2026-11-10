@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
+  },
+  "createdAt": "2026-11-10T22:44:47.542Z",
+  "revision": "50c26d710c5f2a9223623c46516285881970a4ff",
+  "tree": "e3c4c1ac9da2acb344adfce46236ca716924f90d",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/a7ihowt2/tmp/test-intent-vitest-40720-1794350524356.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 163185
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SG8 at 1280x720 and 100 percent text every section and enabled control is in view on keyboard focus, no button is clipped sideways, one scroller when short",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0021a93b7c44f4a492297bde1a9ebf9580d026a29ef5cbb8d86c4c89446811c6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SG8 at 1280x720 and 100 percent text every section and enabled control is in view on keyboard focus, no button is clipped sideways, one scroller when short",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:aeafb59a3eb6c576e1ac9d10516a4d35d0253534e3b619316b97e6c2e90928c1"
+}

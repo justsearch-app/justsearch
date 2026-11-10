@@ -849,7 +849,7 @@ export class DocumentPane extends JfElement {
       color: var(--text-primary);
     }
     .toggle-btn:focus-visible {
-      outline: 2px solid var(--accent-tint);
+      outline: 2px solid var(--focus-ring-color);
       outline-offset: 1px;
     }
     .toggle-btn.selected {
@@ -964,7 +964,7 @@ export class DocumentPane extends JfElement {
       padding: 0.875rem;
     }
     .scroll-region:focus-visible {
-      outline: 2px solid var(--accent-tint);
+      outline: 2px solid var(--focus-ring-color);
       outline-offset: -2px;
     }
     /* Tempdoc 846 §2.3 — the wrapper's rhythm now READS the shared vocabulary instead of restating

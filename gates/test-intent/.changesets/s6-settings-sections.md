@@ -459,6 +459,77 @@ Candidate G follows the settled SG1–SG10 amendments. SD developer-tools change
         "modules/ui-web/src/shell-v0/views/SettingsSurface.sections.test.ts"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "SG3 a background claim of conversation B in the real Search window while Settings is open survives closing Settings by Escape, Back or the close button: the window keeps B, its address names B, history gains no entry, Forward reopens Settings once, and reload shows B. SG4 a member address (security, gallery, editor) at launch and while Settings is open or closed is replaced by the canonical Settings section and anchor without an extra history entry, and focuses the member. SG8 at 600x400 with 200 percent text every enabled control reached by Tab in every section is in view when focused (a control taller than the viewport shows its caret line), no button is cut off sideways, and Settings has exactly one scroll container.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "SG3 a background claim of conversation B in the real Search window while Settings is open survives closing Settings by Escape, Back or the close button: the window keeps B, its address names B, history gains no entry, Forward reopens Settings once, and reload shows B. SG4 a member address (security, gallery, editor) at launch and while Settings is open or closed is replaced by the canonical Settings section and anchor without an extra history entry, and focuses the member. SG8 at 600x400 with 200 percent text every enabled control reached by Tab in every section is in view when focused (a control taller than the viewport shows its caret line), no button is cut off sideways, and Settings has exactly one scroll container."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-settings-repairs.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SG3 dismissal by Escape preserves the real Search window current conversation and reload address",
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SG3 dismissal by Back preserves the real Search window current conversation and reload address",
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SG3 dismissal by Close preserves the real Search window current conversation and reload address",
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SG4 member core.security-surface arrivals replace the address before and after Settings mounts without another history entry",
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SG4 member core.presentation-gallery-surface arrivals replace the address before and after Settings mounts without another history entry",
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SG4 member core.presentation-editor-surface arrivals replace the address before and after Settings mounts without another history entry",
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SG8 at 600x400 and 200 percent text every section and enabled control is in view on keyboard focus, no button is clipped sideways, one scroller when short"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "SG8 at 1280x720 with 100 percent text every enabled control reached by Tab in every section is in view when focused and no button is cut off sideways; the wide two-pane layout is unchanged.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "SG8 at 1280x720 with 100 percent text every enabled control reached by Tab in every section is in view when focused and no button is cut off sideways; the wide two-pane layout is unchanged."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-settings-guards.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SG8 at 1280x720 and 100 percent text every section and enabled control is in view on keyboard focus, no button is clipped sideways, one scroller when short"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/SettingsNav.forced-colors-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "SG8 forced colours give the selected Data & reset category the system Highlight/HighlightText pair and HighlightText keyboard focus ring, including hover, on light and dark palettes; unselected danger rows keep browser colour adjustment.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "SG8 forced colours give the selected Data & reset category the system Highlight/HighlightText pair and HighlightText keyboard focus ring, including hover, on light and dark palettes; unselected danger rows keep browser colour adjustment."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-settings-forced-colors.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/SettingsNav.forced-colors-lockdown.test.ts"
+      ],
+      "repaired": true
     }
   ]
 }

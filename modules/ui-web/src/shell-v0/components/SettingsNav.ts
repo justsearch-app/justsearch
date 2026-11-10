@@ -67,11 +67,14 @@ export class SettingsNav extends JfElement {
       category.sections?.some(entry => entry.key === key && entry.gate && !entry.gate())));
   }
 
-  protected override updated(): void {
+  protected override updated(changed: Map<string, unknown>): void {
     if (this.focusedRowHidden) {
       this.dispatchEvent(new CustomEvent('hidden-row-focus', { bubbles: true, composed: true }));
     } else if (this.focusedRow && !this.focusedRow.isConnected) {
       this.shadowRoot?.querySelector<HTMLElement>(this.query ? '.search-input' : '.category-row.active')?.focus();
+    } else if (changed.has('activeCategory') && this.focusedRow?.matches(':focus')) {
+      // A section change folds the previous section's entries above the focused row away.
+      this.focusedRow.scrollIntoView({ block: 'nearest' });
     }
     this.focusedRow = null;
   }
@@ -153,7 +156,7 @@ export class SettingsNav extends JfElement {
        definition lives in ambientStyles.ts, adopted into this shadow root by JfElement. No local
        placeholder rule here. */
     .search-input:focus-visible {
-      outline: 2px solid var(--focus-ring-color, var(--accent-tint));
+      outline: 2px solid var(--focus-ring-color);
       outline-offset: -1px;
     }
     .groups,
@@ -162,6 +165,10 @@ export class SettingsNav extends JfElement {
       min-height: 0;
       overflow-y: auto;
       padding: 0.75rem 0.5rem;
+    }
+    @media (max-height: 600px) {
+      :host, nav { height: auto; }
+      .groups, .results { flex: none; overflow: visible; }
     }
     .results-list {
       list-style: none;
@@ -281,7 +288,7 @@ export class SettingsNav extends JfElement {
       color: var(--text-primary);
     }
     button:focus-visible {
-      outline: 2px solid var(--focus-ring-color, var(--accent-tint));
+      outline: 2px solid var(--focus-ring-color);
       outline-offset: -2px;
     }
     /* Forced colors (Windows High Contrast) erase the active pill and the brighter anchor text, so
@@ -290,6 +297,7 @@ export class SettingsNav extends JfElement {
        stay visible on that fill. */
     @media (forced-colors: active) {
       button.category-row.active,
+      button.category-row.danger.active,
       button.anchor-row.active {
         forced-color-adjust: none;
         background: Highlight;

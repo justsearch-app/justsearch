@@ -96,11 +96,11 @@ export class DiscreteSlider extends JfElement {
       outline: none;
     }
     input[type='range']:focus-visible::-webkit-slider-thumb {
-      outline: 2px solid var(--focus-ring-color, var(--accent-tint));
+      outline: 2px solid var(--focus-ring-color);
       outline-offset: 2px;
     }
     input[type='range']:focus-visible::-moz-range-thumb {
-      outline: 2px solid var(--focus-ring-color, var(--accent-tint));
+      outline: 2px solid var(--focus-ring-color);
       outline-offset: 2px;
     }
     .ticks {

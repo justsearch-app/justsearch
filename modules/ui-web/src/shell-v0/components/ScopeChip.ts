@@ -71,7 +71,7 @@ export class ScopeChip extends JfElement {
       color: var(--text-primary);
     }
     .scope-chip-remove:focus-visible {
-      outline: 2px solid var(--accent);
+      outline: 2px solid var(--focus-ring-color);
       outline-offset: 1px;
     }
   `;

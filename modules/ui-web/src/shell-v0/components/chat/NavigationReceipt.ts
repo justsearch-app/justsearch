@@ -136,7 +136,7 @@ export class NavigationReceipt extends JfElement {
       background: var(--accent-tint-16);
     }
     .suggestion-chip:focus-visible {
-      outline: 2px solid var(--accent-tint);
+      outline: 2px solid var(--focus-ring-color);
       outline-offset: 1px;
     }
   `;

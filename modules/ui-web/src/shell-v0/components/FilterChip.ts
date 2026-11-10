@@ -56,7 +56,7 @@ export class FilterChip extends JfElement {
       color: var(--text-primary);
     }
     button:focus-visible {
-      outline: 2px solid var(--accent);
+      outline: 2px solid var(--focus-ring-color);
       outline-offset: 1px;
     }
     button[aria-pressed='true'] {

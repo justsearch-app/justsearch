@@ -1,0 +1,527 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
+  },
+  "createdAt": "2026-11-10T20:34:39.030Z",
+  "revision": "3efe7c90d1c26a74eb5d3b78979d0038dbc8f49c",
+  "tree": "ba02c72171de407022d4677f15353b7b3e1c34da",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/themes/builtinPaletteContrast.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/89kyhi17/tmp/test-intent-vitest-64-1794342874496.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 777
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/themes/builtinPaletteContrast.test.ts",
+      "file": "modules/ui-web/src/shell-v0/themes/builtinPaletteContrast.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7af7c7ba78438273fd74cbbe4cbd4972bdee64ed2183fd247eaa34515e6a1a74",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "built-in palette accent on-colors meet WCAG AA against their own fills core.cyanotype.css accent-command → accent-on-command is legible (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette accent on-colors meet WCAG AA against their own fills core.cyanotype.css accent-chat → accent-on-chat is legible (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette accent on-colors meet WCAG AA against their own fills core.cyanotype.css accent-success → accent-on-success is legible (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette accent on-colors meet WCAG AA against their own fills core.cyanotype.css accent-warning → accent-on-warning is legible (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette accent on-colors meet WCAG AA against their own fills core.cyanotype.css accent-danger → accent-on-danger is legible (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette accent on-colors meet WCAG AA against their own fills core.cyanotype.css accent-tint → accent-on-tint is legible (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette accent on-colors meet WCAG AA against their own fills core.cyanotype.css accent-highlight → accent-on-highlight is legible (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette accent on-colors meet WCAG AA against their own fills core.cyanotype.css accent-link → accent-on-link is legible (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette accent on-colors meet WCAG AA against their own fills core.high-vis.json accent-success → accent-on-success is legible (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette accent on-colors meet WCAG AA against their own fills core.high-vis.json accent-warning → accent-on-warning is legible (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette accent on-colors meet WCAG AA against their own fills core.high-vis.json accent-danger → accent-on-danger is legible (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette accent on-colors meet WCAG AA against their own fills core.high-vis.json accent-tint → accent-on-tint is legible (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette accent on-colors meet WCAG AA against their own fills core.night-registry.css accent-command → accent-on-command is legible (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette accent on-colors meet WCAG AA against their own fills core.night-registry.css accent-chat → accent-on-chat is legible (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette accent on-colors meet WCAG AA against their own fills core.night-registry.css accent-success → accent-on-success is legible (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette accent on-colors meet WCAG AA against their own fills core.night-registry.css accent-warning → accent-on-warning is legible (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette accent on-colors meet WCAG AA against their own fills core.night-registry.css accent-danger → accent-on-danger is legible (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette accent on-colors meet WCAG AA against their own fills core.night-registry.css accent-tint → accent-on-tint is legible (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette accent on-colors meet WCAG AA against their own fills core.night-registry.css accent-highlight → accent-on-highlight is legible (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette accent on-colors meet WCAG AA against their own fills core.night-registry.css accent-link → accent-on-link is legible (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette accent on-colors meet WCAG AA against their own fills core.nord.css accent-command → accent-on-command is legible (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette accent on-colors meet WCAG AA against their own fills core.nord.css accent-chat → accent-on-chat is legible (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette accent on-colors meet WCAG AA against their own fills core.nord.css accent-success → accent-on-success is legible (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette accent on-colors meet WCAG AA against their own fills core.nord.css accent-warning → accent-on-warning is legible (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette accent on-colors meet WCAG AA against their own fills core.nord.css accent-danger → accent-on-danger is legible (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette accent on-colors meet WCAG AA against their own fills core.nord.css accent-tint → accent-on-tint is legible (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette accent on-colors meet WCAG AA against their own fills core.registrars-ledger.css accent-command → accent-on-command is legible (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette accent on-colors meet WCAG AA against their own fills core.registrars-ledger.css accent-chat → accent-on-chat is legible (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette accent on-colors meet WCAG AA against their own fills core.registrars-ledger.css accent-success → accent-on-success is legible (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette accent on-colors meet WCAG AA against their own fills core.registrars-ledger.css accent-warning → accent-on-warning is legible (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette accent on-colors meet WCAG AA against their own fills core.registrars-ledger.css accent-danger → accent-on-danger is legible (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette accent on-colors meet WCAG AA against their own fills core.registrars-ledger.css accent-tint → accent-on-tint is legible (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette accent on-colors meet WCAG AA against their own fills core.registrars-ledger.css accent-highlight → accent-on-highlight is legible (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette accent on-colors meet WCAG AA against their own fills core.registrars-ledger.css accent-link → accent-on-link is legible (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette accent on-colors meet WCAG AA against their own fills core.sepia-focus.css accent-command → accent-on-command is legible (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette accent on-colors meet WCAG AA against their own fills core.sepia-focus.css accent-chat → accent-on-chat is legible (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette accent on-colors meet WCAG AA against their own fills core.sepia-focus.css accent-success → accent-on-success is legible (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette accent on-colors meet WCAG AA against their own fills core.sepia-focus.css accent-warning → accent-on-warning is legible (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette accent on-colors meet WCAG AA against their own fills core.sepia-focus.css accent-danger → accent-on-danger is legible (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette accent on-colors meet WCAG AA against their own fills core.sepia-focus.css accent-tint → accent-on-tint is legible (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.cyanotype.css: focus ring on --surface-0 in dark (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.cyanotype.css: focus ring on --surface-1 in dark (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.cyanotype.css: focus ring on --surface-2 in dark (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.cyanotype.css: focus ring on --surface-3 in dark (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.cyanotype.css: focus ring on --surface-4 in dark (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.cyanotype.css: focus ring on --surface-0 in light (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.cyanotype.css: focus ring on --surface-1 in light (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.cyanotype.css: focus ring on --surface-2 in light (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.cyanotype.css: focus ring on --surface-3 in light (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.cyanotype.css: focus ring on --surface-4 in light (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.high-vis.json: focus ring on --surface-0 in dark (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.high-vis.json: focus ring on --surface-1 in dark (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.high-vis.json: focus ring on --surface-2 in dark (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.high-vis.json: focus ring on --surface-3 in dark (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.high-vis.json: focus ring on --surface-4 in dark (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.high-vis.json: focus ring on --surface-0 in light (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.high-vis.json: focus ring on --surface-1 in light (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.high-vis.json: focus ring on --surface-2 in light (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.high-vis.json: focus ring on --surface-3 in light (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.high-vis.json: focus ring on --surface-4 in light (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.night-registry.css: focus ring on --surface-0 in dark (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.night-registry.css: focus ring on --surface-1 in dark (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.night-registry.css: focus ring on --surface-2 in dark (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.night-registry.css: focus ring on --surface-3 in dark (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.night-registry.css: focus ring on --surface-4 in dark (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.night-registry.css: focus ring on --surface-0 in light (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.night-registry.css: focus ring on --surface-1 in light (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.night-registry.css: focus ring on --surface-2 in light (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.night-registry.css: focus ring on --surface-3 in light (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.night-registry.css: focus ring on --surface-4 in light (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.nord.css: focus ring on --surface-0 in dark (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.nord.css: focus ring on --surface-1 in dark (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.nord.css: focus ring on --surface-2 in dark (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.nord.css: focus ring on --surface-3 in dark (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.nord.css: focus ring on --surface-4 in dark (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.nord.css: focus ring on --surface-0 in light (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.nord.css: focus ring on --surface-1 in light (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.nord.css: focus ring on --surface-2 in light (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.nord.css: focus ring on --surface-3 in light (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.nord.css: focus ring on --surface-4 in light (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.registrars-ledger.css: focus ring on --surface-0 in dark (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.registrars-ledger.css: focus ring on --surface-1 in dark (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.registrars-ledger.css: focus ring on --surface-2 in dark (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.registrars-ledger.css: focus ring on --surface-3 in dark (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.registrars-ledger.css: focus ring on --surface-4 in dark (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.registrars-ledger.css: focus ring on --surface-0 in light (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.registrars-ledger.css: focus ring on --surface-1 in light (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.registrars-ledger.css: focus ring on --surface-2 in light (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.registrars-ledger.css: focus ring on --surface-3 in light (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.registrars-ledger.css: focus ring on --surface-4 in light (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.sepia-focus.css: focus ring on --surface-0 in dark (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.sepia-focus.css: focus ring on --surface-1 in dark (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.sepia-focus.css: focus ring on --surface-2 in dark (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.sepia-focus.css: focus ring on --surface-3 in dark (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.sepia-focus.css: focus ring on --surface-4 in dark (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.sepia-focus.css: focus ring on --surface-0 in light (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.sepia-focus.css: focus ring on --surface-1 in light (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.sepia-focus.css: focus ring on --surface-2 in light (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.sepia-focus.css: focus ring on --surface-3 in light (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.sepia-focus.css: focus ring on --surface-4 in light (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "default (no-palette) theme accent on-colors meet WCAG AA in both modes accent-command → accent-on-command is legible in dark (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "default (no-palette) theme accent on-colors meet WCAG AA in both modes accent-command → accent-on-command is legible in light (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "default (no-palette) theme accent on-colors meet WCAG AA in both modes accent-chat → accent-on-chat is legible in dark (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "default (no-palette) theme accent on-colors meet WCAG AA in both modes accent-chat → accent-on-chat is legible in light (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "default (no-palette) theme accent on-colors meet WCAG AA in both modes accent-success → accent-on-success is legible in dark (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "default (no-palette) theme accent on-colors meet WCAG AA in both modes accent-success → accent-on-success is legible in light (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "default (no-palette) theme accent on-colors meet WCAG AA in both modes accent-warning → accent-on-warning is legible in dark (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "default (no-palette) theme accent on-colors meet WCAG AA in both modes accent-warning → accent-on-warning is legible in light (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "default (no-palette) theme accent on-colors meet WCAG AA in both modes accent-danger → accent-on-danger is legible in dark (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "default (no-palette) theme accent on-colors meet WCAG AA in both modes accent-danger → accent-on-danger is legible in light (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "default (no-palette) theme accent on-colors meet WCAG AA in both modes accent-tint → accent-on-tint is legible in dark (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "default (no-palette) theme accent on-colors meet WCAG AA in both modes accent-tint → accent-on-tint is legible in light (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "default (no-palette) theme accent on-colors meet WCAG AA in both modes accent-highlight → accent-on-highlight is legible in dark (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "default (no-palette) theme accent on-colors meet WCAG AA in both modes accent-highlight → accent-on-highlight is legible in light (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "default (no-palette) theme accent on-colors meet WCAG AA in both modes accent-link → accent-on-link is legible in dark (≥ AA)",
+          "status": "passed"
+        },
+        {
+          "name": "default (no-palette) theme accent on-colors meet WCAG AA in both modes accent-link → accent-on-link is legible in light (≥ AA)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "3efe7c90d1",
+    "revision": "3efe7c90d1c26a74eb5d3b78979d0038dbc8f49c",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/themes/builtinPaletteContrast.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/89kyhi17/tmp/test-intent-vitest-64-1794342877821.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 650,
+        "output": "JSON report written to /home/elias/.cache/am/89kyhi17/tmp/test-intent-vitest-64-1794342877821.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/themes/builtinPaletteContrast.test.ts",
+        "classification": "assertion",
+        "detail": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.high-vis.json: focus ring on --surface-3 in light (≥ 3:1):  AssertionError: core.high-vis.json (light): focus ring on --surface-3 is 1.17:1 — below 3:1: expected 1.1671312447736875 to be greater than or equal to 3\n    at /home/elias/.cache/am/89kyhi17/tmp/test-intent-before-AW6yjr/modules/ui-web/src/shell-v0/themes/builtinPaletteContrast.test.ts:193:13\n    a | built-in palette focus rings contrast with their surro"
+      }
+    ]
+  },
+  "digest": "sha256:679ffe26f86b51f0721776a0c8edb0fbb97dfcd0fed79b463dd8072c14f9e26a"
+}
