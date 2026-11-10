@@ -209,12 +209,26 @@ function runChecks(checks, root) {
     const filters = [...new Set(group.map(({ t }) => (t.method ? `${t.fqcn}.${t.method}` : t.fqcn)))];
     const wrapper = IS_WIN ? '.\\gradlew.bat' : './gradlew';
     const { project, task } = group[0].t;
-    const run = sh(`${wrapper} ${project}:${task} ${filters.map((f) => `--tests ${JSON.stringify(f)}`).join(' ')} --rerun -PskipWebBuild=true --console=plain`, root);
+    const command = (filters) => `${wrapper} ${project}:${task} ${filters.map((f) => `--tests ${JSON.stringify(f)}`).join(' ')} --rerun -PskipWebBuild=true --console=plain`;
+    const run = sh(command(filters), root);
     runs.push(run);
     for (const { id, t } of group) {
       const xmlPath = path.join(root, t.resultFile);
       const cases = fs.existsSync(xmlPath) ? selectJUnitCases(parseJUnitXml(fs.readFileSync(xmlPath, 'utf8')), t) : [];
       results.set(id, { runner: 'gradle', cases, buildOutput: run.output });
+    }
+    // Save every grouped result before isolated runs replace a class's report. Custom JUnit
+    // display names can omit the method entirely; Gradle's single-method filter supplies its
+    // identity, and only fresh cases of that exact class belong to the fallback result.
+    for (const { id, t } of group) {
+      if (!t.method || results.get(id).cases.length !== 0) continue;
+      const xmlPath = path.join(root, t.resultFile);
+      fs.rmSync(xmlPath, { force: true });
+      const isolated = sh(command([`${t.fqcn}.${t.method}`]), root);
+      runs.push(isolated);
+      const cases = fs.existsSync(xmlPath)
+        ? parseJUnitXml(fs.readFileSync(xmlPath, 'utf8')).filter((c) => c.classname === t.fqcn) : [];
+      results.set(id, { runner: 'gradle', cases, buildOutput: isolated.output });
     }
   }
   for (const [kind, ids] of vitestFiles) {

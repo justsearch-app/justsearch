@@ -8,7 +8,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { evidenceSelfDigest } from './evidence.mjs';
+import { contentDigest, evidenceSelfDigest, validateEvidence } from './evidence.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const CHECK = 'modules/core/src/test/java/io/x/ProbeTest.java#probe';
@@ -28,6 +28,8 @@ async function fixture(options, check) {
   const root = path.join(scratch, 'repo');
   const beforeRoot = path.join(scratch, 'before');
   const out = path.join(scratch, 'evidence.json');
+  const checks = options.checks ?? [CHECK, ...(options.mixed
+    ? [CHECK.replace('#probe', '#noSuchMethod'), CHECK.replace('#probe', '#skipped')] : [])];
   const env = { ...process.env, LIGHTGBM_NATIVE_LIB_PATH: '', PROBE_NODE: process.execPath,
     PROBE_ROOT: root, PROBE_CONTROL: scratch, PROBE_MODE: options.mode ?? 'assertion',
     PROBE_LOCK: options.lock ? '1' : '' };
@@ -64,6 +66,7 @@ async function fixture(options, check) {
     }
     write('scripts/governance/lib/frontmatter.mjs', fs.readFileSync(path.join(HERE, '../../lib/frontmatter.mjs'), 'utf8'));
     write(CHECK.split('#')[0], '// deterministic CLI boundary fixture\n');
+    for (const id of checks) write(id.split('#')[0], '// deterministic CLI boundary fixture\n');
     write('.gitignore', 'modules/core/build/\n');
     if (options.lfs) {
       const globalConfig = path.join(scratch, 'global.config');
@@ -108,14 +111,47 @@ const failure = !before ? '' : process.env.PROBE_MODE === 'exception'
   ? '<failure type="java.lang.IllegalStateException" message="before probe exploded"/>'
   : '<failure type="org.opentest4j.AssertionFailedError" message="before assertion"/>';
 fs.mkdirSync('modules/core/build/test-results/test', { recursive: true });
-fs.writeFileSync('modules/core/build/test-results/test/TEST-io.x.ProbeTest.xml',
-  '<testsuite><testcase classname="io.x.ProbeTest" name="probe">' + failure + '</testcase><testcase classname="io.x.ProbeTest" name="skipped"><skipped/></testcase></testsuite>');
+const args = process.argv.slice(2);
+const filters = args.flatMap((arg, i) => arg === '--tests' ? [args[i + 1]] : []);
+const selected = name => filters.includes('io.x.ProbeTest') || filters.includes('io.x.ProbeTest.' + name);
+const cases = (selected('probe') ? '<testcase classname="io.x.ProbeTest" name="probe">' + failure + '</testcase>' : '')
+  + (selected('skipped') ? '<testcase classname="io.x.ProbeTest" name="skipped"><skipped/></testcase>' : '');
+if (cases) fs.writeFileSync('modules/core/build/test-results/test/TEST-io.x.ProbeTest.xml', '<testsuite>' + cases + '</testsuite>');
 if (before && process.env.PROBE_MODE === 'exception') console.error('java.lang.IllegalStateException: before probe exploded');
 process.exitCode = before ? 1 : 0;
 `);
-    if (WINDOWS) write('gradlew.bat', '@echo off\n"%PROBE_NODE%" "%~dp0probe.cjs"\nexit /b %errorlevel%\n');
+    if (options.gradle) {
+      write('gradle-fixture.json', JSON.stringify(options.gradle));
+      write('probe.cjs', String.raw`
+const fs = require('node:fs'), path = require('node:path');
+const config = require('./gradle-fixture.json');
+const before = process.cwd() !== process.env.PROBE_ROOT;
+const args = process.argv.slice(2);
+const filters = args.flatMap((arg, i) => arg === '--tests' ? [args[i + 1]] : []);
+const task = config.task ?? 'test', fqcn = config.fqcn ?? 'io.x.ProbeTest';
+const report = 'modules/core/build/test-results/' + task + '/TEST-' + fqcn + '.xml';
+fs.appendFileSync(path.join(process.env.PROBE_CONTROL, 'gradle-runs.jsonl'),
+  JSON.stringify({ before, args, reportExisted: fs.existsSync(report) }) + '\n');
+const cases = Object.entries(config.methods).flatMap(([method, invocations]) =>
+  filters.some(f => f === fqcn || f === fqcn + '.' + method) ? invocations : []);
+if (cases.length) {
+  const xml = cases.map(c => {
+    const status = before ? (c.before ?? c.status ?? 'passed') : (c.status ?? 'passed');
+    const body = status === 'skipped' ? '<skipped/>' : status === 'assertion'
+      ? '<failure type="org.opentest4j.AssertionFailedError" message="expected old behaviour"/>'
+      : status === 'exception' ? '<failure type="java.lang.IllegalStateException"/>' : '';
+    return '<testcase classname="' + (c.classname ?? fqcn) + '" name="' + c.name + '">' + body + '</testcase>';
+  }).join('');
+  fs.mkdirSync(path.dirname(report), { recursive: true });
+  fs.writeFileSync(report, '<testsuite>' + xml + '</testsuite>');
+}
+process.exitCode = cases.length === 0 || cases.some(c =>
+  ['assertion', 'exception'].includes(before ? (c.before ?? c.status) : c.status)) ? 1 : 0;
+`);
+    }
+    if (WINDOWS) write('gradlew.bat', '@echo off\n"%PROBE_NODE%" "%~dp0probe.cjs" %*\nexit /b %errorlevel%\n');
     else {
-      write('gradlew', '#!/bin/sh\nexec "$PROBE_NODE" ./probe.cjs\n');
+      write('gradlew', '#!/bin/sh\nexec "$PROBE_NODE" ./probe.cjs "$@"\n');
       fs.chmodSync(path.join(root, 'gradlew'), 0o755);
     }
     if (options.longPath) {
@@ -198,15 +234,19 @@ try {
       write('added.lfs-test', 'new LFS content\n');
     }
     if (options.missingLfsFormat) git('config', '--unset', 'lfs.repositoryformatversion');
+    if (options.gradle) {
+      const { task = 'test', fqcn = 'io.x.ProbeTest' } = options.gradle;
+      write(`modules/core/build/test-results/${task}/TEST-${fqcn}.xml`,
+        `<testsuite><testcase classname="${fqcn}" name="stale earlier run"/></testsuite>`);
+    }
     const gitBefore = options.lfs ? gitSnapshot(path.join(root, '.git')) : null;
     const gitEvents = [];
     const watcher = options.lfs ? fs.watch(path.join(root, '.git'), { recursive: true },
       (event, file) => gitEvents.push({ event, file })) : null;
     let result;
     try {
-      const child = spawn(process.execPath, [path.join(root, CLI), '--out', out, '--check', CHECK,
-        ...(options.mixed ? ['--check', CHECK.replace('#probe', '#noSuchMethod'),
-          '--check', CHECK.replace('#probe', '#skipped')] : []),
+      const child = spawn(process.execPath, [path.join(root, CLI), '--out', out,
+        ...checks.flatMap(id => ['--check', id]),
         ...(options.candidate ? [] : ['--before', options.invalidRef ? 'NO-SUCH-REVISION' : 'HEAD', '--before-root', beforeRoot])],
       { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] });
       let stdout = '', stderr = '';
@@ -260,6 +300,122 @@ function gitSnapshot(dir) {
     return [rel, fs.statSync(file).isFile() ? fs.readFileSync(file).toString('base64') : null];
   }));
 }
+
+function gradleRuns(scratch) {
+  return fs.readFileSync(path.join(scratch, 'gradle-runs.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
+}
+
+for (const [task, fqcn] of [['test', 'io.x.ProbeTest'], ['integrationTest', 'io.x.IntegrationProbeTest']]) {
+  test(`CLI: ${task} custom display names preserve invocations and assertion fail-before (${fqcn})`, async () => {
+    const id = `modules/core/src/${task}/java/${fqcn.replaceAll('.', '/')}.java#probe`;
+    await fixture({ checks: [id], gradle: { task, fqcn, methods: { probe: [
+      { name: 'case-distinct PDF, configured=false', before: 'assertion' },
+      { name: 'case-distinct PDF, configured=true', before: 'passed' },
+      { name: 'optional invocation', before: 'skipped' },
+    ] } } }, ({ result, output, out, scratch, root }) => {
+      assert.equal(result.status, 0, output);
+      const evidence = readEvidence(out);
+      assert.deepEqual(evidence.checks[0].cases, [
+        { name: 'case-distinct PDF, configured=false', status: 'passed' },
+        { name: 'case-distinct PDF, configured=true', status: 'passed' },
+        { name: 'optional invocation', status: 'passed' },
+      ]);
+      assert.equal(evidence.failBefore.checks[0].classification, 'assertion');
+      assert.equal(evidence.checks[0].contentDigest, contentDigest(fs.readFileSync(path.join(root, id.split('#')[0]), 'utf8')));
+      assert.equal(evidence.producer.scriptDigest, contentDigest(fs.readFileSync(path.join(root, CLI), 'utf8')));
+      for (const runs of [evidence.runs, evidence.failBefore.runs]) {
+        assert.equal(runs.length, 2, 'grouped run plus the isolated fallback must be recorded');
+        for (const run of runs) {
+          assert.ok(run.command.includes(`${fqcn}.probe`));
+          assert.match(run.command, /--rerun -PskipWebBuild=true --console=plain/);
+          assert.match(run.command, /--init-script build\/test-evidence-profile.init.gradle/);
+          assert.ok(run.command.includes(`:modules:core:${task}`));
+        }
+      }
+      assert.equal(gradleRuns(scratch).length, 4);
+      assert.ok(gradleRuns(scratch).every(run => !run.reportExisted), 'every run starts without old class XML');
+      assert.deepEqual(validateEvidence({ evidenceText: fs.readFileSync(out, 'utf8'), evidencePath: out,
+        newChecks: [id], requireFailBefore: true, readWorking: rel => fs.readFileSync(path.join(root, rel), 'utf8') }), []);
+    });
+  });
+}
+
+test('CLI: identical display names, class-wide results and failing siblings stay attributed to their own methods', async () => {
+  const classId = CHECK.split('#')[0];
+  const checks = [CHECK, `${classId}#other`, classId, `${classId}#sibling`];
+  await fixture({ checks, gradle: { methods: {
+    probe: [{ name: 'same display name', before: 'passed' }],
+    other: [{ name: 'same display name', status: 'assertion', before: 'assertion' }],
+    sibling: [{ name: 'sibling()', status: 'assertion', before: 'assertion' }],
+  } } }, ({ result, output, out, scratch }) => {
+    assert.equal(result.status, 1, output);
+    const evidence = readEvidence(out);
+    assert.deepEqual(evidence.checks.map(c => [c.id, c.outcome, c.cases.length]), [
+      [CHECK, 'passed', 1], [checks[1], 'failed', 1], [classId, 'failed', 3], [checks[3], 'failed', 1],
+    ]);
+    assert.deepEqual(evidence.failBefore.checks.map(c => c.classification), ['passed', 'assertion', 'assertion', 'assertion']);
+    for (const runs of [evidence.runs, evidence.failBefore.runs]) {
+      assert.equal(runs.length, 3, 'only the two unmatched methods need fallback');
+      assert.deepEqual(runs.slice(1).map(run => run.command.match(/--tests "([^"]+)"/)[1]), ['io.x.ProbeTest.probe', 'io.x.ProbeTest.other']);
+    }
+    assert.ok(gradleRuns(scratch).every(run => !run.reportExisted));
+  });
+});
+
+test('CLI: absent and excluded methods cannot reuse earlier XML or another classname', async () => {
+  const classId = CHECK.split('#')[0];
+  const checks = [CHECK, `${classId}#noSuchMethod`, `${classId}#excluded`, `${classId}#foreign`];
+  await fixture({ checks, gradle: { methods: {
+    probe: [{ name: 'custom passing invocation', before: 'assertion' }],
+    // An excluded method produces no cases, just like a nonexistent method.
+    excluded: [],
+    foreign: [{ name: 'unrelated class result', classname: 'io.x.ProbeTest$Other', before: 'assertion' }],
+  } } }, ({ result, output, out, scratch }) => {
+    assert.equal(result.status, 1, output);
+    const evidence = readEvidence(out);
+    assert.deepEqual(evidence.checks.map(c => [c.outcome, c.executed, c.cases]), [
+      ['passed', true, [{ name: 'custom passing invocation', status: 'passed' }]],
+      ...checks.slice(1).map(() => ['not-found', false, []]),
+    ]);
+    assert.deepEqual(evidence.failBefore.checks.map(c => c.classification), ['assertion', 'environment', 'environment', 'environment']);
+    assert.equal(evidence.runs.length, 5);
+    assert.equal(evidence.failBefore.runs.length, 5);
+    assert.ok(gradleRuns(scratch).every(run => !run.reportExisted), 'clear both seeded stale XML and XML from the last isolated method');
+  });
+});
+
+test('CLI: custom-named exceptions, passes and absent before results never qualify as assertion evidence', async () => {
+  const classId = CHECK.split('#')[0];
+  const checks = [CHECK, `${classId}#exception`, `${classId}#passed`, `${classId}#absent`];
+  await fixture({ checks, gradle: { methods: {
+    probe: [{ name: 'custom assertion', before: 'assertion' }],
+    exception: [{ name: 'custom exception', before: 'exception' }],
+    passed: [{ name: 'custom pass', before: 'passed' }],
+  } } }, ({ result, output, out }) => {
+    assert.equal(result.status, 1, output);
+    const evidence = readEvidence(out);
+    assert.deepEqual(evidence.checks.map(c => c.outcome), ['passed', 'passed', 'passed', 'not-found']);
+    assert.deepEqual(evidence.failBefore.checks.map(c => c.classification), ['assertion', 'exception', 'passed', 'environment']);
+  });
+});
+
+test('CLI: custom-named skipped, partly skipped and failed invocations retain their real statuses', async () => {
+  const classId = CHECK.split('#')[0];
+  const checks = [CHECK, `${classId}#partly`, `${classId}#failed`];
+  await fixture({ candidate: true, checks, gradle: { methods: {
+    probe: [{ name: 'custom skipped', status: 'skipped' }],
+    partly: [{ name: 'custom skipped', status: 'skipped' }, { name: 'custom passed' }],
+    failed: [{ name: 'custom failed', status: 'assertion' }],
+  } } }, ({ result, output, out, root }) => {
+    assert.equal(result.status, 1, output);
+    const evidence = readEvidence(out);
+    assert.deepEqual(evidence.checks.map(c => c.outcome), ['skipped', 'partly-skipped', 'failed']);
+    assert.deepEqual(evidence.checks.map(c => c.cases.map(c => c.status)), [['skipped'], ['skipped', 'passed'], ['failed']]);
+    const errors = validateEvidence({ evidenceText: fs.readFileSync(out, 'utf8'), evidencePath: out,
+      newChecks: checks, requireFailBefore: false, readWorking: rel => fs.readFileSync(path.join(root, rel), 'utf8') });
+    assert.equal(errors.length, 3, 'the gate still rejects each non-passing check');
+  });
+});
 
 test('CLI: candidate-only LFS hashing leaves Git untouched and preserves the filtered tree', async t => {
   const lfs = spawnSync('git-lfs', ['version'], { encoding: 'utf8' });
