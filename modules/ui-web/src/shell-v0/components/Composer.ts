@@ -68,7 +68,7 @@ export const composerStyles: CSSResult = css`
   }
   .composer textarea:focus {
     outline: 2px solid transparent;
-    border-color: var(--accent-tint);
+    border-color: var(--focus-ring-color);
   }
   .composer button {
     padding: 0.5rem 1rem;

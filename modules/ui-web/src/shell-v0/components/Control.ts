@@ -219,7 +219,7 @@ export class Control extends JfElement {
     }
     /* Keyboard focus indicator — operability is visible, not just functional. */
     button:focus-visible {
-      outline: 2px solid var(--accent-tint);
+      outline: 2px solid var(--focus-ring-color);
       outline-offset: 2px;
       border-radius: 0.25rem;
     }

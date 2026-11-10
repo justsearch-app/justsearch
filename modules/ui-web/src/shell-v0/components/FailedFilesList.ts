@@ -250,7 +250,7 @@ export class FailedFilesList extends JfElement {
     :host([collapsed]) { display: none; }
     .list { max-block-size: var(--frame-failed-list-max); overflow-y: auto; }
     .list:focus { outline: none; }
-    .list:focus-visible { outline: var(--frame-focus-width) solid var(--accent-tint); outline-offset: var(--frame-focus-width); }
+    .list:focus-visible { outline: var(--frame-focus-width) solid var(--focus-ring-color); outline-offset: var(--frame-focus-width); }
     /**
      * Tempdoc 914 D2 — the row STACKS; it is not a two-column flex row.
      *

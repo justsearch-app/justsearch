@@ -176,7 +176,7 @@ export class RunActivity extends JfElement {
     css`
       :host { display: block; }
       section:focus { outline: none; }
-      section:focus-visible { outline: var(--frame-focus-width) solid var(--accent-tint); outline-offset: var(--frame-focus-width); }
+      section:focus-visible { outline: var(--frame-focus-width) solid var(--focus-ring-color); outline-offset: var(--frame-focus-width); }
       .section-label {
         margin: 0.75rem 0 0.25rem 0;
         font-size: var(--font-size-xs);
@@ -222,7 +222,7 @@ export class RunActivity extends JfElement {
       .run > div { min-inline-size: 0; flex: 1; }
       .run.clickable { cursor: pointer; }
       .run.clickable:hover { background: var(--surface-hover); }
-      .run.clickable:focus-visible { outline: var(--frame-focus-width) solid var(--accent-tint); }
+      .run.clickable:focus-visible { outline: var(--frame-focus-width) solid var(--focus-ring-color); }
       .run-title { font-size: var(--font-size-sm); overflow-wrap: anywhere; }
       .meta { margin-block-start: var(--jf-space-1); font-size: var(--font-size-xs); color: var(--text-secondary); }
       .replay { flex: none; font-size: var(--font-size-xs); color: var(--text-secondary); }

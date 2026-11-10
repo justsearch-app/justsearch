@@ -1176,7 +1176,7 @@ export class BrainSurface extends JfElement {
     }
     button.feature-phrase { display: inline; text-align: left; }
     button.feature-phrase:hover, button.step-info:hover { color: var(--text-tint); background: transparent; }
-    button:focus-visible, a:focus-visible { outline: 2px solid var(--text-tint); outline-offset: 4px; }
+    button:focus-visible, a:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 4px; }
     .feature-switch-wrap { display: inline-flex; flex-wrap: wrap; max-width: 100%; align-items: center; vertical-align: middle; margin-inline: 0.4rem; }
     button.feature-switch { border: 1px solid var(--border-subtle); border-radius: 1rem; width: 2rem; height: 1.15rem; padding: 0.1rem; background: var(--surface-tertiary); }
     button.feature-switch span { display: block; width: 0.8rem; height: 0.8rem; border-radius: 50%; background: var(--text-secondary); }

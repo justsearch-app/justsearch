@@ -886,6 +886,8 @@ export class Sv3Main extends JfElement {
            is also the token whose NAME collided: sv3's hover material used to be called --accent,
            so this link painted at 4 % opacity (audit DEFECT-6, fixed in sv3-tokens.css.ts). */
         --accent: var(--info-foreground);
+        /* The shared focus token: this card's rings drew with --accent above before they moved to it. */
+        --focus-ring-color: var(--info-foreground);
         --accent-tint: var(--primary);
         --accent-on-tint: var(--primary-foreground);
         /* Tempdoc 871 §3b — the level-2 "used" marking: an 8 % wash under the row, 16 % behind the
@@ -937,6 +939,7 @@ export class Sv3Main extends JfElement {
         --text-secondary: color-mix(in srgb, var(--secondary-label) 90%, var(--foreground));
         --border-muted: var(--border);
         --accent-primary: var(--ring);
+        --focus-ring-color: var(--ring);
         /* Passed down to the nested <jf-markdown-block> the block renders its content into: it is
            outside the '.sv3-markdown' class bridge, so its tokens arrive here or not at all. The
            component re-points the nested block's --text-primary to its OWN --text-secondary
