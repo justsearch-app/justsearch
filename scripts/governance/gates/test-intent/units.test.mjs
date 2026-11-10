@@ -326,6 +326,8 @@ test('evidence: a valid file passes; each defect is caught', () => {
   assert.deepEqual(v(evidenceFor([rec()])), []);
   assert.equal(v(null).length, 1);
   assert.ok(v(evidenceFor([rec({ executed: false, skipped: true, outcome: 'skipped' })])).length > 0, 'skipped');
+  assert.ok(v(evidenceFor([rec({ executed: false, skipped: true, outcome: 'partly-skipped' })])).length > 0, 'partly skipped');
+  assert.ok(v(evidenceFor([rec({ executed: false, skipped: false, outcome: 'not-found' })])).length > 0, 'unselected');
   assert.ok(v(evidenceFor([rec({ contentDigest: contentDigest('other') })])).length > 0, 'content changed');
   assert.ok(v(evidenceFor([rec({ outcome: 'failed' })])).length > 0, 'failed');
   assert.ok(v(evidenceFor([])).length > 0, 'check missing');
@@ -360,6 +362,16 @@ test('runners: JUnit XML, vitest JSON and libtest parse into cases', () => {
   assert.equal(summarize(selectJUnitCases(cases, { fqcn: 'io.x.ATest', method: 's' })).outcome, 'skipped');
   assert.equal(summarize(selectJUnitCases(cases, { fqcn: 'io.x.ATest' })).outcome, 'partly-skipped');
   assert.equal(summarize([]).outcome, 'not-found');
+  const namedCases = parseJUnitXml('<testsuite>'
+    + '<testcase name="m" classname="io.x.ATest"/>'
+    + '<testcase name="m(int) [1] 42" classname="io.x.ATest"/>'
+    + '<testcase name="m()" classname="io.x.ATest$Inner"/>'
+    + '<testcase name="mOther()" classname="io.x.ATest"/>'
+    + '<testcase name="custom invocation" classname="io.x.ATest"/>'
+    + '<testcase name="m" classname="io.x.OtherTest"/></testsuite>');
+  assert.deepEqual(selectJUnitCases(namedCases, { fqcn: 'io.x.ATest', method: 'm' }).map(c => c.name), ['m', 'm(int) [1] 42', 'm()']);
+  assert.equal(selectJUnitCases(namedCases, { fqcn: 'io.x.ATest' }).length, 5, 'class-wide selection includes nested classes');
+  assert.deepEqual(selectJUnitCases(namedCases, { fqcn: 'io.x.ATest$Inner', method: 'm' }).map(c => c.name), ['m()']);
 
   const vjson = JSON.stringify({ testResults: [{ name: 'F:\\r\\modules\\ui-web\\src\\a.test.ts', status: 'failed', message: '', assertionResults: [
     { fullName: 'a works', title: 'works', status: 'failed', failureMessages: ['AssertionError: expected 1 to be 2'] },
