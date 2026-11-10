@@ -150,11 +150,14 @@ public final class DefaultChildControl implements ChildControl {
   /** Starts the original process; tests control exit and information publication independently. */
   @FunctionalInterface
   interface ProcessStarter {
-    ProcessStarter REAL = (builder, kind) ->
-        CHAT_SERVER_KINDS.contains(kind) && io.justsearch.configuration.PlatformPaths.isWindows()
-            ? WindowsEngineJob.createChat(builder) : BoundChildProcess.start(builder);
+    ProcessStarter REAL = DefaultChildControl::startProcess;
 
     Process start(ProcessBuilder builder, ChildKind kind) throws IOException;
+  }
+
+  private static Process startProcess(ProcessBuilder builder, ChildKind kind) throws IOException {
+    return CHAT_SERVER_KINDS.contains(kind) && io.justsearch.configuration.PlatformPaths.isWindows()
+        ? WindowsEngineJob.createChat(builder) : BoundChildProcess.start(builder);
   }
 
   private final LedgerSink ledger;
