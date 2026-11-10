@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { LitElement, css, html, nothing } from 'lit';
 import { invoke } from '@tauri-apps/api/core';
+import { hasWindowLayer } from '../utils/windowLayer.js';
 
 interface ResetStatus {
   phase: 'idle' | 'requested' | 'incomplete' | 'awaiting_storage' | 'complete';
@@ -35,6 +36,9 @@ class FactoryResetRecovery extends LitElement {
     button:focus-visible { outline: 2px solid var(--accent-tint, Highlight); outline-offset: 3px; }
     button:disabled { cursor: wait; }
     [role='alert'] { border-inline-start: 3px solid currentColor; padding-inline-start: 0.75rem; }
+    /* Desktop: the page's top moves the window and keeps the window layer's controls clear of the page. */
+    .window-top { position: sticky; inset-block-start: 0; z-index: var(--z-glass);
+      block-size: var(--frame-topbar-height); background: var(--surface-1, Canvas); }
     @media (forced-colors: active) {
       :host { color: CanvasText; background: Canvas; }
       button { color: ButtonText; background: ButtonFace; border-color: ButtonText; }
@@ -59,6 +63,7 @@ class FactoryResetRecovery extends LitElement {
     const phase = this.status?.phase;
     const newerVersion = phase === 'incomplete' && this.status?.reason === 'newer_version';
     return html`
+      ${hasWindowLayer() ? html`<div class="window-top" data-tauri-drag-region></div>` : nothing}
       <section aria-labelledby="reset-title">
         <h1 id="reset-title" tabindex="-1">${phase === 'complete' ? 'Reset complete'
           : newerVersion ? 'Update JustSearch or cancel reset'

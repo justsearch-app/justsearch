@@ -94,7 +94,11 @@ function bootFrameHtml() {
         const emit = (map) => [...map].filter(([name]) => names.has(name))
           .map(([name, value]) => `${name}:${value};`).join('')
         const scope = ':is(#boot-frame,#boot-failure)'
+        // The desktop window layer outlives the frame, so it inherits from the root. These defaults
+        // paint it before the application stylesheet; declared first, their layer is the lowest, so
+        // every application and theme layer always wins.
         const tokens = `${scope}{${emit(dark)}}[data-theme="light"] ${scope}{${emit(light)}}`
+          + `@layer boot-defaults{:root{${emit(dark)}}[data-theme="light"]{${emit(light)}}}`
         return html.replaceAll('%JUSTSEARCH_VERSION%', version).replace('%BOOT_FRAME_TOKENS%', tokens)
       },
     },

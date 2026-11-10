@@ -1,0 +1,61 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-10T07:04:09.503Z",
+  "revision": "33671f1dd50147da7fb404d91e7183e0def9a74d",
+  "tree": "260b975daeac8130cde5f97659c1e465ea2f5ea6",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/boot/boot-frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/w438vo5i/tmp/test-intent-vitest-71436-1794294175284.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 74215
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW6 browser runtime has no window layer, drag regions or native commands on any surface",
+      "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:31bce76a84461ce1fab8a5d41b8b77d9fd3dc8b6bafa26b98edee705d36e27b0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SW6 browser runtime has no window layer, drag regions or native commands on any surface",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SA6 rendered shell rejects input until frame hand-off",
+      "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:31bce76a84461ce1fab8a5d41b8b77d9fd3dc8b6bafa26b98edee705d36e27b0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SA6 rendered shell rejects input until frame hand-off",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:db30603cf91ea0f582b777987e3bbc326636f889acd5691b787b1a3c0c72e02b"
+}

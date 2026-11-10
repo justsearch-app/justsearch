@@ -85,10 +85,10 @@ export class StatusPill extends JfElement {
     .transient-action { white-space: nowrap; flex: none; }
     .content { display: inline-flex; align-items: center; gap: var(--jf-space-2); min-width: 0; }
     .trigger.stale { outline: var(--frame-hairline) dashed var(--border-emphasized); }
-    /* The status words stay whole. In the minimal bar the action has its own row. */
+    /* The status words stay whole. In the minimal bar (the top bar's room below 45rem) the action has its own row. */
     .label { white-space: nowrap; flex: none; }
     .notice-below { display: none; }
-    @media (max-width: 719px) {
+    @container (max-width: 44.9375rem) {
       :host { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; }
       .label, .trigger.notice .label { display: none; }
       .trigger { grid-column: 1; grid-row: 1; }
