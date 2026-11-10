@@ -2648,6 +2648,8 @@ mod engine_conn_test_support;
 #[cfg(all(test, target_os = "linux"))]
 mod session_credential_tests;
 #[cfg(test)]
+mod capability_tests;
+#[cfg(test)]
 mod open_guard_tests {
     use super::*;
     use std::fs;

@@ -1,0 +1,76 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-10T11:44:12.482Z",
+  "revision": "825fcfefd185c7c10cdd210e5b867f41101cc6a0",
+  "tree": "96703362aef7ab53432f05602b10d1f55e6b2a98",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/boot/boot-frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/6q0_0se4/tmp/test-intent-vitest-14475-1794310767870.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 284610
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW6 browser runtime has no window layer, drag regions or native commands on any surface",
+      "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c3dfe6d6f0ed8a68281a3fcad7f327be9ebf6568a02cc3b5ce008810eddcacb3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SW6 browser runtime has no window layer, drag regions or native commands on any surface",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SA6 rendered shell rejects input until frame hand-off",
+      "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c3dfe6d6f0ed8a68281a3fcad7f327be9ebf6568a02cc3b5ce008810eddcacb3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SA6 rendered shell rejects input until frame hand-off",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW2 the vendored Tauri drag script is the tauri version Cargo.lock pins, unchanged",
+      "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c3dfe6d6f0ed8a68281a3fcad7f327be9ebf6568a02cc3b5ce008810eddcacb3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SW2 the vendored Tauri drag script is the tauri version Cargo.lock pins, unchanged",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:aaabce09acdd85de385644c36e8d095e84dce2aeb02bd73950a5c062e397e52f"
+}

@@ -11,6 +11,7 @@ import {
   subscribeAppUpdate,
   type AppUpdateStatus,
 } from '../state/appUpdateState.js';
+import { hasWindowLayer } from '../../utils/windowLayer.js';
 import './Button.js';
 
 /** Desktop recovery controls that require no Engine API or surface registry. */
@@ -52,6 +53,9 @@ export class EngineRecovery extends JfElement {
     h1 { font-size: var(--font-size-xl); }
     p { line-height: 1.6; overflow-wrap: anywhere; }
     .actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.5rem; }
+    /* Desktop: the page's top moves the window and keeps the window layer's controls clear of the page. */
+    .window-top { position: sticky; inset-block-start: 0; z-index: var(--z-glass);
+      block-size: var(--frame-topbar-height); background: var(--surface-1); }
   `;
 
   override connectedCallback(): void {
@@ -111,6 +115,7 @@ export class EngineRecovery extends JfElement {
       'install_launching', 'install_launched', 'reconciling',
     ].includes(status?.state ?? '');
     return html`
+      ${hasWindowLayer() ? html`<div class="window-top" data-tauri-drag-region></div>` : nothing}
       <section aria-labelledby="recovery-title" data-testid="engine-recovery">
         <h1 id="recovery-title">${terminal
           ? reasonFor('engine.restart_exhausted').wording

@@ -99,7 +99,7 @@ the top bar (banner), its area switcher (navigation) and the window area (main).
 | Shell part | Responsibility |
 |---|---|
 | Top bar (`chrome/TopBar.ts`, `jf-top-bar`) | Brand; the area switcher; the status pill; Settings; the More (⋯) menu |
-| Area switcher | Search, Library and AI Brain, in that order (Ctrl+1, Ctrl+2, Ctrl+3; tooltips name the shortcut). Below 1000 px only the active area keeps its visible label; below 720 px the bar shows the brand dot, one button naming the active area that opens the three areas as a menu, the pill as an icon, Settings and More |
+| Area switcher | Search, Library and AI Brain, in that order (Ctrl+1, Ctrl+2, Ctrl+3; tooltips name the shortcut). The bar chooses its layout from its own room (after the desktop window controls), measured against the text size: below 1000 px of room at standard text only the active area keeps its visible label; below 720 px the bar shows the brand dot, one button naming the active area that opens the three areas as a menu, the pill as an icon, Settings and More; below 480 px (a 600 px window with enlarged text) that button keeps only its icon and the switcher leaves the centre |
 | More (⋯) menu | System (Health, Activity, Logs), Help & shortcuts (F1) and About; windows contributed by the catalog or plugins under “More”; a Developer group (API explorer, Copy link to this view, Show backend address) only while the developer view tier is on (Settings › Developer › View tier) |
 | Window tab row | A window's own tabs at its top (Library: Folders, Browse; AI Brain: AI Brain, Memory; System: Health, Logs, Activity) and its window actions. Search has none |
 | Stage | The active window; layouts can also compose a second window in a split stage, with a picker for the second pane |
@@ -154,8 +154,25 @@ A settings document from a newer build remains byte-identical through startup an
 reloads: presentation fallback applies its runtime bodies without saving defaults or history.
 Explicit edits during that older-version session can still overwrite the newer document.
 After the first render, navigation and Search loading belong to the shell. Host page-serving
-failure, onboarding, engine loss after mount, and loading-window dragging/controls are outside
-this startup frame's scope.
+failure, onboarding and engine loss after mount are outside this startup frame's scope.
+
+The desktop window has no system title bar. One window layer beside the root, created by the
+page's own script before any application code, holds Minimize, Maximize/Restore and Close at the
+right end of the top area in every window state: the start-up frame, the failure page,
+connecting, engine and reset recovery, and the running app, including the hand-off while the app
+beneath the frame is still blocked. Close hides the window to the tray, as the platform close
+does. The maximize control reads the window's state and follows every change. The empty top area
+of each surface moves the window and a double-click maximizes or restores it; the top bar's
+areas, status pill, Settings, More and their menus never start a drag. The top bar keeps room for
+the controls. They are named icon buttons of one size at any text size, never below a 24 by 24 px
+target, so enlarged text changes the bar's layout rather than their room. They take their colours
+from the surface beneath them: the saved start-up colours while the frame or the failure page
+shows, the app's theme afterwards. Their focus ring uses that surface's text colour, because some
+palettes' accents are too faint on their own surfaces, and is drawn just outside the control, so a
+hover or pressed fill never hides it. In forced colours the ring is the surface's text colour and
+the hover fill is the selected-item pair, which stays distinct from it. The browser has neither
+the controls nor drag regions. While a modal dialog such as Settings is open, the controls wait
+until it closes.
 
 ### Addresses, Back and Forward
 
