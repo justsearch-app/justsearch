@@ -109,6 +109,8 @@ public final class DefaultChildControl implements ChildControl {
   static final Duration GPU_RELEASE_BOUND =
       GPU_POLL_MAX.plus(GPU_POLL_INTERVAL).plus(GPU_READ_BOUND).plusSeconds(1);
   static final int RECENT_EXITS = 32;
+  /** Allow the original Process reaper to publish an exit seen during identity capture. */
+  static final Duration REGISTRATION_EXIT_WAIT = Duration.ofMillis(100);
   private static final Duration GRACE_SLICE = Duration.ofMillis(50);
   private static final Duration CLOSE_WAIT = Duration.ofSeconds(12);
   private static final int MAX_EXECUTABLE = 1024;
@@ -145,6 +147,16 @@ public final class DefaultChildControl implements ChildControl {
     Optional<Boolean> contains(ProcessHandle child);
   }
 
+  /** Starts the original process; tests control exit and information publication independently. */
+  @FunctionalInterface
+  interface ProcessStarter {
+    ProcessStarter REAL = (builder, kind) ->
+        CHAT_SERVER_KINDS.contains(kind) && io.justsearch.configuration.PlatformPaths.isWindows()
+            ? WindowsEngineJob.createChat(builder) : BoundChildProcess.start(builder);
+
+    Process start(ProcessBuilder builder, ChildKind kind) throws IOException;
+  }
+
   private final LedgerSink ledger;
   private final ProcessTerminator terminator;
   private final VramProbe vram;
@@ -154,6 +166,7 @@ public final class DefaultChildControl implements ChildControl {
   private final EngineIdentity owner;
   private final ThreadFactory threads;
   private final JobMembership job;
+  private final ProcessStarter starter;
 
   private final Map<String, Held> live = new ConcurrentHashMap<>();
   /** A root exit does not release the chat role while its observed descendants still run. */
@@ -170,6 +183,12 @@ public final class DefaultChildControl implements ChildControl {
   DefaultChildControl(LedgerSink ledger, ProcessTerminator terminator, VramProbe vram, Clock clock,
       Sleeper sleeper, ManagedChildRegistry registry, EngineIdentity owner, ThreadFactory threads,
       JobMembership job) {
+    this(ledger, terminator, vram, clock, sleeper, registry, owner, threads, job, ProcessStarter.REAL);
+  }
+
+  DefaultChildControl(LedgerSink ledger, ProcessTerminator terminator, VramProbe vram, Clock clock,
+      Sleeper sleeper, ManagedChildRegistry registry, EngineIdentity owner, ThreadFactory threads,
+      JobMembership job, ProcessStarter starter) {
     this.ledger = Objects.requireNonNull(ledger, "ledger");
     this.terminator = Objects.requireNonNull(terminator, "terminator");
     this.vram = Objects.requireNonNull(vram, "vram");
@@ -179,6 +198,7 @@ public final class DefaultChildControl implements ChildControl {
     this.owner = Objects.requireNonNull(owner, "owner");
     this.threads = Objects.requireNonNull(threads, "threads");
     this.job = Objects.requireNonNull(job, "job");
+    this.starter = Objects.requireNonNull(starter, "starter");
   }
 
   /**
@@ -298,8 +318,7 @@ public final class DefaultChildControl implements ChildControl {
     }
     Process process;
     try {
-      process = CHAT_SERVER_KINDS.contains(spec.kind()) && io.justsearch.configuration.PlatformPaths.isWindows()
-          ? WindowsEngineJob.createChat(builder) : BoundChildProcess.start(builder);
+      process = starter.start(builder, spec.kind());
     } catch (IOException | RuntimeException failure) {
       recordStartFailure(childId, spec.kind(), "spawn_failed");
       throw failure;
@@ -338,7 +357,7 @@ public final class DefaultChildControl implements ChildControl {
       recordExit(held, ExitOutcome.Phase.STARTING);
       return held;
     }
-    register(held, manifest);
+    if (!register(held, manifest)) return held;
     if (process instanceof WindowsEngineJob.ChatProcess chat) {
       try {
         chat.resume();
@@ -535,19 +554,26 @@ public final class DefaultChildControl implements ChildControl {
     }
   }
 
-  /** Registers the manifest entry; on failure stops the child (ROLLBACK) and throws. */
-  private void register(Held held, ManifestEntry manifest) throws IOException {
+  /** Registers the manifest entry, or returns false for an early exit; failures roll back. */
+  private boolean register(Held held, ManifestEntry manifest) throws IOException {
     try {
-      ManagedChild entry = ManagedChild.fromProcess(held.process, manifestKind(held.spec.kind()),
-          manifest.endpoint() != null ? manifest.endpoint()
-              : held.spec.stdio() instanceof ChildSpec.Stdio.Pipes ? "stdio" : null,
-          manifest.modelPath(),
-          manifest.declaredConfigHash() != null ? manifest.declaredConfigHash()
-              : argvHash(held.spec.argv()),
-          argvHash(held.spec.argv()));
-      if (held.os.processIdentity().isPresent()
-          && !held.os.processIdentity().equals(Optional.ofNullable(entry.processIdentity())))
-        throw new IOException("Linux child identity changed before registration");
+      ManagedChild entry;
+      try {
+        entry = ManagedChild.fromProcess(held.process, manifestKind(held.spec.kind()),
+            manifest.endpoint() != null ? manifest.endpoint()
+                : held.spec.stdio() instanceof ChildSpec.Stdio.Pipes ? "stdio" : null,
+            manifest.modelPath(),
+            manifest.declaredConfigHash() != null ? manifest.declaredConfigHash()
+                : argvHash(held.spec.argv()),
+            argvHash(held.spec.argv()));
+        if (held.os.processIdentity().isPresent()
+            && !held.os.processIdentity().equals(Optional.ofNullable(entry.processIdentity())))
+          throw new IOException("Linux child identity changed before registration");
+      } catch (IOException | RuntimeException captureFailure) {
+        if (!confirmRegistrationExit(held.process)) throw captureFailure;
+        recordExit(held, ExitOutcome.Phase.STARTING);
+        return false;
+      }
       registry.register(entry);
       boolean exitedWhileRegistering;
       synchronized (held) {
@@ -564,6 +590,7 @@ public final class DefaultChildControl implements ChildControl {
           // The manifest keeps the record; its reconciliation finds the process gone.
         }
       }
+      return true;
     } catch (IOException | RuntimeException failure) {
       Throwable suppressed = null;
       try {
@@ -581,6 +608,17 @@ public final class DefaultChildControl implements ChildControl {
           new ChildRegistrationRefusedException(failure, held);
       if (suppressed != null) refused.addSuppressed(suppressed);
       throw refused;
+    }
+  }
+
+  /** Identity loss alone proves nothing: only the original spawn can confirm its own exit. */
+  private static boolean confirmRegistrationExit(Process process) {
+    if (!process.isAlive()) return true;
+    try {
+      return process.waitFor(REGISTRATION_EXIT_WAIT.toMillis(), TimeUnit.MILLISECONDS);
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      return !process.isAlive();
     }
   }
 
