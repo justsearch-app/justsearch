@@ -14,6 +14,8 @@ import { searchRegister } from './settingsRegister.js';
 type Surface = HTMLElement & { updateComplete: Promise<unknown>; activeCategory: string; activeTab: string };
 let saved: number;
 let refuse: number;
+let holdSaves: boolean;
+let pendingSaves: Array<{ body: { operationKey: string; llm: { contextWindow: number } }; release: (response: Response) => void }>;
 const witness = { acceptedRevision: 0, lastCommittedOperationKey: null };
 const json = (data: unknown, status = 200) => Response.json(data, { status });
 async function settle(el: Surface) {
@@ -45,7 +47,7 @@ function engine(tokens: number | null, reason = 'override') {
   } as unknown as InferenceSnapshot }); __feedContactForTest();
 }
 beforeEach(() => {
-  saved = 4096; refuse = 0; __resetAiStateForTest();
+  saved = 4096; refuse = 0; holdSaves = false; pendingSaves = []; __resetAiStateForTest();
   takeMemberTabIntent('core.brain-surface');
   const labels = Object.fromEntries(readFileSync('../app-api/src/main/resources/messages/registry-surface.en.properties', 'utf8')
     .split('\n').filter(line => line.startsWith('settings.')).map(line => { const i = line.indexOf('='); return [line.slice(0, i), line.slice(i + 1).trim()]; }));
@@ -54,6 +56,7 @@ beforeEach(() => {
     if (String(url).endsWith('/api/settings/v2')) {
       if (init?.method === 'POST') {
         const body = JSON.parse(String(init.body));
+        if (holdSaves) return new Promise<Response>(release => pendingSaves.push({ body, release }));
         if (refuse) return json({ error: 'Reading memory was refused', errorCode: refuse === 409 ? 'VERSION_CONFLICT' : 'SAVE_FAILED' }, refuse);
         saved = body.llm.contextWindow;
         return json({ state: 'COMPLETE', operationKey: body.operationKey,
@@ -63,6 +66,99 @@ beforeEach(() => {
     }
     return json({});
   }));
+});
+
+describe('Reading memory save ownership', () => {
+  async function change(brain: Surface, value: number) {
+    field(brain).value = String(value);
+    field(brain).dispatchEvent(new Event('input'));
+    field(brain).dispatchEvent(new Event('change'));
+    await settle(brain);
+  }
+  async function finish(brain: Surface, status = 200) {
+    await vi.waitFor(() => expect(pendingSaves).toHaveLength(1));
+    const request = pendingSaves.shift()!;
+    if (status === 200) {
+      saved = request.body.llm.contextWindow;
+      request.release(json({ state: 'COMPLETE', operationKey: request.body.operationKey,
+        witness: { acceptedRevision: 1, lastCommittedOperationKey: request.body.operationKey }, llm: { contextWindow: saved } }));
+    } else request.release(json({ error: 'Reading memory was refused', errorCode: status === 409 ? 'VERSION_CONFLICT' : 'SAVE_FAILED' }, status));
+    await settle(brain);
+  }
+  async function poll(brain: Surface) {
+    const reads = () => vi.mocked(fetch).mock.calls.filter(([url, init]) => String(url).endsWith('/api/settings/v2') && init?.method !== 'POST').length;
+    const before = reads();
+    window.dispatchEvent(new Event('focus')); await settle(brain);
+    expect(reads()).toBeGreaterThan(before);
+  }
+  function shown(brain: Surface, value: number, pending = false) {
+    expect(field(brain).value).toBe(String(value));
+    const row = field(brain).closest('.advanced-row')!;
+    expect(row.querySelector('output')?.textContent).toContain(value === 0 ? 'Automatic' : `${new Intl.NumberFormat().format(value)} tokens`);
+    if (pending) expect(row.textContent).toMatch(/not yet saved/i);
+    else expect(row.textContent).not.toMatch(/not yet saved/i);
+  }
+  function error(brain: Surface, status: number) {
+    expect(brain.shadowRoot!.querySelector('jf-error-alert')?.textContent).toMatch(status === 409 ? /Reload and review/ : /refused/);
+  }
+  it.each([500, 409])('one pending change then refusal (%i) restores saved state and accepts the next poll', async status => {
+    const brain = await mount('jf-brain-surface'); await advanced(brain); holdSaves = true;
+    await change(brain, 4097);
+    await finish(brain, status); shown(brain, 4096); error(brain, status);
+    saved = 8192; await poll(brain); shown(brain, 8192); error(brain, status);
+  });
+  it.each([500, 409])('queued changes refused first (%i) never remain displayed or override a poll', async status => {
+    const brain = await mount('jf-brain-surface'); await advanced(brain); holdSaves = true;
+    await change(brain, 4097); await change(brain, 4098); await change(brain, 4099);
+    await finish(brain, status); shown(brain, 4096); error(brain, status);
+    expect(pendingSaves).toHaveLength(0);
+    expect(vi.mocked(fetch).mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1);
+    saved = 8192; await poll(brain); shown(brain, 8192); error(brain, status);
+  });
+  it.each([500, 409])('queued changes refused last (%i) restore the last successful save', async status => {
+    const brain = await mount('jf-brain-surface'); await advanced(brain); holdSaves = true;
+    await change(brain, 4097); await change(brain, 4098); await change(brain, 4099);
+    await finish(brain); expect(saved).toBe(4097);
+    await finish(brain, status); shown(brain, 4097); error(brain, status);
+    saved = 8192; await poll(brain); shown(brain, 8192); error(brain, status);
+  });
+  it('all saves refused, including an explicit retry, leave no queued value behind', async () => {
+    const brain = await mount('jf-brain-surface'); await advanced(brain); holdSaves = true;
+    for (const value of [4097, 8192]) {
+      await change(brain, value); await change(brain, value + 1);
+      await finish(brain, 500); shown(brain, 4096); error(brain, 500);
+      await poll(brain); shown(brain, 4096); error(brain, 500);
+    }
+  });
+  it('a change queued during a successful save stays explicitly unsaved until its own completion', async () => {
+    const brain = await mount('jf-brain-surface'); await advanced(brain); holdSaves = true;
+    await change(brain, 4097); await change(brain, 4098); await change(brain, 4099);
+    shown(brain, 4099, true);
+    await finish(brain); expect(saved).toBe(4097); shown(brain, 4099, true);
+    await poll(brain); shown(brain, 4099, true);
+    await finish(brain); expect(saved).toBe(4099); shown(brain, 4099);
+    await poll(brain); shown(brain, 4099);
+  });
+  it.each([200, 500])('Automatic during a pending save (%i) owns the latest choice without retaining a numeric draft', async status => {
+    const brain = await mount('jf-brain-surface'); await advanced(brain); holdSaves = true;
+    await change(brain, 8192);
+    const automatic = [...brain.shadowRoot!.querySelectorAll<HTMLElement & { label: string; disabled: boolean }>('jf-button')].find(b => b.label === 'Automatic reading memory')!;
+    expect(automatic.disabled).toBe(false);
+    await activate(brain, 'Automatic reading memory'); shown(brain, 0, true);
+    await finish(brain, status);
+    if (status === 200) { shown(brain, 0, true); await finish(brain); shown(brain, 0); }
+    else { shown(brain, 4096); error(brain, status); }
+    await poll(brain); shown(brain, saved);
+  });
+  it('a late refusal returns to the newer saved value already observed by a poll', async () => {
+    engine(4096);
+    const brain = await mount('jf-brain-surface'); await advanced(brain); holdSaves = true;
+    await change(brain, 4097); await change(brain, 4098);
+    saved = 16384; await poll(brain);
+    expect(field(brain).closest('.advanced-row')!.textContent).toContain('Saved: 16,384 tokens.');
+    await finish(brain, 409); shown(brain, 16384); error(brain, 409);
+    await poll(brain); shown(brain, 16384); error(brain, 409);
+  });
 });
 afterEach(() => { document.body.replaceChildren(); takeMemberTabIntent('core.brain-surface'); __resetAiStateForTest(); __resetForTest(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 

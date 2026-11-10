@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:50d139b2765e8cf542ddc51bbf172a675ef389b415ab34fe4acc206118ba41ef"
+    "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
   },
-  "createdAt": "2026-11-10T18:15:29.020Z",
-  "revision": "611a433d52b83eda253c96cc690d03a2d3d1cfa2",
-  "tree": "0bf34bfafd9bfc8b70fd4d4d92058f974f7953fd",
+  "createdAt": "2026-11-10T18:46:22.368Z",
+  "revision": "6e382dc4ad314f24cfb474ec0d0c27f87004e1b0",
+  "tree": "c32816b8c28063b1fe9b50daf4a2d88c9f5918e5",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,16 +18,16 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ContextWindow.home.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/q9b8dqsk/tmp/test-intent-vitest-5-1794334502603.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ContextWindow.home.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/a09elwly/tmp/test-intent-vitest-64-1794336323802.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 1837
+      "durationMs": 4451
     },
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ContextWindow.home-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/q9b8dqsk/tmp/test-intent-vitest-5-1794334504442.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ContextWindow.home-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/a09elwly/tmp/test-intent-vitest-64-1794336328253.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 12941
+      "durationMs": 23463
     }
   ],
   "checks": [
@@ -35,11 +35,55 @@
       "id": "modules/ui-web/src/shell-v0/views/ContextWindow.home.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/ContextWindow.home.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:98e50e141961a390536b743a6fcf9f955a5c12da0960ee6346153c9aadfe76dc",
+      "contentDigest": "sha256:e27916c2e97dde1c0ee47827e77d5bd4db228214c5566b83932f6db1b6807e33",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
+        {
+          "name": "Reading memory save ownership one pending change then refusal (500) restores saved state and accepts the next poll",
+          "status": "passed"
+        },
+        {
+          "name": "Reading memory save ownership one pending change then refusal (409) restores saved state and accepts the next poll",
+          "status": "passed"
+        },
+        {
+          "name": "Reading memory save ownership queued changes refused first (500) never remain displayed or override a poll",
+          "status": "passed"
+        },
+        {
+          "name": "Reading memory save ownership queued changes refused first (409) never remain displayed or override a poll",
+          "status": "passed"
+        },
+        {
+          "name": "Reading memory save ownership queued changes refused last (500) restore the last successful save",
+          "status": "passed"
+        },
+        {
+          "name": "Reading memory save ownership queued changes refused last (409) restore the last successful save",
+          "status": "passed"
+        },
+        {
+          "name": "Reading memory save ownership all saves refused, including an explicit retry, leave no queued value behind",
+          "status": "passed"
+        },
+        {
+          "name": "Reading memory save ownership a change queued during a successful save stays explicitly unsaved until its own completion",
+          "status": "passed"
+        },
+        {
+          "name": "Reading memory save ownership Automatic during a pending save (200) owns the latest choice without retaining a numeric draft",
+          "status": "passed"
+        },
+        {
+          "name": "Reading memory save ownership Automatic during a pending save (500) owns the latest choice without retaining a numeric draft",
+          "status": "passed"
+        },
+        {
+          "name": "Reading memory save ownership a late refusal returns to the newer saved value already observed by a poll",
+          "status": "passed"
+        },
         {
           "name": "Context window has one home Settings links to AI Brain and has no second context control",
           "status": "passed"
@@ -114,7 +158,7 @@
       "id": "modules/ui-web/src/shell-v0/views/ContextWindow.home-lockdown.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/ContextWindow.home-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:0efb748fd8bbd25329055247c4f6ba5061f8dc4fda4e9570ec6aa434c42e5afb",
+      "contentDigest": "sha256:1896e8d58d9a87602ab9c20588dbc41d95bc322e5412e91461e7c2078d869f3a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -126,43 +170,51 @@
         {
           "name": "Settings arrives at Reading memory with focus from Memory tab, without replay on normal return",
           "status": "passed"
+        },
+        {
+          "name": "queued keyboard changes return to saved Reading memory after refusal (500) and the next poll",
+          "status": "passed"
+        },
+        {
+          "name": "queued keyboard changes return to saved Reading memory after refusal (409) and the next poll",
+          "status": "passed"
         }
       ]
     }
   ],
   "failBefore": {
-    "ref": "611a433d52b83eda253c96cc690d03a2d3d1cfa2",
-    "revision": "611a433d52b83eda253c96cc690d03a2d3d1cfa2",
+    "ref": "6e382dc4ad314f24cfb474ec0d0c27f87004e1b0",
+    "revision": "6e382dc4ad314f24cfb474ec0d0c27f87004e1b0",
     "overlays": [],
     "patches": [],
     "runs": [
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ContextWindow.home.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/q9b8dqsk/tmp/test-intent-vitest-5-1794334520172.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ContextWindow.home.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/a09elwly/tmp/test-intent-vitest-64-1794336353896.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 1660,
-        "output": "JSON report written to /home/elias/.cache/am/q9b8dqsk/tmp/test-intent-vitest-5-1794334520172.json\n\n"
+        "durationMs": 2556,
+        "output": "JSON report written to /home/elias/.cache/am/a09elwly/tmp/test-intent-vitest-64-1794336353896.json\n\n"
       },
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ContextWindow.home-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/q9b8dqsk/tmp/test-intent-vitest-5-1794334521832.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ContextWindow.home-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/a09elwly/tmp/test-intent-vitest-64-1794336356452.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 6775,
-        "output": "JSON report written to /home/elias/.cache/am/q9b8dqsk/tmp/test-intent-vitest-5-1794334521832.json\n\n"
+        "durationMs": 25339,
+        "output": "JSON report written to /home/elias/.cache/am/a09elwly/tmp/test-intent-vitest-64-1794336356452.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/views/ContextWindow.home.test.ts",
         "classification": "assertion",
-        "detail": "Context window has one home Settings links to AI Brain and has no second context control:  AssertionError: expected <input …(7)></input> to be null\n    at /home/elias/.cache/am/q9b8dqsk/tmp/test-intent-before-YPrSJn/modules/ui-web/src/shell-v0/views/ContextWindow.home.test.ts:73:70\n    at file:///home/elias/.cache/am/q9b8dqsk/tmp/test-intent-before-YPrSJn/modules/ui-web/node_modules/@vite | Context window has one home Settings search finds context window at the link:  AssertionError: expected '\\"
+        "detail": "Reading memory save ownership queued changes refused first (500) never remain displayed or override a poll:  AssertionError: expected '4099' to be '4096' // Object.is equality\n    at shown (/home/elias/.cache/am/a09elwly/tmp/test-intent-before-qALDA9/modules/ui-web/src/shell-v0/views/ContextWindow.home.test.ts:95:32)\n    at /home/elias/.cache/am/a09elwly/tmp/test-intent-before-qALDA9/modules/ui-web/src/she | Reading memory save ownership queued changes refused first (409) never remain displayed "
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/ContextWindow.home-lockdown.test.ts",
         "classification": "assertion",
-        "detail": "Settings arrives at Reading memory with focus from cold, without replay on normal return:  AssertionError: Settings provides the Reading memory link: expected +0 to be 1 // Object.is equality\n    at /home/elias/.cache/am/q9b8dqsk/tmp/test-intent-before-YPrSJn/modules/ui-web/src/shell-v0/views/ContextWindow.home-lockdown.test.ts:104:75\n    at file:///home/elias/.cache/am/q9b8dqsk/tmp/test- | Settings arrives at Reading memory with focus from Memory tab, without replay on normal return:  Assertion"
+        "detail": "queued keyboard changes return to saved Reading memory after refusal (500) and the next poll:  Error: expected '4098' to be '4096' // Object.is equality\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/.cache/am/a09elwly/tmp/test-intent-before-qALDA9/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3748:47)\n    at /home/elias/.cache/am/a09elwly/tmp/test-intent-before-qALD | queued keyboard changes return to saved Reading memory after refusal (409) and the next poll:  Error: "
       }
     ]
   },
-  "digest": "sha256:44d7138956bcc07ffe1a8e77443a92353969077d82dc9745a0d8b2eb71cfbfb4"
+  "digest": "sha256:2381bb65aed8df5dd0ee406e1f999928e9ddc69400ba0a517ac40ea97cbfc32f"
 }

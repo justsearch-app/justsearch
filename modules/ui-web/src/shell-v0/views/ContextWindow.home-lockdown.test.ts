@@ -137,3 +137,39 @@ it.each(['cold', 'Memory tab'])('Settings arrives at Reading memory with focus f
   expect(replay, 'normal return does not replay arrival focus or highlight').toEqual({ focused: false, animations: 0 });
   expect(errors).toEqual([]);
 }, 60_000);
+
+it.each([500, 409])('queued keyboard changes return to saved Reading memory after refusal (%i) and the next poll', async status => {
+  const { page, errors } = await open();
+  let saved = 4096;
+  let release!: () => void;
+  let posted = false;
+  let reads = 0;
+  const held = new Promise<void>(resolve => { release = resolve; });
+  await page.route(new URL('/api/settings/v2', url).href, async route => {
+    if (route.request().method() === 'POST') {
+      posted = true;
+      await held;
+      await route.fulfill({ status, json: { error: 'Reading memory was refused', errorCode: status === 409 ? 'VERSION_CONFLICT' : 'SAVE_FAILED' } });
+    } else {
+      reads++;
+      await route.fulfill({ json: { ui: {}, llm: { contextWindow: saved }, witness: { acceptedRevision: 0, lastCommittedOperationKey: null } } });
+    }
+  });
+  await page.evaluate(() => window.openContextBrain());
+  const brain = page.locator('jf-brain-surface');
+  await brain.locator('.brain-links button').first().click();
+  const input = brain.locator('#brain-contextWindow');
+  await input.focus(); await input.press('ArrowRight');
+  await expect.poll(() => posted).toBe(true);
+  await input.press('ArrowRight');
+  release();
+  await expect.poll(() => brain.locator('jf-error-alert[tone="error"]').textContent()).toMatch(status === 409 ? /Reload and review/ : /refused/);
+  await expect.poll(() => input.inputValue()).toBe('4096');
+  saved = 8192;
+  const before = reads;
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect.poll(() => reads).toBeGreaterThan(before);
+  await expect.poll(() => input.inputValue()).toBe('8192');
+  expect(await brain.locator('jf-error-alert[tone="error"]').textContent()).toMatch(status === 409 ? /Reload and review/ : /refused/);
+  expect(errors).toEqual([]);
+}, 60_000);

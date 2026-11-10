@@ -1501,9 +1501,10 @@ export class BrainSurface extends JfElement {
     }
     this.rerankerSettings = settings;
     this.settings = { ...(settings.ui ?? {}), mode: getUiMode() } as UiSettings;
-    // Drafts own their values even after focus moves to another surface. Revisions
-    // also cover edits and witnessed saves completed while this read was pending.
-    if (llmRevision === this.llmRevision && this.llmPending === 0 && this.llmDrafts.size === 0) this.llm = (settings.llm ?? {}) as LlmSettings;
+    // Drafts overlay the saved observation separately. A refusal must return to
+    // the latest saved value, including reads received while the save was pending.
+    // Revisions reject reads begun before a newer edit or witnessed completion.
+    if (llmRevision === this.llmRevision) this.llm = (settings.llm ?? {}) as LlmSettings;
   }
 
   /** Only a runtime read started after the last picture change speaks for it; unknown order never does. */
@@ -2515,12 +2516,15 @@ export class BrainSurface extends JfElement {
     } finally {
       ++this.llmRevision;
       --this.llmPending;
+      const queued = this.queuedLlm;
+      this.queuedLlm = null;
       for (const key of Object.keys(updates) as Array<keyof LlmSettings>) {
         if (this.llmDrafts.get(key) === drafts.get(key)) this.llmDrafts.delete(key);
       }
+      // Refusal discards queued Reading memory changes too. Their draft no
+      // longer owns a request and must not mask the saved value or the next poll.
+      if (!completed && (updates.contextWindow !== undefined || queued?.contextWindow !== undefined)) this.llmDrafts.delete('contextWindow');
       this.requestUpdate();
-      const queued = this.queuedLlm;
-      this.queuedLlm = null;
       if (queued && completed) await this.patchLlm(queued);
     }
   }
@@ -3610,13 +3614,13 @@ export class BrainSurface extends JfElement {
     return html`<div class="advanced-row">
       <div><label for=${`brain-${key}`}>${label}</label><p>${description}</p>${key === 'contextWindow' ? this.renderReadingMemoryObservation() : nothing}</div>
       <div class="slider-setting"><input id=${`brain-${key}`} type="range" min=${key === 'maxTokens' ? 16 : 0} max=${Math.max(max, saved ?? 0)} step="1"
-        .value=${String(automatic && key === 'gpuLayers' ? Math.max(max, saved ?? 0) : value ?? 0)} aria-label=${label} aria-valuetext=${shown}
+        .value=${String(automatic && key === 'gpuLayers' ? Math.max(max, saved ?? 0) : value ?? 0)} aria-label=${label} aria-valuetext=${`${shown}${draft == null ? '' : ' · Not yet saved'}`}
         aria-describedby=${key === 'contextWindow' ? 'brain-reading-memory-status brain-reading-memory-help' : nothing}
         @input=${(event: Event) => this.editLlm(key, (event.target as HTMLInputElement).value)}
         @change=${(event: Event) => void this.patchLlm({ [key]: Number((event.target as HTMLInputElement).value) })}>
-        <output for=${`brain-${key}`}>${shown}</output>
-        ${key === 'contextWindow' ? html`<jf-button variant="ghost" label=${`Automatic ${label.toLowerCase()}`} ?disabled=${this.llmPending > 0 || value === 0}
-          .onActivate=${() => void this.patchLlm({ contextWindow: 0 })}>${icon({ name: 'refresh-cw', size: 12 })} Automatic</jf-button>` : nothing}
+        <output for=${`brain-${key}`}>${shown}${draft == null ? nothing : html` · Not yet saved`}</output>
+        ${key === 'contextWindow' ? html`<jf-button variant="ghost" label=${`Automatic ${label.toLowerCase()}`} ?disabled=${value === 0}
+          .onActivate=${() => { this.editLlm(key, '0'); void this.patchLlm({ contextWindow: 0 }); }}>${icon({ name: 'refresh-cw', size: 12 })} Automatic</jf-button>` : nothing}
       </div>
     </div>`;
   }
