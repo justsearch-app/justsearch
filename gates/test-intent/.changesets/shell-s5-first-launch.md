@@ -1002,9 +1002,12 @@ push, fetch or rebase was used.
       "behaviour": "SB2: status polls retain a successful Help count; slow answers survive newer snapshots; successful observations refresh no sooner than 60 seconds, failed or truncated observations become unknown and retry no sooner than 15 seconds. Chromium keeps the first-use view stable across several polls.",
       "sources": [
         {
-          "kind": "owner-words",
-          "location": "task t-20261103-shell agreement",
-          "quote": "The Help count is held independently of the status snapshot. Fetch it once when first use starts needing it. Keep the last successful value while a refresh is pending. Refresh at most once per 60 seconds while first use still needs it. After a failed or truncated answer, the count is unknown until a successful answer, and retry no sooner than 15 seconds later."
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "design decisions of the frame build, within the canonical design",
+          "choice": "The Help count used to leave bundled Help out of the person's own count is held apart from status polls: kept while a refresh is pending, refreshed at most once per 60 seconds while first use needs it, unknown after a failed or truncated answer, retried no sooner than 15 seconds later.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/shell-s5-help-cadence-repaired.json",
@@ -1027,9 +1030,12 @@ push, fetch or rebase was used.
       "behaviour": "An in-flight Help request is aborted when first use stops needing it or the controller disconnects, and late aborted responses never land.",
       "sources": [
         {
-          "kind": "owner-words",
-          "location": "task t-20261103-shell agreement",
-          "quote": "An in-flight request is not aborted just because a new status snapshot arrived; it is aborted only when first use stops needing it or the controller disconnects."
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "design decisions of the frame build, within the canonical design",
+          "choice": "An in-flight Help count request is aborted only when first use stops needing it or the window's frame disconnects, never because a newer status snapshot arrived.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/shell-s5-help-cadence-preserved.json",
