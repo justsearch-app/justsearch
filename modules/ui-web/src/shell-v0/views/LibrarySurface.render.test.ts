@@ -397,8 +397,8 @@ describe('LibrarySurface — the folder row consults enrichment coverage (809 fi
   });
 });
 
-// Upgrade U15/U16: the root row consumes the same retry-wait verdict as the status deck.
-it('library rows describe retry waiting without claiming active indexing', async () => {
+// L1: retry waiting belongs to the library; rows retain their own folder status.
+it('L1 library retry waiting appears once outside folder rows', async () => {
   __resetAiStateForTest();
   const retry = Date.now() + 60_000;
   __feedForTest({ status: { worker: {
@@ -413,13 +413,27 @@ it('library rows describe retry waiting without claiming active indexing', async
   try {
     const root = { pathHash: 'wait-root', collection: 'notes', fileCount: 37,
       indexed: true, inFlightCount: 8, failedCount: 0 } as IndexedRootView;
-    el.roots = [root];
+    el.roots = [root, { ...root, pathHash: 'second-root' }];
     await el.updateComplete;
-    const text = el.shadowRoot?.querySelector('.folder-state')?.textContent ?? '';
-    expect(text).toContain('Waiting to retry');
-    expect(text).toContain('8 remaining');
-    expect(text).toContain(new Date(retry).toLocaleString());
-    expect(text).not.toContain('Indexing');
+    const rows = el.shadowRoot!.querySelectorAll('.folder-state');
+    expect(rows).toHaveLength(2);
+    for (const row of rows) {
+      expect(row.textContent).toContain('Waiting to retry');
+      expect(row.textContent).toContain('8 remaining');
+      expect(row.textContent).not.toContain('files waiting');
+      expect(row.textContent).not.toContain('Next retry');
+    }
+    const once = () => {
+      const text = el.shadowRoot!.textContent!;
+      expect(text.match(/8 files waiting/g)).toHaveLength(1);
+      expect(text.match(/Next retry at/g)).toHaveLength(1);
+      expect(text).not.toContain('Next retry:');
+    };
+    once();
+    expect(el.shadowRoot!.querySelector('.subtitle')?.textContent).toContain('Next retry at');
+    el.reindexOutcome = 'Reindex accepted.';
+    await el.updateComplete;
+    once();
   } finally {
     el.remove();
     __resetAiStateForTest();

@@ -1,0 +1,54 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-10T01:07:16.514Z",
+  "revision": "f68be006c62f6447f38e223050f4f0375f8f9ab6",
+  "tree": "9db86b1c9c3a806a5e8b717c12b37d62c556d38e",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/FailedFilesList.buttons-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/windowfix-w1/tmp/l12-repair/test-intent-vitest-2-1794272830960.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 5552
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/FailedFilesList.buttons-lockdown.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/FailedFilesList.buttons-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:be9aab12ded70449569cdf5e1976493cee46fa85c79226ea720c5b05f38cc6af",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L12 failed-file Cancel/Retry use compact text and shared button styling (light), including narrow/wide-font keyboard focus",
+          "status": "passed"
+        },
+        {
+          "name": "L12 failed-file Cancel/Retry use compact text and shared button styling (dark), including narrow/wide-font keyboard focus",
+          "status": "passed"
+        },
+        {
+          "name": "L12 failed-file Cancel/Retry use compact text and shared button styling (forced), including narrow/wide-font keyboard focus",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:25d1ed96404d407c99826b4d99e725ba16b951164431b8c4413d8b9170489a06"
+}
