@@ -1,0 +1,69 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-10T07:05:20.037Z",
+  "revision": "33671f1dd50147da7fb404d91e7183e0def9a74d",
+  "tree": "4fb92d766e50f7a5b7f1dc3490114c928aae7e9c",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"capability_tests::sw8_window_controls_are_granted_to_the_main_window_only\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 9602
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/capability_tests.rs#capability_tests::sw8_window_controls_are_granted_to_the_main_window_only",
+      "file": "modules/shell/src-tauri/src/capability_tests.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:3f510b193ef12d3b00c9205a4a06da698516f25a03365d6306e8ed4c2e2e8fb3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "capability_tests::sw8_window_controls_are_granted_to_the_main_window_only",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "33671f1dd50147da7fb404d91e7183e0def9a74d",
+    "revision": "33671f1dd50147da7fb404d91e7183e0def9a74d",
+    "overlays": [
+      "modules/shell/src-tauri/src/lib.rs"
+    ],
+    "patches": [],
+    "runs": [
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"capability_tests::sw8_window_controls_are_granted_to_the_main_window_only\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 9673,
+        "output": "\nrunning 1 test\ntest capability_tests::sw8_window_controls_are_granted_to_the_main_window_only ... FAILED\n\nfailures:\n\n---- capability_tests::sw8_window_controls_are_granted_to_the_main_window_only stdout ----\n\nthread 'capability_tests::sw8_window_controls_are_granted_to_the_main_window_only' (75309) panicked at src/capability_tests.rs:78:5:\nassertion `left == right` failed\n  left: []\n right: [\"default\"]\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    capability_tests::sw8_window_controls_are_granted_to_the_main_window_only\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 293 filtered out; finished in 0.00s\n\n\n   Compiling shell v0.3.2 (/home/elias/.cache/am/w438vo5i/tmp/test-intent-before-eEl3IL/modules/shell/src-tauri)\nwarning: function `restart_headless_backend` is never used\n   --> src/lib.rs:978:15\n    |\n978 | pub(crate) fn restart_headless_backend(\n    |               ^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: variants `Configure`, `AssignFailed`, `ResumeFailed`, `Query`, and `Terminate` are never constructed\n  --> src/containment.rs:44:5\n   |\n38 | pub(crate) enum ContainmentError {\n   |                 ---------------- variants in this enum\n...\n44 |     Configure(u32),\n   |     ^^^^^^^^^\n...\n48 |     AssignFailed(u32),\n   |     ^^^^^^^^^^^^\n49 |     /// No primary thread was resumed; the process was terminated and reaped.\n50 |     ResumeFailed(String),\n   |     ^^^^^^^^^^^^\n51 |     /// A job query failed with this Win32 error.\n52 |     Query(u32),\n   |     ^^^^^\n53 |     /// `TerminateJobObject` failed with this Win32 error.\n54 |     Terminate(u32),\n   |     ^^^^^^^^^\n   |\n   = note: `ContainmentError` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis\n\nwarning: method `end` is never used\n   --> src/containment.rs:428:19\n    |\n399 | impl IncarnationJob {\n    | ------------------- method in this implementation\n...\n428 |     pub(crate) fn end(self) -> JobEmpty {\n    |                   ^^^\n\nwarning: method `note_power` is never used\n   --> src/engine_host.rs:595:19\n    |\n133 | impl EngineHost {\n    | --------------- method in this implementation\n...\n595 |     pub(crate) fn note_power(&self, event: supervisor::PowerEvent) {\n    |                   ^^^^^^^^^^\n\nwarning: function `resolve_manifest_path` is never used\n  --> src/platform_paths.rs:97:8\n   |\n97 | pub fn resolve_manifest_path() -> PathBuf {\n   |        ^^^^^^^^^^^^^^^^^^^^^\n\nwarning: field `close_app` is never read\n  --> src/quit.rs:15:18\n   |\n15 |     SessionEnd { close_app: bool },\n   |     ----------   ^^^^^^^^^\n   |     |\n   |     field in this variant\n   |\n   = note: `QuitCause` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis\n\nwarning: fields `started` and `deadline` are never read\n  --> src/quit.rs:70:9\n   |\n69 | pub(crate) struct QuitTicket {\n   |                   ---------- fields in this struct\n70 |     pub started: Instant,\n   |         ^^^^^^^\n71 |     pub deadline: Instant,\n   |         ^^^^^^^^\n\nwarning: methods `suspended_ms_since` and `note_power` are never used\n   --> src/supervisor.rs:643:8\n    |\n599 | pub trait Actuator {\n    |           -------- methods in this trait\n...\n643 |     fn suspended_ms_since(&self, _t0: u64) -> u64 {\n    |        ^^^^^^^^^^^^^^^^^^\n...\n646 |     fn note_power(&self, _event: PowerEvent) {}\n    |        ^^^^^^^^^^\n\nwarning: function `commit_head` is never used\n    --> src/updater.rs:1746:10\n     |\n1746 | async fn commit_head(\n     |          ^^^^^^^^^^^\n\nwarning: function `head_shutdown_receipt_path` is never used\n    --> src/updater.rs:2125:4\n     |\n2125 | fn head_shutdown_receipt_path(app: &AppHandle) -> PathBuf {\n     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nwarning: `shell` (lib test) generated 10 warnings\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 9.60s\n     Running unittests src/lib.rs (/home/elias/.cache/am/w438vo5i/tmp/before-target/debug/deps/shell_lib-3fbd4781eadfa5af)\nerror: test failed, to rerun pass `--lib`\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/shell/src-tauri/src/capability_tests.rs#capability_tests::sw8_window_controls_are_granted_to_the_main_window_only",
+        "classification": "assertion",
+        "detail": "capability_tests::sw8_window_controls_are_granted_to_the_main_window_only:  ---- capability_tests::sw8_window_controls_are_granted_to_the_main_window_only stdout ----\n\nthread 'capability_tests::sw8_window_controls_are_granted_to_the_main_window_only' (75309) panicked at src/capability_tests.rs:78:5:\nassertion `left == right` failed\n  left: []\n right: [\"default\"]\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    capability_tests::sw8_window_controls_are"
+      }
+    ]
+  },
+  "digest": "sha256:b084272e554dce72c4a8d7fed6d63b72b0d0dbc42c3b1f75bc9122341fa8d3c2"
+}

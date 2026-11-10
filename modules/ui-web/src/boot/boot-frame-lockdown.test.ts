@@ -7,16 +7,18 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright-core';
 import { mkdtemp, readFile, readdir, writeFile, rm } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
-let browser: Browser, server: PreviewServer, output: string, url: string, entry: string, builtHtml: string, probe: string, version: string;
+let browser: Browser, server: PreviewServer, output: string, url: string, entry: string, builtHtml: string, probe: string, version: string, dragScript: string;
 const contexts = new Set<BrowserContext>();
+const dragFixture = path.resolve('src/boot/__fixtures__/tauri-drag.js.txt'), dragMarker = '// ---- upstream file below, byte-identical ----\n';
 const key = 'justsearch.bootFrame.v1';
 const secret = 'SECRET-token-key /home/person/private https://secret-host.invalid';
 const saved = { mode: 'light', background: 'rgb(248, 249, 252)', raised: 'rgb(241, 242, 248)', text: 'rgb(20, 24, 32)', muted: 'rgb(50, 55, 65)', border: 'rgb(110, 115, 125)', accent: 'rgb(0, 110, 100)' };
 const catalog = { schemaVersion: '1.0', catalogVersion: 1, namespace: 'registry-surface', primitive: 'Surface', entries: [{ id: 'core.library-surface', presentation: { labelKey: 'registry-surface.library-surface.label', descriptionKey: 'registry-surface.library-surface.description', iconHint: null, category: null }, audience: 'USER', placement: 'RAIL', altitude: 'PRODUCT', consumes: { resources: ['core.indexed-roots'], operations: [], prompts: [], diagnosticChannels: [], conversationShapes: [] }, mountTag: 'jf-library-surface', members: [], riskTier: 'LOW', stateSchema: null, provenance: { tier: 'CORE', contributorId: 'core', version: '1.0', identity: null } }] };
-type Harness = { phase?: string; discoveryHold: boolean; hold: boolean; renderHold: boolean; emit: (payload: unknown) => void; renders: number; samples: string[]; inputs: string[]; calls: string[] };
+type Harness = { phase?: string; discoveryHold: boolean; hold: boolean; renderHold: boolean; emit: (payload: unknown) => void; renders: number; samples: string[]; inputs: string[]; calls: string[]; maximized: boolean; rejections: string[] };
 // Independent inventory of native input paths, including document/window capture listeners.
 const inputTypes = ['keydown', 'keyup', 'keypress', 'pointerdown', 'pointerup', 'pointermove', 'pointercancel',
   'mousedown', 'mouseup', 'click', 'wheel', 'touchstart', 'input', 'dragenter', 'dragover', 'dragleave', 'drop',
@@ -45,6 +47,10 @@ export default env => mergeConfig(original(env), {build:{rollupOptions:{input:{m
   server = await preview({ root, build: { outDir: path.join(output, 'dist') }, preview: { host: '127.0.0.1', port: 0 }, logLevel: 'silent' });
   url = server.resolvedUrls!.local[0]!;
   browser = await chromium.launch({ headless: true });
+  // The native double includes Tauri's own drag-region script (vendored copy of the locked
+  // dependency's file), as the desktop runtime injects it, so drag regions are exercised by the
+  // code that serves them.
+  dragScript = (await readFile(dragFixture, 'utf8')).split(dragMarker)[1]!.replace('__TEMPLATE_os_name__', JSON.stringify('linux'));
 }, 120_000);
 afterEach(async () => {
   // One owner closes each context once, after the test has closed its pages.
@@ -55,7 +61,8 @@ afterAll(async () => {
   if (server) await new Promise<void>((resolve, reject) => server.httpServer.close(error => error ? reject(error) : resolve()));
   if (output) await rm(output, { recursive: true, force: true });
 });
-type Options = { saved?: unknown; os?: 'light' | 'dark'; storageThrows?: boolean; desktop?: boolean; phase?: string; hold?: boolean; renderHold?: boolean; future?: string; settingsFail?: boolean; discoveryHold?: boolean };
+type Options = { saved?: unknown; os?: 'light' | 'dark'; storageThrows?: boolean; desktop?: boolean; phase?: string; hold?: boolean; renderHold?: boolean; future?: string; settingsFail?: boolean; discoveryHold?: boolean;
+  supervisor?: Record<string, unknown>; resetThrows?: boolean; maximized?: boolean; windowRejects?: boolean; theme?: 'light' | 'dark'; storage?: Record<string, string> };
 async function create(options: Options = {}): Promise<Page> {
   const context = await browser.newContext({ colorScheme: options.os ?? 'dark' });
   contexts.add(context);
@@ -63,11 +70,13 @@ async function create(options: Options = {}): Promise<Page> {
   await page.addInitScript(({ options, key, inputTypes }) => {
     if (options.saved !== undefined && !localStorage.getItem(key)) localStorage.setItem(key, JSON.stringify(options.saved));
     if (options.future && !localStorage.getItem('justsearch.userState.v2')) localStorage.setItem('justsearch.userState.v2', options.future);
+    for (const [name, value] of Object.entries(options.storage ?? {})) if (localStorage.getItem(name) === null) localStorage.setItem(name, value);
     if (options.storageThrows) {
       Storage.prototype.getItem = () => { throw new Error('storage denied'); };
       Storage.prototype.setItem = () => { throw new Error('quota denied'); };
     }
-    const h = window.frameHarness = { discoveryHold: !!options.discoveryHold, hold: !!options.hold, renderHold: !!options.renderHold, emit: (_payload: unknown) => {}, renders: 0, samples: [] as string[], inputs: [] as string[], calls: [] as string[] };
+    const h = window.frameHarness = { discoveryHold: !!options.discoveryHold, hold: !!options.hold, renderHold: !!options.renderHold, emit: (_payload: unknown) => {}, renders: 0, samples: [] as string[], inputs: [] as string[], calls: [] as string[], maximized: !!options.maximized, rejections: [] as string[] };
+    window.addEventListener('unhandledrejection', event => h.rejections.push(String(event.reason)));
     const sample = () => {
       const root = document.getElementById('root');
       if (root) h.samples.push(root.querySelector('#boot-frame, #boot-failure, jf-engine-recovery, jf-factory-reset-recovery') ? 'covered' : root.querySelector('jf-shell')?.shadowRoot?.querySelector('jf-top-bar') ? 'rendered' : 'blank');
@@ -109,9 +118,18 @@ async function create(options: Options = {}): Promise<Page> {
       transformCallback: (callback: (event: unknown) => void) => { callbacks.set(++next, callback); return next; },
       invoke: async (command: string, args: { event: string; handler: number }) => {
         h.calls.push(command);
-        if (command === 'factory_reset_status') return { phase: window.frameHarness.phase ?? options.phase ?? 'idle', remaining: [] };
+        // A tiling compositor refuses window state operations: the layer's own commands reject.
+        // Tauri's drag commands only queue a request (tao drag_window returns Ok), so they do nothing.
+        if (options.windowRejects && /\|(is_maximized|minimize|toggle_maximize|close)$/.test(command)) throw new Error('not supported by this compositor');
+        if (options.windowRejects && /\|(start_dragging|internal_toggle_maximize)$/.test(command)) return null;
+        if (command === 'plugin:window|is_maximized') return h.maximized;
+        if (command === 'plugin:window|toggle_maximize' || command === 'plugin:window|internal_toggle_maximize') { h.maximized = !h.maximized; return null; }
+        if (command === 'factory_reset_status') {
+          if (options.resetThrows) throw new Error('reset status unavailable');
+          return { phase: window.frameHarness.phase ?? options.phase ?? 'idle', remaining: [] };
+        }
         if (command === 'plugin:event|listen') { listeners.set(args.event, args.handler); return args.handler; }
-        if (command === 'supervisor_state') return { schemaVersion: 1, kind: 'engine-supervisor-state.v1', supervisor: 'tauri', state: 'running', incarnation: 1, restartCount: 0, maxRestartAttempts: 3 };
+        if (command === 'supervisor_state') return { schemaVersion: 1, kind: 'engine-supervisor-state.v1', supervisor: 'tauri', state: 'running', incarnation: 1, restartCount: 0, maxRestartAttempts: 3, ...options.supervisor };
         if (command === 'api_port') {
           while (h.discoveryHold) await new Promise(resolve => setTimeout(resolve, 10));
           return Number(location.port);
@@ -122,9 +140,10 @@ async function create(options: Options = {}): Promise<Page> {
       },
     } });
   }, { options, key, inputTypes });
+  if (options.desktop !== false) await page.addInitScript({ content: dragScript });
   await page.route(/\/(api|infra|registry)\//, route => {
     const pathname = new URL(route.request().url()).pathname;
-    return route.fulfill({ status: options.settingsFail && pathname === '/api/settings/v2' ? 503 : 200, json: pathname === '/api/registry/surfaces' ? catalog : pathname === '/api/settings/v2' ? { ui: { theme: 'light', highContrast: false } } : {} });
+    return route.fulfill({ status: options.settingsFail && pathname === '/api/settings/v2' ? 503 : 200, json: pathname === '/api/registry/surfaces' ? catalog : pathname === '/api/settings/v2' ? { ui: { theme: options.theme ?? 'light', highContrast: false } } : {} });
   });
   return page;
 }
@@ -165,8 +184,11 @@ it('SA1 SA6 first paint precedes entry and is inert', async () => {
     expect(await page.locator('#boot-frame').count()).toBe(1);
     expect(await page.locator('#boot-frame').evaluate(el => ({ background: getComputedStyle(el).backgroundColor, width: el.getBoundingClientRect().width }))).toEqual({ background: 'rgb(10, 10, 12)', width: 1280 });
     expect(await page.locator('#root button, #root a, #root input, #root [tabindex], #root jf-top-bar').count()).toBe(0);
+    // SW1/SW2: the desktop window layer outside #root holds the page's only controls; the frame stays inert.
+    expect(await page.locator('button, a, input, select, textarea, [tabindex]').evaluateAll(els => els.map(el => el.getAttribute('aria-label')))).toEqual(['Minimize', 'Maximize', 'Close']);
     expect(await page.getByRole('status').textContent()).toBe('Starting');
     await page.keyboard.press('Tab'); expect(await page.locator('#boot-frame :focus').count()).toBe(0);
+    expect(await page.evaluate(() => document.activeElement!.getAttribute('aria-label'))).toBe('Minimize');
   } finally { await page.close(); }
 });
 async function watchShellInput(page: Page) {
@@ -211,9 +233,12 @@ it('SA6 rendered shell rejects input until frame hand-off', async () => {
     expect({ shellFocused: focused.includes('jf-shell'), clicks: await page.locator('jf-shell').getAttribute('data-clicks'),
       keys: await page.locator('jf-shell').getAttribute('data-keys'), menus: await page.locator('jf-top-bar [role="menu"]').count() })
       .toEqual({ shellFocused: false, clicks: '0', keys: '0', menus: 0 });
+    // Tab reaches only the desktop window controls beside the frame (SW2); hand-off leaves focus where it was.
+    const before = await page.evaluateHandle(() => document.activeElement!);
+    expect(await before.evaluate(el => el === document.body || el.closest('#window-controls') !== null)).toBe(true);
     await page.evaluate(() => { window.frameHarness.renderHold = false; }); await page.clock.resume();
     await expect.poll(() => page.locator('#boot-frame, #boot-failure').count()).toBe(0);
-    expect(await page.evaluate(() => document.activeElement!.localName)).toBe('body');
+    expect(await before.evaluate(el => document.activeElement === el)).toBe(true);
     await shellWorksAfterCover(page);
   } finally { await page.close(); }
 });
@@ -498,12 +523,12 @@ it('SA5 live mode contrast and presentation changes survive reload mid-boot', as
     await page.route(`**${entry}`, () => new Promise(() => {}));
     await page.reload({ waitUntil: 'commit' });
     await page.waitForFunction(accent => document.documentElement.getAttribute('data-theme') === 'dark'
-      && document.getElementById('boot-frame')?.style.getPropertyValue('--boot-frame-accent') === accent, cache.accent, { timeout: 4000 });
+      && document.getElementById('boot-frame') && document.documentElement.style.getPropertyValue('--boot-frame-accent') === accent, cache.accent, { timeout: 4000 });
     expect(await page.locator('html').getAttribute('data-theme')).toBe('dark');
-    expect(await page.locator('#boot-frame').evaluate(el => el.style.getPropertyValue('--boot-frame-accent'))).toBe(cache.accent);
+    expect(await page.locator('html').evaluate(el => el.style.getPropertyValue('--boot-frame-accent'))).toBe(cache.accent);
     await page.reload({ waitUntil: 'commit' });
     await page.waitForFunction(accent => document.documentElement.getAttribute('data-theme') === 'dark'
-      && document.getElementById('boot-frame')?.style.getPropertyValue('--boot-frame-accent') === accent, cache.accent, { timeout: 4000 });
+      && document.getElementById('boot-frame') && document.documentElement.style.getPropertyValue('--boot-frame-accent') === accent, cache.accent, { timeout: 4000 });
     expect(await page.evaluate(key => JSON.parse(localStorage.getItem(key)!), key)).toEqual(cache);
   } finally { await page.close(); }
 }, 15_000);
@@ -604,9 +629,9 @@ it('SA5 profile switch and palette changes cache the resulting live colours', as
     const cache = await page.evaluate(key => JSON.parse(localStorage.getItem(key)!), key);
     expect(cache.accent).toBeTruthy();
     await page.route(`**${entry}`, () => new Promise(() => {})); await page.reload({ waitUntil: 'commit' });
-    await page.waitForFunction(accent => document.getElementById('boot-frame')?.style.getPropertyValue('--boot-frame-accent') === accent, cache.accent, { timeout: 4000 });
+    await page.waitForFunction(accent => document.getElementById('boot-frame') && document.documentElement.style.getPropertyValue('--boot-frame-accent') === accent, cache.accent, { timeout: 4000 });
     expect(await page.locator('#boot-frame').count()).toBe(1);
-    expect(await page.locator('#boot-frame').evaluate(el => el.style.getPropertyValue('--boot-frame-accent'))).toBe(cache.accent);
+    expect(await page.locator('html').evaluate(el => el.style.getPropertyValue('--boot-frame-accent'))).toBe(cache.accent);
   } finally { await page.close(); }
 });
 it('SA5 partly failed palette restore leaves the previous cache byte-identical', async () => {
@@ -722,3 +747,482 @@ it('SA7 SA10 deadline survives a long connecting interval before the frame retur
     await expect.poll(() => page.locator('#boot-frame, #boot-failure').count()).toBe(0);
   } finally { release(); await page.close(); }
 }, 15_000);
+
+// Window layer (SW1-SW9). The native double answers window commands; Tauri's real drag script serves drag regions.
+const exhausted = { state: 'exhausted', restartCount: 3 };
+type Surface = { name: string; open: () => Promise<Page>; handOff?: boolean };
+const loaded = (selector: string) => async (page: Page) => { await page.waitForSelector(selector, { state: 'attached' }); return page; };
+const surfaces: Surface[] = [
+  { name: 'start-up frame', open: () => blocked() },
+  { name: 'entry failure', open: async () => { const page = await create(); await page.route(`**${entry}`, route => route.abort()); await page.goto(url); return loaded('#boot-failure')(page); } },
+  { name: 'evaluation failure', open: async () => {
+    const page = await create();
+    await page.route(`**${entry}`, async route => { const response = await route.fetch(); await route.fulfill({ response, body: `import '/fault.js';\n${await response.text()}` }); });
+    await page.route('**/fault.js', route => route.fulfill({ contentType: 'text/javascript', body: 'throw new Error("fault")' }));
+    await page.goto(url); return loaded('#boot-failure')(page);
+  } },
+  { name: 'stalled failure', open: async () => { const page = await create({ hold: true }); await pauseClockBeforeNavigation(page); await page.goto(url); await page.waitForSelector('jf-shell', { state: 'attached' }); await page.clock.fastForward(60_001); return loaded('#boot-failure')(page); } },
+  { name: 'connecting', open: async () => { const page = await create({ discoveryHold: true }); await page.goto(url); return loaded('#root > jf-engine-recovery')(page); } },
+  { name: 'engine terminal', open: async () => { const page = await create({ supervisor: exhausted }); await page.goto(url); return loaded('#root > jf-engine-recovery')(page); } },
+  { name: 'engine not ready', open: async () => { const page = await create({ supervisor: { notReady: 'The index is being checked.' } }); await page.goto(url); return loaded('#root > jf-engine-recovery')(page); } },
+  { name: 'Linux update hold', open: async () => { const page = await create({ supervisor: { state: 'stopped', reason: 'upgrade' } }); await page.goto(url); return loaded('#root > jf-engine-recovery')(page); } },
+  { name: 'reset busy', open: async () => { const page = await create({ phase: 'awaiting_storage' }); await page.goto(url); return loaded('#root > jf-factory-reset-recovery')(page); } },
+  { name: 'reset error', open: async () => { const page = await create({ resetThrows: true }); await page.goto(url); return loaded('#root > jf-factory-reset-recovery')(page); } },
+  { name: 'reset complete', open: async () => { const page = await create({ phase: 'complete' }); await page.goto(url); return loaded('#root > jf-factory-reset-recovery')(page); } },
+  { name: 'running app', open: async () => { const page = await create(); await page.goto(url); await page.waitForSelector('jf-top-bar .more-trigger'); await expect.poll(() => page.locator('#boot-frame').count()).toBe(0); return page; } },
+  { name: 'held hand-off', open: () => heldShell(), handOff: true },
+];
+const controlLabels = (page: Page) => page.locator('#window-controls button').evaluateAll(els => els.map(el => el.getAttribute('aria-label')));
+function control(page: Page, name: string) {
+  // The maximize control is named for what it does next; its own test asserts which.
+  return page.getByRole('region', { name: 'Window' }).getByRole('button', name === 'Maximize' ? { name: /^(Maximize|Restore)$/ } : { name, exact: true });
+}
+/** Window commands that change the window; read-only state queries (is_*) are left out. */
+async function windowCalls(page: Page, from = 0) {
+  return page.evaluate(from => window.frameHarness.calls.slice(from).filter(call => call.startsWith('plugin:window|') && !call.startsWith('plugin:window|is_')), from);
+}
+const callCount = (page: Page) => page.evaluate(() => window.frameHarness.calls.length);
+/** Deepest element at a point across shadow roots, as a real pointer would hit it. */
+async function hitAt(page: Page, x: number, y: number) {
+  return page.evaluate(([x, y]) => {
+    let el = document.elementFromPoint(x, y);
+    while (el?.shadowRoot) { const inner = el.shadowRoot.elementFromPoint(x, y); if (!inner || inner === el) break; el = inner; }
+    return el ? `${el.localName}${el.id ? '#' + el.id : ''}${el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\s+/).join('.') : ''}` : null;
+  }, [x, y] as const);
+}
+/** A primary-button mousedown dispatched at the deepest hit element; returns the drag commands it caused. */
+async function mousedownAt(page: Page, x: number, y: number, detail = 1) {
+  return page.evaluate(([x, y, detail]) => {
+    let el = document.elementFromPoint(x, y);
+    while (el?.shadowRoot) { const inner = el.shadowRoot.elementFromPoint(x, y); if (!inner || inner === el) break; el = inner; }
+    const from = window.frameHarness.calls.length;
+    el!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, composed: true, cancelable: true, button: 0, detail, clientX: x, clientY: y }));
+    return window.frameHarness.calls.slice(from).filter(call => /\|(start_dragging|internal_toggle_maximize)$/.test(call));
+  }, [x, y, detail] as const);
+}
+/** Visible interactive elements in the composed tree whose box starts inside the top area. */
+async function topInteractive(page: Page) {
+  return page.evaluate(() => {
+    const out: { name: string; x: number; y: number; right: number; bottom: number; left: number; top: number }[] = [];
+    const selector = 'button, a[href], input, select, textarea, summary, label, [role="button"], [role^="menuitem"], [role="tab"], [tabindex]:not([tabindex="-1"]), [role="menu"], .group-label';
+    // An inert subtree (the app beneath the start-up frame) has no reachable controls.
+    const inert = (el: Element) => { for (let node: Element | null = el; node; node = node.parentElement ?? ((node.getRootNode() as ShadowRoot).host ?? null)) if ((node as HTMLElement).inert) return true; return false; };
+    const limit = parseFloat(getComputedStyle(document.documentElement).fontSize) * 3.5;
+    const visit = (root: Document | ShadowRoot) => root.querySelectorAll('*').forEach(el => {
+      if (el.matches(selector)) {
+        const r = el.getBoundingClientRect();
+        if (r.width > 0 && r.height > 0 && r.top < limit && getComputedStyle(el).visibility !== 'hidden' && !inert(el)) {
+          out.push({ name: el.getAttribute('aria-label') ?? el.textContent!.trim().slice(0, 30) ?? el.localName, x: r.left + r.width / 2, y: r.top + r.height / 2, left: r.left, right: r.right, top: r.top, bottom: r.bottom });
+          // A menu's padding and labels are part of the menu, never a drag region.
+          if (el.matches('[role="menu"]')) out.push({ name: 'menu padding', x: r.left + 2, y: r.top + 2, left: r.left, right: r.right, top: r.top, bottom: r.bottom });
+        }
+      }
+      if (el.shadowRoot) visit(el.shadowRoot);
+    });
+    visit(document);
+    return out;
+  });
+}
+async function expectHandOffHeld(page: Page) {
+  expect({ frame: await page.locator('#boot-frame').count(), inert: await page.locator('jf-shell').evaluate(el => (el as HTMLElement).inert),
+    inputs: await page.evaluate(() => window.frameHarness.inputs) }).toEqual({ frame: 1, inert: true, inputs: [] });
+}
+
+for (const surface of surfaces) it(`SW1 SW2 SW3 SW7 window controls send their command on ${surface.name}, by pointer and keyboard`, async () => {
+  const page = await surface.open();
+  try {
+    expect(await controlLabels(page)).toEqual(['Minimize', 'Maximize', 'Close']);
+    if (surface.handOff) await page.evaluate(() => { window.frameHarness.inputs.length = 0; });
+    for (const [name, command] of [['Minimize', 'minimize'], ['Maximize', 'toggle_maximize'], ['Close', 'close']] as const) {
+      for (const how of ['pointer', 'Enter', 'Space'] as const) {
+        const from = await callCount(page);
+        const button = control(page, name);
+        if (how === 'pointer') { const box = (await button.boundingBox())!; await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2); }
+        else { await button.focus(); await page.keyboard.press(how); }
+        // Exactly one native command per activation; the tray close path is the platform close request.
+        await expect.poll(() => windowCalls(page, from), { timeout: 2000 }).toEqual([`plugin:window|${command}`]);
+      }
+    }
+    if (surface.handOff) await expectHandOffHeld(page);
+    // SW7: no control or listener asks for the window to be shown, focused or restored.
+    expect([...new Set(await windowCalls(page))].sort()).toEqual(['plugin:window|close', 'plugin:window|minimize', 'plugin:window|toggle_maximize']);
+  } finally { await page.close(); }
+}, 20_000);
+
+for (const surface of surfaces) it(`SW1 SW2 top area of ${surface.name} moves the window; interactive controls never start a drag`, async () => {
+  const page = await surface.open();
+  try {
+    if (surface.handOff) await page.evaluate(() => { window.frameHarness.inputs.length = 0; });
+    const root = parseFloat(await page.evaluate(() => getComputedStyle(document.documentElement).fontSize));
+    // An empty point at the start of the top area, beside the brand where there is one.
+    const point = { x: root * 0.5, y: root * 0.5 };
+    let from = await callCount(page);
+    await page.mouse.move(point.x, point.y); await page.mouse.down(); await page.mouse.up();
+    expect(await windowCalls(page, from)).toEqual(['plugin:window|start_dragging']);
+    from = await callCount(page);
+    await page.mouse.dblclick(point.x, point.y);
+    expect(await windowCalls(page, from)).toEqual(['plugin:window|start_dragging', 'plugin:window|internal_toggle_maximize']);
+    const check = async (state: string) => {
+      const targets = await topInteractive(page);
+      expect(targets.length, state).toBeGreaterThan(0);
+      for (const target of targets) expect({ state, target: target.name, drag: await mousedownAt(page, target.x, target.y), detail: await mousedownAt(page, target.x, target.y, 2) })
+        .toEqual({ state, target: target.name, drag: [], detail: [] });
+    };
+    await check('closed');
+    if (surface.name === 'running app') {
+      await page.locator('jf-top-bar .more-trigger').click();
+      await page.waitForSelector('jf-top-bar [role="menu"]');
+      await check('more menu');
+      await page.keyboard.press('Escape');
+      await page.setViewportSize({ width: 600, height: 400 });
+      await page.locator('jf-top-bar .area-trigger').click();
+      await page.waitForSelector('jf-top-bar [role="menu"]');
+      await check('areas menu');
+    }
+    if (surface.handOff) await expectHandOffHeld(page);
+  } finally { await page.close(); }
+}, 20_000);
+
+it('SW2 the vendored Tauri drag script is the tauri version Cargo.lock pins, unchanged', async () => {
+  const [header, upstream] = (await readFile(dragFixture, 'utf8')).split(dragMarker);
+  const locked = (await readFile(path.resolve('../shell/src-tauri/Cargo.lock'), 'utf8')).match(/name = "tauri"\nversion = "([^"]+)"/)![1];
+  expect(header!.match(/^\/\/ Version: tauri (\S+)$/m)?.[1]).toBe(locked);
+  expect(createHash('sha256').update(upstream!).digest('hex')).toBe(header!.match(/^\/\/ Upstream sha256: ([0-9a-f]{64})$/m)?.[1]);
+});
+it('SW2 controls and moving keep working after the hand-off releases the app', async () => {
+  const page = await heldShell();
+  try {
+    expect(await controlLabels(page)).toEqual(['Minimize', 'Maximize', 'Close']);
+    await control(page, 'Minimize').click();
+    await releaseShell(page);
+    expect(await page.locator('jf-shell').evaluate(el => (el as HTMLElement).inert)).toBe(false);
+    const from = await callCount(page);
+    await control(page, 'Close').click();
+    await page.mouse.move(8, 8); await page.mouse.down(); await page.mouse.up();
+    expect(await windowCalls(page, from)).toEqual(['plugin:window|close', 'plugin:window|start_dragging']);
+    await shellWorksAfterCover(page);
+  } finally { await page.close(); }
+});
+
+for (const where of ['running app', 'entry failure', 'start-up frame']) it(`SW4 maximize control follows the real window state on ${where}`, async () => {
+  const page = await (where === 'start-up frame' ? blocked({ maximized: true }) : (async () => {
+    const page = await create({ maximized: true });
+    if (where === 'entry failure') await page.route(`**${entry}`, route => route.abort());
+    await page.goto(url); await page.waitForSelector(where === 'entry failure' ? '#boot-failure' : 'jf-top-bar');
+    return page;
+  })());
+  try {
+    // Saved state restored the window maximized before it was shown.
+    await expect.poll(() => controlLabels(page)).toEqual(['Minimize', 'Restore', 'Close']);
+    expect(await page.locator('#window-controls [aria-label="Restore"]').getAttribute('title')).toBe('Restore');
+    // Another means (keyboard, desktop, compositor) restores it; the window resizes.
+    await page.evaluate(() => { window.frameHarness.maximized = false; });
+    await page.setViewportSize({ width: 1200, height: 760 });
+    await expect.poll(() => controlLabels(page)).toEqual(['Minimize', 'Maximize', 'Close']);
+    // The control maximizes; the window's resize reports the new state.
+    await control(page, 'Maximize').click();
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await expect.poll(() => controlLabels(page)).toEqual(['Minimize', 'Restore', 'Close']);
+    // Double-click on the top area restores it.
+    await page.mouse.dblclick(8, 8);
+    await page.setViewportSize({ width: 1200, height: 760 });
+    await expect.poll(() => controlLabels(page)).toEqual(['Minimize', 'Maximize', 'Close']);
+    expect(await page.evaluate(() => window.frameHarness.maximized)).toBe(false);
+  } finally { await page.close(); }
+});
+
+for (const surface of [surfaces[0]!, surfaces[1]!, surfaces[11]!]) it(`SW9 refused window operations on ${surface.name} do nothing harmful and raise no error`, async () => {
+  const page = await (surface.name === 'start-up frame' ? blocked({ windowRejects: true }) : (async () => {
+    const page = await create({ windowRejects: true });
+    if (surface.name === 'entry failure') await page.route(`**${entry}`, route => route.abort());
+    await page.goto(url); await page.waitForSelector(surface.name === 'entry failure' ? '#boot-failure' : 'jf-top-bar');
+    return page;
+  })());
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  try {
+    expect(await controlLabels(page)).toEqual(['Minimize', 'Maximize', 'Close']);
+    for (const name of ['Minimize', 'Maximize', 'Close']) await control(page, name).click();
+    await page.mouse.dblclick(8, 8);
+    await expect.poll(() => windowCalls(page)).toHaveLength(5);
+    await page.waitForTimeout(100);
+    // Only the refusals matter here; unrelated harness rejections (no event-plugin internals) are not this check's.
+    const rejections = (await page.evaluate(() => window.frameHarness.rejections)).filter(reason => reason.includes('compositor'));
+    expect({ errors, rejections, labels: await controlLabels(page) })
+      .toEqual({ errors: [], rejections: [], labels: ['Minimize', 'Maximize', 'Close'] });
+  } finally { await page.close(); }
+});
+
+it('SW6 browser runtime has no window layer, drag regions or native commands on any surface', async () => {
+  for (const state of ['frame', 'failure', 'app'] as const) {
+    const page = state === 'frame' ? await blocked({ desktop: false }) : await create({ desktop: false });
+    const errors: string[] = [];
+    page.on('pageerror', error => errors.push(error.message));
+    try {
+      if (state === 'failure') { await page.route(`**${entry}`, route => route.abort()); await page.goto(url); await page.waitForSelector('#boot-failure'); }
+      if (state === 'app') { await page.goto(`${url}?api_port=${new URL(url).port}`); await page.waitForSelector('jf-top-bar .more-trigger'); await expect.poll(() => page.locator('#boot-frame').count()).toBe(0); }
+      const found = await page.evaluate(() => {
+        const out: string[] = [];
+        const visit = (root: Document | ShadowRoot) => root.querySelectorAll('*').forEach(el => {
+          if (el.hasAttribute('data-tauri-drag-region') || el.id === 'window-controls') out.push(el.localName);
+          if (el.shadowRoot) visit(el.shadowRoot);
+        });
+        visit(document);
+        return { out, reserved: getComputedStyle(document.documentElement).getPropertyValue('--window-controls-inline').trim(), attribute: document.documentElement.hasAttribute('data-window-controls') };
+      });
+      expect({ state, found, errors }).toEqual({ state, found: { out: [], reserved: '', attribute: false }, errors: [] });
+      expect(await page.getByRole('region', { name: 'Window' }).count()).toBe(0);
+    } finally { await page.close(); }
+  }
+}, 20_000);
+
+it('SW5 every control is reachable by keyboard in order, with a visible focus ring, after the app and on the failure page', async () => {
+  const page = await create();
+  try {
+    await page.goto(url); await page.waitForSelector('jf-top-bar .more-trigger'); await expect.poll(() => page.locator('#boot-frame').count()).toBe(0);
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    const order: (string | null)[] = [];
+    for (let i = 0; i < 3; i++) { await page.keyboard.press('Shift+Tab'); order.push(await page.evaluate(() => document.activeElement!.getAttribute('aria-label'))); }
+    expect(order).toEqual(['Close', 'Maximize', 'Minimize']);
+    for (const name of ['Minimize', 'Maximize', 'Close']) {
+      await control(page, name).focus();
+      expect(await control(page, name).evaluate(el => { const s = getComputedStyle(el); return { style: s.outlineStyle, width: parseFloat(s.outlineWidth) >= 2, visible: el.matches(':focus-visible') }; }))
+        .toEqual({ style: 'solid', width: true, visible: true });
+    }
+  } finally { await page.close(); }
+  const failed = await create();
+  try {
+    await failed.route(`**${entry}`, route => route.abort()); await failed.goto(url); await failed.waitForSelector('#boot-failure');
+    expect(await failed.locator(':focus').textContent()).toBe('Reload');
+    const order: (string | null)[] = [];
+    for (let i = 0; i < 4; i++) { await failed.keyboard.press('Tab'); order.push(await failed.evaluate(() => document.activeElement!.getAttribute('aria-label') ?? document.activeElement!.textContent)); }
+    expect(order).toEqual(['Copy report', 'Minimize', 'Maximize', 'Close']);
+  } finally { await failed.close(); }
+});
+
+const roomSurfaces = [surfaces[1]!, surfaces[5]!, surfaces[10]!, surfaces[11]!, surfaces[0]!];
+for (const os of ['dark', 'light'] as const) for (const forced of [false, true]) for (const surface of roomSurfaces) it(`SW5 X1 X2 ${surface.name} ${os} forced=${forced}: controls fit at every size and enlarged text, axe clean`, async () => {
+  const page = await (async () => {
+    if (surface.name === 'start-up frame') return blocked({ os });
+    const page = await create({ os, supervisor: surface.name === 'engine terminal' ? exhausted : undefined, phase: surface.name === 'reset complete' ? 'complete' : undefined });
+    if (surface.name === 'entry failure') await page.route(`**${entry}`, route => route.abort());
+    await page.goto(url);
+    await page.waitForSelector({ 'entry failure': '#boot-failure', 'engine terminal': '#root > jf-engine-recovery', 'reset complete': '#root > jf-factory-reset-recovery', 'running app': 'jf-top-bar .more-trigger' }[surface.name]!);
+    if (surface.name === 'running app') await expect.poll(() => page.locator('#boot-frame').count()).toBe(0);
+    return page;
+  })();
+  try {
+    expect(await controlLabels(page)).toEqual(['Minimize', 'Maximize', 'Close']);
+    await page.emulateMedia({ forcedColors: forced ? 'active' : 'none', reducedMotion: 'reduce' });
+    if (surface.name !== 'start-up frame') await page.addScriptTag({ content: await readFile(path.resolve('node_modules/axe-core/axe.min.js'), 'utf8') });
+    const sizes: Record<string, string> = {};
+    for (const width of [1280, 900, 600]) for (const text of ['100%', '200%']) {
+      await page.setViewportSize({ width, height: width === 600 ? 400 : 800 });
+      await page.evaluate(text => { document.documentElement.style.fontSize = text; }, text);
+      const state = `${width} ${text}`;
+      const layer = (await page.locator('#window-controls').boundingBox())!;
+      expect({ state, inside: layer.x >= 0 && layer.x + layer.width <= width + 0.5 && layer.y >= 0, overflow: await page.evaluate(() => document.documentElement.scrollWidth > innerWidth) })
+        .toEqual({ state, inside: true, overflow: false });
+      // Nothing interactive in the top area is covered: each control's centre still hits itself.
+      for (const target of await topInteractive(page)) {
+        const overlaps = target.left < layer.x + layer.width && target.right > layer.x && target.top < layer.y + layer.height && target.bottom > layer.y;
+        const inLayer = ['Minimize', 'Maximize', 'Close'].includes(target.name);
+        expect({ state, target: target.name, overlaps: inLayer ? false : overlaps, inView: target.right <= width + 0.5 && target.left >= -0.5 }).toEqual({ state, target: target.name, overlaps: false, inView: true });
+      }
+      // The room the bar reserves leaves its own controls apart from each other, as in the browser bar.
+      const targets = (await topInteractive(page)).filter(target => target.name !== 'menu padding');
+      const crowded = targets.flatMap((a, i) => targets.slice(i + 1).filter(b => a.left < b.right - 1 && a.right > b.left + 1 && a.top < b.bottom - 1 && a.bottom > b.top + 1).map(b => `${a.name} × ${b.name}`));
+      expect({ state, crowded }).toEqual({ state, crowded: [] });
+      // Recovery actions stay clear of the layer and reachable (the app's top bar is checked above).
+      for (const button of surface.name === 'running app' ? [] : await page.locator('#root button, #root jf-button').all()) {
+        if (!await button.isVisible()) continue;
+        await button.scrollIntoViewIfNeeded();
+        const box = (await button.boundingBox())!;
+        const hit = await hitAt(page, box.x + box.width / 2, box.y + box.height / 2);
+        expect({ state, hit: hit?.startsWith('button') || hit?.startsWith('jf-button') || false, clear: box.y >= layer.y + layer.height - 0.5 || box.x + box.width <= layer.x })
+          .toEqual({ state, hit: true, clear: true });
+      }
+      for (const name of ['Minimize', 'Maximize', 'Close']) {
+        const button = control(page, name);
+        expect({ state, name, visible: await button.isVisible(), transition: await button.evaluate(el => getComputedStyle(el).transitionDuration) }).toEqual({ state, name, visible: true, transition: '0s' });
+        // Named icon buttons keep one size at any text size, never below the 24 × 24 px target.
+        const box = (await button.boundingBox())!;
+        sizes[name] ??= `${box.width}×${box.height}`;
+        expect({ state, name, size: `${box.width}×${box.height}`, target: box.width >= 24 && box.height >= 24 }).toEqual({ state, name, size: sizes[name], target: true });
+        if (!forced) {
+          // Glyph contrast against the surface painted beneath the layer.
+          const ratio = await button.evaluate(el => {
+            const ctx = document.createElement('canvas').getContext('2d')!;
+            const rgba = (value: string) => { ctx.clearRect(0, 0, 1, 1); ctx.fillStyle = value; ctx.fillRect(0, 0, 1, 1); return [...ctx.getImageData(0, 0, 1, 1).data]; };
+            const lum = (v: number[]) => { const l = v.slice(0, 3).map(c => { c /= 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; }); return l[0]! * .2126 + l[1]! * .7152 + l[2]! * .0722; };
+            const r = el.getBoundingClientRect();
+            el.closest<HTMLElement>('#window-controls')!.style.visibility = 'hidden';
+            let under = document.elementFromPoint(r.left + 1, r.top + 1);
+            while (under?.shadowRoot) { const inner = under.shadowRoot.elementFromPoint(r.left + 1, r.top + 1); if (!inner || inner === under) break; under = inner; }
+            el.closest<HTMLElement>('#window-controls')!.style.visibility = '';
+            let bg = [0, 0, 0, 0];
+            for (let node: Element | null = under; node && bg[3] === 0; node = node.parentElement ?? ((node.getRootNode() as ShadowRoot).host ?? null)) bg = rgba(getComputedStyle(node).backgroundColor);
+            const fg = rgba(getComputedStyle(el).color);
+            const a = lum(fg), b = lum(bg);
+            return (Math.max(a, b) + .05) / (Math.min(a, b) + .05);
+          });
+          expect({ state, name, ok: ratio >= 4.5 }).toEqual({ state, name, ok: true });
+        }
+      }
+      if (surface.name !== 'start-up frame') {
+        // The layer itself is clean, and it adds no page violation. Recovery and reset pages carry
+        // their own landmark findings from before the layer; those are compared, not hidden.
+        const audit = await page.evaluate(async () => {
+          type Axe = { run: (context?: unknown) => Promise<{ violations: { id: string }[] }> };
+          const axe = (window as unknown as { axe: Axe }).axe;
+          const ids = async (context?: unknown) => (await axe.run(context ?? document)).violations.map(v => v.id).sort();
+          const layer = document.getElementById('window-controls')!;
+          const own = await ids({ include: [['#window-controls']] });
+          const withLayer = await ids();
+          const bands = [...document.querySelectorAll<HTMLElement>('.boot-window-top')];
+          const next = layer.nextSibling;
+          layer.remove(); bands.forEach(band => { band.hidden = true; });
+          const without = await ids();
+          next ? next.before(layer) : document.body.append(layer); bands.forEach(band => { band.hidden = false; });
+          return { own, added: withLayer.filter(id => !without.includes(id)), withLayer };
+        });
+        expect({ state, own: audit.own, added: audit.added }).toEqual({ state, own: [], added: [] });
+        // The failure page was fully clean before the layer (SA11); the app keeps its measured-axe baseline.
+        if (surface.name === 'entry failure') expect({ state, all: audit.withLayer }).toEqual({ state, all: [] });
+      }
+    }
+    // Forced colours: the ring is the surface's text colour, drawn outside the control.
+    if (forced) expect(await control(page, 'Close').evaluate(el => { el.focus(); const s = getComputedStyle(el); return { color: s.outlineColor, outside: parseFloat(s.outlineOffset) > 0 }; }))
+      .toEqual({ color: await page.evaluate(() => { const probe = document.createElement('span'); probe.style.color = 'CanvasText'; document.body.append(probe); const c = getComputedStyle(probe).color; probe.remove(); return c; }), outside: true });
+  } finally { await page.close(); }
+}, 30_000);
+
+// X1 SW5: the layer takes its colours from the surface beneath it, for every shipped palette and state.
+const shippedPalettes = (JSON.parse(readFileSync(path.resolve('public/themes/manifest.json'), 'utf8')) as { themes: { id: string }[] }).themes.map(theme => theme.id);
+/**
+ * Each control's icon, hover, pressed and focus ring against what is painted behind it, in normal
+ * and forced colours, alone and with keyboard focus kept while the pointer hovers or presses: the
+ * icon at least 4.5:1 against its fill; the ring at least 4.5:1 alone and, over a fill, at least
+ * 3:1 against both the fill and the surface beside it.
+ */
+async function controlContrasts(page: Page, surface: string) {
+  const failures: string[] = [];
+  const away = { x: 1, y: page.viewportSize()!.height - 1 };
+  for (const forced of [false, true]) {
+    await page.emulateMedia({ forcedColors: forced ? 'active' : 'none' });
+    for (const name of ['Minimize', 'Maximize', 'Close']) {
+      const button = control(page, name);
+      const box = (await button.boundingBox())!;
+      const centre = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+      // A key press first, so programmatic focus shows the keyboard focus ring.
+      const focus = async () => { await page.keyboard.press('Shift'); await button.focus(); };
+      const blur = async () => { await button.evaluate(el => (el as HTMLElement).blur()); };
+      // Pressed states are released away from the control, so no window command runs.
+      const release = async () => { await page.mouse.move(away.x, away.y); await page.mouse.up(); };
+      const states: [string, { icon: boolean; ring: boolean }, () => Promise<void>, () => Promise<void>][] = [
+        ['icon', { icon: true, ring: false }, async () => { await page.mouse.move(away.x, away.y); await blur(); }, async () => {}],
+        ['focus ring', { icon: false, ring: true }, focus, blur],
+        ['hover', { icon: true, ring: false }, async () => { await page.mouse.move(centre.x, centre.y); }, async () => {}],
+        ['pressed', { icon: true, ring: false }, async () => { await page.mouse.move(centre.x, centre.y); await page.mouse.down(); }, release],
+        ['focus ring + hover', { icon: true, ring: true }, async () => { await focus(); await page.mouse.move(centre.x, centre.y); }, async () => { await page.mouse.move(away.x, away.y); await blur(); }],
+        ['focus ring + pressed', { icon: true, ring: true }, async () => { await focus(); await page.mouse.move(centre.x, centre.y); await page.mouse.down(); }, async () => { await release(); await blur(); }],
+      ];
+      for (const [state, measure, enter, leave] of states) {
+        await enter();
+        const measured = await button.evaluate((el, ring) => {
+          const ctx = document.createElement('canvas').getContext('2d', { willReadFrequently: true })!;
+          const rgba = (value: string) => { ctx.clearRect(0, 0, 1, 1); ctx.fillStyle = value; ctx.fillRect(0, 0, 1, 1); return [...ctx.getImageData(0, 0, 1, 1).data].map((v, i) => i < 3 ? v : v / 255); };
+          const over = (top: number[], bottom: number[]) => [...top.slice(0, 3).map((v, i) => v * top[3]! + bottom[i]! * (1 - top[3]!)), 1];
+          const lum = (v: number[]) => { const l = v.slice(0, 3).map(c => { c /= 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; }); return l[0]! * .2126 + l[1]! * .7152 + l[2]! * .0722; };
+          const ratio = (x: number[], y: number[]) => { const a = lum(x), b = lum(y); return (Math.max(a, b) + .05) / (Math.min(a, b) + .05); };
+          const css = (v: number[]) => `rgb(${v.slice(0, 3).map(Math.round).join(', ')})`;
+          const own = getComputedStyle(el);
+          const fill = rgba(own.backgroundColor);
+          const visible = !ring || (el.matches(':focus-visible') && own.outlineStyle !== 'none' && parseFloat(own.outlineWidth) > 0);
+          // What the surfaces beneath the layer paint at the control's centre, over the page canvas.
+          const layer = el.closest<HTMLElement>('#window-controls')!;
+          const r = el.getBoundingClientRect();
+          layer.style.visibility = 'hidden';
+          let under = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+          while (under?.shadowRoot) { const inner = under.shadowRoot.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); if (!inner || inner === under) break; under = inner; }
+          layer.style.visibility = '';
+          const chain: number[][] = [];
+          for (let node: Element | null = under; node; node = node.parentElement ?? ((node.getRootNode() as ShadowRoot).host ?? null)) chain.push(rgba(getComputedStyle(node).backgroundColor));
+          const probe = document.createElement('span'); probe.style.color = 'Canvas'; document.documentElement.append(probe);
+          let beside = rgba(getComputedStyle(probe).color); probe.remove();
+          for (const paint of chain.reverse()) beside = over(paint, beside);
+          const filled = over(fill, beside);
+          const icon = over(rgba(own.color), filled);
+          // The ring as painted: over the fill when inset, over the surface when drawn outside the control.
+          const outline = over(rgba(own.outlineColor), parseFloat(own.outlineOffset) < 0 ? filled : beside);
+          return { visible, icon: ratio(icon, filled), ringFill: ratio(outline, filled), ringSurface: ratio(outline, beside),
+            ink: own.color, ring: own.outlineColor, fill: css(filled), beside: css(beside) };
+        }, measure.ring);
+        await leave();
+        const where = `${surface}${forced ? ' forced' : ''} ${name} ${state}`;
+        if (!measured.visible) { failures.push(`${where}: no ring`); continue; }
+        if (measure.icon && measured.icon < 4.5) failures.push(`${where}: icon ${measured.icon.toFixed(2)} (${measured.ink} on ${measured.fill})`);
+        // Alone, the ring is beside the surface only; over a fill the table's 3:1 applies to both.
+        const least = measure.icon ? 3 : 4.5;
+        if (measure.ring && (measured.ringFill < least || measured.ringSurface < least)) failures.push(`${where}: ring ${measured.ringFill.toFixed(2)} against the fill ${measured.fill}, ${measured.ringSurface.toFixed(2)} against the surface ${measured.beside} (${measured.ring})`);
+      }
+    }
+  }
+  await page.emulateMedia({ forcedColors: 'none' });
+  return failures;
+}
+for (const palette of shippedPalettes) for (const mode of ['dark', 'light'] as const) it(`SW5 X1 window controls are legible over every surface with ${palette} ${mode}, and in forced colours`, async () => {
+  const failures: string[] = [];
+  let storage: Record<string, string> = {};
+  // The running app after the theme applied; it writes the saved frame copy the next start paints.
+  const app = await create({ os: mode, theme: mode });
+  try {
+    await app.goto(url); await app.waitForSelector('jf-top-bar .more-trigger'); await expect.poll(() => app.locator('#boot-frame').count()).toBe(0);
+    expect(await controlLabels(app)).toEqual(['Minimize', 'Maximize', 'Close']);
+    await app.addScriptTag({ type: 'module', url: new URL(probe, url).href });
+    await app.waitForFunction(() => 'frameProbe' in window);
+    await app.evaluate(({ palette, mode }) => window.frameProbe.applyAppearance({ paletteId: palette, theme: mode }), { palette, mode });
+    await expect.poll(() => app.evaluate(key => JSON.parse(localStorage.getItem(key) ?? 'null')?.text === getComputedStyle(document.documentElement).getPropertyValue('--text-primary').trim(), key)).toBe(true);
+    failures.push(...await controlContrasts(app, 'running app'));
+    storage = await app.evaluate(() => Object.fromEntries(Object.entries(localStorage)));
+  } finally { await app.close(); }
+  const noCopy = Object.fromEntries(Object.entries(storage).filter(([name]) => name !== key));
+  const start = async (options: Options, styles: boolean, entryFails: boolean) => {
+    const page = await create({ os: mode, theme: mode, ...options });
+    await page.route(`**${entry}`, route => entryFails ? route.abort() : new Promise(() => {}));
+    if (!styles) await page.route('**/*.css', route => route.abort());
+    await page.goto(url, { waitUntil: 'commit' });
+    await page.waitForSelector(entryFails ? '#boot-failure' : '#boot-frame', { state: 'attached' });
+    if (styles) await page.waitForFunction(() => [...document.styleSheets].some(sheet => sheet.href?.endsWith('.css')));
+    return page;
+  };
+  const handOff = async (options: Options) => {
+    const page = await create({ os: mode, theme: mode, renderHold: true, ...options });
+    await page.goto(url); await page.waitForSelector('jf-top-bar .more-trigger');
+    await page.waitForFunction(palette => document.querySelector(`style[data-theme-id="${palette}"]`) !== null, palette);
+    expect(await page.locator('#boot-frame').count()).toBe(1);
+    return page;
+  };
+  const opened = async (options: Options, selector: string) => { const page = await create({ os: mode, theme: mode, ...options }); await page.goto(url); return loaded(selector)(page); };
+  const states: [string, () => Promise<Page>][] = [
+    ['start-up frame, styles blocked', () => start({ storage }, false, false)],
+    ['start-up frame', () => start({ storage }, true, false)],
+    ['start-up frame without a saved copy', () => start({ storage: noCopy }, false, false)],
+    ['failure page, styles blocked', () => start({ storage }, false, true)],
+    ['failure page', () => start({ storage }, true, true)],
+    ['failure page without a saved copy', () => start({ storage: noCopy }, true, true)],
+    ['hand-off', () => handOff({ storage })],
+    ['hand-off without a saved copy', () => handOff({ storage: noCopy })],
+    ['connecting', () => opened({ storage, discoveryHold: true }, '#root > jf-engine-recovery')],
+    ['engine recovery', () => opened({ storage, supervisor: exhausted }, '#root > jf-engine-recovery')],
+    ['factory reset', () => opened({ storage, phase: 'complete' }, '#root > jf-factory-reset-recovery')],
+  ];
+  for (const [surface, open] of states) {
+    const page = await open();
+    try {
+      expect({ surface, labels: await controlLabels(page) }).toEqual({ surface, labels: ['Minimize', 'Maximize', 'Close'] });
+      failures.push(...await controlContrasts(page, surface));
+    } finally { await page.close(); }
+  }
+  expect(failures).toEqual([]);
+}, 90_000);
