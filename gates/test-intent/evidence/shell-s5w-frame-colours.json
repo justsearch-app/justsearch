@@ -1,0 +1,61 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-10T08:12:17.042Z",
+  "revision": "204ea8a98218b44088cae2e4aaac7f7d88a14ae7",
+  "tree": "8a806ed2ae95df2278ecb509e1ffc7791aa53d3f",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/boot/boot-frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/097kad0m/tmp/test-intent-vitest-39624-1794298121874.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 215165
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SA5 live mode contrast and presentation changes survive reload mid-boot",
+      "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SA5 live mode contrast and presentation changes survive reload mid-boot",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SA5 profile switch and palette changes cache the resulting live colours",
+      "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SA5 profile switch and palette changes cache the resulting live colours",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:5d494aa7a1a2d167d058b3d4e526922389f56bfaa75a3184dd571f80cdf268dd"
+}

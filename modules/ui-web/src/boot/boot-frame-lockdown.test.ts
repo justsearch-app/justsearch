@@ -7,6 +7,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright-core';
 import { mkdtemp, readFile, readdir, writeFile, rm } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
@@ -63,7 +64,7 @@ afterAll(async () => {
   if (output) await rm(output, { recursive: true, force: true });
 });
 type Options = { saved?: unknown; os?: 'light' | 'dark'; storageThrows?: boolean; desktop?: boolean; phase?: string; hold?: boolean; renderHold?: boolean; future?: string; settingsFail?: boolean; discoveryHold?: boolean;
-  supervisor?: Record<string, unknown>; resetThrows?: boolean; maximized?: boolean; windowRejects?: boolean };
+  supervisor?: Record<string, unknown>; resetThrows?: boolean; maximized?: boolean; windowRejects?: boolean; theme?: 'light' | 'dark'; storage?: Record<string, string> };
 async function create(options: Options = {}): Promise<Page> {
   const context = await browser.newContext({ colorScheme: options.os ?? 'dark' });
   contexts.add(context);
@@ -71,6 +72,7 @@ async function create(options: Options = {}): Promise<Page> {
   await page.addInitScript(({ options, key, inputTypes }) => {
     if (options.saved !== undefined && !localStorage.getItem(key)) localStorage.setItem(key, JSON.stringify(options.saved));
     if (options.future && !localStorage.getItem('justsearch.userState.v2')) localStorage.setItem('justsearch.userState.v2', options.future);
+    for (const [name, value] of Object.entries(options.storage ?? {})) if (localStorage.getItem(name) === null) localStorage.setItem(name, value);
     if (options.storageThrows) {
       Storage.prototype.getItem = () => { throw new Error('storage denied'); };
       Storage.prototype.setItem = () => { throw new Error('quota denied'); };
@@ -143,7 +145,7 @@ async function create(options: Options = {}): Promise<Page> {
   if (options.desktop !== false) await page.addInitScript({ content: dragScript });
   await page.route(/\/(api|infra|registry)\//, route => {
     const pathname = new URL(route.request().url()).pathname;
-    return route.fulfill({ status: options.settingsFail && pathname === '/api/settings/v2' ? 503 : 200, json: pathname === '/api/registry/surfaces' ? catalog : pathname === '/api/settings/v2' ? { ui: { theme: 'light', highContrast: false } } : {} });
+    return route.fulfill({ status: options.settingsFail && pathname === '/api/settings/v2' ? 503 : 200, json: pathname === '/api/registry/surfaces' ? catalog : pathname === '/api/settings/v2' ? { ui: { theme: options.theme ?? 'light', highContrast: false } } : {} });
   });
   return page;
 }
@@ -523,12 +525,12 @@ it('SA5 live mode contrast and presentation changes survive reload mid-boot', as
     await page.route(`**${entry}`, () => new Promise(() => {}));
     await page.reload({ waitUntil: 'commit' });
     await page.waitForFunction(accent => document.documentElement.getAttribute('data-theme') === 'dark'
-      && document.getElementById('boot-frame')?.style.getPropertyValue('--boot-frame-accent') === accent, cache.accent, { timeout: 4000 });
+      && document.getElementById('boot-frame') && document.documentElement.style.getPropertyValue('--boot-frame-accent') === accent, cache.accent, { timeout: 4000 });
     expect(await page.locator('html').getAttribute('data-theme')).toBe('dark');
-    expect(await page.locator('#boot-frame').evaluate(el => el.style.getPropertyValue('--boot-frame-accent'))).toBe(cache.accent);
+    expect(await page.locator('html').evaluate(el => el.style.getPropertyValue('--boot-frame-accent'))).toBe(cache.accent);
     await page.reload({ waitUntil: 'commit' });
     await page.waitForFunction(accent => document.documentElement.getAttribute('data-theme') === 'dark'
-      && document.getElementById('boot-frame')?.style.getPropertyValue('--boot-frame-accent') === accent, cache.accent, { timeout: 4000 });
+      && document.getElementById('boot-frame') && document.documentElement.style.getPropertyValue('--boot-frame-accent') === accent, cache.accent, { timeout: 4000 });
     expect(await page.evaluate(key => JSON.parse(localStorage.getItem(key)!), key)).toEqual(cache);
   } finally { await page.close(); }
 }, 15_000);
@@ -629,9 +631,9 @@ it('SA5 profile switch and palette changes cache the resulting live colours', as
     const cache = await page.evaluate(key => JSON.parse(localStorage.getItem(key)!), key);
     expect(cache.accent).toBeTruthy();
     await page.route(`**${entry}`, () => new Promise(() => {})); await page.reload({ waitUntil: 'commit' });
-    await page.waitForFunction(accent => document.getElementById('boot-frame')?.style.getPropertyValue('--boot-frame-accent') === accent, cache.accent, { timeout: 4000 });
+    await page.waitForFunction(accent => document.getElementById('boot-frame') && document.documentElement.style.getPropertyValue('--boot-frame-accent') === accent, cache.accent, { timeout: 4000 });
     expect(await page.locator('#boot-frame').count()).toBe(1);
-    expect(await page.locator('#boot-frame').evaluate(el => el.style.getPropertyValue('--boot-frame-accent'))).toBe(cache.accent);
+    expect(await page.locator('html').evaluate(el => el.style.getPropertyValue('--boot-frame-accent'))).toBe(cache.accent);
   } finally { await page.close(); }
 });
 it('SA5 partly failed palette restore leaves the previous cache byte-identical', async () => {
@@ -1088,3 +1090,113 @@ for (const os of ['dark', 'light'] as const) for (const forced of [false, true])
     if (forced) expect(await control(page, 'Close').evaluate(el => { el.focus(); return getComputedStyle(el).outlineColor; })).toBe(await page.evaluate(() => { const probe = document.createElement('span'); probe.style.color = 'Highlight'; document.body.append(probe); const c = getComputedStyle(probe).color; probe.remove(); return c; }));
   } finally { await page.close(); }
 }, 30_000);
+
+// X1 SW5: the layer takes its colours from the surface beneath it, for every shipped palette and state.
+const shippedPalettes = (JSON.parse(readFileSync(path.resolve('public/themes/manifest.json'), 'utf8')) as { themes: { id: string }[] }).themes.map(theme => theme.id);
+/** Each control's icon, hover, pressed and focus ring against what is painted behind it, in normal and forced colours. */
+async function controlContrasts(page: Page, surface: string) {
+  const failures: string[] = [];
+  const away = { x: 1, y: page.viewportSize()!.height - 1 };
+  for (const forced of [false, true]) {
+    await page.emulateMedia({ forcedColors: forced ? 'active' : 'none' });
+    for (const name of ['Minimize', 'Maximize', 'Close']) {
+      const button = control(page, name);
+      const box = (await button.boundingBox())!;
+      const centre = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+      const states: [string, () => Promise<void>, () => Promise<void>][] = [
+        ['icon', async () => { await page.mouse.move(away.x, away.y); await button.evaluate(el => (el as HTMLElement).blur()); }, async () => {}],
+        // A key press first, so programmatic focus shows the keyboard focus ring.
+        ['focus ring', async () => { await page.keyboard.press('Shift'); await button.focus(); }, async () => { await button.evaluate(el => (el as HTMLElement).blur()); }],
+        ['hover', async () => { await page.mouse.move(centre.x, centre.y); }, async () => {}],
+        // Released away from the control, so no window command runs.
+        ['pressed', async () => { await page.mouse.move(centre.x, centre.y); await page.mouse.down(); }, async () => { await page.mouse.move(away.x, away.y); await page.mouse.up(); }],
+      ];
+      for (const [state, enter, leave] of states) {
+        await enter();
+        const measured = await button.evaluate((el, ring) => {
+          const ctx = document.createElement('canvas').getContext('2d', { willReadFrequently: true })!;
+          const rgba = (value: string) => { ctx.clearRect(0, 0, 1, 1); ctx.fillStyle = value; ctx.fillRect(0, 0, 1, 1); return [...ctx.getImageData(0, 0, 1, 1).data].map((v, i) => i < 3 ? v : v / 255); };
+          const over = (top: number[], bottom: number[]) => [...top.slice(0, 3).map((v, i) => v * top[3]! + bottom[i]! * (1 - top[3]!)), 1];
+          const lum = (v: number[]) => { const l = v.slice(0, 3).map(c => { c /= 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; }); return l[0]! * .2126 + l[1]! * .7152 + l[2]! * .0722; };
+          const own = getComputedStyle(el);
+          const ink = rgba(ring ? own.outlineColor : own.color), fill = rgba(own.backgroundColor);
+          const visible = ring ? el.matches(':focus-visible') && own.outlineStyle !== 'none' && parseFloat(own.outlineWidth) > 0 : true;
+          // What the surfaces beneath the layer paint at the control's centre, over the page canvas.
+          const layer = el.closest<HTMLElement>('#window-controls')!;
+          const r = el.getBoundingClientRect();
+          layer.style.visibility = 'hidden';
+          let under = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+          while (under?.shadowRoot) { const inner = under.shadowRoot.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); if (!inner || inner === under) break; under = inner; }
+          layer.style.visibility = '';
+          const chain: number[][] = [];
+          for (let node: Element | null = under; node; node = node.parentElement ?? ((node.getRootNode() as ShadowRoot).host ?? null)) chain.push(rgba(getComputedStyle(node).backgroundColor));
+          const probe = document.createElement('span'); probe.style.color = 'Canvas'; document.documentElement.append(probe);
+          let behind = rgba(getComputedStyle(probe).color); probe.remove();
+          for (const paint of chain.reverse()) behind = over(paint, behind);
+          behind = over(fill, behind);
+          const a = lum(over(ink, behind)), b = lum(behind);
+          return { visible, ratio: (Math.max(a, b) + .05) / (Math.min(a, b) + .05), ink: ring ? own.outlineColor : own.color, behind: `rgb(${behind.slice(0, 3).map(Math.round).join(', ')})` };
+        }, state === 'focus ring');
+        await leave();
+        if (!measured.visible || measured.ratio < 4.5) failures.push(`${surface}${forced ? ' forced' : ''} ${name} ${state}: ${measured.visible ? measured.ratio.toFixed(2) : 'no ring'} (${measured.ink} on ${measured.behind})`);
+      }
+    }
+  }
+  await page.emulateMedia({ forcedColors: 'none' });
+  return failures;
+}
+for (const palette of shippedPalettes) for (const mode of ['dark', 'light'] as const) it(`SW5 X1 window controls are legible over every surface with ${palette} ${mode}, and in forced colours`, async () => {
+  const failures: string[] = [];
+  let storage: Record<string, string> = {};
+  // The running app after the theme applied; it writes the saved frame copy the next start paints.
+  const app = await create({ os: mode, theme: mode });
+  try {
+    await app.goto(url); await app.waitForSelector('jf-top-bar .more-trigger'); await expect.poll(() => app.locator('#boot-frame').count()).toBe(0);
+    expect(await controlLabels(app)).toEqual(['Minimize', 'Maximize', 'Close']);
+    await app.addScriptTag({ type: 'module', url: new URL(probe, url).href });
+    await app.waitForFunction(() => 'frameProbe' in window);
+    await app.evaluate(({ palette, mode }) => window.frameProbe.applyAppearance({ paletteId: palette, theme: mode }), { palette, mode });
+    await expect.poll(() => app.evaluate(key => JSON.parse(localStorage.getItem(key) ?? 'null')?.text === getComputedStyle(document.documentElement).getPropertyValue('--text-primary').trim(), key)).toBe(true);
+    failures.push(...await controlContrasts(app, 'running app'));
+    storage = await app.evaluate(() => Object.fromEntries(Object.entries(localStorage)));
+  } finally { await app.close(); }
+  const noCopy = Object.fromEntries(Object.entries(storage).filter(([name]) => name !== key));
+  const start = async (options: Options, styles: boolean, entryFails: boolean) => {
+    const page = await create({ os: mode, theme: mode, ...options });
+    await page.route(`**${entry}`, route => entryFails ? route.abort() : new Promise(() => {}));
+    if (!styles) await page.route('**/*.css', route => route.abort());
+    await page.goto(url, { waitUntil: 'commit' });
+    await page.waitForSelector(entryFails ? '#boot-failure' : '#boot-frame', { state: 'attached' });
+    if (styles) await page.waitForFunction(() => [...document.styleSheets].some(sheet => sheet.href?.endsWith('.css')));
+    return page;
+  };
+  const handOff = async (options: Options) => {
+    const page = await create({ os: mode, theme: mode, renderHold: true, ...options });
+    await page.goto(url); await page.waitForSelector('jf-top-bar .more-trigger');
+    await page.waitForFunction(palette => document.querySelector(`style[data-theme-id="${palette}"]`) !== null, palette);
+    expect(await page.locator('#boot-frame').count()).toBe(1);
+    return page;
+  };
+  const opened = async (options: Options, selector: string) => { const page = await create({ os: mode, theme: mode, ...options }); await page.goto(url); return loaded(selector)(page); };
+  const states: [string, () => Promise<Page>][] = [
+    ['start-up frame, styles blocked', () => start({ storage }, false, false)],
+    ['start-up frame', () => start({ storage }, true, false)],
+    ['start-up frame without a saved copy', () => start({ storage: noCopy }, false, false)],
+    ['failure page, styles blocked', () => start({ storage }, false, true)],
+    ['failure page', () => start({ storage }, true, true)],
+    ['failure page without a saved copy', () => start({ storage: noCopy }, true, true)],
+    ['hand-off', () => handOff({ storage })],
+    ['hand-off without a saved copy', () => handOff({ storage: noCopy })],
+    ['connecting', () => opened({ storage, discoveryHold: true }, '#root > jf-engine-recovery')],
+    ['engine recovery', () => opened({ storage, supervisor: exhausted }, '#root > jf-engine-recovery')],
+    ['factory reset', () => opened({ storage, phase: 'complete' }, '#root > jf-factory-reset-recovery')],
+  ];
+  for (const [surface, open] of states) {
+    const page = await open();
+    try {
+      expect({ surface, labels: await controlLabels(page) }).toEqual({ surface, labels: ['Minimize', 'Maximize', 'Close'] });
+      failures.push(...await controlContrasts(page, surface));
+    } finally { await page.close(); }
+  }
+  expect(failures).toEqual([]);
+}, 90_000);

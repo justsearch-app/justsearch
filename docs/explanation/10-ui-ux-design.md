@@ -165,7 +165,10 @@ does. The maximize control reads the window's state and follows every change. Th
 of each surface moves the window and a double-click maximizes or restores it; the top bar's
 areas, status pill, Settings, More and their menus never start a drag. The top bar keeps room for
 the controls. They are named icon buttons of one size at any text size, never below a 24 by 24 px
-target, so enlarged text changes the bar's layout rather than their room. The browser has neither
+target, so enlarged text changes the bar's layout rather than their room. They take their colours
+from the surface beneath them: the saved start-up colours while the frame or the failure page
+shows, the app's theme afterwards. Their focus ring uses that surface's text colour, because some
+palettes' accents are too faint on their own surfaces. The browser has neither
 the controls nor drag regions. While a modal dialog such as Settings is open, the controls wait
 until it closes.
 

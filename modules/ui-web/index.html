@@ -56,15 +56,24 @@
         position: fixed; inset-block-start: 0; inset-inline-end: 0; z-index: var(--z-overlay-top);
         display: flex; align-items: center; gap: var(--frame-window-control-gap); box-sizing: border-box;
         block-size: var(--frame-topbar-height); padding-inline-end: var(--frame-window-control-inset);
-        pointer-events: none; color: var(--text-secondary);
+        pointer-events: none; color: var(--window-control-ink);
+        /* The colours of the surface beneath: the app's tokens, or the saved frame colours below. */
+        --window-control-ink: var(--text-secondary); --window-control-strong: var(--text-primary); --window-control-fill: var(--surface-2);
       }
+      :root:has(#root > :is(#boot-frame, #boot-failure)) #window-controls {
+        --window-control-ink: var(--boot-frame-muted, var(--text-secondary)); --window-control-strong: var(--boot-frame-text, var(--text-primary));
+      }
+      /* The frame's bar is raised and the failure page is not: the hover fill is the other surface. */
+      :root:has(#root > #boot-frame) #window-controls { --window-control-fill: var(--boot-frame-background, var(--surface-0)); }
+      :root:has(#root > #boot-failure) #window-controls { --window-control-fill: var(--boot-frame-raised, var(--surface-1)); }
       #window-controls button {
         display: inline-grid; place-items: center; box-sizing: border-box; inline-size: var(--frame-window-control-size); block-size: var(--frame-window-control-size);
         margin: 0; padding: 0; border: 0; border-radius: var(--frame-control-radius); color: inherit; background: transparent; font: inherit;
         pointer-events: auto; cursor: default;
       }
-      #window-controls button:hover { color: var(--text-primary); background: var(--surface-2); }
-      #window-controls button:focus-visible { outline: var(--frame-focus-width) solid var(--focus-ring-color); outline-offset: calc(-1 * var(--frame-focus-width)); }
+      #window-controls button:is(:hover, :active) { color: var(--window-control-strong); background: var(--window-control-fill); }
+      /* Text ink, not the accent: some palettes' accents are below 4.5:1 on their own surfaces. */
+      #window-controls button:focus-visible { outline: var(--frame-focus-width) solid var(--window-control-strong); outline-offset: calc(-1 * var(--frame-focus-width)); }
       #window-controls svg { inline-size: var(--frame-window-control-glyph); block-size: var(--frame-window-control-glyph); fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; }
       #window-controls[data-maximized] .window-maximize-icon, #window-controls:not([data-maximized]) .window-restore-icon { display: none; }
       /* Top areas of the static surfaces move the window. The frame paints no other input target. */
@@ -80,7 +89,7 @@
         .boot-dot { background: Highlight; }
         .boot-actions button:focus-visible, #boot-report:focus-visible { outline-color: Highlight; }
         #window-controls button { color: ButtonText; background: transparent; }
-        #window-controls button:hover { forced-color-adjust: none; color: HighlightText; background: Highlight; }
+        #window-controls button:is(:hover, :active) { forced-color-adjust: none; color: HighlightText; background: Highlight; }
         #window-controls button:focus-visible { outline-color: Highlight; }
       }
     </style>
@@ -138,7 +147,8 @@
               return typeof value === 'string' && value.length <= 120 && /^[a-zA-Z0-9#.,%() /+\-]+$/.test(value)
                 && !/var\(|env\(|currentcolor/i.test(value) && CSS.supports('color', value);
             })) {
-              fields.forEach(function (field) { frame.style.setProperty('--boot-frame-' + field, saved[field]); });
+              // On the root, so the window layer beside #root and the failure page read them too.
+              fields.forEach(function (field) { document.documentElement.style.setProperty('--boot-frame-' + field, saved[field]); });
               mode = saved.mode;
             }
           }
@@ -210,7 +220,6 @@
           if (frame.parentElement !== root) return;
           if (['entry', 'evaluation', 'bootstrap', 'no-engine-address', 'stalled'].indexOf(kind) < 0) kind = 'bootstrap';
           var page = document.getElementById('boot-failure-template').content.firstElementChild.cloneNode(true);
-          fields.forEach(function (field) { var value = frame.style.getPropertyValue('--boot-frame-' + field); if (value) page.style.setProperty('--boot-frame-' + field, value); });
           page.style.colorScheme = mode;
           if (layer) {
             var top = document.createElement('div');

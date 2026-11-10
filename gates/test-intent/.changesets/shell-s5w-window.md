@@ -59,6 +59,27 @@ before-state keeps the base capability file and production code.
 
 `token-names.generated.ts` is regenerated after adding four `--frame-window-control-*` tokens.
 
+Repair after the independent check (SW5, X1). With a saved frame copy from a pale palette in dark
+mode (Registrar's Ledger), the window controls kept the dark-default white ink over the restored
+pale frame: 1.08:1 on the start-up frame and 1.02:1 on the failure page. The layer sits beside
+`#root` and could not see the saved colours, which were set on the frame element. The early script
+now sets them on the document root; while `#root` holds the frame or the failure page, the layer
+reads the same saved colours and the same frame defaults (the build's frame-token scope includes
+the layer then); afterwards it reads the app's tokens. Hover and pressed use the other frame
+surface as fill, and the focus ring uses the surface's primary text colour. No new colour literal.
+
+`SW5 X1 window controls are legible over every surface with <palette> <mode>, and in forced
+colours` (12 checks, one per shipped palette and mode, read from `public/themes/manifest.json`)
+measures each control's icon, hover, pressed state and focus ring against what is painted behind
+it. Against the unrepaired candidate (`204ea8a982`) 7 of the 12 failed by assertion: the reported
+Registrar's Ledger dark case (1.08 and 1.02), every pale-palette-in-dark and dark-palette-in-light
+frame and failure page, the hand-off without a saved copy (frame defaults beneath, palette ink on
+the layer: down to 1.12), and the Sepia Focus focus ring (accent 2.41:1 on its own surface, also in
+the running app and recovery). Forced colours already passed. On `origin/main` all 12 fail by
+assertion because there is no layer (`shell-s5w-window-controls.json`, regenerated with the other
+55). The two SA5 checks now read the restored accent from the root instead of the frame element;
+nothing else in them changed (`shell-s5w-frame-colours.json`, candidate run).
+
 Evidence used the unchanged official producer. Its before-state was a shared clone under TMPDIR,
 not a worktree registered in the source repository: a temporary `git` wrapper on PATH turned the
 producer's `worktree add --detach <dir> <ref>` into `git clone --shared --no-checkout` plus a
@@ -80,7 +101,7 @@ CI runs no clippy step.
         "modules/ui-web/src/boot/boot-frame-lockdown.test.ts"
       ],
       "class": "New",
-      "behaviour": "Desktop runtime, production build: on every surface (start-up frame; entry, evaluation and stalled failure pages; connecting; engine terminal, not ready and Linux update hold; reset busy, error and complete; running app; held hand-off with the app still unreachable) Minimize, Maximize and Close send exactly plugin:window|minimize, toggle_maximize and close by pointer and keyboard, Close only hides as the platform close does, and nothing reveals a hidden window. The empty top area of each surface starts a drag and a double-click maximizes or restores; every interactive control and menu in the top area is excluded. Controls and moving keep working after the hand-off. The maximize control shows Restore or Maximize from the window's real state, also when it starts maximized or changes by other means. Refused operations (tiling compositors) raise no error and change nothing. Each control is reachable in order with a visible 2 px focus ring; at 1280x800, 900x800 and 600x400, at 100 % and 200 % text, in both themes and forced colours: the layer stays inside the window, overlaps no other top-area control, the top bar's own controls do not overlap one another, recovery actions stay clear and reachable, the controls keep one size of at least 24 x 24 px, glyph contrast is at least 4.5:1, no transition runs under reduced motion, and the layer adds no axe violation. SA1 additionally requires that the start-up page's only controls are the layer's three and that Tab reaches Minimize.",
+      "behaviour": "Desktop runtime, production build: on every surface (start-up frame; entry, evaluation and stalled failure pages; connecting; engine terminal, not ready and Linux update hold; reset busy, error and complete; running app; held hand-off with the app still unreachable) Minimize, Maximize and Close send exactly plugin:window|minimize, toggle_maximize and close by pointer and keyboard, Close only hides as the platform close does, and nothing reveals a hidden window. The empty top area of each surface starts a drag and a double-click maximizes or restores; every interactive control and menu in the top area is excluded. Controls and moving keep working after the hand-off. The maximize control shows Restore or Maximize from the window's real state, also when it starts maximized or changes by other means. Refused operations (tiling compositors) raise no error and change nothing. Each control is reachable in order with a visible 2 px focus ring; at 1280x800, 900x800 and 600x400, at 100 % and 200 % text, in both themes and forced colours: the layer stays inside the window, overlaps no other top-area control, the top bar's own controls do not overlap one another, recovery actions stay clear and reachable, the controls keep one size of at least 24 x 24 px, glyph contrast is at least 4.5:1, no transition runs under reduced motion, and the layer adds no axe violation. SA1 additionally requires that the start-up page's only controls are the layer's three and that Tab reaches Minimize. For every shipped palette (public/themes/manifest.json) in dark and light, and in forced colours, each control's icon, hover, pressed state and focus ring is at least 4.5:1 against what is painted behind it, on the running app after the palette applied, the start-up frame and the failure page with the saved frame copy (styles loaded and blocked) and without it, the hand-off with and without the saved copy, connecting, engine recovery and factory reset.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -152,6 +173,14 @@ CI runs no clippy step.
           "delegationScope": "The frame-build plan, S5w: desktop window controls and moving within the settled SW scenarios and the binding design (one persistent layer outside #root, drag regions on every top area, the hand-off guard passing only the layer, maximize state read from the window, exactly four permissions, nothing in the browser).",
           "choice": "Controls order Minimize, Maximize/Restore, Close, placed after More; the layer is a region named Window; its buttons are 32 x 32 px icon buttons whose size does not follow text size (at least the 24 x 24 px target); the maximize label and icon follow is_maximized, re-read on resize, focus and visibility changes; the top bar reserves the layer's fixed width and chooses its layout from the room left, in rem, with an icon-only area button below 30rem; SA1 and SA6 keep their inertness and input assertions while accepting the layer as the page's only controls.",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "The frame-build plan, S5w repair after the independent check: the window layer takes its colours from the same source as the surface beneath it, the saved frame colours while the frame or failure page shows and the app's tokens once the app's theme applies, with no new hard-coded colours.",
+          "choice": "The early script sets the saved frame colours on the document root instead of the frame element, so the frame, the failure page and the window layer beside #root all read them; while #root holds the frame or the failure page, the layer reads the same frame colours and frame defaults; its hover and pressed fill is the other frame surface (background on the raised frame bar, raised on the failure page); its focus ring uses the surface's primary text colour, because some palettes' accents are below 4.5:1 on their own surfaces.",
+          "label": "agent choice"
         }
       ],
       "repaired": true,
@@ -211,7 +240,19 @@ CI runs no clippy step.
         "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 X2 engine terminal light forced=true: controls fit at every size and enlarged text, axe clean",
         "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 X2 reset complete light forced=true: controls fit at every size and enlarged text, axe clean",
         "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 X2 running app light forced=true: controls fit at every size and enlarged text, axe clean",
-        "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 X2 start-up frame light forced=true: controls fit at every size and enlarged text, axe clean"
+        "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 X2 start-up frame light forced=true: controls fit at every size and enlarged text, axe clean",
+        "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 window controls are legible over every surface with core.nord dark, and in forced colours",
+        "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 window controls are legible over every surface with core.nord light, and in forced colours",
+        "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 window controls are legible over every surface with core.sepia-focus dark, and in forced colours",
+        "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 window controls are legible over every surface with core.sepia-focus light, and in forced colours",
+        "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 window controls are legible over every surface with core.high-vis dark, and in forced colours",
+        "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 window controls are legible over every surface with core.high-vis light, and in forced colours",
+        "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 window controls are legible over every surface with core.registrars-ledger dark, and in forced colours",
+        "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 window controls are legible over every surface with core.registrars-ledger light, and in forced colours",
+        "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 window controls are legible over every surface with core.night-registry dark, and in forced colours",
+        "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 window controls are legible over every surface with core.night-registry light, and in forced colours",
+        "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 window controls are legible over every surface with core.cyanotype dark, and in forced colours",
+        "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 window controls are legible over every surface with core.cyanotype light, and in forced colours"
       ]
     },
     {
@@ -247,6 +288,35 @@ CI runs no clippy step.
       "newChecks": [
         "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW6 browser runtime has no window layer, drag regions or native commands on any surface",
         "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SA6 rendered shell rejects input until frame hand-off"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/boot/boot-frame-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "SA5 (both checks) keeps every earlier assertion about the saved frame copy (mode, accent and the byte-identical cache across reloads) and now reads the restored accent from the document root, where the early script sets the saved frame colours so the window layer beside #root can read them; the frame still shows them.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "X1",
+          "quote": "Dark, light and Windows high contrast for every frame component; contrast ≥ 4.5:1 for text; colour never the only signal; reduced motion respected; no new hard-coded colours, sizes or z-indexes (ui-web gates).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "The frame-build plan, S5w repair after the independent check: the window layer takes its colours from the same source as the surface beneath it, the saved frame colours while the frame or failure page shows and the app's tokens once the app's theme applies, with no new hard-coded colours.",
+          "choice": "The early script sets the saved frame colours on the document root instead of the frame element, so the frame, the failure page and the window layer beside #root all read them; while #root holds the frame or the failure page, the layer reads the same frame colours and frame defaults; its hover and pressed fill is the other frame surface (background on the raised frame bar, raised on the failure page); its focus ring uses the surface's primary text colour, because some palettes' accents are below 4.5:1 on their own surfaces.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/shell-s5w-frame-colours.json",
+      "newChecks": [
+        "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SA5 live mode contrast and presentation changes survive reload mid-boot",
+        "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SA5 profile switch and palette changes cache the resulting live colours"
       ]
     },
     {

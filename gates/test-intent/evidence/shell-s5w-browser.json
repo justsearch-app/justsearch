@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-10T07:04:09.503Z",
-  "revision": "33671f1dd50147da7fb404d91e7183e0def9a74d",
-  "tree": "260b975daeac8130cde5f97659c1e465ea2f5ea6",
+  "createdAt": "2026-11-10T08:08:39.711Z",
+  "revision": "204ea8a98218b44088cae2e4aaac7f7d88a14ae7",
+  "tree": "e855763eb577f8570d590bac104d316bf4eba81a",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/boot/boot-frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/w438vo5i/tmp/test-intent-vitest-71436-1794294175284.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/boot/boot-frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/097kad0m/tmp/test-intent-vitest-34649-1794297909057.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 74215
+      "durationMs": 210650
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW6 browser runtime has no window layer, drag regions or native commands on any surface",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:31bce76a84461ce1fab8a5d41b8b77d9fd3dc8b6bafa26b98edee705d36e27b0",
+      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SA6 rendered shell rejects input until frame hand-off",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:31bce76a84461ce1fab8a5d41b8b77d9fd3dc8b6bafa26b98edee705d36e27b0",
+      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -57,5 +57,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:db30603cf91ea0f582b777987e3bbc326636f889acd5691b787b1a3c0c72e02b"
+  "digest": "sha256:40578d218c562869af19cb19a5cc59a250e0e0ccbea071e693b30ed20351931a"
 }
