@@ -407,3 +407,13 @@ proportion register gains width and no-overlap rows for both captures.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-4mgqlrvw-round2",
+  "verdict": "accept",
+  "digest": "sha256:5ae850ae68e23568f43798d90271ec0773acad50bfd0db36dcef2c3468e3c1db"
+}
+```
