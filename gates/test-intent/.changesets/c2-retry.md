@@ -658,3 +658,13 @@ verifier checks them.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "c2-test-intent-verifier-iln_lrod",
+  "verdict": "accept",
+  "digest": "sha256:2fcb306bb860e3427f3812a63323cda9db4ddefd19c36583c0a47eb1aa4215b1"
+}
+```
