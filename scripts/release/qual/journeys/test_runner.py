@@ -359,7 +359,7 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(run.wd.click.call_args_list, [
             call('button.trigger[aria-haspopup="dialog"]'),
             call('article[data-fact="app-update"] button', 'Review and install'),
-            call('button[data-settings-category="desktop"]')])
+            call('button[data-settings-category="general"]')])
         run.nav.assert_not_called()
         run.wd.element.assert_called_with('button[aria-label="Install update"]:not(:disabled)', seconds=45)
 

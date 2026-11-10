@@ -76,6 +76,7 @@ async function mount(conflict = false, delayInitialLoad = false, overlap = false
     firstRead = false;
     return new Response(JSON.stringify({ ui, witness }));
   } } }) });
+  Object.assign(el, { activeCategory: 'appearance' });
   document.body.appendChild(el);
   await settle(el);
   return { el, posts, releaseInitialLoad: () => releaseInitialLoad(), releaseSecondSave: () => releaseSecondSave() };

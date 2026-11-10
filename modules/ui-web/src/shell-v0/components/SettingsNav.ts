@@ -37,6 +37,7 @@ import { JfElement } from '../primitives/JfElement.js';
 import { localizeResourceKey, onCatalogUpdated } from '../../i18n/resourceCatalog.js';
 import {
   categoryLabel,
+  entryLabel,
   searchRegister,
   type SettingsGroup,
   type SettingsCategory,
@@ -46,11 +47,26 @@ import {
 export class SettingsNav extends JfElement {
   static properties = {
     register: { attribute: false },
+    audience: { attribute: false },
     activeCategory: { type: String, attribute: 'active-category' },
     activeAnchor: { type: String, attribute: 'active-anchor' },
     footerVersion: { type: String, attribute: 'footer-version' },
     query: { state: true },
   };
+
+  declare audience: string;
+  private focusedRow: HTMLElement | null = null;
+
+  protected override willUpdate(): void {
+    this.focusedRow = this.shadowRoot?.activeElement as HTMLElement | null;
+  }
+
+  protected override updated(): void {
+    if (this.focusedRow && !this.focusedRow.isConnected) {
+      this.shadowRoot?.querySelector<HTMLElement>(this.query ? '.search-input' : '.category-row.active')?.focus();
+    }
+    this.focusedRow = null;
+  }
 
   declare register: readonly SettingsGroup[];
   declare activeCategory: string;
@@ -400,7 +416,7 @@ export class SettingsNav extends JfElement {
     isRoving: boolean,
     onFocus: () => void,
   ): TemplateResult {
-    const label = result.section ? localizeResourceKey(result.section.labelKey) : categoryLabel(result.category);
+    const label = result.section ? entryLabel(result.section) : categoryLabel(result.category);
     return html`
       <li>
         <button
@@ -476,7 +492,7 @@ export class SettingsNav extends JfElement {
                         tabindex=${anchorActive ? '0' : '-1'}
                         @click=${() => this.jump(s.key)}
                       >
-                        ${localizeResourceKey(s.labelKey)}
+                        ${entryLabel(s)}
                       </button>
                     </li>
                   `;
@@ -491,7 +507,6 @@ export class SettingsNav extends JfElement {
   private renderGroup(group: SettingsGroup): TemplateResult {
     return html`
       <div class="group ${group.danger ? 'danger' : ''}">
-        <div class="group-header">${localizeResourceKey(group.labelKey)}</div>
         <ul class="category-list">
           ${group.categories.map((c) => this.renderCategory(c, group.danger === true))}
         </ul>

@@ -21,6 +21,7 @@
 import { html, css, nothing, type TemplateResult, type PropertyValues } from 'lit';
 import { captureSettingsPatch, saveAbsoluteSettings, type SettingsPatch } from '../../api/settingsAttempt.js';
 import { ifDefined } from 'lit/directives/if-defined.js';
+import { repeat } from 'lit/directives/repeat.js';
 import { keyed } from 'lit/directives/keyed.js';
 import { JfElement } from '../primitives/JfElement.js';
 import { FocusKeeper } from '../primitives/focusKeeper.js';
@@ -113,12 +114,13 @@ import {
   allCategories,
   findCategory,
   firstCategoryId,
+  resolveSettingsCoordinate,
   type SettingsCategory,
   type SettingsSectionEntry,
 } from './settingsRegister.js';
 import { deriveFocus, type Landmark } from '../primitives/navigation.js';
 import { viewportWindow } from '../primitives/scrollViewport.js';
-import { takeMemberTabIntent, subscribeMemberTab } from '../router/memberTabIntent.js';
+import { takeMemberTabRequest, subscribeMemberTab } from '../router/memberTabIntent.js';
 import { FRAME_AREAS, FRAME_FIXED_WINDOWS } from '../layout/frameAreas.js';
 import type { Surface } from '../../api/types/surface.js';
 import type { RendererUserConfig } from '../renderers/userConfig.js';
@@ -217,6 +219,7 @@ export class SettingsSurface extends JfElement {
     // Tempdoc 855 §9.3 — the active settings-window CATEGORY (was `activeTab`): a native category
     // id from `settingsRegister.ts`, or a member category's catalog surface id.
     activeCategory: { state: true },
+    addressAnchor: { state: true },
     // Tempdoc 855 §9.5 — the scroll-spy's derived in-view sub-anchor within the active category.
     activeAnchor: { state: true },
     plugins: { state: true },
@@ -299,6 +302,8 @@ export class SettingsSurface extends JfElement {
   declare activeCategory: string;
   /** The scroll-spy's derived in-view sub-anchor within the active native category, or null. */
   declare activeAnchor: string | null;
+  declare private addressAnchor: string | null;
+  private arrivalRevision = 0;
   declare plugins: InstalledPlugin[];
   // Tempdoc 560 §28 — pending operator-approval candidates (URL-loaded + UNTRUSTED), id → source url.
   declare untrustedLoads: Map<string, string>;
@@ -360,8 +365,8 @@ export class SettingsSurface extends JfElement {
   // Tempdoc 855 §9.3 — mount-on-activation cache for a MEMBER category (mirrors
   // `SurfaceTabs.renderPanel`'s pattern: reuse across re-renders of the SAME category, recreate on
   // a category switch so the previous member's streams tear down on disconnect).
-  private _activeMemberEl: HTMLElement | null = null;
-  private _activeMemberElId: string | null = null;
+  private readonly memberElements = new Map<string, HTMLElement>();
+  private restoreHiddenEntryFocus = false;
 
   constructor() {
     super();
@@ -402,6 +407,7 @@ export class SettingsSurface extends JfElement {
     this.userConfig = {} as RendererUserConfig;
     this.railSurfaces = SettingsSurface.railSurfacesForCustomization();
     this.activeCategory = firstCategoryId();
+    this.addressAnchor = null;
     this.activeAnchor = null;
     this.plugins = getSessionPluginRegistry().list();
     this.untrustedLoads = new Map();
@@ -476,7 +482,8 @@ export class SettingsSurface extends JfElement {
     .settings-content-pane {
       flex: 1;
       min-height: 0;
-      overflow-y: auto;
+      overflow: auto;
+      min-width: 0;
     }
     .settings-content-pane.member {
       display: flex;
@@ -493,7 +500,7 @@ export class SettingsSurface extends JfElement {
     }
     @media (max-width: 600px) {
       .settings-shell { flex-direction: column; }
-      jf-settings-nav { width: 100%; flex: 0 0 10rem; height: 10rem; border-bottom: 1px solid var(--border-subtle); }
+      jf-settings-nav { width: 100%; flex: 0 1 8rem; min-height: 4rem; height: 8rem; border-bottom: 1px solid var(--border-subtle); }
       .settings-content-pane { min-width: 0; }
       .settings-content-inner { padding: 1rem; }
     }
@@ -922,11 +929,11 @@ export class SettingsSurface extends JfElement {
     // id (`settingsRegister.ts`), so the intent's memberId selects it directly — no translation.
     // Drain a pending intent (mounting now) AND subscribe (member deep-link while THIS host is
     // already active still switches the category).
-    const requested = takeMemberTabIntent('core.settings-surface');
-    if (requested) this.activeCategory = requested;
-    this.memberTabUnsub = subscribeMemberTab((hostId, memberId) => {
+    const requested = takeMemberTabRequest('core.settings-surface');
+    if (requested) this.receiveCoordinate(requested.memberId, requested.anchor);
+    this.memberTabUnsub = subscribeMemberTab((hostId, memberId, anchor) => {
       if (hostId !== 'core.settings-surface') return false;
-      this.activeCategory = memberId;
+      this.receiveCoordinate(memberId, anchor);
       return true;
     });
     // 559 Authority VI (slack/fill) — the reading-column fill policy IS available
@@ -1115,6 +1122,10 @@ export class SettingsSurface extends JfElement {
   }
 
   protected override willUpdate(): void {
+    const focusedEntry = this.shadowRoot?.activeElement?.closest<HTMLElement>('[data-settings-anchor]')?.dataset.settingsAnchor;
+    if (focusedEntry && findCategory(this.activeCategory)?.sections?.some(s => s.key === focusedEntry && s.gate && !s.gate())) {
+      this.restoreHiddenEntryFocus = true;
+    }
     // The recovery-only audience exception can disappear on the next status poll.
     // Move focus before the nested operation renderer removes its focused button.
     if (!this.settingsRecovery) {
@@ -1134,10 +1145,15 @@ export class SettingsSurface extends JfElement {
     super.updated(changed);
     // Shell slice 2 — the open section is part of the address (`?section=<category id>`); the
     // frame replaces the address when it changes, so Back still closes the window in one step.
-    if (changed.has('activeCategory')) {
+    if (changed.has('activeCategory') || changed.has('addressAnchor')) {
       this.dispatchEvent(new CustomEvent('settings-section-change', {
-        detail: { id: this.activeCategory }, bubbles: true, composed: true,
+        detail: { id: this.activeCategory, anchor: this.addressAnchor }, bubbles: true, composed: true,
       }));
+    }
+    if (this.restoreHiddenEntryFocus) {
+      this.restoreHiddenEntryFocus = false;
+      const nav = this.shadowRoot?.querySelector<JfElement>('jf-settings-nav');
+      void nav?.updateComplete.then(() => nav.shadowRoot?.querySelector<HTMLButtonElement>('.category-row.active')?.focus());
     }
     if (this.recoveryFocusRequested) void this.focusPendingSettingsRecovery();
     // 569 Move 6 — apply-time RUNTIME conformance: once per applied presentation, audit the
@@ -1633,8 +1649,9 @@ export class SettingsSurface extends JfElement {
    * own `settings.section.*` catalog label, so a renamed section renames its cross-links too.
    */
   private renderRelatedSettingsRow(categoryId: string, sectionKey: string): TemplateResult {
+    const coordinate = resolveSettingsCoordinate(categoryId, sectionKey);
     const section = SETTINGS_REGISTER.flatMap((g) => g.categories)
-      .find((c) => c.id === categoryId)
+      .find((c) => c.id === coordinate?.section)
       ?.sections?.find((s) => s.key === sectionKey);
     if (!section) return html``;
     return this.renderSettingRow(
@@ -1842,6 +1859,8 @@ export class SettingsSurface extends JfElement {
    */
   /** Recovery navigation selects existing controls; it never changes tier or invokes Reset. */
   async focusSettingsRecovery(): Promise<void> {
+    this.selectCategory('data-reset');
+    this.addressAnchor = 'reset-settings';
     this.recoveryFocusRequested = true;
     await this.focusPendingSettingsRecovery();
   }
@@ -2112,7 +2131,7 @@ export class SettingsSurface extends JfElement {
               @input=${(e: Event) => (this.renameDraft = (e.target as HTMLInputElement).value)}
               @keydown=${(e: KeyboardEvent) => {
                 if (e.key === 'Enter') this.commitRenameTheme(entry.id);
-                else if (e.key === 'Escape') this.cancelRenameTheme();
+                else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); this.cancelRenameTheme(); }
               }}
             />
             <span class="theme-tile-actions">
@@ -2981,28 +3000,9 @@ export class SettingsSurface extends JfElement {
     return all.filter((s) => s.placement === 'RAIL' && !memberIds.has(s.id));
   }
 
-  override render(): TemplateResult {
-    // Tempdoc 855 §9.3 — the settings window is register-driven: `<jf-settings-nav>` projects the
-    // ONE declared tree (`settingsRegister.ts`) into groups/categories/sub-anchors, and this
-    // render() projects the ACTIVE category into content — the same register both sides read, so
-    // nav and content cannot drift.
-    const category = findCategory(this.activeCategory) ?? allCategories()[0];
-    if (!category) return html``;
-    return html`
-      <div class="settings-root">
-        <div class="header">
-          <div>
-            <h2 tabindex="-1">Settings</h2>
-            <p class="subtitle">Customize your experience</p>
-          </div>
-          <div class="row">
-            ${this.readOnly
-              ? html`<jf-status-badge tone="warning">Session-only</jf-status-badge>`
-              : nothing}
-            ${this.saving
-              ? html`<span style="font-size: var(--font-size-xs); color: var(--text-tint)">Saving…</span>`
-              : nothing}
-            ${!this.readOnly
+  private renderResetSettings(): TemplateResult {
+    return html`<section class="section"><h3>Reset settings</h3>
+      ${!this.readOnly
               ? html`<span id="settings-reset" tabindex="-1" role="group" aria-label="Reset to defaults"
                   @action-invoke=${() => {
                     // Confirmation removes its focused Yes button before the status receipt arrives.
@@ -3022,6 +3022,59 @@ export class SettingsSurface extends JfElement {
                   ></jf-operation>
                 </span>`
               : nothing}
+    </section>`;
+  }
+
+  private renderVersion(): TemplateResult {
+    const bundle = document.querySelector<HTMLMetaElement>('meta[name="justsearch-version"]')?.content;
+    const version = bundle && /^[0-9A-Za-z.+-]{1,40}$/.test(bundle) ? bundle : 'unknown';
+    return html`<section class="section" data-testid="settings-version"><h3>Version</h3>
+      <p>Web bundle version: ${version} (source: application version metadata).</p>
+      ${this.updateStatus?.currentVersion
+        ? html`<p>Desktop version: ${this.updateStatus.currentVersion} (source: desktop updater).</p>`
+        : nothing}
+    </section>`;
+  }
+
+  private renderUpdateInformation(): TemplateResult {
+    const status = this.updateStatus;
+    return html`<section class="section" data-testid="settings-update-information"><h3>Update information</h3>
+      <p>${!this.host_.platform.capabilities.has('native-notifications')
+        ? 'Application updates are unavailable in the browser.'
+        : !status ? 'Update information is unavailable from the desktop updater.'
+        : status.state === 'idle' ? 'No update check has been observed.'
+        : status.state === 'up_to_date' ? 'The desktop updater last reported this version up to date.'
+        : `Observed desktop updater state: ${status.state}.`}</p>
+      ${status?.availableVersion ? html`<p>Available version: ${status.availableVersion}</p>` : nothing}
+      ${status?.error ? html`<p>${status.error}</p>` : nothing}
+      ${status?.state === 'repair_required' ? html`<p>Re-run the signed installer for ${status.availableVersion ?? 'the target release'}, then restart JustSearch.</p>` : nothing}
+      <jf-button variant="ghost" label="Open Updates"
+        .onActivate=${() => this.activateSearchHit('general', 'app-updates')}>Open Updates</jf-button>
+    </section>`;
+  }
+
+  override render(): TemplateResult {
+    // Tempdoc 855 §9.3 — the settings window is register-driven: `<jf-settings-nav>` projects the
+    // ONE declared tree (`settingsRegister.ts`) into groups/categories/sub-anchors, and this
+    // render() projects the ACTIVE category into content — the same register both sides read, so
+    // nav and content cannot drift.
+    const category = findCategory(this.activeCategory) ?? allCategories()[0];
+    if (!category) return html``;
+    return html`
+      <div class="settings-root" @keydown=${(e: KeyboardEvent) => this.onLocalEscape(e)}>
+        <div class="header">
+          <div>
+            <h2 tabindex="-1">Settings</h2>
+            <p class="subtitle">Customize your experience</p>
+          </div>
+          <div class="row">
+            ${this.readOnly
+              ? html`<jf-status-badge tone="warning">Session-only</jf-status-badge>`
+              : nothing}
+            ${this.saving
+              ? html`<span style="font-size: var(--font-size-xs); color: var(--text-tint)">Saving…</span>`
+              : nothing}
+
           </div>
         </div>
         ${this.error
@@ -3033,6 +3086,7 @@ export class SettingsSurface extends JfElement {
         <div class="settings-shell">
           <jf-settings-nav
             .register=${SETTINGS_REGISTER}
+            .audience=${this.viewerAudience}
             active-category=${this.activeCategory}
             .activeAnchor=${this.activeAnchor}
             .footerVersion=${this.updateStatus?.currentVersion
@@ -3053,22 +3107,13 @@ export class SettingsSurface extends JfElement {
    *  section subset (in the centered reading column); a member category mounts its catalog
    *  surface full-bleed (its own SurfaceLayout owns its width, like `SurfaceTabs.renderPanel`). */
   private renderCategoryContent(category: SettingsCategory): TemplateResult {
-    if (category.kind === 'member' && category.memberSurfaceId) {
-      return html`
-        <div class="settings-content-pane member">${this.renderMemberCategory(category.memberSurfaceId)}</div>
-      `;
-    }
-    // A native category rendering drops the member-element cache, so returning to a member
-    // category re-mounts it fresh — the same reset `SurfaceTabs.renderPanel` does on its
-    // slot branch. Without this, a member with non-idempotent connect/disconnect would
-    // silently show stale content (review finding, 855 P1).
-    this._activeMemberEl = null;
-    this._activeMemberElId = null;
     const sections = (category.sections ?? []).filter((s) => !s.gate || s.gate());
     return html`
       <div class="settings-content-pane">
         <div class="settings-content-inner">
-          ${sections.map((s) => this.renderRegisteredSection(s))}
+          ${this.addressAnchor && category.sections?.some(s => s.key === this.addressAnchor && s.gate && !s.gate())
+            ? html`<p role="status">This destination is hidden by your view tier.</p>` : nothing}
+          ${repeat(sections, s => s.key, s => this.renderRegisteredSection(s))}
         </div>
       </div>
     `;
@@ -3078,7 +3123,8 @@ export class SettingsSurface extends JfElement {
    *  `<jf-settings-nav>` sub-anchor's jump target — the SAME key the register declares. */
   private renderRegisteredSection(entry: SettingsSectionEntry): TemplateResult {
     const renderer = this.sectionRenderers()[entry.key];
-    return html`<div data-settings-anchor=${entry.key}>${renderer ? renderer() : nothing}</div>`;
+    return html`<div data-settings-anchor=${entry.key} tabindex="-1">${entry.memberSurfaceId
+      ? this.renderMemberCategory(entry.memberSurfaceId) : renderer ? renderer() : nothing}</div>`;
   }
 
   /** Tempdoc 855 §9.3 — the SettingsSurface-side projection of the register: each declared native
@@ -3108,6 +3154,9 @@ export class SettingsSurface extends JfElement {
       'view-tier': () => this.renderViewerAudience(),
       'workspace-profiles': () => this.renderWorkspaceProfilesDeveloper(),
       data: () => this.renderData(),
+      'reset-settings': () => this.renderResetSettings(),
+      version: () => this.renderVersion(),
+      'update-information': () => this.renderUpdateInformation(),
     };
   }
 
@@ -3140,9 +3189,7 @@ export class SettingsSurface extends JfElement {
     `;
   }
 
-  /** Tempdoc 855 §9.3 — member-category mount, the same `mountSurface` lazy-load + mount-on-
-   *  activation pattern `SurfaceTabs.renderPanel` uses (§11.3), scoped to just this one category
-   *  (no cross-category cache: switching category away and back re-mounts, tearing down streams). */
+  /** Mount members independently; retained elements disconnect when their section is left. */
   private renderMemberCategory(surfaceId: string): TemplateResult {
     const surface = getSurface(surfaceId);
     if (!surface) return html`<div class="empty-member">Unknown surface: ${surfaceId}</div>`;
@@ -3152,18 +3199,22 @@ export class SettingsSurface extends JfElement {
       void customElements.whenDefined(tag).then(() => this.requestUpdate());
       return html`<div class="empty-member">Loading…</div>`;
     }
-    if (this._activeMemberElId !== surfaceId || this._activeMemberEl === null) {
-      this._activeMemberEl = mountSurface(surface, { apiBase: this.apiBase, host_: this.host_ });
-      this._activeMemberElId = surfaceId;
+    if (!customElements.get(tag)) return html`<div class="empty-member">Cannot mount ${surfaceId}.</div>`;
+    let element = this.memberElements.get(surfaceId);
+    if (!element) {
+      element = mountSurface(surface, { apiBase: this.apiBase, host_: this.host_ }) ?? undefined;
+      if (element) this.memberElements.set(surfaceId, element);
     }
-    return html`${this._activeMemberEl ?? html`<div class="empty-member">Cannot mount ${surfaceId}.</div>`}`;
+    return html`${element ?? html`<div class="empty-member">Cannot mount ${surfaceId}.</div>`}`;
   }
 
   /** Tempdoc 855 §9.3 — switch the active category: reset scroll to top (a fresh page) and let the
    *  scroll-spy re-measure the new category's sub-anchors. */
   private selectCategory(id: string): void {
     if (id === this.activeCategory) return;
+    this.arrivalRevision++;
     this.activeCategory = id;
+    this.addressAnchor = null;
     this.activeAnchor = null;
     void this.updateComplete.then(() => {
       const conv = this.settingsScrollEl();
@@ -3180,28 +3231,49 @@ export class SettingsSurface extends JfElement {
    *  schedules its own `updateComplete` continuation (scrollTop reset + anchor-observer rewire), so
    *  this chains a second one that runs after it in the same microtask batch (registration order). */
   private activateSearchHit(categoryId: string, sectionKey?: string): void {
-    const switchingCategory = categoryId !== this.activeCategory;
-    this.selectCategory(categoryId);
-    if (!sectionKey) return;
-    if (switchingCategory) {
-      void this.updateComplete.then(() => this.jumpToAnchor(sectionKey));
-    } else {
-      this.jumpToAnchor(sectionKey);
+    if (sectionKey) this.receiveCoordinate(categoryId, sectionKey);
+    else {
+      const coordinate = resolveSettingsCoordinate(categoryId);
+      if (coordinate) this.selectCategory(coordinate.section);
     }
   }
 
-  /** Tempdoc 855 §9.5 — click-jump from the nav: scroll the content pane to the sub-anchor,
-   *  honoring reduced-motion (mirrors `NavigationController.jumpTo`). */
-  private jumpToAnchor(key: string): void {
-    const conv = this.settingsScrollEl();
-    if (!conv) return;
-    const target = conv.querySelector(`[data-settings-anchor="${key}"]`) as HTMLElement | null;
-    if (!target) return;
-    const reduce =
-      typeof window.matchMedia === 'function' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    target.scrollIntoView({ block: 'start', behavior: reduce ? 'auto' : 'smooth' });
+  /** All incoming coordinates use the register, with a revision to cancel superseded arrivals. */
+  private receiveCoordinate(id: string, anchor?: string): void {
+    const coordinate = resolveSettingsCoordinate(id, anchor);
+    if (!coordinate) return;
+    this.selectCategory(coordinate.section);
+    const revision = ++this.arrivalRevision;
+    this.addressAnchor = coordinate.anchor ?? null;
+    void this.updateComplete.then(() => {
+      if (revision !== this.arrivalRevision || !coordinate.anchor) return;
+      this.jumpToAnchor(coordinate.anchor, true);
+    });
+  }
+
+  private jumpToAnchor(key: string, focus = false): void {
+    const target = Array.from(this.settingsScrollEl()?.querySelectorAll<HTMLElement>('[data-settings-anchor]') ?? [])
+      .find(el => el.dataset.settingsAnchor === key);
+    if (!target) {
+      if (focus) this.shadowRoot?.querySelector<HTMLElement>('jf-settings-nav')?.shadowRoot
+        ?.querySelector<HTMLButtonElement>('.category-row.active')?.focus();
+      return;
+    }
+    const reduce = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    target.scrollIntoView({ block: 'start', behavior: focus || reduce ? 'auto' : 'smooth' });
     this.activeAnchor = key;
+    this.addressAnchor = key;
+    if (focus) target.focus({ preventScroll: true });
+  }
+
+  private onLocalEscape(e: KeyboardEvent): void {
+    if (e.key !== 'Escape' || e.defaultPrevented || e.isComposing) return;
+    if (this.deleteState === 'confirming') this.cancelDelete();
+    else if (this.renamingThemeId) this.cancelRenameTheme();
+    else if (this.themeImporting) { this.themeImporting = false; this.themeImportDraft = ''; }
+    else return;
+    e.preventDefault();
+    e.stopPropagation();
   }
 
   private settingsScrollEl(): HTMLElement | null {

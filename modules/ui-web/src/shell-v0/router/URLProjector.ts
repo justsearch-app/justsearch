@@ -25,6 +25,7 @@
  *     had no room for that.
  */
 
+import { getSurface } from '../../api/registry/SurfaceCatalogClient.js';
 import { canonicalize, parseUrl } from './parser.js';
 import { getStore } from './storeRegistry.js';
 import { getJournalState, recordNavigation } from '../state/NavigationJournal.js';
@@ -324,6 +325,9 @@ export function currentAddress(): ShellAddressNavigation | null {
 // ----- helpers -----
 
 function writeUrl(surfaceId: string, schema: ResolvedSchema, push = false): void {
+  // A modal owns the address while the underlying stores keep updating.
+  const current = currentAddress();
+  if (current && current.target !== surfaceId && getSurface(current.target)?.placement === 'MODAL') return;
   const state = collectState(schema);
   const addr: ShellAddressNavigation = {
     kind: 'navigate',

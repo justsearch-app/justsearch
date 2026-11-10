@@ -271,7 +271,7 @@ describe('FR7 plugin windows, overrides and provenance', () => {
     try {
       bar(shell).dispatchEvent(new CustomEvent('top-bar-select', { detail: { kind: 'window', id: 'about' }, bubbles: true, composed: true }));
       await settle(shell);
-      expect(decodeURIComponent(window.location.hash)).toBe(`#justsearch://surface/${SETTINGS}?section=desktop`);
+      expect(decodeURIComponent(window.location.hash)).toBe(`#justsearch://surface/${SETTINGS}?section=about`);
       bar(shell).dispatchEvent(new CustomEvent('top-bar-select', { detail: { kind: 'copy-link' }, bubbles: true, composed: true }));
       await settle(shell);
       expect(writeText).toHaveBeenCalledWith(window.location.href);

@@ -156,6 +156,7 @@ async function mountSurface(category?: string): Promise<HTMLElement> {
       selectTheme: async (id) => { if (id === null) realClearActiveTheme(); else await realLoadAndApplyTheme(id); },
     },
   });
+  el.activeCategory = category ?? 'appearance';
   document.body.appendChild(el);
   // Allow Lit's connectedCallback + first render cycle.
   await new Promise((resolve) => setTimeout(resolve, 0));
@@ -378,7 +379,7 @@ describe('SettingsSurface — V1.5 Rail section (the switcher and the More menu)
 
   it('lists the switcher areas in the switcher order, then the More windows in catalog order, in the design words', async () => {
     // Tempdoc 855 P1 — Rail is a sub-anchor of the "layout" category now (register-driven paging).
-    const el = await mountSurface('layout');
+    const el = await mountSurface('appearance');
     const root = el.shadowRoot!;
     expect(labels(root)).toEqual([...AREA_IDS, 'acme.notes-surface', 'acme.graph-surface'].map(labelOf));
     // §2.A: the rows show human labels, not raw surface ids.
@@ -393,7 +394,7 @@ describe('SettingsSurface — V1.5 Rail section (the switcher and the More menu)
   });
 
   it('X1 the More windows line takes its spacing from the space tokens, not an inline size', async () => {
-    const el = await mountSurface('layout');
+    const el = await mountSurface('appearance');
     const list = el.shadowRoot!.querySelector('ul.rail-list[aria-label="More menu windows"]')!;
     const intro = list.previousElementSibling as HTMLElement;
     expect(intro.textContent).toContain('Windows listed under More');
@@ -406,7 +407,7 @@ describe('SettingsSurface — V1.5 Rail section (the switcher and the More menu)
 
   it('respects userConfig.surfaceOrder for the More windows; the switcher keeps its fixed order', async () => {
     setSurfaceOrder(['acme.graph-surface', 'core.brain-surface', 'acme.notes-surface', 'core.search-v3-surface']);
-    const el = await mountSurface('layout');
+    const el = await mountSurface('appearance');
     const root = el.shadowRoot!;
     expect(labels(root)).toEqual([...AREA_IDS, 'acme.graph-surface', 'acme.notes-surface'].map(labelOf));
     expect(listed(root, 'Switcher')).toEqual(AREA_IDS);
@@ -416,7 +417,7 @@ describe('SettingsSurface — V1.5 Rail section (the switcher and the More menu)
   it('hidden surfaces have visibility=false reflected in checkbox', async () => {
     setSurfaceVisibility('core.brain-surface', false);
     setSurfaceVisibility('acme.graph-surface', false);
-    const el = await mountSurface('layout');
+    const el = await mountSurface('appearance');
     const root = el.shadowRoot!;
     const checked = (id: string): boolean =>
       root.querySelector<HTMLInputElement>(`.rail-row[data-surface-id="${id}"] input[type="checkbox"]`)!.checked;
@@ -427,7 +428,7 @@ describe('SettingsSurface — V1.5 Rail section (the switcher and the More menu)
   });
 
   it('move-down arrow on the first More window updates surfaceOrder; the switcher areas have no arrows', async () => {
-    const el = await mountSurface('layout');
+    const el = await mountSurface('appearance');
     const root = el.shadowRoot!;
     expect(root.querySelectorAll('ul.rail-list[aria-label="Switcher"] .rail-arrow')).toHaveLength(0);
     const firstRow = root.querySelector('ul.rail-list[aria-label="More menu windows"] .rail-row') as HTMLElement;
@@ -471,7 +472,7 @@ describe('SettingsSurface — Layout picker (855 fix-round F2 S1)', () => {
   });
 
   async function layoutRadiogroup(root: ShadowRoot): Promise<HTMLElement> {
-    const group = root.querySelector('jf-option-button-group') as HTMLElement & {
+    const group = root.querySelector('[data-settings-anchor="layout"] jf-option-button-group') as HTMLElement & {
       shadowRoot: ShadowRoot | null;
       updateComplete: Promise<unknown>;
     };
@@ -480,7 +481,7 @@ describe('SettingsSurface — Layout picker (855 fix-round F2 S1)', () => {
   }
 
   it('renders one radio per declared layout manifest, in listLayouts() order', async () => {
-    const el = await mountSurface('layout');
+    const el = await mountSurface('appearance');
     const radiogroup = await layoutRadiogroup(el.shadowRoot!);
     const buttons = Array.from(radiogroup.querySelectorAll<HTMLButtonElement>('button[role="radio"]'));
     expect(buttons.map((b) => b.querySelector('.option-label')?.textContent?.trim())).toEqual([
@@ -492,20 +493,20 @@ describe('SettingsSurface — Layout picker (855 fix-round F2 S1)', () => {
   });
 
   it('the active layout (core.default when unset) is marked aria-checked', async () => {
-    const el = await mountSurface('layout');
+    const el = await mountSurface('appearance');
     const radiogroup = await layoutRadiogroup(el.shadowRoot!);
     const checked = radiogroup.querySelector('button[role="radio"][aria-checked="true"]');
     expect(checked?.querySelector('.option-label')?.textContent?.trim()).toBe('Default');
   });
 
   it('the radiogroup carries an accessible name ("Layout")', async () => {
-    const el = await mountSurface('layout');
+    const el = await mountSurface('appearance');
     const radiogroup = await layoutRadiogroup(el.shadowRoot!);
     expect(radiogroup.getAttribute('aria-label')).toBe('Layout');
   });
 
   it('clicking a layout option calls setActiveLayoutId and re-renders the new selection as checked', async () => {
-    const el = await mountSurface('layout') as HTMLElement & { updateComplete: Promise<unknown> };
+    const el = await mountSurface('appearance') as HTMLElement & { updateComplete: Promise<unknown> };
     const radiogroup = await layoutRadiogroup(el.shadowRoot!);
     const focusBtn = Array.from(
       radiogroup.querySelectorAll<HTMLButtonElement>('button[role="radio"]'),
@@ -586,7 +587,7 @@ describe('SettingsSurface — settle transients on hide (tempdoc 609 instance-re
     v.renameDraft = 'My renamed theme';
     v.themeImportDraft = '{"id":"my-draft-theme"}';
     // Tempdoc 855 P1 — `activeTab` generalized to `activeCategory` (register-driven categories).
-    v.activeCategory = 'developer';
+    v.activeCategory = 'advanced';
 
     el.remove(); // navigate away (instance retained; settleTransients fires via JfElement)
 
@@ -598,7 +599,7 @@ describe('SettingsSurface — settle transients on hide (tempdoc 609 instance-re
     expect(v.renameDraft).toBe('My renamed theme');
     expect(v.themeImportDraft).toBe('{"id":"my-draft-theme"}');
     // The user's category choice is recoverable and survives.
-    expect(v.activeCategory).toBe('developer');
+    expect(v.activeCategory).toBe('advanced');
   });
 });
 
@@ -618,7 +619,7 @@ describe('SettingsSurface — Security member deep-link (tempdoc 855 §5 item 1 
     requestMemberTab('core.settings-surface', 'core.security-surface');
     const el = await mountSurface();
     const v = el as unknown as Record<string, unknown>;
-    expect(v.activeCategory).toBe('core.security-surface');
+    expect(v.activeCategory).toBe('security-privacy');
     el.remove();
   });
 
@@ -632,7 +633,7 @@ describe('SettingsSurface — Security member deep-link (tempdoc 855 §5 item 1 
     requestMemberTab('core.settings-surface', 'core.security-surface');
     await (el as unknown as { updateComplete: Promise<unknown> }).updateComplete;
 
-    expect(v.activeCategory).toBe('core.security-surface');
+    expect(v.activeCategory).toBe('security-privacy');
     el.remove();
   });
 });

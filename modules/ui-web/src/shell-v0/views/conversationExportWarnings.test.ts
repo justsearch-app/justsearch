@@ -24,7 +24,7 @@ afterEach(async () => {
 it('S5710 points from Delete all local data to conversation export before loss', async () => {
   const view = document.createElement('jf-settings-surface') as SettingsSurface;
   view.host_ = createMockHostApi({ platform: { capabilities: new Set(['native-notifications']) } });
-  document.body.append(view); await settle(); view.activeCategory = 'data'; await view.updateComplete;
+  document.body.append(view); await settle(); view.activeCategory = 'data-reset'; await view.updateComplete;
   const remove = view.shadowRoot!.querySelector<JfButton>('jf-button[label="Delete all local data"]')!;
   remove.onActivate?.(); await view.updateComplete;
   const text = view.shadowRoot!.textContent!;

@@ -46,7 +46,7 @@ async function mountSurface(): Promise<HTMLElement> {
   await new Promise((resolve) => setTimeout(resolve, 0));
   // Tempdoc 855 P1 — View tier is a sub-anchor of the "developer" category (register-driven
   // paging); the default active category ("appearance") would not render it.
-  el.activeCategory = 'developer';
+  el.activeCategory = 'advanced';
   await el.updateComplete;
   return el;
 }

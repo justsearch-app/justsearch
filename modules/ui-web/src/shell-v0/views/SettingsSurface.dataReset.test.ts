@@ -19,7 +19,7 @@ async function mount(desktop = true): Promise<SettingsSurface> {
   element.host_ = createMockHostApi({ platform: { capabilities: new Set(desktop ? ['native-notifications'] : []) } });
   document.body.append(element);
   await settle();
-  element.activeCategory = 'data';
+  element.activeCategory = 'data-reset';
   await element.updateComplete;
   return element;
 }

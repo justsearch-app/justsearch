@@ -127,6 +127,7 @@ async function mountSettings(): Promise<HTMLElement> {
       },
     },
   });
+  Object.assign(el, { activeCategory: 'appearance' });
   document.body.appendChild(el);
   await new Promise((resolve) => setTimeout(resolve, 0));
   await el.updateComplete;

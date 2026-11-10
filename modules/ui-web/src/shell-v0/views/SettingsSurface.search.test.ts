@@ -57,6 +57,7 @@ async function mountSurface(): Promise<MountedSurface> {
   vi.spyOn(globalThis, 'fetch').mockResolvedValue(
     new Response(JSON.stringify({ ui: {} }), { status: 200 }),
   );
+  el.activeCategory = 'appearance';
   document.body.appendChild(el);
   await new Promise((resolve) => setTimeout(resolve, 0));
   await el.updateComplete;
@@ -105,9 +106,9 @@ describe('SettingsSurface — search-select activation (855 §6 Phase 4)', () =>
 
   it('a category-only hit (no sectionKey) selects that category, same as category-select', async () => {
     const el = await mountSurface();
-    dispatchSearchSelect(el, { categoryId: 'developer' });
+    dispatchSearchSelect(el, { categoryId: 'advanced' });
     await el.updateComplete;
-    expect(el.activeCategory).toBe('developer');
+    expect(el.activeCategory).toBe('advanced');
   });
 
   it('a section hit under the CURRENT category jumps immediately (content already rendered)', async () => {
@@ -122,12 +123,12 @@ describe('SettingsSurface — search-select activation (855 §6 Phase 4)', () =>
     const el = await mountSurface();
     expect(el.activeCategory).toBe('appearance');
 
-    dispatchSearchSelect(el, { categoryId: 'developer', sectionKey: 'view-tier' });
+    dispatchSearchSelect(el, { categoryId: 'advanced', sectionKey: 'view-tier' });
     // The category switch and the anchor jump are two chained `updateComplete` continuations
     // (SettingsSurface.ts `activateSearchHit`) — await lets both settle.
     await el.updateComplete;
 
-    expect(el.activeCategory).toBe('developer');
+    expect(el.activeCategory).toBe('advanced');
     const anchorEl = el.shadowRoot!.querySelector('[data-settings-anchor="view-tier"]');
     expect(anchorEl).not.toBeNull();
     expect(scrolledTo).toBe(anchorEl);
@@ -158,7 +159,7 @@ describe('SettingsSurface — search-select activation (855 §6 Phase 4)', () =>
     const input = nav.shadowRoot!.querySelector<HTMLInputElement>('input.search-input')!;
     // No i18n catalog is seeded in this file — `localizeResourceKey` falls back to the raw key
     // (`settings.category.developer`), so a plain substring query still finds it.
-    input.value = 'developer';
+    input.value = 'advanced';
     input.dispatchEvent(new Event('input', { bubbles: true }));
     await nav.updateComplete;
 
@@ -172,10 +173,10 @@ describe('SettingsSurface — search-select activation (855 §6 Phase 4)', () =>
     // round-trip takes, before asserting the settled state.
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    expect(el.activeCategory).toBe('developer');
+    expect(el.activeCategory).toBe('advanced');
     const activeRow = nav.shadowRoot!.querySelector<HTMLButtonElement>('.category-row.active');
     expect(activeRow).not.toBeNull();
-    expect(activeRow?.dataset.settingsCategory).toBe('developer');
+    expect(activeRow?.dataset.settingsCategory).toBe('advanced');
     expect(nav.shadowRoot!.activeElement).toBe(activeRow);
   });
 });

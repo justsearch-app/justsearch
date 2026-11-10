@@ -448,6 +448,7 @@ async def _check_legacy_token_plugin(page) -> None:
 
 async def _set_density_in_settings(page, label: str) -> None:
     """Select one FE-local Density stop and prove the control projected it."""
+    await page.locator('jf-settings-nav [data-settings-category="appearance"]').click()
     slider = page.locator(S.CSS_DENSITY_SLIDER).first
     await slider.wait_for(state="visible", timeout=10_000)
     await slider.fill(str({"Compact": 0, "Comfortable": 1, "Spacious": 2}[label]))
@@ -978,7 +979,8 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         if "high-contrast" not in (await page.locator("html").get_attribute("class") or ""):
             return
         await page.locator(S.rail_css(S.RAIL_SURFACE_SETTINGS)).click()
-        await page.get_by_text('Accessibility', exact=True).first.click()
+        await page.locator('[data-settings-category="appearance"]').click()
+        await page.locator('jf-settings-nav [data-settings-anchor="accessibility"]').click()
         await page.get_by_role("switch", name="High contrast", exact=True).click()
         await page.wait_for_function("!document.documentElement.classList.contains('high-contrast')")
         await page.keyboard.press("Escape")
@@ -1473,6 +1475,14 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
 
     _settings_setup = _view_setup("settings")
 
+    def setup_settings_section(section, theme="dark"):
+        async def setup(page):
+            await _view_setup("settings", theme)(page)
+            await page.locator(f'jf-settings-nav [data-settings-category="{section}"]').click()
+            await page.locator(f'jf-settings-nav [data-settings-category="{section}"][aria-current="true"]').wait_for()
+        return setup
+
+
     def setup_indexing_rules(narrow=False, focus_rules=True):
         async def setup(page):
             if narrow:
@@ -1699,7 +1709,7 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         return setup
 
     async def setup_settings_forced_colors(page):
-        await _settings_setup(page)
+        await setup_settings_section("appearance")(page)
         await page.keyboard.press("Tab")
         await _settle_focus_marks(page)
 
@@ -2264,6 +2274,8 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         *[Step(f"{v}-light", setup=_view_setup(v, "light"), isolated=True, color_scheme="light",
                fixtures_variant="install-preview" if v in ("ai-brain-components", "ai-brain-consent") else "default")
           for v in views],
+        Step("settings-appearance", setup=setup_settings_section("appearance"), isolated=True),
+        Step("settings-appearance-light", setup=setup_settings_section("appearance", "light"), isolated=True, color_scheme="light"),
         Step("help-narrow", setup=setup_help_narrow, isolated=True),
 
         # --- Isolated: density/mode variants ---

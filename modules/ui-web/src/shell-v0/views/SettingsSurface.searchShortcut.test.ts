@@ -24,7 +24,7 @@ async function mount(native = true): Promise<SettingsElement> {
   const el = document.createElement('jf-settings-surface') as SettingsElement;
   el.host_ = createMockHostApi({ platform: { capabilities: new Set(native ? ['native-notifications'] : []) } });
   document.body.append(el);
-  el.activeCategory = 'desktop';
+  el.activeCategory = 'general';
   await new Promise((resolve) => setTimeout(resolve, 0));
   await el.updateComplete;
   return el;

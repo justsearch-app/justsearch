@@ -43,6 +43,7 @@ async function mountSettings(): Promise<HTMLElement> {
       fetch: () => Promise.resolve(new Response(JSON.stringify({ ui: {} }), { status: 200 })),
     },
   });
+  Object.assign(el, { activeCategory: 'appearance' });
   document.body.appendChild(el);
   await new Promise((resolve) => setTimeout(resolve, 0));
   await el.updateComplete;

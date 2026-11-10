@@ -62,7 +62,7 @@ describe('SettingsSurface app updates', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     // Tempdoc 855 P1 — App updates is a sub-anchor of the "desktop" category (register-driven
     // paging); the default active category ("appearance") would not render it.
-    element.activeCategory = 'desktop';
+    element.activeCategory = 'general';
     await element.updateComplete;
 
     const section = element.shadowRoot?.querySelector('[data-testid="settings-app-updates"]');
@@ -83,7 +83,7 @@ describe('SettingsSurface app updates', () => {
     });
     document.body.appendChild(element);
     await new Promise((resolve) => setTimeout(resolve, 0));
-    element.activeCategory = 'desktop';
+    element.activeCategory = 'general';
     await element.updateComplete;
 
     const install = element.shadowRoot?.querySelector(

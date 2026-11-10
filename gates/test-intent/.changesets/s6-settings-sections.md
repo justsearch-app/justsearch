@@ -1,0 +1,467 @@
+---
+schema: test-intent.v1
+task: t-20261103-shell
+author-role: builder
+author-session: s6-settings-builder-g
+---
+
+# Test-intent entries
+
+Candidate G follows the settled SG1–SG10 amendments. SD developer-tools changes are excluded.
+
+```json
+{
+  "entries": [
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.appUpdate.test.ts",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.chatWidth.test.ts",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.dataReset.test.ts",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.highContrast.test.ts",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.overlap.test.ts",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions.test.ts",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.searchShortcut.test.ts",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.ui-mode.test.ts",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.viewerAudience.test.ts",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions-lockdown.test.ts",
+        "modules/ui-web/src/shell-v0/components/ConfirmBand.frame-lockdown.test.ts",
+        "modules/ui-web/src/shell-v0/views/conversationExportWarnings.test.ts"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "Only setup coordinates move to the settled section (General, Appearance, Data & reset or Advanced), including selecting Appearance explicitly after the default becomes General. Every prior input, visibility, write, error, confirmation, cancellation, focus, timing, native-capability and audience assertion remains intact.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "SG2 and SG9 move existing controls without changing their behavior. SG10 retains their checks by pointing test setup at each control’s new section."
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame.test.ts"
+      ],
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "SG7 More > About opens the About section instead of Desktop; copy-link continues copying the current URL."
+        }
+      ],
+      "conflictSearch": "Decision records searched for Settings category/section placement, Reset header and Developer navigation conflicts: none. ADR-0023 concerns persistence receipts and is unchanged. Settled SG amendments override the draft; developer-tools SD rows remain outside candidate G."
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "SG7 More > About opens the About section instead of Desktop; copy-link continues copying the current URL.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "SG7 More > About opens the About section instead of Desktop; copy-link continues copying the current URL."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-settings-adapted.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame.test.ts"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/SettingsNav.test.ts"
+      ],
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "SG2 removes group headings. The late-catalog oracle now observes a section label, retaining the before-catalog raw-key and after-catalog localized-label assertions."
+        }
+      ],
+      "conflictSearch": "Decision records searched for Settings category/section placement, Reset header and Developer navigation conflicts: none. ADR-0023 concerns persistence receipts and is unchanged. Settled SG amendments override the draft; developer-tools SD rows remain outside candidate G."
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/SettingsNav.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "SG2 removes group headings. The late-catalog oracle now observes a section label, retaining the before-catalog raw-key and after-catalog localized-label assertions.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "SG2 removes group headings. The late-catalog oracle now observes a section label, retaining the before-catalog raw-key and after-catalog localized-label assertions."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-settings-adapted.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/SettingsNav.test.ts"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.notifications.test.ts"
+      ],
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "SG2 Notifications belongs to General; register membership and search hit coordinates name General. Existing notification choice and write assertions remain."
+        }
+      ],
+      "conflictSearch": "Decision records searched for Settings category/section placement, Reset header and Developer navigation conflicts: none. ADR-0023 concerns persistence receipts and is unchanged. Settled SG amendments override the draft; developer-tools SD rows remain outside candidate G."
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.notifications.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "SG2 Notifications belongs to General; register membership and search hit coordinates name General. Existing notification choice and write assertions remain.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "SG2 Notifications belongs to General; register membership and search hit coordinates name General. Existing notification choice and write assertions remain."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-settings-adapted.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.notifications.test.ts"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.search.test.ts"
+      ],
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "SG2/SG6 search selects Advanced and its View tier anchor, and restores focus to Advanced after query clearing; the new section identity replaces Developer. Appearance setup remains explicit."
+        }
+      ],
+      "conflictSearch": "Decision records searched for Settings category/section placement, Reset header and Developer navigation conflicts: none. ADR-0023 concerns persistence receipts and is unchanged. Settled SG amendments override the draft; developer-tools SD rows remain outside candidate G."
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.search.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "SG2/SG6 search selects Advanced and its View tier anchor, and restores focus to Advanced after query clearing; the new section identity replaces Developer. Appearance setup remains explicit.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "SG2/SG6 search selects Advanced and its View tier anchor, and restores focus to Advanced after query clearing; the new section identity replaces Developer. Appearance setup remains explicit."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-settings-adapted.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.search.test.ts"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.section-address.test.ts"
+      ],
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "SG4 privacy-trust resolves to Security & privacy in the surface and its composed section-change event."
+        }
+      ],
+      "conflictSearch": "Decision records searched for Settings category/section placement, Reset header and Developer navigation conflicts: none. ADR-0023 concerns persistence receipts and is unchanged. Settled SG amendments override the draft; developer-tools SD rows remain outside candidate G."
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.section-address.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "SG4 privacy-trust resolves to Security & privacy in the surface and its composed section-change event.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "SG4 privacy-trust resolves to Security & privacy in the surface and its composed section-change event."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-settings-adapted.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.section-address.test.ts"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.v15.test.ts"
+      ],
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "SG2/SG4/SG9 Layout and rail controls remain in Appearance, remembered section uses Advanced, and pending/live Security member requests select Security & privacy. Theme, layout, overrides, drafts and persistence oracles remain; the Layout radiogroup selector is scoped to its moved anchor."
+        }
+      ],
+      "conflictSearch": "Decision records searched for Settings category/section placement, Reset header and Developer navigation conflicts: none. ADR-0023 concerns persistence receipts and is unchanged. Settled SG amendments override the draft; developer-tools SD rows remain outside candidate G."
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.v15.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "SG2/SG4/SG9 Layout and rail controls remain in Appearance, remembered section uses Advanced, and pending/live Security member requests select Security & privacy. Theme, layout, overrides, drafts and persistence oracles remain; the Layout radiogroup selector is scoped to its moved anchor.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "SG2/SG4/SG9 Layout and rail controls remain in Appearance, remembered section uses Advanced, and pending/live Security member requests select Security & privacy. Theme, layout, overrides, drafts and persistence oracles remain; the Layout radiogroup selector is scoped to its moved anchor."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-settings-adapted.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.v15.test.ts"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/settingsRegister.test.ts"
+      ],
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "SG2/SG6 the Switcher entry keeps its shipped search words and now belongs to Appearance."
+        }
+      ],
+      "conflictSearch": "Decision records searched for Settings category/section placement, Reset header and Developer navigation conflicts: none. ADR-0023 concerns persistence receipts and is unchanged. Settled SG amendments override the draft; developer-tools SD rows remain outside candidate G."
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/settingsRegister.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "SG2/SG6 the Switcher entry keeps its shipped search words and now belongs to Appearance.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "SG2/SG6 the Switcher entry keeps its shipped search words and now belongs to Appearance."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-settings-adapted.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/settingsRegister.test.ts"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.navigation.test.ts"
+      ],
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "SG4 replaces privacy-trust in the emitted address with canonical security-privacy while keeping one-step history close behavior."
+        }
+      ],
+      "conflictSearch": "Decision records searched for Settings category/section placement, Reset header and Developer navigation conflicts: none. ADR-0023 concerns persistence receipts and is unchanged. Settled SG amendments override the draft; developer-tools SD rows remain outside candidate G."
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.navigation.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "SG1 default Ctrl+comma opens Settings from Search/text inputs and repeats without history changes, excluding IME, repeat and extra modifiers. SG4 legacy section/tab/category plus explicit entry resolves to General > Keyboard; section events emit canonical Security & privacy.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "SG1 default Ctrl+comma opens Settings from Search/text inputs and repeats without history changes, excluding IME, repeat and extra modifiers. SG4 legacy section/tab/category plus explicit entry resolves to General > Keyboard; section events emit canonical Security & privacy."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-settings-sections.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.navigation.test.ts#SG1 Ctrl+comma opens over Search, repeats in place and honours typing, IME, repeat and modifier guards",
+        "modules/ui-web/src/shell-v0/chrome/Shell.navigation.test.ts#SG4 legacy coordinate section=layout&entry=keyboard arrives at General and the Keyboard anchor",
+        "modules/ui-web/src/shell-v0/chrome/Shell.navigation.test.ts#SG4 legacy coordinate category=layout&entry=keyboard arrives at General and the Keyboard anchor",
+        "modules/ui-web/src/shell-v0/chrome/Shell.navigation.test.ts#SG4 legacy coordinate tab=layout&anchor=keyboard arrives at General and the Keyboard anchor"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts"
+      ],
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "SG5 recovery now selects Data & reset rather than preserving the previously open section; no View-tier detour, invocation, or audience change is allowed."
+        }
+      ],
+      "conflictSearch": "Decision records searched for Settings category/section placement, Reset header and Developer navigation conflicts: none. ADR-0023 concerns persistence receipts and is unchanged. Settled SG amendments override the draft; developer-tools SD rows remain outside candidate G."
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "SG5 recovery from Appearance selects Data & reset and focuses the actual Reset button for USER, OPERATOR and DEVELOPER without invoking it. Confirmation/error/success and the existing USER recovery exception retain their checks.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "SG5 recovery from Appearance selects Data & reset and focuses the actual Reset button for USER, OPERATOR and DEVELOPER without invoking it. Confirmation/error/success and the existing USER recovery exception retain their checks."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-settings-sections.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts#SG5 R2 selects Data & reset from another section and focuses Reset in every tier without invoking it"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts"
+      ],
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "SG4 maps a Developer link and reload to Advanced > View tier. SG1/SG3/SG4/SG8/SG9 supply the additional browser contracts below."
+        }
+      ],
+      "conflictSearch": "Decision records searched for Settings category/section placement, Reset header and Developer navigation conflicts: none. ADR-0023 concerns persistence receipts and is unchanged. Settled SG amendments override the draft; developer-tools SD rows remain outside candidate G."
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "SG1 browser Ctrl+comma preserves composer draft/caret and history, command guard blocks other modals, higher-priority bindings win, and More/status transients dismiss with focus returned to a surviving trigger. SG3/SG4 pending/background projection cannot overwrite an addressed Settings entry; reload and close retain the underlying area, and section changes remove stale anchors. SG8 narrow enlarged-text navigation and local Escape order work. SG9 real Gallery/Editor instances and editor drafts survive sibling apply and leaving/returning.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "SG1 browser Ctrl+comma preserves composer draft/caret and history, command guard blocks other modals, higher-priority bindings win, and More/status transients dismiss with focus returned to a surviving trigger. SG3/SG4 pending/background projection cannot overwrite an addressed Settings entry; reload and close retain the underlying area, and section changes remove stale anchors. SG8 narrow enlarged-text navigation and local Escape order work. SG9 real Gallery/Editor instances and editor drafts survive sibling apply and leaving/returning."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-settings-browser.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#FR3 the Settings section in the address wins over the one Settings remembers a legacy Settings › Developer link opens Advanced at View tier, and reload keeps it, while the engine is slow to answer",
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SG1 browser Ctrl+comma opens once from a composer and restores the editable control and caret",
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SG1 command guard blocks the palette and another modal",
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SG1 user and plugin chords outrank the Settings default, which opens after they are removed",
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SG1 the Settings command dismisses jf-top-bar .more-trigger and closes onto its surviving trigger",
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SG1 the Settings command dismisses jf-status-pill .trigger and closes onto its surviving trigger",
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SG3 SG4 an addressed entry survives underlying background projection, reload and a one-step close; section changes remove its anchor",
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SG8 at 600x400 and 200 percent text every section remains reachable, and Escape cancels JSON import before closing",
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SG4 selecting another section removes the old Theme anchor before reload",
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SG9 real Gallery and Editor keep sibling instances and editor drafts on apply and section return"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.sections.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "SG2 seven ordered sections place every native/member entry exactly once. SG3/SG4 old categories and explicit entries resolve with entry precedence, latest pending/live arrivals alone scroll/focus and no saved-state writes. SG5 recovery selects Data & reset. SG6 live audience changes refresh content, anchors and search results and rescue disappearing focus; hidden destinations explain audience restrictions. SG7 About names bundle/updater sources and known/unknown/unavailable/observed update states, leaving actions in General. SG8 local theme import/rename Escape is consumed. SG9 member instances/drafts remain independent; missing, loading or unregistered members leave siblings usable.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "SG2 seven ordered sections place every native/member entry exactly once. SG3/SG4 old categories and explicit entries resolve with entry precedence, latest pending/live arrivals alone scroll/focus and no saved-state writes. SG5 recovery selects Data & reset. SG6 live audience changes refresh content, anchors and search results and rescue disappearing focus; hidden destinations explain audience restrictions. SG7 About names bundle/updater sources and known/unknown/unavailable/observed update states, leaving actions in General. SG8 local theme import/rename Escape is consumed. SG9 member instances/drafts remain independent; missing, loading or unregistered members leave siblings usable."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-settings-sections.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.sections.test.ts"
+      ],
+      "repaired": true
+    }
+  ]
+}
+```
+
+## Acceptance records

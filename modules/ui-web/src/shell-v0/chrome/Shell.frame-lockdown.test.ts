@@ -11,6 +11,10 @@ import { chromium, type Browser, type BrowserContext, type BrowserServer, type P
 import { mkdtemp, mkdir, rm } from 'node:fs/promises';
 import path from 'node:path';
 
+declare global {
+  interface Window { loadSettingsModule<T>(id: string): Promise<T> }
+}
+
 const SEARCH = 'core.search-v3-surface';
 const LIBRARY = 'core.library-surface';
 const BROWSE = 'core.browse-surface';
@@ -32,6 +36,7 @@ window.fetch = async (input) => {
   if (registryDelay && String(input).endsWith('/api/registry/surfaces')) await new Promise(r => setTimeout(r, registryDelay));
   return json({ entries: [] });
 };
+window.loadSettingsModule = id => import(id);
 window.EventSource = class { constructor() { this.readyState = 0; } addEventListener() {} removeEventListener() {} close() {} };
 const { __seedForTest } = await import('/src/api/registry/SurfaceCatalogClient.ts');
 await import('/src/shell-v0/index.ts');
@@ -52,7 +57,10 @@ __seedForTest({ schemaVersion: '1.0.0', catalogVersion: 1, namespace: 'core', pr
   surface('${BROWSE}', 'jf-browse-surface', { placement: 'DEEPLINK' }),
   surface('${BRAIN}', 'jf-brain-surface'),
   surface('core.system-surface', 'jf-system-surface'),
-  surface('${SETTINGS}', 'jf-settings-surface', { placement: 'MODAL' }),
+  surface('${SETTINGS}', 'jf-settings-surface', { placement: 'MODAL', members: ['core.security-surface', 'core.presentation-gallery-surface', 'core.presentation-editor-surface'] }),
+  surface('core.security-surface', 'jf-security-surface', { placement: 'DEEPLINK' }),
+  surface('core.presentation-gallery-surface', 'jf-presentation-gallery-surface', { placement: 'DEEPLINK' }),
+  surface('core.presentation-editor-surface', 'jf-presentation-editor-surface', { placement: 'DEEPLINK' }),
 ] });
 document.body.append(document.createElement('jf-shell'));
 document.body.dataset.ready = 'true';
@@ -365,16 +373,16 @@ describe('FR3 the window under Settings shows its addressed tab', () => {
 });
 
 describe('FR3 the Settings section in the address wins over the one Settings remembers', () => {
-  it('a link to Settings › Developer opens Developer, and reload keeps it, while the engine is slow to answer', async () => {
+  it('a legacy Settings › Developer link opens Advanced at View tier, and reload keeps it, while the engine is slow to answer', async () => {
     const page = await open(1280, 800, '?registryDelay=1500', `#justsearch://surface/${SETTINGS}?section=developer`);
     await settle(page, 2500);
-    expect(await where(page)).toMatchObject({ settings: true, address: `${SETTINGS}?section=developer` });
-    expect(await settingsSection(page)).toBe('developer');
+    expect(await where(page)).toMatchObject({ settings: true, address: `${SETTINGS}?anchor=view-tier&section=advanced` });
+    expect(await settingsSection(page)).toBe('advanced');
     await page.reload();
     await page.locator('body[data-ready="true"]').waitFor({ timeout: 45_000 });
     await settle(page, 2500);
-    expect(await where(page)).toMatchObject({ settings: true, address: `${SETTINGS}?section=developer` });
-    expect(await settingsSection(page)).toBe('developer');
+    expect(await where(page)).toMatchObject({ settings: true, address: `${SETTINGS}?anchor=view-tier&section=advanced` });
+    expect(await settingsSection(page)).toBe('advanced');
   }, 120_000);
 });
 
@@ -489,3 +497,154 @@ describe('X1 forced colours', () => {
     }
   }, 120_000);
 });
+
+it('SG1 browser Ctrl+comma opens once from a composer and restores the editable control and caret', async () => {
+  const page = await open();
+  const composer = page.locator('jf-frame-search-probe textarea');
+  await composer.fill('keep this draft');
+  await composer.evaluate((el: HTMLTextAreaElement) => { el.focus(); el.setSelectionRange(5, 9); });
+  const count = await page.evaluate(() => history.length);
+  await page.keyboard.press('Control+,'); await settle(page);
+  expect((await where(page)).settings).toBe(true);
+  expect((await where(page)).stage).toBe('jf-frame-search-probe');
+  expect(await composer.inputValue()).toBe('keep this draft');
+  await page.locator('jf-settings-nav [data-settings-category="appearance"]').click();
+  const address = (await where(page)).address;
+  await page.keyboard.press('Control+,'); await settle(page);
+  expect((await where(page)).address).toBe(address);
+  expect(await page.evaluate(() => history.length)).toBe(count + 1);
+  await page.keyboard.press('Escape'); await settle(page);
+  expect((await where(page)).settings).toBe(false);
+  expect(await composer.evaluate((el: HTMLTextAreaElement) => [el.matches(':focus'), el.selectionStart, el.selectionEnd])).toEqual([true, 5, 9]);
+}, 30_000);
+
+it('SG1 command guard blocks the palette and another modal', async () => {
+  const page = await open();
+  await page.keyboard.press('Control+k'); await settle(page);
+  expect(await page.locator('jf-command-palette').evaluate((el: HTMLElement & { open: boolean }) => el.open)).toBe(true);
+  const before = (await where(page)).address;
+  await page.keyboard.press('Control+,'); await settle(page);
+  expect((await where(page)).settings).toBe(false); expect((await where(page)).address).toBe(before);
+  // Invoke the command directly too: the protection belongs to the command, not just its binding.
+  await page.evaluate(async () => {
+    const commands = await window.loadSettingsModule<typeof import('../commands/CommandRegistry.js')>('/src/shell-v0/commands/CommandRegistry.ts');
+    await commands.invokeCommand('shell.go-to-settings');
+  });
+  expect((await where(page)).settings).toBe(false);
+  await page.keyboard.press('Escape'); await settle(page);
+  await page.evaluate(async () => {
+    const { ModalityController } = await window.loadSettingsModule<typeof import('../primitives/modality.js')>('/src/shell-v0/primitives/modality.ts');
+    const host = { addController() {}, removeController() {}, requestUpdate() {}, updateComplete: Promise.resolve(true) };
+    const modal = new ModalityController(host); modal.enter();
+    (window as unknown as { releaseSettingsGuard(): void }).releaseSettingsGuard = () => modal.exit();
+  });
+  await page.keyboard.press('Control+,'); await settle(page); expect((await where(page)).settings).toBe(false);
+  await page.evaluate(() => (window as unknown as { releaseSettingsGuard(): void }).releaseSettingsGuard());
+}, 30_000);
+
+it('SG1 user and plugin chords outrank the Settings default, which opens after they are removed', async () => {
+  const page = await open();
+  for (const source of ['plugin', 'user'] as const) {
+    await page.evaluate(async source => {
+      const registry = await window.loadSettingsModule<typeof import('../commands/KeybindingRegistry.js')>('/src/shell-v0/commands/KeybindingRegistry.ts');
+      const { makeCoreProvenance } = await window.loadSettingsModule<typeof import('../primitives/provenance.js')>('/src/shell-v0/primitives/provenance.ts');
+      registry.registerKeybinding({ key: 'mod+,', commandId: 'shell.focus-composer', source, provenance: makeCoreProvenance() });
+    }, source);
+    await page.keyboard.press('Control+,'); await settle(page); expect((await where(page)).settings).toBe(false);
+  }
+  await page.evaluate(async () => {
+    const registry = await window.loadSettingsModule<typeof import('../commands/KeybindingRegistry.js')>('/src/shell-v0/commands/KeybindingRegistry.ts');
+    registry.unregisterKeybinding('mod+,', 'shell.focus-composer');
+  });
+  await page.keyboard.press('Control+,'); await settle(page);
+  expect((await where(page)).settings).toBe(true);
+}, 30_000);
+
+it.each(['jf-top-bar .more-trigger', 'jf-status-pill .trigger'])('SG1 the Settings command dismisses %s and closes onto its surviving trigger', async selector => {
+  const page = await open();
+  await page.locator(selector).click(); await settle(page);
+  await page.evaluate(async () => {
+    const commands = await window.loadSettingsModule<typeof import('../commands/CommandRegistry.js')>('/src/shell-v0/commands/CommandRegistry.ts');
+    await commands.invokeCommand('shell.go-to-settings');
+  }); await settle(page);
+  expect((await where(page)).settings).toBe(true);
+  expect(await page.locator('jf-top-bar [role="menu"]').count()).toBe(0);
+  expect(await page.locator('jf-status-pill').evaluate((el: HTMLElement & { open: boolean }) => el.open)).toBe(false);
+  await page.keyboard.press('Escape'); await settle(page);
+  expect(await page.locator(selector).evaluate(el => el.matches(':focus')), `return focus to ${selector}`).toBe(true);
+}, 30_000);
+
+it('SG3 SG4 an addressed entry survives underlying background projection, reload and a one-step close; section changes remove its anchor', async () => {
+  const page = await open();
+  await page.evaluate(async () => {
+    const { setQuery } = await window.loadSettingsModule<typeof import('../state/searchState.js')>('/src/shell-v0/state/searchState.ts');
+    setQuery('pending search');
+    location.hash = 'justsearch://surface/core.settings-surface?section=layout&anchor=keyboard';
+  });
+  await settle(page, 300);
+  expect((await where(page)).settings).toBe(true);
+  expect((await where(page)).address).toBe(`${SETTINGS}?anchor=keyboard&section=general`);
+  await page.evaluate(async () => {
+    const { setQuery } = await window.loadSettingsModule<typeof import('../state/searchState.js')>('/src/shell-v0/state/searchState.ts'); setQuery('background update');
+  });
+  await settle(page, 300);
+  expect((await where(page)).address).toBe(`${SETTINGS}?anchor=keyboard&section=general`);
+  await page.reload(); await settle(page, 300);
+  expect((await where(page)).address).toBe(`${SETTINGS}?anchor=keyboard&section=general`);
+  await page.keyboard.press('Escape'); await settle(page); expect((await where(page)).settings).toBe(false);
+  expect((await where(page)).stage).toBe('jf-frame-search-probe');
+  await page.evaluate(() => { location.hash = 'justsearch://surface/core.settings-surface?section=appearance&anchor=theme'; });
+  await settle(page);
+  await page.locator('jf-settings-nav [data-settings-category="general"]').click(); await settle(page);
+  expect((await where(page)).address).toBe(`${SETTINGS}?section=general`);
+  await page.reload(); await settle(page, 300);
+  expect((await where(page)).address).toBe(`${SETTINGS}?section=general`);
+}, 30_000);
+
+it('SG8 at 600x400 and 200 percent text every section remains reachable, and Escape cancels JSON import before closing', async () => {
+  const page = await open(600, 400);
+  await page.evaluate(() => { document.documentElement.style.fontSize = '200%'; });
+  await openSettings(page);
+  for (const id of ['general', 'appearance', 'security-privacy', 'data-reset', 'plugins', 'advanced', 'about']) {
+    const row = page.locator(`jf-settings-nav [data-settings-category="${id}"]`);
+    expect(await row.count(), `section ${id} is rendered`).toBe(1);
+    await row.focus(); await page.keyboard.press('Enter'); await settle(page);
+    expect(await row.getAttribute('aria-current')).toBe('true');
+    expect(await row.evaluate(el => { const r = el.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; })).toBe(true);
+  }
+  await page.locator('jf-settings-nav [data-settings-category="appearance"]').focus(); await page.keyboard.press('Enter');
+  await page.locator('jf-button[label="Import a theme from JSON"] button').focus(); await page.keyboard.press('Enter');
+  await page.locator('textarea.theme-import-json').fill('unfinished draft');
+  await page.keyboard.press('Escape'); await settle(page);
+  expect(await page.locator('textarea.theme-import-json').count()).toBe(0);
+  expect((await where(page)).settings).toBe(true);
+  await page.keyboard.press('Escape'); await settle(page); expect((await where(page)).settings).toBe(false);
+}, 30_000);
+
+it('SG4 selecting another section removes the old Theme anchor before reload', async () => {
+  const page = await open(1280, 800, '', `#justsearch://surface/${SETTINGS}?section=appearance&anchor=theme`);
+  await page.locator('jf-settings-nav [data-settings-category="plugins"]').click(); await settle(page);
+  expect((await where(page)).address).toBe(`${SETTINGS}?section=plugins`);
+  await page.reload();
+  await expect.poll(() => settingsSection(page), { timeout: 5000 }).toBe('plugins');
+  expect((await where(page)).address).not.toContain('anchor=theme');
+}, 30_000);
+
+it('SG9 real Gallery and Editor keep sibling instances and editor drafts on apply and section return', async () => {
+  const page = await open(); await openSettings(page);
+  await page.locator('jf-settings-nav [data-settings-category="appearance"]').click();
+  const editor = page.locator('jf-presentation-editor-surface'); const gallery = page.locator('jf-presentation-gallery-surface');
+  await expect.poll(() => gallery.count(), { message: 'Appearance contains the Gallery alongside its native controls' }).toBe(1);
+  await expect.poll(() => editor.count(), { message: 'Appearance contains the Editor alongside the Gallery' }).toBe(1);
+  await editor.locator('textarea[aria-label="Presentation declaration JSON"]').fill('{"draft":"keep me"}');
+  await editor.evaluate(el => { el.setAttribute('data-instance-witness', 'retained'); });
+  await gallery.evaluate(el => { el.setAttribute('data-instance-witness', 'retained'); });
+  await gallery.getByRole('button', { name: 'Apply', exact: true }).first().click(); await settle(page);
+  expect(await editor.getAttribute('data-instance-witness')).toBe('retained');
+  expect(await editor.locator('textarea[aria-label="Presentation declaration JSON"]').inputValue()).toBe('{"draft":"keep me"}');
+  await page.locator('jf-settings-nav [data-settings-category="general"]').click(); await settle(page);
+  expect(await editor.count()).toBe(0);
+  await page.locator('jf-settings-nav [data-settings-category="appearance"]').click(); await settle(page);
+  expect(await editor.getAttribute('data-instance-witness')).toBe('retained'); expect(await gallery.getAttribute('data-instance-witness')).toBe('retained');
+  expect(await editor.locator('textarea[aria-label="Presentation declaration JSON"]').inputValue()).toBe('{"draft":"keep me"}');
+}, 30_000);

@@ -98,7 +98,7 @@ describe('Settings own risky actions ask in place (DE1)', () => {
 describe('Delete all local data stays a typed dialog (DE2)', () => {
   it('opens a modal dialog that names who asked, what is deleted, what stays, that it cannot be undone, and the phrase', async () => {
     invoke.mockReset().mockImplementation(async (command: string) => command === 'prepare_delete_data' ? 'single-use' : undefined);
-    const { el } = await mount('data', { platform: { capabilities: new Set(['native-notifications']) } });
+    const { el } = await mount('data-reset', { platform: { capabilities: new Set(['native-notifications']) } });
     el.shadowRoot!.querySelector<Answer>('jf-button[label="Delete all local data"]')!.onActivate();
     await el.updateComplete; await settle();
     const dialog = el.shadowRoot!.querySelector<HTMLDialogElement>('dialog.delete-dialog')!;

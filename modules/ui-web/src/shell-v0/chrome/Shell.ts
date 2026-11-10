@@ -278,7 +278,7 @@ import {
 import { modalOwnsFocus, openModalDepth } from '../primitives/modality.js';
 import { installSearchSummonBridge } from '../router/tauriBridge.js';
 import { surfaceIcon } from '../utils/surfaceIcons.js';
-import { findCategory } from '../views/settingsRegister.js';
+import { resolveSettingsCoordinate, firstCategoryId } from '../views/settingsRegister.js';
 import { focusRegion, type FrameRegion } from './frameRegions.js';
 // Slice 491 §9.D Phase E (C2/C3) — side-effect imports that register typed
 // chat views in the viewFactoryRegistry at module-load time.
@@ -504,11 +504,13 @@ export class Shell extends JfElement {
    * it starts on, which must never overwrite a section the address asks for (FR3, reload).
    */
   private readonly onSettingsSectionChange = (e: Event): void => {
-    const section = (e as CustomEvent<{ id?: string }>).detail?.id;
-    if (!section) return;
+    const detail = (e as CustomEvent<{ id?: string; anchor?: string }>).detail;
+    const coordinate = resolveSettingsCoordinate(detail?.id, detail?.anchor);
+    if (!coordinate) return;
+    const { section } = coordinate;
     this.settingsSection = section;
     if (this.shadowRoot?.querySelector<SettingsWindow>('jf-settings-window')?.open) {
-      this.replaceAddressState(SETTINGS_SURFACE_ID, { section });
+      this.replaceAddressState(SETTINGS_SURFACE_ID, { section, anchor: detail.anchor ?? undefined });
     }
   };
 
@@ -750,7 +752,14 @@ export class Shell extends JfElement {
     // Journal records every invocation; PendingEffect can intercept in
     // §21.E.
     registerShellActions({
-      navigate: (target) => this.activateSurface(target, {}, 'BUTTON'),
+      navigate: (target) => {
+        if (target === SETTINGS_SURFACE_ID) {
+          // The command is also callable without the key dispatcher (palette/plugin binding).
+          const settingsOpen = this.shadowRoot?.querySelector<SettingsWindow>('jf-settings-window')?.open;
+          if (settingsOpen || modalOwnsFocus()) return;
+        }
+        this.activateSurface(target, {}, 'BUTTON');
+      },
       // Search Thread S2 — focus the one bar: broadcast; the unified window (and
       // any future bar host) listens and focuses its composer textarea.
       focusComposer: () => window.dispatchEvent(new CustomEvent('jf-focus-composer')),
@@ -927,6 +936,9 @@ export class Shell extends JfElement {
       when: "activeSurface == 'core.search-v3-surface'",
       source: 'default',
       provenance: CORE_PROVENANCE,
+    });
+    registerKeybindingEntry({
+      key: 'mod+,', commandId: 'shell.go-to-settings', source: 'default', provenance: CORE_PROVENANCE,
     });
     loadPersistedKeybindings();
     this.keybindingTeardown = attachKeybindingDispatcher((commandId) => invokeCommand(commandId));
@@ -1475,6 +1487,7 @@ export class Shell extends JfElement {
         if (!win) return;
         // ST15 — the status panel is a popover over the page, never under a window: close it first
         // so Settings records the pill (not a hidden panel row) as the element to return focus to.
+        this.shadowRoot?.querySelector<TopBar>('jf-top-bar')?.closeMenu();
         this.shadowRoot?.querySelector<StatusPill>('jf-status-pill')?.dismissForWindowChange();
         // Tempdoc 855 §11.1 D4 — remember whether THIS open-episode added a history entry. Only the
         // opening navigation can, and a repeat navigation while the window is already open pushes
@@ -1488,9 +1501,15 @@ export class Shell extends JfElement {
         // Shell slice 2 — `?section=<category>` opens that Settings section (reload, deep link,
         // Back/Forward). Unknown sections are ignored: the window keeps the section it shows, and an
         // address without one is completed with it.
-        const section = state?.section;
-        if (typeof section === 'string' && findCategory(section)) requestMemberTab(SETTINGS_SURFACE_ID, section);
-        else if (this.settingsSection) this.replaceAddressState(SETTINGS_SURFACE_ID, { section: this.settingsSection });
+        const coordinate = resolveSettingsCoordinate(
+          typeof state?.section === 'string' ? state.section : undefined,
+          typeof state?.anchor === 'string' ? state.anchor : undefined,
+        ) ?? { section: this.settingsSection ?? firstCategoryId() };
+        requestMemberTab(SETTINGS_SURFACE_ID, coordinate.section, coordinate.anchor);
+        this.replaceAddressState(SETTINGS_SURFACE_ID, {
+          section: coordinate.section, anchor: coordinate.anchor,
+          tab: undefined, category: undefined, entry: undefined,
+        });
         if (state?.focusSettingsRecovery === true || state?.focusSettingsRecovery === 'true') {
           win.focusSettingsRecovery();
         }
@@ -1518,8 +1537,10 @@ export class Shell extends JfElement {
       // plain typo/synonym auto-correct from firing it.
       onRedirect: (originalId, targetId) => {
         if (getSurface(targetId)?.members?.includes(originalId)) {
-          if (targetId !== SETTINGS_SURFACE_ID) this.hostTabs.set(targetId, originalId);
-          requestMemberTab(targetId, originalId);
+          if (targetId !== SETTINGS_SURFACE_ID) {
+            this.hostTabs.set(targetId, originalId);
+            requestMemberTab(targetId, originalId);
+          }
         }
       },
       // 548 S4-A: a `query` intent is lowered to a navigation of the search surface. Search Thread
@@ -1545,6 +1566,23 @@ export class Shell extends JfElement {
         if (control === 'hours' || control === 'battery') {
           requestIndexingRuleFocus(control);
           intent = { ...intent, address: { kind: 'navigate', target: 'core.library-surface', state: {} } };
+        }
+      }
+      if (intent.address.kind === 'navigate') {
+        const { target, state } = intent.address;
+        const settingsMember = getSurface(SETTINGS_SURFACE_ID)?.members?.includes(target);
+        if (target === SETTINGS_SURFACE_ID || settingsMember) {
+          const value = (...keys: string[]): string | undefined => {
+            for (const key of keys) if (typeof state?.[key] === 'string') return state[key] as string;
+            return undefined;
+          };
+          const coordinate = resolveSettingsCoordinate(
+            settingsMember ? target : value('section', 'tab', 'category'), value('anchor', 'entry'),
+          );
+          const { tab: _tab, category: _category, entry: _entry, ...rest } = state ?? {};
+          intent = { ...intent, address: { ...intent.address, state: {
+            ...rest, ...(coordinate ? { section: coordinate.section, anchor: coordinate.anchor } : {}),
+          } } };
         }
       }
       return dispatchIntent(intent, options);
@@ -2015,10 +2053,15 @@ export class Shell extends JfElement {
   }
 
   /** Replace the current address's state (no new history entry) while it still names `target`. */
-  private replaceAddressState(target: string, patch: StateSnapshot): void {
+  private replaceAddressState(target: string, patch: Partial<StateSnapshot>): void {
     const current = parseUrl(window.location.hash.slice(1));
     if (current?.kind !== 'navigate' || canonicalSurfaceId(current.target) !== target) return;
-    const next = `#${canonicalize({ ...current, state: { ...current.state, ...patch } })}`;
+    const state: StateSnapshot = { ...current.state };
+    for (const [key, value] of Object.entries(patch)) {
+      if (value === undefined) delete state[key];
+      else state[key] = value;
+    }
+    const next = `#${canonicalize({ ...current, state })}`;
     if (window.location.hash === next) return;
     try {
       window.history.replaceState(window.history.state, '', next);
@@ -2061,8 +2104,8 @@ export class Shell extends JfElement {
   /** The reader chose something in the top bar. */
   private onTopBarSelect(selection: TopBarSelection): void {
     if (selection.kind === 'area') this.switchArea(selection.id);
-    // About: Settings › Desktop shows the version and update state (there is no About page yet).
-    else if (selection.kind === 'window' && selection.id === 'about') this.activateSurface(SETTINGS_SURFACE_ID, { section: 'desktop' }, 'BUTTON');
+    // About is an observed version/update summary; update actions stay in General.
+    else if (selection.kind === 'window' && selection.id === 'about') this.activateSurface(SETTINGS_SURFACE_ID, { section: 'about' }, 'BUTTON');
     else if (selection.kind === 'window') this.activateSurface(selection.id, {}, 'BUTTON');
     else if (selection.kind === 'settings') this.activateSurface(SETTINGS_SURFACE_ID, {}, 'BUTTON');
     else void this.copyLink();

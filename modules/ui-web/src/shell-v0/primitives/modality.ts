@@ -22,6 +22,7 @@
  * and a global-key handler that asked a second source would be the fork §2.2 is about.
  */
 import type { ReactiveController, ReactiveControllerHost } from 'lit';
+import { deepActiveElement } from '../utils/keyboardHandler.js';
 
 /**
  * How many modals are currently entered. ONE counter, two consumers: the background scroll-lock
@@ -110,7 +111,7 @@ export class ModalityController implements ReactiveController {
     if (this.active) return;
     this.active = true;
     this.savedFocus =
-      typeof document !== 'undefined' ? (document.activeElement as HTMLElement | null) : null;
+      typeof document !== 'undefined' ? (deepActiveElement() as HTMLElement | null) : null;
     acquireScrollLock();
   }
 

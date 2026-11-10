@@ -194,7 +194,7 @@ describe('the Layout sub-anchor in the shipped words (shell slice 2)', () => {
     __seedForTest(Object.fromEntries(bundle.split(/\r?\n/).filter((line) => line.startsWith('settings.'))
       .map((line) => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)])));
     const hits = (query: string) => searchRegister(query, SETTINGS_REGISTER)
-      .filter((r) => r.category.id === 'layout' && r.section?.key === 'rail');
+      .filter((r) => r.category.id === 'appearance' && r.section?.key === 'rail');
     expect(hits('switcher')).toHaveLength(1);
     expect(hits('rail')).toEqual([]);
   });

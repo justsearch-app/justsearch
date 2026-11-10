@@ -100,7 +100,7 @@ the top bar (banner), its area switcher (navigation) and the window area (main).
 |---|---|
 | Top bar (`chrome/TopBar.ts`, `jf-top-bar`) | Brand; the area switcher; the status pill; Settings; the More (⋯) menu |
 | Area switcher | Search, Library and AI Brain, in that order (Ctrl+1, Ctrl+2, Ctrl+3; tooltips name the shortcut). The bar chooses its layout from its own room (after the desktop window controls), measured against the text size: below 1000 px of room at standard text only the active area keeps its visible label; below 720 px the bar shows the brand dot, one button naming the active area that opens the three areas as a menu, the pill as an icon, Settings and More; below 480 px (a 600 px window with enlarged text) that button keeps only its icon and the switcher leaves the centre |
-| More (⋯) menu | System (Health, Activity, Logs), Help & shortcuts (F1) and About; windows contributed by the catalog or plugins under “More”; a Developer group (API explorer, Copy link to this view, Show backend address) only while the developer view tier is on (Settings › Developer › View tier) |
+| More (⋯) menu | System (Health, Activity, Logs), Help & shortcuts (F1) and About; windows contributed by the catalog or plugins under “More”; a Developer group (API explorer, Copy link to this view, Show backend address) only while the developer view tier is on (Settings › Advanced › View tier) |
 | Window tab row | A window's own tabs at its top (Library: Folders, Browse; AI Brain: AI Brain, Memory; System: Health, Logs, Activity) and its window actions. Search has none |
 | Stage | The active window; layouts can also compose a second window in a split stage, with a picker for the second pane |
 | Details pane (`jf-details-pane`) | At most one per window, on its right edge: tabs that scroll rather than shrink, 360-560 px and resizable, inline from 980 px of window width, a sheet over the window below. Each window owns its details, so a split stage's two windows never show each other's selection |
@@ -179,7 +179,7 @@ until it closes.
 
 Every view has a `justsearch://surface/<id>` address in the URL hash. A window's open tab is
 part of it (`?tab=<tab id>`, for example `core.library-surface?tab=core.browse-surface`), and
-so is the Settings section (`core.settings-surface?section=<category>`). Switching a window
+so is the Settings section (`core.settings-surface?section=<section>&anchor=<entry>`). Switching a window
 tab adds a history entry, so Back returns to the tab before; changing the Settings section
 replaces the address, so closing Settings stays one step. The section in the address always
 wins over the one Settings remembers from its last opening. Member and retired surface IDs
@@ -228,18 +228,27 @@ navigates back (if opening the window pushed the current address) or forward-nav
 to the underlying stage surface (covering the case where Settings was the boot/deep-link
 entry) — so Back is always meaningful and never doubles up with a real browser Back.
 
-Inside the window, one category tree — declared once in
-`shell-v0/views/settingsRegister.ts` as `{group → category → entry}`, where an entry
-is either a native section or a member surface id — drives the vertical grouped nav
-(accordion + scroll-spy), the category pages, deep-link targets, and in-window search;
-these are projections of the same register.
-Member categories mount `core.security-surface` (Privacy & Trust),
-`core.presentation-gallery-surface` and `core.presentation-editor-surface` through the
-catalog composition machinery. The Token Editor (`placement: 'DEEPLINK'`) is reached
-from Appearance through a launch link, per the plugin-presentation boundary
-([ADR-0035](../decisions/0035-fe-plugin-boundary.md)). A member surface's own ID stays
-deep-linkable: for example, `core.security-surface` opens the Settings window at its
-member category through the member-to-host redirect.
+Inside the window, one register in `shell-v0/views/settingsRegister.ts` drives navigation,
+rendering, search and address resolution. Its seven sections, in order, are General,
+Appearance & skins, Security & privacy, Data & reset, Plugins, Advanced and About.
+General is the first page on a fresh opening; the running app remembers the last section
+without saving a new preference. Explicit addresses win over that memory.
+
+Existing category, member and entry addresses resolve to their new section and anchor.
+An explicit entry wins over its former category's default. Changing section clears the
+old anchor; section and anchor changes replace the address, keeping close a single step.
+Ctrl+comma (Command+comma on macOS) opens Settings from text fields as well as the page.
+It keeps an open Settings window in place and yields to another modal, including the palette.
+User and plugin bindings retain precedence. Help and the Settings button name the shortcut.
+
+Appearance mounts Gallery and Editor as separate, stable catalog members alongside the
+existing appearance controls. Security & privacy mounts `core.security-surface` and keeps
+grants, plugin permissions and local ranking feedback separate. Their catalog member IDs
+remain deep-linkable. Token Editor stays a launch link to its plugin surface, per
+[ADR-0035](../decisions/0035-fe-plugin-boundary.md). View tier and the existing audience-gated
+Workspace profiles are under Advanced. Reset to defaults is under Data & reset with its
+existing confirmation and recovery exception. About names the web bundle version source
+and the desktop updater's observed information when available; update actions stay in General.
 
 ### Status pill and panel
 

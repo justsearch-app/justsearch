@@ -590,7 +590,7 @@ def update_prepare(run):
 def open_update_offer(run, evidence):
     # Begin where the user sees the offer. The banner's own action navigates
     # to Settings; it does not directly install the update. Engine recovery
-    # recreates Settings at Appearance, so do not reuse its former category.
+    # recreates Settings at General, so do not reuse its former category.
     started = time.monotonic()
     run.close_settings()
     banner = wait_for(lambda: update_banner(run),
@@ -606,11 +606,11 @@ def open_update_offer(run, evidence):
         run.wd.click('article[data-fact="app-update"] button', 'Review and install')
     else:
         run.nav('Settings')
-    run.wd.click('button[data-settings-category="desktop"]')
+    run.wd.click('button[data-settings-category="general"]')
     run.wd.element('button[aria-label="Install update"]:not(:disabled)', seconds=45)
     run.evidence(evidence, {'banner': banner, 'action': 'status panel: Review and install' if action else 'Settings fallback: status panel row has no visible action',
                           'secondsToControlsReady': round(time.monotonic() - started, 3),
-                          'readinessSignal': 'Banner names candidate; enabled Install update visible in Desktop settings'})
+                          'readinessSignal': 'Banner names candidate; enabled Install update visible in General settings'})
 
 
 def update_banner(run):
@@ -790,7 +790,7 @@ with open('/var/lib/dpkg/lock-frontend','a') as lock:
         # The packaged updater specifies DPkg::Lock::Timeout=300. Do not shorten
         # the product timeout or replace its apt process in qualification.
         time_started = time.monotonic()
-        # Recovery may recreate Settings at Appearance. Observe the banner's
+        # Recovery may recreate Settings at General. Observe the banner's
         # own re-offer first, then follow it back to the install control.
         wait_for(lambda: run.require('initialVersion') in update_banner(run),
                  'Update re-offered after dpkg lock timeout', seconds=390)
@@ -917,7 +917,7 @@ def shortcut(run):
     require_candidate(run)
     run.start_ui()
     run.nav('Settings')
-    run.wd.click('button[data-settings-category="desktop"]')
+    run.wd.click('button[data-settings-category="general"]')
     # Settings explain the native registration result on the actual session.
     section = wait_for(lambda: (text if text and 'Loading shortcut status' not in text else None)
                        if (text := run.wd.execute("return all(document,'[data-testid=\"settings-search-shortcut\"]').map(e=>e.textContent).join(' ')")) else None,

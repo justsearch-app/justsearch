@@ -20,6 +20,16 @@
       "knownRules": []
     },
     {
+      "surface": "settings-appearance",
+      "uiShotStep": "settings-appearance",
+      "knownRules": []
+    },
+    {
+      "surface": "settings-appearance-light",
+      "uiShotStep": "settings-appearance-light",
+      "knownRules": []
+    },
+    {
       "surface": "security",
       "uiShotStep": "security",
       "knownRules": []

@@ -33,7 +33,7 @@ async function mountNotifications(): Promise<Surface> {
   document.body.appendChild(el);
   await new Promise((resolve) => setTimeout(resolve, 0));
   await el.updateComplete;
-  el.activeCategory = 'notifications';
+  el.activeCategory = 'general';
   await el.updateComplete;
   return el;
 }
@@ -55,8 +55,8 @@ afterEach(() => {
 describe('DE5 Settings › General › Notifications', () => {
   it('lives in the General group and settings search finds it', () => {
     const general = SETTINGS_REGISTER.find((g) => g.id === 'general')!;
-    expect(general.categories.map((c) => c.id)).toContain('notifications');
-    expect(searchRegister('notifications').map((hit) => hit.category.id)).toContain('notifications');
+    expect(general.categories.map((c) => c.id)).toContain('general');
+    expect(searchRegister('notifications').map((hit) => hit.category.id)).toContain('general');
   });
   it('offers Off, On and On with sound with the stored value selected, named for assistive technology', async () => {
     setNotifications('sound');

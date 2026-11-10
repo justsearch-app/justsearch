@@ -1,0 +1,996 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
+  },
+  "createdAt": "2026-11-10T21:06:34.756Z",
+  "revision": "fa0f2213444bd62de138981efcae72a9bc8ed059",
+  "tree": "e9f5f13312b99b67e044b5d17724b14460eae79f",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.frame.test.ts\" \"src/shell-v0/chrome/Shell.navigation.test.ts\" \"src/shell-v0/components/SettingsNav.test.ts\" \"src/shell-v0/views/SettingsSurface.appUpdate.test.ts\" \"src/shell-v0/views/SettingsSurface.chatWidth.test.ts\" \"src/shell-v0/views/SettingsSurface.dataReset.test.ts\" \"src/shell-v0/views/SettingsSurface.highContrast.test.ts\" \"src/shell-v0/views/SettingsSurface.notifications.test.ts\" \"src/shell-v0/views/SettingsSurface.overlap.test.ts\" \"src/shell-v0/views/SettingsSurface.ownActions.test.ts\" \"src/shell-v0/views/SettingsSurface.search.test.ts\" \"src/shell-v0/views/SettingsSurface.searchShortcut.test.ts\" \"src/shell-v0/views/SettingsSurface.section-address.test.ts\" \"src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts\" \"src/shell-v0/views/SettingsSurface.ui-mode.test.ts\" \"src/shell-v0/views/SettingsSurface.v15.test.ts\" \"src/shell-v0/views/SettingsSurface.viewerAudience.test.ts\" \"src/shell-v0/views/conversationExportWarnings.test.ts\" \"src/shell-v0/views/settingsRegister.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/oiu69mt5/tmp/test-intent-vitest-47-1794344778640.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 16104
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame.test.ts",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.frame.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3be328922e63c68ec98c53936cac4326c7f979df7419a683fd3f294f4a5cd9b3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FR1 / FR4 / FR8 the frame is one top bar over the window area has a banner (the top bar), a navigation (the switcher) and one main with the page heading",
+          "status": "passed"
+        },
+        {
+          "name": "FR1 / FR4 / FR8 the frame is one top bar over the window area carries no rail, back/forward buttons, recents, bookmarks, Copy URL, Simple/Detailed toggle or backend address",
+          "status": "passed"
+        },
+        {
+          "name": "FR1 / FR4 / FR8 the frame is one top bar over the window area the status pill sits in the top bar and its name states its state",
+          "status": "passed"
+        },
+        {
+          "name": "FR1 / FR4 / FR8 the frame is one top bar over the window area Ctrl+1/2/3 switch areas and the switcher follows",
+          "status": "passed"
+        },
+        {
+          "name": "FR1 / FR4 / FR8 the frame is one top bar over the window area F1 opens Help & shortcuts",
+          "status": "passed"
+        },
+        {
+          "name": "FR5 saved layouts map onto the frame core.focus (rail.visible:false) hides the switcher; Ctrl+2 and the palette still reach the areas",
+          "status": "passed"
+        },
+        {
+          "name": "FR5 saved layouts map onto the frame core.zen (rail.visible:false) hides the switcher; Ctrl+2 and the palette still reach the areas",
+          "status": "passed"
+        },
+        {
+          "name": "FR5 saved layouts map onto the frame acme.custom-no-rail (rail.visible:false) hides the switcher; Ctrl+2 and the palette still reach the areas",
+          "status": "passed"
+        },
+        {
+          "name": "FR5 saved layouts map onto the frame statusBar.visible:false hides plugin status in the pill only",
+          "status": "passed"
+        },
+        {
+          "name": "FR5 saved layouts map onto the frame a split layout keeps the second window pane with its picker",
+          "status": "passed"
+        },
+        {
+          "name": "FR5 saved layouts map onto the frame the window list respects a layout's rail.surfaces (switcher and More list only what it names)",
+          "status": "passed"
+        },
+        {
+          "name": "FR7 plugin windows, overrides and provenance a catalog window contribution is listed under More › More and mounts with host injection",
+          "status": "passed"
+        },
+        {
+          "name": "FR7 plugin windows, overrides and provenance a surface override mounts the override and the provenance badge says a non-core element is active",
+          "status": "passed"
+        },
+        {
+          "name": "FR7 plugin windows, overrides and provenance the Developer group follows the developer view tier (API explorer listed only when present)",
+          "status": "passed"
+        },
+        {
+          "name": "FR7 plugin windows, overrides and provenance About opens Settings at the section that shows the version; Copy link copies this view's address",
+          "status": "passed"
+        },
+        {
+          "name": "FR8 F6 cycles top bar → window tabs → content → details pane moves through the present regions in order, wraps, and Shift+F6 goes back",
+          "status": "passed"
+        },
+        {
+          "name": "FR8 F6 cycles top bar → window tabs → content → details pane skips a region a window does not have (Search has no tab row here)",
+          "status": "passed"
+        },
+        {
+          "name": "L3 the unknown-destination notice names what happened in words that fit the top bar and offers the destinations",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.navigation.test.ts",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.navigation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:fe8dbde7a466d1e524bbb207f895b9e06a397951fd97945af1c4f0e28d1837d5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FR3 Back and Forward run on browser history, which the journal follows (a) an incoming same-window address (conversation B while A is shown) keeps A: Back returns to A",
+          "status": "passed"
+        },
+        {
+          "name": "FR3 Back and Forward run on browser history, which the journal follows (b) Back then Forward after Search → Library returns to Library, and browser history agrees",
+          "status": "passed"
+        },
+        {
+          "name": "FR3 Back and Forward run on browser history, which the journal follows (c) Library → Search → Library by area clicks, then browser Back and Forward: stage, address and journal stay in step",
+          "status": "passed"
+        },
+        {
+          "name": "FR3 Back and Forward run on browser history, which the journal follows (c) with a conversation open in Search, browser Back and Forward move the journal cursor instead of appending entries",
+          "status": "passed"
+        },
+        {
+          "name": "FR3 Back and Forward run on browser history, which the journal follows Back on the first view the app owns stays in the app; the mouse back and forward buttons are Back and Forward",
+          "status": "passed"
+        },
+        {
+          "name": "FR3 Back and Forward run on browser history, which the journal follows rapid area switching lands on the last area, with each step on the Back stack",
+          "status": "passed"
+        },
+        {
+          "name": "FR3 Back and Forward run on browser history, which the journal follows a late boot response after the reader switched areas does not move them back",
+          "status": "passed"
+        },
+        {
+          "name": "FR3 Back and Forward run on browser history, which the journal follows reload mid-navigation keeps the view and its Back step",
+          "status": "passed"
+        },
+        {
+          "name": "FR3 the window tab is part of the address a tab click names the tab in the address as a new entry; Back returns to the tab before; Forward and reload restore it",
+          "status": "passed"
+        },
+        {
+          "name": "FR3 the window tab is part of the address returning to a window by the switcher keeps its tab in the address",
+          "status": "passed"
+        },
+        {
+          "name": "FR6 deep links land on the right window and tab justsearch://surface/core.search-v3-surface opens jf-nav-search-probe",
+          "status": "passed"
+        },
+        {
+          "name": "FR6 deep links land on the right window and tab justsearch://surface/core.library-surface opens jf-nav-host-probe",
+          "status": "passed"
+        },
+        {
+          "name": "FR6 deep links land on the right window and tab justsearch://surface/core.brain-surface opens jf-nav-brain-probe",
+          "status": "passed"
+        },
+        {
+          "name": "FR6 deep links land on the right window and tab justsearch://surface/core.system-surface opens jf-nav-system-probe",
+          "status": "passed"
+        },
+        {
+          "name": "FR6 deep links land on the right window and tab justsearch://surface/core.help-surface opens jf-nav-help-probe",
+          "status": "passed"
+        },
+        {
+          "name": "FR6 deep links land on the right window and tab justsearch://surface/core.unified-chat-surface opens jf-nav-search-probe",
+          "status": "passed"
+        },
+        {
+          "name": "FR6 deep links land on the right window and tab justsearch://surface/core.search-surface opens jf-nav-search-probe",
+          "status": "passed"
+        },
+        {
+          "name": "FR6 deep links land on the right window and tab a member id opens its host on that tab, and the address names the tab",
+          "status": "passed"
+        },
+        {
+          "name": "FR6 deep links land on the right window and tab Settings opens over the window it was reached from",
+          "status": "passed"
+        },
+        {
+          "name": "C9 / FR3 the Settings section is part of the address a section deep link opens that section; a section change replaces the address; Escape closes once onto the area",
+          "status": "passed"
+        },
+        {
+          "name": "C9 / FR3 the Settings section is part of the address browser Back closes Settings once and keeps the area; Forward reopens it",
+          "status": "passed"
+        },
+        {
+          "name": "C9 / FR3 the Settings section is part of the address a deep link arriving while Settings is open closes it and lands on the window and tab",
+          "status": "passed"
+        },
+        {
+          "name": "FR6 / C11 saved navigation state and bookmarks load after the upgrade a pre-change journal resumes the last view; bookmarks and co-resident values survive a userState write",
+          "status": "passed"
+        },
+        {
+          "name": "SG1 Settings command and default chord SG1 Ctrl+comma opens over Search, repeats in place and honours typing, IME, repeat and modifier guards",
+          "status": "passed"
+        },
+        {
+          "name": "SG4 legacy coordinate section=layout&entry=keyboard arrives at General and the Keyboard anchor",
+          "status": "passed"
+        },
+        {
+          "name": "SG4 legacy coordinate category=layout&entry=keyboard arrives at General and the Keyboard anchor",
+          "status": "passed"
+        },
+        {
+          "name": "SG4 legacy coordinate tab=layout&anchor=keyboard arrives at General and the Keyboard anchor",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/SettingsNav.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/SettingsNav.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7aca35d9a9ad9fd42e260cd81a082ba5560134bc36e6c790c02f21c1d790c7c3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "jf-settings-nav renders one category row per declared category, in register order",
+          "status": "passed"
+        },
+        {
+          "name": "jf-settings-nav accordion: only the ACTIVE category shows its sub-anchors",
+          "status": "passed"
+        },
+        {
+          "name": "jf-settings-nav switching the active category moves the accordion",
+          "status": "passed"
+        },
+        {
+          "name": "jf-settings-nav a member category (no declared sections) shows no sub-anchors even when active",
+          "status": "passed"
+        },
+        {
+          "name": "jf-settings-nav clicking a category row dispatches category-select with its id",
+          "status": "passed"
+        },
+        {
+          "name": "jf-settings-nav clicking a sub-anchor dispatches anchor-jump with its key",
+          "status": "passed"
+        },
+        {
+          "name": "jf-settings-nav the danger group isolates its category row with the danger class",
+          "status": "passed"
+        },
+        {
+          "name": "jf-settings-nav aria-current marks the active category row",
+          "status": "passed"
+        },
+        {
+          "name": "jf-settings-nav active-row background: category pill vs. anchor no-pill (fix-round F2 N6) the active CATEGORY row keeps the --surface-active pill",
+          "status": "passed"
+        },
+        {
+          "name": "jf-settings-nav active-row background: category pill vs. anchor no-pill (fix-round F2 N6) the active ANCHOR row carries aria-current but a transparent background (no pill)",
+          "status": "passed"
+        },
+        {
+          "name": "jf-settings-nav search (855 §6 Phase 4) the search input is a real labeled input (aria-label from i18n)",
+          "status": "passed"
+        },
+        {
+          "name": "jf-settings-nav search (855 §6 Phase 4) an empty query shows the grouped view, not the results list",
+          "status": "passed"
+        },
+        {
+          "name": "jf-settings-nav search (855 §6 Phase 4) typing filters to a flat result list (category row for a category-label match)",
+          "status": "passed"
+        },
+        {
+          "name": "jf-settings-nav search (855 §6 Phase 4) typing a section term filters to a section row, labeled with its category",
+          "status": "passed"
+        },
+        {
+          "name": "jf-settings-nav search (855 §6 Phase 4) a query with no matches renders the no-results state",
+          "status": "passed"
+        },
+        {
+          "name": "jf-settings-nav search (855 §6 Phase 4) clicking a category-match result dispatches search-select with just the categoryId",
+          "status": "passed"
+        },
+        {
+          "name": "jf-settings-nav search (855 §6 Phase 4) clicking a section-match result dispatches search-select with both categoryId and sectionKey",
+          "status": "passed"
+        },
+        {
+          "name": "jf-settings-nav search (855 §6 Phase 4) activating a result clears the query, restoring the grouped view",
+          "status": "passed"
+        },
+        {
+          "name": "jf-settings-nav search (855 §6 Phase 4) activating a result focuses the restored active category row, not body",
+          "status": "passed"
+        },
+        {
+          "name": "jf-settings-nav search (855 §6 Phase 4) Escape in the search input clears a non-empty query",
+          "status": "passed"
+        },
+        {
+          "name": "jf-settings-nav search (855 §6 Phase 4) Escape in the search input does NOT bubble past the nav (would-be dialog cancel stays silent)",
+          "status": "passed"
+        },
+        {
+          "name": "jf-settings-nav search (855 §6 Phase 4) Escape in the search input when already empty bubbles past the nav (two-stage ESC lets the dialog close)",
+          "status": "passed"
+        },
+        {
+          "name": "jf-settings-nav search (855 §6 Phase 4) ArrowDown roves focus between search-result rows (reuses the nav row-navigation handler)",
+          "status": "passed"
+        },
+        {
+          "name": "jf-settings-nav search (855 §6 Phase 4) Home/End typed in the search input are NOT hijacked by the row roving-tabindex handler",
+          "status": "passed"
+        },
+        {
+          "name": "jf-settings-nav re-renders on a late-arriving catalog (855 fix-round F2 S2) a section label mounted BEFORE its catalog key exists shows the raw key, then resolves once the catalog arrives",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.appUpdate.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.appUpdate.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9b8a263e0fb6bc3e9f8569d61ee90741f9fb89937482b05b5d82279539608493",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SettingsSurface app updates shows an authenticated available release and requires an explicit install action",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface app updates invokes installation only after the user activates the install control",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.chatWidth.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.chatWidth.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4f8e8b6c369c86d7f889cfaffd092cc1e069712ade63a3693fa5c98d7f15a2a0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SettingsSurface — the chat-width section renders under the register key, with the three presets and the stored value selected",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface — the chat-width section moving the control writes through to the store",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.dataReset.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.dataReset.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:330c166dbc58e43797c0c952853e9153cd90b31cdf9ca3d32341e1354a2b1867",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP5.1 Settings reset RS1 discloses authored stores, permanent loss, preserved assets, automatic timing and a copy path without encryption",
+          "status": "passed"
+        },
+        {
+          "name": "WP5.1 Settings reset RS2 Cancel and an incomplete typed confirmation never invoke deletion",
+          "status": "passed"
+        },
+        {
+          "name": "WP5.1 Settings reset RS8 Escape cancels, restores focus, and the typed input has an associated description",
+          "status": "passed"
+        },
+        {
+          "name": "WP5.1 Settings reset RS8 browser explains the disabled control in visible text",
+          "status": "passed"
+        },
+        {
+          "name": "WP5.1 Settings reset RS3 typed confirmation sends the issued token once and describes automatic restart",
+          "status": "passed"
+        },
+        {
+          "name": "WP5.1 Settings reset RN2 settings-to-defaults remains the separate core.reset-settings operation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.highContrast.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.highContrast.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:caf6067f8ec24841109d70d8de59f99efff9ccaa80695df49d4a56eaf8517567",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SettingsSurface — High contrast, end to end activating the switch applies the root class AND persists the narrow POST",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface — High contrast, end to end toggling off reverses both the class and the persisted value",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface — High contrast, end to end renders exactly ONE high-contrast control in the whole surface (§17 R1)",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface — High contrast, end to end the declared Interface region no longer declares a second high-contrast control",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface — High contrast, end to end renders the declared Interface region (default path), not the built-in fallback",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface — the Appearance → Accessibility cross-link (§17 R1) replaces the pruned toggle with a keyboard-operable link to the target section",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface — the Appearance → Accessibility cross-link (§17 R1) renders exactly once, as a sibling of the declared surface — not projected inside it (F1)",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface — the Appearance → Accessibility cross-link (§17 R1) activating it scrolls the Accessibility sub-anchor into view",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface — declared theme picker swatches (fix-round F1) renders the swatch tile trio, not plain text buttons",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface — declared theme picker swatches (fix-round F1) paints the same fill colors the hand-authored fallback uses (one shared vocabulary)",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface — declared theme picker swatches (fix-round F1) renders a check badge on the swatch tile matching the current theme value",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.notifications.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.notifications.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6bd624860f1cfa44bea51b1e3fa4d4e87a25fa1070db4a040358c5b01b90e1ae",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DE5 Settings › General › Notifications lives in the General group and settings search finds it",
+          "status": "passed"
+        },
+        {
+          "name": "DE5 Settings › General › Notifications offers Off, On and On with sound with the stored value selected, named for assistive technology",
+          "status": "passed"
+        },
+        {
+          "name": "DE5 Settings › General › Notifications says when it applies, in the words of ref-13",
+          "status": "passed"
+        },
+        {
+          "name": "DE5 Settings › General › Notifications choosing writes the store and shows the choice",
+          "status": "passed"
+        },
+        {
+          "name": "DE5 Settings › General › Notifications a retained surface shows the value the document holds now",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.overlap.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.overlap.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:179ded8730f1ddf1404cb4f61e8eabe618e5d2c9f6e633411f8c1d70daebe877",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S36.9: opening Settings and choosing Dark writes only the edited field once",
+          "status": "passed"
+        },
+        {
+          "name": "S36.9/N36.2: a rejected Dark save restores the stored theme in the control and document",
+          "status": "passed"
+        },
+        {
+          "name": "S36.9: a delayed mount observation cannot overwrite an accepted Dark choice",
+          "status": "passed"
+        },
+        {
+          "name": "S36.9: a conflict is reconciled after a later overlapping save finishes",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.ownActions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8603eda8d4914494367022d0d784dbfd594a6fde2144ce2776e4ad89df268b0f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Settings own risky actions ask in place (DE1) deleting a custom theme asks in a band naming the theme; Keep it deletes nothing, the verb deletes once",
+          "status": "passed"
+        },
+        {
+          "name": "Settings own risky actions ask in place (DE1) revoking a plugin asks in a band under its row; the verb revokes it",
+          "status": "passed"
+        },
+        {
+          "name": "Delete all local data stays a typed dialog (DE2) opens a modal dialog that names who asked, what is deleted, what stays, that it cannot be undone, and the phrase",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.search.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.search.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c33eaba9f6d6bf4244f171b1594e63ae8460a68e957e4afceafc9d4c2cf6680c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SettingsSurface — search-select activation (855 §6 Phase 4) mounts on the default (first) category",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface — search-select activation (855 §6 Phase 4) a category-only hit (no sectionKey) selects that category, same as category-select",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface — search-select activation (855 §6 Phase 4) a section hit under the CURRENT category jumps immediately (content already rendered)",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface — search-select activation (855 §6 Phase 4) a section hit under a DIFFERENT category switches category then jumps to the anchor",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface — search-select activation (855 §6 Phase 4) activating a category-only hit for the category ALREADY active is a no-op (mirrors category-select)",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface — search-select activation (855 §6 Phase 4) activating a search result via a real click focuses the nav active-category row, not body",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface — re-renders on a late-arriving catalog (855 fix-round F2 S2) the related-settings cross-link label resolves once a late catalog merge fires",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.searchShortcut.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.searchShortcut.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a2fc67bac1087b10e2378e6cddda6d6b40a4eca2e25c6cab0ede74ebd9761a20",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "desktop search shortcut SC13 shows shortcut status independently of failed autostart and announces it politely",
+          "status": "passed"
+        },
+        {
+          "name": "desktop search shortcut SC13 exposes the unavailable reason on the keyboard switch itself",
+          "status": "passed"
+        },
+        {
+          "name": "desktop search shortcut SC7 distinguishes off, active and enabled but unavailable",
+          "status": "passed"
+        },
+        {
+          "name": "desktop search shortcut SC8 keeps the shell state after a failed save and prevents overlapping toggles",
+          "status": "passed"
+        },
+        {
+          "name": "desktop search shortcut SC8 keeps newer shell state when an older toggle reply arrives late",
+          "status": "passed"
+        },
+        {
+          "name": "desktop search shortcut SN6 hides native shortcut controls and makes no native calls in a browser",
+          "status": "passed"
+        },
+        {
+          "name": "desktop search shortcut SC7 reports an unavailable status when the native reply is malformed",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.section-address.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.section-address.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3c1cc7b3f34a122f57cc69615b31633cb3335746a3782a6b75eef9c63ad810c7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "reports each section it shows — on mount and when a section is requested — for the address",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7fa7a6122fb581190566fade4bfaa8085ac88dcba845cdb480e8abdfa6d81091",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37c settings recovery R2 retains recovery route focus until the first status reveals the hold",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R2 retains the pending hand-off across app focus moves inside shadow roots",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R2 drops pending recovery focus when the user moves focus, even if they return",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R2 drops pending recovery focus after pointerdown outside the Settings dialog",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R2 drops pending recovery focus after keydown outside the Settings dialog",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R2 drops pending recovery focus after blur outside the Settings dialog",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R2 cancels user keydown focus movement inside a shadow root",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R2 cancels user pointerdown focus movement inside a shadow root",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R2 drops pending recovery focus when Settings closes and is reopened normally",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R2 drops pending recovery focus when the first status reports no recovery hold",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R2 fulfills pending recovery focus from a stale reported recovery hold",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R2 never steals focus moved during the existing asynchronous focus walk",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R2 cancels a repeated recovery route when the user moves focus before the window updates",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R1 R4 preserves confirmation and Yes focus through stale polling and a status gap (USER)",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R1 R4 preserves confirmation and Yes focus through stale polling and a status gap (OPERATOR)",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R1 R4 preserves confirmation and Yes focus through stale polling and a status gap (DEVELOPER)",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R1 exposes the existing reset in every tier only for the observed recovery hold",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R1 preserves confirmation, cancellation, errors and successful reset handling in User tier",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery SG5 R2 selects Data & reset from another section and focuses Reset in every tier without invoking it",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R3 preserves normal audience visibility outside recovery (null)",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R3 preserves normal audience visibility outside recovery (user_paused)",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R3 preserves normal audience visibility outside recovery (game_mode)",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R1 R3 removes the exception on a remote clear and restores focus only when Reset had focus",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R1 R3 restores focus when pending confirmation blurs before the recovery hold clears",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.ui-mode.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.ui-mode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ec57a533f42ba333818159fec274b1e05c5dc5665c3e0eb77a8cae86c64ff9aa",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SettingsSurface shared detail level does not let a delayed settings load overwrite a newer shared choice",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface shared detail level queues its mode POST behind an earlier mode write from another projection",
+          "status": "passed"
+        },
+        {
+          "name": "rolls detail level back and clears busy when a save is rejected",
+          "status": "passed"
+        },
+        {
+          "name": "rolls detail level back and clears busy when a save is timed out",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.v15.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.v15.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:06710ba548d767f5520fdac2ff85d690af16a6bf0bc94518e67dbd8fd2639ef6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SettingsSurface — V1.5 Themes section renders Default + built-in theme options",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface — V1.5 Themes section renders a delete control for a custom theme but not for built-ins (§8 #3)",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface — V1.5 Themes section Default option is selected when no theme is active",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface — V1.5 Themes section clicking Default invokes clearActiveTheme (no fetch needed)",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface — V1.5 Themes section a built-in theme with a manifest-declared swatch paints two-tone tiles, not a neutral fallback",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface — V1.5 Themes section a custom theme with no swatch-bearing tokens renders the neutral fallback tile",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface — V1.5 Themes section a custom theme carrying surface-primary/accent-tint tokens derives its swatch",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface — V1.5 Rail section (the switcher and the More menu) lists the switcher areas in the switcher order, then the More windows in catalog order, in the design words",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface — V1.5 Rail section (the switcher and the More menu) X1 the More windows line takes its spacing from the space tokens, not an inline size",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface — V1.5 Rail section (the switcher and the More menu) respects userConfig.surfaceOrder for the More windows; the switcher keeps its fixed order",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface — V1.5 Rail section (the switcher and the More menu) hidden surfaces have visibility=false reflected in checkbox",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface — V1.5 Rail section (the switcher and the More menu) move-down arrow on the first More window updates surfaceOrder; the switcher areas have no arrows",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface — Layout picker (855 fix-round F2 S1) renders one radio per declared layout manifest, in listLayouts() order",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface — Layout picker (855 fix-round F2 S1) the active layout (core.default when unset) is marked aria-checked",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface — Layout picker (855 fix-round F2 S1) the radiogroup carries an accessible name (\"Layout\")",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface — Layout picker (855 fix-round F2 S1) clicking a layout option calls setActiveLayoutId and re-renders the new selection as checked",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface — V1.5 Plugins section shows empty-state hint when no plugins are installed",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface — V1.5 Plugins section lists installed plugins from the session registry",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface — V1.5 Plugins section plugin row exposes Revoke button",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface — settle transients on hide (tempdoc 609 instance-retention) resets the destructive delete ceremony on disconnect but KEEPS draft work + active tab",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface — Security member deep-link (tempdoc 855 §5 item 1 / §9.3) drains a pending member-tab intent on mount: activeCategory becomes core.security-surface",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface — Security member deep-link (tempdoc 855 §5 item 1 / §9.3) a live member-tab request while already mounted switches activeCategory to core.security-surface",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface — Token Editor link (855 §5 item 2 / §9.6 item 5) renders the Token Editor anchor under the Appearance category",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface — Token Editor link (855 §5 item 2 / §9.6 item 5) activating the Token Editor link navigates to vendor.token-editor.editor-surface",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.viewerAudience.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.viewerAudience.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a2803c9b0984d0b9e3c44a2ab402fc832a0214aed8f5dc795752282aadbe87c1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SettingsSurface — viewer-audience toggle renders the three audience-tier buttons",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface — viewer-audience toggle User button selected by default",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface — viewer-audience toggle clicking Operator updates the store",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface — viewer-audience toggle clicking Developer updates the store",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface — viewer-audience toggle clicking User reverts the store",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface — viewer-audience toggle selected class follows the active audience",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/conversationExportWarnings.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/conversationExportWarnings.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:aca25ae8c6eb0886761592f814d074a663b83ad8f5fdedc213fd51026d3d2161",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S5710 points from Delete all local data to conversation export before loss",
+          "status": "passed"
+        },
+        {
+          "name": "S5710 points from conversation delete to export and preserves cancel",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/settingsRegister.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/settingsRegister.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0f5059ad834ed58987fb43b42c4b5a60c1605aea37f32670621ff0493e6ebd70",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "searchRegister an empty (or whitespace-only) query returns no results",
+          "status": "passed"
+        },
+        {
+          "name": "searchRegister matches a native category label, case-insensitively",
+          "status": "passed"
+        },
+        {
+          "name": "searchRegister matches a member category label via present()",
+          "status": "passed"
+        },
+        {
+          "name": "searchRegister matches a sub-anchor section label and carries its category",
+          "status": "passed"
+        },
+        {
+          "name": "searchRegister a group-label match fans out to every category in that group",
+          "status": "passed"
+        },
+        {
+          "name": "searchRegister respects audience gating: a USER querying a DEVELOPER-only section gets no hit",
+          "status": "passed"
+        },
+        {
+          "name": "searchRegister a DEVELOPER querying the same term DOES get the hit",
+          "status": "passed"
+        },
+        {
+          "name": "searchRegister an ungated section (view tier) matches regardless of audience",
+          "status": "passed"
+        },
+        {
+          "name": "searchRegister no match returns an empty array",
+          "status": "passed"
+        },
+        {
+          "name": "categoryLabel resolves a native category through localizeResourceKey",
+          "status": "passed"
+        },
+        {
+          "name": "the Layout sub-anchor in the shipped words (shell slice 2) the Settings search indexes the switcher list by the nav's own label: \"switcher\" finds it, \"rail\" does not",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:a53982e0dfce115190d92ed2deb50a0b3480bff820451ee9503970b839c0fe19"
+}
