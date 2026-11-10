@@ -122,7 +122,9 @@ final class RecordedIngestionCoordinatorTest {
       var context = EngineProvenance.context(EngineContext.ClientKind.WEBVIEW, "resume-capacity", Optional.empty(),
           Optional.empty(), TransportTag.BUTTON, EngineContext.Survival.DURABLE, EngineContext.Urgency.BACKGROUND);
       var provenance = EngineProvenance.invocation(context, ExecutorTag.UI, Instant.now(CLOCK), Optional.empty());
-      var operation = new CoreOperationCatalog().findByIdValue(CoreOperationCatalog.RESUME_IMPORT.value()).orElseThrow();
+      var resume = new CoreOperationCatalog().findByIdValue(CoreOperationCatalog.RESUME_IMPORT.value());
+      assertTrue(resume.isPresent(), "Resume import is a catalog operation");
+      var operation = resume.orElseThrow();
       String arguments = new tools.jackson.databind.ObjectMapper().writeValueAsString(
           Map.of("operationKey", key, "interruptionRevision", before.interruptionRevision()));
       var refused = assertThrows(io.justsearch.app.api.EngineAdmissionException.class,
@@ -181,7 +183,9 @@ final class RecordedIngestionCoordinatorTest {
     var context = EngineProvenance.context(EngineContext.ClientKind.WEBVIEW, "resume-capacity", Optional.empty(),
         Optional.empty(), TransportTag.BUTTON, EngineContext.Survival.DURABLE, EngineContext.Urgency.BACKGROUND);
     var provenance = EngineProvenance.invocation(context, ExecutorTag.UI, Instant.now(CLOCK), Optional.empty());
-    var operation = new CoreOperationCatalog().findByIdValue(CoreOperationCatalog.RESUME_IMPORT.value()).orElseThrow();
+    var resume = new CoreOperationCatalog().findByIdValue(CoreOperationCatalog.RESUME_IMPORT.value());
+    assertTrue(resume.isPresent(), "Resume import is a catalog operation");
+    var operation = resume.orElseThrow();
     String arguments = new tools.jackson.databind.ObjectMapper().writeValueAsString(
         Map.of("operationKey", key, "interruptionRevision", state.interruptionRevision()));
     assertTrue(dispatcher.dispatch(operation, arguments, provenance, Optional.empty(), context, OperationKeys.generate(CLOCK)).success());
@@ -1655,13 +1659,26 @@ final class RecordedIngestionCoordinatorTest {
               assertFalse(child.state().terminal());
               assertEquals(originalParent.id(), parent.id());
               assertEquals(originalChild.id(), child.id());
+              assertEquals(originalParent.context(), parent.context());
+              assertEquals(originalChild.context(), child.context());
               assertEquals(originalPreparation, operations.acceptedPreparation(parent.id()).orElseThrow());
               assertEquals(originalChildPreparation, operations.acceptedPreparation(child.id()).orElseThrow());
-              assertEquals(1, preparations.get());
+              assertEquals(1, preparations.get(), "recovery must not resample either handler preparation");
               assertEquals(0, successorProducers.get());
-              assertEquals(1, queue.jobStateCounts().pendingCount());
+              assertEquals(0, parent.unitsCompleted());
+              assertEquals(0, parent.unitsFailed());
+              assertEquals(0, child.unitsCompleted());
+              assertEquals(0, child.unitsFailed());
+              var jobCounts = queue.jobStateCounts();
+              assertEquals(1, jobCounts.pendingCount());
+              assertEquals(0, jobCounts.processingCount(), "refused recovery must not leave an issued job in flight");
+              assertEquals(0, jobCounts.failedCount());
+              assertFalse(queue.hasIssuedRecordedClaims(child.key()), "refused recovery must not issue claims");
               assertTrue(queue.pollPending(1).isEmpty());
-              assertNull(queue.recordedWalk(child.key()).orElseThrow().enumerationClosedAt());
+              var progress = queue.recordedWalk(child.key()).orElseThrow();
+              assertNull(progress.enumerationClosedAt());
+              assertEquals(0, progress.completedUnits(), "enumeration refusal cannot claim indexed work");
+              assertEquals(0, progress.failedUnits());
               assertEquals(0, admission.activeWorkCount());
               return;
             }
@@ -1775,7 +1792,7 @@ final class RecordedIngestionCoordinatorTest {
       } else if (!"none".equals(cut) && !"before-marker".equals(cut)) {
         // These old cut names once depended on retirement/terminalization. I8 prohibits both;
         // persist the interruption and prove repeated recovery keeps every member instead.
-        old.operations.interruptImport(accepted.accepted().id(), "RECOVERY_GENERATION_MISMATCH");
+        assertDoesNotThrow(() -> old.operations.interruptImport(accepted.accepted().id(), "RECOVERY_GENERATION_MISMATCH"));
       }
     }
     if ("before-marker".equals(cut)) {
@@ -1801,7 +1818,13 @@ final class RecordedIngestionCoordinatorTest {
           recovered.maintain(); recovered.maintain();
           String reason = "exhausted".equals(cut) ? RecordedIngestionSettlement.EXHAUSTED : "RECOVERY_GENERATION_MISMATCH";
           assertRetainedImport(recovered, operations, parentKey, reason);
+          var parent = operations.find(parentKey).orElseThrow();
+          if ("exhausted".equals(cut)) {
+            assertEquals(3, parent.attempts());
+            assertEquals(3, operations.find(childKey).orElseThrow().attempts());
+          }
           assertFalse(operations.find(childKey).orElseThrow().state().terminal());
+          assertEquals(0, parent.unitsCompleted());
           assertEquals(1, queue.jobStateCounts().pendingCount());
           assertTrue(queue.pollPending(1).isEmpty());
           assertNull(queue.recordedWalk(childKey).orElseThrow().sealedAt());
@@ -1846,6 +1869,8 @@ final class RecordedIngestionCoordinatorTest {
         f.coordinator.maintain();
         var terminal = f.operations.find(request.key()).orElseThrow();
         assertRetainedImport(f.coordinator, f.operations, terminal.key(), "RECOVERY_GENERATION_MISMATCH");
+        assertEquals(refusing.checkpointCursor(), terminal.checkpointCursor());
+        assertEquals(1, terminal.unitsCompleted(), "the issued owner's committed effect remains counted");
         var receipt = f.queue.recordedWalk(childKey.get()).orElseThrow();
         assertEquals(1, receipt.completedUnits(), "the issued owner's committed effect remains counted");
         assertNull(receipt.sealedAt());
@@ -2627,7 +2652,9 @@ final class RecordedIngestionCoordinatorTest {
     var row = operations.find(key).orElseThrow();
     assertFalse(row.state().terminal(), "interrupted import remains open");
     assertNull(row.receipt());
-    var interruption = coordinator.interruptedImports().stream().filter(item -> key.equals(item.operationKey())).findFirst().orElseThrow();
+    var listed = coordinator.interruptedImports().stream().filter(item -> key.equals(item.operationKey())).findFirst();
+    assertTrue(listed.isPresent(), "interrupted import is listed");
+    var interruption = listed.orElseThrow();
     assertEquals(reason, interruption.reason());
   }
 

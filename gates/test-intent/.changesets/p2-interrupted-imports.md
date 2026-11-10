@@ -805,3 +805,14 @@ Execution evidence is written by run-evidence.mjs (fail-before with gates/test-i
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "p2-intent-verifier-de0qxi8x-20261110",
+  "verdict": "reject",
+  "digest": "sha256:70cc5ea59457fb75cd7b1a13986511cf38395581a9907089ce9ecd55477199f7",
+  "note": "Reject entries 5,6,7,19,20: baseline non-assertion failures do not prove the behavior. Reject entries 18,19,23: unrelated context, confirmed-count and exhausted-attempt preservation assertions were removed outside the Obsolete warrant. Other entries have no objection. Independent candidate 186/186 and original baseline 112/112 passed without skips."
+}
+```
