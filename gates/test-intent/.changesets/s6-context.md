@@ -108,3 +108,13 @@ author-session: s6-context-builder-20261110
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-aaux90db-round2-20261110",
+  "verdict": "accept",
+  "digest": "sha256:e190fb9e22b76c8c171bf9a110f27899756efbacaa81c7dbc457d315a6a0f3e6"
+}
+```
