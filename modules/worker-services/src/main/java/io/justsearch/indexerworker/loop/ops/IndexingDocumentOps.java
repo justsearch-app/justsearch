@@ -30,7 +30,6 @@ public final class IndexingDocumentOps {
   private static final int CHUNK_THRESHOLD_CHARS = ChunkDocumentWriter.CHUNK_THRESHOLD_CHARS;
   private static final int CONTENT_PREVIEW_MAX_CHARS =
       ChunkDocumentWriter.CONTENT_PREVIEW_MAX_CHARS;
-  private static final String DEFAULT_LANGUAGE = resolveDefaultLanguageTag();
 
   private IndexingDocumentOps() {}
 
@@ -534,7 +533,7 @@ public final class IndexingDocumentOps {
     String mimeBase = normalizeMimeBase(mime);
     String fileKind = classifyFileKind(filePath, mimeBase);
     boolean isMarkdown = "markdown".equals(fileKind);
-    String language = resolveLanguage(contentPreview(extraction.content(), isMarkdown));
+    String language = LanguageUtils.resolveLanguage(contentPreview(extraction.content(), isMarkdown));
 
     Long parentTokenCount = null;
     if (tokenCounter != null) {
@@ -659,170 +658,6 @@ public final class IndexingDocumentOps {
           ".ini", ".gradle", ".properties" -> true;
       default -> false;
     };
-  }
-
-  public static String resolveLanguage(Object previewObj) {
-    String preview = previewObj instanceof String s ? s : null;
-    String detected = detectLanguage(preview);
-    if (detected != null && !detected.isBlank()) {
-      return detected;
-    }
-    return DEFAULT_LANGUAGE != null && !DEFAULT_LANGUAGE.isBlank() ? DEFAULT_LANGUAGE : "und";
-  }
-
-  public static String resolveDefaultLanguageTag() {
-    try {
-      Locale locale = Locale.getDefault();
-      if (locale != null) {
-        String tag = locale.toLanguageTag();
-        if (tag != null && !tag.isBlank()) {
-          return tag;
-        }
-      }
-    } catch (Exception ignored) {
-      // best-effort
-    }
-    return "en-US";
-  }
-
-  public static String detectLanguage(String text) {
-    if (text == null) {
-      return null;
-    }
-    String sample = text.strip();
-    if (sample.isEmpty()) {
-      return null;
-    }
-    int latin = 0;
-    int cyrillic = 0;
-    int han = 0;
-    int kana = 0;
-    int hangul = 0;
-    int arabic = 0;
-    int devanagari = 0;
-    int greek = 0;
-    int examined = 0;
-    int limit = Math.min(sample.length(), 4096);
-    for (int i = 0; i < limit; i++) {
-      char ch = sample.charAt(i);
-      if (!Character.isLetter(ch)) {
-        continue;
-      }
-      examined++;
-      Character.UnicodeBlock block = Character.UnicodeBlock.of(ch);
-      if (block == null) {
-        continue;
-      }
-      if (isLatin(block)) {
-        latin++;
-      } else if (isCyrillic(block)) {
-        cyrillic++;
-      } else if (isHan(block)) {
-        han++;
-      } else if (isKana(block)) {
-        kana++;
-      } else if (isHangul(block)) {
-        hangul++;
-      } else if (isArabic(block)) {
-        arabic++;
-      } else if (isDevanagari(block)) {
-        devanagari++;
-      } else if (isGreek(block)) {
-        greek++;
-      }
-    }
-    if (examined < 8) {
-      return null;
-    }
-    int threshold = Math.max(5, examined / 6);
-    if (han >= threshold) {
-      return "zh";
-    }
-    if (kana >= threshold) {
-      return "ja";
-    }
-    if (hangul >= threshold) {
-      return "ko";
-    }
-    if (arabic >= threshold) {
-      return "ar";
-    }
-    if (devanagari >= threshold) {
-      return "hi";
-    }
-    if (cyrillic >= threshold) {
-      return "ru";
-    }
-    if (greek >= threshold) {
-      return "el";
-    }
-    if (latin >= threshold) {
-      return null;
-    }
-    return null;
-  }
-
-  public static boolean isLatin(Character.UnicodeBlock block) {
-    return block == Character.UnicodeBlock.BASIC_LATIN
-        || block == Character.UnicodeBlock.LATIN_1_SUPPLEMENT
-        || block == Character.UnicodeBlock.LATIN_EXTENDED_A
-        || block == Character.UnicodeBlock.LATIN_EXTENDED_ADDITIONAL
-        || block == Character.UnicodeBlock.LATIN_EXTENDED_B
-        || block == Character.UnicodeBlock.LATIN_EXTENDED_C
-        || block == Character.UnicodeBlock.LATIN_EXTENDED_D
-        || block == Character.UnicodeBlock.LATIN_EXTENDED_E
-        || block == Character.UnicodeBlock.LATIN_EXTENDED_F
-        || block == Character.UnicodeBlock.LATIN_EXTENDED_G;
-  }
-
-  public static boolean isCyrillic(Character.UnicodeBlock block) {
-    return block == Character.UnicodeBlock.CYRILLIC
-        || block == Character.UnicodeBlock.CYRILLIC_SUPPLEMENTARY
-        || block == Character.UnicodeBlock.CYRILLIC_EXTENDED_A
-        || block == Character.UnicodeBlock.CYRILLIC_EXTENDED_B
-        || block == Character.UnicodeBlock.CYRILLIC_EXTENDED_C;
-  }
-
-  public static boolean isHan(Character.UnicodeBlock block) {
-    return block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS
-        || block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_A
-        || block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_B
-        || block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_C
-        || block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_D
-        || block == Character.UnicodeBlock.CJK_COMPATIBILITY_IDEOGRAPHS
-        || block == Character.UnicodeBlock.CJK_COMPATIBILITY_IDEOGRAPHS_SUPPLEMENT;
-  }
-
-  public static boolean isKana(Character.UnicodeBlock block) {
-    return block == Character.UnicodeBlock.HIRAGANA
-        || block == Character.UnicodeBlock.KATAKANA
-        || block == Character.UnicodeBlock.KATAKANA_PHONETIC_EXTENSIONS;
-  }
-
-  public static boolean isHangul(Character.UnicodeBlock block) {
-    return block == Character.UnicodeBlock.HANGUL_SYLLABLES
-        || block == Character.UnicodeBlock.HANGUL_JAMO
-        || block == Character.UnicodeBlock.HANGUL_COMPATIBILITY_JAMO
-        || block == Character.UnicodeBlock.HANGUL_JAMO_EXTENDED_A
-        || block == Character.UnicodeBlock.HANGUL_JAMO_EXTENDED_B;
-  }
-
-  public static boolean isArabic(Character.UnicodeBlock block) {
-    return block == Character.UnicodeBlock.ARABIC
-        || block == Character.UnicodeBlock.ARABIC_PRESENTATION_FORMS_A
-        || block == Character.UnicodeBlock.ARABIC_PRESENTATION_FORMS_B
-        || block == Character.UnicodeBlock.ARABIC_SUPPLEMENT
-        || block == Character.UnicodeBlock.ARABIC_EXTENDED_A;
-  }
-
-  public static boolean isDevanagari(Character.UnicodeBlock block) {
-    return block == Character.UnicodeBlock.DEVANAGARI
-        || block == Character.UnicodeBlock.DEVANAGARI_EXTENDED;
-  }
-
-  public static boolean isGreek(Character.UnicodeBlock block) {
-    return block == Character.UnicodeBlock.GREEK
-        || block == Character.UnicodeBlock.GREEK_EXTENDED;
   }
 
   /**

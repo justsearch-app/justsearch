@@ -45,6 +45,7 @@ dependencies {
 
   // Tika for content extraction
   implementation(libs.tika.core)
+  implementation("org.apache.tika:tika-langdetect-optimaize:${libs.versions.tika.get()}")
   // The owned text parser reuses Tika's CSV sniffing and table implementation.
   implementation("org.apache.tika:tika-parser-text-module:${libs.versions.tika.get()}")
   implementation("org.apache.pdfbox:pdfbox:3.0.6")

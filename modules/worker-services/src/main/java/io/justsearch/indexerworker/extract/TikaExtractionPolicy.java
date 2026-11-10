@@ -64,6 +64,7 @@ public record TikaExtractionPolicy(
   // v8: structured prefixes, ragged tables, embedded UTF-8 and partial OCR coverage are retained.
   // v9: case-distinct structured page edges retain their exact text identity.
   // v10: physical PDF text preserves word boundaries and rejoins lowercase line-end hyphens, including OCR.
+  //      Language labels derive from content, including Latin prose, without a locale fallback.
   public static TikaExtractionPolicy defaults() {
     return new TikaExtractionPolicy(
         "tika-default-v10",

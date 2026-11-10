@@ -74,7 +74,10 @@ public final class VduResultWriter {
       }
     }
     if (replaceContent) {
-      String preview = LanguageUtils.contentPreview(content, ChunkDocumentWriter.CONTENT_PREVIEW_MAX_CHARS);
+      boolean isMarkdown = "markdown".equals(
+          runtime.documentFieldOps().getDocumentFieldOrThrow(docId, SchemaFields.FILE_KIND));
+      String preview = LanguageUtils.contentPreview(
+          content, ChunkDocumentWriter.CONTENT_PREVIEW_MAX_CHARS, isMarkdown);
       updates.put(SchemaFields.CONTENT, content);
       updates.put(SchemaFields.PARENT_TOKEN_COUNT, IndexingDocumentOps.estimateTokenCount(content));
       String reason = runtime.documentFieldOps().getDocumentFieldOrThrow(docId, SchemaFields.EXTRACTION_REASON_CODE);
