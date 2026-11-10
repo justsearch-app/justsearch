@@ -16,7 +16,7 @@ const key = 'justsearch.bootFrame.v1';
 const secret = 'SECRET-token-key /home/person/private https://secret-host.invalid';
 const saved = { mode: 'light', background: 'rgb(248, 249, 252)', raised: 'rgb(241, 242, 248)', text: 'rgb(20, 24, 32)', muted: 'rgb(50, 55, 65)', border: 'rgb(110, 115, 125)', accent: 'rgb(0, 110, 100)' };
 const catalog = { schemaVersion: '1.0', catalogVersion: 1, namespace: 'registry-surface', primitive: 'Surface', entries: [{ id: 'core.library-surface', presentation: { labelKey: 'registry-surface.library-surface.label', descriptionKey: 'registry-surface.library-surface.description', iconHint: null, category: null }, audience: 'USER', placement: 'RAIL', altitude: 'PRODUCT', consumes: { resources: ['core.indexed-roots'], operations: [], prompts: [], diagnosticChannels: [], conversationShapes: [] }, mountTag: 'jf-library-surface', members: [], riskTier: 'LOW', stateSchema: null, provenance: { tier: 'CORE', contributorId: 'core', version: '1.0', identity: null } }] };
-type Harness = { phase?: string; discoveryHold: boolean; hold: boolean; renderHold: boolean; emit: (payload: unknown) => void; samples: string[]; inputs: string[]; calls: string[] };
+type Harness = { phase?: string; discoveryHold: boolean; hold: boolean; renderHold: boolean; emit: (payload: unknown) => void; renders: number; samples: string[]; inputs: string[]; calls: string[] };
 // Independent inventory of native input paths, including document/window capture listeners.
 const inputTypes = ['keydown', 'keyup', 'keypress', 'pointerdown', 'pointerup', 'pointermove', 'pointercancel',
   'mousedown', 'mouseup', 'click', 'wheel', 'touchstart', 'input', 'dragenter', 'dragover', 'dragleave', 'drop',
@@ -67,7 +67,7 @@ async function create(options: Options = {}): Promise<Page> {
       Storage.prototype.getItem = () => { throw new Error('storage denied'); };
       Storage.prototype.setItem = () => { throw new Error('quota denied'); };
     }
-    const h = window.frameHarness = { discoveryHold: !!options.discoveryHold, hold: !!options.hold, renderHold: !!options.renderHold, emit: (_payload: unknown) => {}, samples: [] as string[], inputs: [] as string[], calls: [] as string[] };
+    const h = window.frameHarness = { discoveryHold: !!options.discoveryHold, hold: !!options.hold, renderHold: !!options.renderHold, emit: (_payload: unknown) => {}, renders: 0, samples: [] as string[], inputs: [] as string[], calls: [] as string[] };
     const sample = () => {
       const root = document.getElementById('root');
       if (root) h.samples.push(root.querySelector('#boot-frame, #boot-failure, jf-engine-recovery, jf-factory-reset-recovery') ? 'covered' : root.querySelector('jf-shell')?.shadowRoot?.querySelector('jf-top-bar') ? 'rendered' : 'blank');
@@ -95,7 +95,8 @@ async function create(options: Options = {}): Promise<Page> {
           const result = perform.call(this);
           // Render real controls beneath the frame, but keep Lit's hand-off promise pending.
           while (h.renderHold) await new Promise(resolve => setTimeout(resolve, 10));
-          return result;
+          await result;
+          h.renders++;
         };
       }
       define(name, ctor, config);
@@ -132,7 +133,11 @@ async function blocked(options: Options = {}) {
   await page.route(`**${entry}`, () => new Promise(() => {}));
   await page.route('**/*.css', route => route.abort());
   await page.goto(url, { waitUntil: 'commit' });
-  await page.waitForFunction(() => document.readyState !== 'loading');
+  // A committed response can precede parsing and the inline appearance script.
+  await page.waitForFunction(() => {
+    const frame = document.getElementById('boot-frame');
+    return frame && frame.style.colorScheme === document.documentElement.getAttribute('data-theme');
+  }, undefined, { timeout: 4000 });
   return page;
 }
 async function failure(page: Page, kind: string) {
@@ -189,7 +194,7 @@ async function shellWorksAfterCover(page: Page) {
   await page.keyboard.press('Escape');
   const box = (await more.boundingBox())!;
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-  expect(await page.locator('jf-top-bar [role="menu"]').count()).toBe(1);
+  await expect.poll(() => page.locator('jf-top-bar [role="menu"]').count(), { timeout: 4000 }).toBe(1);
 }
 it('SA6 rendered shell rejects input until frame hand-off', async () => {
   const page = await create({ renderHold: true });
@@ -227,7 +232,7 @@ it('SA6 never-rendering shell stays unreachable and deadline Reload takes focus'
     expect(await page.locator('jf-top-bar').count()).toBe(0);
     expect(await page.locator('jf-shell').count()).toBe(0);
     await page.evaluate(() => { window.frameHarness.hold = false; }); await page.clock.resume();
-    await page.waitForTimeout(100);
+    await expect.poll(() => page.evaluate(() => window.frameHarness.renders), { timeout: 4000 }).toBeGreaterThan(0);
     expect(await page.locator('#boot-failure').count()).toBe(1);
     await Promise.all([page.waitForEvent('framenavigated'), page.keyboard.press('Enter')]);
     await page.waitForSelector('jf-shell', { state: 'attached' });
@@ -341,7 +346,7 @@ it('SA6 SA17 deadline discards rendered controls; failure page alone handles inp
     }
     // Finishing the discarded render cannot remove the failure page or reclaim focus.
     await page.evaluate(() => { window.frameHarness.renderHold = false; }); await page.clock.resume();
-    await page.waitForTimeout(100);
+    await expect.poll(() => page.evaluate(() => window.frameHarness.renders), { timeout: 4000 }).toBeGreaterThan(0);
     expect(await page.locator('#boot-failure').count()).toBe(1);
     for (const key of ['Enter', 'Space']) {
       await pauseClockBeforeNavigation(page);
@@ -380,7 +385,11 @@ for (const [label, value, os, mode] of [
 });
 it('SA3 query theme wins', async () => {
   const page = await blocked({ saved });
-  try { await page.goto(`${url}?theme=dark`, { waitUntil: 'commit' }); expect(await page.locator('html').getAttribute('data-theme')).toBe('dark'); }
+  try {
+    await page.goto(`${url}?theme=dark`, { waitUntil: 'commit' });
+    await page.waitForFunction(() => document.documentElement.getAttribute('data-theme') === 'dark', undefined, { timeout: 4000 });
+    expect(await page.locator('html').getAttribute('data-theme')).toBe('dark');
+  }
   finally { await page.close(); }
 });
 it('SA4 denied storage still paints', async () => {
@@ -411,7 +420,7 @@ it('SA10 SA17 60-second deadline discards an attached shell even when rendering 
     await page.clock.fastForward(2); await failure(page, 'stalled');
     expect(await page.locator('jf-shell').count()).toBe(0);
     await page.evaluate(() => { window.frameHarness.hold = false; }); await page.clock.resume();
-    await page.waitForTimeout(100);
+    await expect.poll(() => page.evaluate(() => window.frameHarness.renders), { timeout: 4000 }).toBeGreaterThan(0);
     expect(await page.locator('#boot-failure').count()).toBe(1);
   } finally { await page.close(); }
 });
@@ -419,7 +428,9 @@ it('SA7 SA17 no blank interval through recovery removal and delayed render', asy
   const page = await create({ hold: true });
   try {
     await page.goto(url); await page.waitForSelector('jf-shell', { state: 'attached' });
-    expect(await page.locator('#boot-frame').count()).toBe(1); await page.waitForTimeout(150);
+    const samples = await page.evaluate(() => window.frameHarness.samples.length);
+    await expect.poll(() => page.evaluate(() => window.frameHarness.samples.length), { timeout: 4000 }).toBeGreaterThanOrEqual(samples + 10);
+    expect(await page.locator('#boot-frame').count()).toBe(1);
     await page.evaluate(() => { window.frameHarness.hold = false; }); await page.waitForSelector('jf-top-bar');
     await expect.poll(() => page.locator('#boot-frame').count()).toBe(0);
     expect(await page.evaluate(() => window.frameHarness.samples)).not.toContain('blank');
@@ -486,11 +497,13 @@ it('SA5 live mode contrast and presentation changes survive reload mid-boot', as
     expect(cache.accent).toBe('oklch(60% 0.18 290)');
     await page.route(`**${entry}`, () => new Promise(() => {}));
     await page.reload({ waitUntil: 'commit' });
-    await page.waitForFunction(() => document.readyState !== 'loading');
+    await page.waitForFunction(accent => document.documentElement.getAttribute('data-theme') === 'dark'
+      && document.getElementById('boot-frame')?.style.getPropertyValue('--boot-frame-accent') === accent, cache.accent, { timeout: 4000 });
     expect(await page.locator('html').getAttribute('data-theme')).toBe('dark');
     expect(await page.locator('#boot-frame').evaluate(el => el.style.getPropertyValue('--boot-frame-accent'))).toBe(cache.accent);
     await page.reload({ waitUntil: 'commit' });
-    await page.waitForFunction(() => document.readyState !== 'loading');
+    await page.waitForFunction(accent => document.documentElement.getAttribute('data-theme') === 'dark'
+      && document.getElementById('boot-frame')?.style.getPropertyValue('--boot-frame-accent') === accent, cache.accent, { timeout: 4000 });
     expect(await page.evaluate(key => JSON.parse(localStorage.getItem(key)!), key)).toEqual(cache);
   } finally { await page.close(); }
 }, 15_000);
@@ -509,8 +522,8 @@ it('SA5 a second window saves its look without an incidental stale overwrite', a
     await second.evaluate(() => document.dispatchEvent(new CustomEvent('jf-set-appearance', { detail: { theme: 'dark' } })));
     await expect.poll(() => first.evaluate(key => JSON.parse(localStorage.getItem(key) ?? 'null')?.mode, key)).toBe('dark');
     const before = await first.evaluate(key => localStorage.getItem(key), key);
-    await first.evaluate(() => { document.documentElement.style.overflow = 'hidden'; });
-    await first.waitForTimeout(50);
+    const samples = await first.evaluate(() => { document.documentElement.style.overflow = 'hidden'; return window.frameHarness.samples.length; });
+    await expect.poll(() => first.evaluate(() => window.frameHarness.samples.length), { timeout: 4000 }).toBeGreaterThanOrEqual(samples + 2);
     expect(await first.evaluate(key => localStorage.getItem(key), key)).toBe(before);
   } finally { await second.close(); await first.close(); }
 }, 15_000);
@@ -591,7 +604,7 @@ it('SA5 profile switch and palette changes cache the resulting live colours', as
     const cache = await page.evaluate(key => JSON.parse(localStorage.getItem(key)!), key);
     expect(cache.accent).toBeTruthy();
     await page.route(`**${entry}`, () => new Promise(() => {})); await page.reload({ waitUntil: 'commit' });
-    await page.waitForFunction(() => document.readyState !== 'loading');
+    await page.waitForFunction(accent => document.getElementById('boot-frame')?.style.getPropertyValue('--boot-frame-accent') === accent, cache.accent, { timeout: 4000 });
     expect(await page.locator('#boot-frame').count()).toBe(1);
     expect(await page.locator('#boot-frame').evaluate(el => el.style.getPropertyValue('--boot-frame-accent'))).toBe(cache.accent);
   } finally { await page.close(); }
@@ -644,7 +657,7 @@ for (const cover of ['frame', 'failure']) for (const takeover of ['recovery', 'r
     await button.focus(); await page.keyboard.press('Enter');
     await expect.poll(() => page.evaluate(() => window.frameHarness.calls)).toContain(takeover === 'recovery' ? 'restart_engine' : 'retry_factory_reset');
     await page.evaluate(() => { window.frameHarness.renderHold = false; }); await page.clock.resume();
-    await page.waitForTimeout(100);
+    await expect.poll(() => page.evaluate(() => window.frameHarness.renders), { timeout: 4000 }).toBeGreaterThan(0);
     expect(await page.locator(takeover === 'recovery' ? '#root > jf-engine-recovery' : '#root > jf-factory-reset-recovery').count()).toBe(1);
   } finally { await page.close(); }
 });

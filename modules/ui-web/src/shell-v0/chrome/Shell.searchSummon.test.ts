@@ -34,6 +34,7 @@ import { CORE_PROVENANCE } from '../primitives/provenance.js';
 import { takeSearchV3Handoff } from '../utils/compose.js';
 import { initLayoutCatalog } from '../layout/LayoutManifest.js';
 import { setActiveLayoutId, setSecondaryActiveSurface } from '../state/userConfigState.js';
+import { getSearchState, resetSearchState } from '../state/searchState.js';
 
 const DEFAULT = 'core.search-v3-surface';
 const LIBRARY = 'core.library-surface';
@@ -62,7 +63,8 @@ interface ShellElement extends HTMLElement {
   activateSurface(id: string, state: Record<string, never>, transport: 'BUTTON'): void;
 }
 async function settle(shell: ShellElement): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, 30));
+  if (vi.isFakeTimers()) await vi.advanceTimersByTimeAsync(30);
+  else await new Promise((resolve) => setTimeout(resolve, 30));
   await shell.updateComplete;
 }
 async function mount(): Promise<ShellElement> {
@@ -93,12 +95,19 @@ describe('native search summon shared destination', () => {
   });
   afterEach(async () => {
     document.body.replaceChildren();
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    if (vi.isFakeTimers()) await vi.advanceTimersByTimeAsync(0);
+    else await new Promise((resolve) => setTimeout(resolve, 0));
     __resetAiStateForTest(); __resetModalityForTest(); deactivateProjection();
     __resetBootstrapForTest(); __resetUserConfigForTest(); resetCatalog();
     vi.unstubAllGlobals();
     unregisterCommand('test.overlap');
     unregisterKeybinding('alt+shift+space', 'test.overlap');
+    // The shared search store survives shell removal; cancel its work before teardown.
+    resetSearchState();
+    if (vi.isFakeTimers()) {
+      try { expect(vi.getTimerCount()).toBe(0); }
+      finally { vi.useRealTimers(); }
+    }
   });
 
   it('SC2 SC3 focuses the current default once without changing draft, URL or journal', async () => {
@@ -207,14 +216,20 @@ describe('native search summon shared destination', () => {
         ?.shadowRoot?.querySelector('jf-sv3-composer')?.shadowRoot?.querySelector('textarea') ?? null;
       expect(field).toBeTruthy();
     }, { timeout: 5000 });
+    // Own the draft's debounce so cleanup is checked before it can fire by chance.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     const input = field as unknown as HTMLTextAreaElement;
     input.value = 'keep the actual v3 draft';
     input.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+    expect(vi.getTimerCount()).toBeGreaterThan(0);
     const button = document.createElement('button'); document.body.append(button); button.focus();
     await summon(shell);
     expect(deepActiveElement()).toBe(input);
     expect(input.getAttribute('aria-label')).toBeTruthy();
     expect(input.value).toBe('keep the actual v3 draft');
+    await vi.advanceTimersByTimeAsync(200);
+    expect(getSearchState().passStage).toBe('quick');
+    expect(vi.getTimerCount()).toBeGreaterThan(0);
   });
 
   it('SC2 reuses a secondary search pane and never focuses the other composer', async () => {
