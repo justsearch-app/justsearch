@@ -2631,6 +2631,38 @@
         "[data-testid=\"sv3-column\"]",
         "[data-testid=\"sv3-composer-band\"]"
       ]
+    },
+    {
+      "$comment": "S5 SB17, measured 2026-11-10: unseeded Engine-owned first-use status at 1280x800. Retain the notice reading measure and 320px card floor. The current step and progress bar must render with positive geometry; no existing ceiling is raised.",
+      "uiShotStep": "first-use",
+      "elements": [
+        {
+          "selector": "[data-testid=\"getting-started-card\"]",
+          "inlineSizeRole": "notice",
+          "minWidthPx": 320
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"first-use-headline\"]",
+        "[aria-label=\"Getting started step\"]",
+        "li[aria-current=\"step\"]"
+      ]
+    },
+    {
+      "$comment": "S5 SB17, measured 2026-11-10: unseeded Engine-owned first-use status at 1280x800. Retain the notice reading measure and 320px card floor. The current step and progress bar must render with positive geometry; no existing ceiling is raised.",
+      "uiShotStep": "first-use-reading",
+      "elements": [
+        {
+          "selector": "[data-testid=\"getting-started-card\"]",
+          "inlineSizeRole": "notice",
+          "minWidthPx": 320
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"first-use-progress\"]",
+        "[aria-label=\"Getting started step\"]",
+        "li[aria-current=\"step\"]"
+      ]
     }
   ]
 }

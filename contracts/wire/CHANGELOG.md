@@ -18,6 +18,11 @@ the V1.5 follow-up per slice 3a-1-8f.
 
 ### Added
 
+- Wire 3.0.5: CoreIndexView field 20 `ownSearchableDocuments` is the searchable population
+  without the app's internal collections (bundled Help, agent history), from the same snapshot
+  as `searchableDocuments`; absent when the index counts are unknown. Additive optional; no
+  stored state.
+
 - Wire 3.0.3: SearchFilters field 17 `sizeBytes` echoes inclusive source-file byte bounds.
   ByteRange uses optional integer endpoints so zero remains a real bound. Additive optional;
   no new index fields or saved state (WP2.3a).

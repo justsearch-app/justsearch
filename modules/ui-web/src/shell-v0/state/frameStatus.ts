@@ -107,6 +107,7 @@ export interface DurableStatusOperation {
   readonly fresh?: boolean;
 }
 interface FrameStatusInput {
+  readonly gettingStarted?: { readonly visible: boolean; readonly known: boolean; readonly currentStep: number };
   readonly ai: AiState | null;
   readonly now: number;
   readonly contactLostAt: number | null;
@@ -576,6 +577,7 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
     pill = { kind: 'working', label: row.title, stale: row.stale ?? stale, ...(row.percent != null ? { percent: row.percent } : {}) };
   // A completion is a ready claim: it needs a fresh observation like calm does (ST2).
   } else if (!stale && input.finished && now - input.finished.at < FINISHED_DWELL_MS) pill = { kind: 'finished', label: input.finished.title, stale: false };
+  else if (input.gettingStarted?.visible && input.gettingStarted.known) pill = { kind: 'calm', label: `Getting started · ${input.gettingStarted.currentStep} of 3`, stale: false };
   else if (!stale && ai?.verdict.kind === 'operational' && progress.phase === 'ready') pill = { kind: 'calm', label: 'Up to date', stale: false };
   else pill = { kind: 'unknown', label: 'Checking search status', stale: true };
   if (pill.stale) {

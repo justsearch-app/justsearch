@@ -310,6 +310,10 @@ message CoreIndexView {
   // Spec E step E1: whether the VDU backlog (pendingVduCount) can drain right now. Set by the Head:
   // VDU is wired, a vision-capable chat model is configured and no capability block is standing.
   bool vdu_available = 19 [json_name = "vduAvailable"];
+  // The person's searchable documents, excluding the app's InternalCollections. Same snapshot as
+  // searchableDocuments; absent means unknown (older worker or indexedDocumentsUnknown).
+  optional int64 own_searchable_documents = 20 [json_name = "ownSearchableDocuments"];
+
 }
 
 message FailureTrackingView {

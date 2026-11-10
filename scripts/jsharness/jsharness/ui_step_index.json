@@ -1,4 +1,6 @@
 {
+  "shell-v0/components/GettingStarted.ts": ["first-use", "first-use-reading"],
+  "shell-v0/state/firstUse.ts": ["first-use", "first-use-reading"],
   "shell-v0/state/stopAttempt.ts": ["sv3-ask-stop-late-response", "sv3-run-halt", "sv3-run-halt-failure", "sv3-run-halt-timeout"],
   "shell-v0/controllers/AgentSessionController.ts": ["sv3-run-activity-steering", "sv3-run-budget", "sv3-run-approval", "sv3-run-approval-failure", "sv3-run-halt", "sv3-run-halt-failure", "sv3-run-halt-timeout"],
   "shell-v0/components/EngineRecovery.ts": ["engine-recovery"],

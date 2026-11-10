@@ -11,7 +11,10 @@ Capture UI screenshots **and a structured `<step>.measure.json` fact-sheet** for
 toolkit (tempdoc 615). The harness drives the **live Lit `shell-v0`** UI.
 
 For deterministic data without a backend, use `ui-shot --fixtures`: the harness intercepts API
-requests with fixtures and dismisses the first-run walkthrough. `?demo=true` alone supplies no data
+requests with fixtures and hides Getting started to preserve established captures. The
+`first-use` and `first-use-reading` steps instead leave walkthrough progress unseeded, covering
+an empty engine and files partly read. Use `--fixtures --no-demo` for those steps.
+`?demo=true` alone supplies no data
 to the current shell. Real integration checks need a running dev stack; AI checks also need an active
 local model. Every capture writes a `.measure.json` (accessibility tree, axe, geometry, and console)
 unless disabled; use those facts alongside the PNG.

@@ -64,7 +64,7 @@ class IndexStatusReadFailureTest {
   void fallbackCountsRetainTheirObservationUntilRecovery() throws Exception {
     IndexCountOps counts = mock(IndexCountOps.class);
     stubParents(counts, 12);
-    when(counts.countQueryOrThrow(any())).thenReturn(9);
+    when(counts.countQueriesOrThrow(any(org.apache.lucene.search.Query[].class))).thenReturn(new long[] {9, 9});
     var ops = ops(counts);
     var fresh = ops.buildStatusResponse();
     var active = observation(fresh, "active");
@@ -72,7 +72,7 @@ class IndexStatusReadFailureTest {
     assertEquals("fresh", active.get("state"));
     assertTrue((Long) active.get("observed_at_ms") > 0);
     failParents(counts);
-    when(counts.countQueryOrThrow(any())).thenThrow(new IOException("reader lost"));
+    when(counts.countQueriesOrThrow(any(org.apache.lucene.search.Query[].class))).thenThrow(new IOException("reader lost"));
     for (int repeat = 0; repeat < 2; repeat++) {
       var stale = ops.buildStatusResponse();
       assertEquals(12, stale.getCore().getDocCount());
@@ -82,7 +82,7 @@ class IndexStatusReadFailureTest {
       assertEquals(searchable.get("observed_at_ms"), observation(stale, "searchable").get("observed_at_ms"));
     }
     stubParents(counts, 18);
-    doReturn(15).when(counts).countQueryOrThrow(any());
+    doReturn(new long[] {15, 15}).when(counts).countQueriesOrThrow(any(org.apache.lucene.search.Query[].class));
     var recovered = ops.buildStatusResponse();
     assertEquals(18, recovered.getCore().getDocCount());
     assertEquals(15, recovered.getCore().getSearchableDocCount());
@@ -94,7 +94,7 @@ class IndexStatusReadFailureTest {
   void failedFilteredCountDoesNotBorrowTheUnfilteredPopulation() throws Exception {
     IndexCountOps counts = mock(IndexCountOps.class);
     stubParents(counts, 7);
-    when(counts.countQueryOrThrow(any())).thenThrow(new IOException("filtered read failed"));
+    when(counts.countQueriesOrThrow(any(org.apache.lucene.search.Query[].class))).thenThrow(new IOException("filtered read failed"));
     var status = ops(counts).buildStatusResponse();
     assertTrue(status.getCore().getDocCountUnknown());
     assertEquals("fresh", observation(status, "active").get("state"));
@@ -119,7 +119,7 @@ class IndexStatusReadFailureTest {
     IndexCountOps building = mock(IndexCountOps.class);
     stubParents(serving, 12);
     stubParents(building, 4);
-    when(serving.countQueryOrThrow(any())).thenReturn(9);
+    when(serving.countQueriesOrThrow(any(org.apache.lucene.search.Query[].class))).thenReturn(new long[] {9, 9});
     var ops = ops(building, serving);
     var fresh = ops.buildStatusResponse();
     assertEquals(12, fresh.getMigration().getActiveDocCount());
@@ -157,7 +157,7 @@ class IndexStatusReadFailureTest {
       return RETURNS_DEFAULTS.answer(invocation);
     });
     stubParents(counts, 7);
-    when(counts.countQueryOrThrow(any())).thenReturn(5);
+    when(counts.countQueriesOrThrow(any(org.apache.lucene.search.Query[].class))).thenReturn(new long[] {5, 5});
     if (!ioFailure) when(counts.maxDoc()).thenThrow(new IllegalStateException("reader closed"));
     var status = ops(counts).buildStatusResponse();
     assertEquals("IDLE", status.getCore().getState());

@@ -40,7 +40,6 @@
  *
  * Mounted as the main USER/RAIL Search surface, keeping its established address:
  * `#justsearch://surface/core.search-v3-surface`.
- *
  * Side-effect registers <jf-sv3-window> and its four regions.
  */
 import { Sv3SessionsDomain, type Sv3RecentItem } from './sv3-sessions-domain.js';
@@ -62,6 +61,7 @@ import { CORE_INTERACTION_SHAPES, ONE_WINDOW_MOUNT_TAG } from '../../plugin-api/
 import { subscribeInspector, setOpen as setInspectorOpen, getInspectorState } from '../../state/inspectorState.js';
 import type { DocumentLineRange } from '../../components/documentPane/DocumentPane.js';
 import { peekSearchV3Handoff, takeSearchV3Handoff } from '../../utils/compose.js';
+import type { PluginHostApi } from '../../plugin-api/plugin-types.js';
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { keyed } from 'lit/directives/keyed.js';
 import { JfElement } from '../../primitives/JfElement.js';
@@ -720,7 +720,9 @@ export class SearchV3View extends JfElement {
     `,
   ];
 
+  declare host_: PluginHostApi | undefined;
   static properties = {
+    host_: { attribute: false },
     composerState: { type: String, reflect: true, attribute: COMPOSER_STATE_ATTR },
     theme: { type: String, reflect: true },
     apiBase: { type: String, attribute: 'api-base' },
@@ -2816,7 +2818,7 @@ export class SearchV3View extends JfElement {
           <jf-button label="Review in Library" .onActivate=${() => requestSurfaceNavigation('core.library-surface')}>Review in Library</jf-button>
         </div>` : nothing}
         <jf-sv3-main
-          .apiBase=${this.apiBase}
+          .apiBase=${this.apiBase} .host_=${this.host_}
           state=${this.composerState}
           .view=${results}
           .forgetAvailable=${this.search.forgetAvailable && !this.search.forgetBusy}
@@ -2861,6 +2863,7 @@ export class SearchV3View extends JfElement {
           data-testid="sv3-context-bar-host"
         ></jf-sv3-context-bar>
         <jf-sv3-composer
+          .host_=${this.host_} .apiBase=${this.apiBase}
           state=${this.composerState}
           slot-kind=${slot.kind}
           slot-reason=${slot.reason}

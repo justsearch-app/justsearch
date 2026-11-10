@@ -353,20 +353,10 @@ final class IndexStatusOps {
     // be counted on the reader that SERVES search — the same one activeDocCount reads. During a
     // rebuild the ingest reader is the half-built NEW generation while search still serves the old
     // one, so counting there described a generation no query could reach.
-    java.util.OptionalLong searchable;
-    if (activeCountOps != null) {
-      searchable =
-          countDefaultScopeDocs(
-              activeCountOps,
-              activeDocCountUnknown
-                  ? java.util.OptionalLong.empty()
-                  : java.util.OptionalLong.of(activeDocCount), countObservations);
-    } else {
-      searchable =
-          docCountUnknown ? java.util.OptionalLong.empty() : java.util.OptionalLong.of(docCount);
-    }
-    long searchableDocCount = searchable.orElse(0L);
-    boolean countsUnknown = docCountUnknown || searchable.isEmpty();
+    ScopedCounts searchable = activeCountOps == null ? null : countDefaultScopeDocs(activeCountOps, countObservations);
+    long searchableDocCount = searchable == null ? 0L : searchable.searchable();
+    boolean countsUnknown = docCountUnknown || searchable == null;
+    Long ownSearchableDocCount = countsUnknown ? null : searchable.own();
 
     long buildingDocCount = 0;
     if (ingestCountOps != null && ingestCountOps != activeCountOps) {
@@ -411,6 +401,7 @@ final class IndexStatusOps {
                 queueDepth,
                 docCount,
                 searchableDocCount,
+                ownSearchableDocCount,
                 countsUnknown,
                 healthy,
                 state,
@@ -464,51 +455,48 @@ final class IndexStatusOps {
     }
   }
 
-  /**
-   * Tempdoc 811 C-4 — the population a DEFAULT-scope search can actually return: non-chunk
-   * documents minus the collections the default scope excludes (today exactly {@code
-   * agent-history}). The exclusion set is NOT re-listed here: {@link
-   * QueryFilterBuilder#buildFilterQueryOnly} with {@code null} filters IS the production
-   * default-scope filter (chunk {@code MUST_NOT} + the reserved-collection {@code MUST_NOT} + the
-   * {@code MatchAllDocs} anchor), so this count is a projection of the one search authority and
-   * cannot drift from what search does. Help docs and {@code mcp-ingest} documents are IN the
-   * default scope and therefore counted — that is the honest number; a per-collection breakdown is
-   * deferred (811 §After the decisions).
-   *
-   * <p>Honest limit: the collection {@code MUST_NOT} only matches documents that CARRY the
-   * collection tag, and chunk documents written before #379 carry none. That caveat cannot bite
-   * here because this counts NON-chunk documents, whose {@code collection} has always been written.
-   *
-   * @param fallback returned when the builder yields no filter at all (it cannot today — the
-   *     default scope always contributes the two exclusions — but a zero would be a silent lie if
-   *     that ever changed)
-   */
-  private java.util.OptionalLong countDefaultScopeDocs(
-      IndexCountOps countOps, java.util.OptionalLong fallback,
-      Map<String, io.justsearch.ipc.CountObservation> observations) {
+  /** Default search and the person's population share one serving-reader acquisition and fallback. */
+  private ScopedCounts countDefaultScopeDocs(
+      IndexCountOps countOps, Map<String, io.justsearch.ipc.CountObservation> observations) {
     Query defaultScope = QueryFilterBuilder.buildFilterQueryOnly(null);
     if (defaultScope == null) {
-      observations.put("searchable", observations.get("active"));
-      return fallback;
+      defaultScope = new org.apache.lucene.search.BooleanQuery.Builder()
+          .add(new org.apache.lucene.search.MatchAllDocsQuery(), org.apache.lucene.search.BooleanClause.Occur.FILTER)
+          .add(new org.apache.lucene.search.TermQuery(new org.apache.lucene.index.Term(SchemaFields.IS_CHUNK, "true")),
+              org.apache.lucene.search.BooleanClause.Occur.MUST_NOT).build();
+    }
+    var ownScope = new org.apache.lucene.search.BooleanQuery.Builder()
+        .add(defaultScope, org.apache.lucene.search.BooleanClause.Occur.FILTER);
+    for (String collection : io.justsearch.configuration.InternalCollections.RESERVED) {
+      ownScope.add(new org.apache.lucene.search.TermQuery(new org.apache.lucene.index.Term(SchemaFields.COLLECTION, collection)),
+          org.apache.lucene.search.BooleanClause.Occur.MUST_NOT);
     }
     try {
-      long count = countOps.countQueryOrThrow(defaultScope);
-      CountReading reading = new CountReading(countOps, count, System.currentTimeMillis());
+      long[] counts = countOps.countQueriesOrThrow(defaultScope, ownScope.build());
+      ScopedCounts reading = new ScopedCounts(countOps, counts[0], counts[1], System.currentTimeMillis());
       lastKnownSearchableDocCount.set(reading);
-      observations.put("searchable", observation("fresh", reading));
-      return java.util.OptionalLong.of(count);
+      observations.put("searchable", scopedObservation("fresh", reading));
+      return reading;
     } catch (IOException | RuntimeException e) {
-      CountReading previous = lastKnownSearchableDocCount.get();
+      ScopedCounts previous = lastKnownSearchableDocCount.get();
       boolean sameGeneration = previous != null && previous.ops() == countOps;
-      observations.put("searchable", observation(sameGeneration ? "stale" : "unknown", sameGeneration ? previous : null));
-      return sameGeneration ? java.util.OptionalLong.of(previous.count()) : java.util.OptionalLong.empty();
+      observations.put("searchable", scopedObservation(sameGeneration ? "stale" : "unknown", sameGeneration ? previous : null));
+      return sameGeneration ? previous : null;
     }
+  }
+
+  private record ScopedCounts(IndexCountOps ops, long searchable, long own, long observedAtMs) {}
+
+  private static io.justsearch.ipc.CountObservation scopedObservation(String state, ScopedCounts counts) {
+    return io.justsearch.ipc.CountObservation.newBuilder().setState(state)
+        .setObservedAtMs(counts == null ? 0L : counts.observedAtMs()).build();
   }
 
   private CoreStatus buildCore(
       long queueDepth,
       long docCount,
       long searchableDocCount,
+      Long ownSearchableDocCount,
       boolean docCountUnknown,
       boolean healthy,
       String state,
@@ -579,6 +567,7 @@ final class IndexStatusOps {
     for (double v : recentDocsPerSecTrend()) {
       b.addRecentDocsPerSec(v);
     }
+    if (ownSearchableDocCount != null) b.setOwnSearchableDocCount(ownSearchableDocCount);
     return b.build();
   }
 
@@ -1306,7 +1295,7 @@ final class IndexStatusOps {
         .setObservedAtMs(reading == null ? 0 : reading.observedAtMs()).build();
   }
 
-  private final java.util.concurrent.atomic.AtomicReference<CountReading> lastKnownSearchableDocCount =
+  private final java.util.concurrent.atomic.AtomicReference<ScopedCounts> lastKnownSearchableDocCount =
       new java.util.concurrent.atomic.AtomicReference<>();
 
   private final java.util.concurrent.atomic.AtomicReference<CountReading> lastKnownActiveDocCount =

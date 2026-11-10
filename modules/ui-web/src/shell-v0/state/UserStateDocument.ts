@@ -567,6 +567,9 @@ function ensureInitialized(): void {
   if (initialized) return;
   initialized = true;
   if (typeof localStorage === 'undefined') return;
+  // Walkthrough progress is shared across windows. Adopt the whole latest document through
+  // the same merge path used before saves, so co-resident values and local profiles survive.
+  if (typeof window !== 'undefined') window.addEventListener('storage', onDocumentStorage);
   // §11.3 / §13.3 — read order:
   //   1. v2 key (current)
   //   2. v1 key (legacy — migrated forward, both keys preserved)
@@ -1305,6 +1308,10 @@ function adoptOtherWindowSaves(): boolean {
   return true;
 }
 
+function onDocumentStorage(event: StorageEvent): void {
+  if (event.key === DOCUMENT_STORAGE_KEY && event.storageArea === localStorage) adoptOtherWindowSaves();
+}
+
 function notify(): void {
   for (const listener of listeners) {
     try {
@@ -1432,6 +1439,7 @@ export function mutateDocument(
 // ============================================================
 
 export function __resetUserStateForTest(): void {
+  if (typeof window !== 'undefined') window.removeEventListener('storage', onDocumentStorage);
   setDocumentFromView(DEFAULT_DOCUMENT);
   listeners.clear();
   initialized = false;
@@ -1457,6 +1465,7 @@ export function __resetUserStateForTest(): void {
  * Tempdoc 511-followup-2 Track CC.
  */
 export function __resetInMemoryStateForTest(): void {
+  if (typeof window !== 'undefined') window.removeEventListener('storage', onDocumentStorage);
   setDocumentFromView(DEFAULT_DOCUMENT);
   listeners.clear();
   initialized = false;

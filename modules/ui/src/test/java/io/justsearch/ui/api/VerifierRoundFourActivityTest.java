@@ -38,9 +38,9 @@ public class VerifierRoundFourActivityTest {
      }
    }finally{app.stop();ex.shutdownNow();}
  }
- @ParameterizedTest @ValueSource(strings={"/api/inference/transitions","/api/conversations/encryption","/api/chat/agent/tools","/api/indexing/failed-jobs","/api/runtime/manifest"})
+ @ParameterizedTest @ValueSource(strings={"/api/inference/transitions","/api/conversations/encryption","/api/chat/agent/tools","/api/indexing/failed-jobs","/api/runtime/manifest","/api/indexing/suggested-roots"})
  void unattendedReadDoesNotAdvanceCapturedBoundary(String p)throws Exception{http("get",p,false);}
- @ParameterizedTest @ValueSource(strings={"/api/knowledge/suggest","/api/preview","/api/operations/{id}/preview","/api/chat/sessions/last","/api/chat/sessions/{id}/transcript","/api/chat/agent/history","/api/chat/agent/history/{batchId}","/api/meta/openapi.json","/api/registry/prompts","/api/debug/events","/api/debug/engine-log","/api/debug/chunks","/api/indexing/suggested-roots"})
+ @ParameterizedTest @ValueSource(strings={"/api/knowledge/suggest","/api/preview","/api/operations/{id}/preview","/api/chat/sessions/last","/api/chat/sessions/{id}/transcript","/api/chat/agent/history","/api/chat/agent/history/{batchId}","/api/meta/openapi.json","/api/registry/prompts","/api/debug/events","/api/debug/engine-log","/api/debug/chunks"})
  void personRequestedReadAdvancesBoundary(String p)throws Exception{http("get",p,true);}
  @ParameterizedTest @ValueSource(strings={"/api/knowledge/folders","/api/knowledge/folder-files","/api/conversations/encryption/unlock","/api/conversations/encryption/lock","/api/ui/activity"})
  void personRequestedActionAdvancesBoundary(String p)throws Exception{http("post",p,true);}

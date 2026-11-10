@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-10T03:40:57.778Z",
+  "revision": "f449a9cf0e86ee3992d76f6c2d842ee77bef7ead",
+  "tree": "3390984406831e29f35b6b008a3e9ea044d0a95c",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-api:test --tests \"io.justsearch.app.api.status.WorkerOperationalFallbackTest.fallbackOwnCountStaysUnknownInStatusJson\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 11156
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/status/WorkerOperationalFallbackTest.java#fallbackOwnCountStaysUnknownInStatusJson",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/status/WorkerOperationalFallbackTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7fd60ea8b0f034f70581db8f3635dbfa343ca7b03bddae1a81e27b7cca1e7d51",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "fallbackOwnCountStaysUnknownInStatusJson()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:5f990cc9d2653282b8dace35637212082953b75acf5b90090cc4e80fb9bfa927"
+}
