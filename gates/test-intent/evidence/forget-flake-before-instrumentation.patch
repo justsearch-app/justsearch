@@ -1,0 +1,45 @@
+--- a/modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetInProcessTest.java
++++ b/modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetInProcessTest.java
+@@ -66,6 +66,7 @@
+   private static final Clock CLOCK = Clock.systemUTC();
+   private static final JsonMapper JSON = JsonMapper.builder().build();
+   @TempDir Path directory;
++  boolean busyEligibility;
+ 
+   @Test
+   void S55RealWatchedFileOwnerRemovesParentChunksAndJobsKeepsPrecisePolicyAndOriginals() throws Exception {
+@@ -374,7 +375,9 @@
+       // R9 changes policy while SWITCHING, where the monitor promotes on its own once the queue
+       // drains. Hold the root-binding owner that native promotion takes before any replay, so its
+       // first attempt starts only after the HOT Save; the setup no longer races that monitor.
+-      try (var ignoredSubscription = f.queue.indexingJobChangeFeed().orElseThrow().subscribe(ignored -> capture.run());
++      try (var eligibility = busyEligibility
++              ? EngineForgetInProcessTestHostAssumptionsTest.BusyEligibility.install(f.server, f.queue, exact) : null;
++          var ignoredSubscription = f.queue.indexingJobChangeFeed().orElseThrow().subscribe(ignored -> capture.run());
+           var promotionHold = removePolicyAfterSkip ? PromotionHold.acquire(f) : null) {
+         String predecessor = f.client.getStatus(TestEngineContexts.FOREGROUND).getMigration().getActiveGenerationId();
+         var started = f.client.startMigration("forget-native-preservation", TestEngineContexts.FOREGROUND);
+@@ -532,6 +535,7 @@
+               Map.of("response", saved.response(), "record", saved.record())));
+           assertNull(field(((DefaultWorkerAppServices) f.server.appServices()).ingestService(),
+               WorkerIngestService.class, "watcherReplayFailure"), "SETUP: no promotion attempt preceded the HOT Save");
++          if (eligibility != null) eligibility.arm();
+           promotionHold.close();
+         }
+         // Publicly requested SWITCHING follows observed enumeration/writer/queue readiness.
+@@ -547,6 +551,7 @@
+               && status.getBuildingGenerationId().isBlank();
+           var publisher = ((DefaultWorkerAppServices) f.server.appServices()).ingestService();
+           refusal = field(publisher, WorkerIngestService.class, "watcherReplayFailure");
++          if (eligibility != null) eligibility.observe(refusal);
+           if (terminal || ("Buffered UPSERT lacks its accepted target projection: " + key(exact)).equals(refusal)) break;
+           Thread.sleep(20);
+         } while (System.nanoTime() < completionDeadline);
+@@ -578,6 +583,7 @@
+         }
+         assertTrue(terminal, "R2 actual native migration did not settle at the observed exact target receipt refusal; "
+             + "this bounded observation is not a claim of permanent failure: " + refusal);
++        if (eligibility != null) eligibility.assertObserved();
+         if (removePolicyAfterSkip) {
+           capture.run();
+           var old = admissions.get("path:" + key(exact));

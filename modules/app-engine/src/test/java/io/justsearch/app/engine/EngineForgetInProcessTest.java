@@ -66,6 +66,7 @@ final class EngineForgetInProcessTest {
   private static final Clock CLOCK = Clock.systemUTC();
   private static final JsonMapper JSON = JsonMapper.builder().build();
   @TempDir Path directory;
+  boolean busyEligibility;
 
   @Test
   void S55RealWatchedFileOwnerRemovesParentChunksAndJobsKeepsPrecisePolicyAndOriginals() throws Exception {
@@ -125,7 +126,8 @@ final class EngineForgetInProcessTest {
     Path watched = Files.createDirectory(directory.resolve("replay-watched"));
     Path exact = Files.writeString(watched.resolve("report.txt"), "private physical source remains");
     Path sibling = Files.writeString(watched.resolve("report.txt.bak"), "allowed sibling extraction control");
-    try (var f = new Fixture(directory.resolve("replay-process"), List.of(watched))) {
+    try (var ignoredVolume = EngineTestHarness.knownVolume();
+        var f = new Fixture(directory.resolve("replay-process"), List.of(watched))) {
       f.seed(exact, "private indexed parent and proper chunks");
       var result = f.forget(exact, "FILE");
       var outcome = JSON.valueToTree(result.structuredData().get("forget"));
@@ -267,6 +269,12 @@ final class EngineForgetInProcessTest {
   }
 
   private void nativeMigrationOfPresentFile(boolean forgotten, boolean removePolicyAfterSkip) throws Exception {
+    try (var ignoredVolume = EngineTestHarness.knownVolume()) {
+      nativeMigrationWithKnownVolume(forgotten, removePolicyAfterSkip);
+    }
+  }
+
+  private void nativeMigrationWithKnownVolume(boolean forgotten, boolean removePolicyAfterSkip) throws Exception {
     Path watched = Files.createDirectory(directory.resolve(forgotten ? "native-forget" : "native-control"));
     Path exact = Files.writeString(watched.resolve("report.txt"), "present native migration target bytes");
     Path sibling = Files.writeString(watched.resolve("report.txt.bak"), "eligible native migration sibling bytes");
@@ -374,7 +382,9 @@ final class EngineForgetInProcessTest {
       // R9 changes policy while SWITCHING, where the monitor promotes on its own once the queue
       // drains. Hold the root-binding owner that native promotion takes before any replay, so its
       // first attempt starts only after the HOT Save; the setup no longer races that monitor.
-      try (var ignoredSubscription = f.queue.indexingJobChangeFeed().orElseThrow().subscribe(ignored -> capture.run());
+      try (var eligibility = busyEligibility
+              ? EngineForgetInProcessTestHostAssumptionsTest.BusyEligibility.install(f.server, f.queue, exact) : null;
+          var ignoredSubscription = f.queue.indexingJobChangeFeed().orElseThrow().subscribe(ignored -> capture.run());
           var promotionHold = removePolicyAfterSkip ? PromotionHold.acquire(f) : null) {
         String predecessor = f.client.getStatus(TestEngineContexts.FOREGROUND).getMigration().getActiveGenerationId();
         var started = f.client.startMigration("forget-native-preservation", TestEngineContexts.FOREGROUND);
@@ -532,6 +542,7 @@ final class EngineForgetInProcessTest {
               Map.of("response", saved.response(), "record", saved.record())));
           assertNull(field(((DefaultWorkerAppServices) f.server.appServices()).ingestService(),
               WorkerIngestService.class, "watcherReplayFailure"), "SETUP: no promotion attempt preceded the HOT Save");
+          if (eligibility != null) eligibility.arm();
           promotionHold.close();
         }
         // Publicly requested SWITCHING follows observed enumeration/writer/queue readiness.
@@ -540,6 +551,7 @@ final class EngineForgetInProcessTest {
             "SETUP: public SWITCHING/cutover request must be admitted");
         boolean terminal;
         Object refusal;
+        Object lastRefusal = null;
         long completionDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(45);
         do {
           var status = f.client.getStatus(TestEngineContexts.FOREGROUND).getMigration();
@@ -547,10 +559,13 @@ final class EngineForgetInProcessTest {
               && status.getBuildingGenerationId().isBlank();
           var publisher = ((DefaultWorkerAppServices) f.server.appServices()).ingestService();
           refusal = field(publisher, WorkerIngestService.class, "watcherReplayFailure");
-          if (terminal || ("Buffered UPSERT lacks its accepted target projection: " + key(exact)).equals(refusal)) break;
+          if (refusal != null) lastRefusal = refusal;
+          if (eligibility != null) eligibility.observe(refusal);
+          if (terminal) break;
           Thread.sleep(20);
         } while (System.nanoTime() < completionDeadline);
         if (!terminal) {
+          refusal = lastRefusal;
           assertTrue(forgotten && targetAdmitted
               && ("Buffered UPSERT lacks its accepted target projection: " + key(exact)).equals(refusal),
               "SETUP/INCONCLUSIVE: bounded native migration observation lacks the exact target projection refusal: " + refusal);
@@ -577,7 +592,8 @@ final class EngineForgetInProcessTest {
                   .isExcludedPath(watched, exact), "the current policy must reflect the completed public Save");
         }
         assertTrue(terminal, "R2 actual native migration did not settle at the observed exact target receipt refusal; "
-            + "this bounded observation is not a claim of permanent failure: " + refusal);
+            + "this bounded observation is not a claim of permanent failure: " + lastRefusal);
+        if (eligibility != null) eligibility.assertObserved();
         if (removePolicyAfterSkip) {
           capture.run();
           var old = admissions.get("path:" + key(exact));
