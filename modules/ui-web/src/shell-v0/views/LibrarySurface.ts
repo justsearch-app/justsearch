@@ -309,6 +309,12 @@ export class LibrarySurface extends JfElement {
   }
   private excludesAttempt: SettingsAttempt | null = null;
   private excludesLoadStarted = false;
+  /** Identifies the passive read in flight; leaving the Library orphans it. */
+  private excludesRefreshRead: object | null = null;
+  private readonly onWindowFocus = () => { void this.refreshExcludes(); };
+  private get excludesClean(): boolean {
+    return this.excludesLoaded && !this.excludesBusy && !this.excludesAttempt && !this.excludesConflict && !this.excludesDirty;
+  }
   declare addBusy: boolean;
   declare removingHashes: ReadonlySet<string>;
   declare actionMessage: string | null;
@@ -771,6 +777,8 @@ export class LibrarySurface extends JfElement {
     void this.refresh();
     if (this.reindexOutcomeKey) void this.checkReindexOutcome();
     if (!this.excludesLoadStarted) void this.loadExcludes();
+    else void this.refreshExcludes();
+    window.addEventListener('focus', this.onWindowFocus);
     this.presentationUnsub = subscribePresentation(() => this.requestUpdate());
     // Keep empty roots provisional during transitions, but only call a real
     // rebuild/migration "Rebuilding". Other transitions use the status bar's wording.
@@ -858,6 +866,8 @@ export class LibrarySurface extends JfElement {
   }
 
   override disconnectedCallback(): void {
+    window.removeEventListener('focus', this.onWindowFocus);
+    this.excludesRefreshRead = null;
     this.indexingRuleUnsub?.();
     this.indexingRuleUnsub = undefined;
     this.indexingFocusSerial++;
@@ -1072,8 +1082,8 @@ export class LibrarySurface extends JfElement {
       pathHash, displayPath: name.label, fullPath, pathTitle: name.title, walkError: undefined,
       status: !this.indexingActivity.confirmed && fs.glyph === 'indexed' ? 'pending' : fs.glyph,
       statusText: !this.indexingActivity.confirmed && fs.state === 'ready' ? this.indexingActivity.summary
-        : statusText + (this.retryWaiting && this.indexingActivity.detail ? ` · ${this.indexingActivity.detail}` : ''),
-      metaText: this.removingHashes.has(pathHash) ? 'Removing folder…' : this.folderActivityText(fs.metaText),
+        : statusText,
+      metaText: this.removingHashes.has(pathHash) ? 'Removing folder…' : fs.metaText,
       removalBusy: this.removingHashes.has(pathHash),
       ...(this.removeConfirm?.origin === 'row' && this.removalPlan(pathHash) ? { removeConfirm: this.removalPlan(pathHash)! } : {}),
       failed: fs.failed, failedLastKnown: fs.failedIsLastKnown === true, apiBase: this.apiBase,
@@ -1445,12 +1455,16 @@ export class LibrarySurface extends JfElement {
     }
   }
 
+  private async readExcludesPolicy(): Promise<ExcludesPolicy> {
+    const response = await this.doFetch('/api/indexing/excludes', { signal: AbortSignal.timeout(10_000) });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return excludesPolicySchema.parse(await response.json());
+  }
+
   private async loadExcludesPolicy(): Promise<void> {
     this.excludesPolicy = null;
     try {
-      const response = await this.doFetch('/api/indexing/excludes', { signal: AbortSignal.timeout(10_000) });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      this.excludesPolicy = excludesPolicySchema.parse(await response.json());
+      this.excludesPolicy = await this.readExcludesPolicy();
     } catch {
       // Keep effects unavailable until a later observation succeeds.
     }
@@ -1482,6 +1496,44 @@ export class LibrarySurface extends JfElement {
       this.error = err instanceof Error ? err.message : String(err);
     } finally {
       this.excludesBusy = false;
+    }
+  }
+
+  /**
+   * Passive catch-up after focus or a return to the Library: another window may have saved. It runs
+   * only while the editor holds nothing of the user's, and is applied only if that is still true,
+   * so a draft or a save attempt keeps its original witness. A failed read changes nothing.
+   */
+  private async refreshExcludes(): Promise<void> {
+    if (this.excludesRefreshRead || !this.excludesClean) return;
+    const read = (this.excludesRefreshRead = {});
+    const witness = this.excludesWitness;
+    try {
+      const [body, policy] = await Promise.all([
+        readSettingsObservation((path, init) => this.doFetch(path, init)),
+        this.readExcludesPolicy(),
+      ]);
+      if (this.excludesRefreshRead !== read || !this.excludesClean || this.excludesWitness !== witness) return;
+      const entries = body.ui?.excludePatterns ?? [];
+      const text = entries.filter((entry) => typeof entry === 'string').join('\n');
+      const literals = entries.filter((entry): entry is ExactPathExclusion => typeof entry !== 'string');
+      // A shown Preview or notice described the list and policy this observation replaces.
+      if (text !== this.excludesSavedText || JSON.stringify(literals) !== JSON.stringify(this.excludesSavedLiterals)
+          || JSON.stringify(policy) !== JSON.stringify(this.excludesPolicy)) {
+        this.excludesResult = null;
+        this.excludesNotice = '';
+      }
+      this.excludesSavedText = text;
+      this.excludesSavedLiterals = literals;
+      this.excludesText = text;
+      this.excludesLiterals = [...literals];
+      this.excludesInvalidPatterns = body.ui?.invalidExcludePatterns ?? [];
+      this.excludesWitness = body.witness;
+      this.excludesPolicy = policy;
+    } catch {
+      // The shown list and its witness stay; the next focus or return reads again.
+    } finally {
+      if (this.excludesRefreshRead === read) this.excludesRefreshRead = null;
     }
   }
 
@@ -1923,17 +1975,6 @@ export class LibrarySurface extends JfElement {
    * renders: the scan omits collections rather than undercounting them (see `otherSources.ts`), so
    * silence there would be the same invisibility this section exists to end.
    */
-  private folderActivityText(folderText: string): string {
-    const activity = this.indexingActivity;
-    if (!activity.confirmed || activity.detail) {
-      // The global reason is explicitly scoped to the index; per-folder failures and verification
-      // caveats remain owned by folderStatus, even when its observation is only last known.
-      const scope = activity.confirmed ? 'Index: ' : 'Index (folder observation last known): ';
-      return `${folderText} · ${scope}${activity.summary}${activity.detail ? ` — ${activity.detail}` : ''}`;
-    }
-    return folderText;
-  }
-
   private renderOtherSources(): TemplateResult | typeof nothing {
     const { sources, truncated } = this.otherSources;
     if (sources.length === 0 && !truncated) return nothing;
@@ -2171,7 +2212,7 @@ export class LibrarySurface extends JfElement {
         ${this.reindexOutcome}
         ${this.reindexOutcomeKey ? html`<jf-button label="Check reindex outcome" .disabled=${this.reindexOutcomeBusy}
           .onActivate=${() => this.checkReindexOutcome()}>Check reindex outcome</jf-button>` : nothing}
-        <p>${this.indexingActivity.summary}${this.indexingActivity.detail ? ` — ${this.indexingActivity.detail}` : ''}</p>
+        ${this.retryWaiting ? nothing : html`<p>${this.indexingActivity.summary}${this.indexingActivity.detail ? ` — ${this.indexingActivity.detail}` : ''}</p>`}
       </div>` : nothing}
 
 

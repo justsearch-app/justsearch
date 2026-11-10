@@ -104,7 +104,7 @@ const SHORTCUTS: ShortcutRow[] = [
 // header and the Health quick actions (LibrarySurface.ts, HealthSurface.ts renderActions).
 const TROUBLESHOOTING: string[] = [
   'If search results look stale, use "Reindex" in Library or in the Health tab of the System view.',
-  'If indexing seems stuck, use "Recover component" in the Health tab of the System view (shown when Settings → Developer → View tier is Operator), or "Force Rebuild" there to rebuild the whole index from scratch, which takes a long time.',
+  'If indexing seems stuck, use "Recover component" in the Health tab of the System view (shown when Settings → Developer → View tier is Operator), or "Rebuild search index" there to rebuild the whole index from scratch, which takes a long time.',
   'Use "Copy Diagnostic Summary" above before reporting a bug; review it before posting.',
 ];
 

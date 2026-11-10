@@ -18,7 +18,7 @@
  */
 
 import type { StatusResponse } from '../../api/generated/index.js';
-import { formatCount } from '../display/format.js';
+import { formatCount, formatDeadline } from '../display/format.js';
 
 /**
  * The 813 §3a phase model, index-wide scope. `Scanning` is per-scan (the scan SSE) and is therefore
@@ -664,7 +664,7 @@ export function selectIndexingProgress(
           ? 'Embedding cannot run right now. Keyword search remains available.'
           : 'Some enrichment cannot run right now. Keyword search remains available.' : '',
       (pause.reasons ?? [pause.reason]).includes('user_paused') && pause.untilEpochMs != null
-        ? `Until ${new Date(pause.untilEpochMs).toLocaleString()}.` : '',
+        ? `Until ${formatDeadline(new Date(pause.untilEpochMs))}.` : '',
       pause.waiting && pause.reason !== 'settings_recovery'
         ? pause.reasons?.includes('schedule') || pause.reasons?.includes('on_battery')
           ? ''
@@ -782,7 +782,7 @@ function indexingActivity(
     const retry = count(status.worker?.failure?.nextRetryAtMs);
     const deadline = retry > 0 ? new Date(retry) : null;
     const nextRetry = deadline && Number.isFinite(deadline.getTime())
-      ? ` Next retry: ${deadline.toLocaleString()}.` : '';
+      ? ` Next retry at ${formatDeadline(deadline)}.` : '';
     return { summary: 'Waiting to retry',
       detail: `${formatCount(jobs)} ${jobs === 1 ? 'file' : 'files'} waiting.${nextRetry}`,
       confirmed: true, enrichmentDeferred };

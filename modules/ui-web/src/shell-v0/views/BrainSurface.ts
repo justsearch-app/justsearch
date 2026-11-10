@@ -2308,7 +2308,7 @@ export class BrainSurface extends JfElement {
   }
 
   // Tempdoc 508-followup §ε2 + parallel 508 reconcile: `forceRebuildIndex`
-  // method removed during merge. The "Force rebuild" button now mounts
+  // method removed during merge. The "Rebuild search index" button now mounts
   // via `<jf-operation operation-id="core.bulk-reindex">` (parallel 508
   // migration), and the typed-REBUILD confirm ceremony lives on the
   // wire's `ConfirmStrategy.Inline` rather than in a Lit handler.

@@ -24,3 +24,14 @@ export function formatBytes(n: number | undefined | null): string {
 export function formatCount(n: number): string {
   return NUM.format(n);
 }
+
+/** Local deadline time, with a short weekday only when it is not today. */
+export function formatDeadline(deadline: Date): string {
+  const now = new Date();
+  const today = deadline.getFullYear() === now.getFullYear() &&
+    deadline.getMonth() === now.getMonth() && deadline.getDate() === now.getDate();
+  // SES tames Date#toLocaleString to a raw date string, ignoring its options.
+  return new Intl.DateTimeFormat(undefined, {
+    ...(today ? {} : { weekday: 'short' }), hour: '2-digit', minute: '2-digit',
+  }).format(deadline);
+}
