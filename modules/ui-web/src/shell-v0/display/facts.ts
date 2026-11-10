@@ -25,7 +25,7 @@
 import { unknownDocumentCountLabel, type AiState } from '../state/aiStateStore.js';
 import { EMBED_VECTOR_DIM } from '../../api/generated/field-constants.js';
 import { whenKnown } from '../state/known.js';
-import { formatBytes, formatCount } from './format.js';
+import { formatBytes, formatCount, formatDateTime } from './format.js';
 
 /** Ternary presence — `unknown` is distinct from `absent` (594 §11.3 #3 / §14 U5). */
 export type FactPresence = 'present' | 'absent' | 'unknown';
@@ -189,7 +189,7 @@ const FACTS: Record<string, FactDef> = {
       provenance: (s) => {
         const observation = s.status?.worker?.countObservations?.active;
         return observation?.state === 'stale'
-          ? `Last known · observed ${observation.observedAtMs ? new Date(observation.observedAtMs).toLocaleString() : 'at an unknown time'}`
+          ? `Last known · observed ${observation.observedAtMs ? formatDateTime(new Date(observation.observedAtMs)) : 'at an unknown time'}`
           : undefined;
       },
     },

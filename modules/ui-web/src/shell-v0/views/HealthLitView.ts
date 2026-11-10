@@ -17,6 +17,7 @@
  * etc.) and split this view across them.
  */
 
+import { formatTime } from '../display/format.js';
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
 import { EnvelopeStream } from '../streaming/EnvelopeStream.js';
@@ -633,7 +634,7 @@ export class HealthLitView extends JfElement {
       .slice(0, 3)
       .map(([k, v]) => `${k}=${String(v)}`)
       .join(', ');
-    const time = event.timestamp ? new Date(event.timestamp).toLocaleTimeString() : '';
+    const time = event.timestamp ? formatTime(new Date(event.timestamp)) : '';
     return html`
       <div class="occurrence">
         <span class="occurrence-severity" data-severity=${event.severity}>

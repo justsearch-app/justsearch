@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
+  },
+  "createdAt": "2026-11-10T17:29:31.315Z",
+  "revision": "611a433d52b83eda253c96cc690d03a2d3d1cfa2",
+  "tree": "ae160c370dbf7e2f304ff2eb7f2eac7fe363320d",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/display/date-call-sites-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/s8_vy9ey/tmp/test-intent-vitest-64-1794331768463.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2850
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/display/date-call-sites-lockdown.test.ts#preserves saved snapshot labels and missing or invalid timestamp fallbacks",
+      "file": "modules/ui-web/src/shell-v0/display/date-call-sites-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9a657ee2d2b10c602ce1e36369b2bfc98588c3188e43b56d7124210b294fc0e1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "preserves saved snapshot labels and missing or invalid timestamp fallbacks",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:e4b2b88d22170086a5962b2c61ebcb81171866d15c38c57181faca308ebb42b8"
+}

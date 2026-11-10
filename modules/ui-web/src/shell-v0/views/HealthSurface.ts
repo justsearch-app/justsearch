@@ -76,7 +76,7 @@ import {
 } from '../state/enrichmentCoverage.js';
 import { present } from '../display/present.js';
 import { projectFact } from '../display/facts.js';
-import { formatBytes, formatCount } from '../display/format.js';
+import { formatBytes, formatCount, formatTime } from '../display/format.js';
 // 569 §15 — co-project the liveness + overflow facets on a REAL surface (the 4th surface).
 import { activeBodyFor, subscribePresentation } from '../state/presentationRuntime.js';
 import { HEALTH_STATUS_REGION, HEALTH_STATS_REGION } from '../themes/builtinPresentations.js';
@@ -1382,7 +1382,7 @@ export class HealthSurface extends JfElement {
               r="3"
               fill="${d.row.success ? 'var(--accent-tint)' : 'var(--accent-danger)'}"
             >
-              <title>${new Date(d.row.timestampMs).toLocaleTimeString()} · gen=${d.gen} · ${d.row.fromMode.toLowerCase()} → ${d.row.toMode.toLowerCase()} · ${d.row.reason.toLowerCase().replace(/_/g, ' ')} · ${d.row.durationMs}ms${d.row.wireCode ? ` · ${d.row.wireCode}` : ''}</title>
+              <title>${formatTime(new Date(d.row.timestampMs))} · gen=${d.gen} · ${d.row.fromMode.toLowerCase()} → ${d.row.toMode.toLowerCase()} · ${d.row.reason.toLowerCase().replace(/_/g, ' ')} · ${d.row.durationMs}ms${d.row.wireCode ? ` · ${d.row.wireCode}` : ''}</title>
             </circle>`,
           )}
         </svg>
@@ -1422,7 +1422,7 @@ export class HealthSurface extends JfElement {
                     : 'var(--accent-danger)'}; flex-shrink:0; align-self: center"
                 ></span>
                 <span style="color: var(--text-secondary)"
-                  >${new Date(r.timestampMs).toLocaleTimeString()}</span
+                  >${formatTime(new Date(r.timestampMs))}</span
                 >
                 <span>${r.fromMode.toLowerCase()} → ${r.toMode.toLowerCase()}</span>
                 <span style="color: var(--text-secondary)"
@@ -1493,7 +1493,7 @@ export class HealthSurface extends JfElement {
                     : 'var(--accent-tint)'}; flex-shrink:0; align-self: center"
                 ></span>
                 <span style="color: var(--text-secondary)">
-                  ${s.start ? new Date(s.start).toLocaleTimeString() : '—'}
+                  ${s.start ? formatTime(new Date(s.start)) : '—'}
                 </span>
                 <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 18rem">
                   ${s.name ?? '(unnamed)'}

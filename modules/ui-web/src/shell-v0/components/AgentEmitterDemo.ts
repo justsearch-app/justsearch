@@ -27,6 +27,7 @@
  * code paths are battle-tested.
  */
 
+import { formatTime } from '../display/format.js';
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
 import './StatusBadge.js';
@@ -213,7 +214,7 @@ export class AgentEmitterDemo extends JfElement {
   private appendLog(outcome: DemoOutcome): void {
     this.log = [
       ...this.log,
-      { at: new Date().toLocaleTimeString(), outcome },
+      { at: formatTime(new Date()), outcome },
     ].slice(-20);
   }
 

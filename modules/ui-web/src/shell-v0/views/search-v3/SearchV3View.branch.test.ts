@@ -1427,7 +1427,7 @@ describe('deleting a conversation that has branches', () => {
     expect(document.querySelector('jf-confirm-dialog')).not.toBeNull();
     const message = await answerConfirm(el, false);
     expect(message).toContain('Creation time unknown');
-    expect(message).not.toContain(new Date(0).toLocaleString());
+    expect(message).not.toContain(new Intl.DateTimeFormat(undefined, { year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric' }).format(new Date(0)));
     expect(backend.deletes).toEqual([]);
   });
 

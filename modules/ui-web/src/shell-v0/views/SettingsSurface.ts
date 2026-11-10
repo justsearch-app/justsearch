@@ -45,7 +45,7 @@ import { present } from '../display/present.js';
 // Tempdoc 883 D-A.7 — the context-window readout projects the SAME `core.ai.contextWindow` fact
 // Brain renders (the one Display-value authority, 594 §9.2), so the two cannot word it differently.
 import { projectFact } from '../display/facts.js';
-import { formatCount } from '../display/format.js';
+import { formatCount, formatDateTime, formatTime } from '../display/format.js';
 import { subscribeAiState, type AiState } from '../state/aiStateStore.js';
 import { selectIndexingProgress } from '../state/indexingProgress.js';
 import '../components/IndexingControls.js';
@@ -3654,7 +3654,7 @@ export class SettingsSurface extends JfElement {
                           </select>
                         </td>
                         <td style="padding:0.25rem 0.5rem;color:var(--text-tertiary);">
-                          ${new Date(c.decidedAt).toLocaleString()}
+                          ${formatDateTime(new Date(c.decidedAt))}
                         </td>
                         <td style="padding:0.25rem 0.5rem;">
                           <button
@@ -3752,7 +3752,7 @@ export class SettingsSurface extends JfElement {
     const { createProfileFromCurrent, listProfiles: listWorkspaceProfiles } =
       await import('../substrates/profiles/index.js');
     const id = `dev.profile.${Date.now()}`;
-    const label = `Snapshot @ ${new Date().toLocaleTimeString()}`;
+    const label = `Snapshot @ ${formatTime(new Date())}`;
     // §25.ζ#4 — propagate the picker selection. createProfileFromCurrent's
     // 3rd-arg `overrides` accepts `inheritsFrom`.
     const overrides: { description: string; inheritsFrom?: string } = {
