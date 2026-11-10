@@ -44,3 +44,13 @@ adaptation. No product code changes.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1c6cd-c131-76d2-8168-69b8cb158c20",
+  "verdict": "accept",
+  "digest": "sha256:6eed9e7276c7607bec0952fc0e9f8989f63e2e078e0e10704a3490d96a80dc6e"
+}
+```
