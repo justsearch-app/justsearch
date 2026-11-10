@@ -30,6 +30,7 @@
 import { authorizedFetch } from '../api/authorizedFetch.js';
 import {
   getDocument,
+  hasNewerStoredUserState,
   subscribeProjection,
   mutateDocument,
 } from './UserStateDocument.js';
@@ -87,6 +88,18 @@ function isSystemThemeDark(): boolean {
   return true;
 }
 
+const appearanceChangeListeners = new Set<() => void>();
+
+/** Completed appearance writes, including palette/presentation injection and OS-mode changes. */
+export function subscribeAppearanceChanges(listener: () => void): () => void {
+  appearanceChangeListeners.add(listener);
+  return () => { appearanceChangeListeners.delete(listener); };
+}
+
+function appearanceChanged(): void {
+  for (const listener of appearanceChangeListeners) listener();
+}
+
 /** Sets `data-theme` to the CURRENT OS preference. Only call while `system` is the active choice. */
 function applyResolvedSystemTheme(): void {
   if (typeof document === 'undefined') return;
@@ -94,6 +107,7 @@ function applyResolvedSystemTheme(): void {
     'data-theme',
     isSystemThemeDark() ? 'dark' : 'light',
   );
+  appearanceChanged();
 }
 
 /** Binds the OS-preference-change listener once (module lifetime); re-applies live while `system` is active. */
@@ -213,16 +227,18 @@ export function syncCustomThemesToCatalog(): void {
  */
 export async function restoreActiveThemeIfPersisted(
   fetchImpl: typeof fetch = authorizedFetch,
-): Promise<void> {
+): Promise<boolean> {
   const id = getActiveThemeId();
-  if (!id) return;
+  if (!id) return true;
   try {
     // C1: route the palette restore through the one appearance writer.
     await applyAppearance({ paletteId: id }, fetchImpl);
+    return true;
   } catch {
     // Theme file may have been removed; clear the persisted id
     // so we don't keep retrying every boot.
     mutateDocument((doc) => ({ ...doc, activeThemeId: null }));
+    return false;
   }
 }
 
@@ -266,6 +282,7 @@ export function applyTheme(themeId: string, cssText: string): void {
       ? doc
       : { ...doc, activeThemeId: themeId },
   );
+  appearanceChanged();
 }
 
 /**
@@ -345,6 +362,7 @@ export async function applyAppearance(
   if (typeof document !== 'undefined') {
     deriveRoleForegrounds();
   }
+  appearanceChanged();
 }
 
 /**
@@ -357,7 +375,8 @@ export async function applyAppearance(
  */
 export async function restoreAppearanceOnBoot(
   fetchImpl: typeof fetch = authorizedFetch,
-): Promise<void> {
+): Promise<boolean> {
+  let settingsRestored = false;
   // (1) light/dark + high-contrast from persisted settings.
   try {
     const res = await fetchImpl('/api/settings/v2');
@@ -370,6 +389,8 @@ export async function restoreAppearanceOnBoot(
         );
         // Q8: seed the app-wide UI-mode authority from the same settings read.
         setUiMode(data.ui.mode);
+        settingsRestored = ['light', 'dark', 'system'].includes(data.ui.theme ?? '')
+          && (data.ui.highContrast === undefined || typeof data.ui.highContrast === 'boolean');
       }
     }
   } catch {
@@ -385,7 +406,8 @@ export async function restoreAppearanceOnBoot(
     await applyAppearance({ surfaceMode: persistedSurfaceMode }, fetchImpl);
   }
   // (3) the persisted palette (separately persisted in the user-state document).
-  await restoreActiveThemeIfPersisted(fetchImpl);
+  const paletteRestored = await restoreActiveThemeIfPersisted(fetchImpl);
+  return settingsRestored && paletteRestored && !hasNewerStoredUserState();
 }
 
 /**
@@ -417,6 +439,7 @@ export function clearActiveTheme(): void {
   mutateDocument((doc) =>
     doc.activeThemeId === null ? doc : { ...doc, activeThemeId: null },
   );
+  appearanceChanged();
 }
 
 /**
