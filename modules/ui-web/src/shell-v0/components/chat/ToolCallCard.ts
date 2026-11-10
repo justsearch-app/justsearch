@@ -167,7 +167,7 @@ export class ToolCallCard extends JfElement {
       outline: none;
     }
     .tool-card-header:focus-visible {
-      outline: 2px solid var(--accent);
+      outline: 2px solid var(--focus-ring-color);
       outline-offset: 2px;
     }
     .tool-card-lead {
@@ -357,7 +357,7 @@ export class ToolCallCard extends JfElement {
       background: var(--surface-tertiary);
     }
     .search-row-open:focus-visible {
-      outline: 2px solid var(--accent);
+      outline: 2px solid var(--focus-ring-color);
       outline-offset: -2px;
     }
     .search-row-dot {

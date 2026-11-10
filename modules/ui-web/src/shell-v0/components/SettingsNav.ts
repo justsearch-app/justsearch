@@ -148,7 +148,7 @@ export class SettingsNav extends JfElement {
        definition lives in ambientStyles.ts, adopted into this shadow root by JfElement. No local
        placeholder rule here. */
     .search-input:focus-visible {
-      outline: 2px solid var(--focus-ring-color, var(--accent-tint));
+      outline: 2px solid var(--focus-ring-color);
       outline-offset: -1px;
     }
     .groups,
@@ -280,7 +280,7 @@ export class SettingsNav extends JfElement {
       color: var(--text-primary);
     }
     button:focus-visible {
-      outline: 2px solid var(--focus-ring-color, var(--accent-tint));
+      outline: 2px solid var(--focus-ring-color);
       outline-offset: -2px;
     }
     /* Forced colors (Windows High Contrast) erase the active pill and the brighter anchor text, so

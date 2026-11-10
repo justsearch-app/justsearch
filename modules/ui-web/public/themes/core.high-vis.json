@@ -10,6 +10,7 @@
     "p-shadow": "0, 0, 0",
     "p-text": "255, 255, 255",
     "accent-tint": "oklch(85% 0.20 200)",
+    "focus-ring-color": "#008890",
     "accent-success": "oklch(80% 0.22 145)",
     "accent-warning": "oklch(85% 0.22 70)",
     "accent-danger": "oklch(75% 0.25 25)",

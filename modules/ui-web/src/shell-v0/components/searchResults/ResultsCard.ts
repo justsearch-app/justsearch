@@ -1017,7 +1017,7 @@ export class ResultsCard extends JfElement {
       .provenance-fork:hover,
       .provenance-fork:focus-visible {
         color: var(--text-primary);
-        border-color: var(--accent-tint);
+        border-color: var(--focus-ring-color);
         outline: 2px solid transparent;
       }
       .snapshot-rows .row {
@@ -1041,7 +1041,7 @@ export class ResultsCard extends JfElement {
       .excerpt-collapse:hover,
       .excerpt-collapse:focus-visible {
         color: var(--text-primary);
-        border-color: var(--accent-tint);
+        border-color: var(--focus-ring-color);
         outline: 2px solid transparent;
       }
       .snapshot-empty-note {
