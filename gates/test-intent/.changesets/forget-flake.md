@@ -80,3 +80,13 @@ author-session: forget-flake-builder-7lnojjvf
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1c537-959b-7392-831c-d17cb3dbcd66",
+  "verdict": "accept",
+  "digest": "sha256:cf671a132fb8a6918123c94bce993fa4d75531c3dc2ffb74d1f92de051ca21bf"
+}
+```
