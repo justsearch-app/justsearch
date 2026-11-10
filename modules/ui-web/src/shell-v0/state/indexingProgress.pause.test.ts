@@ -34,7 +34,9 @@ describe('WP3.7 status-owned pause projection', () => {
     const deadline = Date.UTC(2035, 0, 2, 15, 30);
     const manual = select(status('PAUSED', 'user_paused', 12, deadline));
     expect(manual).toMatchObject({ pause: { reason: 'user_paused', untilEpochMs: deadline } });
-    expect(manual.activity.detail).toContain(new Date(deadline).toLocaleString());
+    expect(manual.activity.detail).toContain(`Until ${new Intl.DateTimeFormat(undefined, {
+      weekday: 'short', hour: '2-digit', minute: '2-digit',
+    }).format(new Date(deadline))}.`);
     expect(select(status('PAUSED', 'settings_recovery')).activity.detail).toContain('Settings recovery');
     for (const reason of ['future_reason', 'constructor']) {
       const unknown = select(status('PAUSED', reason));
