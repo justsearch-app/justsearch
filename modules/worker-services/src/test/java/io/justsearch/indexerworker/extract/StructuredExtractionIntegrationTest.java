@@ -53,6 +53,75 @@ class StructuredExtractionIntegrationTest {
     }
   }
 
+  @org.junit.jupiter.params.ParameterizedTest(name = "case-distinct PDF, configured={0}")
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  @Timeout(90)
+  void caseDistinctPdfEdgesSurviveRealStructuredParserAndReusedChild(boolean configured) throws Exception {
+    Path pdf = writeCaseEdgesPdf();
+    var policy = configured ? TikaExtractionPolicy.fromWorkerLimits(
+        new io.justsearch.configuration.resolved.ResolvedConfig.Worker(100_000, 1_000_000))
+        : TikaExtractionPolicy.defaults();
+    try (var structured = new StructuredContentExtractor();
+        var sandbox = new PersistentExtractionSandbox(
+            io.justsearch.indexerworker.TestWorkerExecutorRegistrations.readers(),
+            PersistentExtractionSandboxTest.javaCommand(ExtractionSandboxChild.class), policy,
+            OcrRoutingConfig.disabled(), java.time.Duration.ofSeconds(30), 1, 128, null)) {
+      var direct = structured.extractWithStatus(pdf);
+      assertEquals(6, direct.pageCount(), "empty summary would expose a flat fallback");
+      assertCaseEdges(direct.result().content());
+      long pid = -1;
+      for (int request = 0; request < 2; request++) {
+        var artifact = sandbox.extract(pdf);
+        assertEquals(configured ? "tika-config-v9-100000-1000000" : "tika-default-v9", artifact.policyId());
+        assertEquals("tika-policy-structured", artifact.parserId());
+        assertEquals(ExtractionStatus.SUCCESS_FULL, artifact.status());
+        assertFalse(artifact.truncated());
+        assertCaseEdges(artifact.result().content());
+        assertEquals(direct.result().content(), artifact.result().content());
+        artifact.validate(policy, "case-distinct-pdf");
+        if (request == 0) pid = sandbox.firstChildPid();
+        else assertEquals(pid, sandbox.firstChildPid(), "second request reuses the actual parser child");
+      }
+      assertEquals(1, sandbox.spawnCount());
+      assertEquals(0, sandbox.restartCount());
+    }
+  }
+
+  private static void assertCaseEdges(String text) {
+    for (String variant : java.util.List.of("Code", "CODE", "code")) {
+      assertTrue(text.contains("Header " + variant), text);
+      assertTrue(text.contains("Footer " + variant), text);
+    }
+    assertFalse(text.contains("Repeated Header"), "flat fallback must not satisfy the fixture");
+    assertFalse(text.contains("Repeated Footer"), "exact repeated edge removal remains active");
+    for (int page = 0; page < 6; page++) assertTrue(text.contains("Body page " + page));
+  }
+
+  private Path writeCaseEdgesPdf() throws Exception {
+    Path pdf = tempDir.resolve("case-edges.pdf");
+    var variants = java.util.List.of("Code", "CODE", "code");
+    try (var document = new org.apache.pdfbox.pdmodel.PDDocument()) {
+      for (int page = 0; page < 6; page++) {
+        var item = new org.apache.pdfbox.pdmodel.PDPage();
+        document.addPage(item);
+        try (var content = new org.apache.pdfbox.pdmodel.PDPageContentStream(document, item)) {
+          content.beginText();
+          content.setFont(new org.apache.pdfbox.pdmodel.font.PDType1Font(
+              org.apache.pdfbox.pdmodel.font.Standard14Fonts.FontName.HELVETICA), 8);
+          content.newLineAtOffset(40, 750);
+          content.showText(page < 3 ? "Header " + variants.get(page) : "Repeated Header");
+          content.newLineAtOffset(0, -100);
+          content.showText("Body page " + page + " preserves the physical source and its readable text.");
+          content.newLineAtOffset(0, -550);
+          content.showText(page < 3 ? "Footer " + variants.get(page) : "Repeated Footer");
+          content.endText();
+        }
+      }
+      document.save(pdf.toFile());
+    }
+    return pdf;
+  }
+
   @Nested
   class DocxFixture {
 
