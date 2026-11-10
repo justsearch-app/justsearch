@@ -268,3 +268,13 @@ this changeset differ from HEAD; the existing acceptance record is byte-identica
   "digest": "sha256:1cd4073433f1cb6c1d80ecf82ed5c5a9dcd1e846d08e5935d78c9bd68c624640"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1c2e6-09e3-78e2-9f7a-79ec83b2f82e",
+  "verdict": "accept",
+  "digest": "sha256:f9a1f6039d1e07c59dcf6dd09e1e685be0f021d69cf4f3457bd0dc048efe4252"
+}
+```
