@@ -80,6 +80,30 @@ assertion because there is no layer (`shell-s5w-window-controls.json`, regenerat
 55). The two SA5 checks now read the restored accent from the root instead of the frame element;
 nothing else in them changed (`shell-s5w-frame-colours.json`, candidate run).
 
+Second repair after the independent check (SW5, X1). In forced colours, a keyboard-focused
+control that was then hovered or pressed lost its focus ring: the ring was inset in `Highlight` on
+a `Highlight` fill, 1.45:1 in dark and 1.57:1 in light, on all three controls and every surface.
+The ring is now drawn just outside the control (a positive offset of one hairline), against the
+surface, in every colour scheme. In forced colours it is `CanvasText`, and the hover and pressed
+fill is the `SelectedItem` / `SelectedItemText` pair. `Highlight` cannot be the fill: in Chromium's
+emulated dark scheme it is 2.41:1 against `CanvasText`, so no ring colour reaches 3:1 against both
+it and the black surface. With the new pair, the ring is 5.36:1 (dark) and 3.92:1 (light) against
+the fill and 21:1 against the surface, and the icon is 5.36:1 on the fill. No size or colour
+literal was added. Normal colours keep the surface's primary text colour for the ring.
+
+`controlContrasts`, used by the 12 `SW5 X1 window controls are legible…` checks, now also measures
+focus kept while the pointer hovers (`focus ring + hover`) and presses (`focus ring + pressed`).
+In both, the icon must be at least 4.5:1 against its fill and the ring at least 3:1 against both
+the fill and the surface beside it; the ring is measured as painted (over the fill when inset,
+over the surface when drawn outside). The earlier states keep their 4.5:1 thresholds. On the
+unrepaired candidate (`11402bc1c3`) all 12 failed by assertion, with 72 forced-colour findings each
+(`focus ring + hover` and `+ pressed` × 3 controls × 12 surfaces, 1.45 or 1.57 against the fill);
+normal colours passed. The forced-colours case of the ten `SW5 X1 X2 … controls fit` checks
+asserted the ring colour `Highlight`. It now asserts `CanvasText` and a positive offset; nothing
+else in those checks changed. All three evidence files citing this test file were regenerated:
+`shell-s5w-window-controls.json` (67 pass; 67 fail by assertion on `origin/main`),
+`shell-s5w-browser.json` and `shell-s5w-frame-colours.json` (candidate runs).
+
 Evidence used the unchanged official producer. Its before-state was a shared clone under TMPDIR,
 not a worktree registered in the source repository: a temporary `git` wrapper on PATH turned the
 producer's `worktree add --detach <dir> <ref>` into `git clone --shared --no-checkout` plus a
@@ -101,7 +125,7 @@ CI runs no clippy step.
         "modules/ui-web/src/boot/boot-frame-lockdown.test.ts"
       ],
       "class": "New",
-      "behaviour": "Desktop runtime, production build: on every surface (start-up frame; entry, evaluation and stalled failure pages; connecting; engine terminal, not ready and Linux update hold; reset busy, error and complete; running app; held hand-off with the app still unreachable) Minimize, Maximize and Close send exactly plugin:window|minimize, toggle_maximize and close by pointer and keyboard, Close only hides as the platform close does, and nothing reveals a hidden window. The empty top area of each surface starts a drag and a double-click maximizes or restores; every interactive control and menu in the top area is excluded. Controls and moving keep working after the hand-off. The maximize control shows Restore or Maximize from the window's real state, also when it starts maximized or changes by other means. Refused operations (tiling compositors) raise no error and change nothing. Each control is reachable in order with a visible 2 px focus ring; at 1280x800, 900x800 and 600x400, at 100 % and 200 % text, in both themes and forced colours: the layer stays inside the window, overlaps no other top-area control, the top bar's own controls do not overlap one another, recovery actions stay clear and reachable, the controls keep one size of at least 24 x 24 px, glyph contrast is at least 4.5:1, no transition runs under reduced motion, and the layer adds no axe violation. SA1 additionally requires that the start-up page's only controls are the layer's three and that Tab reaches Minimize. For every shipped palette (public/themes/manifest.json) in dark and light, and in forced colours, each control's icon, hover, pressed state and focus ring is at least 4.5:1 against what is painted behind it, on the running app after the palette applied, the start-up frame and the failure page with the saved frame copy (styles loaded and blocked) and without it, the hand-off with and without the saved copy, connecting, engine recovery and factory reset.",
+      "behaviour": "Desktop runtime, production build: on every surface (start-up frame; entry, evaluation and stalled failure pages; connecting; engine terminal, not ready and Linux update hold; reset busy, error and complete; running app; held hand-off with the app still unreachable) Minimize, Maximize and Close send exactly plugin:window|minimize, toggle_maximize and close by pointer and keyboard, Close only hides as the platform close does, and nothing reveals a hidden window. The empty top area of each surface starts a drag and a double-click maximizes or restores; every interactive control and menu in the top area is excluded. Controls and moving keep working after the hand-off. The maximize control shows Restore or Maximize from the window's real state, also when it starts maximized or changes by other means. Refused operations (tiling compositors) raise no error and change nothing. Each control is reachable in order with a visible 2 px focus ring; at 1280x800, 900x800 and 600x400, at 100 % and 200 % text, in both themes and forced colours: the layer stays inside the window, overlaps no other top-area control, the top bar's own controls do not overlap one another, recovery actions stay clear and reachable, the controls keep one size of at least 24 x 24 px, glyph contrast is at least 4.5:1, no transition runs under reduced motion, and the layer adds no axe violation. SA1 additionally requires that the start-up page's only controls are the layer's three and that Tab reaches Minimize. For every shipped palette (public/themes/manifest.json) in dark and light, and in forced colours, each control's icon, hover, pressed state and focus ring is at least 4.5:1 against what is painted behind it, and with keyboard focus kept while the pointer hovers or presses the icon stays at least 4.5:1 against its fill and the focus ring at least 3:1 against both the fill and the surface beside it, on the running app after the palette applied, the start-up frame and the failure page with the saved frame copy (styles loaded and blocked) and without it, the hand-off with and without the saved copy, connecting, engine recovery and factory reset.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -180,6 +204,14 @@ CI runs no clippy step.
           "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
           "delegationScope": "The frame-build plan, S5w repair after the independent check: the window layer takes its colours from the same source as the surface beneath it, the saved frame colours while the frame or failure page shows and the app's tokens once the app's theme applies, with no new hard-coded colours.",
           "choice": "The early script sets the saved frame colours on the document root instead of the frame element, so the frame, the failure page and the window layer beside #root all read them; while #root holds the frame or the failure page, the layer reads the same frame colours and frame defaults; its hover and pressed fill is the other frame surface (background on the raised frame bar, raised on the failure page); its focus ring uses the surface's primary text colour, because some palettes' accents are below 4.5:1 on their own surfaces.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "The frame-build plan, S5w second repair after the independent check: the focus indicator stays distinguishable from any fill the control can have, drawn outside the control against the surface in a system colour that differs from the fill, keeping the 32 px fixed size and no new hard-coded colours outside forced-colours system colours.",
+          "choice": "The focus ring is drawn one hairline outside the control in every colour scheme; in forced colours it is CanvasText and the hover and pressed fill is SelectedItem with SelectedItemText icons, because Highlight is 2.41:1 against CanvasText in the emulated dark scheme.",
           "label": "agent choice"
         }
       ],

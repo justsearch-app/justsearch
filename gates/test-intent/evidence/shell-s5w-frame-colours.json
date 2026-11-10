@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-10T08:12:17.042Z",
-  "revision": "204ea8a98218b44088cae2e4aaac7f7d88a14ae7",
-  "tree": "8a806ed2ae95df2278ecb509e1ffc7791aa53d3f",
+  "createdAt": "2026-11-10T09:18:52.705Z",
+  "revision": "11402bc1c38587a8331b161b04ce61b4586d8188",
+  "tree": "fbd7495da0604634b8bcff72b4793188d9909579",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/boot/boot-frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/097kad0m/tmp/test-intent-vitest-39624-1794298121874.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/boot/boot-frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/flvbinnp/tmp/test-intent-vitest-41172-1794302032269.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 215165
+      "durationMs": 300434
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SA5 live mode contrast and presentation changes survive reload mid-boot",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SA5 profile switch and palette changes cache the resulting live colours",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -57,5 +57,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:5d494aa7a1a2d167d058b3d4e526922389f56bfaa75a3184dd571f80cdf268dd"
+  "digest": "sha256:7c530f93b8dc5193f8337777eb365b6bd57736e4f759a146f24e1faff60fe681"
 }

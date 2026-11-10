@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-10T08:04:55.034Z",
-  "revision": "204ea8a98218b44088cae2e4aaac7f7d88a14ae7",
-  "tree": "6380b50a487b11a09b45c7f854e41e7ac29c7ea6",
+  "createdAt": "2026-11-10T09:08:49.733Z",
+  "revision": "11402bc1c38587a8331b161b04ce61b4586d8188",
+  "tree": "4f82b155554449c9e9724b6ba38759501edd79d1",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/boot/boot-frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/097kad0m/tmp/test-intent-vitest-27133-1794297612897.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/boot/boot-frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/flvbinnp/tmp/test-intent-vitest-28166-1794301353747.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 207915
+      "durationMs": 301492
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SA1 SA6 first paint precedes entry and is inert",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 SW3 SW7 window controls send their command on start-up frame, by pointer and keyboard",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -59,7 +59,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 SW3 SW7 window controls send their command on entry failure, by pointer and keyboard",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -74,7 +74,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 SW3 SW7 window controls send their command on evaluation failure, by pointer and keyboard",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -89,7 +89,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 SW3 SW7 window controls send their command on stalled failure, by pointer and keyboard",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -104,7 +104,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 SW3 SW7 window controls send their command on connecting, by pointer and keyboard",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -119,7 +119,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 SW3 SW7 window controls send their command on engine terminal, by pointer and keyboard",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -134,7 +134,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 SW3 SW7 window controls send their command on engine not ready, by pointer and keyboard",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -149,7 +149,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 SW3 SW7 window controls send their command on Linux update hold, by pointer and keyboard",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -164,7 +164,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 SW3 SW7 window controls send their command on reset busy, by pointer and keyboard",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -179,7 +179,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 SW3 SW7 window controls send their command on reset error, by pointer and keyboard",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -194,7 +194,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 SW3 SW7 window controls send their command on reset complete, by pointer and keyboard",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -209,7 +209,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 SW3 SW7 window controls send their command on running app, by pointer and keyboard",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -224,7 +224,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 SW3 SW7 window controls send their command on held hand-off, by pointer and keyboard",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -239,7 +239,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 top area of start-up frame moves the window; interactive controls never start a drag",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -254,7 +254,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 top area of entry failure moves the window; interactive controls never start a drag",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -269,7 +269,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 top area of evaluation failure moves the window; interactive controls never start a drag",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -284,7 +284,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 top area of stalled failure moves the window; interactive controls never start a drag",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -299,7 +299,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 top area of connecting moves the window; interactive controls never start a drag",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -314,7 +314,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 top area of engine terminal moves the window; interactive controls never start a drag",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -329,7 +329,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 top area of engine not ready moves the window; interactive controls never start a drag",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -344,7 +344,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 top area of Linux update hold moves the window; interactive controls never start a drag",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -359,7 +359,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 top area of reset busy moves the window; interactive controls never start a drag",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -374,7 +374,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 top area of reset error moves the window; interactive controls never start a drag",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -389,7 +389,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 top area of reset complete moves the window; interactive controls never start a drag",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -404,7 +404,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 top area of running app moves the window; interactive controls never start a drag",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -419,7 +419,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 top area of held hand-off moves the window; interactive controls never start a drag",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -434,7 +434,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW2 controls and moving keep working after the hand-off releases the app",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -449,7 +449,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW4 maximize control follows the real window state on running app",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -464,7 +464,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW4 maximize control follows the real window state on entry failure",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -479,7 +479,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW4 maximize control follows the real window state on start-up frame",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -494,7 +494,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW9 refused window operations on start-up frame do nothing harmful and raise no error",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -509,7 +509,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW9 refused window operations on entry failure do nothing harmful and raise no error",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -524,7 +524,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW9 refused window operations on running app do nothing harmful and raise no error",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -539,7 +539,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 every control is reachable by keyboard in order, with a visible focus ring, after the app and on the failure page",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -554,7 +554,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 X2 entry failure dark forced=false: controls fit at every size and enlarged text, axe clean",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -569,7 +569,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 X2 engine terminal dark forced=false: controls fit at every size and enlarged text, axe clean",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -584,7 +584,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 X2 reset complete dark forced=false: controls fit at every size and enlarged text, axe clean",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -599,7 +599,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 X2 running app dark forced=false: controls fit at every size and enlarged text, axe clean",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -614,7 +614,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 X2 start-up frame dark forced=false: controls fit at every size and enlarged text, axe clean",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -629,7 +629,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 X2 entry failure dark forced=true: controls fit at every size and enlarged text, axe clean",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -644,7 +644,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 X2 engine terminal dark forced=true: controls fit at every size and enlarged text, axe clean",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -659,7 +659,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 X2 reset complete dark forced=true: controls fit at every size and enlarged text, axe clean",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -674,7 +674,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 X2 running app dark forced=true: controls fit at every size and enlarged text, axe clean",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -689,7 +689,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 X2 start-up frame dark forced=true: controls fit at every size and enlarged text, axe clean",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -704,7 +704,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 X2 entry failure light forced=false: controls fit at every size and enlarged text, axe clean",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -719,7 +719,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 X2 engine terminal light forced=false: controls fit at every size and enlarged text, axe clean",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -734,7 +734,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 X2 reset complete light forced=false: controls fit at every size and enlarged text, axe clean",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -749,7 +749,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 X2 running app light forced=false: controls fit at every size and enlarged text, axe clean",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -764,7 +764,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 X2 start-up frame light forced=false: controls fit at every size and enlarged text, axe clean",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -779,7 +779,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 X2 entry failure light forced=true: controls fit at every size and enlarged text, axe clean",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -794,7 +794,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 X2 engine terminal light forced=true: controls fit at every size and enlarged text, axe clean",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -809,7 +809,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 X2 reset complete light forced=true: controls fit at every size and enlarged text, axe clean",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -824,7 +824,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 X2 running app light forced=true: controls fit at every size and enlarged text, axe clean",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -839,7 +839,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 X2 start-up frame light forced=true: controls fit at every size and enlarged text, axe clean",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -854,7 +854,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 window controls are legible over every surface with core.nord dark, and in forced colours",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -869,7 +869,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 window controls are legible over every surface with core.nord light, and in forced colours",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -884,7 +884,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 window controls are legible over every surface with core.sepia-focus dark, and in forced colours",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -899,7 +899,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 window controls are legible over every surface with core.sepia-focus light, and in forced colours",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -914,7 +914,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 window controls are legible over every surface with core.high-vis dark, and in forced colours",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -929,7 +929,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 window controls are legible over every surface with core.high-vis light, and in forced colours",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -944,7 +944,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 window controls are legible over every surface with core.registrars-ledger dark, and in forced colours",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -959,7 +959,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 window controls are legible over every surface with core.registrars-ledger light, and in forced colours",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -974,7 +974,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 window controls are legible over every surface with core.night-registry dark, and in forced colours",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -989,7 +989,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 window controls are legible over every surface with core.night-registry light, and in forced colours",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -1004,7 +1004,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 window controls are legible over every surface with core.cyanotype dark, and in forced colours",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -1019,7 +1019,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 window controls are legible over every surface with core.cyanotype light, and in forced colours",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:6f6c969fff92482936f9ae7271434172eaaa15125ca424879c4136771f5a87fe",
+      "contentDigest": "sha256:f22a815296a3cf17298cc42ee3cbc142dd63dc49499e09a9fe862e99a24ff44a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -1038,350 +1038,350 @@
     "patches": [],
     "runs": [
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/boot/boot-frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/097kad0m/tmp/test-intent-vitest-27133-1794297822525.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/boot/boot-frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/flvbinnp/tmp/test-intent-vitest-28166-1794301656808.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 72306,
-        "output": "JSON report written to /home/elias/.cache/am/097kad0m/tmp/test-intent-vitest-27133-1794297822525.json\n\n"
+        "durationMs": 72707,
+        "output": "JSON report written to /home/elias/.cache/am/flvbinnp/tmp/test-intent-vitest-28166-1794301656808.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SA1 SA6 first paint precedes entry and is inert",
         "classification": "assertion",
-        "detail": "SA1 SA6 first paint precedes entry and is inert:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:190:147\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at processImmediate (node:i"
+        "detail": "SA1 SA6 first paint precedes entry and is inert:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:190:147\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 SW3 SW7 window controls send their command on start-up frame, by pointer and keyboard",
         "classification": "assertion",
-        "detail": "SW1 SW2 SW3 SW7 window controls send their command on start-up frame, by pointer and keyboard:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:836:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modu"
+        "detail": "SW1 SW2 SW3 SW7 window controls send their command on start-up frame, by pointer and keyboard:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:836:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modu"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 SW3 SW7 window controls send their command on entry failure, by pointer and keyboard",
         "classification": "assertion",
-        "detail": "SW1 SW2 SW3 SW7 window controls send their command on entry failure, by pointer and keyboard:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:836:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modu"
+        "detail": "SW1 SW2 SW3 SW7 window controls send their command on entry failure, by pointer and keyboard:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:836:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modu"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 SW3 SW7 window controls send their command on evaluation failure, by pointer and keyboard",
         "classification": "assertion",
-        "detail": "SW1 SW2 SW3 SW7 window controls send their command on evaluation failure, by pointer and keyboard:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:836:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modu"
+        "detail": "SW1 SW2 SW3 SW7 window controls send their command on evaluation failure, by pointer and keyboard:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:836:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modu"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 SW3 SW7 window controls send their command on stalled failure, by pointer and keyboard",
         "classification": "assertion",
-        "detail": "SW1 SW2 SW3 SW7 window controls send their command on stalled failure, by pointer and keyboard:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:836:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modu"
+        "detail": "SW1 SW2 SW3 SW7 window controls send their command on stalled failure, by pointer and keyboard:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:836:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modu"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 SW3 SW7 window controls send their command on connecting, by pointer and keyboard",
         "classification": "assertion",
-        "detail": "SW1 SW2 SW3 SW7 window controls send their command on connecting, by pointer and keyboard:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:836:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modu"
+        "detail": "SW1 SW2 SW3 SW7 window controls send their command on connecting, by pointer and keyboard:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:836:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modu"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 SW3 SW7 window controls send their command on engine terminal, by pointer and keyboard",
         "classification": "assertion",
-        "detail": "SW1 SW2 SW3 SW7 window controls send their command on engine terminal, by pointer and keyboard:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:836:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modu"
+        "detail": "SW1 SW2 SW3 SW7 window controls send their command on engine terminal, by pointer and keyboard:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:836:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modu"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 SW3 SW7 window controls send their command on engine not ready, by pointer and keyboard",
         "classification": "assertion",
-        "detail": "SW1 SW2 SW3 SW7 window controls send their command on engine not ready, by pointer and keyboard:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:836:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modu"
+        "detail": "SW1 SW2 SW3 SW7 window controls send their command on engine not ready, by pointer and keyboard:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:836:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modu"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 SW3 SW7 window controls send their command on Linux update hold, by pointer and keyboard",
         "classification": "assertion",
-        "detail": "SW1 SW2 SW3 SW7 window controls send their command on Linux update hold, by pointer and keyboard:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:836:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modu"
+        "detail": "SW1 SW2 SW3 SW7 window controls send their command on Linux update hold, by pointer and keyboard:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:836:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modu"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 SW3 SW7 window controls send their command on reset busy, by pointer and keyboard",
         "classification": "assertion",
-        "detail": "SW1 SW2 SW3 SW7 window controls send their command on reset busy, by pointer and keyboard:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:836:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modu"
+        "detail": "SW1 SW2 SW3 SW7 window controls send their command on reset busy, by pointer and keyboard:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:836:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modu"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 SW3 SW7 window controls send their command on reset error, by pointer and keyboard",
         "classification": "assertion",
-        "detail": "SW1 SW2 SW3 SW7 window controls send their command on reset error, by pointer and keyboard:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:836:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modu"
+        "detail": "SW1 SW2 SW3 SW7 window controls send their command on reset error, by pointer and keyboard:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:836:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modu"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 SW3 SW7 window controls send their command on reset complete, by pointer and keyboard",
         "classification": "assertion",
-        "detail": "SW1 SW2 SW3 SW7 window controls send their command on reset complete, by pointer and keyboard:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:836:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modu"
+        "detail": "SW1 SW2 SW3 SW7 window controls send their command on reset complete, by pointer and keyboard:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:836:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modu"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 SW3 SW7 window controls send their command on running app, by pointer and keyboard",
         "classification": "assertion",
-        "detail": "SW1 SW2 SW3 SW7 window controls send their command on running app, by pointer and keyboard:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:836:39\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at processImmediate (node:in"
+        "detail": "SW1 SW2 SW3 SW7 window controls send their command on running app, by pointer and keyboard:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:836:39\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at processImmediate (node:in"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 SW3 SW7 window controls send their command on held hand-off, by pointer and keyboard",
         "classification": "assertion",
-        "detail": "SW1 SW2 SW3 SW7 window controls send their command on held hand-off, by pointer and keyboard:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:836:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modu"
+        "detail": "SW1 SW2 SW3 SW7 window controls send their command on held hand-off, by pointer and keyboard:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:836:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modu"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 top area of start-up frame moves the window; interactive controls never start a drag",
         "classification": "assertion",
-        "detail": "SW1 SW2 top area of start-up frame moves the window; interactive controls never start a drag:  AssertionError: expected [] to deeply equal [ 'plugin:window|start_dragging' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:863:43\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modul"
+        "detail": "SW1 SW2 top area of start-up frame moves the window; interactive controls never start a drag:  AssertionError: expected [] to deeply equal [ 'plugin:window|start_dragging' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:863:43\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modul"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 top area of entry failure moves the window; interactive controls never start a drag",
         "classification": "assertion",
-        "detail": "SW1 SW2 top area of entry failure moves the window; interactive controls never start a drag:  AssertionError: expected [] to deeply equal [ 'plugin:window|start_dragging' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:863:43\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modul"
+        "detail": "SW1 SW2 top area of entry failure moves the window; interactive controls never start a drag:  AssertionError: expected [] to deeply equal [ 'plugin:window|start_dragging' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:863:43\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modul"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 top area of evaluation failure moves the window; interactive controls never start a drag",
         "classification": "assertion",
-        "detail": "SW1 SW2 top area of evaluation failure moves the window; interactive controls never start a drag:  AssertionError: expected [] to deeply equal [ 'plugin:window|start_dragging' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:863:43\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modul"
+        "detail": "SW1 SW2 top area of evaluation failure moves the window; interactive controls never start a drag:  AssertionError: expected [] to deeply equal [ 'plugin:window|start_dragging' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:863:43\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modul"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 top area of stalled failure moves the window; interactive controls never start a drag",
         "classification": "assertion",
-        "detail": "SW1 SW2 top area of stalled failure moves the window; interactive controls never start a drag:  AssertionError: expected [] to deeply equal [ 'plugin:window|start_dragging' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:863:43\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modul"
+        "detail": "SW1 SW2 top area of stalled failure moves the window; interactive controls never start a drag:  AssertionError: expected [] to deeply equal [ 'plugin:window|start_dragging' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:863:43\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modul"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 top area of connecting moves the window; interactive controls never start a drag",
         "classification": "assertion",
-        "detail": "SW1 SW2 top area of connecting moves the window; interactive controls never start a drag:  AssertionError: expected [] to deeply equal [ 'plugin:window|start_dragging' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:863:43\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modul"
+        "detail": "SW1 SW2 top area of connecting moves the window; interactive controls never start a drag:  AssertionError: expected [] to deeply equal [ 'plugin:window|start_dragging' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:863:43\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modul"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 top area of engine terminal moves the window; interactive controls never start a drag",
         "classification": "assertion",
-        "detail": "SW1 SW2 top area of engine terminal moves the window; interactive controls never start a drag:  AssertionError: expected [] to deeply equal [ 'plugin:window|start_dragging' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:863:43\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modul"
+        "detail": "SW1 SW2 top area of engine terminal moves the window; interactive controls never start a drag:  AssertionError: expected [] to deeply equal [ 'plugin:window|start_dragging' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:863:43\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modul"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 top area of engine not ready moves the window; interactive controls never start a drag",
         "classification": "assertion",
-        "detail": "SW1 SW2 top area of engine not ready moves the window; interactive controls never start a drag:  AssertionError: expected [] to deeply equal [ 'plugin:window|start_dragging' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:863:43\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modul"
+        "detail": "SW1 SW2 top area of engine not ready moves the window; interactive controls never start a drag:  AssertionError: expected [] to deeply equal [ 'plugin:window|start_dragging' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:863:43\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modul"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 top area of Linux update hold moves the window; interactive controls never start a drag",
         "classification": "assertion",
-        "detail": "SW1 SW2 top area of Linux update hold moves the window; interactive controls never start a drag:  AssertionError: expected [] to deeply equal [ 'plugin:window|start_dragging' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:863:43\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modul"
+        "detail": "SW1 SW2 top area of Linux update hold moves the window; interactive controls never start a drag:  AssertionError: expected [] to deeply equal [ 'plugin:window|start_dragging' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:863:43\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modul"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 top area of reset busy moves the window; interactive controls never start a drag",
         "classification": "assertion",
-        "detail": "SW1 SW2 top area of reset busy moves the window; interactive controls never start a drag:  AssertionError: expected [] to deeply equal [ 'plugin:window|start_dragging' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:863:43\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modul"
+        "detail": "SW1 SW2 top area of reset busy moves the window; interactive controls never start a drag:  AssertionError: expected [] to deeply equal [ 'plugin:window|start_dragging' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:863:43\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modul"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 top area of reset error moves the window; interactive controls never start a drag",
         "classification": "assertion",
-        "detail": "SW1 SW2 top area of reset error moves the window; interactive controls never start a drag:  AssertionError: expected [] to deeply equal [ 'plugin:window|start_dragging' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:863:43\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modul"
+        "detail": "SW1 SW2 top area of reset error moves the window; interactive controls never start a drag:  AssertionError: expected [] to deeply equal [ 'plugin:window|start_dragging' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:863:43\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modul"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 top area of reset complete moves the window; interactive controls never start a drag",
         "classification": "assertion",
-        "detail": "SW1 SW2 top area of reset complete moves the window; interactive controls never start a drag:  AssertionError: expected [] to deeply equal [ 'plugin:window|start_dragging' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:863:43\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modul"
+        "detail": "SW1 SW2 top area of reset complete moves the window; interactive controls never start a drag:  AssertionError: expected [] to deeply equal [ 'plugin:window|start_dragging' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:863:43\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modul"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 top area of running app moves the window; interactive controls never start a drag",
         "classification": "assertion",
-        "detail": "SW1 SW2 top area of running app moves the window; interactive controls never start a drag:  AssertionError: expected [] to deeply equal [ 'plugin:window|start_dragging' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:863:43\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modul"
+        "detail": "SW1 SW2 top area of running app moves the window; interactive controls never start a drag:  AssertionError: expected [] to deeply equal [ 'plugin:window|start_dragging' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:863:43\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modul"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW1 SW2 top area of held hand-off moves the window; interactive controls never start a drag",
         "classification": "assertion",
-        "detail": "SW1 SW2 top area of held hand-off moves the window; interactive controls never start a drag:  AssertionError: expected [] to deeply equal [ 'plugin:window|start_dragging' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:863:43\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modul"
+        "detail": "SW1 SW2 top area of held hand-off moves the window; interactive controls never start a drag:  AssertionError: expected [] to deeply equal [ 'plugin:window|start_dragging' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:863:43\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modul"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW2 controls and moving keep working after the hand-off releases the app",
         "classification": "assertion",
-        "detail": "SW2 controls and moving keep working after the hand-off releases the app:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:891:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modu"
+        "detail": "SW2 controls and moving keep working after the hand-off releases the app:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:891:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modu"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW4 maximize control follows the real window state on running app",
         "classification": "assertion",
-        "detail": "SW4 maximize control follows the real window state on running app:  Error: expected [] to deeply equal [ 'Minimize', 'Restore', 'Close' ]\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3748:47)\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-befor"
+        "detail": "SW4 maximize control follows the real window state on running app:  Error: expected [] to deeply equal [ 'Minimize', 'Restore', 'Close' ]\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3748:47)\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-befor"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW4 maximize control follows the real window state on entry failure",
         "classification": "assertion",
-        "detail": "SW4 maximize control follows the real window state on entry failure:  Error: expected [] to deeply equal [ 'Minimize', 'Restore', 'Close' ]\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3748:47)\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-befor"
+        "detail": "SW4 maximize control follows the real window state on entry failure:  Error: expected [] to deeply equal [ 'Minimize', 'Restore', 'Close' ]\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3748:47)\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-befor"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW4 maximize control follows the real window state on start-up frame",
         "classification": "assertion",
-        "detail": "SW4 maximize control follows the real window state on start-up frame:  Error: expected [] to deeply equal [ 'Minimize', 'Restore', 'Close' ]\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3748:47)\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-befor"
+        "detail": "SW4 maximize control follows the real window state on start-up frame:  Error: expected [] to deeply equal [ 'Minimize', 'Restore', 'Close' ]\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3748:47)\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-befor"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW9 refused window operations on start-up frame do nothing harmful and raise no error",
         "classification": "assertion",
-        "detail": "SW9 refused window operations on start-up frame do nothing harmful and raise no error:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:940:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modu"
+        "detail": "SW9 refused window operations on start-up frame do nothing harmful and raise no error:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:940:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modu"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW9 refused window operations on entry failure do nothing harmful and raise no error",
         "classification": "assertion",
-        "detail": "SW9 refused window operations on entry failure do nothing harmful and raise no error:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:940:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modu"
+        "detail": "SW9 refused window operations on entry failure do nothing harmful and raise no error:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:940:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modu"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW9 refused window operations on running app do nothing harmful and raise no error",
         "classification": "assertion",
-        "detail": "SW9 refused window operations on running app do nothing harmful and raise no error:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:940:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modu"
+        "detail": "SW9 refused window operations on running app do nothing harmful and raise no error:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:940:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_modu"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 every control is reachable by keyboard in order, with a visible focus ring, after the app and on the failure page",
         "classification": "assertion",
-        "detail": "SW5 every control is reachable by keyboard in order, with a visible focus ring, after the app and on the failure page:  AssertionError: expected [ null, null, null ] to deeply equal [ 'Close', 'Maximize', 'Minimize' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:982:19\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/module"
+        "detail": "SW5 every control is reachable by keyboard in order, with a visible focus ring, after the app and on the failure page:  AssertionError: expected [ null, null, null ] to deeply equal [ 'Close', 'Maximize', 'Minimize' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:982:19\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/module"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 X2 entry failure dark forced=false: controls fit at every size and enlarged text, axe clean",
         "classification": "assertion",
-        "detail": "SW5 X1 X2 entry failure dark forced=false: controls fit at every size and enlarged text, axe clean:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1011:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
+        "detail": "SW5 X1 X2 entry failure dark forced=false: controls fit at every size and enlarged text, axe clean:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1011:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 X2 engine terminal dark forced=false: controls fit at every size and enlarged text, axe clean",
         "classification": "assertion",
-        "detail": "SW5 X1 X2 engine terminal dark forced=false: controls fit at every size and enlarged text, axe clean:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1011:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
+        "detail": "SW5 X1 X2 engine terminal dark forced=false: controls fit at every size and enlarged text, axe clean:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1011:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 X2 reset complete dark forced=false: controls fit at every size and enlarged text, axe clean",
         "classification": "assertion",
-        "detail": "SW5 X1 X2 reset complete dark forced=false: controls fit at every size and enlarged text, axe clean:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1011:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
+        "detail": "SW5 X1 X2 reset complete dark forced=false: controls fit at every size and enlarged text, axe clean:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1011:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 X2 running app dark forced=false: controls fit at every size and enlarged text, axe clean",
         "classification": "assertion",
-        "detail": "SW5 X1 X2 running app dark forced=false: controls fit at every size and enlarged text, axe clean:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1011:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
+        "detail": "SW5 X1 X2 running app dark forced=false: controls fit at every size and enlarged text, axe clean:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1011:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 X2 start-up frame dark forced=false: controls fit at every size and enlarged text, axe clean",
         "classification": "assertion",
-        "detail": "SW5 X1 X2 start-up frame dark forced=false: controls fit at every size and enlarged text, axe clean:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1011:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
+        "detail": "SW5 X1 X2 start-up frame dark forced=false: controls fit at every size and enlarged text, axe clean:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1011:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 X2 entry failure dark forced=true: controls fit at every size and enlarged text, axe clean",
         "classification": "assertion",
-        "detail": "SW5 X1 X2 entry failure dark forced=true: controls fit at every size and enlarged text, axe clean:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1011:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
+        "detail": "SW5 X1 X2 entry failure dark forced=true: controls fit at every size and enlarged text, axe clean:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1011:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 X2 engine terminal dark forced=true: controls fit at every size and enlarged text, axe clean",
         "classification": "assertion",
-        "detail": "SW5 X1 X2 engine terminal dark forced=true: controls fit at every size and enlarged text, axe clean:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1011:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
+        "detail": "SW5 X1 X2 engine terminal dark forced=true: controls fit at every size and enlarged text, axe clean:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1011:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 X2 reset complete dark forced=true: controls fit at every size and enlarged text, axe clean",
         "classification": "assertion",
-        "detail": "SW5 X1 X2 reset complete dark forced=true: controls fit at every size and enlarged text, axe clean:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1011:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
+        "detail": "SW5 X1 X2 reset complete dark forced=true: controls fit at every size and enlarged text, axe clean:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1011:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 X2 running app dark forced=true: controls fit at every size and enlarged text, axe clean",
         "classification": "assertion",
-        "detail": "SW5 X1 X2 running app dark forced=true: controls fit at every size and enlarged text, axe clean:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1011:39\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at processImmediate (node:i"
+        "detail": "SW5 X1 X2 running app dark forced=true: controls fit at every size and enlarged text, axe clean:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1011:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 X2 start-up frame dark forced=true: controls fit at every size and enlarged text, axe clean",
         "classification": "assertion",
-        "detail": "SW5 X1 X2 start-up frame dark forced=true: controls fit at every size and enlarged text, axe clean:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1011:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
+        "detail": "SW5 X1 X2 start-up frame dark forced=true: controls fit at every size and enlarged text, axe clean:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1011:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 X2 entry failure light forced=false: controls fit at every size and enlarged text, axe clean",
         "classification": "assertion",
-        "detail": "SW5 X1 X2 entry failure light forced=false: controls fit at every size and enlarged text, axe clean:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1011:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
+        "detail": "SW5 X1 X2 entry failure light forced=false: controls fit at every size and enlarged text, axe clean:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1011:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 X2 engine terminal light forced=false: controls fit at every size and enlarged text, axe clean",
         "classification": "assertion",
-        "detail": "SW5 X1 X2 engine terminal light forced=false: controls fit at every size and enlarged text, axe clean:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1011:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
+        "detail": "SW5 X1 X2 engine terminal light forced=false: controls fit at every size and enlarged text, axe clean:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1011:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 X2 reset complete light forced=false: controls fit at every size and enlarged text, axe clean",
         "classification": "assertion",
-        "detail": "SW5 X1 X2 reset complete light forced=false: controls fit at every size and enlarged text, axe clean:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1011:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
+        "detail": "SW5 X1 X2 reset complete light forced=false: controls fit at every size and enlarged text, axe clean:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1011:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 X2 running app light forced=false: controls fit at every size and enlarged text, axe clean",
         "classification": "assertion",
-        "detail": "SW5 X1 X2 running app light forced=false: controls fit at every size and enlarged text, axe clean:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1011:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
+        "detail": "SW5 X1 X2 running app light forced=false: controls fit at every size and enlarged text, axe clean:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1011:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 X2 start-up frame light forced=false: controls fit at every size and enlarged text, axe clean",
         "classification": "assertion",
-        "detail": "SW5 X1 X2 start-up frame light forced=false: controls fit at every size and enlarged text, axe clean:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1011:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
+        "detail": "SW5 X1 X2 start-up frame light forced=false: controls fit at every size and enlarged text, axe clean:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1011:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 X2 entry failure light forced=true: controls fit at every size and enlarged text, axe clean",
         "classification": "assertion",
-        "detail": "SW5 X1 X2 entry failure light forced=true: controls fit at every size and enlarged text, axe clean:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1011:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
+        "detail": "SW5 X1 X2 entry failure light forced=true: controls fit at every size and enlarged text, axe clean:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1011:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 X2 engine terminal light forced=true: controls fit at every size and enlarged text, axe clean",
         "classification": "assertion",
-        "detail": "SW5 X1 X2 engine terminal light forced=true: controls fit at every size and enlarged text, axe clean:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1011:39\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at processImmediate (node:i"
+        "detail": "SW5 X1 X2 engine terminal light forced=true: controls fit at every size and enlarged text, axe clean:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1011:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 X2 reset complete light forced=true: controls fit at every size and enlarged text, axe clean",
         "classification": "assertion",
-        "detail": "SW5 X1 X2 reset complete light forced=true: controls fit at every size and enlarged text, axe clean:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1011:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
+        "detail": "SW5 X1 X2 reset complete light forced=true: controls fit at every size and enlarged text, axe clean:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1011:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 X2 running app light forced=true: controls fit at every size and enlarged text, axe clean",
         "classification": "assertion",
-        "detail": "SW5 X1 X2 running app light forced=true: controls fit at every size and enlarged text, axe clean:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1011:39\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at processImmediate (node:i"
+        "detail": "SW5 X1 X2 running app light forced=true: controls fit at every size and enlarged text, axe clean:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1011:39\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at processImmediate (node:i"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 X2 start-up frame light forced=true: controls fit at every size and enlarged text, axe clean",
         "classification": "assertion",
-        "detail": "SW5 X1 X2 start-up frame light forced=true: controls fit at every size and enlarged text, axe clean:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1011:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
+        "detail": "SW5 X1 X2 start-up frame light forced=true: controls fit at every size and enlarged text, axe clean:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1011:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 window controls are legible over every surface with core.nord dark, and in forced colours",
         "classification": "assertion",
-        "detail": "SW5 X1 window controls are legible over every surface with core.nord dark, and in forced colours:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1155:38\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
+        "detail": "SW5 X1 window controls are legible over every surface with core.nord dark, and in forced colours:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1177:38\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 window controls are legible over every surface with core.nord light, and in forced colours",
         "classification": "assertion",
-        "detail": "SW5 X1 window controls are legible over every surface with core.nord light, and in forced colours:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1155:38\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at processImmediate (node:i"
+        "detail": "SW5 X1 window controls are legible over every surface with core.nord light, and in forced colours:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1177:38\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 window controls are legible over every surface with core.sepia-focus dark, and in forced colours",
         "classification": "assertion",
-        "detail": "SW5 X1 window controls are legible over every surface with core.sepia-focus dark, and in forced colours:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1155:38\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
+        "detail": "SW5 X1 window controls are legible over every surface with core.sepia-focus dark, and in forced colours:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1177:38\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 window controls are legible over every surface with core.sepia-focus light, and in forced colours",
         "classification": "assertion",
-        "detail": "SW5 X1 window controls are legible over every surface with core.sepia-focus light, and in forced colours:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1155:38\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
+        "detail": "SW5 X1 window controls are legible over every surface with core.sepia-focus light, and in forced colours:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1177:38\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at processImmediate (node:i"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 window controls are legible over every surface with core.high-vis dark, and in forced colours",
         "classification": "assertion",
-        "detail": "SW5 X1 window controls are legible over every surface with core.high-vis dark, and in forced colours:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1155:38\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
+        "detail": "SW5 X1 window controls are legible over every surface with core.high-vis dark, and in forced colours:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1177:38\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 window controls are legible over every surface with core.high-vis light, and in forced colours",
         "classification": "assertion",
-        "detail": "SW5 X1 window controls are legible over every surface with core.high-vis light, and in forced colours:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1155:38\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
+        "detail": "SW5 X1 window controls are legible over every surface with core.high-vis light, and in forced colours:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1177:38\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at processImmediate (node:i"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 window controls are legible over every surface with core.registrars-ledger dark, and in forced colours",
         "classification": "assertion",
-        "detail": "SW5 X1 window controls are legible over every surface with core.registrars-ledger dark, and in forced colours:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1155:38\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
+        "detail": "SW5 X1 window controls are legible over every surface with core.registrars-ledger dark, and in forced colours:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1177:38\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at processImmediate (node:i"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 window controls are legible over every surface with core.registrars-ledger light, and in forced colours",
         "classification": "assertion",
-        "detail": "SW5 X1 window controls are legible over every surface with core.registrars-ledger light, and in forced colours:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1155:38\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
+        "detail": "SW5 X1 window controls are legible over every surface with core.registrars-ledger light, and in forced colours:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1177:38\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 window controls are legible over every surface with core.night-registry dark, and in forced colours",
         "classification": "assertion",
-        "detail": "SW5 X1 window controls are legible over every surface with core.night-registry dark, and in forced colours:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1155:38\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
+        "detail": "SW5 X1 window controls are legible over every surface with core.night-registry dark, and in forced colours:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1177:38\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at processImmediate (node:i"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 window controls are legible over every surface with core.night-registry light, and in forced colours",
         "classification": "assertion",
-        "detail": "SW5 X1 window controls are legible over every surface with core.night-registry light, and in forced colours:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1155:38\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
+        "detail": "SW5 X1 window controls are legible over every surface with core.night-registry light, and in forced colours:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1177:38\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at processImmediate (node:i"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 window controls are legible over every surface with core.cyanotype dark, and in forced colours",
         "classification": "assertion",
-        "detail": "SW5 X1 window controls are legible over every surface with core.cyanotype dark, and in forced colours:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1155:38\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at processImmediate (node:i"
+        "detail": "SW5 X1 window controls are legible over every surface with core.cyanotype dark, and in forced colours:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1177:38\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
       },
       {
         "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SW5 X1 window controls are legible over every surface with core.cyanotype light, and in forced colours",
         "classification": "assertion",
-        "detail": "SW5 X1 window controls are legible over every surface with core.cyanotype light, and in forced colours:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/097kad0m/tmp/test-intent-before-qtED3i/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1155:38\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
+        "detail": "SW5 X1 window controls are legible over every surface with core.cyanotype light, and in forced colours:  AssertionError: expected [] to deeply equal [ 'Minimize', 'Maximize', 'Close' ]\n    at /home/elias/.cache/am/flvbinnp/tmp/test-intent-before-kpqjrV/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:1177:38\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5w/modules/ui-web/node_mod"
       }
     ]
   },
-  "digest": "sha256:d76c756a9b496bc62e8a3447379b76272d462f301457448d5076ea417fbef363"
+  "digest": "sha256:59fdc3ca10b1dca7336055b218985f6a4fc142e113843ed89b1560afbc0e3c43"
 }

@@ -72,8 +72,9 @@
         pointer-events: auto; cursor: default;
       }
       #window-controls button:is(:hover, :active) { color: var(--window-control-strong); background: var(--window-control-fill); }
-      /* Text ink, not the accent: some palettes' accents are below 4.5:1 on their own surfaces. */
-      #window-controls button:focus-visible { outline: var(--frame-focus-width) solid var(--window-control-strong); outline-offset: calc(-1 * var(--frame-focus-width)); }
+      /* Text ink, not the accent: some palettes' accents are below 4.5:1 on their own surfaces. Drawn
+         outside the control, against the surface, so a hover or pressed fill never hides it. */
+      #window-controls button:focus-visible { outline: var(--frame-focus-width) solid var(--window-control-strong); outline-offset: var(--frame-hairline); }
       #window-controls svg { inline-size: var(--frame-window-control-glyph); block-size: var(--frame-window-control-glyph); fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; }
       #window-controls[data-maximized] .window-maximize-icon, #window-controls:not([data-maximized]) .window-restore-icon { display: none; }
       /* Top areas of the static surfaces move the window. The frame paints no other input target. */
@@ -89,8 +90,9 @@
         .boot-dot { background: Highlight; }
         .boot-actions button:focus-visible, #boot-report:focus-visible { outline-color: Highlight; }
         #window-controls button { color: ButtonText; background: transparent; }
-        #window-controls button:is(:hover, :active) { forced-color-adjust: none; color: HighlightText; background: Highlight; }
-        #window-controls button:focus-visible { outline-color: Highlight; }
+        /* The ring is the surface's text colour; the fill is a pair that ring stays distinct from (Highlight is not). */
+        #window-controls button:is(:hover, :active) { forced-color-adjust: none; color: SelectedItemText; background: SelectedItem; }
+        #window-controls button:focus-visible { outline-color: CanvasText; }
       }
     </style>
   </head>

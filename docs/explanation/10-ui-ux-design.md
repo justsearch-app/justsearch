@@ -168,7 +168,9 @@ the controls. They are named icon buttons of one size at any text size, never be
 target, so enlarged text changes the bar's layout rather than their room. They take their colours
 from the surface beneath them: the saved start-up colours while the frame or the failure page
 shows, the app's theme afterwards. Their focus ring uses that surface's text colour, because some
-palettes' accents are too faint on their own surfaces. The browser has neither
+palettes' accents are too faint on their own surfaces, and is drawn just outside the control, so a
+hover or pressed fill never hides it. In forced colours the ring is the surface's text colour and
+the hover fill is the selected-item pair, which stays distinct from it. The browser has neither
 the controls nor drag regions. While a modal dialog such as Settings is open, the controls wait
 until it closes.
 

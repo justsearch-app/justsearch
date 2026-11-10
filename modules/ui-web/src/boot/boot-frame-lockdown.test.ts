@@ -1087,13 +1087,20 @@ for (const os of ['dark', 'light'] as const) for (const forced of [false, true])
         if (surface.name === 'entry failure') expect({ state, all: audit.withLayer }).toEqual({ state, all: [] });
       }
     }
-    if (forced) expect(await control(page, 'Close').evaluate(el => { el.focus(); return getComputedStyle(el).outlineColor; })).toBe(await page.evaluate(() => { const probe = document.createElement('span'); probe.style.color = 'Highlight'; document.body.append(probe); const c = getComputedStyle(probe).color; probe.remove(); return c; }));
+    // Forced colours: the ring is the surface's text colour, drawn outside the control.
+    if (forced) expect(await control(page, 'Close').evaluate(el => { el.focus(); const s = getComputedStyle(el); return { color: s.outlineColor, outside: parseFloat(s.outlineOffset) > 0 }; }))
+      .toEqual({ color: await page.evaluate(() => { const probe = document.createElement('span'); probe.style.color = 'CanvasText'; document.body.append(probe); const c = getComputedStyle(probe).color; probe.remove(); return c; }), outside: true });
   } finally { await page.close(); }
 }, 30_000);
 
 // X1 SW5: the layer takes its colours from the surface beneath it, for every shipped palette and state.
 const shippedPalettes = (JSON.parse(readFileSync(path.resolve('public/themes/manifest.json'), 'utf8')) as { themes: { id: string }[] }).themes.map(theme => theme.id);
-/** Each control's icon, hover, pressed and focus ring against what is painted behind it, in normal and forced colours. */
+/**
+ * Each control's icon, hover, pressed and focus ring against what is painted behind it, in normal
+ * and forced colours, alone and with keyboard focus kept while the pointer hovers or presses: the
+ * icon at least 4.5:1 against its fill; the ring at least 4.5:1 alone and, over a fill, at least
+ * 3:1 against both the fill and the surface beside it.
+ */
 async function controlContrasts(page: Page, surface: string) {
   const failures: string[] = [];
   const away = { x: 1, y: page.viewportSize()!.height - 1 };
@@ -1103,24 +1110,31 @@ async function controlContrasts(page: Page, surface: string) {
       const button = control(page, name);
       const box = (await button.boundingBox())!;
       const centre = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
-      const states: [string, () => Promise<void>, () => Promise<void>][] = [
-        ['icon', async () => { await page.mouse.move(away.x, away.y); await button.evaluate(el => (el as HTMLElement).blur()); }, async () => {}],
-        // A key press first, so programmatic focus shows the keyboard focus ring.
-        ['focus ring', async () => { await page.keyboard.press('Shift'); await button.focus(); }, async () => { await button.evaluate(el => (el as HTMLElement).blur()); }],
-        ['hover', async () => { await page.mouse.move(centre.x, centre.y); }, async () => {}],
-        // Released away from the control, so no window command runs.
-        ['pressed', async () => { await page.mouse.move(centre.x, centre.y); await page.mouse.down(); }, async () => { await page.mouse.move(away.x, away.y); await page.mouse.up(); }],
+      // A key press first, so programmatic focus shows the keyboard focus ring.
+      const focus = async () => { await page.keyboard.press('Shift'); await button.focus(); };
+      const blur = async () => { await button.evaluate(el => (el as HTMLElement).blur()); };
+      // Pressed states are released away from the control, so no window command runs.
+      const release = async () => { await page.mouse.move(away.x, away.y); await page.mouse.up(); };
+      const states: [string, { icon: boolean; ring: boolean }, () => Promise<void>, () => Promise<void>][] = [
+        ['icon', { icon: true, ring: false }, async () => { await page.mouse.move(away.x, away.y); await blur(); }, async () => {}],
+        ['focus ring', { icon: false, ring: true }, focus, blur],
+        ['hover', { icon: true, ring: false }, async () => { await page.mouse.move(centre.x, centre.y); }, async () => {}],
+        ['pressed', { icon: true, ring: false }, async () => { await page.mouse.move(centre.x, centre.y); await page.mouse.down(); }, release],
+        ['focus ring + hover', { icon: true, ring: true }, async () => { await focus(); await page.mouse.move(centre.x, centre.y); }, async () => { await page.mouse.move(away.x, away.y); await blur(); }],
+        ['focus ring + pressed', { icon: true, ring: true }, async () => { await focus(); await page.mouse.move(centre.x, centre.y); await page.mouse.down(); }, async () => { await release(); await blur(); }],
       ];
-      for (const [state, enter, leave] of states) {
+      for (const [state, measure, enter, leave] of states) {
         await enter();
         const measured = await button.evaluate((el, ring) => {
           const ctx = document.createElement('canvas').getContext('2d', { willReadFrequently: true })!;
           const rgba = (value: string) => { ctx.clearRect(0, 0, 1, 1); ctx.fillStyle = value; ctx.fillRect(0, 0, 1, 1); return [...ctx.getImageData(0, 0, 1, 1).data].map((v, i) => i < 3 ? v : v / 255); };
           const over = (top: number[], bottom: number[]) => [...top.slice(0, 3).map((v, i) => v * top[3]! + bottom[i]! * (1 - top[3]!)), 1];
           const lum = (v: number[]) => { const l = v.slice(0, 3).map(c => { c /= 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; }); return l[0]! * .2126 + l[1]! * .7152 + l[2]! * .0722; };
+          const ratio = (x: number[], y: number[]) => { const a = lum(x), b = lum(y); return (Math.max(a, b) + .05) / (Math.min(a, b) + .05); };
+          const css = (v: number[]) => `rgb(${v.slice(0, 3).map(Math.round).join(', ')})`;
           const own = getComputedStyle(el);
-          const ink = rgba(ring ? own.outlineColor : own.color), fill = rgba(own.backgroundColor);
-          const visible = ring ? el.matches(':focus-visible') && own.outlineStyle !== 'none' && parseFloat(own.outlineWidth) > 0 : true;
+          const fill = rgba(own.backgroundColor);
+          const visible = !ring || (el.matches(':focus-visible') && own.outlineStyle !== 'none' && parseFloat(own.outlineWidth) > 0);
           // What the surfaces beneath the layer paint at the control's centre, over the page canvas.
           const layer = el.closest<HTMLElement>('#window-controls')!;
           const r = el.getBoundingClientRect();
@@ -1131,14 +1145,22 @@ async function controlContrasts(page: Page, surface: string) {
           const chain: number[][] = [];
           for (let node: Element | null = under; node; node = node.parentElement ?? ((node.getRootNode() as ShadowRoot).host ?? null)) chain.push(rgba(getComputedStyle(node).backgroundColor));
           const probe = document.createElement('span'); probe.style.color = 'Canvas'; document.documentElement.append(probe);
-          let behind = rgba(getComputedStyle(probe).color); probe.remove();
-          for (const paint of chain.reverse()) behind = over(paint, behind);
-          behind = over(fill, behind);
-          const a = lum(over(ink, behind)), b = lum(behind);
-          return { visible, ratio: (Math.max(a, b) + .05) / (Math.min(a, b) + .05), ink: ring ? own.outlineColor : own.color, behind: `rgb(${behind.slice(0, 3).map(Math.round).join(', ')})` };
-        }, state === 'focus ring');
+          let beside = rgba(getComputedStyle(probe).color); probe.remove();
+          for (const paint of chain.reverse()) beside = over(paint, beside);
+          const filled = over(fill, beside);
+          const icon = over(rgba(own.color), filled);
+          // The ring as painted: over the fill when inset, over the surface when drawn outside the control.
+          const outline = over(rgba(own.outlineColor), parseFloat(own.outlineOffset) < 0 ? filled : beside);
+          return { visible, icon: ratio(icon, filled), ringFill: ratio(outline, filled), ringSurface: ratio(outline, beside),
+            ink: own.color, ring: own.outlineColor, fill: css(filled), beside: css(beside) };
+        }, measure.ring);
         await leave();
-        if (!measured.visible || measured.ratio < 4.5) failures.push(`${surface}${forced ? ' forced' : ''} ${name} ${state}: ${measured.visible ? measured.ratio.toFixed(2) : 'no ring'} (${measured.ink} on ${measured.behind})`);
+        const where = `${surface}${forced ? ' forced' : ''} ${name} ${state}`;
+        if (!measured.visible) { failures.push(`${where}: no ring`); continue; }
+        if (measure.icon && measured.icon < 4.5) failures.push(`${where}: icon ${measured.icon.toFixed(2)} (${measured.ink} on ${measured.fill})`);
+        // Alone, the ring is beside the surface only; over a fill the table's 3:1 applies to both.
+        const least = measure.icon ? 3 : 4.5;
+        if (measure.ring && (measured.ringFill < least || measured.ringSurface < least)) failures.push(`${where}: ring ${measured.ringFill.toFixed(2)} against the fill ${measured.fill}, ${measured.ringSurface.toFixed(2)} against the surface ${measured.beside} (${measured.ring})`);
       }
     }
   }
