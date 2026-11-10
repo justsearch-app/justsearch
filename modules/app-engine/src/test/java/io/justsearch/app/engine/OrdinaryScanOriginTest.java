@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
@@ -94,6 +95,76 @@ final class OrdinaryScanOriginTest {
     }
   }
 
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.MethodSource("ordinaryScanKeys")
+  void nonImportScanKeysRetainUnknownOriginAndAllowEveryBoundary(String key) throws Exception {
+    try (var f = new Environment()) {
+      Path root = Files.createDirectory(temp.resolve("root"));
+      Path file = Files.writeString(root.resolve("ordinary.txt"), "ordinary content");
+      f.queue.enqueueEntries(List.of(JobQueue.EnqueueEntry.stat(file).withinRoot(root)), "documents", key);
+      var saved = f.queue.pollPending(1).getFirst();
+      // Enqueue normalizes empty scan keys; also exercise each callback with the raw identity.
+      var raw = new JobQueue.IndexJob(file, "documents", null, key, "ordinary-unit", null, false, null, root);
+      for (var claim : List.of(saved, raw)) {
+        assertEquals(Optional.empty(), assertDoesNotThrow(() -> f.queue.sourceOriginId(claim)));
+        for (var boundary : JobQueue.IngestionBoundary.values()) {
+          assertTrue(assertDoesNotThrow(() -> f.queue.allowsIngestionBoundary(boundary, key, claim)),
+              boundary.toString());
+        }
+      }
+    }
+  }
+
+  private static java.util.stream.Stream<String> ordinaryScanKeys() {
+    return java.util.stream.Stream.concat(java.util.stream.Stream.of(null, "", "scan-id", "1-1-7000-8000-1",
+        "00000000-0000-7000-0000-000000000001", "00000000-0000-7000-C000-000000000001",
+        "00000000-0000-7000-8000-00000000000A"),
+        java.util.stream.IntStream.rangeClosed(0, 8)
+            .mapToObj(version -> "00000000-0000-" + version + "000-8000-000000000001"));
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.EnumSource(value = OperationKind.class, names = {"INGEST", "REINDEX"})
+  void nonImportRecordedParentsAndChildrenKeepTheirBoundaryRules(OperationKind kind) throws Exception {
+    try (var f = new Environment()) {
+      Path root = Files.createDirectory(temp.resolve("root"));
+      Path file = Files.writeString(root.resolve("ordinary.txt"), "ordinary content");
+      var context = EngineProvenance.context(EngineContext.ClientKind.INTERNAL, "non-import-test",
+          Optional.empty(), Optional.of(new OperationAuthorizationBasis.StructuralAuto().encode()),
+          TransportTag.SYSTEM_INTERNAL, EngineContext.Survival.DURABLE, EngineContext.Urgency.BACKGROUND);
+      var request = new OperationAttemptRunner.Request(OperationKeys.generate(Clock.systemUTC()),
+          OperationDescriptor.invocation(kind, "core.other-scan", "{}", false), context,
+          EngineProvenance.invocation(context, ExecutorTag.AGENT, java.time.Instant.now(), Optional.empty()));
+      var plan = new RecordedRootPlan("ordinary-generation", List.of(
+          new RecordedRootPlan.Root(root, "documents", false, false, List.of(), List.of())));
+      var prepared = RecordedParentFixture.prepare(request, plan);
+      f.operations.savePreparation(request.key(), request.descriptor(), prepared);
+      var parent = f.operations.acceptPrepared(request.key(), request.descriptor(), context, request.provenance(), prepared.nonce()).record();
+      assertTrue(f.operations.start(parent.id()));
+      var child = f.operations.acceptIngestChild(parent.key(), OperationKeys.generate(Clock.systemUTC()), prepared, plan).record();
+      for (String key : List.of(parent.key(), child.key())) {
+        var claim = new JobQueue.IndexJob(file, "documents", null, key, "ordinary-unit", null, false, null, root);
+        assertEquals(Optional.empty(), f.queue.sourceOriginId(claim));
+        for (var boundary : JobQueue.IngestionBoundary.values()) {
+          assertTrue(f.queue.allowsIngestionBoundary(boundary, key, claim), boundary.toString());
+        }
+      }
+      var failure = new IllegalArgumentException("recorded parent lookup failed");
+      doThrow(failure).when(f.operations).find(parent.key());
+      assertSame(failure, assertThrows(IllegalArgumentException.class, () -> f.queue.allowsIngestionBoundary(
+          JobQueue.IngestionBoundary.TRAVERSAL, child.key(), null)));
+      doCallRealMethod().when(f.operations).find(parent.key());
+      try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + temp.resolve("operations.db"));
+          var delete = connection.prepareStatement("DELETE FROM operations WHERE id=?")) {
+        delete.setLong(1, parent.id());
+        assertEquals(1, delete.executeUpdate());
+      }
+      assertThrows(JobQueue.IngestionApprovalInterruptedException.class, () -> f.queue.allowsIngestionBoundary(
+          JobQueue.IngestionBoundary.TRAVERSAL, child.key(), null),
+          "a recorded child with a missing owner cannot become an ordinary scan");
+    }
+  }
+
   @Test
   void actualOrdinaryScanPublishesParentAndChunksWithUnknownOrigin() throws Exception {
     try (var f = new Environment()) {
@@ -151,6 +222,11 @@ final class OrdinaryScanOriginTest {
       var failure = new IllegalArgumentException("recorded operation lookup failed");
       doThrow(failure).when(f.operations).find(key);
       assertSame(failure, assertThrows(IllegalArgumentException.class, () -> f.queue.sourceOriginId(claim)));
+      doCallRealMethod().doThrow(failure).when(f.operations).find(key);
+      assertSame(failure, assertThrows(IllegalArgumentException.class, () -> f.queue.sourceOriginId(claim)),
+          "the import-approval lookup must also propagate storage errors");
+      assertSame(failure, assertThrows(IllegalArgumentException.class, () -> f.queue.allowsIngestionBoundary(
+          JobQueue.IngestionBoundary.PUBLICATION, key, claim)));
     }
   }
 

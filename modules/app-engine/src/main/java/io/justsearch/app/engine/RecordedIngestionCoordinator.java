@@ -63,6 +63,8 @@ import java.util.function.BooleanSupplier;
 final class RecordedIngestionCoordinator implements RecordedIngestionService, RecordedIngestionLifecycle {
   private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(RecordedIngestionCoordinator.class);
   private static final String REFUSAL_CURSOR = "ingest-refusal:1:";
+  private static final String WRITE_UNAVAILABLE = "RECOVERY_WRITE_UNAVAILABLE";
+  private static final String ORIGIN_WRITE_UNAVAILABLE = "RECOVERY_ORIGIN_WRITE_UNAVAILABLE";
   private static final Set<String> DURABLE_REFUSALS = Set.of("RECOVERY_BINDING_INVALID",
       "RECOVERY_SCOPE_REFUSED", "RECOVERY_AUTHORIZATION_REFUSED", "RECOVERY_GENERATION_MISMATCH",
       RecordedIngestionSettlement.EXHAUSTED);
@@ -173,6 +175,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
   private final RecordedIngestPlanResolver resolver = new RecordedIngestPlanResolver();
   private final Set<String> bootRenewals;
   private final Map<String, String> unsavedInterruptions = new ConcurrentHashMap<>();
+  private final Set<String> writesFailedThisMaintenance = new HashSet<>();
   private final Map<String, OperationAuthority.LiveOriginApproval> liveApprovals = new ConcurrentHashMap<>();
   private final Map<String, Parent> parents = new HashMap<>();
   private final Map<String, Bulk> bulks = new HashMap<>();
@@ -538,6 +541,14 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     return Set.copyOf(retained);
   }
 
+  private Optional<OperationRecord> scanOperation(String key) {
+    // Queue scan identities also include ordinary UUIDv4 and legacy keys. Validate only the
+    // key shape here: errors reading an actual operation must still reach the caller.
+    try { OperationKeys.timestampMillis(key); }
+    catch (IllegalArgumentException ordinaryScan) { return Optional.empty(); }
+    return operations.find(key);
+  }
+
   @Override
   public Attachment attach(JobQueue queue, CheckedServingGeneration generation, BooleanSupplier online) throws IOException {
     return attach(queue, generation, online, Optional::empty);
@@ -555,7 +566,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     synchronized (lock) {
       if (attached != null) throw new IOException("Recorded ingestion still owns its prior queue");
       queue.useRecordedWalkRetention(this::retainedImportChildren);
-      queue.useImportApprovalBinding(key -> operations.find(key).filter(RecordedIngestionCoordinator::isImport)
+      queue.useImportApprovalBinding(key -> scanOperation(key).filter(RecordedIngestionCoordinator::isImport)
           .map(this::importState).filter(state -> state.binding() != null).map(state -> state.binding().id()).orElse(null));
       queue.useIngestionBoundaryAuthority((key, claim) -> {
         if (key == null) return true;
@@ -565,15 +576,19 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
         if (permission != null && isImport(permission.parent)) {
           return recordedClaimDecision(key) != JobQueue.RecordedClaimDecision.DENY;
         }
-        try { OperationKeys.timestampMillis(key); }
-        catch (IllegalArgumentException ordinary) { return true; }
-        return bulkPermissions.containsKey(key) || permission != null;
+        // Bulk capture precedes claim permission; ordinary scans and watched-root reindex
+        // also keep their own admission rules. Only an import needs this approval boundary.
+        var owner = scanOperation(key);
+        if (owner.isPresent() && owner.orElseThrow().descriptor().kind() == OperationKind.INGEST
+            && owner.orElseThrow().descriptor().operationRef() == null) {
+          owner = scanOperation(RecordedIngestChild.parentKey(owner.orElseThrow().descriptor()));
+          if (owner.isEmpty()) return false;
+        }
+        return owner.filter(RecordedIngestionCoordinator::isImport).isEmpty();
       });
       queue.useSourceOriginAuthority(key -> {
         // Ordinary walks use scan ids, not recorded-operation keys. Keep their existing lookup.
-        try { OperationKeys.timestampMillis(key); }
-        catch (IllegalArgumentException ordinaryScan) { return key; }
-        return operations.find(key).map(row -> {
+        return scanOperation(key).map(row -> {
           if (row.descriptor().kind() != OperationKind.INGEST || row.descriptor().operationRef() != null) return key;
           try { return RecordedIngestChild.parentKey(row.descriptor()); }
           catch (IllegalArgumentException invalid) { return key; }
@@ -737,8 +752,15 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
   public void maintain() {
     synchronized (lock) {
       if (pumping || attached == null) return;
+      writesFailedThisMaintenance.clear();
       pumping = true;
       try {
+        for (var pending : List.copyOf(unsavedInterruptions.entrySet())) {
+          if (WRITE_UNAVAILABLE.equals(pending.getValue()) || ORIGIN_WRITE_UNAVAILABLE.equals(pending.getValue())) continue;
+          var row = operations.find(pending.getKey());
+          if (row.isEmpty() || row.orElseThrow().state().terminal()) unsavedInterruptions.remove(pending.getKey());
+          else interrupt(row.orElseThrow(), pending.getValue());
+        }
         // Only winning/consumed owner transitions repeat a pass. They are finite in the frozen
         // root plans and captured runner cohort. Queue writes/notifications alone never repeat it.
         do {
@@ -803,7 +825,17 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     }
     if (parent != null) releaseInterruptedWork(parent);
     unsavedInterruptions.put(row.key(), reason);
-    try { operations.interruptImport(row.id(), reason); unsavedInterruptions.remove(row.key()); }
+    // A failed write revokes this pass's effects, not the accepted approval. Keep its explanation
+    // until that write succeeds; another maintenance call (or boot) retries the same frozen work.
+    if (WRITE_UNAVAILABLE.equals(reason) || ORIGIN_WRITE_UNAVAILABLE.equals(reason)) {
+      writesFailedThisMaintenance.add(row.key());
+      return;
+    }
+    try {
+      operations.interruptImport(row.id(), reason);
+      var saved = importState(row);
+      if (saved != null && saved.interruptionReason() != null) unsavedInterruptions.remove(row.key());
+    }
     catch (io.justsearch.app.api.operations.OperationStoreException unavailable) {
       log.warn("Import {} remains interrupted; its latch write will retry", row.key(), unavailable);
     }
@@ -838,7 +870,8 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     // Claims and publication can run before the next maintenance pass. Reread the durable latch
     // here; a process-local permission is never authority to bypass a saved interruption.
     var active = importState(parent.row);
-    return !parent.interrupted && active != null && active.binding() != null
+    return !parent.interrupted && !unsavedInterruptions.containsKey(parent.row.key())
+        && active != null && active.binding() != null
         && parent.origins.size() == parent.plan.roots().size()
         && parent.origins.stream().allMatch(origin -> authority.evaluateImportApproval(
             origin, active, liveApprovals.get(active.binding().id())));
@@ -869,7 +902,11 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
         }
         return new RecordedIngestRecoveryDecision.Refused(new OperationReceipt("RECOVERY_AUTHORIZATION_REFUSED", null));
       }
-      recordImportOrigins(row, plan, physical);
+      try { recordImportOrigins(row, plan, physical); }
+      catch (IllegalStateException unavailable) {
+        return new RecordedIngestRecoveryDecision.Refused(new OperationReceipt(ORIGIN_WRITE_UNAVAILABLE, null));
+      }
+      unsavedInterruptions.remove(row.key(), ORIGIN_WRITE_UNAVAILABLE);
       var generation = physical.generationValue();
       if (generation.isEmpty() || !physical.online.getAsBoolean()) return new RecordedIngestRecoveryDecision.Wait();
       if (!generation.orElseThrow().equals(plan.generation())) return new RecordedIngestRecoveryDecision.Refused(
@@ -878,17 +915,20 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     } catch (IllegalArgumentException | IllegalStateException malformed) {
       return new RecordedIngestRecoveryDecision.Refused(new OperationReceipt("RECOVERY_BINDING_INVALID", null));
     } catch (io.justsearch.app.api.operations.OperationStoreException unavailable) {
-      return new RecordedIngestRecoveryDecision.Refused(new OperationReceipt("RECOVERY_WRITE_UNAVAILABLE", null));
+      return new RecordedIngestRecoveryDecision.Refused(new OperationReceipt(WRITE_UNAVAILABLE, null));
     }
   }
 
   private Reconciliation reconcileImport(OperationRecord row, Attached physical) {
+    if (writesFailedThisMaintenance.contains(row.key())) return new Reconciliation.Wait();
+    try {
     final OperationStore.Preparation stored;
     final RecordedRootPlan plan;
     try {
       stored = preparation(row);
       plan = resolver.resolve(row, stored);
     } catch (RuntimeException invalid) {
+      if (invalid instanceof io.justsearch.app.api.operations.OperationStoreException) throw invalid;
       interrupt(row, "RECOVERY_BINDING_INVALID");
       return new Reconciliation.Wait();
     }
@@ -920,10 +960,15 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
       acquireWork(parent);
       return pending(parent.completion);
     });
+    } catch (io.justsearch.app.api.operations.OperationStoreException unavailable) {
+      interrupt(row, WRITE_UNAVAILABLE);
+      return new Reconciliation.Wait();
+    }
   }
 
   /** Interruption keeps the same producer/runner owner, including its unclosed enumeration. */
   private boolean holdInterruptedImport(Parent parent, Attached physical) {
+    if (writesFailedThisMaintenance.contains(parent.row.key())) return true;
     var state = importState(parent.row);
     if (state != null && "cancelled".equals(state.interruptionReason())) {
       parent.cancelled = true;
@@ -1157,7 +1202,11 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     }
     if (isImport(row)) {
       // Observing confirmed receipts executes no source work and consumes no recovery attempt.
-      operations.checkpoint(row.id(), cursor, completed, failed);
+      if (!operations.checkpoint(row.id(), cursor, completed, failed)) {
+        interrupt(row, WRITE_UNAVAILABLE);
+        return Optional.of(new Reconciliation.Wait());
+      }
+      unsavedInterruptions.remove(row.key(), WRITE_UNAVAILABLE);
       return Optional.of("SUCCESS".equals(outcomeCode) ? new Reconciliation.Complete(outcome)
           : "cancelled".equals(outcomeCode) ? new Reconciliation.Cancelled(outcome) : new Reconciliation.Failed(outcome));
     }
@@ -1213,6 +1262,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
           : failed(RecordedIngestionSettlement.UNAVAILABLE);
     }
     if (parentRow.state() == OperationState.COMPLETE_WITH_GAPS) return new Reconciliation.Wait();
+    if (writesFailedThisMaintenance.contains(parentRow.key())) return new Reconciliation.Wait();
     String hash = planHash(binding.plan());
     var policy = recovery(parentRow, parentPreparation, physical);
     if (isImport(parentRow)) {
@@ -1303,6 +1353,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
   }
 
   private void drive(Parent parent, Attached physical, Set<String> openChildParents, boolean unknownChild) {
+    try {
     OperationRecord row = operations.find(parent.row.key()).orElseThrow();
     if (row.state().terminal()) {
       release(parent);
@@ -1381,6 +1432,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
         break;
       }
       startFreshChild(parent, attempts.acceptIngestChild(parent.handle, rootPlan.roots().getFirst()), rootPlan);
+      unsavedInterruptions.remove(parent.row.key(), WRITE_UNAVAILABLE);
       return;
     }
     if (parent.refusal != null) {
@@ -1394,6 +1446,10 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     } else {
       checkpointParent(parent, row);
       parent.completion.complete(OperationResult.success("Recorded ingestion completed"));
+    }
+    } catch (io.justsearch.app.api.operations.OperationStoreException unavailable) {
+      if (!isImport(parent.row)) throw unavailable;
+      interrupt(parent.row, WRITE_UNAVAILABLE);
     }
   }
 
@@ -1437,6 +1493,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
   private void checkpointParent(Parent parent, OperationRecord observed) {
     if (parent.completed >= observed.unitsCompleted() && parent.failed >= observed.unitsFailed()) {
       parent.handle.checkpoint(parentCursor(observed, parent.nextRoot), parent.completed, parent.failed);
+      unsavedInterruptions.remove(parent.row.key(), WRITE_UNAVAILABLE);
     }
   }
 
@@ -1686,6 +1743,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
 
   private void release(Parent parent) {
     if (parents.remove(parent.row.key(), parent)) advanced = true;
+    unsavedInterruptions.remove(parent.row.key());
     if (parent.child != null) permissions.remove(parent.child.row.key());
     if (parent.cancellationSubscription != null) parent.cancellationSubscription.close();
     if (parent.work != null) { parent.work.close(); parent.work = null; }

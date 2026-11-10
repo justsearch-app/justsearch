@@ -439,11 +439,19 @@ final class InterruptedImportRestartTest {
     }
   }
 
-  @Test void i16RecoveryWriteFailureRetainsVisibleExplanationAndRetries() throws Exception {
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.CsvSource({"interruption_reason,FAIL", "interruption_reason,IGNORE",
+      "active_approval_binding,FAIL", "active_approval_binding,IGNORE"})
+  void i16RecoveryWriteFailureRetainsVisibleExplanationAndRetries(String column, String rejection) throws Exception {
     var seed = seed(true, false, false);
     try (var connection = DriverManager.getConnection("jdbc:sqlite:" + directory.resolve("operations.db"));
         var statement = connection.createStatement()) {
-      statement.executeUpdate("CREATE TRIGGER refuse_latch BEFORE UPDATE OF interruption_reason ON operations BEGIN SELECT RAISE(FAIL,'latch unavailable'); END");
+      if (column.equals("active_approval_binding")) {
+        statement.executeUpdate("UPDATE operations SET active_approval_binding='invalid'");
+      }
+      statement.executeUpdate("CREATE TRIGGER refuse_latch BEFORE UPDATE OF " + column
+          + " ON operations BEGIN SELECT "
+          + (rejection.equals("FAIL") ? "RAISE(FAIL,'latch unavailable')" : "RAISE(IGNORE)") + "; END");
     }
     try (var runtime = new Runtime()) {
       runtime.bind();
@@ -453,6 +461,79 @@ final class InterruptedImportRestartTest {
           var statement = connection.createStatement()) { statement.executeUpdate("DROP TRIGGER refuse_latch"); }
       runtime.coordinator.maintain();
       assertInterrupted(runtime, seed.key());
+    }
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"INSERT", "UPDATE OF preparation_payload"})
+  void i16RecoveryChildWriteFailureRemainsVisible(String write) throws Exception {
+    var seed = seed(false, false, false);
+    try (var runtime = new Runtime()) {
+      try (var connection = DriverManager.getConnection("jdbc:sqlite:" + directory.resolve("operations.db"));
+          var statement = connection.createStatement()) {
+        statement.executeUpdate("CREATE TRIGGER refuse_child BEFORE " + write
+            + " ON operations WHEN NEW.operation_ref IS NULL BEGIN SELECT RAISE(FAIL,'child unavailable'); END");
+      }
+      assertDoesNotThrow(runtime::bind);
+      assertTrue(runtime.reads.isEmpty(), "a child that was not saved cannot start a producer");
+      assertFalse(runtime.store.find(seed.key()).orElseThrow().state().terminal());
+      var interrupted = runtime.coordinator.interruptedImports();
+      assertEquals(1, interrupted.size(), "failed child acceptance must remain visible");
+      assertEquals(seed.key(), interrupted.getFirst().operationKey());
+      assertEquals("RECOVERY_WRITE_UNAVAILABLE", interrupted.getFirst().reason());
+      assertTrue(runtime.store.findIngestChild(seed.key(), seed.plan()).isEmpty(),
+          "the operation and its preparation roll back together");
+      try (var connection = DriverManager.getConnection("jdbc:sqlite:" + directory.resolve("operations.db"));
+          var statement = connection.createStatement()) { statement.executeUpdate("DROP TRIGGER refuse_child"); }
+      runtime.coordinator.maintain();
+      assertEquals(OperationState.COMPLETE, runtime.store.find(seed.key()).orElseThrow().state());
+      assertEquals(List.of(seed.plan()), runtime.reads);
+      assertTrue(runtime.coordinator.interruptedImports().isEmpty());
+    }
+  }
+
+  @Test void i16RecoveryOriginWriteFailureRemainsVisibleAndRetries() throws Exception {
+    var seed = seed(false, false, false);
+    try (var queue = new SqliteJobQueue(directory.resolve("jobs.db"))) { queue.open(); }
+    try (var connection = DriverManager.getConnection("jdbc:sqlite:" + directory.resolve("jobs.db"));
+        var statement = connection.createStatement()) {
+      statement.executeUpdate("CREATE TRIGGER refuse_origin BEFORE INSERT ON source_origin "
+          + "BEGIN SELECT RAISE(FAIL,'origin unavailable'); END");
+    }
+    try (var runtime = new Runtime()) {
+      runtime.bind();
+      assertTrue(runtime.reads.isEmpty());
+      assertEquals("RECOVERY_ORIGIN_WRITE_UNAVAILABLE", runtime.coordinator.interruptedImports().getFirst().reason());
+      assertFalse(runtime.store.find(seed.key()).orElseThrow().state().terminal());
+      try (var connection = DriverManager.getConnection("jdbc:sqlite:" + directory.resolve("jobs.db"));
+          var statement = connection.createStatement()) { statement.executeUpdate("DROP TRIGGER refuse_origin"); }
+      runtime.coordinator.maintain();
+      assertEquals(OperationState.COMPLETE, runtime.store.find(seed.key()).orElseThrow().state());
+      assertEquals(List.of(seed.plan()), runtime.reads);
+    }
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"FAIL", "IGNORE"})
+  void i16RecoveryCompletionCheckpointFailureRemainsVisibleAndRetries(String rejection) throws Exception {
+    var seed = seed(false, false, false);
+    finishChild(seed);
+    try (var connection = DriverManager.getConnection("jdbc:sqlite:" + directory.resolve("operations.db"));
+        var statement = connection.createStatement()) {
+      statement.executeUpdate("CREATE TRIGGER refuse_checkpoint BEFORE UPDATE OF checkpoint_cursor ON operations "
+          + "WHEN NEW.operation_ref='core.ingest-files' BEGIN SELECT "
+          + (rejection.equals("FAIL") ? "RAISE(FAIL,'checkpoint unavailable')" : "RAISE(IGNORE)") + "; END");
+    }
+    try (var runtime = new Runtime()) {
+      runtime.bind();
+      assertTrue(runtime.reads.isEmpty());
+      assertFalse(runtime.store.find(seed.key()).orElseThrow().state().terminal());
+      assertEquals("RECOVERY_WRITE_UNAVAILABLE", runtime.coordinator.interruptedImports().getFirst().reason());
+      try (var connection = DriverManager.getConnection("jdbc:sqlite:" + directory.resolve("operations.db"));
+          var statement = connection.createStatement()) { statement.executeUpdate("DROP TRIGGER refuse_checkpoint"); }
+      runtime.coordinator.maintain();
+      assertEquals(OperationState.COMPLETE, runtime.store.find(seed.key()).orElseThrow().state());
+      assertTrue(runtime.reads.isEmpty(), "observing completion never rereads a source");
     }
   }
 
