@@ -205,16 +205,24 @@ function runChecks(checks, root) {
     }
   }
   for (const group of gradleGroups.values()) {
-    for (const { t } of group) fs.rmSync(path.join(root, t.resultFile), { force: true });
-    const filters = [...new Set(group.map(({ t }) => (t.method ? `${t.fqcn}.${t.method}` : t.fqcn)))];
     const wrapper = IS_WIN ? '.\\gradlew.bat' : './gradlew';
     const { project, task } = group[0].t;
-    const run = sh(`${wrapper} ${project}:${task} ${filters.map((f) => `--tests ${JSON.stringify(f)}`).join(' ')} --rerun -PskipWebBuild=true --console=plain`, root);
-    runs.push(run);
-    for (const { id, t } of group) {
-      const xmlPath = path.join(root, t.resultFile);
-      const cases = fs.existsSync(xmlPath) ? selectJUnitCases(parseJUnitXml(fs.readFileSync(xmlPath, 'utf8')), t) : [];
-      results.set(id, { runner: 'gradle', cases, buildOutput: run.output });
+    const command = (filters) => `${wrapper} ${project}:${task} ${filters.map((f) => `--tests ${JSON.stringify(f)}`).join(' ')} --rerun -PskipWebBuild=true --console=plain`;
+    const classes = group.filter(({ t }) => !t.method);
+    // Display names cannot identify methods: even a name like "method()" may belong to a
+    // sibling. Keep class checks grouped, and use a fresh, isolated run for every method check.
+    const batches = [...(classes.length ? [classes] : []), ...group.filter(({ t }) => t.method).map((entry) => [entry])];
+    for (const batch of batches) {
+      for (const { t } of batch) fs.rmSync(path.join(root, t.resultFile), { force: true });
+      const filters = [...new Set(batch.map(({ t }) => (t.method ? `${t.fqcn}.${t.method}` : t.fqcn)))];
+      const run = sh(command(filters), root);
+      runs.push(run);
+      for (const { id, t } of batch) {
+        const xmlPath = path.join(root, t.resultFile);
+        const parsed = fs.existsSync(xmlPath) ? parseJUnitXml(fs.readFileSync(xmlPath, 'utf8')) : [];
+        const cases = t.method ? parsed.filter((c) => c.classname === t.fqcn) : selectJUnitCases(parsed, t);
+        results.set(id, { runner: 'gradle', cases, buildOutput: run.output });
+      }
     }
   }
   for (const [kind, ids] of vitestFiles) {
