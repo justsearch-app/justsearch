@@ -399,3 +399,13 @@ CI runs no clippy step.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1c4cd-82b4-7160-ae39-0f08d218f7f8",
+  "verdict": "accept",
+  "digest": "sha256:3302bd6aa8010a8e619f1d093f2c76acc16f8580ab3a284edbf09749fff5b70c"
+}
+```
