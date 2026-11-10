@@ -154,7 +154,8 @@ A settings document from a newer build remains byte-identical through startup an
 reloads: presentation fallback applies its runtime bodies without saving defaults or history.
 Explicit edits during that older-version session can still overwrite the newer document.
 After the first render, navigation and Search loading belong to the shell. Host page-serving
-failure, onboarding and engine loss after mount are outside this startup frame's scope.
+failure, onboarding and engine loss after mount are outside this startup frame's scope; engine
+loss after mount is described in [Losing the engine](#losing-the-engine).
 
 The desktop window has no system title bar. One window layer beside the root, created by the
 page's own script before any application code, holds Minimize, Maximize/Restore and Close at the
@@ -396,6 +397,48 @@ Earlier shows one row per decision. An agent reading the outcome of that key
 (`justsearch_operation_outcome`) and `GET /api/operation-history/{operationKey}` give the
 same answer: waiting, denied by the user, or denied automatically once the deadline passed
 unanswered.
+
+### Losing the engine
+
+Once the app is on screen, losing the engine never replaces the window. The status pill's own
+decision drives one treatment (`components/EngineLoss.ts`, `state/engineLoss.ts`): when no
+channel has had contact for the 40 s contact window and the pill's 10 s grace has passed, so
+that it says “Can't reach the engine”, the window area below the top bar dims behind
+**JustSearch can't reach its engine**. A shorter gap shows nothing, and failing polls while live
+streams still arrive are not an outage. On the desktop the supervisor's state also counts: an
+exhausted or stopped engine, or one that runs but whose index is not ready (then **JustSearch's
+engine isn't ready**), shows the same treatment at once, with the supervisor's reason in plain
+words. Before the app has loaded, including while the start-up frame still covers it, the
+recovery page keeps the root as before; the Linux update hold still replaces the loaded app and
+Windows keeps its installer hand-off.
+
+The treatment says that searching and indexing are on hold and that files and the index are
+safe, and offers **Restart the engine** (desktop) or **Try again** (browser), **Open Health** and
+**Copy report**, with when the engine was last connected and last tried. The top bar, the pill
+and its panel, Settings, More and the window controls stay usable; the window area beneath is
+inert and keeps its state, so drafts, the selected conversation and an interrupted request
+survive and nothing is sent again. Restart the engine asks the host's existing restart, shows
+“Restarting the engine…” until the engine answers or stops again, ignores repeated clicks, and
+says in plain words why the host refused (quitting or an update, already starting or running,
+still shutting down). The browser cannot restart the engine: it says to restart it where it
+runs, and Try again reads the status once. No wording speaks of reloading the window.
+
+Open Health shows Health as a band-topped page instead of the dimmed one: “JustSearch can't
+reach its engine” and the last facts seen (engine, engine process and its own words on the
+desktop, index state, searchable files, files waiting), each with how long ago it was seen;
+live controls and cards are not shown. Copy report copies a fixed set of fields, never text the
+engine, host or an error wrote: product version, desktop/browser, OS family, time, seconds since
+the last contact, supervisor state, a reason code from a closed list and the recent exit codes.
+When the clipboard refuses, the report is shown selected. When the engine answers again the
+treatment leaves without a reload and focus returns where it was; a new engine identity still
+rebinds as before (the desktop reloads on its backend-restart event), and a late answer from the
+old engine neither shows nor ends the outage. Approvals and completions that happened unseen
+are not announced on return.
+
+Focus moves into the treatment once per outage, unless a modal such as the protected security
+dialog holds it; that dialog stays above the treatment with its own rules, and the treatment
+never answers or restores an approval. The `engine-loss` and `engine-loss-600x400-forced`
+captures cover it in the measured-axe register.
 
 ### Progress vocabulary (status panel, Health, folder rows)
 

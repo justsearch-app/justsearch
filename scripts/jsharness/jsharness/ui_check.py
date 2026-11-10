@@ -649,6 +649,32 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         await page.get_by_text("JustSearch could not restart", exact=True).wait_for()
         await page.get_by_text("Install update", exact=True).wait_for()
 
+    def setup_engine_loss(width, height):
+        """S5c — the loaded app loses its engine: every engine request fails from now on, and the
+        page clock passes the 40 s contact window and the status pill's 10 s grace."""
+        async def setup(page):
+            await page.set_viewport_size({"width": width, "height": height})
+            # SES lockdown freezes Date, which the page clock replaces: reload with the app's own
+            # debug switch for it, with the clock installed before any application timer exists.
+            parsed = urlparse(ui_url)
+            params = parse_qs(parsed.query)
+            params["lockdown"] = ["0"]
+            await page.goto("about:blank")  # the current page is locked down; install on a fresh one
+            await page.clock.install()
+            await page.goto(urlunparse(parsed._replace(query=urlencode(params, doseq=True))),
+                            wait_until="domcontentloaded", timeout=timeout_ms)
+            await _await_app_ready(page)
+            await _open_sv3_window(page)
+            await page.route("**/api/**", lambda route: route.abort())
+            await page.clock.run_for(60_000)
+            loss = page.locator('jf-engine-loss [data-testid="engine-loss"]')
+            await loss.wait_for(state="visible", timeout=20_000)
+            await page.get_by_text("JustSearch can\u2019t reach its engine", exact=True).wait_for()
+            await page.get_by_role("button", name="Copy report", exact=True).wait_for()
+            if cooldown_ms > 0:
+                await asyncio.sleep(cooldown_ms / 1000)
+        return setup
+
     async def setup_engine_admission_wait(page):
         """Exercise the real admission-wait emitter and its status-pill projection."""
         await page.evaluate(
@@ -2205,6 +2231,8 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         Step("first-use-reading", setup=first_use_setup(True), isolated=True, fixtures_variant="first-use-reading"),
         Step("engine-recovery", setup=setup_engine_recovery, isolated=True),
         Step("engine-admission-wait", setup=setup_engine_admission_wait, isolated=True),
+        Step("engine-loss", setup=setup_engine_loss(1280, 800), isolated=True),
+        Step("engine-loss-600x400-forced", setup=setup_engine_loss(600, 400), isolated=True, forced_colors="active"),
         Step("health-completion", setup=setup_health_completion, isolated=True),
         Step("health-recovery", setup=setup_health_recovery, isolated=True),
         Step("search-failure", setup=setup_search_failure, isolated=True),

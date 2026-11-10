@@ -33,6 +33,7 @@ import { needsTypedConfirm } from '../components/acceptPendingEffect.js';
 import { agentRequestNotice, endEventId, needsYouCount, routeDesktopNotice, workFailedNotice, workFinishedNotice, type DesktopNotice } from '../state/noticePolicy.js';
 import { getNotifications } from '../state/notificationsState.js';
 import { setTaskbarBadge } from '../../utils/taskbarBadge.js';
+import { reportEngineReachability } from '../state/engineLoss.js';
 
 /** Which observation a needs-you row comes from (C6: only an observed source can announce an arrival). */
 function needsSource(id: string): string {
@@ -486,6 +487,8 @@ export class FrameStatusController implements ReactiveController {
       ...(this.presenceLive && this.ai?.snapshotLive ? ['presence'] : []),
       ...[...this.operations.values()].filter(o => o.fresh && o.outcome).map(o => `operation:${o.id}`)]);
     this.model = next;
+    // S5c — the engine-loss treatment follows this pill's own decision, after the same grace.
+    reportEngineReachability(next.pill.kind === 'unreachable');
     this.host.requestUpdate();
   }
 }

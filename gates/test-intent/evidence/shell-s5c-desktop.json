@@ -1,0 +1,347 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
+  },
+  "createdAt": "2026-11-10T14:03:40.110Z",
+  "revision": "21fe180483bce1f3f197c008f47b760136604e56",
+  "tree": "9166e1de7e0d3771dfd7d00b544b692e6b87ca9c",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/boot/desktopEngineLoss.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/55f3co5o/tmp/test-intent-vitest-1174-1794319412884.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 3128
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/boot/desktopEngineLoss.test.ts#not ready: the same treatment, the reason in plain words, Health reachable",
+      "file": "modules/ui-web/src/boot/desktopEngineLoss.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4eb86ecfd1ab88a86d73c317709e203913684d26b349e17433ea0b60c68beac4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SC2 supervisor loss after the app has loaded keeps the app not ready: the same treatment, the reason in plain words, Health reachable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/desktopEngineLoss.test.ts#a terminal stop: the same treatment, the reason in plain words, Health reachable",
+      "file": "modules/ui-web/src/boot/desktopEngineLoss.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4eb86ecfd1ab88a86d73c317709e203913684d26b349e17433ea0b60c68beac4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SC2 supervisor loss after the app has loaded keeps the app a terminal stop: the same treatment, the reason in plain words, Health reachable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/desktopEngineLoss.test.ts#exhausted restarts: the same treatment, the reason in plain words, Health reachable",
+      "file": "modules/ui-web/src/boot/desktopEngineLoss.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4eb86ecfd1ab88a86d73c317709e203913684d26b349e17433ea0b60c68beac4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SC2 supervisor loss after the app has loaded keeps the app exhausted restarts: the same treatment, the reason in plain words, Health reachable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/desktopEngineLoss.test.ts#exhausted on a locked data folder: the same treatment, the reason in plain words, Health reachable",
+      "file": "modules/ui-web/src/boot/desktopEngineLoss.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4eb86ecfd1ab88a86d73c317709e203913684d26b349e17433ea0b60c68beac4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SC2 supervisor loss after the app has loaded keeps the app exhausted on a locked data folder: the same treatment, the reason in plain words, Health reachable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/desktopEngineLoss.test.ts#the Linux update hold still replaces the loaded app",
+      "file": "modules/ui-web/src/boot/desktopEngineLoss.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4eb86ecfd1ab88a86d73c317709e203913684d26b349e17433ea0b60c68beac4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SC2 supervisor loss after the app has loaded keeps the app the Linux update hold still replaces the loaded app",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/desktopEngineLoss.test.ts#uses the native restart once for repeated clicks, shows it under way, and leaves when the engine answers",
+      "file": "modules/ui-web/src/boot/desktopEngineLoss.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4eb86ecfd1ab88a86d73c317709e203913684d26b349e17433ea0b60c68beac4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SC3 Restart the engine uses the native restart once for repeated clicks, shows it under way, and leaves when the engine answers",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/desktopEngineLoss.test.ts#says when the restarted engine fails again, and a later restart is offered again",
+      "file": "modules/ui-web/src/boot/desktopEngineLoss.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4eb86ecfd1ab88a86d73c317709e203913684d26b349e17433ea0b60c68beac4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SC3 Restart the engine says when the restarted engine fails again, and a later restart is offered again",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/desktopEngineLoss.test.ts#a refusal (Quit or upgrade is in progress; restart refused) is said in plain words and the treatment stays usable",
+      "file": "modules/ui-web/src/boot/desktopEngineLoss.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4eb86ecfd1ab88a86d73c317709e203913684d26b349e17433ea0b60c68beac4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SC3 Restart the engine a refusal (Quit or upgrade is in progress; restart refused) is said in plain words and the treatment stays usable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/desktopEngineLoss.test.ts#a refusal (An update holds Engine replacement; restart refused) is said in plain words and the treatment stays usable",
+      "file": "modules/ui-web/src/boot/desktopEngineLoss.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4eb86ecfd1ab88a86d73c317709e203913684d26b349e17433ea0b60c68beac4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SC3 Restart the engine a refusal (An update holds Engine replacement; restart refused) is said in plain words and the treatment stays usable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/desktopEngineLoss.test.ts#a refusal (Engine has no terminal state; restart refused) is said in plain words and the treatment stays usable",
+      "file": "modules/ui-web/src/boot/desktopEngineLoss.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4eb86ecfd1ab88a86d73c317709e203913684d26b349e17433ea0b60c68beac4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SC3 Restart the engine a refusal (Engine has no terminal state; restart refused) is said in plain words and the treatment stays usable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/desktopEngineLoss.test.ts#a refusal (The Engine is already starting or running; restart refused) is said in plain words and the treatment stays usable",
+      "file": "modules/ui-web/src/boot/desktopEngineLoss.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4eb86ecfd1ab88a86d73c317709e203913684d26b349e17433ea0b60c68beac4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SC3 Restart the engine a refusal (The Engine is already starting or running; restart refused) is said in plain words and the treatment stays usable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/desktopEngineLoss.test.ts#a refusal (Engine was stopped for quit or upgrade; restart refused) is said in plain words and the treatment stays usable",
+      "file": "modules/ui-web/src/boot/desktopEngineLoss.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4eb86ecfd1ab88a86d73c317709e203913684d26b349e17433ea0b60c68beac4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SC3 Restart the engine a refusal (Engine was stopped for quit or upgrade; restart refused) is said in plain words and the treatment stays usable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/desktopEngineLoss.test.ts#a refusal (The previous supervision generation is finishing; try again) is said in plain words and the treatment stays usable",
+      "file": "modules/ui-web/src/boot/desktopEngineLoss.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4eb86ecfd1ab88a86d73c317709e203913684d26b349e17433ea0b60c68beac4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SC3 Restart the engine a refusal (The previous supervision generation is finishing; try again) is said in plain words and the treatment stays usable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/desktopEngineLoss.test.ts#rebinds as today: the session is dropped and the window reloads",
+      "file": "modules/ui-web/src/boot/desktopEngineLoss.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4eb86ecfd1ab88a86d73c317709e203913684d26b349e17433ea0b60c68beac4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SC6 a new engine identity rebinds as today: the session is dropped and the window reloads",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/desktopEngineLoss.test.ts#copies the supervisor facts as fixed fields and never its free text",
+      "file": "modules/ui-web/src/boot/desktopEngineLoss.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4eb86ecfd1ab88a86d73c317709e203913684d26b349e17433ea0b60c68beac4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SC5 Copy report on the desktop copies the supervisor facts as fixed fields and never its free text",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "origin/main",
+    "revision": "21fe180483bce1f3f197c008f47b760136604e56",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/boot/desktopEngineLoss.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/55f3co5o/tmp/test-intent-vitest-1174-1794319417250.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 2639,
+        "output": "JSON report written to /home/elias/.cache/am/55f3co5o/tmp/test-intent-vitest-1174-1794319417250.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/boot/desktopEngineLoss.test.ts#not ready: the same treatment, the reason in plain words, Health reachable",
+        "classification": "assertion",
+        "detail": "SC2 supervisor loss after the app has loaded keeps the app not ready: the same treatment, the reason in plain words, Health reachable:  AssertionError: the app is not replaced: expected <jf-engine-recovery></jf-engine-recovery> to be null\n    at /home/elias/.cache/am/55f3co5o/tmp/test-intent-before-CEe3Xd/modules/ui-web/src/boot/desktopEngineLoss.test.ts:139:81\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5c/mod"
+      },
+      {
+        "id": "modules/ui-web/src/boot/desktopEngineLoss.test.ts#a terminal stop: the same treatment, the reason in plain words, Health reachable",
+        "classification": "assertion",
+        "detail": "SC2 supervisor loss after the app has loaded keeps the app a terminal stop: the same treatment, the reason in plain words, Health reachable:  AssertionError: the app is not replaced: expected <jf-engine-recovery></jf-engine-recovery> to be null\n    at /home/elias/.cache/am/55f3co5o/tmp/test-intent-before-CEe3Xd/modules/ui-web/src/boot/desktopEngineLoss.test.ts:139:81\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5c/mod"
+      },
+      {
+        "id": "modules/ui-web/src/boot/desktopEngineLoss.test.ts#exhausted restarts: the same treatment, the reason in plain words, Health reachable",
+        "classification": "assertion",
+        "detail": "SC2 supervisor loss after the app has loaded keeps the app exhausted restarts: the same treatment, the reason in plain words, Health reachable:  AssertionError: the app is not replaced: expected <jf-engine-recovery></jf-engine-recovery> to be null\n    at /home/elias/.cache/am/55f3co5o/tmp/test-intent-before-CEe3Xd/modules/ui-web/src/boot/desktopEngineLoss.test.ts:139:81\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5c/mod"
+      },
+      {
+        "id": "modules/ui-web/src/boot/desktopEngineLoss.test.ts#exhausted on a locked data folder: the same treatment, the reason in plain words, Health reachable",
+        "classification": "assertion",
+        "detail": "SC2 supervisor loss after the app has loaded keeps the app exhausted on a locked data folder: the same treatment, the reason in plain words, Health reachable:  AssertionError: the app is not replaced: expected <jf-engine-recovery></jf-engine-recovery> to be null\n    at /home/elias/.cache/am/55f3co5o/tmp/test-intent-before-CEe3Xd/modules/ui-web/src/boot/desktopEngineLoss.test.ts:139:81\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5c/mod"
+      },
+      {
+        "id": "modules/ui-web/src/boot/desktopEngineLoss.test.ts#the Linux update hold still replaces the loaded app",
+        "classification": "assertion",
+        "detail": "SC2 supervisor loss after the app has loaded keeps the app the Linux update hold still replaces the loaded app:  AssertionError: expected null not to be null\n    at /home/elias/.cache/am/55f3co5o/tmp/test-intent-before-CEe3Xd/modules/ui-web/src/boot/desktopEngineLoss.test.ts:177:34\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5c/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifac"
+      },
+      {
+        "id": "modules/ui-web/src/boot/desktopEngineLoss.test.ts#uses the native restart once for repeated clicks, shows it under way, and leaves when the engine answers",
+        "classification": "assertion",
+        "detail": "SC3 Restart the engine uses the native restart once for repeated clicks, shows it under way, and leaves when the engine answers:  AssertionError: expected null not to be null\n    at /home/elias/.cache/am/55f3co5o/tmp/test-intent-before-CEe3Xd/modules/ui-web/src/boot/desktopEngineLoss.test.ts:204:25\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5c/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifac"
+      },
+      {
+        "id": "modules/ui-web/src/boot/desktopEngineLoss.test.ts#says when the restarted engine fails again, and a later restart is offered again",
+        "classification": "assertion",
+        "detail": "SC3 Restart the engine says when the restarted engine fails again, and a later restart is offered again:  AssertionError: /^Restart the engine$/ is offered: expected null not to be null\n    at click (/home/elias/.cache/am/55f3co5o/tmp/test-intent-before-CEe3Xd/modules/ui-web/src/boot/desktopEngineLoss.test.ts:116:43)\n    at /home/elias/.cache/am/55f3co5o/tmp/test-intent-before-CEe3Xd/modules/ui-web/src/"
+      },
+      {
+        "id": "modules/ui-web/src/boot/desktopEngineLoss.test.ts#a refusal (Quit or upgrade is in progress; restart refused) is said in plain words and the treatment stays usable",
+        "classification": "assertion",
+        "detail": "SC3 Restart the engine a refusal (Quit or upgrade is in progress; restart refused) is said in plain words and the treatment stays usable:  AssertionError: /^Restart the engine$/ is offered: expected null not to be null\n    at click (/home/elias/.cache/am/55f3co5o/tmp/test-intent-before-CEe3Xd/modules/ui-web/src/boot/desktopEngineLoss.test.ts:116:43)\n    at /home/elias/.cache/am/55f3co5o/tmp/test-intent-before-CEe3Xd/modules/ui-web/src/"
+      },
+      {
+        "id": "modules/ui-web/src/boot/desktopEngineLoss.test.ts#a refusal (An update holds Engine replacement; restart refused) is said in plain words and the treatment stays usable",
+        "classification": "assertion",
+        "detail": "SC3 Restart the engine a refusal (An update holds Engine replacement; restart refused) is said in plain words and the treatment stays usable:  AssertionError: /^Restart the engine$/ is offered: expected null not to be null\n    at click (/home/elias/.cache/am/55f3co5o/tmp/test-intent-before-CEe3Xd/modules/ui-web/src/boot/desktopEngineLoss.test.ts:116:43)\n    at /home/elias/.cache/am/55f3co5o/tmp/test-intent-before-CEe3Xd/modules/ui-web/src/"
+      },
+      {
+        "id": "modules/ui-web/src/boot/desktopEngineLoss.test.ts#a refusal (Engine has no terminal state; restart refused) is said in plain words and the treatment stays usable",
+        "classification": "assertion",
+        "detail": "SC3 Restart the engine a refusal (Engine has no terminal state; restart refused) is said in plain words and the treatment stays usable:  AssertionError: /^Restart the engine$/ is offered: expected null not to be null\n    at click (/home/elias/.cache/am/55f3co5o/tmp/test-intent-before-CEe3Xd/modules/ui-web/src/boot/desktopEngineLoss.test.ts:116:43)\n    at /home/elias/.cache/am/55f3co5o/tmp/test-intent-before-CEe3Xd/modules/ui-web/src/"
+      },
+      {
+        "id": "modules/ui-web/src/boot/desktopEngineLoss.test.ts#a refusal (The Engine is already starting or running; restart refused) is said in plain words and the treatment stays usable",
+        "classification": "assertion",
+        "detail": "SC3 Restart the engine a refusal (The Engine is already starting or running; restart refused) is said in plain words and the treatment stays usable:  AssertionError: /^Restart the engine$/ is offered: expected null not to be null\n    at click (/home/elias/.cache/am/55f3co5o/tmp/test-intent-before-CEe3Xd/modules/ui-web/src/boot/desktopEngineLoss.test.ts:116:43)\n    at /home/elias/.cache/am/55f3co5o/tmp/test-intent-before-CEe3Xd/modules/ui-web/src/"
+      },
+      {
+        "id": "modules/ui-web/src/boot/desktopEngineLoss.test.ts#a refusal (Engine was stopped for quit or upgrade; restart refused) is said in plain words and the treatment stays usable",
+        "classification": "assertion",
+        "detail": "SC3 Restart the engine a refusal (Engine was stopped for quit or upgrade; restart refused) is said in plain words and the treatment stays usable:  AssertionError: /^Restart the engine$/ is offered: expected null not to be null\n    at click (/home/elias/.cache/am/55f3co5o/tmp/test-intent-before-CEe3Xd/modules/ui-web/src/boot/desktopEngineLoss.test.ts:116:43)\n    at /home/elias/.cache/am/55f3co5o/tmp/test-intent-before-CEe3Xd/modules/ui-web/src/"
+      },
+      {
+        "id": "modules/ui-web/src/boot/desktopEngineLoss.test.ts#a refusal (The previous supervision generation is finishing; try again) is said in plain words and the treatment stays usable",
+        "classification": "assertion",
+        "detail": "SC3 Restart the engine a refusal (The previous supervision generation is finishing; try again) is said in plain words and the treatment stays usable:  AssertionError: /^Restart the engine$/ is offered: expected null not to be null\n    at click (/home/elias/.cache/am/55f3co5o/tmp/test-intent-before-CEe3Xd/modules/ui-web/src/boot/desktopEngineLoss.test.ts:116:43)\n    at /home/elias/.cache/am/55f3co5o/tmp/test-intent-before-CEe3Xd/modules/ui-web/src/"
+      },
+      {
+        "id": "modules/ui-web/src/boot/desktopEngineLoss.test.ts#rebinds as today: the session is dropped and the window reloads",
+        "classification": "assertion",
+        "detail": "SC6 a new engine identity rebinds as today: the session is dropped and the window reloads:  AssertionError: expected null not to be null\n    at /home/elias/.cache/am/55f3co5o/tmp/test-intent-before-CEe3Xd/modules/ui-web/src/boot/desktopEngineLoss.test.ts:265:34\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5c/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifac"
+      },
+      {
+        "id": "modules/ui-web/src/boot/desktopEngineLoss.test.ts#copies the supervisor facts as fixed fields and never its free text",
+        "classification": "assertion",
+        "detail": "SC5 Copy report on the desktop copies the supervisor facts as fixed fields and never its free text:  AssertionError: /^Restart the engine$/ is offered: expected null not to be null\n    at click (/home/elias/.cache/am/55f3co5o/tmp/test-intent-before-CEe3Xd/modules/ui-web/src/boot/desktopEngineLoss.test.ts:116:43)\n    at /home/elias/.cache/am/55f3co5o/tmp/test-intent-before-CEe3Xd/modules/ui-web/src/"
+      }
+    ]
+  },
+  "digest": "sha256:3c4990660e6c16c42bae2d3a97ee1da945bfcf876a1a649bfa6bccb58420053d"
+}

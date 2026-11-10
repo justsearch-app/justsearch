@@ -2663,6 +2663,44 @@
         "[aria-label=\"Getting started step\"]",
         "li[aria-current=\"step\"]"
       ]
+    },
+    {
+      "$comment": "S5c X2, measured 2026-11-10: the engine-loss treatment over Search at 1280x800 (browser runtime, every engine request failing past the contact window and the pill's grace). The panel keeps a reading width of at most 40rem and at least 320px, and never covers the top bar, whose pill, Settings, More and window controls stay usable.",
+      "uiShotStep": "engine-loss",
+      "elements": [
+        {
+          "selector": "[data-testid=\"engine-loss\"]",
+          "minWidthPx": 320,
+          "maxWidthPx": 640
+        },
+        {
+          "selector": "[data-testid=\"engine-loss\"]",
+          "mustNotOverlapSelector": "jf-top-bar"
+        }
+      ],
+      "requiredSelectors": [
+        "#engine-loss-title",
+        "#engine-loss-body"
+      ]
+    },
+    {
+      "$comment": "S5c X2, measured 2026-11-10: the same at 600x400 in forced colours. The panel fits inside the window's width less the window area's padding, and never covers the top bar.",
+      "uiShotStep": "engine-loss-600x400-forced",
+      "elements": [
+        {
+          "selector": "[data-testid=\"engine-loss\"]",
+          "minWidthPx": 320,
+          "maxWidthPx": 568
+        },
+        {
+          "selector": "[data-testid=\"engine-loss\"]",
+          "mustNotOverlapSelector": "jf-top-bar"
+        }
+      ],
+      "requiredSelectors": [
+        "#engine-loss-title",
+        "#engine-loss-body"
+      ]
     }
   ]
 }

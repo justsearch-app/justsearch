@@ -1,0 +1,327 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
+  },
+  "createdAt": "2026-11-10T13:48:41.705Z",
+  "revision": "21fe180483bce1f3f197c008f47b760136604e56",
+  "tree": "256e66070cf5c6b3626b452906fb08e69d5db166",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/plyo8mkb/tmp/test-intent-vitest-22118-1794318333383.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 24438
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts#1280 x 800, 'dark', text x1: readable, inside the window, focus moved in, top bar usable",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ef8e8c5a8dd8571a544e90a2dca1f4ca810a8c07b29e7209b6a58f156c651479",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "X1 X2 SC9 the treatment at every size and palette 1280 x 800, 'dark', text x1: readable, inside the window, focus moved in, top bar usable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts#1280 x 800, 'light', text x1: readable, inside the window, focus moved in, top bar usable",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ef8e8c5a8dd8571a544e90a2dca1f4ca810a8c07b29e7209b6a58f156c651479",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "X1 X2 SC9 the treatment at every size and palette 1280 x 800, 'light', text x1: readable, inside the window, focus moved in, top bar usable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts#1280 x 800, 'forced', text x1: readable, inside the window, focus moved in, top bar usable",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ef8e8c5a8dd8571a544e90a2dca1f4ca810a8c07b29e7209b6a58f156c651479",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "X1 X2 SC9 the treatment at every size and palette 1280 x 800, 'forced', text x1: readable, inside the window, focus moved in, top bar usable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts#900 x 800, 'dark', text x1: readable, inside the window, focus moved in, top bar usable",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ef8e8c5a8dd8571a544e90a2dca1f4ca810a8c07b29e7209b6a58f156c651479",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "X1 X2 SC9 the treatment at every size and palette 900 x 800, 'dark', text x1: readable, inside the window, focus moved in, top bar usable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts#900 x 800, 'light', text x1: readable, inside the window, focus moved in, top bar usable",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ef8e8c5a8dd8571a544e90a2dca1f4ca810a8c07b29e7209b6a58f156c651479",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "X1 X2 SC9 the treatment at every size and palette 900 x 800, 'light', text x1: readable, inside the window, focus moved in, top bar usable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts#900 x 800, 'forced', text x1: readable, inside the window, focus moved in, top bar usable",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ef8e8c5a8dd8571a544e90a2dca1f4ca810a8c07b29e7209b6a58f156c651479",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "X1 X2 SC9 the treatment at every size and palette 900 x 800, 'forced', text x1: readable, inside the window, focus moved in, top bar usable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts#600 x 400, 'dark', text x1: readable, inside the window, focus moved in, top bar usable",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ef8e8c5a8dd8571a544e90a2dca1f4ca810a8c07b29e7209b6a58f156c651479",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "X1 X2 SC9 the treatment at every size and palette 600 x 400, 'dark', text x1: readable, inside the window, focus moved in, top bar usable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts#600 x 400, 'light', text x1: readable, inside the window, focus moved in, top bar usable",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ef8e8c5a8dd8571a544e90a2dca1f4ca810a8c07b29e7209b6a58f156c651479",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "X1 X2 SC9 the treatment at every size and palette 600 x 400, 'light', text x1: readable, inside the window, focus moved in, top bar usable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts#600 x 400, 'forced', text x1: readable, inside the window, focus moved in, top bar usable",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ef8e8c5a8dd8571a544e90a2dca1f4ca810a8c07b29e7209b6a58f156c651479",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "X1 X2 SC9 the treatment at every size and palette 600 x 400, 'forced', text x1: readable, inside the window, focus moved in, top bar usable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts#600 x 400, 'dark', text x2: readable, inside the window, focus moved in, top bar usable",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ef8e8c5a8dd8571a544e90a2dca1f4ca810a8c07b29e7209b6a58f156c651479",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "X1 X2 SC9 the treatment at every size and palette 600 x 400, 'dark', text x2: readable, inside the window, focus moved in, top bar usable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts#900 x 800, 'light', text x2: readable, inside the window, focus moved in, top bar usable",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ef8e8c5a8dd8571a544e90a2dca1f4ca810a8c07b29e7209b6a58f156c651479",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "X1 X2 SC9 the treatment at every size and palette 900 x 800, 'light', text x2: readable, inside the window, focus moved in, top bar usable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts#adds no axe violation, in both themes and forced colours",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ef8e8c5a8dd8571a544e90a2dca1f4ca810a8c07b29e7209b6a58f156c651479",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "X1 X2 SC9 the treatment at every size and palette adds no axe violation, in both themes and forced colours",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts#focus returns to the text box when the engine is back, the draft is kept, nothing is sent, twice",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ef8e8c5a8dd8571a544e90a2dca1f4ca810a8c07b29e7209b6a58f156c651479",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SC9 SC6 focus and leaving in a real browser focus returns to the text box when the engine is back, the draft is kept, nothing is sent, twice",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts#Open Health at 600x400 steps aside to a band; Health is readable and takes input",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ef8e8c5a8dd8571a544e90a2dca1f4ca810a8c07b29e7209b6a58f156c651479",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SC9 SC6 focus and leaving in a real browser Open Health at 600x400 steps aside to a band; Health is readable and takes input",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "origin/main",
+    "revision": "21fe180483bce1f3f197c008f47b760136604e56",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/plyo8mkb/tmp/test-intent-vitest-22118-1794318359495.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 161992,
+        "output": "JSON report written to /home/elias/.cache/am/plyo8mkb/tmp/test-intent-vitest-22118-1794318359495.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts#1280 x 800, 'dark', text x1: readable, inside the window, focus moved in, top bar usable",
+        "classification": "assertion",
+        "detail": "X1 X2 SC9 the treatment at every size and palette 1280 x 800, 'dark', text x1: readable, inside the window, focus moved in, top bar usable:  AssertionError: the treatment shows: expected false to be true // Object.is equality\n    at shown (/home/elias/.cache/am/plyo8mkb/tmp/test-intent-before-OtryZs/modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts:121:66)\n    at /home/elias/.cache/am/plyo8mkb/tmp/test-intent-before-Ot"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts#1280 x 800, 'light', text x1: readable, inside the window, focus moved in, top bar usable",
+        "classification": "assertion",
+        "detail": "X1 X2 SC9 the treatment at every size and palette 1280 x 800, 'light', text x1: readable, inside the window, focus moved in, top bar usable:  AssertionError: the treatment shows: expected false to be true // Object.is equality\n    at shown (/home/elias/.cache/am/plyo8mkb/tmp/test-intent-before-OtryZs/modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts:121:66)\n    at /home/elias/.cache/am/plyo8mkb/tmp/test-intent-before-Ot"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts#1280 x 800, 'forced', text x1: readable, inside the window, focus moved in, top bar usable",
+        "classification": "assertion",
+        "detail": "X1 X2 SC9 the treatment at every size and palette 1280 x 800, 'forced', text x1: readable, inside the window, focus moved in, top bar usable:  AssertionError: the treatment shows: expected false to be true // Object.is equality\n    at shown (/home/elias/.cache/am/plyo8mkb/tmp/test-intent-before-OtryZs/modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts:121:66)\n    at /home/elias/.cache/am/plyo8mkb/tmp/test-intent-before-Ot"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts#900 x 800, 'dark', text x1: readable, inside the window, focus moved in, top bar usable",
+        "classification": "assertion",
+        "detail": "X1 X2 SC9 the treatment at every size and palette 900 x 800, 'dark', text x1: readable, inside the window, focus moved in, top bar usable:  AssertionError: the treatment shows: expected false to be true // Object.is equality\n    at shown (/home/elias/.cache/am/plyo8mkb/tmp/test-intent-before-OtryZs/modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts:121:66)\n    at /home/elias/.cache/am/plyo8mkb/tmp/test-intent-before-Ot"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts#900 x 800, 'light', text x1: readable, inside the window, focus moved in, top bar usable",
+        "classification": "assertion",
+        "detail": "X1 X2 SC9 the treatment at every size and palette 900 x 800, 'light', text x1: readable, inside the window, focus moved in, top bar usable:  AssertionError: the treatment shows: expected false to be true // Object.is equality\n    at shown (/home/elias/.cache/am/plyo8mkb/tmp/test-intent-before-OtryZs/modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts:121:66)\n    at /home/elias/.cache/am/plyo8mkb/tmp/test-intent-before-Ot"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts#900 x 800, 'forced', text x1: readable, inside the window, focus moved in, top bar usable",
+        "classification": "assertion",
+        "detail": "X1 X2 SC9 the treatment at every size and palette 900 x 800, 'forced', text x1: readable, inside the window, focus moved in, top bar usable:  AssertionError: the treatment shows: expected false to be true // Object.is equality\n    at shown (/home/elias/.cache/am/plyo8mkb/tmp/test-intent-before-OtryZs/modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts:121:66)\n    at /home/elias/.cache/am/plyo8mkb/tmp/test-intent-before-Ot"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts#600 x 400, 'dark', text x1: readable, inside the window, focus moved in, top bar usable",
+        "classification": "assertion",
+        "detail": "X1 X2 SC9 the treatment at every size and palette 600 x 400, 'dark', text x1: readable, inside the window, focus moved in, top bar usable:  AssertionError: the treatment shows: expected false to be true // Object.is equality\n    at shown (/home/elias/.cache/am/plyo8mkb/tmp/test-intent-before-OtryZs/modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts:121:66)\n    at /home/elias/.cache/am/plyo8mkb/tmp/test-intent-before-Ot"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts#600 x 400, 'light', text x1: readable, inside the window, focus moved in, top bar usable",
+        "classification": "assertion",
+        "detail": "X1 X2 SC9 the treatment at every size and palette 600 x 400, 'light', text x1: readable, inside the window, focus moved in, top bar usable:  AssertionError: the treatment shows: expected false to be true // Object.is equality\n    at shown (/home/elias/.cache/am/plyo8mkb/tmp/test-intent-before-OtryZs/modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts:121:66)\n    at /home/elias/.cache/am/plyo8mkb/tmp/test-intent-before-Ot"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts#600 x 400, 'forced', text x1: readable, inside the window, focus moved in, top bar usable",
+        "classification": "assertion",
+        "detail": "X1 X2 SC9 the treatment at every size and palette 600 x 400, 'forced', text x1: readable, inside the window, focus moved in, top bar usable:  AssertionError: the treatment shows: expected false to be true // Object.is equality\n    at shown (/home/elias/.cache/am/plyo8mkb/tmp/test-intent-before-OtryZs/modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts:121:66)\n    at /home/elias/.cache/am/plyo8mkb/tmp/test-intent-before-Ot"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts#600 x 400, 'dark', text x2: readable, inside the window, focus moved in, top bar usable",
+        "classification": "assertion",
+        "detail": "X1 X2 SC9 the treatment at every size and palette 600 x 400, 'dark', text x2: readable, inside the window, focus moved in, top bar usable:  AssertionError: the treatment shows: expected false to be true // Object.is equality\n    at shown (/home/elias/.cache/am/plyo8mkb/tmp/test-intent-before-OtryZs/modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts:121:66)\n    at /home/elias/.cache/am/plyo8mkb/tmp/test-intent-before-Ot"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts#900 x 800, 'light', text x2: readable, inside the window, focus moved in, top bar usable",
+        "classification": "assertion",
+        "detail": "X1 X2 SC9 the treatment at every size and palette 900 x 800, 'light', text x2: readable, inside the window, focus moved in, top bar usable:  AssertionError: the treatment shows: expected false to be true // Object.is equality\n    at shown (/home/elias/.cache/am/plyo8mkb/tmp/test-intent-before-OtryZs/modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts:121:66)\n    at /home/elias/.cache/am/plyo8mkb/tmp/test-intent-before-Ot"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts#adds no axe violation, in both themes and forced colours",
+        "classification": "assertion",
+        "detail": "X1 X2 SC9 the treatment at every size and palette adds no axe violation, in both themes and forced colours:  AssertionError: the treatment shows: expected false to be true // Object.is equality\n    at shown (/home/elias/.cache/am/plyo8mkb/tmp/test-intent-before-OtryZs/modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts:121:66)\n    at /home/elias/.cache/am/plyo8mkb/tmp/test-intent-before-Ot"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts#focus returns to the text box when the engine is back, the draft is kept, nothing is sent, twice",
+        "classification": "assertion",
+        "detail": "SC9 SC6 focus and leaving in a real browser focus returns to the text box when the engine is back, the draft is kept, nothing is sent, twice:  AssertionError: the treatment shows: expected false to be true // Object.is equality\n    at shown (/home/elias/.cache/am/plyo8mkb/tmp/test-intent-before-OtryZs/modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts:121:66)\n    at /home/elias/.cache/am/plyo8mkb/tmp/test-intent-before-Ot"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts#Open Health at 600x400 steps aside to a band; Health is readable and takes input",
+        "classification": "assertion",
+        "detail": "SC9 SC6 focus and leaving in a real browser Open Health at 600x400 steps aside to a band; Health is readable and takes input:  AssertionError: the treatment shows: expected false to be true // Object.is equality\n    at shown (/home/elias/.cache/am/plyo8mkb/tmp/test-intent-before-OtryZs/modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts:121:66)\n    at /home/elias/.cache/am/plyo8mkb/tmp/test-intent-before-Ot"
+      }
+    ]
+  },
+  "digest": "sha256:d385e8a5eb30fe37e2bb041f52afd661b7cbbec08dfa6375c702f695b9c0f473"
+}

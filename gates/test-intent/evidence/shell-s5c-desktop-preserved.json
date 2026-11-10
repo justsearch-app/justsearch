@@ -1,0 +1,61 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
+  },
+  "createdAt": "2026-11-10T14:03:45.068Z",
+  "revision": "21fe180483bce1f3f197c008f47b760136604e56",
+  "tree": "b9d5ba200e78c4b983dc903f442db78370df6b88",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/boot/desktopEngineLoss.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/55f3co5o/tmp/test-intent-vitest-1362-1794319422297.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2769
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/boot/desktopEngineLoss.test.ts#before the app has loaded, the existing recovery page stays, also while the start-up frame still covers the app",
+      "file": "modules/ui-web/src/boot/desktopEngineLoss.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4eb86ecfd1ab88a86d73c317709e203913684d26b349e17433ea0b60c68beac4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SC2 supervisor loss after the app has loaded keeps the app before the app has loaded, the existing recovery page stays, also while the start-up frame still covers the app",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/desktopEngineLoss.test.ts#Windows keeps its installer hand-off: an upgrade stop shows no treatment and keeps the app",
+      "file": "modules/ui-web/src/boot/desktopEngineLoss.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4eb86ecfd1ab88a86d73c317709e203913684d26b349e17433ea0b60c68beac4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SC2 supervisor loss after the app has loaded keeps the app Windows keeps its installer hand-off: an upgrade stop shows no treatment and keeps the app",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:11e35d8ef342e1b108a7f9d0a152c123d5469fad8f344837db385dbb5e47e3b2"
+}

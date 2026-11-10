@@ -55,6 +55,8 @@ import { applyPresentation, listPresentations } from '../state/presentationState
 import './OverlayHost.js';
 import '../components/DragOverlay.js';
 import '../components/StatusPill.js';
+import '../components/EngineLoss.js';
+import { subscribeEngineLoss } from '../state/engineLoss.js';
 import '../components/RetiredStatusElements.js';
 import './RetiredFrameElements.js';
 import './TopBar.js';
@@ -381,6 +383,7 @@ export class Shell extends JfElement {
     userConfig: { state: true },
     developerTier: { state: true },
     initialNavigationPending: { state: true },
+    engineLossCovers: { state: true },
   };
 
   declare apiBase: string;
@@ -393,6 +396,9 @@ export class Shell extends JfElement {
   declare developerTier: boolean;
   /** Draft cutover must wait for URL, native cold ingress and journal restore. */
   private declare initialNavigationPending: boolean;
+  /** S5c — the engine-loss treatment dims the window area: it takes no input until the engine is back. */
+  private declare engineLossCovers: boolean;
+  private engineLossUnsubscribe: (() => void) | null = null;
 
   private dragUnsubscribe: (() => void) | null = null;
   private userConfigUnsubscribe: (() => void) | null = null;
@@ -597,6 +603,7 @@ export class Shell extends JfElement {
     this.surfaces = [];
     this.activeId = null;
     this.initialNavigationPending = true;
+    this.engineLossCovers = false;
     this.dragActive = false;
     this.dragKind = null;
     this.userConfig = getUserConfig();
@@ -608,9 +615,10 @@ export class Shell extends JfElement {
     :host {
       display: grid;
       grid-template-columns: minmax(0, 1fr);
-      grid-template-rows: auto minmax(0, 1fr);
+      grid-template-rows: auto auto minmax(0, 1fr);
       grid-template-areas:
         'topbar'
+        'notice'
         'stage';
       width: 100vw;
       height: 100vh;
@@ -628,6 +636,11 @@ export class Shell extends JfElement {
       overflow: auto;
       min-width: 0;
     }
+    /* S5c — engine loss: a band above Health, or the whole window area below the top bar. */
+    jf-engine-loss { grid-area: notice; }
+    /* Above anything the window area positions (details sheets, pop-overs); top-bar menus, the status
+       panel and dialogs stay above it. */
+    jf-engine-loss[mode='overlay'] { grid-row: notice / stage; grid-column: 1; position: relative; z-index: var(--z-overlay-float); }
     .stage:focus { outline: none; }
     .stage:focus-visible { outline: var(--frame-focus-width) solid var(--focus-ring-color); outline-offset: calc(-1 * var(--frame-focus-width)); }
     /* Tempdoc 559 Authority II — the page's single <h1> names the active window; the top bar shows
@@ -718,6 +731,9 @@ export class Shell extends JfElement {
     // authoritative backend action-event log, so the activity timeline is one log (no read-time
     // client merge). Always-mounted shell → ingests effects regardless of which surface is open.
     this.effectIngestStop = startEffectIngest({ apiBase: this.apiBase });
+    this.engineLossUnsubscribe = subscribeEngineLoss((loss) => {
+      this.engineLossCovers = loss.lost && !loss.healthOpen;
+    });
     this._aiUnsub = subscribeAiState((s) => {
       const prevActivity = this._aiState?.activity?.state;
       this._aiState = s;
@@ -1770,6 +1786,8 @@ export class Shell extends JfElement {
     this.viewerAudienceUnsubscribe = null;
     this.keybindingTeardown?.();
     this._aiUnsub?.();
+    this.engineLossUnsubscribe?.();
+    this.engineLossUnsubscribe = null;
     this.scopeProfileSwitchUnsub?.();
     this.scopeProfileSwitchUnsub = null;
     this.evalContextScopeBumpUnsub?.();
@@ -2392,7 +2410,7 @@ export class Shell extends JfElement {
           .authorizationHost=${() => this.shadowRoot?.querySelector('jf-authorization-host') ?? null}
         ></jf-status-pill>
       </jf-top-bar>
-      <div class="stage" role=${placementToLandmarkRole('STAGE')} aria-label="Main content">
+      <div class="stage" role=${placementToLandmarkRole('STAGE')} aria-label="Main content" ?inert=${this.engineLossCovers}>
         <h1 class="visually-hidden">${active ? present({ kind: 'surface', id: active.id }).label : 'JustSearch'}</h1>
         <jf-stage
           .initialNavigationPending=${this.initialNavigationPending}
@@ -2405,6 +2423,7 @@ export class Shell extends JfElement {
           api-base=${this.apiBase}
         ></jf-stage>
       </div>
+      <jf-engine-loss></jf-engine-loss>
       <!-- Tempdoc 559 Authority I: viewport-docked chrome overlays dock into the
            OverlayHost's named slots (the slot owns placement). Modals,
            anchored/hover popovers and toggled panels follow as separate

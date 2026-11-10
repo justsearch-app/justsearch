@@ -62,6 +62,8 @@ import {
 import { getCurrentOpenChannelCount, getPeakOpenChannelCount } from '../state/liveChannelBudget.js';
 import { presentVerdict, type SystemHealthVerdict } from '../state/verdict.js';
 import { formatRelativeMs } from '../../utils/relativeTime.js';
+import { noteHealthOnScreen, subscribeEngineLoss, engineLossReason, type EngineLoss } from '../state/engineLoss.js';
+import { engineLossAge } from '../components/EngineLoss.js';
 import { type Maybe, UNKNOWN } from '../state/known.js';
 import { unavailableBecause } from '../state/availability.js';
 import { readinessNotice, reasonFor } from '../state/readinessNotice.js';
@@ -207,6 +209,7 @@ export class HealthSurface extends JfElement {
     bulkError: { state: true },
     error: { state: true },
     recommendedActions: { state: true },
+    engineLoss: { state: true },
   };
 
   declare transitions: TransitionRecord[];
@@ -258,6 +261,10 @@ export class HealthSurface extends JfElement {
 
   private pollStatus: number | null = null;
   private unsubAi: (() => void) | null = null;
+  /** S5c — while the engine is lost, Health shows its last known facts, each with its age. */
+  declare engineLoss: EngineLoss | null;
+  private unsubEngineLoss: (() => void) | null = null;
+  private engineLossClock: number | null = null;
   // 569 §15 — presentation subscription (declared status/stats regions on this real surface).
   private presentationUnsub: (() => void) | null = null;
   private eventStreamAbort: AbortController | null = null;
@@ -626,6 +633,10 @@ export class HealthSurface extends JfElement {
       this.verdict = s.verdict;
       this.provisional = s.stability.kind === 'provisional';
     });
+    noteHealthOnScreen(true);
+    this.unsubEngineLoss = subscribeEngineLoss((loss) => { this.engineLoss = loss; });
+    // Ages move on while nothing else does.
+    this.engineLossClock = window.setInterval(() => { if (this.engineLoss?.lost) this.requestUpdate(); }, 1_000);
     void this.refreshTelemetry();
     this.telemetryTimer = window.setInterval(() => { if (this.autoRefresh) void this.refreshTelemetry(); }, 5000);
     this.sectionUnsub = subscribeMemberTab((hostId, section) => {
@@ -668,6 +679,11 @@ export class HealthSurface extends JfElement {
     this.sectionUnsub = null;
     this.unsubAi?.();
     this.unsubAi = null;
+    this.unsubEngineLoss?.();
+    this.unsubEngineLoss = null;
+    if (this.engineLossClock !== null) window.clearInterval(this.engineLossClock);
+    this.engineLossClock = null;
+    noteHealthOnScreen(false);
     this.presentationUnsub?.();
     this.presentationUnsub = null;
     this.eventStreamAbort?.abort();
@@ -1924,7 +1940,56 @@ export class HealthSurface extends JfElement {
       : null;
   }
 
+  /**
+   * S5c SC4 — the engine can't be reached: the last facts JustSearch saw, each with when it saw them,
+   * and nothing that claims live state (no live controls, streams or "connected" words).
+   */
+  private renderLastKnown(loss: EngineLoss): TemplateResult {
+    const now = Date.now();
+    const seen = (ms: number | null | undefined): string => {
+      const age = engineLossAge(ms ?? null, now);
+      return age ? `last seen ${age}` : 'not seen yet';
+    };
+    const ai = this.aiState;
+    const core = ai?.status?.worker?.core;
+    const observed = ai?.connection.lastSuccessMs ?? null;
+    const count = core?.ownSearchableDocuments ?? core?.searchableDocuments;
+    const reason = engineLossReason(loss);
+    const supervisorWords: Record<string, string> = {
+      starting: 'Starting', running: 'Running', stopping: 'Stopping', restarting: 'Restarting',
+      exhausted: 'Stopped after repeated failures', stopped: 'Stopped',
+    };
+    const facts: { label: string; value: string; when: string }[] = [
+      { label: 'Engine', value: loss.cause === 'not-ready' ? 'Not ready' : 'Can’t be reached', when: `last connected ${engineLossAge(ai?.connection.lastContactMs ?? null, now) ?? 'never'}` },
+      ...(loss.supervisor ? [{ label: 'Engine process', value: supervisorWords[loss.supervisor.state] ?? loss.supervisor.state,
+        when: `reported ${engineLossAge(loss.supervisorAtMs, now) ?? ''}`.trim() }] : []),
+      ...(loss.supervisor?.notReady ? [{ label: 'Engine said', value: loss.supervisor.notReady, when: `reported ${engineLossAge(loss.supervisorAtMs, now) ?? ''}`.trim() }] : []),
+      { label: 'Index', value: core?.indexState ? core.indexState.charAt(0) + core.indexState.slice(1).toLowerCase().replaceAll('_', ' ') : 'Unknown', when: seen(core?.indexState ? observed : null) },
+      { label: 'Searchable files', value: count == null ? 'Unknown' : NUM.format(count), when: seen(count == null ? null : observed) },
+      { label: 'Files waiting', value: core?.pendingJobs == null ? 'Unknown' : NUM.format(core.pendingJobs), when: seen(core?.pendingJobs == null ? null : observed) },
+    ];
+    return html`
+      <div class="header">
+        <div class="header-left">
+          <h2>${icon({ name: 'server', size: 16 })} System Health</h2>
+          <jf-status-badge tone="error"><span class="dot"></span>${loss.cause === 'not-ready' ? 'Engine not ready' : 'Engine unreachable'}</jf-status-badge>
+        </div>
+      </div>
+      <div class="body" data-testid="health-last-known">
+        <div class="card section">
+          <h3>${loss.cause === 'not-ready' ? 'JustSearch’s engine isn’t ready' : 'JustSearch can’t reach its engine'}</h3>
+          <p>${reason ? `${reason} ` : ''}These are the last facts JustSearch saw, each with when it saw them. Nothing here is live.</p>
+          ${facts.map(fact => html`<div class="data-row" data-fact=${fact.label}>
+            <span class="key">${fact.label}</span>
+            <span class="val">${fact.value} <span class="when">· ${fact.when}</span></span>
+          </div>`)}
+        </div>
+      </div>
+    `;
+  }
+
   override render(): TemplateResult {
+    if (this.engineLoss?.lost) return this.renderLastKnown(this.engineLoss);
     const refusal = this.ownershipRefusal();
     const progress = this.indexingProgress();
     // Tempdoc 571 §11 / 578 — the §11.8 hand-rolled Health|Logs tab strip is RETIRED: Logs is now a

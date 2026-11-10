@@ -408,6 +408,9 @@ const clockTickSig = signal(0);
 // mirroring how `activity.startedAtMs` backs "Thinking… Ns". A static timestamp, not a ticking value:
 // `computeStatusLabel` computes the elapsed at render, and the existing 5s `clockTick` drives refresh.
 const loadStartedAtSig = signal<number | null>(null);
+// When the last status or inference read finished, answered or not: the engine-loss treatment's
+// "Tried again" age. A plain stamp, read on demand; nothing derives from it.
+let lastAttemptMs: number | null = null;
 
 // ── Lifecycle (non-reactive) ──
 
@@ -1064,6 +1067,7 @@ function ingestInferenceSnapshot(snap: InferenceSnapshot | null): void {
 }
 
 function onInferenceUpdate(snap: InferenceSnapshot | null): void {
+  lastAttemptMs = Date.now();
   if (snap) {
     ingestInferenceSnapshot(snap);
   } else {
@@ -1074,6 +1078,7 @@ function onInferenceUpdate(snap: InferenceSnapshot | null): void {
 }
 
 function onStatusUpdate(snap: StatusSnapshot | null, invalidated = false): void {
+  lastAttemptMs = Date.now();
   // A producer epoch change revokes everything the previous producer reported: its status body and
   // its inference snapshot. Capabilities and runtime fall back to inference data when no status is
   // held, so keeping it would show the previous process as Online. Only the new head's reads restore.
@@ -1267,6 +1272,11 @@ export function refreshStatusNow(): Promise<void> {
   return refreshStatusPollNow();
 }
 
+/** When the last status or inference read finished, answered or not (`null` before the first). */
+export function getLastContactAttemptMs(): number | null {
+  return lastAttemptMs;
+}
+
 export function setAiActivity(patch: Partial<AiActivity>): void {
   activitySig.set({ ...activitySig.get(), ...patch });
 }
@@ -1332,6 +1342,7 @@ export function __resetAiStateForTest(): void {
   enrichSettleSamplesSig.set(NO_ENRICH_SAMPLES);
   clockTickSig.set(0);
   loadStartedAtSig.set(null);
+  lastAttemptMs = null;
   __resetOriginContactForTest();
   __resetAiInstallPollForTest();
   _startedAtMs = 0;

@@ -1,0 +1,327 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
+  },
+  "createdAt": "2026-11-10T14:03:23.502Z",
+  "revision": "21fe180483bce1f3f197c008f47b760136604e56",
+  "tree": "1215d2ce27ab0b5962e4673a9782905a9f92ed93",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.engineLoss.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/55f3co5o/tmp/test-intent-vitest-887-1794319395921.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 3268
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts#dims the window area from Search behind the explanation, actions and times, keeping the top bar",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7ab2ad4ac92f090535062058b0e7a6b5ee6deb6dcaa11d4ff863c808cfe1ad3d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SC1 engine loss after the app has loaded dims the window area from Search behind the explanation, actions and times, keeping the top bar",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts#dims the window area from Library behind the explanation, actions and times, keeping the top bar",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7ab2ad4ac92f090535062058b0e7a6b5ee6deb6dcaa11d4ff863c808cfe1ad3d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SC1 engine loss after the app has loaded dims the window area from Library behind the explanation, actions and times, keeping the top bar",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts#dims the window area from Help behind the explanation, actions and times, keeping the top bar",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7ab2ad4ac92f090535062058b0e7a6b5ee6deb6dcaa11d4ff863c808cfe1ad3d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SC1 engine loss after the app has loaded dims the window area from Help behind the explanation, actions and times, keeping the top bar",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts#appears beneath an open Settings window, which stays open and usable",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7ab2ad4ac92f090535062058b0e7a6b5ee6deb6dcaa11d4ff863c808cfe1ad3d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SC1 from open overlays appears beneath an open Settings window, which stays open and usable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts#appears with the status panel open, which stays open and says the engine cannot be reached",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7ab2ad4ac92f090535062058b0e7a6b5ee6deb6dcaa11d4ff863c808cfe1ad3d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SC1 from open overlays appears with the status panel open, which stays open and says the engine cannot be reached",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts#shows the last known facts, each with when it was seen, and nothing live",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7ab2ad4ac92f090535062058b0e7a6b5ee6deb6dcaa11d4ff863c808cfe1ad3d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SC4 Open Health shows the last known facts, each with when it was seen, and nothing live",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts#moves focus in once, leaves without a reload when the engine is back, returns focus, and a second outage behaves the same",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7ab2ad4ac92f090535062058b0e7a6b5ee6deb6dcaa11d4ff863c808cfe1ad3d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SC6 SC9 leaving, focus and announcements moves focus in once, leaves without a reload when the engine is back, returns focus, and a second outage behaves the same",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts#reads the status once per request, says the engine still cannot be reached, then leaves when it answers",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7ab2ad4ac92f090535062058b0e7a6b5ee6deb6dcaa11d4ff863c808cfe1ad3d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SC3 browser Try again reads the status once per request, says the engine still cannot be reached, then leaves when it answers",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts#copies only the fixed fields, with no path, host, key or error text",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7ab2ad4ac92f090535062058b0e7a6b5ee6deb6dcaa11d4ff863c808cfe1ad3d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SC5 Copy report copies only the fixed fields, with no path, host, key or error text",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts#shows the report ready to select when the clipboard refuses it",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7ab2ad4ac92f090535062058b0e7a6b5ee6deb6dcaa11d4ff863c808cfe1ad3d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SC5 Copy report shows the report ready to select when the clipboard refuses it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts#keeps the draft and the open window, and sends nothing again when the engine is back",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7ab2ad4ac92f090535062058b0e7a6b5ee6deb6dcaa11d4ff863c808cfe1ad3d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SC7 SC8 what the treatment keeps and never does keeps the draft and the open window, and sends nothing again when the engine is back",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts#a typed approval open during the loss keeps its dialog, focus and rules; the treatment answers nothing",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7ab2ad4ac92f090535062058b0e7a6b5ee6deb6dcaa11d4ff863c808cfe1ad3d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SC7 SC8 what the treatment keeps and never does a typed approval open during the loss keeps its dialog, focus and rules; the treatment answers nothing",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts#returning never announces an approval already waiting, or a completion that happened unseen, as new",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7ab2ad4ac92f090535062058b0e7a6b5ee6deb6dcaa11d4ff863c808cfe1ad3d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SC7 SC8 what the treatment keeps and never does returning never announces an approval already waiting, or a completion that happened unseen, as new",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts#a new engine identity rebinds; a late answer from the old one neither ends the outage nor shows",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7ab2ad4ac92f090535062058b0e7a6b5ee6deb6dcaa11d4ff863c808cfe1ad3d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SC6 engine identity a new engine identity rebinds; a late answer from the old one neither ends the outage nor shows",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "origin/main",
+    "revision": "21fe180483bce1f3f197c008f47b760136604e56",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.engineLoss.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/55f3co5o/tmp/test-intent-vitest-887-1794319400463.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 2821,
+        "output": "JSON report written to /home/elias/.cache/am/55f3co5o/tmp/test-intent-vitest-887-1794319400463.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts#dims the window area from Search behind the explanation, actions and times, keeping the top bar",
+        "classification": "assertion",
+        "detail": "SC1 engine loss after the app has loaded dims the window area from Search behind the explanation, actions and times, keeping the top bar:  AssertionError: the treatment shows: expected null not to be null\n    at /home/elias/.cache/am/55f3co5o/tmp/test-intent-before-iyH28n/modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts:188:48\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5c/modules/ui-web/node_modules/@v"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts#dims the window area from Library behind the explanation, actions and times, keeping the top bar",
+        "classification": "assertion",
+        "detail": "SC1 engine loss after the app has loaded dims the window area from Library behind the explanation, actions and times, keeping the top bar:  AssertionError: the treatment shows: expected null not to be null\n    at /home/elias/.cache/am/55f3co5o/tmp/test-intent-before-iyH28n/modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts:188:48\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5c/modules/ui-web/node_modules/@v"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts#dims the window area from Help behind the explanation, actions and times, keeping the top bar",
+        "classification": "assertion",
+        "detail": "SC1 engine loss after the app has loaded dims the window area from Help behind the explanation, actions and times, keeping the top bar:  AssertionError: the treatment shows: expected null not to be null\n    at /home/elias/.cache/am/55f3co5o/tmp/test-intent-before-iyH28n/modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts:188:48\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5c/modules/ui-web/node_modules/@v"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts#appears beneath an open Settings window, which stays open and usable",
+        "classification": "assertion",
+        "detail": "SC1 from open overlays appears beneath an open Settings window, which stays open and usable:  AssertionError: the treatment shows: expected null not to be null\n    at /home/elias/.cache/am/55f3co5o/tmp/test-intent-before-iyH28n/modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts:215:57\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5c/modules/ui-web/node_modules/@v"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts#appears with the status panel open, which stays open and says the engine cannot be reached",
+        "classification": "assertion",
+        "detail": "SC1 from open overlays appears with the status panel open, which stays open and says the engine cannot be reached:  AssertionError: the treatment shows: expected null not to be null\n    at /home/elias/.cache/am/55f3co5o/tmp/test-intent-before-iyH28n/modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts:227:57\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5c/modules/ui-web/node_modules/@v"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts#shows the last known facts, each with when it was seen, and nothing live",
+        "classification": "assertion",
+        "detail": "SC4 Open Health shows the last known facts, each with when it was seen, and nothing live:  AssertionError: Open Health is offered: expected null not to be null\n    at /home/elias/.cache/am/55f3co5o/tmp/test-intent-before-iyH28n/modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts:276:48\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5c/modules/ui-web/node_modules"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts#moves focus in once, leaves without a reload when the engine is back, returns focus, and a second outage behaves the same",
+        "classification": "assertion",
+        "detail": "SC6 SC9 leaving, focus and announcements moves focus in once, leaves without a reload when the engine is back, returns focus, and a second outage behaves the same:  AssertionError: round 1: shows: expected null not to be null\n    at /home/elias/.cache/am/55f3co5o/tmp/test-intent-before-iyH28n/modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts:325:52\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5c/modules/ui-web/node_modules/@vitest"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts#reads the status once per request, says the engine still cannot be reached, then leaves when it answers",
+        "classification": "assertion",
+        "detail": "SC3 browser Try again reads the status once per request, says the engine still cannot be reached, then leaves when it answers:  AssertionError: expected null not to be null\n    at /home/elias/.cache/am/55f3co5o/tmp/test-intent-before-iyH28n/modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts:356:23\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5c/modules/ui-web/node_modules/@vitest/runner/dist/chu"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts#copies only the fixed fields, with no path, host, key or error text",
+        "classification": "assertion",
+        "detail": "SC5 Copy report copies only the fixed fields, with no path, host, key or error text:  AssertionError: Copy report is offered: expected null not to be null\n    at /home/elias/.cache/am/55f3co5o/tmp/test-intent-before-iyH28n/modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts:400:48\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5c/modules/ui-web/node_modules"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts#shows the report ready to select when the clipboard refuses it",
+        "classification": "assertion",
+        "detail": "SC5 Copy report shows the report ready to select when the clipboard refuses it:  AssertionError: Copy report is offered: expected null not to be null\n    at /home/elias/.cache/am/55f3co5o/tmp/test-intent-before-iyH28n/modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts:422:48\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5c/modules/ui-web/node_modules"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts#keeps the draft and the open window, and sends nothing again when the engine is back",
+        "classification": "assertion",
+        "detail": "SC7 SC8 what the treatment keeps and never does keeps the draft and the open window, and sends nothing again when the engine is back:  AssertionError: expected null not to be null\n    at /home/elias/.cache/am/55f3co5o/tmp/test-intent-before-iyH28n/modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts:441:34\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5c/modules/ui-web/node_modules/@vitest/runner/dist/chu"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts#a typed approval open during the loss keeps its dialog, focus and rules; the treatment answers nothing",
+        "classification": "assertion",
+        "detail": "SC7 SC8 what the treatment keeps and never does a typed approval open during the loss keeps its dialog, focus and rules; the treatment answers nothing:  AssertionError: the treatment shows beneath: expected null not to be null\n    at /home/elias/.cache/am/55f3co5o/tmp/test-intent-before-iyH28n/modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts:465:65\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5c/modules/ui-web/node_mo"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts#returning never announces an approval already waiting, or a completion that happened unseen, as new",
+        "classification": "assertion",
+        "detail": "SC7 SC8 what the treatment keeps and never does returning never announces an approval already waiting, or a completion that happened unseen, as new:  AssertionError: expected null not to be null\n    at /home/elias/.cache/am/55f3co5o/tmp/test-intent-before-iyH28n/modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts:497:36\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5c/modules/ui-web/node_modules/@vitest/runner/dist/chu"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts#a new engine identity rebinds; a late answer from the old one neither ends the outage nor shows",
+        "classification": "assertion",
+        "detail": "SC6 engine identity a new engine identity rebinds; a late answer from the old one neither ends the outage nor shows:  AssertionError: expected null not to be null\n    at /home/elias/.cache/am/55f3co5o/tmp/test-intent-before-iyH28n/modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts:528:34\n    at file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5c/modules/ui-web/node_modules/@vitest/runner/dist/chu"
+      }
+    ]
+  },
+  "digest": "sha256:9954ed30a438cfa95d5f6522948ed3d78f7246b01892546be709a5efc41cb281"
+}
