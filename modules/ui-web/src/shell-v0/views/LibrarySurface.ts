@@ -32,6 +32,7 @@ import { OperationError, type OperationInvocationSuccess } from '../operations/O
 import type { OpSuccessEventDetail, OpErrorEventDetail } from '../components/OpButton.js';
 import '../components/Button.js';
 import '../components/IngestionSummary.js';
+import '../components/InterruptedImports.js';
 // Tempdoc 571 §11 / 578 — Library ⊇ Browse: Library hosts the Browse file-tree as a tab.
 import '../components/SurfaceTabs.js';
 import type { SurfaceTabs, SurfaceTabItem } from '../components/SurfaceTabs.js';
@@ -2217,6 +2218,7 @@ export class LibrarySurface extends JfElement {
   private renderFolders(): TemplateResult {
     return html`
       ${this.renderHeader()}
+      ${this.activeTab === 'folders' ? html`<jf-interrupted-imports api-base=${this.apiBase} .host_=${this.host_}></jf-interrupted-imports>` : nothing}
       ${this.renderAttention()}
       <div class="action-message" role="status" aria-live="polite">${this.actionMessage ?? ''}</div>
       ${this.reindexOutcome ? html`<div class="action-message" role=${this.reindexOutcomeError ? 'alert' : 'status'}>
