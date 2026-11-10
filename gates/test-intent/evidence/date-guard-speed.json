@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
+  },
+  "createdAt": "2026-11-10T18:50:13.099Z",
+  "revision": "3e160cbc34303d00c36b998f1a1e4992543bb304",
+  "tree": "1590da48bf4c4319c71eea8f58a5efe8d6cb7242",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/display/dateLocaleGuard.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/2uooq705/tmp/test-intent-vitest-2-1794336612183.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 914
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/display/dateLocaleGuard.test.ts#rejects planted Date locale calls while allowing number formatting",
+      "file": "modules/ui-web/src/shell-v0/display/dateLocaleGuard.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5fa6cfe49f818328e2a27b56594e4c27411fba2dedf70c8f903917ac6f96d947",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "rejects planted Date locale calls while allowing number formatting",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:9f01cdbf980d1182d14ecf3417a7e64d4aaebd712d5f18a7ff62ca3ecf4dbb26"
+}
