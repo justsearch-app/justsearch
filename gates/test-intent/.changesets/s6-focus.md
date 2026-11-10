@@ -29,6 +29,14 @@ Sepia keeps its committed deeper amber --focus-ring-color #79551f: 5.6329, 5.195
 3.3370:1 in dark and 4.6883, 4.4758, 4.2098, 3.5895, 3.3640:1 in light.
 The palette and guard checks pass together (117 assertions).
 
+The production loader regression check enumerates every shipped CSS/JSON palette and calls
+`applyAppearance` in light and dark with a file-backed fetch adapter. It checks successful loading,
+no token-validation rejection, injected palette CSS and the active palette id. High Vis also must
+inject its authored focus colour. `evidence/s6-focus-loading.json` records the two High Vis cases
+failing assertions on b3a13c6bec because `focus-ring-color` was absent from KNOWN_TOKEN_NAMES;
+all twelve cases pass after adding that name. The default already exists in tokens.css.
+A separate shared baseline clone also reproduced those same two failures. No other token was added.
+
 ```json
 {
   "entries": [
@@ -53,6 +61,28 @@ The palette and guard checks pass together (117 assertions).
       "newChecks": [
         "modules/ui-web/src/shell-v0/themes/builtinPaletteContrast.test.ts",
         "modules/ui-web/src/shell-v0/themes/focusRingAuthority.test.ts"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/themes/builtinPaletteLoading.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Every shipped CSS/JSON palette loads through applyAppearance in light and dark modes without token-validation rejection, injects its palette stylesheet, and becomes the active palette. CSS palettes retain their authored CSS; High Vis includes its authored --focus-ring-color: #008890.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including follow-up defects it owns",
+          "choice": "Every built-in palette must load, validate and apply through the production appearance writer in both light and dark modes without rejected tokens; High Vis must inject its authored focus-ring colour.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-focus-loading.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/themes/builtinPaletteLoading.test.ts"
       ],
       "repaired": true
     }

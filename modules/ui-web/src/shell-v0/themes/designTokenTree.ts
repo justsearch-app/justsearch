@@ -80,6 +80,8 @@ export const KNOWN_TOKEN_NAMES: ReadonlySet<string> = new Set([
   'accent-on-command', 'accent-on-chat', 'accent-on-success', 'accent-on-warning', 'accent-on-danger',
   // Tempdoc 577 Phase 7 — the search window's highlight + link roles
   'accent-highlight', 'accent-on-highlight', 'accent-link', 'accent-on-link',
+  // Keyboard focus indicator
+  'focus-ring-color',
   // Glass surfaces
   'glass-surface', 'glass-surface-hover', 'glass-surface-active',
   'glass-border', 'glass-border-hover', 'glass-border-strong',

@@ -1,0 +1,111 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
+  },
+  "createdAt": "2026-11-10T20:58:54.462Z",
+  "revision": "b3a13c6bec426fefa7a2d1fce865dc8f167bd4cd",
+  "tree": "182ec4cba37d1d478a0ef9cadcb433a66b69ab93",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/themes/builtinPaletteLoading.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/jk0y0w_a/tmp/test-intent-vitest-64-1794344330308.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 656
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/themes/builtinPaletteLoading.test.ts",
+      "file": "modules/ui-web/src/shell-v0/themes/builtinPaletteLoading.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6e2a7df4b494b20ba7566d69a2190828bbc81e93f29b5607df7f044a64bdb0f2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "built-in palettes through the production appearance writer loads, validates and applies core.cyanotype in light without rejected tokens",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palettes through the production appearance writer loads, validates and applies core.cyanotype in dark without rejected tokens",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palettes through the production appearance writer loads, validates and applies core.high-vis in light without rejected tokens",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palettes through the production appearance writer loads, validates and applies core.high-vis in dark without rejected tokens",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palettes through the production appearance writer loads, validates and applies core.night-registry in light without rejected tokens",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palettes through the production appearance writer loads, validates and applies core.night-registry in dark without rejected tokens",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palettes through the production appearance writer loads, validates and applies core.nord in light without rejected tokens",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palettes through the production appearance writer loads, validates and applies core.nord in dark without rejected tokens",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palettes through the production appearance writer loads, validates and applies core.registrars-ledger in light without rejected tokens",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palettes through the production appearance writer loads, validates and applies core.registrars-ledger in dark without rejected tokens",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palettes through the production appearance writer loads, validates and applies core.sepia-focus in light without rejected tokens",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palettes through the production appearance writer loads, validates and applies core.sepia-focus in dark without rejected tokens",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "b3a13c6bec",
+    "revision": "b3a13c6bec426fefa7a2d1fce865dc8f167bd4cd",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/themes/builtinPaletteLoading.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/jk0y0w_a/tmp/test-intent-vitest-64-1794344333136.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 805,
+        "output": "JSON report written to /home/elias/.cache/am/jk0y0w_a/tmp/test-intent-vitest-64-1794344333136.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/themes/builtinPaletteLoading.test.ts",
+        "classification": "assertion",
+        "detail": "built-in palettes through the production appearance writer loads, validates and applies core.high-vis in light without rejected tokens:  AssertionError: core.high-vis must load through the appearance writer: expected Error: Theme 'core.high-vis': neither /th… to be null\n    at /home/elias/.cache/am/jk0y0w_a/tmp/test-intent-before-TqvtMZ/modules/ui-web/src/shell-v0/themes/builtinPaletteLoading.test.ts:57:76\n    at file:///home/elias/. | built-in palettes through the production appearance writer l"
+      }
+    ]
+  },
+  "digest": "sha256:c634dc5f55b38da68a0349bed9c1f03273671d6658396562070e2c37a91b6f2c"
+}
