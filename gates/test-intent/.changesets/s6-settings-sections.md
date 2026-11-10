@@ -508,6 +508,28 @@ Candidate G follows the settled SG1–SG10 amendments. SD developer-tools change
       "newChecks": [
         "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SG8 at 1280x720 and 100 percent text every section and enabled control is in view on keyboard focus, no button is clipped sideways, one scroller when short"
       ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/SettingsNav.forced-colors-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "SG8 forced colours give the selected Data & reset category the system Highlight/HighlightText pair and HighlightText keyboard focus ring, including hover, on light and dark palettes; unselected danger rows keep browser colour adjustment.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "SG8 forced colours give the selected Data & reset category the system Highlight/HighlightText pair and HighlightText keyboard focus ring, including hover, on light and dark palettes; unselected danger rows keep browser colour adjustment."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-settings-forced-colors.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/SettingsNav.forced-colors-lockdown.test.ts"
+      ],
+      "repaired": true
     }
   ]
 }

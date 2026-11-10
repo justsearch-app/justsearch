@@ -289,6 +289,7 @@ export class SettingsNav extends JfElement {
        stay visible on that fill. */
     @media (forced-colors: active) {
       button.category-row.active,
+      button.category-row.danger.active,
       button.anchor-row.active {
         forced-color-adjust: none;
         background: Highlight;
