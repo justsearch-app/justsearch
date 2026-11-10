@@ -18,17 +18,56 @@ author-session: forget-flake-builder-7lnojjvf
       "moved": [
         "instrumentation"
       ],
-      "whatMoved": "S55 returned-root replay and the shared native migration scenarios scope the existing EngineTestHarness.knownVolume fixture before construction through close/reopen. Only host volume discovery is supplied; native held-directory checks, files, queues, extraction, policy guards and every existing expected outcome remain real and unchanged. The completion observer retains refusal details for deadline diagnostics and waits through retryable projection refusals until terminal promotion or its existing deadline. A separately opted-in regression scenario installs checked lock barriers; ordinary scenarios do not install them. All final receipt, replacement admission, current-byte hash, policy and reopen assertions remain enabled.",
+      "whatMoved": "S55 returned-root replay and the shared native migration scenarios supply their existing positive known-volume precondition with the scoped EngineTestHarness.knownVolume fixture before construction through close/reopen. Extracting nativeMigrationWithKnownVolume only scopes that fixture. Host volume discovery is supplied; native held-directory checks, files, queues, extraction, policy guards, inputs, fault injection, expected outcomes, tags and conditions stay unchanged by this fixture adaptation. The observer and opt-in contention changes are classified separately below.",
       "sources": [
         {
           "kind": "delegated-choice",
           "delegationQuote": "i think agents should not ask me for any input if they know better, which in most work related tasks is the case.",
           "delegationLocation": "task t-20261103-forgetflake request",
           "delegationScope": "fixing a recurring CI flake",
-          "choice": "Supply the scenarios' existing known-volume precondition with the scoped test fixture and observe retryable migration refusals until the existing deadline, preserving all final expectations and production guards.",
+          "choice": "Supply the scenarios' existing positive known-volume precondition with the scoped test fixture, restoring the volume lookup afterward and preserving the scenarios' oracle.",
           "label": "agent choice"
         }
       ]
+    },
+    {
+      "items": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetInProcessTest.java"
+      ],
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "i think agents should not ask me for any input if they know better, which in most work related tasks is the case.",
+          "delegationLocation": "task t-20261103-forgetflake request",
+          "delegationScope": "fixing a recurring CI flake",
+          "choice": "Retire the completion observer's old condition that the first exact 'Buffered UPSERT lacks its accepted target projection: ' refusal ends observation and immediately reaches the nonterminal assertions. That stopping condition treats a retryable replay refusal as the end of the observation. Replace it with bounded observation of retries, without changing production behavior or the final assertions. This choice follows the pre-existing replay contract in docs/explanation/11-index-schema-migration.md:542-546 ('Replay retains the buffer if decoding or enqueueing fails.') and :571-574 ('Strict read or mutation failure retains the complete snapshot for retry.'); neither passage makes the first refusal terminal.",
+          "label": "agent choice"
+        }
+      ],
+      "conflictSearch": "decision records searched for a conflict: none. Ran rg -n -i 'retry|refus|promot|switching|migration|cutover|forget|readmission' docs/decisions --glob '*.md', then the focused search for 'first (refusal|failure)|stop.{0,40}(refusal|projection)|refusal.{0,40}(terminal|stop)|watcherReplayFailure|Buffered UPSERT|target projection|cutover|SWITCHING'. Read ADR-0030:241-276 (agent-dispatch retry policy) and ADR-0048:63-85 (bounded ingestion retries); neither requires native promotion observation to stop on a projection refusal. Confirmed the cited replay contract exists at origin/main and is unchanged in this PR."
+    },
+    {
+      "items": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetInProcessTest.java"
+      ],
+      "class": "New",
+      "behaviour": "The shared native migration completion observer continues after retryable target-projection refusals until terminal promotion (IDLE with the successor active and no building generation) or the existing 45-second deadline. It retains the last non-null refusal for deadline diagnostics. All existing final receipt, replacement admission, current-byte hash, policy and reopen assertions, including the terminal assertion, remain enabled. The separately opted-in contention scenario arms checked lock barriers and reports the observed refusal to the barrier before retry; ordinary scenarios do not install those barriers. The existing regression check forces a real busy eligibility refusal, requires the ordinary observer to see it, then requires retry and promotion through the complete R9 oracle.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "i think agents should not ask me for any input if they know better, which in most work related tasks is the case.",
+          "delegationLocation": "task t-20261103-forgetflake request",
+          "delegationScope": "fixing a recurring CI flake",
+          "choice": "Observe retryable native replay refusals until promotion or the existing 45-second observation deadline, retaining refusal diagnostics and all final assertions; pin this with opt-in real lock contention and checked barriers. This is a bounded test-observation choice within fixing the recurring CI flake. Its product basis predates the PR: docs/explanation/11-index-schema-migration.md:542-546 says 'Replay retains the buffer if decoding or enqueueing fails.', :571-574 says 'Strict read or mutation failure retains the complete snapshot for retry.', and :656-658 bounds SWITCHING rather than declaring the first refusal terminal. The test's existing 45-second deadline is retained, not substituted for the product's switching budget.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/forget-flake.json",
+      "newChecks": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetInProcessTestHostAssumptionsTest.java#hotSaveObserverWaitsForRetryAfterBusyEligibilityRefusal"
+      ],
+      "repaired": true
     },
     {
       "items": [
@@ -87,6 +126,16 @@ author-session: forget-flake-builder-7lnojjvf
   "role": "verifier",
   "session": "01a1c537-959b-7392-831c-d17cb3dbcd66",
   "verdict": "accept",
+  "digest": "sha256:cf671a132fb8a6918123c94bce993fa4d75531c3dc2ffb74d1f92de051ca21bf"
+}
+```
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "01a1c547-8d82-7401-a006-7fd7f8b596d6",
+  "verdict": "reject",
   "digest": "sha256:cf671a132fb8a6918123c94bce993fa4d75531c3dc2ffb74d1f92de051ca21bf"
 }
 ```
