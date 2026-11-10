@@ -54,3 +54,13 @@ adaptation. No product code changes.
   "digest": "sha256:6eed9e7276c7607bec0952fc0e9f8989f63e2e078e0e10704a3490d96a80dc6e"
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "01a1c6d4-4e59-7cf0-a66d-f41cad8a7cfd",
+  "verdict": "accept",
+  "digest": "sha256:6eed9e7276c7607bec0952fc0e9f8989f63e2e078e0e10704a3490d96a80dc6e"
+}
+```
