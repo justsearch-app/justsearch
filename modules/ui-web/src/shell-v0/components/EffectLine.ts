@@ -21,6 +21,7 @@
  * the consuming component and composes around this line.
  */
 
+import { formatDateTime } from '../display/format.js';
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
 import type { Effect } from '../substrates/effect.js';
@@ -117,7 +118,7 @@ export class EffectLine extends JfElement {
         timeNode = html`<time
           class="time"
           datetime=${this.timestamp}
-          title=${new Date(ms).toLocaleString()}
+          title=${formatDateTime(new Date(ms))}
           >${formatRelative(ms)}</time
         >`;
       }

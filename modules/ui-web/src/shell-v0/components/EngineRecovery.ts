@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import { formatTime } from '../display/format.js';
 import { css, html, nothing } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
 import { isTerminal, type SupervisorState } from '../../api/supervisorState.js';
@@ -132,7 +133,7 @@ export class EngineRecovery extends JfElement {
         ${this.supervisor?.lastExit?.code === 2 ? html`<p>The data folder is in use by another process. Close the other instance before restarting.</p>` : nothing}
         ${this.supervisor?.crashFile ? html`<p>${this.supervisor.crashFile.exception}
           ${this.supervisor.crashFile.problematicFrame} (${this.supervisor.crashFile.name}, ${this.supervisor.crashFile.at})</p>` : nothing}
-        ${this.supervisor?.retryAt ? html`<p>Automatic retry at ${new Date(this.supervisor.retryAt).toLocaleTimeString()}.</p>` : nothing}
+        ${this.supervisor?.retryAt ? html`<p>Automatic retry at ${formatTime(new Date(this.supervisor.retryAt))}.</p>` : nothing}
         ${available ? html`<p>JustSearch ${status.availableVersion ?? 'update'} is available.</p>` : nothing}
         ${status?.state === 'up_to_date' ? html`<p>You have the latest version.</p>` : nothing}
         ${status?.state === 'repair_required' ? html`<p>The last update needs repair. Automatic restart may be paused until the update is recovered. ${status.error ?? ''}</p>` : nothing}

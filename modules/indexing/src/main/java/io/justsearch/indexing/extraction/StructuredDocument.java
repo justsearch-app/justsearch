@@ -388,7 +388,6 @@ public record StructuredDocument(List<Element> elements, int pageCount) {
 
   private static String normalizeForComparison(String text) {
     if (text == null) return null;
-    String trimmed = text.strip().toLowerCase(java.util.Locale.ROOT);
-    return trimmed;
+    return text.strip();
   }
 }

@@ -14,6 +14,7 @@
  *
  * Restart uses the existing native `restart_engine`; there is no new command.
  */
+import { formatTimeMinutes } from '../display/format.js';
 import { isTerminal, type SupervisorState } from '../../api/supervisorState.js';
 import { isTauriRuntime } from '../../utils/tauriRuntime.js';
 import { createObservableStore } from './createObservableStore.js';
@@ -183,7 +184,7 @@ export function engineLossReason(loss: EngineLoss): string {
           : /hang/.test(raw) || exit === 'hang' ? ' It stopped responding.'
             : /spawn_failed/.test(raw) ? ' It could not be started.' : '';
     const retry = supervisor?.retryAt && supervisor.lastExit?.code !== 2
-      ? ` JustSearch tries once more at ${new Date(supervisor.retryAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.` : '';
+      ? ` JustSearch tries once more at ${formatTimeMinutes(new Date(supervisor.retryAt))}.` : '';
     return supervisor?.state === 'exhausted'
       ? `The engine stopped ${times} ${times === 1 ? 'time' : 'times'}, so JustSearch stopped restarting it.${why}${retry}`
       : `The engine stopped.${why}`;

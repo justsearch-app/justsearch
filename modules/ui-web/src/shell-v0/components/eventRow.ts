@@ -15,6 +15,7 @@
  * `projectUnifiedThread`): it composes none of those, so it stays outside the run-renderers register
  * (565 §12.6) by construction.
  */
+import { formatDateTime } from '../display/format.js';
 import './OperationOutcomeDetail.js';
 import { html, css, type CSSResult, type TemplateResult } from 'lit';
 import type { UnifiedActionEntry } from '../operations/ActionLedgerClient.js';
@@ -24,7 +25,7 @@ import { statusToTone, statusGlyph, glyphChar, toneText } from '../utils/statusT
 /** Human absolute time for the `<time>` title/hover (machine ISO in `datetime`, relative form visible). */
 function absoluteTime(iso: string): string {
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
+  return Number.isNaN(d.getTime()) ? iso : formatDateTime(d);
 }
 
 /**

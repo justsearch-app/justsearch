@@ -37,6 +37,7 @@ import type { JfButton } from '../components/Button.js';
 // §2.A: rail-customization labels resolve through the one surface-label
 // authority — never the raw `core.*-surface` id.
 import { present } from '../display/present.js';
+import { formatDateTime, formatTime } from '../display/format.js';
 import { subscribeAiState, type AiState } from '../state/aiStateStore.js';
 import { selectIndexingProgress } from '../state/indexingProgress.js';
 import '../components/IndexingControls.js';
@@ -3535,7 +3536,7 @@ export class SettingsSurface extends JfElement {
                           </select>
                         </td>
                         <td style="padding:0.25rem 0.5rem;color:var(--text-tertiary);">
-                          ${new Date(c.decidedAt).toLocaleString()}
+                          ${formatDateTime(new Date(c.decidedAt))}
                         </td>
                         <td style="padding:0.25rem 0.5rem;">
                           <button
@@ -3633,7 +3634,7 @@ export class SettingsSurface extends JfElement {
     const { createProfileFromCurrent, listProfiles: listWorkspaceProfiles } =
       await import('../substrates/profiles/index.js');
     const id = `dev.profile.${Date.now()}`;
-    const label = `Snapshot @ ${new Date().toLocaleTimeString()}`;
+    const label = `Snapshot @ ${formatTime(new Date())}`;
     // §25.ζ#4 — propagate the picker selection. createProfileFromCurrent's
     // 3rd-arg `overrides` accepts `inheritsFrom`.
     const overrides: { description: string; inheritsFrom?: string } = {

@@ -14,16 +14,21 @@ class AsciiFirstUtf8PolicyTest {
   @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @NullAndEmptySource
   @ValueSource(strings = {" ", "\t"})
-  void blankOrNullIdentityUsesVersionSix(String identity) {
-    assertEquals("tika-default-v8", new TikaExtractionPolicy(identity, 1000, 1000, 1000,
+  void blankOrNullIdentityUsesCurrentGeneration(String identity) {
+    assertEquals("tika-default-v9", new TikaExtractionPolicy(identity, 1000, 1000, 1000,
         128, 128, 4096, 256, 8, 100, true, Set.of(), Set.of()).policyId());
   }
 
   @Test
-  void defaultAndConfiguredIdentitiesUseVersionSix() {
-    assertEquals("tika-default-v8", TikaExtractionPolicy.defaults().policyId());
-    assertEquals("tika-default-v8", TikaExtractionPolicy.fromWorkerLimits(null).policyId());
-    assertEquals("tika-config-v8-1000-2000", TikaExtractionPolicy.fromWorkerLimits(
+  void defaultAndConfiguredIdentitiesUseCurrentGeneration() {
+    assertEquals("tika-default-v9", TikaExtractionPolicy.defaults().policyId());
+    assertEquals("tika-default-v9", TikaExtractionPolicy.fromWorkerLimits(null).policyId());
+    assertEquals("tika-config-v9-1000-2000", TikaExtractionPolicy.fromWorkerLimits(
         new ResolvedConfig.Worker(1000, 2000)).policyId());
+  }
+  @Test
+  void explicitCustomIdentityRemainsCallerOwned() {
+    assertEquals("tika-default-v8", new TikaExtractionPolicy("  tika-default-v8  ",
+        1000, 1000, 1000, 128, 128, 4096, 256, 8, 100, true, Set.of(), Set.of()).policyId());
   }
 }

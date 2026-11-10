@@ -25,6 +25,29 @@ export function formatCount(n: number): string {
   return NUM.format(n);
 }
 
+/** Local numeric date and time, including seconds (Date#toLocaleString's default fields). */
+export function formatDateTime(date: Date): string {
+  if (Number.isNaN(date.getTime())) return 'Invalid Date';
+  return new Intl.DateTimeFormat(undefined, {
+    year: 'numeric', month: 'numeric', day: 'numeric',
+    hour: 'numeric', minute: 'numeric', second: 'numeric',
+  }).format(date);
+}
+
+/** Local clock time including seconds (Date#toLocaleTimeString's default fields). */
+export function formatTime(date: Date): string {
+  if (Number.isNaN(date.getTime())) return 'Invalid Date';
+  return new Intl.DateTimeFormat(undefined, {
+    hour: 'numeric', minute: 'numeric', second: 'numeric',
+  }).format(date);
+}
+
+/** Local clock time with two-digit hours and minutes. */
+export function formatTimeMinutes(date: Date): string {
+  if (Number.isNaN(date.getTime())) return 'Invalid Date';
+  return new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }).format(date);
+}
+
 /** Local deadline time, with a short weekday only when it is not today. */
 export function formatDeadline(deadline: Date): string {
   const now = new Date();

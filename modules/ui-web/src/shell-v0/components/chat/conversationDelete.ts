@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import { formatDateTime } from '../../display/format.js';
 import { html, type TemplateResult } from 'lit';
 import { confirmAsync } from '../ConfirmDialog.js';
 import type { DeleteCascadeResult, DeleteTreeEntry } from '../../state/conversationListStore.js';
@@ -20,7 +21,7 @@ export async function confirmConversationTree(
     branches.delete(row.depth + 1);
     const item = html`<li>
       <strong>${name(row)}</strong>
-      <div>${row.id} · ${row.createdAt > 0 && Number.isFinite(row.createdAt) ? `Created ${new Date(row.createdAt).toLocaleString()}` : 'Creation time unknown'}${row.messageCount === undefined ? '' : ` · ${row.messageCount} own messages`}</div>
+      <div>${row.id} · ${row.createdAt > 0 && Number.isFinite(row.createdAt) ? `Created ${formatDateTime(new Date(row.createdAt))}` : 'Creation time unknown'}${row.messageCount === undefined ? '' : ` · ${row.messageCount} own messages`}</div>
       ${row.parentSessionId ? html`<div>Branched from ${row.parentSessionId} at ${row.branchPointMessageId ?? 'unknown message'}</div>` : ''}
       ${children.length > 0 ? html`<ol>${children}</ol>` : ''}
     </li>`;
