@@ -594,7 +594,7 @@ function ensureInitialized(): void {
     // clobbered: run with defaults this session and leave it on disk so
     // the newer build reads it back intact on next launch. (Residual: a
     // later user mutation in this session still persists over it via
-    // saveDocument — but boot no longer destroys it unprompted, which is
+    // saveDocument — but presentation boot fallback also avoids persisting defaults, closing
     // the silent-loss path F9 identifies.)
     const storedVersion = peekSchemaVersion(v2Raw);
     if (storedVersion !== null && storedVersion > CURRENT_SCHEMA_VERSION) {
@@ -1328,6 +1328,13 @@ function notify(): void {
 export function getDocument(): UserStateV1 {
   ensureInitialized();
   return docSig.get();
+}
+
+/** Boot fallback must not persist defaults over a document a newer build owns (F9). */
+export function hasNewerStoredUserState(): boolean {
+  ensureInitialized();
+  const version = lastStoredRaw === null ? null : peekSchemaVersion(lastStoredRaw);
+  return version !== null && version > CURRENT_SCHEMA_VERSION;
 }
 
 /**

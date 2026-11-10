@@ -1,0 +1,471 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-10T00:35:27.043Z",
+  "revision": "c58ffb350205865438803e18fe39b083559f0b63",
+  "tree": "98bf4a2c99aa59503d10b2fdb29ef801415c5037",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/boot/boot-frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/u2ichxvr/tmp/test-intent-vitest-3-1794270829477.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 42651
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
+      "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6b7a29cb223d88d6a2594c3fe0e4c599260f1fee5abe3e78658f9bffecd2649a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SA1 SA6 first paint precedes entry and is inert",
+          "status": "passed"
+        },
+        {
+          "name": "SA6 rendered shell rejects input until frame hand-off",
+          "status": "passed"
+        },
+        {
+          "name": "SA6 never-rendering shell stays unreachable and deadline Reload takes focus",
+          "status": "passed"
+        },
+        {
+          "name": "SA6 every input path is stopped at window capture under the frame and released after paint",
+          "status": "passed"
+        },
+        {
+          "name": "SA6 shell shortcuts neither run nor queue beneath the frame, then normal shortcuts work",
+          "status": "passed"
+        },
+        {
+          "name": "SA6 pointer hover wheel context menu and mouse Back/Forward cannot reach the covered shell",
+          "status": "passed"
+        },
+        {
+          "name": "SA6 SA17 deadline discards rendered controls; failure page alone handles input and keyboard actions",
+          "status": "passed"
+        },
+        {
+          "name": "SA6 browser reload keys retain their native default at frame",
+          "status": "passed"
+        },
+        {
+          "name": "SA6 browser reload keys retain their native default at failure",
+          "status": "passed"
+        },
+        {
+          "name": "SA6 browser reload keys retain their native default at painted",
+          "status": "passed"
+        },
+        {
+          "name": "SA2 SA3 SA4 saved light over OS dark",
+          "status": "passed"
+        },
+        {
+          "name": "SA2 SA3 SA4 saved dark over OS light",
+          "status": "passed"
+        },
+        {
+          "name": "SA2 SA3 SA4 no copy follows OS light",
+          "status": "passed"
+        },
+        {
+          "name": "SA2 SA3 SA4 hostile copy follows OS dark",
+          "status": "passed"
+        },
+        {
+          "name": "SA3 query theme wins",
+          "status": "passed"
+        },
+        {
+          "name": "SA4 denied storage still paints",
+          "status": "passed"
+        },
+        {
+          "name": "SA8 SA12 entry failure report",
+          "status": "passed"
+        },
+        {
+          "name": "SA8 SA12 parse failure report",
+          "status": "passed"
+        },
+        {
+          "name": "SA8 SA12 dependency failure report",
+          "status": "passed"
+        },
+        {
+          "name": "SA8 SA12 evaluation failure report",
+          "status": "passed"
+        },
+        {
+          "name": "SA8 SA12 bootstrap failure report",
+          "status": "passed"
+        },
+        {
+          "name": "SA8 SA12 no-engine-address failure report",
+          "status": "passed"
+        },
+        {
+          "name": "SA10 SA17 60-second deadline discards an attached shell even when rendering later completes",
+          "status": "passed"
+        },
+        {
+          "name": "SA7 SA17 no blank interval through recovery removal and delayed render",
+          "status": "passed"
+        },
+        {
+          "name": "SA14 terminal event during hand-off beats first render and deadline",
+          "status": "passed"
+        },
+        {
+          "name": "SA14 reset incomplete takes over",
+          "status": "passed"
+        },
+        {
+          "name": "SA14 reset awaiting_storage takes over",
+          "status": "passed"
+        },
+        {
+          "name": "SA5 failed restore preserves previous paint cache",
+          "status": "passed"
+        },
+        {
+          "name": "SA16 SA18 newer-schema bytes survive complete boot and repeated reloads",
+          "status": "passed"
+        },
+        {
+          "name": "SA11 X1 X2 dark 1280 forced=false enlarged text",
+          "status": "passed"
+        },
+        {
+          "name": "SA11 X1 X2 dark 1280 forced=true enlarged text",
+          "status": "passed"
+        },
+        {
+          "name": "SA11 X1 X2 dark 900 forced=false enlarged text",
+          "status": "passed"
+        },
+        {
+          "name": "SA11 X1 X2 dark 900 forced=true enlarged text",
+          "status": "passed"
+        },
+        {
+          "name": "SA11 X1 X2 dark 600 forced=false enlarged text",
+          "status": "passed"
+        },
+        {
+          "name": "SA11 X1 X2 dark 600 forced=true enlarged text",
+          "status": "passed"
+        },
+        {
+          "name": "SA11 X1 X2 light 1280 forced=false enlarged text",
+          "status": "passed"
+        },
+        {
+          "name": "SA11 X1 X2 light 1280 forced=true enlarged text",
+          "status": "passed"
+        },
+        {
+          "name": "SA11 X1 X2 light 900 forced=false enlarged text",
+          "status": "passed"
+        },
+        {
+          "name": "SA11 X1 X2 light 900 forced=true enlarged text",
+          "status": "passed"
+        },
+        {
+          "name": "SA11 X1 X2 light 600 forced=false enlarged text",
+          "status": "passed"
+        },
+        {
+          "name": "SA11 X1 X2 light 600 forced=true enlarged text",
+          "status": "passed"
+        },
+        {
+          "name": "SA5 live mode contrast and presentation changes survive reload mid-boot",
+          "status": "passed"
+        },
+        {
+          "name": "SA5 a second window saves its look without an incidental stale overwrite",
+          "status": "passed"
+        },
+        {
+          "name": "SA10 stalled catalog discovery raises failure and late mount replaces it before rendering",
+          "status": "passed"
+        },
+        {
+          "name": "SA9 optional theme and lazy chunk failures stay optional",
+          "status": "passed"
+        },
+        {
+          "name": "SA4 denied storage does not block complete boot",
+          "status": "passed"
+        },
+        {
+          "name": "SA4 malformed copy null is ignored",
+          "status": "passed"
+        },
+        {
+          "name": "SA4 malformed copy {\"mode\":\"light\",\"background\":\"rgb(248, 249, 252)\",\"raised\":\"rgb(241, 242, 248)\",\"text\":\"rgb(20, 24, 32)\",\"muted\":\"rgb(50, 55, 65)\",\"border\":\"rgb(110, 115, 125)\",\"accent\":123} is ignored",
+          "status": "passed"
+        },
+        {
+          "name": "SA4 malformed copy {\"mode\":\"light\",\"background\":\"rgb(248, 249, 252)\",\"raised\":\"rgb(241, 242, 248)\",\"text\":\"rgb(20, 24, 32)\",\"muted\":\"rgb(50, 55, 65)\",\"border\":\"rgb(110, 115, 125)\",\"accent\":\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"} is ignored",
+          "status": "passed"
+        },
+        {
+          "name": "SA4 malformed copy {\"mode\":\"light\",\"background\":\"rgb(248, 249, 252)\",\"raised\":\"rgb(241, 242, 248)\",\"text\":\"rgb(20, 24, 32)\",\"muted\":\"rgb(50, 55, 65)\",\"border\":\"rgb(110, 115, 125)\",\"accent\":\"notacolor\"} is ignored",
+          "status": "passed"
+        },
+        {
+          "name": "SA4 malformed copy {\"mode\":\"system\",\"background\":\"rgb(248, 249, 252)\",\"raised\":\"rgb(241, 242, 248)\",\"text\":\"rgb(20, 24, 32)\",\"muted\":\"rgb(50, 55, 65)\",\"border\":\"rgb(110, 115, 125)\",\"accent\":\"rgb(0, 110, 100)\"} is ignored",
+          "status": "passed"
+        },
+        {
+          "name": "SA15 catalog cache absent still boots",
+          "status": "passed"
+        },
+        {
+          "name": "SA15 catalog cache valid still boots",
+          "status": "passed"
+        },
+        {
+          "name": "SA15 catalog cache stale still boots",
+          "status": "passed"
+        },
+        {
+          "name": "SA15 catalog cache malformed still boots",
+          "status": "passed"
+        },
+        {
+          "name": "SA13 SA15 built HTML resolves placeholders and boots with hashed inline CSP",
+          "status": "passed"
+        },
+        {
+          "name": "SA5 profile switch and palette changes cache the resulting live colours",
+          "status": "passed"
+        },
+        {
+          "name": "SA5 partly failed palette restore leaves the previous cache byte-identical",
+          "status": "passed"
+        },
+        {
+          "name": "SA14 factory reset taking over during hand-off beats the pending first render",
+          "status": "passed"
+        },
+        {
+          "name": "SA6 SA14 recovery replaces frame and its keyboard action works",
+          "status": "passed"
+        },
+        {
+          "name": "SA6 SA14 reset replaces frame and its keyboard action works",
+          "status": "passed"
+        },
+        {
+          "name": "SA6 SA14 recovery replaces failure and its keyboard action works",
+          "status": "passed"
+        },
+        {
+          "name": "SA6 SA14 reset replaces failure and its keyboard action works",
+          "status": "passed"
+        },
+        {
+          "name": "SA12 refused clipboard reveals only the fixed report ready to select",
+          "status": "passed"
+        },
+        {
+          "name": "X1 X2 light frame colours and bounds with no application stylesheet",
+          "status": "passed"
+        },
+        {
+          "name": "X1 X2 dark frame colours and bounds with no application stylesheet",
+          "status": "passed"
+        },
+        {
+          "name": "SA7 SA10 deadline survives a long connecting interval before the frame returns",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SA6 never-rendering shell stays unreachable and deadline Reload takes focus",
+      "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6b7a29cb223d88d6a2594c3fe0e4c599260f1fee5abe3e78658f9bffecd2649a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SA6 never-rendering shell stays unreachable and deadline Reload takes focus",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SA6 every input path is stopped at window capture under the frame and released after paint",
+      "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6b7a29cb223d88d6a2594c3fe0e4c599260f1fee5abe3e78658f9bffecd2649a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SA6 every input path is stopped at window capture under the frame and released after paint",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SA6 shell shortcuts neither run nor queue beneath the frame, then normal shortcuts work",
+      "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6b7a29cb223d88d6a2594c3fe0e4c599260f1fee5abe3e78658f9bffecd2649a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SA6 shell shortcuts neither run nor queue beneath the frame, then normal shortcuts work",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SA6 pointer hover wheel context menu and mouse Back/Forward cannot reach the covered shell",
+      "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6b7a29cb223d88d6a2594c3fe0e4c599260f1fee5abe3e78658f9bffecd2649a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SA6 pointer hover wheel context menu and mouse Back/Forward cannot reach the covered shell",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SA6 SA17 deadline discards rendered controls; failure page alone handles input and keyboard actions",
+      "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6b7a29cb223d88d6a2594c3fe0e4c599260f1fee5abe3e78658f9bffecd2649a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SA6 SA17 deadline discards rendered controls; failure page alone handles input and keyboard actions",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SA10 SA17 60-second deadline discards an attached shell even when rendering later completes",
+      "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6b7a29cb223d88d6a2594c3fe0e4c599260f1fee5abe3e78658f9bffecd2649a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SA10 SA17 60-second deadline discards an attached shell even when rendering later completes",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SA10 stalled catalog discovery raises failure and late mount replaces it before rendering",
+      "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6b7a29cb223d88d6a2594c3fe0e4c599260f1fee5abe3e78658f9bffecd2649a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SA10 stalled catalog discovery raises failure and late mount replaces it before rendering",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "5ef0ec6cc32d53dfadc84f12ced4e43b7335d979",
+    "revision": "5ef0ec6cc32d53dfadc84f12ced4e43b7335d979",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/boot/boot-frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/u2ichxvr/tmp/test-intent-vitest-3-1794270875666.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 50672,
+        "output": "JSON report written to /home/elias/.cache/am/u2ichxvr/tmp/test-intent-vitest-3-1794270875666.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
+        "classification": "assertion",
+        "detail": "SA6 never-rendering shell stays unreachable and deadline Reload takes focus:  AssertionError: expected 1 to be +0 // Object.is equality\n    at /home/elias/.cache/am/u2ichxvr/tmp/test-intent-before-jttqwh/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:228:52\n    at file:///home/elias/.cache/am/u2ichxvr/tmp/test-intent-before-jttqwh/modules/ui-web/node_modules/@vitest/runn | SA6 every input path is stopped at window capture under the frame and released after paint:  AssertionError: expected ["
+      },
+      {
+        "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SA6 never-rendering shell stays unreachable and deadline Reload takes focus",
+        "classification": "assertion",
+        "detail": "SA6 never-rendering shell stays unreachable and deadline Reload takes focus:  AssertionError: expected 1 to be +0 // Object.is equality\n    at /home/elias/.cache/am/u2ichxvr/tmp/test-intent-before-jttqwh/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:228:52\n    at file:///home/elias/.cache/am/u2ichxvr/tmp/test-intent-before-jttqwh/modules/ui-web/node_modules/@vitest/runn"
+      },
+      {
+        "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SA6 every input path is stopped at window capture under the frame and released after paint",
+        "classification": "assertion",
+        "detail": "SA6 every input path is stopped at window capture under the frame and released after paint:  AssertionError: expected [ { type: 'keydown', …(3) }, …(43) ] to deeply equal []\n    at /home/elias/.cache/am/u2ichxvr/tmp/test-intent-before-jttqwh/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:270:58\n    at file:///home/elias/.cache/am/u2ichxvr/tmp/test-intent-before-jttqwh/modules/ui-web/no"
+      },
+      {
+        "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SA6 shell shortcuts neither run nor queue beneath the frame, then normal shortcuts work",
+        "classification": "assertion",
+        "detail": "SA6 shell shortcuts neither run nor queue beneath the frame, then normal shortcuts work:  AssertionError: expected { chord: 'Control+k', …(2) } to deeply equal { chord: 'Control+k', seen: [], …(1) }\n    at /home/elias/.cache/am/u2ichxvr/tmp/test-intent-before-jttqwh/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:284:107\n    at file:///home/elias/.cache/am/u2ichxvr/tmp/test-intent-be"
+      },
+      {
+        "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SA6 pointer hover wheel context menu and mouse Back/Forward cannot reach the covered shell",
+        "classification": "assertion",
+        "detail": "SA6 pointer hover wheel context menu and mouse Back/Forward cannot reach the covered shell:  AssertionError: expected [ 'window:mouseenter', …(37) ] to deeply equal []\n    at /home/elias/.cache/am/u2ichxvr/tmp/test-intent-before-jttqwh/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:315:67\n    at file:///home/elias/.cache/am/u2ichxvr/tmp/test-intent-before-jttqwh/modules/ui-web/node_mod"
+      },
+      {
+        "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SA6 SA17 deadline discards rendered controls; failure page alone handles input and keyboard actions",
+        "classification": "assertion",
+        "detail": "SA6 SA17 deadline discards rendered controls; failure page alone handles input and keyboard actions:  AssertionError: expected 1 to be +0 // Object.is equality\n    at /home/elias/.cache/am/u2ichxvr/tmp/test-intent-before-jttqwh/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:326:52\n    at file:///home/elias/.cache/am/u2ichxvr/tmp/test-intent-before-jttqwh/modules/ui-web/node_modules/@vitest/runn"
+      },
+      {
+        "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SA10 SA17 60-second deadline discards an attached shell even when rendering later completes",
+        "classification": "assertion",
+        "detail": "SA10 SA17 60-second deadline discards an attached shell even when rendering later completes:  AssertionError: expected 1 to be +0 // Object.is equality\n    at /home/elias/.cache/am/u2ichxvr/tmp/test-intent-before-jttqwh/modules/ui-web/src/boot/boot-frame-lockdown.test.ts:412:52\n    at file:///home/elias/.cache/am/u2ichxvr/tmp/test-intent-before-jttqwh/modules/ui-web/node_modules/@vitest/runn"
+      },
+      {
+        "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#SA10 stalled catalog discovery raises failure and late mount replaces it before rendering",
+        "classification": "assertion",
+        "detail": "SA10 stalled catalog discovery raises failure and late mount replaces it before rendering:  Error: expected 1 to be +0 // Object.is equality\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/.cache/am/u2ichxvr/tmp/test-intent-before-jttqwh/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3748:47)\n    at /home/elias/.cache/am/u2ichxvr/tmp/test-intent-before-jttqwh/module"
+      }
+    ]
+  },
+  "digest": "sha256:0528ce22a0092f97db383ecda31f7f85dbfdd09ee7f1a67cf5dc6cc92a34b5fe"
+}

@@ -1,3 +1,6 @@
+// Static imports evaluate before this flag; their uncaught failures belong to the early page.
+if (window.__justsearchBootFailure) window.__justsearchBootFailure.started = true
+
 // Lit initializes built-in metadata during module evaluation. Load the library before
 // SES freezes intrinsics, without registering surfaces or opening application state.
 import 'lit'
@@ -368,6 +371,8 @@ async function bootstrap() {
     // ignore — manifest load is best-effort; built-in catalog is the fallback
   }
 
+  let appearanceRestored
+  let presentationRestored = false
   // Slice 474 V1.5.1 polish — restore the persisted active theme so
   // user customization survives reloads. Best-effort; on failure the
   // chrome falls back to default tokens.
@@ -377,7 +382,7 @@ async function bootstrap() {
     // light/dark + high-contrast appearance AND the persisted palette through
     // the single appearance writer, so they survive a reload even if the
     // Settings surface never mounts.
-    await restoreAppearanceOnBoot()
+    appearanceRestored = await restoreAppearanceOnBoot()
     // 569 §19 Seam 4 — re-project the persisted adaptation profile (motion) AFTER the appearance.
     // Density already threads via userConfig.
     const { restoreAdaptationProfileOnBoot, migrateLegacyContrastPreference } = await import(
@@ -390,6 +395,7 @@ async function bootstrap() {
     // No-ops without a network call once migrated.
     await migrateLegacyContrastPreference()
   } catch {
+    appearanceRestored = false
     // ignore — theme restoration is best-effort
   }
 
@@ -401,9 +407,17 @@ async function bootstrap() {
   // quarantine fallback.
   try {
     const { restoreActivePresentationOnBoot } = await import('./shell-v0/state/presentationState.ts')
-    restoreActivePresentationOnBoot() // the ONE writer (theme + body/layout + interaction)
+    const result = restoreActivePresentationOnBoot() // the ONE writer (theme + body/layout + interaction)
+    presentationRestored = result.ok && result.quarantined.length === 0
   } catch {
     // ignore — presentation boot is best-effort; the built-in render is the fallback
+  }
+
+  try {
+    const { installBootFramePersistence } = await import('./boot/bootFrame.ts')
+    installBootFramePersistence(appearanceRestored && presentationRestored)
+  } catch {
+    // Paint caching is optional, just like the appearance restores above.
   }
 
   const root = document.getElementById('root')
@@ -433,4 +447,4 @@ async function bootstrap() {
   }
 }
 
-bootstrap()
+bootstrap().catch(() => window.__justsearchBootFailure?.('bootstrap'))

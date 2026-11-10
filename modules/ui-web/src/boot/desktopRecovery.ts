@@ -6,6 +6,8 @@ import { installBackendRestartBridge } from '../api/backendRestart.js';
 import { resolveBootApiBase } from './apiBase.js';
 import { gateFactoryReset } from './factoryReset.js';
 
+const frames = new WeakMap<HTMLElement, HTMLElement>();
+
 const recoverySurfaces = new WeakMap<HTMLElement, {
   recovery: EngineRecovery;
   teardown: () => void;
@@ -26,7 +28,56 @@ export function mountBootApplication(root: HTMLElement, application: HTMLElement
     owner.teardown();
     presentation = owner.recovery;
   }
-  if (root.childNodes.length !== 1 || root.firstChild !== presentation) root.replaceChildren(presentation);
+  if (presentation !== application) {
+    if (root.firstChild !== presentation || root.childNodes.length !== 1) root.replaceChildren(presentation);
+    return;
+  }
+  const frame = frames.get(root) ?? root.querySelector<HTMLElement>('#boot-frame');
+  if (root.querySelector('#boot-failure') || frame?.parentElement !== root) {
+    application.inert = false;
+    root.replaceChildren(application);
+    return;
+  }
+  // Attach beneath the fixed paint. Lit's first render, including the top bar, owns hand-off.
+  application.inert = true;
+  // Inert excludes element targets, but shell shortcuts and drag/navigation listeners also
+  // run on window/document. Capture at window before attachment registers those listeners.
+  const inputTypes = ['keydown', 'keyup', 'keypress', 'pointerdown', 'pointerup', 'pointermove', 'pointercancel',
+    'mousedown', 'mouseup', 'click', 'wheel', 'touchstart', 'input', 'dragenter', 'dragover', 'dragleave', 'drop',
+    'mouseenter', 'mouseleave', 'scroll', 'contextmenu', 'paste'] as const;
+  const releaseInput = (): void => {
+    for (const type of inputTypes) window.removeEventListener(type, guardInput, true);
+    observer.disconnect();
+  };
+  const stillCovered = (): boolean => frame.parentElement === root && application.parentElement === root;
+  const guardInput = (event: Event): void => {
+    if (!stillCovered()) { releaseInput(); return; }
+    // Keep browser/OS defaults (including reload); nothing under the frame receives input.
+    event.stopImmediatePropagation();
+  };
+  const observer = new MutationObserver(() => { if (!stillCovered()) releaseInput(); });
+  observer.observe(root, { childList: true });
+  for (const type of inputTypes) window.addEventListener(type, guardInput, true);
+  root.appendChild(application);
+  const rendered = application as HTMLElement & { updateComplete?: Promise<boolean> };
+  if (!rendered.updateComplete) return; // A never-rendering shell remains covered until the deadline.
+  void (async () => {
+    try {
+      while (await rendered.updateComplete === false) { /* Lit scheduled a subsequent render. */ }
+      const bar = application.shadowRoot?.querySelector('jf-top-bar') as (HTMLElement & { updateComplete?: Promise<boolean> }) | null;
+      if (!bar) return;
+      if (bar.updateComplete) await bar.updateComplete;
+      // Two animation frames let the first rendered surface paint before its cover leaves.
+      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+      if (application.parentElement !== root || owner && needsRecovery(owner.recovery.supervisor)) return;
+      // Recovery/reset may have replaced both nodes while Lit was pending. Never reclaim their root.
+      if (frame.parentElement === root) {
+        root.replaceChildren(application);
+        releaseInput();
+        application.inert = false;
+      }
+    } catch { window.__justsearchBootFailure?.('bootstrap'); }
+  })();
 }
 
 /** Resolve the API only after desktop recovery events can reach the boot surface. */
@@ -34,14 +85,12 @@ export async function resolveBootWithRecovery(
   root: HTMLElement,
   teardown: () => void = () => {},
 ): Promise<string | null> {
+  const frame = root.querySelector<HTMLElement>('#boot-frame');
+  if (frame) frames.set(root, frame);
   if (!isTauriRuntime()) {
     const base = await resolveBootApiBase();
     if (!base) {
-      const alert = document.createElement('div');
-      alert.setAttribute('role', 'alert');
-      alert.style.cssText = 'padding:24px;font:14px system-ui,sans-serif';
-      alert.textContent = 'Unable to connect to the JustSearch backend.';
-      root.replaceChildren(alert);
+      window.__justsearchBootFailure?.('no-engine-address');
     }
     return base;
   }
@@ -67,7 +116,13 @@ export async function resolveBootWithRecovery(
   });
   await installBackendRestartBridge(() => window.location.reload());
   const base = await resolveBootApiBase();
-  if (base && !needsRecovery(recovery.supervisor)) recovery.remove();
+  if (base && !needsRecovery(recovery.supervisor)) {
+    if (recovery.parentElement === root) {
+      recovery.remove();
+      const frame = frames.get(root);
+      if (frame && !root.hasChildNodes()) root.appendChild(frame);
+    }
+  }
   else waitingForApi = true;
   return base;
 }

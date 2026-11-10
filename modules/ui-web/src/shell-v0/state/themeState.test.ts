@@ -260,7 +260,7 @@ describe('themeState — §2.C / C5 single appearance writer', () => {
     const fakeFetch = vi.fn().mockRejectedValue(new Error('offline'));
     await expect(
       restoreAppearanceOnBoot(fakeFetch as unknown as typeof fetch),
-    ).resolves.toBeUndefined();
+    ).resolves.toBe(false);
     expect(document.documentElement.hasAttribute('data-theme')).toBe(false);
   });
 
