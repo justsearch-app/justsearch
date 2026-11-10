@@ -37,7 +37,7 @@ final class LinuxPackChildEnvironmentTest {
     }
     Path main = root.resolve("main.c");
     Files.writeString(main, "#include <stdio.h>\n#include <stdlib.h>\nint fixture_value(void);"
-        + "int main(void) { printf(\"%d\\n%s\\n\", fixture_value(), getenv(\"LD_LIBRARY_PATH\")); }\n");
+        + "int main(void) { printf(\"%d\\n%s\\n\", fixture_value(), getenv(\"LD_LIBRARY_PATH\")); while (getchar() != EOF) {} return 0; }\n");
     Path executable = pack.resolve("llama-server");
     command(List.of("gcc", "-o", executable.toString(), main.toString(), "-L" + pack,
         "-l:libfixture.so.1", "-Wl,--enable-new-dtags,-rpath,$ORIGIN"));
@@ -88,6 +88,7 @@ final class LinuxPackChildEnvironmentTest {
             new ChildSpec.Stdio.Pipes(), false, OptionalLong.empty(), Optional.empty(),
             ChildSpec.CooperativeStop.NONE, "loader-fixture");
         ChildHandle child = control.start(spec);
+        child.stdin().close();
         System.out.write(child.stdout().readAllBytes());
         child.exit().toCompletableFuture().get(10, TimeUnit.SECONDS);
         System.out.println("parent=" + System.getenv("LD_LIBRARY_PATH"));
