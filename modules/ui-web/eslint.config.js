@@ -118,6 +118,46 @@ export default defineConfig([
     },
   },
 
+  // SES replaces Date's locale methods with raw date strings. Use the shared Intl formatters;
+  // type information keeps Number#toLocaleString available for ordinary counts.
+  {
+    files: ['src/**/*.{js,jsx,ts,tsx}'],
+    languageOptions: {
+      parser: tsParser,
+      parserOptions: {
+        projectService: { allowDefaultProject: ['src/*.js', 'src/*.jsx', 'src/boot/*.js'] },
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    plugins: {
+      ses: { rules: {
+        'no-date-locale': {
+          meta: { type: 'problem', schema: [], messages: {
+            locale: 'Date locale methods ignore formatting under SES. Use display/format.ts Intl formatters.',
+          } },
+          create(context) {
+            const services = context.sourceCode.parserServices;
+            const checker = services.program.getTypeChecker();
+            const isDate = type => {
+              if (type.isUnionOrIntersection()) return type.types.some(isDate);
+              if (type.getSymbol()?.getName() === 'Date') return true;
+              const constraint = checker.getBaseConstraintOfType(type);
+              if (constraint && constraint !== type) return isDate(constraint);
+              return type.getBaseTypes?.()?.some(isDate) ?? false;
+            };
+            return { MemberExpression(node) {
+              const method = node.computed ? node.property.value : node.property.name;
+              if (!['toLocaleString', 'toLocaleDateString', 'toLocaleTimeString'].includes(method)) return;
+              const receiver = services.esTreeNodeToTSNodeMap.get(node.object);
+              if (isDate(checker.getTypeAtLocation(receiver))) context.report({ node, messageId: 'locale' });
+            } };
+          },
+        },
+      } },
+    },
+    rules: { 'ses/no-date-locale': 'error' },
+  },
+
   // ==================== FSD Layer Boundary Rules ====================
   // These rules enforce the Feature-Sliced Design import hierarchy.
   // Currently set to 'warn' during migration; flip to 'error' when complete.

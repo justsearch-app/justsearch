@@ -1,0 +1,340 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
+  },
+  "createdAt": "2026-11-10T17:29:04.841Z",
+  "revision": "611a433d52b83eda253c96cc690d03a2d3d1cfa2",
+  "tree": "f007ded63da4621af03b06c5e73adc2d04e8ea9c",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/display/dateLocaleGuard.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/s8_vy9ey/tmp/test-intent-vitest-4-1794331725249.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 5527
+    },
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/display/date-call-sites-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/s8_vy9ey/tmp/test-intent-vitest-4-1794331730777.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 4301
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/display/dateLocaleGuard.test.ts",
+      "file": "modules/ui-web/src/shell-v0/display/dateLocaleGuard.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:2d34c5fdc7ec7a93d6be16b81727a5469e225a0e3a9fa1fa4ceade530b809651",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "rejects planted Date locale calls while allowing number formatting",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/display/date-call-sites-lockdown.test.ts#formats consent timestamp as requested under SES lockdown",
+      "file": "modules/ui-web/src/shell-v0/display/date-call-sites-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9a657ee2d2b10c602ce1e36369b2bfc98588c3188e43b56d7124210b294fc0e1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "formats consent timestamp as requested under SES lockdown",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/display/date-call-sites-lockdown.test.ts#formats new snapshot label as requested under SES lockdown",
+      "file": "modules/ui-web/src/shell-v0/display/date-call-sites-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9a657ee2d2b10c602ce1e36369b2bfc98588c3188e43b56d7124210b294fc0e1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "formats new snapshot label as requested under SES lockdown",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/display/date-call-sites-lockdown.test.ts#formats transition tooltip as requested under SES lockdown",
+      "file": "modules/ui-web/src/shell-v0/display/date-call-sites-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9a657ee2d2b10c602ce1e36369b2bfc98588c3188e43b56d7124210b294fc0e1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "formats transition tooltip as requested under SES lockdown",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/display/date-call-sites-lockdown.test.ts#formats transition time as requested under SES lockdown",
+      "file": "modules/ui-web/src/shell-v0/display/date-call-sites-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9a657ee2d2b10c602ce1e36369b2bfc98588c3188e43b56d7124210b294fc0e1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "formats transition time as requested under SES lockdown",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/display/date-call-sites-lockdown.test.ts#formats trace start as requested under SES lockdown",
+      "file": "modules/ui-web/src/shell-v0/display/date-call-sites-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9a657ee2d2b10c602ce1e36369b2bfc98588c3188e43b56d7124210b294fc0e1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "formats trace start as requested under SES lockdown",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/display/date-call-sites-lockdown.test.ts#formats automatic retry as requested under SES lockdown",
+      "file": "modules/ui-web/src/shell-v0/display/date-call-sites-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9a657ee2d2b10c602ce1e36369b2bfc98588c3188e43b56d7124210b294fc0e1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "formats automatic retry as requested under SES lockdown",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/display/date-call-sites-lockdown.test.ts#formats engine loss retry as requested under SES lockdown",
+      "file": "modules/ui-web/src/shell-v0/display/date-call-sites-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9a657ee2d2b10c602ce1e36369b2bfc98588c3188e43b56d7124210b294fc0e1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "formats engine loss retry as requested under SES lockdown",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/display/date-call-sites-lockdown.test.ts#formats ledger tooltip as requested under SES lockdown",
+      "file": "modules/ui-web/src/shell-v0/display/date-call-sites-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9a657ee2d2b10c602ce1e36369b2bfc98588c3188e43b56d7124210b294fc0e1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "formats ledger tooltip as requested under SES lockdown",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/display/date-call-sites-lockdown.test.ts#formats effect tooltip as requested under SES lockdown",
+      "file": "modules/ui-web/src/shell-v0/display/date-call-sites-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9a657ee2d2b10c602ce1e36369b2bfc98588c3188e43b56d7124210b294fc0e1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "formats effect tooltip as requested under SES lockdown",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/display/date-call-sites-lockdown.test.ts#formats observation provenance as requested under SES lockdown",
+      "file": "modules/ui-web/src/shell-v0/display/date-call-sites-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9a657ee2d2b10c602ce1e36369b2bfc98588c3188e43b56d7124210b294fc0e1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "formats observation provenance as requested under SES lockdown",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/display/date-call-sites-lockdown.test.ts#formats health event time as requested under SES lockdown",
+      "file": "modules/ui-web/src/shell-v0/display/date-call-sites-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9a657ee2d2b10c602ce1e36369b2bfc98588c3188e43b56d7124210b294fc0e1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "formats health event time as requested under SES lockdown",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/display/date-call-sites-lockdown.test.ts#formats agent demo time as requested under SES lockdown",
+      "file": "modules/ui-web/src/shell-v0/display/date-call-sites-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9a657ee2d2b10c602ce1e36369b2bfc98588c3188e43b56d7124210b294fc0e1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "formats agent demo time as requested under SES lockdown",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/display/date-call-sites-lockdown.test.ts#formats conversation creation time as requested under SES lockdown",
+      "file": "modules/ui-web/src/shell-v0/display/date-call-sites-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9a657ee2d2b10c602ce1e36369b2bfc98588c3188e43b56d7124210b294fc0e1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "formats conversation creation time as requested under SES lockdown",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "611a433d52b83eda253c96cc690d03a2d3d1cfa2",
+    "revision": "611a433d52b83eda253c96cc690d03a2d3d1cfa2",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/display/dateLocaleGuard.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/s8_vy9ey/tmp/test-intent-vitest-4-1794331739395.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1160,
+        "output": "JSON report written to /home/elias/.cache/am/s8_vy9ey/tmp/test-intent-vitest-4-1794331739395.json\n\n"
+      },
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/display/date-call-sites-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/s8_vy9ey/tmp/test-intent-vitest-4-1794331740555.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 3684,
+        "output": "JSON report written to /home/elias/.cache/am/s8_vy9ey/tmp/test-intent-vitest-4-1794331740555.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/display/dateLocaleGuard.test.ts",
+        "classification": "assertion",
+        "detail": "rejects planted Date locale calls while allowing number formatting:  AssertionError: expected [] to deeply equal [ 3, 4, 5, 6, 7, 8 ]\n    at /home/elias/.cache/am/s8_vy9ey/tmp/test-intent-before-M2J3Nn/modules/ui-web/src/shell-v0/display/dateLocaleGuard.test.ts:20:6\n    at file:///home/elias/.cache/am/s8_vy9ey/tmp/test-intent-before-M2J3Nn/modules/ui-web/node_modules"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/display/date-call-sites-lockdown.test.ts#formats consent timestamp as requested under SES lockdown",
+        "classification": "assertion",
+        "detail": "formats consent timestamp as requested under SES lockdown:  AssertionError: expected [ '11/9/2026, 8:24:35 AM' ] to include 'Mon Nov 09 2026 08:24:35 GMT-0500 (Ea…'\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/s8_vy9ey/tmp/test-intent-before-M2J3Nn/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1319:15)\n    at Proxy.<anonymous> (file:///h"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/display/date-call-sites-lockdown.test.ts#formats new snapshot label as requested under SES lockdown",
+        "classification": "assertion",
+        "detail": "formats new snapshot label as requested under SES lockdown:  AssertionError: expected [ 'Snapshot @ 12:29:03 PM', …(1) ] to include 'Snapshot @ 12:29:03 GMT-0500 (Eastern…'\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/s8_vy9ey/tmp/test-intent-before-M2J3Nn/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1319:15)\n    at Proxy.<anonymous> (fi"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/display/date-call-sites-lockdown.test.ts#formats transition tooltip as requested under SES lockdown",
+        "classification": "assertion",
+        "detail": "formats transition tooltip as requested under SES lockdown:  AssertionError: expected [ Array(1) ] to include '08:24:35 GMT-0500 (Eastern Standard T…'\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/s8_vy9ey/tmp/test-intent-before-M2J3Nn/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1319:15)\n    at Proxy.<anonymous> (file:///home/elias/.cach"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/display/date-call-sites-lockdown.test.ts#formats transition time as requested under SES lockdown",
+        "classification": "assertion",
+        "detail": "formats transition time as requested under SES lockdown:  AssertionError: expected [ '8:24:35 AM' ] to include '08:24:35 GMT-0500 (Eastern Standard T…'\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/s8_vy9ey/tmp/test-intent-before-M2J3Nn/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1319:15)\n    at Proxy.<anonymous> (file:///home/elias/."
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/display/date-call-sites-lockdown.test.ts#formats trace start as requested under SES lockdown",
+        "classification": "assertion",
+        "detail": "formats trace start as requested under SES lockdown:  AssertionError: expected [ '8:24:35 AM' ] to include '08:24:35 GMT-0500 (Eastern Standard T…'\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/s8_vy9ey/tmp/test-intent-before-M2J3Nn/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1319:15)\n    at Proxy.<anonymous> (file:///home/elias/."
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/display/date-call-sites-lockdown.test.ts#formats automatic retry as requested under SES lockdown",
+        "classification": "assertion",
+        "detail": "formats automatic retry as requested under SES lockdown:  AssertionError: expected [ 'Automatic retry at 8:24:35 AM.' ] to include 'Automatic retry at 08:24:35 GMT-0500 …'\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/s8_vy9ey/tmp/test-intent-before-M2J3Nn/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1319:15)\n    at Proxy.<anonymous> ("
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/display/date-call-sites-lockdown.test.ts#formats engine loss retry as requested under SES lockdown",
+        "classification": "assertion",
+        "detail": "formats engine loss retry as requested under SES lockdown:  AssertionError: expected [ Array(1) ] to include 'The engine stopped 0 times, so JustSe…'\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/s8_vy9ey/tmp/test-intent-before-M2J3Nn/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1319:15)\n    at Proxy.<anonymous> (file:///home/elias/.cach"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/display/date-call-sites-lockdown.test.ts#formats ledger tooltip as requested under SES lockdown",
+        "classification": "assertion",
+        "detail": "formats ledger tooltip as requested under SES lockdown:  AssertionError: expected [ '11/9/2026, 8:24:35 AM' ] to include 'Mon Nov 09 2026 08:24:35 GMT-0500 (Ea…'\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/s8_vy9ey/tmp/test-intent-before-M2J3Nn/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1319:15)\n    at Proxy.<anonymous> (file:///h"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/display/date-call-sites-lockdown.test.ts#formats effect tooltip as requested under SES lockdown",
+        "classification": "assertion",
+        "detail": "formats effect tooltip as requested under SES lockdown:  AssertionError: expected [ '11/9/2026, 8:24:35 AM' ] to include 'Mon Nov 09 2026 08:24:35 GMT-0500 (Ea…'\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/s8_vy9ey/tmp/test-intent-before-M2J3Nn/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1319:15)\n    at Proxy.<anonymous> (file:///h"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/display/date-call-sites-lockdown.test.ts#formats observation provenance as requested under SES lockdown",
+        "classification": "assertion",
+        "detail": "formats observation provenance as requested under SES lockdown:  AssertionError: expected [ Array(1) ] to include 'Last known · observed Mon Nov 09 2026…'\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/s8_vy9ey/tmp/test-intent-before-M2J3Nn/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1319:15)\n    at Proxy.<anonymous> (file:///home/elias/.cach"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/display/date-call-sites-lockdown.test.ts#formats health event time as requested under SES lockdown",
+        "classification": "assertion",
+        "detail": "formats health event time as requested under SES lockdown:  AssertionError: expected [ '8:24:35 AM' ] to include '08:24:35 GMT-0500 (Eastern Standard T…'\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/s8_vy9ey/tmp/test-intent-before-M2J3Nn/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1319:15)\n    at Proxy.<anonymous> (file:///home/elias/."
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/display/date-call-sites-lockdown.test.ts#formats agent demo time as requested under SES lockdown",
+        "classification": "assertion",
+        "detail": "formats agent demo time as requested under SES lockdown:  AssertionError: expected [ '12:29:03 PM', '12:29:03 PM' ] to include '12:29:03 GMT-0500 (Eastern Standard T…'\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/s8_vy9ey/tmp/test-intent-before-M2J3Nn/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1319:15)\n    at Proxy.<anonymous> (file"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/display/date-call-sites-lockdown.test.ts#formats conversation creation time as requested under SES lockdown",
+        "classification": "assertion",
+        "detail": "formats conversation creation time as requested under SES lockdown:  AssertionError: expected [ Array(1) ] to include 'date-test · Created Mon Nov 09 2026 0…'\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/s8_vy9ey/tmp/test-intent-before-M2J3Nn/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1319:15)\n    at Proxy.<anonymous> (file:///home/elias/.cach"
+      }
+    ]
+  },
+  "digest": "sha256:f47d4fef605c8f4591eedab894d5bb241417cb2574c14829098aef0c98874561"
+}

@@ -80,7 +80,7 @@ describe('count observation provenance', () => {
       expect(hasLiveDocumentCount(state)).toBe(false);
       const fact = projectFact('core.files', state);
       expect(fact.value).toBe('12');
-      expect(fact.provenance).toBe(`Last known · observed ${new Date(observedAtMs).toLocaleString()}`);
+      expect(fact.provenance).toBe(`Last known · observed ${new Intl.DateTimeFormat(undefined, { year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric' }).format(new Date(observedAtMs))}`);
     }
   });
 

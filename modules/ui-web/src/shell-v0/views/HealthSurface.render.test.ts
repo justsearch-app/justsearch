@@ -76,7 +76,7 @@ describe('HealthSurface — recommendedActions panel', () => {
       const text = el.shadowRoot?.textContent ?? '';
       expect(text).toContain('Waiting to retry');
       expect(text).toContain('Next retry at');
-      expect(text).not.toContain(new Date(retry).toLocaleString());
+      expect(text).not.toContain(new Intl.DateTimeFormat(undefined, { year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric' }).format(new Date(retry)));
       const files = [...(el.shadowRoot?.querySelectorAll('.card') ?? [])]
         .find(card => card.querySelector('.card-label')?.textContent?.trim() === 'Files');
       expect(files?.querySelector('.card-value')?.textContent?.trim()).toBe(formatCount(37));
