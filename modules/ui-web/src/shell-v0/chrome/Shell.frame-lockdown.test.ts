@@ -152,6 +152,19 @@ async function where(page: Page): Promise<{ stage: string | undefined; address: 
   });
 }
 
+/** Reload and wait for the harness to boot again: `reload()` returns at `load`, before the app's module graph has run. */
+async function reload(page: Page): Promise<void> {
+  await page.reload();
+  await page.locator('body[data-ready="true"]').waitFor({ timeout: 45_000 });
+  await page.locator('jf-top-bar').waitFor();
+}
+
+/** Reload an addressed Settings window and wait until it has reopened at `section`. */
+async function reloadIntoSettings(page: Page, section: string): Promise<void> {
+  await reload(page);
+  await expect.poll(async () => ((await where(page)).settings ? settingsSection(page) : undefined), { timeout: 10_000 }).toBe(section);
+}
+
 async function area(page: Page, id: string): Promise<void> {
   await page.locator(`jf-top-bar nav [data-surface-id="${id}"]`).click();
   await settle(page);
@@ -591,7 +604,7 @@ it('SG3 SG4 an addressed entry survives underlying background projection, reload
   });
   await settle(page, 300);
   expect((await where(page)).address).toBe(`${SETTINGS}?anchor=keyboard&section=general`);
-  await page.reload(); await settle(page, 300);
+  await reloadIntoSettings(page, 'general'); await settle(page, 300);
   expect((await where(page)).address).toBe(`${SETTINGS}?anchor=keyboard&section=general`);
   await page.keyboard.press('Escape'); await settle(page); expect((await where(page)).settings).toBe(false);
   expect((await where(page)).stage).toBe('jf-frame-search-probe');
@@ -599,7 +612,7 @@ it('SG3 SG4 an addressed entry survives underlying background projection, reload
   await settle(page);
   await page.locator('jf-settings-nav [data-settings-category="general"]').click(); await settle(page);
   expect((await where(page)).address).toBe(`${SETTINGS}?section=general`);
-  await page.reload(); await settle(page, 300);
+  await reloadIntoSettings(page, 'general'); await settle(page, 300);
   expect((await where(page)).address).toBe(`${SETTINGS}?section=general`);
 }, 30_000);
 
@@ -754,7 +767,7 @@ it.each(['Escape', 'Back', 'Close'])('SG3 dismissal by %s preserves the real Sea
   await page.keyboard.press('Escape'); await settle(page);
   expect((await where(page)).settings).toBe(false);
   expect(await active()).toBe('settings-conversation-B');
-  await page.reload(); await settle(page, 400);
+  await reload(page); await settle(page, 400);
   expect(await active()).toBe('settings-conversation-B');
   expect((await where(page)).address).toContain('conversationId=settings-conversation-B');
   expect((await where(page)).settings).toBe(false);
