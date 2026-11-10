@@ -109,6 +109,8 @@ public final class DefaultChildControl implements ChildControl {
   static final Duration GPU_RELEASE_BOUND =
       GPU_POLL_MAX.plus(GPU_POLL_INTERVAL).plus(GPU_READ_BOUND).plusSeconds(1);
   static final int RECENT_EXITS = 32;
+  /** Allow the original Process reaper to publish an exit seen during identity capture. */
+  static final Duration REGISTRATION_EXIT_WAIT = Duration.ofMillis(100);
   private static final Duration GRACE_SLICE = Duration.ofMillis(50);
   private static final Duration CLOSE_WAIT = Duration.ofSeconds(12);
   private static final int MAX_EXECUTABLE = 1024;
@@ -145,6 +147,19 @@ public final class DefaultChildControl implements ChildControl {
     Optional<Boolean> contains(ProcessHandle child);
   }
 
+  /** Starts the original process; tests control exit and information publication independently. */
+  @FunctionalInterface
+  interface ProcessStarter {
+    ProcessStarter REAL = DefaultChildControl::startProcess;
+
+    Process start(ProcessBuilder builder, ChildKind kind) throws IOException;
+  }
+
+  private static Process startProcess(ProcessBuilder builder, ChildKind kind) throws IOException {
+    return CHAT_SERVER_KINDS.contains(kind) && io.justsearch.configuration.PlatformPaths.isWindows()
+        ? WindowsEngineJob.createChat(builder) : BoundChildProcess.start(builder);
+  }
+
   private final LedgerSink ledger;
   private final ProcessTerminator terminator;
   private final VramProbe vram;
@@ -154,6 +169,7 @@ public final class DefaultChildControl implements ChildControl {
   private final EngineIdentity owner;
   private final ThreadFactory threads;
   private final JobMembership job;
+  private final ProcessStarter starter;
 
   private final Map<String, Held> live = new ConcurrentHashMap<>();
   /** A root exit does not release the chat role while its observed descendants still run. */
@@ -170,6 +186,12 @@ public final class DefaultChildControl implements ChildControl {
   DefaultChildControl(LedgerSink ledger, ProcessTerminator terminator, VramProbe vram, Clock clock,
       Sleeper sleeper, ManagedChildRegistry registry, EngineIdentity owner, ThreadFactory threads,
       JobMembership job) {
+    this(ledger, terminator, vram, clock, sleeper, registry, owner, threads, job, ProcessStarter.REAL);
+  }
+
+  DefaultChildControl(LedgerSink ledger, ProcessTerminator terminator, VramProbe vram, Clock clock,
+      Sleeper sleeper, ManagedChildRegistry registry, EngineIdentity owner, ThreadFactory threads,
+      JobMembership job, ProcessStarter starter) {
     this.ledger = Objects.requireNonNull(ledger, "ledger");
     this.terminator = Objects.requireNonNull(terminator, "terminator");
     this.vram = Objects.requireNonNull(vram, "vram");
@@ -179,6 +201,7 @@ public final class DefaultChildControl implements ChildControl {
     this.owner = Objects.requireNonNull(owner, "owner");
     this.threads = Objects.requireNonNull(threads, "threads");
     this.job = Objects.requireNonNull(job, "job");
+    this.starter = Objects.requireNonNull(starter, "starter");
   }
 
   /**
@@ -298,8 +321,7 @@ public final class DefaultChildControl implements ChildControl {
     }
     Process process;
     try {
-      process = CHAT_SERVER_KINDS.contains(spec.kind()) && io.justsearch.configuration.PlatformPaths.isWindows()
-          ? WindowsEngineJob.createChat(builder) : BoundChildProcess.start(builder);
+      process = starter.start(builder, spec.kind());
     } catch (IOException | RuntimeException failure) {
       recordStartFailure(childId, spec.kind(), "spawn_failed");
       throw failure;
@@ -334,20 +356,25 @@ public final class DefaultChildControl implements ChildControl {
       held.state = ChildHandle.State.RUNNING;
       exitedWhileStarting = held.exitedWhileStarting;
     }
-    if (exitedWhileStarting) {
-      recordExit(held, ExitOutcome.Phase.STARTING);
+    // Registration may observe an exit on this caller's thread. Keep its interrupt away from
+    // the ledger and manifest channels until the entire outcome has been published and removed.
+    try (RegistrationInterrupt interrupt = new RegistrationInterrupt()) {
+      if (exitedWhileStarting) {
+        recordExit(held, ExitOutcome.Phase.STARTING);
+        awaitRegistrationExit(held, interrupt);
+        return held;
+      }
+      if (!register(held, manifest, interrupt)) return held;
+      if (process instanceof WindowsEngineJob.ChatProcess chat) {
+        try {
+          chat.resume();
+        } catch (IOException failure) {
+          var _ = beginStop(held, SURVIVOR_RETRY, Optional.empty());
+          throw failure;
+        }
+      }
       return held;
     }
-    register(held, manifest);
-    if (process instanceof WindowsEngineJob.ChatProcess chat) {
-      try {
-        chat.resume();
-      } catch (IOException failure) {
-        var _ = beginStop(held, SURVIVOR_RETRY, Optional.empty());
-        throw failure;
-      }
-    }
-    return held;
   }
 
   /**
@@ -535,19 +562,28 @@ public final class DefaultChildControl implements ChildControl {
     }
   }
 
-  /** Registers the manifest entry; on failure stops the child (ROLLBACK) and throws. */
-  private void register(Held held, ManifestEntry manifest) throws IOException {
+  /** Registers the manifest entry, or returns false for an early exit; failures roll back. */
+  private boolean register(Held held, ManifestEntry manifest, RegistrationInterrupt interrupt) throws IOException {
     try {
-      ManagedChild entry = ManagedChild.fromProcess(held.process, manifestKind(held.spec.kind()),
-          manifest.endpoint() != null ? manifest.endpoint()
-              : held.spec.stdio() instanceof ChildSpec.Stdio.Pipes ? "stdio" : null,
-          manifest.modelPath(),
-          manifest.declaredConfigHash() != null ? manifest.declaredConfigHash()
-              : argvHash(held.spec.argv()),
-          argvHash(held.spec.argv()));
-      if (held.os.processIdentity().isPresent()
-          && !held.os.processIdentity().equals(Optional.ofNullable(entry.processIdentity())))
-        throw new IOException("Linux child identity changed before registration");
+      ManagedChild entry;
+      try {
+        entry = ManagedChild.fromProcess(held.process, manifestKind(held.spec.kind()),
+            manifest.endpoint() != null ? manifest.endpoint()
+                : held.spec.stdio() instanceof ChildSpec.Stdio.Pipes ? "stdio" : null,
+            manifest.modelPath(),
+            manifest.declaredConfigHash() != null ? manifest.declaredConfigHash()
+                : argvHash(held.spec.argv()),
+            argvHash(held.spec.argv()));
+        if (held.os.processIdentity().isPresent()
+            && !held.os.processIdentity().equals(Optional.ofNullable(entry.processIdentity())))
+          throw new IOException("Linux child identity changed before registration");
+      } catch (IOException | RuntimeException captureFailure) {
+        if (!confirmRegistrationExit(held.process, interrupt)) throw captureFailure;
+        recordExit(held, ExitOutcome.Phase.STARTING);
+        awaitRegistrationExit(held, interrupt);
+        return false;
+      }
+      interrupt.defer();
       registry.register(entry);
       boolean exitedWhileRegistering;
       synchronized (held) {
@@ -558,20 +594,20 @@ public final class DefaultChildControl implements ChildControl {
       // the id was known, so that exit could not remove the entry: remove it here (removal is
       // idempotent, so an exit that saw the id as well does no harm).
       if (exitedWhileRegistering) {
+        awaitRegistrationExit(held, interrupt);
         try {
           registry.remove(entry.id());
         } catch (IOException | RuntimeException retained) {
           // The manifest keeps the record; its reconciliation finds the process gone.
         }
       }
+      return true;
     } catch (IOException | RuntimeException failure) {
       Throwable suppressed = null;
       try {
-        stop(held, StopRequest.of(StopReason.ROLLBACK, StopMode.NOW, REQUESTED_BY))
-            .toCompletableFuture().get(STOP_BOUND.toMillis(), TimeUnit.MILLISECONDS);
-      } catch (InterruptedException interrupted) {
-        Thread.currentThread().interrupt();
-        suppressed = interrupted;
+        interrupt.defer();
+        interrupt.await(stop(held, StopRequest.of(StopReason.ROLLBACK, StopMode.NOW, REQUESTED_BY))
+            .toCompletableFuture());
       } catch (ExecutionException | TimeoutException survived) {
         // The handle stays owned (SURVIVED): close(), later stops and the next chat-server start
         // retry it, and the exception hands it to the caller, which keeps owning it.
@@ -581,6 +617,62 @@ public final class DefaultChildControl implements ChildControl {
           new ChildRegistrationRefusedException(failure, held);
       if (suppressed != null) refused.addSuppressed(suppressed);
       throw refused;
+    }
+  }
+
+  /** The watcher claims EXITED before writing; a registration exit must include its outcome. */
+  private static void awaitRegistrationExit(Held held, RegistrationInterrupt interrupt) throws IOException {
+    try {
+      interrupt.await(held.exit);
+    } catch (ExecutionException | TimeoutException unpublished) {
+      throw new IOException("child exited during registration but its outcome was not published",
+          unpublished);
+    }
+  }
+
+  /** Identity loss alone proves nothing: only the original spawn can confirm its own exit. */
+  private static boolean confirmRegistrationExit(Process process, RegistrationInterrupt interrupt) {
+    interrupt.defer();
+    try {
+      if (!process.isAlive()) return true;
+      return process.waitFor(REGISTRATION_EXIT_WAIT.toMillis(), TimeUnit.MILLISECONDS);
+    } catch (InterruptedException interrupted) {
+      interrupt.interrupted = true;
+      return !process.isAlive();
+    } finally {
+      interrupt.defer();
+    }
+  }
+
+  /** Hold registration interruptions until all its bookkeeping, including rollback, is done. */
+  private static final class RegistrationInterrupt implements AutoCloseable {
+    private boolean interrupted = Thread.interrupted();
+
+    void defer() {
+      interrupted |= Thread.interrupted();
+    }
+
+    void await(CompletableFuture<?> future) throws ExecutionException, TimeoutException {
+      defer();
+      long deadline = System.nanoTime() + STOP_BOUND.toNanos();
+      try {
+        while (true) {
+          try {
+            long remaining = deadline - System.nanoTime();
+            if (remaining <= 0) throw new TimeoutException("registration exit wait expired");
+            future.get(remaining, TimeUnit.NANOSECONDS);
+            return;
+          } catch (InterruptedException interrupt) {
+            interrupted = true;
+          }
+        }
+      } finally {
+        defer();
+      }
+    }
+
+    @Override public void close() {
+      if (interrupted) Thread.currentThread().interrupt();
     }
   }
 
