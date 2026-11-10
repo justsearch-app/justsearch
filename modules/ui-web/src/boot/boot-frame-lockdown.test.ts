@@ -148,6 +148,12 @@ async function failure(page: Page, kind: string) {
   expect(report.time).toMatch(/^\d{4}-\d\d-\d\dT/);
   expect(JSON.stringify(report)).not.toMatch(/SECRET|private|secret-host|token|http|\/home/);
 }
+async function pauseClockBeforeNavigation(page: Page) {
+  // install() alone keeps ticking in real time. Pause before the document creates its
+  // deadline, so loading and assertions cannot consume any of the tested 60 seconds.
+  await page.clock.install({ time: new Date('2026-01-01T00:00:00Z') });
+  await page.clock.pauseAt(new Date('2026-01-02T00:00:00Z'));
+}
 it('SA1 SA6 first paint precedes entry and is inert', async () => {
   const page = await blocked();
   try {
@@ -188,7 +194,7 @@ async function shellWorksAfterCover(page: Page) {
 it('SA6 rendered shell rejects input until frame hand-off', async () => {
   const page = await create({ renderHold: true });
   try {
-    await page.clock.install(); await page.goto(url); await page.waitForSelector('jf-top-bar .more-trigger');
+    await pauseClockBeforeNavigation(page); await page.goto(url); await page.waitForSelector('jf-top-bar .more-trigger');
     await page.addScriptTag({ type: 'module', url: new URL(probe, url).href });
     await page.evaluate(() => window.frameProbe.dismissWalkthrough('welcome'));
     await watchShellInput(page);
@@ -209,7 +215,7 @@ it('SA6 rendered shell rejects input until frame hand-off', async () => {
 it('SA6 never-rendering shell stays unreachable and deadline Reload takes focus', async () => {
   const page = await create({ hold: true });
   try {
-    await page.clock.install(); await page.goto(url); await page.waitForSelector('jf-shell', { state: 'attached' });
+    await pauseClockBeforeNavigation(page); await page.goto(url); await page.waitForSelector('jf-shell', { state: 'attached' });
     await watchShellInput(page);
     const focused = await tabThroughCover(page); await page.mouse.click(20, 20);
     expect({ shellFocused: focused.includes('jf-shell'), clicks: await page.locator('jf-shell').getAttribute('data-clicks'),
@@ -230,7 +236,7 @@ it('SA6 never-rendering shell stays unreachable and deadline Reload takes focus'
 const shellShortcuts = ['Control+k', 'Control+,', 'Control+1', 'Control+2', 'Control+3', 'F1', 'F6', 'Escape', 'Alt+ArrowLeft', 'Alt+ArrowRight', 'Space'];
 async function heldShell() {
   const page = await create({ renderHold: true });
-  await page.clock.install(); await page.goto(url); await page.waitForSelector('jf-top-bar .more-trigger');
+  await pauseClockBeforeNavigation(page); await page.goto(url); await page.waitForSelector('jf-top-bar .more-trigger');
   await page.addScriptTag({ type: 'module', url: new URL(probe, url).href });
   await page.evaluate(() => window.frameProbe.dismissWalkthrough('welcome'));
   await page.waitForLoadState('networkidle');
@@ -338,6 +344,7 @@ it('SA6 SA17 deadline discards rendered controls; failure page alone handles inp
     await page.waitForTimeout(100);
     expect(await page.locator('#boot-failure').count()).toBe(1);
     for (const key of ['Enter', 'Space']) {
+      await pauseClockBeforeNavigation(page);
       await page.getByRole('button', { name: 'Reload', exact: true }).focus();
       await Promise.all([page.waitForEvent('framenavigated'), page.keyboard.press(key)]);
       await page.waitForSelector('jf-top-bar'); await page.clock.fastForward(60_001);
@@ -398,10 +405,10 @@ for (const fault of ['entry', 'parse', 'dependency', 'evaluation', 'bootstrap', 
 it('SA10 SA17 60-second deadline discards an attached shell even when rendering later completes', async () => {
   const page = await create({ hold: true });
   try {
-    await page.clock.install(); await page.goto(url); await page.waitForSelector('jf-shell', { state: 'attached' });
+    await pauseClockBeforeNavigation(page); await page.goto(url); await page.waitForSelector('jf-shell', { state: 'attached' });
     expect(await page.locator('#boot-frame').count()).toBe(1);
-    await page.clock.fastForward(59_000); expect(await page.locator('#boot-failure').count()).toBe(0);
-    await page.clock.fastForward(1_001); await failure(page, 'stalled');
+    await page.clock.fastForward(59_999); expect(await page.locator('#boot-failure').count()).toBe(0);
+    await page.clock.fastForward(2); await failure(page, 'stalled');
     expect(await page.locator('jf-shell').count()).toBe(0);
     await page.evaluate(() => { window.frameHarness.hold = false; }); await page.clock.resume();
     await page.waitForTimeout(100);
@@ -421,7 +428,7 @@ it('SA7 SA17 no blank interval through recovery removal and delayed render', asy
 it('SA14 terminal event during hand-off beats first render and deadline', async () => {
   const page = await create({ hold: true });
   try {
-    await page.clock.install(); await page.goto(url); await page.waitForSelector('jf-shell', { state: 'attached' });
+    await pauseClockBeforeNavigation(page); await page.goto(url); await page.waitForSelector('jf-shell', { state: 'attached' });
     await page.evaluate(() => { window.frameHarness.emit({ schemaVersion: 1, kind: 'engine-supervisor-state.v1', supervisor: 'tauri', state: 'exhausted', incarnation: 1, restartCount: 3, maxRestartAttempts: 3 }); window.frameHarness.hold = false; });
     await page.clock.fastForward(60_001);
     expect(await page.locator('#root > jf-engine-recovery').count()).toBe(1);
@@ -431,7 +438,7 @@ it('SA14 terminal event during hand-off beats first render and deadline', async 
 for (const phase of ['incomplete', 'awaiting_storage']) it(`SA14 reset ${phase} takes over`, async () => {
   const page = await create({ phase, saved });
   try {
-    await page.clock.install(); await page.goto(url); await page.waitForSelector('jf-factory-reset-recovery'); await page.clock.fastForward(60_001);
+    await pauseClockBeforeNavigation(page); await page.goto(url); await page.waitForSelector('jf-factory-reset-recovery'); await page.clock.fastForward(60_001);
     expect(await page.locator('#boot-frame, #boot-failure, jf-shell').count()).toBe(0);
     if (phase === 'awaiting_storage') expect(await page.evaluate(key => localStorage.getItem(key), key)).toBeNull();
   } finally { await page.close(); }
@@ -513,7 +520,7 @@ it('SA10 stalled catalog discovery raises failure and late mount replaces it bef
   const waiting = new Promise<void>(resolve => { release = resolve; });
   try {
     await page.route('**/api/registry/surfaces', async route => { await waiting; await route.fulfill({ json: catalog }); });
-    await page.clock.install();
+    await pauseClockBeforeNavigation(page);
     const request = page.waitForRequest('**/api/registry/surfaces');
     await page.goto(url); await request;
     expect(await page.locator('#boot-frame').count()).toBe(1);
@@ -608,7 +615,7 @@ it('SA5 partly failed palette restore leaves the previous cache byte-identical',
 it('SA14 factory reset taking over during hand-off beats the pending first render', async () => {
   const page = await create({ hold: true });
   try {
-    await page.clock.install(); await page.goto(url); await page.waitForSelector('jf-shell', { state: 'attached' });
+    await pauseClockBeforeNavigation(page); await page.goto(url); await page.waitForSelector('jf-shell', { state: 'attached' });
     await page.addScriptTag({ type: 'module', url: new URL(probe, url).href });
     const blocked = await page.evaluate(async () => {
       window.frameHarness.phase = 'incomplete';
@@ -690,7 +697,7 @@ it('SA7 SA10 deadline survives a long connecting interval before the frame retur
   const waiting = new Promise<void>(resolve => { release = resolve; });
   try {
     await page.route('**/api/registry/surfaces', async route => { await waiting; await route.fulfill({ json: catalog }); });
-    await page.clock.install(); await page.goto(url); await page.waitForSelector('jf-engine-recovery');
+    await pauseClockBeforeNavigation(page); await page.goto(url); await page.waitForSelector('jf-engine-recovery');
     await page.clock.fastForward(60_001);
     expect(await page.locator('#boot-failure').count()).toBe(0);
     expect(await page.locator('#root > jf-engine-recovery').count()).toBe(1);

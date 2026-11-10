@@ -86,7 +86,7 @@ runs received `--maxWorkers=4`; before checkouts were shared clones under TMPDIR
 worktrees registered in the source repository. Dependencies were linked package by package,
 leaving each clone its own writable cache directories. No test or result was intercepted.
 
-Final validation after removing the extra default-cancellation constraints:
+Earlier validation after removing the extra default-cancellation constraints:
 `npm run typecheck` and `npm run lint` exited 0.
 The single final-tree `npx vitest run --maxWorkers=4` passed 735 files / 9,354 tests
 in 153.05 seconds. Both official evidence producer invocations exited 0. Each ran the
@@ -102,6 +102,74 @@ The governance check against `276da8de3f` reports only the missing independent a
 record. Its non-blocking reconsider-rate warning reports reviewer disagreements or third
 reviewer tie-breaks in 12/48 audited PRs (25.0%); the orchestrator must carry that finding
 into delivery. Independent verification and acceptance remain the orchestrator's work.
+
+CI clock determinism follow-up on `c58ffb350205865438803e18fe39b083559f0b63`:
+Playwright's installed clock continues advancing with real elapsed time. In an isolated
+shared clone of that head, adding a 1,200 ms setup delay before the original 59,000 ms
+advance reproduced the reported assertion failure: `expected 1 to be +0`. A separate
+clock probe measured 60,200 ms after the real delay and 59,000 ms advance; with the
+clock paused it measured exactly 59,000 ms.
+
+All nine clock setup sites now install and pause at a known time before navigation,
+including the shared held-shell setup used by input and replacement checks. Reloads
+in the rendered-controls deadline check also pause before navigating again. Time spent
+loading assets, probing controls or waiting for HTTP can no longer consume the deadline.
+The attached-shell check requires absence of failure at 59,999 ms and its presence at
+60,001 ms, retaining shell disposal and late-render checks. Resume still releases held
+rendering and discovery where those scenarios require it. No product code changed.
+
+The revised deadline check passed with the same 1,200 ms setup delay in the shared
+clone. With the candidate test unchanged and only that clone's production HTML deadline
+changed from 60,000 to 59,999 ms, it failed at the pre-deadline absence assertion:
+`expected 1 to be +0` (the failure page already existed). Thus pausing removes wall-time
+drift without accepting even a one-millisecond-early deadline. Each check built its own
+production assets and used headless Chromium; the main worktree's product files were
+never changed. The existing independent acceptance record below is deliberately retained
+and becomes stale for the orchestrator to replace.
+
+The complete boot-frame suite then passed five consecutive production-build runs under
+four owned CPU busy loops: 67 passed, zero failed and zero skipped in every run. The
+commands were `node node_modules/vitest/vitest.mjs run src/boot/boot-frame-lockdown.test.ts
+--config vitest.config.lockdown.ts --reporter=json --outputFile=<per-run temporary report>`
+from `modules/ui-web`; elapsed times were 43.96, 42.40, 44.96, 41.80 and 39.74 seconds.
+All four load processes were alive through each run and were stopped and waited for by
+their owner afterwards. `npm run typecheck` and `npm run lint` both exited 0.
+`.agents/preflight` is absent. Checks touched the machine's CPU and their own temporary
+builds, preview servers and headless browsers. No shared application, dev stack or GPU was
+used; dependencies in temporary clones were independent copies, and no cache was cleared.
+
+Both unchanged official evidence-producer invocations exited 0 on this candidate.
+`shell-s5-frame-inert.json` and `shell-s5-new-behavior.json` each record all 67 frame
+checks passing with the current test content digest; the latter also records the unchanged
+seven appearance-restoration checks passing. The former retains assertion failures for
+all seven named regressions on `5ef0ec6cc32d53dfadc84f12ced4e43b7335d979`. In particular,
+the attached-shell check now fails there at shell disposal after 60,001 ms, rather than
+at the wall-time-sensitive pre-deadline assertion. The producer's temporary Git adapter
+used shared clones for its before checkout; all clone dependencies were copied, keeping
+writable caches separate. No source-repository worktree registration was created.
+
+The required `node scripts/governance/gates/test-intent/cli.mjs --base origin/main`
+exited 1 against `1d4755a67f6c90b8957c28f9e717db823039c05e`: alongside the expected
+stale acceptance, it reports seven uncovered items. This is an existing branch/base
+problem, reproduced by running the unchanged CLI against a fresh shared clone of the
+unmodified head `c58ffb350205865438803e18fe39b083559f0b63` with that same explicit base:
+its original acceptance is valid, but the same seven uncovered items already fail.
+They are:
+
+- `modules/app-agent/src/test/java/io/justsearch/agent/tools/FileOperationMoveSafetyTest.java`
+- `modules/app-agent/src/test/java/io/justsearch/agent/tools/FileOperationsToolMoveResultTest.java`
+- `modules/ui-web/src/boot/boot-frame-lockdown.test.ts`
+- `modules/ui-web/src/shell-v0/state/bootAppearanceRestore.test.ts`
+- `modules/ui-web/src/shell-v0/views/BrainSurface.removalBand-lockdown.test.ts`
+- `modules/ui-web/src/shell-v0/views/BrainSurface.remove-files-witness.test.ts`
+- `modules/ui-web/src/shell-v0/views/BrainSurface.remove-files.test.ts`
+
+The main-worktree gate also emits the non-blocking reconsider-rate warning: 12 of 48
+audited PRs (25.0%) had reviewer disagreements or third-reviewer tie-breaks. The
+orchestrator must report that finding. Resolving the pre-existing coverage failures is
+outside this clock assignment; no entries were invented to cover unrelated changes,
+and no fetch or rebase was performed. Only the frame test, its two evidence files and
+this changeset differ from HEAD; the existing acceptance record is byte-identical.
 
 ```json
 {

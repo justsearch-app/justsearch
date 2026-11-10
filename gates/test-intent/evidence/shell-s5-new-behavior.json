@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
   },
-  "createdAt": "2026-11-09T23:06:21.974Z",
-  "revision": "425fb82607f6c0bf8ceb0614dcaa46a43c219fa1",
-  "tree": "f385588bc425af1fab22ee8f078047b3488db445",
+  "createdAt": "2026-11-10T00:36:47.635Z",
+  "revision": "c58ffb350205865438803e18fe39b083559f0b63",
+  "tree": "b3238266c141eaf3d23e281d00322444bd562494",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,16 +18,16 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/boot/boot-frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/91eedicj/tmp/test-intent-vitest-6-1794265523660.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/boot/boot-frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/u2ichxvr/tmp/test-intent-vitest-2852-1794270937357.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 57196
+      "durationMs": 67908
     },
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/bootAppearanceRestore.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/91eedicj/tmp/test-intent-vitest-6-1794265580858.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/bootAppearanceRestore.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/u2ichxvr/tmp/test-intent-vitest-2852-1794271005267.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 1115
+      "durationMs": 2368
     }
   ],
   "checks": [
@@ -35,7 +35,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:f1d6856c9834080c2ff354740f9f89aff1764c3ad4a768f9bdccff50a3b3060c",
+      "contentDigest": "sha256:6b7a29cb223d88d6a2594c3fe0e4c599260f1fee5abe3e78658f9bffecd2649a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -351,5 +351,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:d8e22843d6b24268894e81cc0d2d5e1f0c1d7948187de7712c5760e48df43940"
+  "digest": "sha256:52acbd968102d0d838d9393ec930f694b97b9b9fcb75cc6d1e6edff5d9b5e39b"
 }
