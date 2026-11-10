@@ -756,7 +756,10 @@ message CoreStatus {
   // readers that predate this field; a reader that knows it must show the count as unknown, never
   // as an empty index. Absent (false) means the counts are known, as every earlier sender meant.
   bool doc_count_unknown = 23;
-  // Next available field number: 24
+  // Default-search population minus InternalCollections, from the same serving-reader snapshot.
+  // Absent for an older worker or when doc_count_unknown is true; zero is a measured empty population.
+  optional int64 own_searchable_doc_count = 24;
+
 }
 
 // Failure tracking and search quality signals.

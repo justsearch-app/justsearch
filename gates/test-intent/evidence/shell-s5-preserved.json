@@ -1,0 +1,215 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-09T22:18:17.052Z",
+  "revision": "e3a479db7d1547a2d31df44c73334c982c31e15d",
+  "tree": "d97cdc3c2bd8b955efe473599239af89971d1d94",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/GettingStarted.plugins.test.ts\" \"src/shell-v0/substrates/manifest/walkthroughContributions.test.ts\" \"src/shell-v0/views/LibrarySurface.folderActions.test.ts\" \"src/shell-v0/views/LibrarySurface.addCollection.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/k5yzey4h/tmp/test-intent-vitest-3-1794262692263.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 4787
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/GettingStarted.plugins.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/GettingStarted.plugins.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a06bffd7a13ca7512e0566d7d6b426f28c82025541314b9d78af5596fae0fa50",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "plugin walkthrough triggers after the core welcome retirement preserves onCommand:sample.command completion and saved progress across reload",
+          "status": "passed"
+        },
+        {
+          "name": "plugin walkthrough triggers after the core welcome retirement preserves onSettingChanged:activeThemeId completion and saved progress across reload",
+          "status": "passed"
+        },
+        {
+          "name": "plugin walkthrough triggers after the core welcome retirement preserves extensionInstalled:other completion and saved progress across reload",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/substrates/manifest/walkthroughContributions.test.ts",
+      "file": "modules/ui-web/src/shell-v0/substrates/manifest/walkthroughContributions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:04d53f207a25204ef2632bbbc8f8f7a07f42c0ce66c8f0029f0af0abd2b60a93",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "plugin walkthroughs through ContributionManifest (SB12) installing a contributed tour registers its steps with manifest provenance",
+          "status": "passed"
+        },
+        {
+          "name": "plugin walkthroughs through ContributionManifest (SB12) rejects a duplicate manifest without duplicating the walkthrough",
+          "status": "passed"
+        },
+        {
+          "name": "plugin walkthroughs through ContributionManifest (SB12) uninstall rolls the walkthrough back atomically",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d9f75adec5ddae75753a80507296eb5f1d3ec0d342b16266334f42c7635c9460",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "keeps a refused Add draft reachable and allows correction and retry",
+          "status": "passed"
+        },
+        {
+          "name": "explains a preview overlap (inside) and blocks click and Enter before Add",
+          "status": "passed"
+        },
+        {
+          "name": "explains a preview overlap (containing) and blocks click and Enter before Add",
+          "status": "passed"
+        },
+        {
+          "name": "submits Add once while waiting and announces its outcome",
+          "status": "passed"
+        },
+        {
+          "name": "switching member tabs during Add retains the pending outcome and draft until acceptance",
+          "status": "passed"
+        },
+        {
+          "name": "a cancelled native picker leaves a closed form and an existing draft unchanged",
+          "status": "passed"
+        },
+        {
+          "name": "exposes row removal progress, suppresses repeats and keeps the other row usable",
+          "status": "passed"
+        },
+        {
+          "name": "R3 a completed removal offers to add the same folder again, once, with its plain consequence",
+          "status": "passed"
+        },
+        {
+          "name": "L20 Ctrl+Z after another window already added the folder back says so and sends no add",
+          "status": "passed"
+        },
+        {
+          "name": "R3 a failed add-again says so and can be tried again",
+          "status": "passed"
+        },
+        {
+          "name": "a refused removal retains the row, explains retry without a live-watch claim, and retries",
+          "status": "passed"
+        },
+        {
+          "name": "reconciles an uncertain removal response with current roots (NETWORK_ERROR)",
+          "status": "passed"
+        },
+        {
+          "name": "reconciles an uncertain removal response with current roots (SERIALIZATION_ERROR)",
+          "status": "passed"
+        },
+        {
+          "name": "reconciles an uncertain removal response with current roots (HANDLER_FAILURE)",
+          "status": "passed"
+        },
+        {
+          "name": "ignores an old removal response after returning and reads the current roots",
+          "status": "passed"
+        },
+        {
+          "name": "names legacy inner folders and ancestor coverage in Remove confirmations",
+          "status": "passed"
+        },
+        {
+          "name": "distinguishes accepted reindex from the recorded completion and failure",
+          "status": "passed"
+        },
+        {
+          "name": "explains an empty reindex scope and offline folders without claiming a full reindex",
+          "status": "passed"
+        },
+        {
+          "name": "R1 browser Add reveals and focuses Folders from folders and Cancel restores focus",
+          "status": "passed"
+        },
+        {
+          "name": "R1 browser Add reveals and focuses Folders from core.browse-surface and Cancel restores focus",
+          "status": "passed"
+        },
+        {
+          "name": "R1 desktop Add reveals and focuses Folders from folders and Cancel restores focus",
+          "status": "passed"
+        },
+        {
+          "name": "R1 desktop Add reveals and focuses Folders from core.browse-surface and Cancel restores focus",
+          "status": "passed"
+        },
+        {
+          "name": "R1 a late picker selects Folders, but a response from before reconnect cannot open a form",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.addCollection.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.addCollection.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d093d64d89202fccfa39b3895121fc246f38a0158aba1a3512bed56fc6c02df7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "LibrarySurface — Add Folder carries the collection (914 D4) sends `collection` when the user names one",
+          "status": "passed"
+        },
+        {
+          "name": "LibrarySurface — Add Folder carries the collection (914 D4) OMITS `collection` when the field is blank — the backend default is not re-spelled here",
+          "status": "passed"
+        },
+        {
+          "name": "LibrarySurface — Add Folder carries the collection (914 D4) OMITS `collection` when the field holds only whitespace",
+          "status": "passed"
+        },
+        {
+          "name": "LibrarySurface — Add Folder carries the collection (914 D4) the native picker fills the SAME form instead of adding immediately, so the field exists there too",
+          "status": "passed"
+        },
+        {
+          "name": "LibrarySurface — Add Folder carries the collection (914 D4) the header button re-opens the picker rather than submitting an open form",
+          "status": "passed"
+        },
+        {
+          "name": "LibrarySurface — Add Folder carries the collection (914 D4) refuses a RESERVED collection instead of creating a root that impersonates an internal corpus",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:c6a9a24e0cef274b840834076bdf4e229233aeb5977972913017b4b5875db1d5"
+}

@@ -47,9 +47,11 @@ interface ActiveStepView {
 export class WalkthroughCard extends JfElement {
   static properties = {
     active: { state: true },
+    embedded: { type: Boolean },
   };
 
   declare active: ActiveStepView | null;
+  declare embedded: boolean;
 
   private unsubs: Array<() => void> = [];
   // Tempdoc 521 §22 Phase C — the active step's onSettingChanged
@@ -60,56 +62,26 @@ export class WalkthroughCard extends JfElement {
   constructor() {
     super();
     this.active = null;
+    this.embedded = false;
   }
 
   static styles = css`
-    :host {
-      /* 559 Authority I: placement owned by the OverlayHost bottom-left slot. */
-      max-width: 360px;
-      display: block;
-    }
+    :host { display: block; min-inline-size: 0; }
     :host([hidden]) { display: none; }
-    .card {
-      background: var(--surface-1);
-      color: var(--text-primary);
-      border: 1px solid var(--border-subtle);
-      border-left: 3px solid var(--accent-tint);
-      border-radius: 0.375rem;
-      padding: 0.875rem 1rem;
-      box-shadow: var(--shadow-float);
-      font-size: var(--font-size-sm);
-      line-height: 1.45;
-    }
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: var(--font-size-xs);
-      color: var(--text-muted);
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      margin-bottom: 0.375rem;
-    }
-    .title {
-      font-weight: 600;
-      font-size: var(--font-size-md);
-      margin: 0 0 0.25rem 0;
-      color: var(--text-primary);
-    }
-    .body { margin-bottom: 0.75rem; white-space: pre-wrap; }
-    .actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 0.5rem;
-    }
-    /* 574 B (remediation) — dismiss = jf-button (secondary), advance = jf-button variant="primary". */
+    .card { padding: var(--jf-space-4); color: var(--text-primary);
+      border-block-start: var(--frame-hairline) solid var(--border-subtle); }
+    .header, .actions { display: flex; flex-wrap: wrap; gap: var(--jf-space-2); justify-content: space-between; }
+    .header { font-size: var(--font-size-xs); color: var(--text-secondary); }
+    .title { font-size: var(--font-size-md); margin-block: var(--jf-space-2); }
+    .body { margin-block: var(--jf-space-3); white-space: pre-wrap; overflow-wrap: anywhere; }
+    @media (forced-colors: active) { .card { border-color: CanvasText; } }
   `;
 
   override connectedCallback(): void {
     super.connectedCallback();
     this.unsubs.push(onWalkthroughCatalogChange(() => this.refresh()));
     this.unsubs.push(subscribeWalkthroughProgress(() => this.refresh()));
-    this.unsubs.push(
+    if (!this.embedded) this.unsubs.push(
       onCommandInvoked((commandId) =>
         this.handleCompletionTrigger('onCommand', commandId),
       ),
@@ -117,7 +89,7 @@ export class WalkthroughCard extends JfElement {
     // Plugin-installed: any successful install triggers the dispatcher,
     // which advances iff the active step's completionEvent's pluginId
     // matches the installed id.
-    this.unsubs.push(
+    if (!this.embedded) this.unsubs.push(
       getSessionPluginRegistry().onInstalled((pluginId) =>
         this.handleCompletionTrigger('extensionInstalled', pluginId),
       ),
@@ -140,6 +112,7 @@ export class WalkthroughCard extends JfElement {
   private updateSettingChangedSubscription(): void {
     this.settingChangedUnsub?.();
     this.settingChangedUnsub = null;
+    if (this.embedded) return;
     const event = this.active?.step.completionEvent;
     if (!event || !event.startsWith('onSettingChanged:')) return;
     const key = event.slice('onSettingChanged:'.length);
@@ -176,7 +149,7 @@ export class WalkthroughCard extends JfElement {
         stepIndex,
         totalSteps: w.steps.length,
       };
-      this.hidden = false;
+      this.hidden = !this.embedded;
       this.updateSettingChangedSubscription();
       return;
     }
@@ -201,7 +174,7 @@ export class WalkthroughCard extends JfElement {
 
   override render(): TemplateResult {
     const active = this.active;
-    if (!active) return html``;
+    if (!active || !this.embedded) return html``;
     const finalStep = active.stepIndex === active.totalSteps - 1;
     return html`
       <div class="card" role="status" aria-live="polite">

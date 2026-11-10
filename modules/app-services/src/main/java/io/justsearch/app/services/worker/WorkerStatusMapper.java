@@ -91,7 +91,9 @@ final class WorkerStatusMapper {
                         core.getSearchableDocCount(),
                         core.getIndexMaxDoc(),
                         core.getIndexNumDocs(),
-                        core.getDocCountUnknown()))
+                        core.getDocCountUnknown(),
+                        null,
+                        core.hasOwnSearchableDocCount() ? core.getOwnSearchableDocCount() : null))
                 .failure(new FailureTrackingView(
                         failure.getFailedCount(),
                         failure.getLastFailedPath(),

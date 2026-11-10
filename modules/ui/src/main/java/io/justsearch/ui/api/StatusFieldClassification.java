@@ -143,7 +143,7 @@ final class StatusFieldClassification {
         measurement("indexedDocuments", "pendingJobs", "indexSizeBytes", "pendingVduCount",
             "writerQueueDepth", "writerPendingDocs", "commitCount", "refreshLagMs",
             "recentJobQueueDepth", "recentDocsPerSec", "pendingBytes", "pendingUnknownSizeJobs",
-            "searchableDocuments", "indexMaxDoc", "indexNumDocs"));
+            "searchableDocuments", "ownSearchableDocuments", "indexMaxDoc", "indexNumDocs"));
     put(table, FailureTrackingView.class,
         measurement("failedJobs", "lastFailedPath", "lastFailedErrorMessage",
             "searchesZeroResultCount", "failedByFileKind"),

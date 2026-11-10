@@ -61,6 +61,46 @@ function devExamplesMiddleware() {
   }
 }
 
+/** Stamp the release identity and a closed subset of canonical tokens into the script-free paint. */
+function bootFrameHtml() {
+  return {
+    name: 'jf-boot-frame-html',
+    transformIndexHtml: {
+      order: 'pre',
+      handler(html) {
+        const version = fs.readFileSync(path.resolve(__dirname, '../../gradle.properties'), 'utf8')
+          .match(/^\s*version\s*=\s*(.+)$/m)?.[1].trim()
+        if (!version || !/^\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?$/.test(version)) {
+          throw new Error('Missing or invalid canonical release version')
+        }
+        // Resolve the frame's token closure from the same sources as the shell. Scoped to the
+        // static surfaces: these defaults must never override live themes on the application.
+        const source = fs.readFileSync(path.resolve(__dirname, 'src/styles/tokens.css'), 'utf8')
+          .replace(/\/\*[\s\S]*?\*\//g, '')
+        const primitives = fs.readFileSync(path.resolve(__dirname, 'src/shell-v0/themes/primitives.css'), 'utf8')
+          .replace(/\/\*[\s\S]*?\*\//g, '')
+        const declarations = (block) => new Map([...block.matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)]
+          .map((m) => [m[1], m[2].trim()]))
+        const dark = declarations(source.match(/:root\s*\{([^}]+)\}/)[1] + primitives)
+        const light = declarations(source.match(/\[data-theme="light"\]\s*\{([^}]+)\}/)[1])
+        const names = new Set([...html.matchAll(/var\((--[\w-]+)/g)].map((m) => m[1]))
+        // The inline contrast probe reads this ink by name in JS, outside CSS var() references.
+        names.add('--jf-color-neutral-0')
+        for (const name of names) {
+          for (const value of [dark.get(name), light.get(name)]) {
+            for (const m of (value ?? '').matchAll(/var\((--[\w-]+)/g)) names.add(m[1])
+          }
+        }
+        const emit = (map) => [...map].filter(([name]) => names.has(name))
+          .map(([name, value]) => `${name}:${value};`).join('')
+        const scope = ':is(#boot-frame,#boot-failure)'
+        const tokens = `${scope}{${emit(dark)}}[data-theme="light"] ${scope}{${emit(light)}}`
+        return html.replaceAll('%JUSTSEARCH_VERSION%', version).replace('%BOOT_FRAME_TOKENS%', tokens)
+      },
+    },
+  }
+}
+
 // --- Backend discovery (tempdoc 501 Phase 5) ---
 //
 // Replaces the original 501-Phase-1 candidate-ladder for api-port.txt with a
@@ -242,6 +282,7 @@ export default defineConfig(({ command, mode }) => {
     'import.meta.env.VITE_JUSTSEARCH_API_PORT': JSON.stringify(String(discoveredPort)),
   } : {},
   plugins: [
+    bootFrameHtml(),
     apiProxyPlugin(),
     devExamplesMiddleware(),
     isAnalyze && visualizer({

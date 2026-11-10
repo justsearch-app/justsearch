@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import { setFirstUseRoots, getFirstUse, subscribeFirstUse } from '../state/firstUse.js';
 import type { ReactiveController, ReactiveControllerHost } from 'lit';
 import { subscribeAiState, type AiState } from '../state/aiStateStore.js';
 import { deriveFrameStatus, completedLongWork, transientPlacement, FINISHED_DWELL_MS, type FrameStatus, type StatusFact, type DurableStatusOperation } from '../state/frameStatus.js';
@@ -136,9 +137,10 @@ export class FrameStatusController implements ReactiveController {
     }),
       subscribeTasks(() => this.refresh()), subscribePending(() => this.refresh()),
       subscribeConsent(() => this.refresh()), subscribeAppUpdate(() => this.refresh()),
-      onStatusBarChange(() => this.host.requestUpdate())];
+      onStatusBarChange(() => this.host.requestUpdate()), subscribeFirstUse(() => this.refresh())];
     this.timer = setInterval(() => this.refresh(), 1_000);
     this.stopFocusWatch = onWindowFocusChange(() => { this.focusChanges++; });
+    document.addEventListener('jf-first-use-folder-added', this.folderAdded);
     document.addEventListener('jf-plugin-load-error', this.pluginError);
     document.addEventListener('jf-plugin-loaded', this.pluginLoaded);
     queueMicrotask(() => { if (this.connected) this.refresh(); });
@@ -156,7 +158,9 @@ export class FrameStatusController implements ReactiveController {
     this.activeWork = null; this.activeWorkSince = null; this.installingSince = null; this.sawTransitioning = false; this.needsKey = null;
     this.observedSources = new Set();
     clearInterval(this.timer);
+    document.removeEventListener('jf-first-use-folder-added', this.folderAdded);
     document.removeEventListener('jf-plugin-load-error', this.pluginError);
+    setFirstUseRoots(null, new Map());
     document.removeEventListener('jf-plugin-loaded', this.pluginLoaded);
   }
   setStore(store: AdvisoryStore | null): void {
@@ -224,6 +228,7 @@ export class FrameStatusController implements ReactiveController {
     } });
   }
   /** Reuses the shared status cadence. Read serially, retain values on failure, ignore late teardown responses. */
+  private readonly folderAdded = (): void => { void this.readRemote(); };
   private async readRemote(): Promise<void> {
     if (this.remoteBusy || !this.connected || this.lastRemoteStamp === null) return;
     this.remoteBusy = true;
@@ -238,6 +243,7 @@ export class FrameStatusController implements ReactiveController {
       const roots = z.object({ items: z.array(indexedRootViewSchema) }).parse(await response.json());
       if (current()) { this.roots = roots.items; this.rootsLive = true; }
     } catch { if (current()) this.rootsLive = false; }
+    if (current() && !this.rootsLive) setFirstUseRoots(null, this.rootPaths);
     // R4 — folder rows are named by folder; the observation carries hashes only (memoized resolver).
     for (const root of this.roots) {
       if (!current()) break;
@@ -246,6 +252,7 @@ export class FrameStatusController implements ReactiveController {
       const path = await resolvePathLazy('core.indexed-roots', hash, { apiBase: this.host.apiBase }).catch(() => null);
       if (path && current()) this.rootPaths.set(hash, path);
     }
+    if (current()) setFirstUseRoots(this.rootsLive ? this.roots : null, this.rootPaths);
     if (current()) try {
       const response = await authorizedFetch(`${this.host.apiBase}/api/presence`, { signal: abort.signal });
       if (!response.ok) throw new Error('Background observation unavailable');
@@ -361,7 +368,7 @@ export class FrameStatusController implements ReactiveController {
         ? [{ ...item.prompt, expiresAt: item.prompt.expiresAt ?? this.deadlines.get(item.prompt.pendingId),
           state: authorizationHost?.statusRequestState(item.prompt.pendingId) ?? null }] : []),
       consents: listPendingConsentRequests().map(c => ({ id: String(c.id), pluginId: c.contributorId, capability: c.capability })),
-      update: getAppUpdateStatus(), conditions: this.conditions, finished: this.finished,
+      gettingStarted: getFirstUse(), update: getAppUpdateStatus(), conditions: this.conditions, finished: this.finished,
       roots: this.roots, rootPaths: this.rootPaths, rootsLive: this.rootsLive && !!this.ai?.indexingStatusLive,
       activity: this.activity, withdrawn: withdrawnAuthorizations(), presence: { runs: this.presence, live: this.presenceLive && !!this.ai?.snapshotLive }, operations: [...this.operations.values()] });
     let next = derive();

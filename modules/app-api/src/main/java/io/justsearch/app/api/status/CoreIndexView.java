@@ -56,6 +56,10 @@ package io.justsearch.app.api.status;
  * indexedDocuments} and {@code searchableDocuments} are not counts — the index could not be counted
  * and no earlier count exists. Both then carry 0 for older readers; a surface that knows this field
  * shows the count as checking or unknown, never as an empty index. False means the counts are known.
+ *
+ * <p>{@code ownSearchableDocuments} is the same default-search population minus InternalCollections
+ * (including bundled Help), measured with searchableDocuments on one reader. Null means unknown
+ * (including an older worker); indexedDocumentsUnknown also makes it null.
  */
 @SuppressWarnings("ArrayRecordComponent") // 419 C3 V1/V2: intentional for API time-series payload
 public record CoreIndexView(
@@ -77,12 +81,44 @@ public record CoreIndexView(
     long indexMaxDoc,
     long indexNumDocs,
     boolean indexedDocumentsUnknown,
-    Boolean vduAvailable) {
+    Boolean vduAvailable,
+    Long ownSearchableDocuments) {
   public CoreIndexView {
+    ownSearchableDocuments = indexedDocumentsUnknown ? null : ownSearchableDocuments;
     indexState = indexState == null ? "" : indexState;
     vduAvailable = vduAvailable == null ? Boolean.TRUE : vduAvailable;
     recentJobQueueDepth = recentJobQueueDepth == null ? new long[0] : recentJobQueueDepth;
     recentDocsPerSec = recentDocsPerSec == null ? new double[0] : recentDocsPerSec;
+  }
+
+  /**
+   * Compatibility constructors do not know the internal-collection population: own count defaults
+   * to null (unknown), never indexedDocuments or searchableDocuments, which can include Help.
+   */
+  public CoreIndexView(
+    boolean indexHealthy,
+    long indexedDocuments,
+    long pendingJobs,
+    String indexState,
+    long indexSizeBytes,
+    int pendingVduCount,
+    long writerQueueDepth,
+    long writerPendingDocs,
+    long commitCount,
+    long refreshLagMs,
+    long[] recentJobQueueDepth,
+    double[] recentDocsPerSec,
+    long pendingBytes,
+    long pendingUnknownSizeJobs,
+    long searchableDocuments,
+    long indexMaxDoc,
+    long indexNumDocs,
+    boolean indexedDocumentsUnknown,
+    Boolean vduAvailable) {
+    this(indexHealthy, indexedDocuments, pendingJobs, indexState, indexSizeBytes, pendingVduCount,
+        writerQueueDepth, writerPendingDocs, commitCount, refreshLagMs, recentJobQueueDepth,
+        recentDocsPerSec, pendingBytes, pendingUnknownSizeJobs, searchableDocuments, indexMaxDoc,
+        indexNumDocs, indexedDocumentsUnknown, vduAvailable, null);
   }
 
   /**
@@ -223,6 +259,6 @@ public record CoreIndexView(
     return new CoreIndexView(indexHealthy, indexedDocuments, pendingJobs, indexState,
         indexSizeBytes, pendingVduCount, writerQueueDepth, writerPendingDocs, commitCount,
         refreshLagMs, recentJobQueueDepth, recentDocsPerSec, pendingBytes, pendingUnknownSizeJobs,
-        searchableDocuments, indexMaxDoc, indexNumDocs, indexedDocumentsUnknown, available);
+        searchableDocuments, indexMaxDoc, indexNumDocs, indexedDocumentsUnknown, available, ownSearchableDocuments);
   }
 }

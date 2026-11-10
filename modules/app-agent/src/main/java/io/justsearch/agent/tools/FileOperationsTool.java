@@ -135,7 +135,11 @@ public final class FileOperationsTool implements OperationHandler {
       if (report.allSucceeded()) {
         return OperationResult.success(report.summary(), report.batchId());
       } else {
-        return OperationResult.failure(report.summary());
+        String failures = report.results().stream()
+            .filter(result -> !result.success())
+            .map(result -> "[" + result.index() + "] " + result.errorMessage())
+            .collect(Collectors.joining("\n"));
+        return OperationResult.failure(report.summary() + "\n" + failures);
       }
 
     } catch (OperationArgException e) {

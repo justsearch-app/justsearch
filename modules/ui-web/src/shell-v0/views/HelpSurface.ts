@@ -13,6 +13,9 @@
  * pulls this file into the boot graph automatically.
  */
 
+import { reopenGettingStarted } from '../state/firstUse.js';
+import { requestSurfaceNavigation } from '../controllers/navigateRequest.js';
+import '../components/Button.js';
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
 import { surfaceScrollLayoutStyles } from '../primitives/surfaceLayout.js';
@@ -101,7 +104,7 @@ const SHORTCUTS: ShortcutRow[] = [
 // header and the Health quick actions (LibrarySurface.ts, HealthSurface.ts renderActions).
 const TROUBLESHOOTING: string[] = [
   'If search results look stale, use "Reindex" in Library or in the Health tab of the System view.',
-  'If indexing seems stuck, use "Recover component" in the Health tab of the System view (shown when Settings → Developer → View tier is Operator), or "Force Rebuild" there to rebuild the whole index from scratch, which takes a long time.',
+  'If indexing seems stuck, use "Recover component" in the Health tab of the System view (shown when Settings → Developer → View tier is Operator), or "Rebuild search index" there to rebuild the whole index from scratch, which takes a long time.',
   'Use "Copy Diagnostic Summary" above before reporting a bug; review it before posting.',
 ];
 
@@ -168,6 +171,7 @@ export class HelpSurface extends JfElement {
     const body = activeBodyFor(HELP_REFERENCE_REGION);
     if (!body) {
       return html`
+        <jf-button label="Getting started" .onActivate=${() => { reopenGettingStarted(); requestSurfaceNavigation('core.search-v3-surface'); }}>Getting started</jf-button>
         ${this.renderShortcuts()}
         <section style="margin-top: 1rem">
           <div class="panel">
@@ -187,7 +191,7 @@ export class HelpSurface extends JfElement {
         </section>
       `;
     }
-    return html`<jf-declared-surface
+    return html`<jf-button label="Getting started" .onActivate=${() => { reopenGettingStarted(); requestSurfaceNavigation('core.search-v3-surface'); }}>Getting started</jf-button><jf-declared-surface
       .declaration=${body}
       .data=${{ shortcuts: SHORTCUTS, troubleshooting: TROUBLESHOOTING, network: NETWORK }}
       .enabled=${true}

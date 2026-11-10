@@ -11,7 +11,7 @@
  *
  * Typed-confirm mode: when `typed-confirm-word` is set, the confirm
  * button is disabled until the user types the exact word into the
- * prompt input. Used for HIGH-risk operations (Force Rebuild Index,
+ * prompt input. Used for HIGH-risk operations (Rebuild search index,
  * Delete all data, etc.).
  *
  * Side-effect registers `<jf-confirm-dialog>`.

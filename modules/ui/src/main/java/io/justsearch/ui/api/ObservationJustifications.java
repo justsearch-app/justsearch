@@ -70,6 +70,7 @@ public final class ObservationJustifications {
       Map.entry("GET /api/indexing/forgets", "CONSUMER: ui-web/src/api/domains/forget.ts hydrates Library unfinished intents and Search v3 host capability without replaying effects"),
       Map.entry("GET /api/indexing/forgets/{operationKey}", "STATUS: current exact forget observation for UI lost-response and reload reconciliation"),
       Map.entry("GET /api/indexing/roots", "CONSUMER: ui-web/src/shell-v0/views/BrowseSurface.ts mount hydration via api/domains/indexing.ts"),
+      Map.entry("GET /api/indexing/suggested-roots", "CONSUMER: ui-web/src/shell-v0/views/search-v3/SearchV3View.ts automatically reads which suggested folders exist for the first-use view"),
       Map.entry("GET /api/inference/encoders", "STATUS: currently loaded encoder runtime and device state (encoderRuntimeHandler)"),
       Map.entry("GET /api/inference/status", "STATUS: inference readiness/state"),
       Map.entry("GET /api/inference/transitions", "CONSUMER: ui-web/src/shell-v0/views/BrainSurface.ts automatic transition timeline poll"),

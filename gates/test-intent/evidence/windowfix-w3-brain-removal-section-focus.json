@@ -1,0 +1,87 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-09T22:12:24.100Z",
+  "revision": "1a0b2be2dcaedd048281c5f4c5ff76591fb9e8cf",
+  "tree": "3ac8313189b237f65347f0c60db6084f44653091",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.removalBand-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/windowfix-w3/tmp/windowfix-w3/test-intent-vitest-2303-1794262299101.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 20987
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.removalBand-lockdown.test.ts#D9 polling closes a focused band onto Downloaded files when not-downloaded leaves no action or outcome",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.removalBand-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8b603a28765b52653a1675981590a22f0b69806ac93a803dfc956579f091eec6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "D9 polling closes a focused band onto Downloaded files when not-downloaded leaves no action or outcome",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.removalBand-lockdown.test.ts#D9 polling closes a focused band onto Downloaded files when not-removable leaves no action or outcome",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.removalBand-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8b603a28765b52653a1675981590a22f0b69806ac93a803dfc956579f091eec6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "D9 polling closes a focused band onto Downloaded files when not-removable leaves no action or outcome",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "1a0b2be2dc",
+    "revision": "1a0b2be2dcaedd048281c5f4c5ff76591fb9e8cf",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.removalBand-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/windowfix-w3/tmp/windowfix-w3/test-intent-vitest-2303-1794262322145.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 21469,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/windowfix-w3/tmp/windowfix-w3/test-intent-vitest-2303-1794262322145.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.removalBand-lockdown.test.ts#D9 polling closes a focused band onto Downloaded files when not-downloaded leaves no action or outcome",
+        "classification": "assertion",
+        "detail": "D9 polling closes a focused band onto Downloaded files when not-downloaded leaves no action or outcome:  AssertionError: Downloaded files receives focus instead of BODY: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/ordb5fse/tmp/test-intent-before-3Mx3NK/modules/ui-web/src/shell-v0/views/BrainSurface.removalBand-lockdown.test.ts:309:113\n    at file:///home/elias/.cache/am"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.removalBand-lockdown.test.ts#D9 polling closes a focused band onto Downloaded files when not-removable leaves no action or outcome",
+        "classification": "assertion",
+        "detail": "D9 polling closes a focused band onto Downloaded files when not-removable leaves no action or outcome:  AssertionError: Downloaded files receives focus instead of BODY: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/ordb5fse/tmp/test-intent-before-3Mx3NK/modules/ui-web/src/shell-v0/views/BrainSurface.removalBand-lockdown.test.ts:309:113\n    at file:///home/elias/.cache/am"
+      }
+    ]
+  },
+  "digest": "sha256:95b4c06a0a412cde9511c9b02659129a1d0338d913e15f08050dea656faea741"
+}

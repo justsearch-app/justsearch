@@ -3,6 +3,7 @@
  * Indexing domain API - Index management and roots
  */
 
+import { z } from 'zod';
 import { request } from '../http';
 import { parseWireContract } from '../schemas';
 import { failedJobsResponseSchema } from '../generated/schema-types/failed-jobs-response.js';
@@ -80,12 +81,12 @@ export async function getSuggestedRoots(
   baseUrl: string,
   signal?: AbortSignal
 ): Promise<SuggestedRoot[]> {
-  const data = await request<{ suggestions: SuggestedRoot[] }>(
+  const data = await request<unknown>(
     baseUrl,
     '/api/indexing/suggested-roots',
     { signal }
   );
-  return data.suggestions ?? [];
+  return z.object({ suggestions: z.array(z.object({ label: z.string().trim().min(1), path: z.string().trim().min(1) })) }).parse(data).suggestions;
 }
 
 // ============================================

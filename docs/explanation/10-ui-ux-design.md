@@ -57,6 +57,40 @@ These are window-composition rules. A conversation's reading measure and a docum
 are content layouts within a window, not a narrow container for the whole application.
 Some floating panels use blur; backdrop blur and a glass aesthetic are not UI requirements.
 
+### First use and Getting started
+
+Search shows **Nothing to search yet** only after a successful folder-list answer and a
+fresh, confirmed zero searchable-document count. Unknown, stale and failed observations
+leave the ordinary composer in place. The empty state offers **Add a folder** and suggested
+folders by name and path, with no estimated file counts. Both use Library's existing add
+operation: a native picker on desktop and manual path entry in a browser. Registration does
+not mean files are searchable.
+
+The Getting started card has three steps: add folders, try a search, and optional answers
+and search by meaning. Folder and AI completion come from current facts. Only a search
+response received while files are searchable saves the search-completed mark. While files
+are being read, the live count says “n files searchable so far”, with “m waiting to be read”
+when the queue is known, or “still reading” when only activity is known. There is no promised
+total or time estimate. A watched folder with no searchable files points to Library.
+
+The core card finishes after adding content and trying a search; AI is optional. **Hide**
+also removes its calm-status pill. **Help → Getting started** reopens the card until hidden.
+Progress is cross-profile and shared across windows, using `walkthroughState['core.getting-started']`
+in `justsearch.userState.v2`: `completedStepIds` holds `try-search` and, after Help reopening,
+`reopened-from-help`; `dismissed` records Hide. The old welcome record is read without being
+changed. Finished or dismissed old welcomes suppress the core card when folders are watched;
+partial old progress completes no new step. A completed factory reset clears the state.
+
+Plugin walkthroughs retain their registry, completion triggers and saved progress. Pending
+plugin steps appear as a section of Getting started, including a plugin-only card once the
+core steps finish. The old four-step core welcome contribution is retired. The pill says
+“Getting started · n of 3” only at the calm status level; every higher status keeps precedence.
+The card never navigates on its own or changes restored destinations or browser history.
+
+Ordinary demo and fixture captures suppress the card so their established composition stays
+stable. The `first-use` and `first-use-reading` captures deliberately seed no walkthrough
+state and cover a fresh empty engine and a folder with files partly read.
+
 ## 2. Shell structure
 
 `chrome/Shell.ts` renders one top bar over the window area. The page has three landmarks:
@@ -84,6 +118,44 @@ The retired rail and title-bar elements (`jf-rail`, `jf-recents-menu`,
 presentation that names one still loads. Saved bookmarks and the navigation journal stay
 stored; the title bar's bookmark, recent-views and Copy URL controls and its Simple/Detailed
 toggle are gone (Settings › Appearance › Detail level remains).
+
+### Opening the window
+
+`index.html` paints an inert frame before the application entry script: brand, the three area
+names with none selected, a Starting pill, Settings and More symbols, and an empty work area.
+Only “Starting” is announced. It has no controls, application stores, navigation selectors or
+custom elements. Its inline styles project a small set of canonical tokens at build time.
+
+`justsearch.bootFrame.v1` is a disposable localStorage paint cache: light/dark mode and six
+resolved colours (background, raised surface, text, muted text, border and accent). It follows
+the live appearance after successful appearance and presentation restore. Later appearance,
+palette, presentation and profile changes go through `boot/bootFrame.ts`'s
+`installBootFramePersistence` seam, which subscribes to completed appearance writes and saves resolved token changes. A failed or partial
+restore preserves the previous cache. Invalid values and unavailable storage fall back to the
+OS preference; `?theme=light` or `?theme=dark` takes precedence. A factory reset clears the cache
+with the other window storage before any application store loads.
+
+Recovery and reset retain ownership of the root. Desktop connecting gives the frame back when
+an engine address is available. `mountBootApplication` keeps it above the attached shell until
+Lit has completed the shell and top bar's first render and a paint opportunity. A terminal event
+or reset replacing the root during that hand-off wins.
+
+If the entry script or one of its static dependencies cannot load or evaluate, bootstrap rejects,
+or a browser has no engine address, a static page says **JustSearch couldn't open its window**.
+The same page replaces a frame still showing after 60 seconds. It offers Reload and Copy report,
+starts keyboard focus on Reload, and works without application code. Clipboard refusal reveals
+a selectable report. The report contains only the release version from `gradle.properties`, a
+fixed failure kind, desktop/browser, OS family and ISO failure time. It never reads error text,
+URLs, paths, hosts or keys. Optional boot failures remain optional. A late successful first
+render replaces the failure page; a deadline cannot replace recovery or reset. If connecting
+held the root beyond the deadline, the deadline still applies when the frame returns.
+
+A settings document from a newer build remains byte-identical through startup and repeated
+reloads: presentation fallback applies its runtime bodies without saving defaults or history.
+Explicit edits during that older-version session can still overwrite the newer document.
+After the first render, navigation and Search loading belong to the shell. Host page-serving
+failure, onboarding, engine loss after mount, and loading-window dragging/controls are outside
+this startup frame's scope.
 
 ### Addresses, Back and Forward
 
