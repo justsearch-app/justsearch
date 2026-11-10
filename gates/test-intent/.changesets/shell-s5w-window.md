@@ -438,3 +438,13 @@ CI runs no clippy step.
   "digest": "sha256:3302bd6aa8010a8e619f1d093f2c76acc16f8580ab3a284edbf09749fff5b70c"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-28vvee1g",
+  "verdict": "accept",
+  "digest": "sha256:7d348465b7d6df30703ed6e5a3f9306527d2b52e46472623887522d12c5e68a1"
+}
+```
