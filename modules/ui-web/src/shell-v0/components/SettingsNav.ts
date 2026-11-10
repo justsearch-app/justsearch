@@ -61,9 +61,12 @@ export class SettingsNav extends JfElement {
     this.focusedRow = this.shadowRoot?.activeElement as HTMLElement | null;
   }
 
-  protected override updated(): void {
+  protected override updated(changed: Map<string, unknown>): void {
     if (this.focusedRow && !this.focusedRow.isConnected) {
       this.shadowRoot?.querySelector<HTMLElement>(this.query ? '.search-input' : '.category-row.active')?.focus();
+    } else if (changed.has('activeCategory') && this.focusedRow?.matches(':focus')) {
+      // A section change folds the previous section's entries above the focused row away.
+      this.focusedRow.scrollIntoView({ block: 'nearest' });
     }
     this.focusedRow = null;
   }
@@ -154,6 +157,10 @@ export class SettingsNav extends JfElement {
       min-height: 0;
       overflow-y: auto;
       padding: 0.75rem 0.5rem;
+    }
+    @media (max-height: 600px) {
+      :host, nav { height: auto; }
+      .groups, .results { flex: none; overflow: visible; }
     }
     .results-list {
       list-style: none;

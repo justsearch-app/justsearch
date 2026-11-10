@@ -34,7 +34,7 @@ const json = (body) => new Response(JSON.stringify(body), { status: 200, headers
 const registryDelay = Number(new URLSearchParams(location.search).get('registryDelay') ?? 0);
 window.fetch = async (input) => {
   if (registryDelay && String(input).endsWith('/api/registry/surfaces')) await new Promise(r => setTimeout(r, registryDelay));
-  return json({ entries: [] });
+  return json({ entries: [], conversations: [], messages: [] });
 };
 window.loadSettingsModule = id => import(id);
 window.EventSource = class { constructor() { this.readyState = 0; } addEventListener() {} removeEventListener() {} close() {} };
@@ -52,7 +52,7 @@ const surface = (id, mountTag, extra = {}) => ({ id, mountTag, audience: 'USER',
   presentation: { labelKey: id, descriptionKey: id }, consumes: { operations: [], resources: [], prompts: [], diagnosticChannels: [] },
   provenance: { tier: 'CORE', contributorId: 'core', version: '1.0.0' }, ...extra });
 __seedForTest({ schemaVersion: '1.0.0', catalogVersion: 1, namespace: 'core', primitive: 'Surface', entries: [
-  surface('${SEARCH}', 'jf-frame-search-probe'),
+  surface('${SEARCH}', new URLSearchParams(location.search).has('realSearch') ? 'jf-sv3-window' : 'jf-frame-search-probe'),
   surface('${LIBRARY}', 'jf-library-surface', { members: ['${BROWSE}'] }),
   surface('${BROWSE}', 'jf-browse-surface', { placement: 'DEEPLINK' }),
   surface('${BRAIN}', 'jf-brain-surface'),
@@ -610,7 +610,7 @@ it('SG8 at 600x400 and 200 percent text every section remains reachable, and Esc
     expect(await row.count(), `section ${id} is rendered`).toBe(1);
     await row.focus(); await page.keyboard.press('Enter'); await settle(page);
     expect(await row.getAttribute('aria-current')).toBe('true');
-    expect(await row.evaluate(el => { const r = el.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; })).toBe(true);
+    expect(await row.evaluate(el => { const r = el.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; }), `${id}: ${await row.evaluate(el => JSON.stringify([el.getBoundingClientRect().top, el.getBoundingClientRect().bottom, (document.querySelector('jf-shell')!.shadowRoot!.querySelector('jf-settings-window')!.querySelector('jf-settings-surface') ?? document.body).localName]))}`).toBe(true);
   }
   await page.locator('jf-settings-nav [data-settings-category="appearance"]').focus(); await page.keyboard.press('Enter');
   await page.locator('jf-button[label="Import a theme from JSON"] button').focus(); await page.keyboard.press('Enter');
@@ -648,3 +648,152 @@ it('SG9 real Gallery and Editor keep sibling instances and editor drafts on appl
   expect(await editor.getAttribute('data-instance-witness')).toBe('retained'); expect(await gallery.getAttribute('data-instance-witness')).toBe('retained');
   expect(await editor.locator('textarea[aria-label="Presentation declaration JSON"]').inputValue()).toBe('{"draft":"keep me"}');
 }, 30_000);
+
+it.each(['Escape', 'Back', 'Close'])('SG3 dismissal by %s preserves the real Search window current conversation and reload address', async (dismissal) => {
+  const page = await open(1280, 720, '?realSearch=1');
+  await page.locator('jf-sv3-window').waitFor();
+  const claim = async (id: string): Promise<void> => {
+    await page.evaluate(async (conversation) => {
+      const { setActiveConversation } = await window.loadSettingsModule<typeof import('../state/conversationListStore.js')>('/src/shell-v0/state/conversationListStore.ts');
+      setActiveConversation(conversation);
+    }, id);
+    await settle(page, 300);
+  };
+  const active = () => page.evaluate(async () => {
+    const { getConversationListState } = await window.loadSettingsModule<typeof import('../state/conversationListStore.js')>('/src/shell-v0/state/conversationListStore.ts');
+    return getConversationListState().activeId;
+  });
+  await claim('settings-conversation-A');
+  expect((await where(page)).address).toContain('conversationId=settings-conversation-A');
+  await openSettings(page);
+  const settingsAddress = (await where(page)).address;
+  await claim('settings-conversation-B');
+  expect(await active()).toBe('settings-conversation-B');
+  expect((await where(page)).address).toBe(settingsAddress);
+  const length = await page.evaluate(() => history.length);
+  if (dismissal === 'Back') await page.goBack();
+  else if (dismissal === 'Close') await page.locator('jf-settings-window button.close').click();
+  else await page.keyboard.press('Escape');
+  await settle(page, 300);
+  expect((await where(page)).settings).toBe(false);
+  expect(await active()).toBe('settings-conversation-B');
+  expect((await where(page)).address).toContain('conversationId=settings-conversation-B');
+  expect((await where(page)).stage).toBe('jf-sv3-window');
+  expect(await page.evaluate(() => history.length)).toBe(length);
+  await page.goForward(); await settle(page);
+  expect((await where(page)).settings).toBe(true);
+  await page.keyboard.press('Escape'); await settle(page);
+  expect((await where(page)).settings).toBe(false);
+  expect(await active()).toBe('settings-conversation-B');
+  await page.reload(); await settle(page, 400);
+  expect(await active()).toBe('settings-conversation-B');
+  expect((await where(page)).address).toContain('conversationId=settings-conversation-B');
+  expect((await where(page)).settings).toBe(false);
+}, 30_000);
+
+it.each([
+  ['core.security-surface', 'security-privacy'],
+  ['core.presentation-gallery-surface', 'appearance'],
+  ['core.presentation-editor-surface', 'appearance'],
+])('SG4 member %s arrivals replace the address before and after Settings mounts without another history entry', async (member, section) => {
+  const page = await open(1280, 720, '', `#justsearch://surface/${member}`);
+  expect((await where(page)).address).toBe(`${SETTINGS}?anchor=${member}&section=${section}`);
+  expect(await page.evaluate(() => history.length)).toBe(2);
+  for (const mounted of [false, true]) {
+    await page.keyboard.press('Escape'); await settle(page);
+    if (mounted) await openSettings(page);
+    const length = await page.evaluate(() => history.length);
+    await page.evaluate((id) => { location.hash = `justsearch://surface/${id}`; }, member);
+    await settle(page, 400);
+    expect((await where(page)).address).toBe(`${SETTINGS}?anchor=${member}&section=${section}`);
+    expect(await settingsSection(page)).toBe(section);
+    expect(await page.evaluate(() => history.length)).toBe(length + 1);
+    expect(await page.locator(`div[data-settings-anchor="${member}"]`).evaluate(el => (el.getRootNode() as ShadowRoot).activeElement === el)).toBe(true);
+  }
+}, 30_000);
+
+/**
+ * SG8 oracle, per section: every enabled control Tab reaches is in view once focused (its box meets
+ * every clipping ancestor; one taller than that viewport shows its caret line), no visible button is
+ * cut off sideways, and, in a short window, the Settings content has exactly one scroll container.
+ */
+function sg8Probe(root: Element): { controls: string[]; focused: number; visible: boolean; detail: string; sideways: string[]; scrollers: string[] } {
+  const all: HTMLElement[] = [root as HTMLElement];
+  const visit = (node: ParentNode): void => {
+    for (const el of node.querySelectorAll<HTMLElement>('*')) { all.push(el); if (el.shadowRoot) visit(el.shadowRoot); }
+  };
+  visit(root);
+  const up = (el: Element): Element | null => el.parentElement ?? ((el.getRootNode() as ShadowRoot).host ?? null);
+  const pane = (root.getRootNode() as ShadowRoot).querySelector('.settings-content-pane')!;
+  const inPane = (el: Element): boolean => { for (let p: Element | null = el; p; p = up(p)) if (p === pane) return true; return false; };
+  const enabled = all.filter(el => inPane(el) && el.matches('button, input, select, textarea, a[href], [tabindex]') &&
+    !(el instanceof HTMLInputElement && el.type === 'radio' && !el.checked) && el.tabIndex >= 0 &&
+    !el.matches(':disabled') && el.getClientRects().length > 0 && getComputedStyle(el).visibility === 'visible');
+  const sideways = all.filter(el => el.localName === 'button' && el.getClientRects().length > 0).flatMap(button => {
+    const r = button.getBoundingClientRect();
+    let cut = r.left < -1 || r.right > innerWidth + 1 ||
+      (getComputedStyle(button).overflowX !== 'visible' && button.scrollWidth > button.clientWidth + 1);
+    for (let p = up(button); p && !cut; p = up(p)) {
+      const b = p.getBoundingClientRect();
+      if (getComputedStyle(p).overflowX !== 'visible' && (r.left < b.left - 1 || r.right > b.right + 1)) cut = true;
+    }
+    const host = (button.getRootNode() as ShadowRoot).host;
+    return cut ? [`${(host ?? button).textContent?.trim().replace(/\s+/g, ' ').slice(0, 60)} ${JSON.stringify([r.left, r.right])}`] : [];
+  });
+  const scrollers = all.filter(el => !el.matches('textarea, input, select') && ['auto', 'scroll'].includes(getComputedStyle(el).overflowY) &&
+    el.scrollHeight > el.clientHeight + 1).map(el => `${el.localName}.${el.className}`);
+  let el = document.activeElement as HTMLElement | null;
+  while (el?.shadowRoot?.activeElement) el = el.shadowRoot.activeElement as HTMLElement;
+  const focused = el ? enabled.indexOf(el) : -1;
+  let visible = false; let detail = '';
+  if (el && focused >= 0) {
+    const r = el.getBoundingClientRect();
+    let top = 0; let bottom = innerHeight; let left = 0; let right = innerWidth;
+    for (let p = up(el); p; p = up(p)) {
+      const style = getComputedStyle(p); const b = p.getBoundingClientRect();
+      if (style.overflowY !== 'visible') { top = Math.max(top, b.top); bottom = Math.min(bottom, b.bottom); }
+      if (style.overflowX !== 'visible') { left = Math.max(left, b.left); right = Math.min(right, b.right); }
+    }
+    let caretTop = r.top; let caretBottom = r.bottom;
+    if (el instanceof HTMLTextAreaElement && r.height > bottom - top) {
+      // The caret line: lay the text before the caret out the way the textarea does.
+      const style = getComputedStyle(el); const mirror = document.createElement('div');
+      for (const key of ['font', 'letterSpacing', 'lineHeight', 'padding', 'border', 'boxSizing', 'width', 'tabSize'] as const) mirror.style[key] = style[key];
+      Object.assign(mirror.style, { position: 'absolute', visibility: 'hidden', whiteSpace: 'pre-wrap', overflowWrap: 'break-word' });
+      mirror.textContent = el.value.slice(0, el.selectionStart ?? 0);
+      const caret = document.createElement('span'); caret.textContent = '\u200b'; mirror.append(caret);
+      document.body.append(mirror);
+      caretTop = r.top + caret.offsetTop - el.scrollTop; caretBottom = caretTop + caret.offsetHeight;
+      mirror.remove();
+    }
+    const meets = Math.min(r.bottom, bottom) - Math.max(r.top, top) > 0 && Math.min(r.right, right) - Math.max(r.left, left) > 0;
+    visible = meets && (r.height <= bottom - top || (caretTop >= top - 1 && caretBottom <= bottom + 1));
+    detail = JSON.stringify({ el: el.outerHTML.slice(0, 160), rect: [r.top, r.bottom, r.left, r.right], caret: [caretTop, caretBottom], viewport: [top, bottom, left, right] });
+  }
+  return { controls: enabled.map(c => c.outerHTML.slice(0, 120)), focused, visible, detail, sideways, scrollers };
+}
+
+it.each([[600, 400, 200], [1280, 720, 100]])('SG8 at %ix%i and %i percent text every section and enabled control is in view on keyboard focus, no button is clipped sideways, one scroller when short', async (width, height, text) => {
+  const page = await open(width, height);
+  await page.evaluate((size) => { document.documentElement.style.fontSize = `${size}%`; }, text);
+  await openSettings(page);
+  await page.addScriptTag({ content: `window.sg8Probe = ${sg8Probe.toString()}` });
+  const probe = () => page.locator('jf-settings-surface .settings-root').evaluate(root => (window as unknown as { sg8Probe: typeof sg8Probe }).sg8Probe(root));
+  for (const section of ['general', 'appearance', 'security-privacy', 'data-reset', 'plugins', 'advanced', 'about']) {
+    const row = page.locator(`jf-settings-nav [data-settings-category="${section}"]`);
+    await row.focus(); await page.keyboard.press('Enter'); await settle(page);
+    expect(await row.getAttribute('aria-current')).toBe('true');
+    const layout = await probe();
+    const reached = new Set<number>();
+    for (let step = 0; step < layout.controls.length + 20 && reached.size < layout.controls.length; step++) {
+      await page.keyboard.press('Tab'); await settle(page, 50);
+      const focus = await probe();
+      if (focus.focused < 0) continue;
+      expect(focus.visible, `${section}: ${focus.detail}`).toBe(true);
+      reached.add(focus.focused);
+    }
+    expect(layout.controls.filter((_, index) => !reached.has(index)), `${section}: enabled controls not reached by Tab`).toEqual([]);
+    expect(layout.sideways, `${section}: buttons cut off sideways`).toEqual([]);
+    if (height === 400) expect(layout.scrollers, `${section}: Settings content scroll containers`).toHaveLength(1);
+  }
+}, 90_000);

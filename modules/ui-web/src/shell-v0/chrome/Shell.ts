@@ -1580,9 +1580,17 @@ export class Shell extends JfElement {
             settingsMember ? target : value('section', 'tab', 'category'), value('anchor', 'entry'),
           );
           const { tab: _tab, category: _category, entry: _entry, ...rest } = state ?? {};
-          intent = { ...intent, address: { ...intent.address, state: {
+          const address: ShellAddressNavigation = { kind: 'navigate', target: SETTINGS_SURFACE_ID, state: {
             ...rest, ...(coordinate ? { section: coordinate.section, anchor: coordinate.anchor } : {}),
-          } } };
+          } };
+          // A browser-made member entry already exists. Canonicalize it before the modal handler
+          // decides whether opening Settings earns a push (including on boot, before mounting).
+          const current = parseUrl(window.location.hash.slice(1));
+          if (settingsMember && current?.kind === 'navigate' && current.target === target) {
+            try { window.history.replaceState(window.history.state, '', `#${canonicalize(address)}`); }
+            catch { /* history API failure is non-fatal */ }
+          }
+          intent = { ...intent, address };
         }
       }
       return dispatchIntent(intent, options);

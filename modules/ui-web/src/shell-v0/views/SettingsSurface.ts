@@ -504,6 +504,14 @@ export class SettingsSurface extends JfElement {
       .settings-content-pane { min-width: 0; }
       .settings-content-inner { padding: 1rem; }
     }
+    /* Short windows use one scroll container: header and navigation cannot squeeze out content. */
+    @media (max-height: 600px) {
+      .settings-root { overflow: auto; }
+      .settings-shell { flex: none; flex-direction: column; overflow: visible; }
+      jf-settings-nav { width: 100%; flex: none; height: auto; min-height: 0; border-bottom: 1px solid var(--border-subtle); }
+      .settings-content-pane { flex: none; overflow: visible; }
+      .toggle-row, .plugin-loader { flex-wrap: wrap; }
+    }
     .empty-member {
       padding: 1.5rem;
       color: var(--text-secondary);
@@ -3208,8 +3216,9 @@ export class SettingsSurface extends JfElement {
     return html`${element ?? html`<div class="empty-member">Cannot mount ${surfaceId}.</div>`}`;
   }
 
-  /** Tempdoc 855 §9.3 — switch the active category: reset scroll to top (a fresh page) and let the
-   *  scroll-spy re-measure the new category's sub-anchors. */
+  /** Tempdoc 855 §9.3 — switch the active category: reset the content pane's scroll to top (a fresh
+   *  page) and let the scroll-spy re-measure the new category's sub-anchors. A short window scrolls
+   *  as one column with the navigation above the content, so the focused section row stays put. */
   private selectCategory(id: string): void {
     if (id === this.activeCategory) return;
     this.arrivalRevision++;
@@ -3217,8 +3226,8 @@ export class SettingsSurface extends JfElement {
     this.addressAnchor = null;
     this.activeAnchor = null;
     void this.updateComplete.then(() => {
-      const conv = this.settingsScrollEl();
-      if (conv) conv.scrollTop = 0;
+      const pane = this.shadowRoot?.querySelector<HTMLElement>('.settings-content-pane');
+      if (pane) pane.scrollTop = 0;
       this.setupAnchorObservers();
     });
   }
@@ -3277,7 +3286,8 @@ export class SettingsSurface extends JfElement {
   }
 
   private settingsScrollEl(): HTMLElement | null {
-    return (this.shadowRoot?.querySelector('.settings-content-pane') as HTMLElement | null) ?? null;
+    const selector = window.matchMedia('(max-height: 600px)').matches ? '.settings-root' : '.settings-content-pane';
+    return this.shadowRoot?.querySelector<HTMLElement>(selector) ?? null;
   }
 
   private readonly onAnchorScroll = (): void => {
@@ -3303,7 +3313,8 @@ export class SettingsSurface extends JfElement {
       this.anchorScrollEl = el;
       el.addEventListener('scroll', this.onAnchorScroll, { passive: true });
       if (typeof ResizeObserver !== 'undefined') {
-        this.anchorResizeObserver = new ResizeObserver(() => this.measureAnchors());
+        // A resize across the short-window threshold changes which element scrolls.
+        this.anchorResizeObserver = new ResizeObserver(() => this.setupAnchorObservers());
         this.anchorResizeObserver.observe(el);
       }
     }

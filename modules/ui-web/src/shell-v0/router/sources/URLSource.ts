@@ -25,6 +25,7 @@
  */
 
 import { isSurfaceUrl, parseUrl } from '../parser.js';
+import { resumeUnderModal } from '../URLProjector.js';
 import type { Intent } from '../types.js';
 import type { IntentSource, SourceDispatch } from './IntentSource.js';
 
@@ -104,6 +105,7 @@ export function createURLSource(config: URLSourceConfig = {}): IntentSource {
       const handler = (event: PopStateEvent) => {
         const origin = event.isTrusted && pending?.url === win.location.href ? pending.origin : 'restore';
         clearPending();
+        resumeUnderModal();
         const popped = parseHash(win, config.onUnknownSurface);
         if (popped) {
           dispatch(popped, { pushHistory: false, taskOrigin: origin });
