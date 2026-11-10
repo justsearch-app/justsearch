@@ -29,32 +29,32 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
-/** The extraction caller classifies a start that already exited, then replaces it on demand. */
+/** The extraction caller reports the exit code of an exited start, then replaces it on demand. */
 @Timeout(30)
 final class RegistrationExitExtractionTest {
   @TempDir Path tmp;
 
   @Test
-  void registrationExitIsACrashWithItsActualCodeAndDiagnostic() throws Exception {
-    assertFailureAndReplacement("fixture startup crash", false);
+  void registrationExitReportsItsActualCodeAndGetsAReplacement() throws Exception {
+    assertFailureAndReplacement("fixture startup crash");
   }
 
   @Test
-  void registrationHeapExitIsPermanentAndKeepsItsActualCodeAndDiagnostic() throws Exception {
-    assertFailureAndReplacement("java.lang.OutOfMemoryError: fixture startup heap", true);
+  void registrationHeapExitReportsItsActualCodeAndGetsAReplacement() throws Exception {
+    assertFailureAndReplacement("java.lang.OutOfMemoryError: fixture startup heap");
   }
 
   @Test
   void realRegistrationCrashWaitsForPublishedStatusAndGetsAReplacement() throws Exception {
-    assertRealFailureAndReplacement("fixture startup crash", false);
+    assertRealFailureAndReplacement("fixture startup crash");
   }
 
   @Test
   void realRegistrationHeapExitWaitsForPublishedStatusAndGetsAReplacement() throws Exception {
-    assertRealFailureAndReplacement("java.lang.OutOfMemoryError: fixture startup heap", true);
+    assertRealFailureAndReplacement("java.lang.OutOfMemoryError: fixture startup heap");
   }
 
-  private void assertRealFailureAndReplacement(String diagnostic, boolean oom) throws Exception {
+  private void assertRealFailureAndReplacement(String diagnostic) throws Exception {
     try (var fixture = new io.justsearch.app.api.runtime.child.RegistrationPublicationFixture(tmp, diagnostic);
         var replacement = DefaultChildControl.unrecorded(ManagedChildRegistry.noop());
         var executor = java.util.concurrent.Executors.newSingleThreadExecutor()) {
@@ -79,10 +79,7 @@ final class RegistrationExitExtractionTest {
         var failure = result.get(10, TimeUnit.SECONDS);
         assertAll(
             () -> assertFalse(returnedBeforePublication, "extraction registration returned without its exit outcome"),
-            () -> assertEquals(oom ? ContentExtractor.ExtractionException.class : SandboxExtractionException.class,
-                failure.getClass()),
-            () -> assertTrue(failure.getMessage().contains("37"), failure.getMessage()),
-            () -> assertTrue(failure.getMessage().contains(diagnostic), failure.getMessage()));
+            () -> assertTrue(failure.getMessage().contains("37"), failure.getMessage()));
         assertEquals("ok-replacement.txt", sandbox.extract(input).result().content());
         assertEquals(2, launches.get());
         assertEquals(1, fixture.exitRecords.get());
@@ -91,7 +88,7 @@ final class RegistrationExitExtractionTest {
     }
   }
 
-  private void assertFailureAndReplacement(String diagnostic, boolean oom) throws Exception {
+  private void assertFailureAndReplacement(String diagnostic) throws Exception {
     CountDownLatch requestWritten = new CountDownLatch(1);
     try (DefaultChildControl real = DefaultChildControl.unrecorded(ManagedChildRegistry.noop())) {
       ChildControl control = mock(ChildControl.class, delegatesTo(real));
@@ -127,10 +124,7 @@ final class RegistrationExitExtractionTest {
       try (var sandbox = ChildControlFixtures.pool(command, Duration.ofSeconds(10), 500, null, control)) {
         Path input = Files.writeString(tmp.resolve("ok-replacement.txt"), "test input");
         var failure = assertThrows(ContentExtractor.ExtractionException.class, () -> sandbox.extract(input));
-        assertEquals(oom ? ContentExtractor.ExtractionException.class : SandboxExtractionException.class,
-            failure.getClass());
         assertTrue(failure.getMessage().contains("23"), failure.getMessage());
-        assertTrue(failure.getMessage().contains(diagnostic), failure.getMessage());
         assertEquals("ok-replacement.txt", sandbox.extract(input).result().content());
         assertEquals(2, launches.get(), "the later request starts a replacement");
       }

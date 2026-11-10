@@ -353,21 +353,25 @@ public final class DefaultChildControl implements ChildControl {
       held.state = ChildHandle.State.RUNNING;
       exitedWhileStarting = held.exitedWhileStarting;
     }
-    if (exitedWhileStarting) {
-      recordExit(held, ExitOutcome.Phase.STARTING);
-      awaitRegistrationExit(held);
+    // Registration may observe an exit on this caller's thread. Keep its interrupt away from
+    // the ledger and manifest channels until the entire outcome has been published and removed.
+    try (RegistrationInterrupt interrupt = new RegistrationInterrupt()) {
+      if (exitedWhileStarting) {
+        recordExit(held, ExitOutcome.Phase.STARTING);
+        awaitRegistrationExit(held, interrupt);
+        return held;
+      }
+      if (!register(held, manifest, interrupt)) return held;
+      if (process instanceof WindowsEngineJob.ChatProcess chat) {
+        try {
+          chat.resume();
+        } catch (IOException failure) {
+          var _ = beginStop(held, SURVIVOR_RETRY, Optional.empty());
+          throw failure;
+        }
+      }
       return held;
     }
-    if (!register(held, manifest)) return held;
-    if (process instanceof WindowsEngineJob.ChatProcess chat) {
-      try {
-        chat.resume();
-      } catch (IOException failure) {
-        var _ = beginStop(held, SURVIVOR_RETRY, Optional.empty());
-        throw failure;
-      }
-    }
-    return held;
   }
 
   /**
@@ -556,7 +560,7 @@ public final class DefaultChildControl implements ChildControl {
   }
 
   /** Registers the manifest entry, or returns false for an early exit; failures roll back. */
-  private boolean register(Held held, ManifestEntry manifest) throws IOException {
+  private boolean register(Held held, ManifestEntry manifest, RegistrationInterrupt interrupt) throws IOException {
     try {
       ManagedChild entry;
       try {
@@ -571,11 +575,12 @@ public final class DefaultChildControl implements ChildControl {
             && !held.os.processIdentity().equals(Optional.ofNullable(entry.processIdentity())))
           throw new IOException("Linux child identity changed before registration");
       } catch (IOException | RuntimeException captureFailure) {
-        if (!confirmRegistrationExit(held.process)) throw captureFailure;
+        if (!confirmRegistrationExit(held.process, interrupt)) throw captureFailure;
         recordExit(held, ExitOutcome.Phase.STARTING);
-        awaitRegistrationExit(held);
+        awaitRegistrationExit(held, interrupt);
         return false;
       }
+      interrupt.defer();
       registry.register(entry);
       boolean exitedWhileRegistering;
       synchronized (held) {
@@ -586,7 +591,7 @@ public final class DefaultChildControl implements ChildControl {
       // the id was known, so that exit could not remove the entry: remove it here (removal is
       // idempotent, so an exit that saw the id as well does no harm).
       if (exitedWhileRegistering) {
-        awaitRegistrationExit(held);
+        awaitRegistrationExit(held, interrupt);
         try {
           registry.remove(entry.id());
         } catch (IOException | RuntimeException retained) {
@@ -597,11 +602,9 @@ public final class DefaultChildControl implements ChildControl {
     } catch (IOException | RuntimeException failure) {
       Throwable suppressed = null;
       try {
-        stop(held, StopRequest.of(StopReason.ROLLBACK, StopMode.NOW, REQUESTED_BY))
-            .toCompletableFuture().get(STOP_BOUND.toMillis(), TimeUnit.MILLISECONDS);
-      } catch (InterruptedException interrupted) {
-        Thread.currentThread().interrupt();
-        suppressed = interrupted;
+        interrupt.defer();
+        interrupt.await(stop(held, StopRequest.of(StopReason.ROLLBACK, StopMode.NOW, REQUESTED_BY))
+            .toCompletableFuture());
       } catch (ExecutionException | TimeoutException survived) {
         // The handle stays owned (SURVIVED): close(), later stops and the next chat-server start
         // retry it, and the exception hands it to the caller, which keeps owning it.
@@ -615,34 +618,58 @@ public final class DefaultChildControl implements ChildControl {
   }
 
   /** The watcher claims EXITED before writing; a registration exit must include its outcome. */
-  private static void awaitRegistrationExit(Held held) throws IOException {
-    boolean interrupted = Thread.interrupted();
-    long deadline = System.nanoTime() + STOP_BOUND.toNanos();
+  private static void awaitRegistrationExit(Held held, RegistrationInterrupt interrupt) throws IOException {
     try {
-      while (true) {
-        try {
-          held.exit.get(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS);
-          return;
-        } catch (InterruptedException interrupt) {
-          interrupted = true;
-        } catch (ExecutionException | TimeoutException unpublished) {
-          throw new IOException("child exited during registration but its outcome was not published",
-              unpublished);
-        }
-      }
-    } finally {
-      if (interrupted) Thread.currentThread().interrupt();
+      interrupt.await(held.exit);
+    } catch (ExecutionException | TimeoutException unpublished) {
+      throw new IOException("child exited during registration but its outcome was not published",
+          unpublished);
     }
   }
 
   /** Identity loss alone proves nothing: only the original spawn can confirm its own exit. */
-  private static boolean confirmRegistrationExit(Process process) {
-    if (!process.isAlive()) return true;
+  private static boolean confirmRegistrationExit(Process process, RegistrationInterrupt interrupt) {
+    interrupt.defer();
     try {
+      if (!process.isAlive()) return true;
       return process.waitFor(REGISTRATION_EXIT_WAIT.toMillis(), TimeUnit.MILLISECONDS);
     } catch (InterruptedException interrupted) {
-      Thread.currentThread().interrupt();
+      interrupt.interrupted = true;
       return !process.isAlive();
+    } finally {
+      interrupt.defer();
+    }
+  }
+
+  /** Hold registration interruptions until all its bookkeeping, including rollback, is done. */
+  private static final class RegistrationInterrupt implements AutoCloseable {
+    private boolean interrupted = Thread.interrupted();
+
+    void defer() {
+      interrupted |= Thread.interrupted();
+    }
+
+    void await(CompletableFuture<?> future) throws ExecutionException, TimeoutException {
+      defer();
+      long deadline = System.nanoTime() + STOP_BOUND.toNanos();
+      try {
+        while (true) {
+          try {
+            long remaining = deadline - System.nanoTime();
+            if (remaining <= 0) throw new TimeoutException("registration exit wait expired");
+            future.get(remaining, TimeUnit.NANOSECONDS);
+            return;
+          } catch (InterruptedException interrupt) {
+            interrupted = true;
+          }
+        }
+      } finally {
+        defer();
+      }
+    }
+
+    @Override public void close() {
+      if (interrupted) Thread.currentThread().interrupt();
     }
   }
 
