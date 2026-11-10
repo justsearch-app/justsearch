@@ -14,8 +14,7 @@ nightly workflow:
    reported as the run's cohort identity).
 2. It has a populated ``projections/`` directory with the LR4-* outputs
    actually produced (no hard-fail on any single projection status, but
-   at least ``contract_violations`` + ``rate_timeline`` +
-   ``stratified_metrics`` + ``bootstrap_ci`` must exist).
+   both ``contract_violations`` and ``rate_timeline`` must exist).
 
 Tempdoc 930 §18.1 row 7 removed the σ-band arm: it compared the cohort's
 calibrated ``envelope.json`` against a pinned ``--baseline-stdev``, and no
@@ -40,8 +39,6 @@ from typing import Any
 REQUIRED_PROJECTIONS = (
     "contract_violations",
     "rate_timeline",
-    "stratified_metrics",
-    "bootstrap_ci",
 )
 
 

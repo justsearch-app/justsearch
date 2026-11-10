@@ -7,6 +7,8 @@ description: "CLI reference for the jseval evaluation, pipeline profiling, and t
 
 # jseval Pipeline Reference
 
+**Agent-utility campaign freeze (2026-11-09):** Fresh and resumed live agent-utility campaigns are frozen. Their commands and runbooks remain available for historical reproduction and offline analysis, along with published evidence and offline replay. Neighboring experiments retain their existing status.
+
 `python -m jseval` is the canonical **agent-only** tool for dataset
 evaluation, pipeline profiling, and throughput benchmarking. It is not
 designed for human developers — all output and progress reporting is

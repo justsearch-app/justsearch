@@ -1,8 +1,12 @@
 # Research
 
-JustSearch is also a research project about how people and AI agents find, read and use
-what is in their files. Its purpose is findings that make JustSearch better: every question
-is tested in JustSearch itself, and its answer could change it.
+**Agent-utility campaign freeze (2026-11-09):** Fresh and resumed live agent-utility campaigns are frozen. Their commands and runbooks remain available for historical reproduction and offline analysis, along with published evidence and offline replay. Neighboring experiments retain their existing status.
+
+JustSearch is also a research project. It asks what can be done with what JustSearch learns
+about a collection of files when it indexes it, beyond answering a search, and which of those
+things are worth anything to a person or an AI assistant. Improving search itself is part of
+it. Questions are tried in JustSearch itself; a finding does not by itself change what the
+product is for (see [NON-GOALS](NON-GOALS.md)).
 
 Findings stay internal by default; "this did not help" is a result too. A finding is
 published only once it is confirmed (checked against a baseline, repeated, and tested on

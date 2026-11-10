@@ -1,0 +1,174 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-09T22:10:38.985Z",
+  "revision": "1a0b2be2dcaedd048281c5f4c5ff76591fb9e8cf",
+  "tree": "3ac8313189b237f65347f0c60db6084f44653091",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/BrainSurface.removalBand-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/windowfix-w3/tmp/windowfix-w3/test-intent-vitest-4-1794262216620.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 22363
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.removalBand-lockdown.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.removalBand-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8b603a28765b52653a1675981590a22f0b69806ac93a803dfc956579f091eec6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "D1 pointer opens on Keep it; Escape cancels only the band and restores its opener",
+          "status": "passed"
+        },
+        {
+          "name": "D1 keyboard opens on Keep it; Escape cancels only the band and restores its opener",
+          "status": "passed"
+        },
+        {
+          "name": "D3 either host replaces the other draft in this document; a second window stays independent",
+          "status": "passed"
+        },
+        {
+          "name": "D6 collapse clears the draft permanently when the confirmation leaves",
+          "status": "passed"
+        },
+        {
+          "name": "D6 hide clears the draft permanently when the confirmation leaves",
+          "status": "passed"
+        },
+        {
+          "name": "D6 hide-runtime clears the draft permanently when the confirmation leaves",
+          "status": "passed"
+        },
+        {
+          "name": "D6 missing clears the draft permanently when the confirmation leaves",
+          "status": "passed"
+        },
+        {
+          "name": "D2 double-click answers at most once; cancellation never invokes removal",
+          "status": "passed"
+        },
+        {
+          "name": "D2 Enter answers at most once; cancellation never invokes removal",
+          "status": "passed"
+        },
+        {
+          "name": "D2 Space answers at most once; cancellation never invokes removal",
+          "status": "passed"
+        },
+        {
+          "name": "D4 complete/incomplete=false keeps preview paths, sizes, features and assurances",
+          "status": "passed"
+        },
+        {
+          "name": "D4 complete/incomplete=true keeps preview paths, sizes, features and assurances",
+          "status": "passed"
+        },
+        {
+          "name": "D5 the accepted digest survives a later poll and a stale-preview refusal stays visible",
+          "status": "passed"
+        },
+        {
+          "name": "D7 removed outcome and focus survive the opener disappearing during removal",
+          "status": "passed"
+        },
+        {
+          "name": "D7 refused outcome and focus survive the opener disappearing during removal",
+          "status": "passed"
+        },
+        {
+          "name": "D7 partial outcome and focus survive the opener disappearing during removal",
+          "status": "passed"
+        },
+        {
+          "name": "D7 interrupted outcome and focus survive the opener disappearing during removal",
+          "status": "passed"
+        },
+        {
+          "name": "D7 a running removal observed after reload blocks conflicting actions",
+          "status": "passed"
+        },
+        {
+          "name": "D1/D4 narrow window and wide font (forced colours=false) keep both answers and paths readable",
+          "status": "passed"
+        },
+        {
+          "name": "D1/D4 narrow window and wide font (forced colours=true) keep both answers and paths readable",
+          "status": "passed"
+        },
+        {
+          "name": "D2 holding Enter from the opener cannot answer the new band",
+          "status": "passed"
+        },
+        {
+          "name": "D2 holding Space from the opener cannot answer the new band",
+          "status": "passed"
+        },
+        {
+          "name": "D7 switching screens during removal keeps the pending guard and shows its late outcome",
+          "status": "passed"
+        },
+        {
+          "name": "D7 a backend refusal before another removal is observed stays visible",
+          "status": "passed"
+        },
+        {
+          "name": "D9 removed waits for a later removal poll and focuses the settled row action or outcome",
+          "status": "passed"
+        },
+        {
+          "name": "D9 partial waits for a later removal poll and focuses the settled row action or outcome",
+          "status": "passed"
+        },
+        {
+          "name": "D9 no-action waits for a later removal poll and focuses the settled row action or outcome",
+          "status": "passed"
+        },
+        {
+          "name": "D9 polling closes a focused band onto row without stealing focus elsewhere",
+          "status": "passed"
+        },
+        {
+          "name": "D9 polling closes a focused band onto outcome without stealing focus elsewhere",
+          "status": "passed"
+        },
+        {
+          "name": "D9 polling closes a focused band onto elsewhere without stealing focus elsewhere",
+          "status": "passed"
+        },
+        {
+          "name": "D9 polling closes a focused band onto Downloaded files when not-downloaded leaves no action or outcome",
+          "status": "passed"
+        },
+        {
+          "name": "D9 polling closes a focused band onto Downloaded files when not-removable leaves no action or outcome",
+          "status": "passed"
+        },
+        {
+          "name": "D9 a later removal outcome keeps focus deliberately moved elsewhere while running",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:473800c36f39c6ff72312d54620f53bbc3c7f34aebb95ffd95441bc39fa8ef7f"
+}
