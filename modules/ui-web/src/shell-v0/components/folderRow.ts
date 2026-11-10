@@ -58,7 +58,7 @@ export const folderRowStyles = css`
   .folder-toggle { display: flex; align-items: center; gap: .75rem; min-width: 0;
     padding: 0; border: 0; background: transparent; color: var(--text-primary);
     text-align: start; font: inherit; cursor: pointer; }
-  .folder-toggle:focus-visible { outline: 2px solid var(--accent-tint); outline-offset: 3px; }
+  .folder-toggle:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 3px; }
   .card-icon, .chevron { flex: none; color: var(--text-secondary); }
   .chevron { display: inline-flex; }
   .folder-toggle[aria-expanded='true'] .chevron { transform: rotate(90deg); }

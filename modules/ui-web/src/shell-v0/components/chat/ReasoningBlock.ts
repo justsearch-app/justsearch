@@ -178,7 +178,7 @@ export class ReasoningBlock extends JfElement {
       color: var(--text-primary);
     }
     .disclosure:focus-visible {
-      outline: 2px solid var(--accent-primary);
+      outline: 2px solid var(--focus-ring-color);
       outline-offset: 2px;
       border-radius: 4px;
     }
@@ -221,7 +221,7 @@ export class ReasoningBlock extends JfElement {
       background: var(--surface-subtle);
     }
     .copy-btn:focus-visible {
-      outline: 2px solid var(--accent-primary);
+      outline: 2px solid var(--focus-ring-color);
       outline-offset: 2px;
     }
     .content {

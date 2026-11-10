@@ -70,7 +70,7 @@ class IndexingControls extends SignalWatcher(JfElement) {
     }
     button { cursor: pointer; }
     button[aria-disabled="true"] { opacity: .65; cursor: default; }
-    button:focus-visible, select:focus-visible { outline: 2px solid var(--accent-tint); outline-offset: 2px; }
+    button:focus-visible, select:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 2px; }
     p { margin: 0; font-size: var(--font-size-xs); overflow-wrap: anywhere; }
     p:not(:empty) { margin-top: .25rem; }
     :host([compact]) button, :host([compact]) select { border: 0; background: transparent; }

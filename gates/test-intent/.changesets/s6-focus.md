@@ -7,31 +7,38 @@ author-session: s6-focus-builder-20261110
 
 # Built-in palette keyboard focus contrast
 
-Discover every CSS/JSON palette in public/themes, excluding manifest metadata, instead of the
-previous three-file subset. Preserve the existing accent checks and add a 3:1 focus-ring floor
-against each surface-0 through surface-4 the palette defines. If it defines no surfaces, check
-the inherited base surfaces. Resolve palette focus-ring overrides, accent fallback and inherited
-base values in both light and dark appearances, including token aliases and base hue seeds.
+All six built-in CSS/JSON palettes are checked against surface-0 through surface-4 in both
+appearances, merging each palette value over the inherited appearance value independently.
+The source guard scans CSS and JS/TS templates for focus outline and box-shadow token bypasses.
+Non-painting resets and transparent outlines repainted by forced colours remain; explicit system
+colour overrides remain. Painted focus outlines, the session halo, composer frame, grips and the
+focus-ring utility now read --focus-ring-color. No accent or other token values change.
+Search keeps its window-scoped --ring, whose contrast is pinned by sv3-tokens.test.ts;
+the guard permits that token only inside views/search-v3/.
 
-On origin/main (fa0f2213444bd62de138981efcae72a9bc8ed059), with only the candidate test overlaid
-in a shared clone, the new assertions fail ten times: Sepia's five surfaces in both appearances.
-Its original accent-based ring measures 2.62, 2.41, 2.12, 1.81 and 1.51:1 on surfaces 0–4.
-All other checks pass (102 passed, 10 failed). The runner-produced record is
-`gates/test-intent/evidence/s6-focus-before.json`; its command exits 1 for those assertions.
+The runner-produced `evidence/s6-focus.json` records both checks failing assertions before on
+fa0f221344 and passing on the candidate. `evidence/s6-focus-highvis.json` additionally records
+the extended palette check failing on 3efe7c90d1: High Vis inherits light surface-3 and surface-4,
+where the old ring measures 1.1671:1 and 1.0938:1. Candidate checks are overlaid into temporary
+checkouts with private dependency copies. The evidence runner itself runs from a shared clone,
+so its temporary worktree registration does not write into the source repository.
 
-Only Sepia needs a palette change: `--focus-ring-color: #79551f`, a deeper amber, measures
-5.6329, 5.1958, 4.5551, 3.8926 and 3.2499:1 on surfaces 0–4. No other token changes.
-The candidate has 112 passing checks, including all 56 focus/surface/appearance checks.
-The forced-colors system Highlight rules remain in place. CSS palettes use the existing direct
-injection path; no theme validation or conformance rule changes.
+Sepia keeps its committed deeper amber --focus-ring-color #79551f: 5.6329, 5.1958, 4.5551,
+3.8926 and 3.2499:1 on surfaces 0–4 in either appearance. High Vis adds a cyan
+--focus-ring-color #008890. Its ratios on surfaces 0–4 are 4.6883, 4.4758, 4.2098, 3.7997,
+3.3370:1 in dark and 4.6883, 4.4758, 4.2098, 3.5895, 3.3640:1 in light.
+The palette and guard checks pass together (117 assertions).
 
 ```json
 {
   "entries": [
     {
-      "items": ["modules/ui-web/src/shell-v0/themes/builtinPaletteContrast.test.ts"],
+      "items": [
+        "modules/ui-web/src/shell-v0/themes/builtinPaletteContrast.test.ts",
+        "modules/ui-web/src/shell-v0/themes/focusRingAuthority.test.ts"
+      ],
       "class": "New",
-      "behaviour": "Every built-in CSS/JSON palette has an effective keyboard focus ring with at least 3:1 contrast against every surface it defines, or inherited base surfaces if it defines none. Palette ring overrides win, otherwise the palette accent and appearance base apply. Both appearances are checked. Existing accent-on-color checks extend to every discovered palette without weakening their expectations.",
+      "behaviour": "Every built-in CSS/JSON palette has an effective keyboard focus ring with at least 3:1 contrast against all five surfaces in both appearances. Each palette value overrides the appearance base independently, including partially inherited surfaces. Focus outline and box-shadow rules read --focus-ring-color instead of accents or local ring aliases; only views/search-v3/ may keep its window-scoped --ring, pinned by its own contrast tests. Forced-colour system colours and non-painting resets remain. Existing accent checks keep their expectations.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -43,7 +50,11 @@ injection path; no theme validation or conformance rule changes.
         }
       ],
       "evidence": "gates/test-intent/evidence/s6-focus.json",
-      "newChecks": ["modules/ui-web/src/shell-v0/themes/builtinPaletteContrast.test.ts"]
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/themes/builtinPaletteContrast.test.ts",
+        "modules/ui-web/src/shell-v0/themes/focusRingAuthority.test.ts"
+      ],
+      "repaired": true
     }
   ]
 }

@@ -176,12 +176,9 @@ describe('built-in palette focus rings contrast with their surrounding surfaces 
 
   for (const file of BUILT_IN_PALETTES) {
     const palette = loadPaletteTokens(file);
-    const ownSurfaces = surfaces.filter((name) => palette[name] !== undefined);
-    // Palette surfaces do not flip with appearance. With none, check the inherited base surfaces.
-    const surroundingSurfaces = ownSurfaces.length > 0 ? ownSurfaces : surfaces;
     for (const [mode, base] of [['dark', dark], ['light', light]] as const) {
       const tokens = { ...base, ...palette };
-      for (const surfaceName of surroundingSurfaces) {
+      for (const surfaceName of surfaces) {
         it(`${file}: focus ring on --${surfaceName} in ${mode} (≥ 3:1)`, () => {
           // The base ring aliases --accent-tint, so an unset ring uses the palette's accent first.
           const ring = resolveTokenColor('focus-ring-color', tokens);

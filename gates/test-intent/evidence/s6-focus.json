@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
   },
-  "createdAt": "2026-11-10T20:22:58.217Z",
-  "revision": "fa0f2213444bd62de138981efcae72a9bc8ed059",
-  "tree": "f03fb431a299b3a18be3349c2508feb9e4806161",
+  "createdAt": "2026-11-10T20:41:04.725Z",
+  "revision": "3efe7c90d1c26a74eb5d3b78979d0038dbc8f49c",
+  "tree": "6b0edf094296f14b59ba26fd6bb90fad26d8215f",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/themes/builtinPaletteContrast.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/9vi8o1li/tmp/test-intent-vitest-3-1794342176985.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/themes/builtinPaletteContrast.test.ts\" \"src/shell-v0/themes/focusRingAuthority.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/4glaxu78/tmp/test-intent-vitest-7-1794343257442.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 1228
+      "durationMs": 1023
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/themes/builtinPaletteContrast.test.ts",
       "file": "modules/ui-web/src/shell-v0/themes/builtinPaletteContrast.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:dad9c91c47039245bd5ecad8583acff75151935a6e1116311a42aeb39a15c7a6",
+      "contentDigest": "sha256:7af7c7ba78438273fd74cbbe4cbd4972bdee64ed2183fd247eaa34515e6a1a74",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -247,6 +247,14 @@
           "status": "passed"
         },
         {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.high-vis.json: focus ring on --surface-3 in dark (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.high-vis.json: focus ring on --surface-4 in dark (≥ 3:1)",
+          "status": "passed"
+        },
+        {
           "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.high-vis.json: focus ring on --surface-0 in light (≥ 3:1)",
           "status": "passed"
         },
@@ -256,6 +264,14 @@
         },
         {
           "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.high-vis.json: focus ring on --surface-2 in light (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.high-vis.json: focus ring on --surface-3 in light (≥ 3:1)",
+          "status": "passed"
+        },
+        {
+          "name": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.high-vis.json: focus ring on --surface-4 in light (≥ 3:1)",
           "status": "passed"
         },
         {
@@ -483,8 +499,49 @@
           "status": "passed"
         }
       ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/themes/focusRingAuthority.test.ts",
+      "file": "modules/ui-web/src/shell-v0/themes/focusRingAuthority.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e50cb4d6c4dbafec8f14a6d6e7805a7231082fe93133e2763b03141848404ead",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "focus outlines and shadows use the focus-ring token, preserving forced-colours system colours",
+          "status": "passed"
+        }
+      ]
     }
   ],
-  "failBefore": null,
-  "digest": "sha256:838f0a0c33b3d2122d7b964f853950c7ddd72933e014d5a037ff5b1f1353b375"
+  "failBefore": {
+    "ref": "fa0f221344",
+    "revision": "fa0f2213444bd62de138981efcae72a9bc8ed059",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/themes/builtinPaletteContrast.test.ts\" \"src/shell-v0/themes/focusRingAuthority.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/4glaxu78/tmp/test-intent-vitest-7-1794343262049.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1759,
+        "output": "JSON report written to /home/elias/.cache/am/4glaxu78/tmp/test-intent-vitest-7-1794343262049.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/themes/builtinPaletteContrast.test.ts",
+        "classification": "assertion",
+        "detail": "built-in palette focus rings contrast with their surrounding surfaces (≥ 3:1) core.high-vis.json: focus ring on --surface-3 in light (≥ 3:1):  AssertionError: core.high-vis.json (light): focus ring on --surface-3 is 1.17:1 — below 3:1: expected 1.1671312447736875 to be greater than or equal to 3\n    at /home/elias/.cache/am/4glaxu78/tmp/test-intent-before-FCmTeD/modules/ui-web/src/shell-v0/themes/builtinPaletteContrast.test.ts:193:13\n    a | built-in palette focus rings contrast with their surro"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/themes/focusRingAuthority.test.ts",
+        "classification": "assertion",
+        "detail": "focus outlines and shadows use the focus-ring token, preserving forced-colours system colours:  AssertionError: boot/factoryReset.ts: button:focus-visible { outline: 2px solid var(--accent-tint, Highlight) }\nshell-v0/components/Control.ts: button:focus-visible { outline: 2px solid var(--accent-tint) }\nshell-v0/components/FailedFilesList.ts: .list:focus-visible { outline: var(--frame-focus-widt"
+      }
+    ]
+  },
+  "digest": "sha256:668f8ff5a63f5d820d8e9b75112ad81ffee6bcb93d5cec38d9ae22f9257f197b"
 }
