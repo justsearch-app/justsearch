@@ -363,7 +363,7 @@ the base still produces the v9 identity. The three new test files are exempt (is
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopTest.java"
       ],
       "class": "New",
-      "behaviour": "DetectLanguageTests now observes the label the indexer stores, LanguageUtils.resolveLanguage, instead of IndexingDocumentOps.detectLanguage, which this change removes (the indexer's parent metadata derivation, deriveParentMetadataWithTokenCounter, now calls LanguageUtils.resolveLanguage). At the base, resolveLanguage returned the machine locale tag for null, empty and Latin-only text. nullReturnsNull, emptyReturnsNull and latinReturnsNull now expect no label (null) from it; latinReturnsNull's display name changes from \"Latin-only text returns null (uses default)\" to \"Short Latin text has insufficient evidence\" (its input has fewer than 50 Latin letters). The five script cases (zh, ja, ko, ru, ar) keep their inputs and expected codes; only their callee changes. Nothing else in the file changes.",
+      "behaviour": "DetectLanguageTests now observes the label the indexer stores, LanguageUtils.resolveLanguage, instead of IndexingDocumentOps.detectLanguage, which this change removes (the indexer's parent metadata derivation, deriveParentMetadataWithTokenCounter, now calls LanguageUtils.resolveLanguage). At the base, resolveLanguage returned the machine locale tag for null, empty and Latin-only text. nullReturnsNull, emptyReturnsNull and latinReturnsNull now expect no label (null) from it; latinReturnsNull's display name changes from \"Latin-only text returns null (uses default)\" to \"Short Latin text has insufficient evidence\" (its input has fewer than 50 Latin letters). The five script cases (zh, ja, ko, ru, ar) keep their inputs and expected codes; only their callee changes. Nothing else in the file changes. Gradle's IndexingLoopTest.nullReturnsNull filter also selects the unchanged NormalizeMimeBaseTests.nullReturnsNull (same method name in another nested class), so that check records two cases with the display name \"null returns null\"; the unchanged one passes on both arms.",
       "sources": [
         {
           "kind": "owner-words",
@@ -379,9 +379,11 @@ the base still produces the v9 identity. The three new test files are exempt (is
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/lang-detect-content.json",
+      "evidence": "gates/test-intent/evidence/lang-detect-content-labels.json",
       "newChecks": [
-        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopTest.java"
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopTest.java#nullReturnsNull",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopTest.java#emptyReturnsNull",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopTest.java#latinReturnsNull"
       ],
       "repaired": true
     },
