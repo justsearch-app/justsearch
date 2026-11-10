@@ -2102,7 +2102,8 @@ export class Sv3Composer extends JfElement {
   }
 
   private corpusLine(): TemplateResult | typeof nothing {
-    if (this.corpus.kind === 'unknown') return nothing;
+    const setup = getFirstUse();
+    if (setup.coreVisible && setup.progress && !setup.empty || this.corpus.kind === 'unknown') return nothing;
     if (this.corpus.kind === 'documents') {
       return html`<p class="corpus" data-testid="sv3-composer-corpus" data-kind="documents">
         Searching ${this.corpus.count.toLocaleString()}

@@ -105,7 +105,7 @@ final class SearchableDocCountReaderSelectionTest extends io.justsearch.adapters
     when(failing.docCountOrThrow()).thenReturn(12L);
     parentSnapshotReturns(failing, 10L);
     when(failing.countByFieldOrThrow(anyString(), anyString())).thenReturn(2);
-    when(failing.countQueryOrThrow(any())).thenThrow(new IOException("reader unavailable"));
+    when(failing.countQueriesOrThrow(any(org.apache.lucene.search.Query[].class))).thenThrow(new IOException("reader unavailable"));
 
     CoreStatus core = buildStatus(failing, null).getCore();
 
@@ -125,7 +125,7 @@ final class SearchableDocCountReaderSelectionTest extends io.justsearch.adapters
     when(healthy.docCountOrThrow()).thenReturn(12L);
     parentSnapshotReturns(healthy, 10L);
     when(healthy.countByFieldOrThrow(anyString(), anyString())).thenReturn(2);
-    when(healthy.countQueryOrThrow(any())).thenReturn(7);
+    when(healthy.countQueriesOrThrow(any(org.apache.lucene.search.Query[].class))).thenReturn(new long[] {7, 7});
 
     CoreStatus core = buildStatus(healthy, null).getCore();
 

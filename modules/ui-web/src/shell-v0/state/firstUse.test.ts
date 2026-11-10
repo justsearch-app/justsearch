@@ -7,23 +7,18 @@ import { __resetUserStateForTest, __resetInMemoryStateForTest, getAllWalkthrough
 // The baseline fails assertions about the absent feature, rather than failing to load the suite.
 const modules = import.meta.glob('./firstUse.ts', { eager: true });
 const api = Object.values(modules)[0] as typeof import('./firstUse.js') | undefined;
-const facts = { roots: 0, searchable: 5, helpSearchable: 5, waiting: 0, reading: false, aiActive: false };
+const facts = { roots: 0, searchable: 0, waiting: 0, reading: false, aiActive: false };
 const project = (...args: Parameters<NonNullable<typeof api>['projectFirstUse']>) => api?.projectFirstUse(...args) ?? {};
 beforeEach(() => __resetUserStateForTest());
 
 describe('Getting started facts (SB1–SB11)', () => {
   it('zero searchable documents confirms first use without Help', () => {
-    expect(project({ ...facts, searchable: 0, helpSearchable: null })).toMatchObject({
+    expect(project({ ...facts, searchable: 0 })).toMatchObject({
       searchable: 0, known: true, empty: true, visible: true, currentStep: 1, done: [false, false, false],
     });
   });
   it('unknown searchable documents stay unknown without Help', () => {
-    expect(project({ ...facts, searchable: null, helpSearchable: null })).toMatchObject({
-      searchable: null, known: false, empty: false, visible: false, progress: null,
-    });
-  });
-  it('positive searchable documents stay unknown without Help', () => {
-    expect(project({ ...facts, searchable: 5, helpSearchable: null })).toMatchObject({
+    expect(project({ ...facts, searchable: null })).toMatchObject({
       searchable: null, known: false, empty: false, visible: false, progress: null,
     });
   });
@@ -33,15 +28,12 @@ describe('Getting started facts (SB1–SB11)', () => {
     expect(project(facts)).toMatchObject({ empty: true, visible: true, done: [false, false, false] });
     expect(project({ ...facts, roots: 1, searchable: 7 })).toMatchObject({ empty: false, done: [true, false, false] });
   });
-  it('bundled Help never licenses setup completion, and unknown Help never licenses advice', () => {
-    expect(project(facts)).toMatchObject({ searchable: 0, done: [false, false, false], currentStep: 1 });
-    expect(project({ ...facts, helpSearchable: null })).toMatchObject({ searchable: null, visible: false, progress: null });
-    expect(project({ ...facts, searchable: 8, helpSearchable: 8 })).toMatchObject({ searchable: 0, empty: true });
+  it('a watched folder under way never licenses setup completion', () => {
     expect(project({ ...facts, roots: 1, reading: true })).toMatchObject({ done: [false, false, false], folderUnderWay: true });
   });
   it('live progress names observed searchable and waiting counts, with no invented total or time', () => {
-    expect(project({ ...facts, roots: 1, searchable: 17, waiting: 8, reading: true })).toMatchObject({ progress: '12 files searchable so far · 8 waiting to be read' });
-    expect(project({ ...facts, roots: 1, searchable: 6, waiting: null, reading: true })).toMatchObject({ progress: '1 file searchable so far · still reading' });
+    expect(project({ ...facts, roots: 1, searchable: 12, waiting: 8, reading: true })).toMatchObject({ progress: '12 files searchable so far · 8 waiting to be read' });
+    expect(project({ ...facts, roots: 1, searchable: 1, waiting: null, reading: true })).toMatchObject({ progress: '1 file searchable so far · still reading' });
     expect(project({ ...facts, roots: 1, searchable: null, waiting: null })).toMatchObject({ progress: null, empty: false });
   });
   it('a watched folder with zero searchable documents points to Library and does not finish', () => {
@@ -59,7 +51,7 @@ describe('Getting started facts (SB1–SB11)', () => {
     ['malformed', { activeStepIndex: 'four', completedStepIds: null, dismissed: 'yes' }, false],
   ] as const) {
     for (const roots of [0, 1]) it(`old welcome ${name}, ${roots ? 'populated' : 'empty'} engine`, () => {
-      expect(project({ ...facts, roots, searchable: roots ? 15 : 5 }, undefined, old)).toMatchObject({ visible: !(roots && suppress), done: [!!roots, false, false] });
+      expect(project({ ...facts, roots, searchable: roots ? 10 : 0 }, undefined, old)).toMatchObject({ visible: !(roots && suppress), done: [!!roots, false, false] });
     });
   }
   it('Hide and Help reopen survive reload, keep old/plugin records and co-resident values', () => {

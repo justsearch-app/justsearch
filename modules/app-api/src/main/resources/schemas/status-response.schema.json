@@ -973,6 +973,9 @@
             "indexedDocumentsUnknown" : {
               "type" : "boolean"
             },
+            "ownSearchableDocuments" : {
+              "type" : [ "integer", "null" ]
+            },
             "pendingBytes" : {
               "type" : "integer"
             },

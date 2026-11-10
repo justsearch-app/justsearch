@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-10T02:27:19.929Z",
+  "revision": "bd0882cb6baf4f266d2b5ccfe5491cc790746143",
+  "tree": "543102173e3deb0da61891523548e3dd21e798f8",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/firstUse.engine.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/mmh34lkw/tmp/test-intent-vitest-159-1794277639147.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 781
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/state/firstUse.engine.test.ts#unknown index counts invalidate the own count in the same snapshot",
+      "file": "modules/ui-web/src/shell-v0/state/firstUse.engine.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:2ae54aa28a4f023c946fdd6b25d55799ab3c80cdc15a59e010abd19e3dca2bfd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unknown index counts invalidate the own count in the same snapshot",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:298116033619cab75b7a93a2f2d957906ff7528922573f446089757d08059d1e"
+}

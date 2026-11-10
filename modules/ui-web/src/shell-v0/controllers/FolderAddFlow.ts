@@ -51,6 +51,7 @@ export class FolderAddFlow {
     const state = this.host.state;
     if (this.pickerBusy || state.addBusy) return;
     const current = this.host.current();
+    state.error = null; this.host.changed();
     this.pickerBusy = true;
     try {
       if (this.host.api().platform.capabilities.has('folder-picker')) {
@@ -74,7 +75,7 @@ export class FolderAddFlow {
   }
   setPath(value: string): void {
     const state = this.host.state;
-    state.pendingPath = value; state.pendingPreview = null;
+    state.pendingPath = value; state.pendingPreview = null; state.error = null;
     if (this.previewTimer !== null) clearTimeout(this.previewTimer);
     ++this.previewSeq; // invalidate an older response even before the debounce fires
     const path = value.trim();

@@ -1,0 +1,125 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-10T02:34:07.542Z",
+  "revision": "bd0882cb6baf4f266d2b5ccfe5491cc790746143",
+  "tree": "7402ddf83d7e26233d0c5a14d72b565c40eed427",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": "Picked up JAVA_TOOL_OPTIONS: -Djava.awt.headless=true",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.IndexStatusReadFailureTest\" --tests \"io.justsearch.indexerworker.services.SearchableDocCountReaderSelectionTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 18660
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/IndexStatusReadFailureTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/IndexStatusReadFailureTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4d2b108ec80f99f2a193b7ef30172988db41d72b21640b7d58f6d08d50ae9625",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "fallbackCountsRetainTheirObservationUntilRecovery()",
+          "status": "passed"
+        },
+        {
+          "name": "parentCountDoesNotSubtractCountsFromDifferentReaders()",
+          "status": "passed"
+        },
+        {
+          "name": "failedCompletenessReadDoesNotPublishSuccessfulEmptyStages()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] false",
+          "status": "passed"
+        },
+        {
+          "name": "[2] true",
+          "status": "passed"
+        },
+        {
+          "name": "failedFilteredCountDoesNotBorrowTheUnfilteredPopulation()",
+          "status": "passed"
+        },
+        {
+          "name": "buildingFallbackIsIndependentAndCannotCrossGenerations()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] advance, true",
+          "status": "passed"
+        },
+        {
+          "name": "[2] size, true",
+          "status": "passed"
+        },
+        {
+          "name": "[3] close, true",
+          "status": "passed"
+        },
+        {
+          "name": "[4] advance, false",
+          "status": "passed"
+        },
+        {
+          "name": "[5] size, false",
+          "status": "passed"
+        },
+        {
+          "name": "[6] close, false",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SearchableDocCountReaderSelectionTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SearchableDocCountReaderSelectionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3bc744cf1b579531e04600f66778d56e13efd37309b53086a1cff0c7dc37df84",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ioExceptionFallsBackInsteadOfReportingZero()",
+          "status": "passed"
+        },
+        {
+          "name": "healthyReaderReportsScopedCount()",
+          "status": "passed"
+        },
+        {
+          "name": "parentCountsDoNotSubtractIndependentReaderObservations()",
+          "status": "passed"
+        },
+        {
+          "name": "followsSearchServingReader()",
+          "status": "passed"
+        },
+        {
+          "name": "aReadOnlyServingReaderReportsFinishedEnrichmentAfterReopen()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:15428732822efcda724f8b16814f648bc7ee821633bc00f868e5209a82189cde"
+}

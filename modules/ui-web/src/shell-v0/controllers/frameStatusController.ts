@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { setFirstUseRoots, getFirstUse, subscribeFirstUse, firstUseNeedsHelpCount, setFirstUseHelpFacet } from '../state/firstUse.js';
-import { fetchCollectionFacet } from '../state/searchState.js';
-import { facetScanCapFor } from '../state/otherSources.js';
+import { setFirstUseRoots, getFirstUse, subscribeFirstUse } from '../state/firstUse.js';
 import type { ReactiveController, ReactiveControllerHost } from 'lit';
 import { subscribeAiState, type AiState } from '../state/aiStateStore.js';
 import { deriveFrameStatus, completedLongWork, transientPlacement, FINISHED_DWELL_MS, type FrameStatus, type StatusFact, type DurableStatusOperation } from '../state/frameStatus.js';
@@ -61,8 +59,6 @@ export class FrameStatusController implements ReactiveController {
   indexingAnnouncement = '';
   verdictAnnouncement: VerdictPresentation['announce'] | null = null;
   aiEngineAnnouncement: AiEngineVerdictPresentation['announce'] | null = null;
-  private helpRefreshAt = 0;
-  private helpAbort: AbortController | null = null;
   private indexingTransition = false;
   private indexingWasPaused = false;
   private indexingAnnouncementKey: string | null = null;
@@ -151,7 +147,6 @@ export class FrameStatusController implements ReactiveController {
   }
   hostDisconnected(): void {
     this.connected = false;
-    this.helpAbort?.abort(); this.helpAbort = null;
     this.lifecycle++;
     this.gaps++;
     this.stopFocusWatch?.(); this.stopFocusWatch = undefined;
@@ -340,25 +335,7 @@ export class FrameStatusController implements ReactiveController {
     } catch { emitEphemeralToast({ message: 'Could not copy plugin error details.', severity: 'error' }); }
   }
   dismissPluginError(key: string): void { this.pluginErrors.delete(key); this.refresh(); }
-  private observeFirstUseHelp(): void {
-    const ai = this.ai;
-    if (!this.connected || !firstUseNeedsHelpCount()) {
-      this.helpAbort?.abort(); this.helpAbort = null;
-      return;
-    }
-    if (this.helpAbort || Date.now() < this.helpRefreshAt || !ai?.status || !ai.index?.searchableDocumentCount || !ai.indexingStatusLive) return;
-    const abort = new AbortController(); this.helpAbort = abort;
-    void fetchCollectionFacet(facetScanCapFor(ai.index.searchableDocumentCount), this.host.apiBase, abort.signal)
-      .catch(() => null).then(payload => {
-        if (abort.signal.aborted || !this.connected) return;
-        // Retain a successful count during the next scan; an inexact answer is unknown.
-        const count = setFirstUseHelpFacet(payload);
-        this.helpRefreshAt = Date.now() + (count === null ? 15_000 : 60_000);
-        this.helpAbort = null;
-      });
-  }
   refresh(): void {
-    this.observeFirstUseHelp();
     const now = Date.now();
     if (this.ai?.connection.reachable) this.contactLostAt = null;
     else this.contactLostAt ??= now;

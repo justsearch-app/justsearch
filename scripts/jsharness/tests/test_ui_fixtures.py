@@ -143,11 +143,8 @@ class TestFixtureBodies:
             assert status["inference"].get("identity") is None
             assert status["aiReady"] is False
             assert status["worker"]["enrichment"]["embeddingEnabled"] is False
-            facet = json.loads(ui_fixtures.fixture_body("http://x/api/knowledge/collection-facet", variant))
-            assert facet.get("facetsTruncated") is False
-            assert facet["facets"]["collection"]["justsearch-help"] == 5
             assert status["worker"]["core"]["searchableDocuments"] == (7 if reading else 5)
-            assert status["worker"]["core"]["searchableDocuments"] - facet["facets"]["collection"]["justsearch-help"] == (2 if reading else 0)
+            assert status["worker"]["core"]["ownSearchableDocuments"] == (2 if reading else 0)
             assert status["worker"]["core"]["pendingJobs"] == (8 if reading else 0)
             assert len(roots["items"]) == (1 if reading else 0)
 

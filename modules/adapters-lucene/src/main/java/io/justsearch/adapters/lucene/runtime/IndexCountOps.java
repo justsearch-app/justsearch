@@ -279,6 +279,17 @@ public final class IndexCountOps {
     return bridge.withSearcher(searcher -> searcher.count(query));
   }
 
+  /** Counts related populations on one acquired reader, so a refresh cannot split their snapshot. */
+  public long[] countQueriesOrThrow(Query... queries) throws IOException {
+    return bridge.withSearcher(searcher -> {
+      long[] counts = new long[queries.length];
+      for (int i = 0; i < queries.length; i++) {
+        counts[i] = searcher.count(queries[i]);
+      }
+      return counts;
+    });
+  }
+
   /** Strict final-scope proof for a committed prefix delete; exceptions are certified by caller. */
   public int countPathPrefixExcludingAcceptedSurvivorsStrict(
       String prefix, List<String> fileIds, List<String> projectionIds) throws IOException {

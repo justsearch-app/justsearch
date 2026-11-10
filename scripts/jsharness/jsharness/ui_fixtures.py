@@ -643,6 +643,7 @@ def _status_body(variant: str) -> str:
         d["meta"]["workerRpcAtMs"] = int(datetime.now(timezone.utc).timestamp() * 1000)
         d["worker"]["core"].update({"indexState": "INDEXING" if reading else "IDLE", "indexHealthy": True,
             "indexedDocuments": 7 if reading else 5, "searchableDocuments": 7 if reading else 5,
+            "ownSearchableDocuments": 2 if reading else 0,
             "indexedDocumentsUnknown": False, "pendingJobs": 8 if reading else 0})
         d["worker"].pop("countObservations", None)
         # A fresh keyword-only install has neither loaded AI nor failed optional enrichment.
@@ -863,9 +864,6 @@ def fixture_body(url: str, variant: str = "default") -> str:
         return _status_body(variant)
     if "/api/settings" in url:
         return _settings_body(variant)
-    if "/api/knowledge/collection-facet" in url and variant.startswith("first-use"):
-        return json.dumps({"facets": {"collection": {"justsearch-help": 5,
-            **({"default": 2} if variant == "first-use-reading" else {})}}, "facetsTruncated": False})
     if "/api/knowledge/search" in url:
         return _search_body(variant)
     if "/api/indexing-roots/substrate" in url:

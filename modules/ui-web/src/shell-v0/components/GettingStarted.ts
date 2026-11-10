@@ -60,6 +60,8 @@ export class GettingStarted extends JfElement {
     header { display: flex; flex-wrap: wrap; align-items: center; gap: var(--jf-space-3); padding: var(--jf-space-4); }
     header h2 { font-size: var(--font-size-md); font-weight: 500; margin: 0; }
     header p { flex: 1; font-size: var(--font-size-xs); }
+    progress { flex-basis: 100%; inline-size: 100%; block-size: var(--jf-space-2); accent-color: var(--text-tint); }
+    li[aria-current='step'] { border-inline-start: var(--frame-focus-width) solid var(--text-tint); }
     ol { list-style: none; margin: 0; padding: 0; }
     li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--jf-space-3);
       padding: var(--jf-space-4); border-block-start: var(--frame-hairline) solid var(--border-subtle); }
@@ -136,8 +138,10 @@ export class GettingStarted extends JfElement {
       ${addState.error ? html`<p class="error" role="alert">${addState.error}</p>` : nothing}
       ${flow().renderForm()}
       ${view.visible ? html`<section class="card" data-testid="getting-started-card" aria-label="Getting started">
-        <header><h2>Getting started</h2>${view.coreVisible ? html`<p role="status" aria-live="polite">${view.completed} of 3 · the last step is optional</p>` : nothing}
-          <jf-button variant="ghost" label="Hide Getting started" .onActivate=${hideGettingStarted}>Hide</jf-button></header>
+        <header><h2>Getting started</h2>${view.coreVisible ? html`<p role="status" aria-live="polite">${view.currentStep} of 3 · the last step is optional</p>` : nothing}
+          <jf-button variant="ghost" label="Hide Getting started" .onActivate=${hideGettingStarted}>Hide</jf-button>
+          ${view.coreVisible ? html`<progress role="progressbar" aria-label="Getting started step" aria-valuemin="1" aria-valuemax="3"
+            aria-valuenow=${view.currentStep} max="3" value=${view.currentStep}></progress>` : nothing}</header>
         ${view.coreVisible ? html`<ol>${[
           { title: 'Add folders to search', body: view.folderUnderWay ? 'Under way. Your folder is being read; search works as soon as the first files are searchable.' : view.folderNeedsAttention
             ? 'No files are searchable yet. Open Library to check what is being read or skipped.'
@@ -148,7 +152,7 @@ export class GettingStarted extends JfElement {
             action: '', run: () => {} },
           { title: 'Optional: answers and search by meaning', body: 'Adds AI models that run on this computer.',
             action: 'Open AI Brain', run: () => requestSurfaceNavigation('core.brain-surface') },
-        ].map((step, i) => html`<li><span class="mark" role="img" aria-label=${view.done[i] ? 'Done' : i === 0 && view.folderUnderWay ? 'Under way' : `Step ${i + 1}`}>${view.done[i] ? icon({ name: 'check-circle-2' }) : i + 1}</span>
+        ].map((step, i) => html`<li aria-current=${i + 1 === view.currentStep ? 'step' : nothing}><span class="mark" role="img" aria-label=${view.done[i] ? 'Done' : i === 0 && view.folderUnderWay ? 'Under way' : `Step ${i + 1}`}>${view.done[i] ? icon({ name: 'check-circle-2' }) : i + 1}</span>
           <div class="step">${step.title}<p>${step.body}</p></div>
           ${step.action ? html`<jf-button variant="ghost" label=${step.action} ?data-add-folder=${i === 0 && !empty}
             .disabled=${i === 0 && addState.addBusy} .onActivate=${step.run}>${step.action}</jf-button>` : nothing}</li>`)}

@@ -15,19 +15,10 @@ let roots = params.has('unknown') ? null : params.has('reading') ? 1 : 0;
 let help = 5;
 let count = params.has('unknown') ? null : params.has('reading') ? 2 : 0, pending = params.has('reading') ? 8 : 0;
 const root = { pathHash: 'notes', collection: 'default', status: 'indexing', inFlightCount: 8, failedCount: 0, walkCompleted: false };
-window.holdHelp = params.has('help-slow');
-window.helpCalls = 0;
-const heldHelp = [];
-window.releaseHelp = () => { window.holdHelp = false; for (const resolve of heldHelp.splice(0)) resolve(); };
 window.fetch = async (input) => {
   const url = String(input?.url ?? input);
   if (url.includes('/api/indexing-roots/substrate')) return roots === null ? new Response('', { status: 503 }) : json({ items: roots ? [root] : [], count: roots });
   if (url.includes('/api/indexing/suggested-roots')) return json({ suggestions: [{ label: 'Documents', path: '/Documents' }] });
-  if (url.includes('/api/knowledge/collection-facet')) {
-    window.helpCalls++;
-    if (window.holdHelp) await new Promise(resolve => heldHelp.push(resolve));
-    return params.has('help-unknown') ? new Response('', { status: 503 }) : json({ facets: { collection: { 'justsearch-help': help, ...(count ? { default: count } : {}) } }, facetsTruncated: false });
-  }
   if (url.includes('/api/knowledge/search')) return json({ totalHits: 0, matchCount: 0, tookMs: 1, results: [], nextCursor: null, facets: {}, facetsTruncated: false });
   if (url.includes('/api/path-hash/resolve')) return json({ path: '/notes' });
   return json({ entries: [], conversations: [] });
@@ -53,7 +44,7 @@ window.search = await import('/src/shell-v0/state/searchState.ts');
 window.observe = (r, c, q = 0) => {
   roots = r; count = c; pending = q;
   window.firstUse?.setFirstUseRoots(roots === null ? null : roots ? [root] : [], new Map([['notes', '/notes']]));
-  window.ai.__feedForTest({ status: count === null ? null : { worker: { core: { indexState: pending ? 'INDEXING' : 'IDLE', indexedDocuments: count + help, searchableDocuments: count + help, pendingJobs: pending } } } });
+  window.ai.__feedForTest({ status: count === null ? null : { worker: { core: { indexState: pending ? 'INDEXING' : 'IDLE', indexedDocuments: count + help, searchableDocuments: count + help, ownSearchableDocuments: params.has('own-unknown') ? null : count, pendingJobs: pending } } } });
   window.ai.__feedContactForTest();
 };
 window.updateHelp = n => { help = n; window.observe(roots, count, pending); };
@@ -78,7 +69,6 @@ document.body.dataset.ready = 'true';
 type AppWindow = Window & { observe(roots: number | null, count: number | null, pending?: number): void;
   attachHost(): void; addCalls: unknown[]; finishAdd(result: unknown): void;
   updateHelp(n: number): void;
-  holdHelp: boolean; helpCalls: number; releaseHelp(): void;
   search: { setQuery(query: string): void; submitSearch(): void };
   firstUse: { recordFirstUseSearch(): void; hideGettingStarted(): void; reopenGettingStarted(): void };
   userState: { markWalkthroughStepComplete(id: string, step: string): void; createProfile(id: string, label: string): void; setActiveProfileId(id: string): void };
@@ -125,39 +115,6 @@ const focusedLabel = (page: Page) => page.evaluate(() => { let el = document.act
   return el?.getAttribute('aria-label') ?? el?.textContent?.trim(); });
 
 describe('first use through the real frame', { timeout: 60_000 }, () => {
-  it('keeps the first-use view across polls and a slow refresh without repeated facet scans', async () => {
-    const page = await open();
-    expect(await page.getByText('Nothing to search yet', { exact: true }).count()).toBe(1);
-    await page.evaluate(() => { (window as unknown as AppWindow).holdHelp = true; });
-    for (let i = 0; i < 4; i++) {
-      await page.clock.runFor(2_000); await settle(page);
-      expect(await page.getByText('Nothing to search yet', { exact: true }).count()).toBe(1);
-      expect(await card(page).count()).toBe(1);
-      expect(await page.evaluate(() => (window as unknown as AppWindow).helpCalls)).toBe(1);
-    }
-    // Refresh uses the existing one-second frame cadence after the successful answer.
-    await page.clock.runFor(54_000); await settle(page);
-    expect(await page.evaluate(() => (window as unknown as AppWindow).helpCalls)).toBe(2);
-    for (let i = 0; i < 3; i++) {
-      await page.clock.runFor(2_000); await settle(page);
-      expect(await card(page).count()).toBe(1);
-      expect(await page.getByText('Nothing to search yet', { exact: true }).count()).toBe(1);
-      expect(await page.evaluate(() => (window as unknown as AppWindow).helpCalls)).toBe(2);
-    }
-    await page.evaluate(() => (window as unknown as AppWindow).releaseHelp()); await settle(page);
-    expect(await card(page).count()).toBe(1);
-  });
-  it('lets a slow initial Help response land after several real frame status polls', async () => {
-    const page = await open('?help-slow');
-    expect(await card(page).count()).toBe(0);
-    expect(await page.getByText('Nothing to search yet', { exact: true }).count()).toBe(0);
-    expect(await page.locator('jf-sv3-composer textarea').count()).toBe(1);
-    await page.clock.runFor(8_000); await settle(page);
-    expect(await page.evaluate(() => (window as unknown as AppWindow).helpCalls)).toBe(1);
-    await page.evaluate(() => (window as unknown as AppWindow).releaseHelp()); await settle(page);
-    expect(await page.getByText('Nothing to search yet', { exact: true }).count()).toBe(1);
-    expect(await card(page).count()).toBe(1);
-  });
   it('unknown → zero → positive changes the hero only with confirmed facts and preserves the ordinary composer', async () => {
     const page = await open('?unknown');
     expect(await page.getByText('Nothing to search yet', { exact: true }).count()).toBe(0);
@@ -169,7 +126,7 @@ describe('first use through the real frame', { timeout: 60_000 }, () => {
     expect(await page.locator('jf-sv3-composer textarea').count()).toBe(1);
     expect(await page.getByText('2 files searchable so far · 8 waiting to be read', { exact: true }).count()).toBe(1);
   });
-  it('Help alone keeps setup current, and missing Help observations stay unknown', async () => {
+  it('Help alone keeps setup current, and unknown own counts stay unknown', async () => {
     const page = await open();
     expect(await page.getByText('Nothing to search yet', { exact: true }).count()).toBe(1);
     expect(await page.locator('jf-status-pill').getByRole('button', { name: 'Getting started · 1 of 3', exact: true }).count()).toBe(1);
@@ -179,12 +136,13 @@ describe('first use through the real frame', { timeout: 60_000 }, () => {
     await page.evaluate(() => (window as unknown as AppWindow).updateHelp(8)); await page.clock.runFor(60_000); await settle(page);
     expect(await card(page).count()).toBe(1);
     expect(await page.locator('jf-getting-started [aria-label="Done"]').count()).toBe(0);
-    await page.goto(url + '?help-unknown'); await page.locator('body[data-ready="true"]').waitFor(); await settle(page);
+    await page.goto(url + '?own-unknown'); await page.locator('body[data-ready="true"]').waitFor(); await settle(page);
     expect(await card(page).count()).toBe(0);
     expect(await page.getByText('Nothing to search yet', { exact: true }).count()).toBe(0);
   });
   it('a folder is under way until own documents exist; empty folders point to Library', async () => {
     const page = await open();
+    expect(await card(page).count()).toBe(1);
     await page.evaluate(() => (window as unknown as AppWindow).observe(1, 0, 8)); await settle(page);
     expect(await page.locator('jf-getting-started [aria-label="Done"]').count()).toBe(0);
     expect(await card(page).textContent()).toContain('Under way');
