@@ -20,6 +20,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { mutateDocument } from '../state/UserStateDocument.js';
 import './SettingsSurface.js';
 import { createMockHostApi } from '../plugin-api/testHostApi.js';
 import { __resetUserConfigForTest } from '../state/userConfigState.js';
@@ -123,6 +124,7 @@ describe('SettingsSurface — search-select activation (855 §6 Phase 4)', () =>
     const el = await mountSurface();
     expect(el.activeCategory).toBe('appearance');
 
+    mutateDocument(doc => ({ ...doc, showDeveloperTools: true }));
     dispatchSearchSelect(el, { categoryId: 'advanced', sectionKey: 'view-tier' });
     // The category switch and the anchor jump are two chained `updateComplete` continuations
     // (SettingsSurface.ts `activateSearchHit`) — await lets both settle.

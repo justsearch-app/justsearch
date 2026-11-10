@@ -108,7 +108,7 @@ describe('FR7 the More (⋯) menu', () => {
     expect(q(bar, '[data-menu-action="copy-link"]'), 'developer tools stay hidden').toBeNull();
   });
 
-  it('shows the Developer group only while the developer tier is on: API explorer, Copy link, backend address', async () => {
+  it('SD1 shows the Developer group while tools are on: API explorer, Copy link, backend address and Logs', async () => {
     const bar = await mount(b => {
       b.developer = true;
       b.developerWindows = [{ id: 'core.api-explorer-surface', label: 'API Explorer', icon: 'code' }];
@@ -123,6 +123,10 @@ describe('FR7 the More (⋯) menu', () => {
     expect(q(bar, '[data-testid="backend-address"]')!.textContent).toBe('http://127.0.0.1:7777');
     q<HTMLButtonElement>(bar, '[data-menu-action="copy-link"]')!.click();
     expect(seen).toEqual([{ kind: 'copy-link' }]);
+    await openMore(bar);
+    expect(q(bar, '[data-menu-action="logs"]')).not.toBeNull();
+    q<HTMLButtonElement>(bar, '[data-menu-action="logs"]')!.click();
+    expect(seen.at(-1)).toEqual({ kind: 'logs' });
   });
 
   it('About reports its own selection without claiming a window id', async () => {

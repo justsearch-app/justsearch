@@ -48,6 +48,7 @@ export class SettingsNav extends JfElement {
   static properties = {
     register: { attribute: false },
     audience: { attribute: false },
+    showDeveloperTools: { attribute: false },
     activeCategory: { type: String, attribute: 'active-category' },
     activeAnchor: { type: String, attribute: 'active-anchor' },
     footerVersion: { type: String, attribute: 'footer-version' },
@@ -55,14 +56,21 @@ export class SettingsNav extends JfElement {
   };
 
   declare audience: string;
+  declare showDeveloperTools: boolean;
   private focusedRow: HTMLElement | null = null;
+  private focusedRowHidden = false;
 
   protected override willUpdate(): void {
     this.focusedRow = this.shadowRoot?.activeElement as HTMLElement | null;
+    const key = this.focusedRow?.dataset.settingsAnchor;
+    this.focusedRowHidden = !!key && this.register.some(group => group.categories.some(category =>
+      category.sections?.some(entry => entry.key === key && entry.gate && !entry.gate())));
   }
 
   protected override updated(): void {
-    if (this.focusedRow && !this.focusedRow.isConnected) {
+    if (this.focusedRowHidden) {
+      this.dispatchEvent(new CustomEvent('hidden-row-focus', { bubbles: true, composed: true }));
+    } else if (this.focusedRow && !this.focusedRow.isConnected) {
       this.shadowRoot?.querySelector<HTMLElement>(this.query ? '.search-input' : '.category-row.active')?.focus();
     }
     this.focusedRow = null;
@@ -423,6 +431,7 @@ export class SettingsNav extends JfElement {
           type="button"
           data-nav-row
           class="search-result-row"
+          data-settings-anchor=${result.section?.key ?? nothing}
           tabindex=${isRoving ? '0' : '-1'}
           @click=${() => void this.activateSearchResult(result)}
           @focus=${onFocus}

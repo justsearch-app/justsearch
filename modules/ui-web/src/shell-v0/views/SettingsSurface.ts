@@ -134,6 +134,7 @@ import {
   setViewerAudience,
   subscribeViewerAudience,
 } from '../state/viewerAudienceState.js';
+import { getShowDeveloperTools, setShowDeveloperTools, subscribeShowDeveloperTools } from '../state/developerToolsState.js';
 // Allowlisted in eslint.config.js — see 511-followup-B. The audience
 // toggle UI needs the `Audience` union directly for radio-button
 // rendering; mounting an aggregate component would be a worse fit.
@@ -232,6 +233,8 @@ export class SettingsSurface extends JfElement {
     witnessEntries: { state: true },
     // Tempdoc 511-followup Track A
     viewerAudience: { state: true },
+    showDeveloperTools: { state: true },
+    hiddenDestinationKey: { state: true },
     // Tempdoc 543 §20.7 B6 — WorkspaceProfile registry snapshot for
     // the developer affordance.
     workspaceProfiles: { state: true },
@@ -318,6 +321,9 @@ export class SettingsSurface extends JfElement {
   }>;
   // Tempdoc 511-followup Track A
   declare viewerAudience: Audience;
+  declare showDeveloperTools: boolean;
+  declare private hiddenDestinationKey: string | null;
+  private developerToolsUnsub: (() => void) | null = null;
   // Tempdoc 543 §20.7 B6 — developer affordance: cached list of
   // WorkspaceProfile registry entries for the dev switcher.
   declare workspaceProfiles: ReadonlyArray<{ id: string; label: string }>;
@@ -415,6 +421,8 @@ export class SettingsSurface extends JfElement {
     this.witnessEntries = [];
     // Tempdoc 511-followup Track A
     this.viewerAudience = getViewerAudience();
+    this.showDeveloperTools = getShowDeveloperTools();
+    this.hiddenDestinationKey = null;
     // Tempdoc 543 §20.7 B6 — initialize empty; populated lazily on
     // connectedCallback (dynamic import keeps the substrate lazily-
     // loaded for non-DEVELOPER audiences).
@@ -969,6 +977,7 @@ export class SettingsSurface extends JfElement {
     this.viewerAudienceUnsub = subscribeViewerAudience((a) => {
       this.viewerAudience = a;
     });
+    this.developerToolsUnsub = subscribeShowDeveloperTools(show => { this.showDeveloperTools = show; });
     // Shared indexing observations; use the same store as Brain and the status bar.
     this.aiStateUnsub = subscribeAiState((s) => {
       const indexing = s.status?.operating?.indexing;
@@ -1093,6 +1102,8 @@ export class SettingsSurface extends JfElement {
     this.memberTabUnsub?.();
     this.memberTabUnsub = null;
     this.viewerAudienceUnsub?.();
+    this.developerToolsUnsub?.();
+    this.developerToolsUnsub = null;
     this.aiStateUnsub?.();
     this.aiStateUnsub = null;
     this.workspaceProfilesUnsub?.();
@@ -1152,8 +1163,7 @@ export class SettingsSurface extends JfElement {
     }
     if (this.restoreHiddenEntryFocus) {
       this.restoreHiddenEntryFocus = false;
-      const nav = this.shadowRoot?.querySelector<JfElement>('jf-settings-nav');
-      void nav?.updateComplete.then(() => nav.shadowRoot?.querySelector<HTMLButtonElement>('.category-row.active')?.focus());
+      this.focusDeveloperTools();
     }
     if (this.recoveryFocusRequested) void this.focusPendingSettingsRecovery();
     // 569 Move 6 — apply-time RUNTIME conformance: once per applied presentation, audit the
@@ -1889,6 +1899,21 @@ export class SettingsSurface extends JfElement {
     this.cancelSettingsRecoveryFocus();
     target?.scrollIntoView({ block: 'nearest' });
     target?.focus();
+  }
+
+  private focusDeveloperTools(): void {
+    this.selectCategory('advanced');
+    void this.updateComplete.then(() => this.shadowRoot?.querySelector<HTMLElement>('#show-developer-tools')?.focus());
+  }
+
+  private renderDeveloperTools(): TemplateResult {
+    return html`<section class="section">
+      <h3>Show developer tools</h3>
+      <label><input id="show-developer-tools" type="checkbox" role="switch"
+        .checked=${this.showDeveloperTools}
+        @change=${(e: Event) => setShowDeveloperTools((e.target as HTMLInputElement).checked)}>
+        Show developer tools</label>
+    </section>`;
   }
 
   private renderViewerAudience(): TemplateResult {
@@ -3087,6 +3112,8 @@ export class SettingsSurface extends JfElement {
           <jf-settings-nav
             .register=${SETTINGS_REGISTER}
             .audience=${this.viewerAudience}
+            .showDeveloperTools=${this.showDeveloperTools}
+            @hidden-row-focus=${() => this.focusDeveloperTools()}
             active-category=${this.activeCategory}
             .activeAnchor=${this.activeAnchor}
             .footerVersion=${this.updateStatus?.currentVersion
@@ -3108,11 +3135,16 @@ export class SettingsSurface extends JfElement {
    *  surface full-bleed (its own SurfaceLayout owns its width, like `SurfaceTabs.renderPanel`). */
   private renderCategoryContent(category: SettingsCategory): TemplateResult {
     const sections = (category.sections ?? []).filter((s) => !s.gate || s.gate());
+    const hiddenEntry = allCategories().flatMap(c => c.sections ?? []).find(s => s.key === this.hiddenDestinationKey);
+    const hiddenReason = hiddenEntry?.gate && !hiddenEntry.gate()
+      ? ((hiddenEntry.key === 'workspace-profiles' && this.viewerAudience !== 'DEVELOPER') || hiddenEntry.key === 'plugin-permissions'
+        ? 'This destination is hidden by your view tier.'
+        : 'This row appears when developer tools are shown.')
+      : null;
     return html`
       <div class="settings-content-pane">
         <div class="settings-content-inner">
-          ${this.addressAnchor && category.sections?.some(s => s.key === this.addressAnchor && s.gate && !s.gate())
-            ? html`<p role="status">This destination is hidden by your view tier.</p>` : nothing}
+          ${hiddenReason ? html`<p role="status">${hiddenReason}</p>` : nothing}
           ${repeat(sections, s => s.key, s => this.renderRegisteredSection(s))}
         </div>
       </div>
@@ -3151,6 +3183,7 @@ export class SettingsSurface extends JfElement {
       desktop: () => this.renderDesktop(),
       'app-updates': () => this.renderAppUpdates(),
       'feedback-capture': () => this.renderFeedbackCaptureSection(),
+      'show-developer-tools': () => this.renderDeveloperTools(),
       'view-tier': () => this.renderViewerAudience(),
       'workspace-profiles': () => this.renderWorkspaceProfilesDeveloper(),
       data: () => this.renderData(),
@@ -3213,6 +3246,7 @@ export class SettingsSurface extends JfElement {
   private selectCategory(id: string): void {
     if (id === this.activeCategory) return;
     this.arrivalRevision++;
+    this.hiddenDestinationKey = null;
     this.activeCategory = id;
     this.addressAnchor = null;
     this.activeAnchor = null;
@@ -3242,12 +3276,17 @@ export class SettingsSurface extends JfElement {
   private receiveCoordinate(id: string, anchor?: string): void {
     const coordinate = resolveSettingsCoordinate(id, anchor);
     if (!coordinate) return;
-    this.selectCategory(coordinate.section);
+    const entry = findCategory(coordinate.section)?.sections?.find(s => s.key === coordinate.anchor);
+    const hidden = entry?.gate && !entry.gate();
+    this.selectCategory(hidden ? 'advanced' : coordinate.section);
+    this.hiddenDestinationKey = hidden ? entry.key : null;
+    const destination = hidden ? 'show-developer-tools' : coordinate.anchor;
     const revision = ++this.arrivalRevision;
-    this.addressAnchor = coordinate.anchor ?? null;
+    this.addressAnchor = destination ?? null;
     void this.updateComplete.then(() => {
-      if (revision !== this.arrivalRevision || !coordinate.anchor) return;
-      this.jumpToAnchor(coordinate.anchor, true);
+      if (revision !== this.arrivalRevision || !destination) return;
+      this.jumpToAnchor(destination, true);
+      if (hidden) this.focusDeveloperTools();
     });
   }
 

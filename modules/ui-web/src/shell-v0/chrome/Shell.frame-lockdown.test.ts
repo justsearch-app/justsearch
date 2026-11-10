@@ -56,7 +56,9 @@ __seedForTest({ schemaVersion: '1.0.0', catalogVersion: 1, namespace: 'core', pr
   surface('${LIBRARY}', 'jf-library-surface', { members: ['${BROWSE}'] }),
   surface('${BROWSE}', 'jf-browse-surface', { placement: 'DEEPLINK' }),
   surface('${BRAIN}', 'jf-brain-surface'),
-  surface('core.system-surface', 'jf-system-surface'),
+  surface('core.system-surface', 'jf-system-surface', { members: ['core.health-surface', 'core.logs-surface'] }),
+  surface('core.health-surface', 'jf-health-surface', { placement: 'DEEPLINK' }),
+  surface('core.logs-surface', 'jf-logs-surface', { placement: 'DEEPLINK' }),
   surface('${SETTINGS}', 'jf-settings-surface', { placement: 'MODAL', members: ['core.security-surface', 'core.presentation-gallery-surface', 'core.presentation-editor-surface'] }),
   surface('core.security-surface', 'jf-security-surface', { placement: 'DEEPLINK' }),
   surface('core.presentation-gallery-surface', 'jf-presentation-gallery-surface', { placement: 'DEEPLINK' }),
@@ -373,15 +375,15 @@ describe('FR3 the window under Settings shows its addressed tab', () => {
 });
 
 describe('FR3 the Settings section in the address wins over the one Settings remembers', () => {
-  it('a legacy Settings › Developer link opens Advanced at View tier, and reload keeps it, while the engine is slow to answer', async () => {
+  it('SD1 a legacy Settings › Developer link opens Advanced at Show developer tools, and reload keeps it, while the engine is slow to answer', async () => {
     const page = await open(1280, 800, '?registryDelay=1500', `#justsearch://surface/${SETTINGS}?section=developer`);
     await settle(page, 2500);
-    expect(await where(page)).toMatchObject({ settings: true, address: `${SETTINGS}?anchor=view-tier&section=advanced` });
+    expect(await where(page)).toMatchObject({ settings: true, address: `${SETTINGS}?anchor=show-developer-tools&section=advanced` });
     expect(await settingsSection(page)).toBe('advanced');
     await page.reload();
     await page.locator('body[data-ready="true"]').waitFor({ timeout: 45_000 });
     await settle(page, 2500);
-    expect(await where(page)).toMatchObject({ settings: true, address: `${SETTINGS}?anchor=view-tier&section=advanced` });
+    expect(await where(page)).toMatchObject({ settings: true, address: `${SETTINGS}?anchor=show-developer-tools&section=advanced` });
     expect(await settingsSection(page)).toBe('advanced');
   }, 120_000);
 });
@@ -647,4 +649,71 @@ it('SG9 real Gallery and Editor keep sibling instances and editor drafts on appl
   await page.locator('jf-settings-nav [data-settings-category="appearance"]').click(); await settle(page);
   expect(await editor.getAttribute('data-instance-witness')).toBe('retained'); expect(await gallery.getAttribute('data-instance-witness')).toBe('retained');
   expect(await editor.locator('textarea[aria-label="Presentation declaration JSON"]').inputValue()).toBe('{"draft":"keep me"}');
+}, 30_000);
+
+
+it('SD1 SD3 SG6 developer tools update Settings and More live and Logs opens the System member', async () => {
+  const page = await open();
+  await page.locator('jf-top-bar .settings-trigger').click();
+  const settings = page.locator('jf-settings-surface');
+  await settings.locator('jf-settings-nav [data-settings-category="advanced"]').click();
+  const tools = settings.getByRole('switch', { name: 'Show developer tools' });
+  await settle(page);
+  expect(await tools.count()).toBe(1);
+  expect(await tools.isChecked()).toBe(false);
+  await tools.check();
+  expect(await tools.isChecked()).toBe(true);
+  const tier = settings.locator('div[data-settings-anchor="view-tier"]');
+  await tier.waitFor();
+  await tier.locator('jf-option-button-group').getByRole('radio', { name: /Developer/ }).click();
+  await settings.locator('div[data-settings-anchor="workspace-profiles"]').waitFor();
+  // A focused navigation row disappearing after a storage update returns to the switch.
+  const nav = settings.locator('jf-settings-nav');
+  const focused = nav.locator('[data-settings-anchor="workspace-profiles"]');
+  await focused.focus();
+  await page.evaluate(async () => {
+    const { setViewerAudience } = await window.loadSettingsModule<{ setViewerAudience(value: string): void }>('/src/shell-v0/state/viewerAudienceState.ts');
+    setViewerAudience('USER');
+  });
+  await expect.poll(() => tools.evaluate(el => el.matches(':focus'))).toBe(true);
+  expect(await tools.isChecked()).toBe(true);
+  await page.locator('jf-settings-window button.close').click();
+  await page.locator('jf-top-bar .more-trigger').click();
+  await page.locator('jf-top-bar [data-menu-action="logs"]').click();
+  await settle(page);
+  expect((await where(page)).address).toContain('core.system-surface');
+  expect((await where(page)).address).toContain('core.logs-surface');
+  await page.locator('jf-top-bar .settings-trigger').click();
+  await tools.uncheck();
+  await page.locator('jf-settings-window button.close').click();
+  await page.locator('jf-top-bar .more-trigger').click();
+  expect(await page.locator('jf-top-bar #developer-label').count()).toBe(0);
+}, 30_000);
+
+it('SD3 another browser window updates open Settings and an already open More menu', async () => {
+  const first = await open();
+  await first.locator('jf-top-bar .settings-trigger').click();
+  await first.locator('jf-settings-nav [data-settings-category="advanced"]').click();
+  const firstTools = first.locator('jf-settings-surface').getByRole('switch', { name: 'Show developer tools' });
+  await settle(first);
+  expect(await firstTools.count()).toBe(1);
+  const second = await context!.newPage();
+  await second.goto(url);
+  await second.locator('body[data-ready="true"]').waitFor();
+  await second.locator('jf-top-bar').waitFor();
+  await settle(second);
+  // The new window may restore the first window's open Settings from the journal.
+  if (!(await where(second)).settings) await second.locator('jf-top-bar .settings-trigger').click();
+  await second.locator('jf-settings-nav [data-settings-category="advanced"]').click();
+  const secondTools = second.locator('jf-settings-surface').getByRole('switch', { name: 'Show developer tools' });
+  await secondTools.check();
+  await expect.poll(() => firstTools.isChecked()).toBe(true);
+  await first.locator('jf-settings-window button.close').click();
+  await first.locator('jf-top-bar .more-trigger').click();
+  await first.locator('jf-top-bar #developer-label').waitFor();
+  await secondTools.uncheck();
+  await first.locator('jf-top-bar #developer-label').waitFor({ state: 'detached' });
+  await first.locator('jf-top-bar .more-trigger').click();
+  await first.locator('jf-top-bar .settings-trigger').click();
+  expect(await firstTools.isChecked()).toBe(false);
 }, 30_000);

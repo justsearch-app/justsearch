@@ -1,0 +1,183 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
+  },
+  "createdAt": "2026-11-10T21:54:56.689Z",
+  "revision": "50c26d710c5f2a9223623c46516285881970a4ff",
+  "tree": "d2ead3e3cd3161033c9db767166015bdda823094",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/5bb7bl3g/tmp/test-intent-vitest-3-1794347548229.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 1,
+      "durationMs": 148457,
+      "output": "JSON report written to /home/elias/.cache/am/5bb7bl3g/tmp/test-intent-vitest-3-1794347548229.json\n\n"
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9e1679bdeff9b91b513e0cecd49a94b19aab47be6000e4a4a14ff4f1077a1b6d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "failed",
+      "cases": [
+        {
+          "name": "L3 a notice for a window that does not exist is readable at every size (default font) 1280×800: the notice can be read, the pill is not cut and \"Choose destination\" is offered",
+          "status": "passed"
+        },
+        {
+          "name": "L3 a notice for a window that does not exist is readable at every size (default font) 900×700: the notice can be read, the pill is not cut and \"Choose destination\" is offered",
+          "status": "passed"
+        },
+        {
+          "name": "L3 a notice for a window that does not exist is readable at every size (default font) 900×800: the notice can be read, the pill is not cut and \"Choose destination\" is offered",
+          "status": "passed"
+        },
+        {
+          "name": "L3 a notice for a window that does not exist is readable at every size (default font) 600×400: the notice can be read, the pill is not cut and \"Choose destination\" is offered",
+          "status": "passed"
+        },
+        {
+          "name": "L3 a notice for a window that does not exist is readable at every size (default font) C1 an unknown destination vendor.nope-window shows the same notice",
+          "status": "passed"
+        },
+        {
+          "name": "L3 a notice for a window that does not exist is readable at every size (default font) C1 an unknown destination nope-window shows the same notice",
+          "status": "passed"
+        },
+        {
+          "name": "L3 a notice for a window that does not exist is readable at every size (wide font) 1280×800: the notice can be read, the pill is not cut and \"Choose destination\" is offered",
+          "status": "passed"
+        },
+        {
+          "name": "L3 a notice for a window that does not exist is readable at every size (wide font) 900×700: the notice can be read, the pill is not cut and \"Choose destination\" is offered",
+          "status": "passed"
+        },
+        {
+          "name": "L3 a notice for a window that does not exist is readable at every size (wide font) 900×800: the notice can be read, the pill is not cut and \"Choose destination\" is offered",
+          "status": "passed"
+        },
+        {
+          "name": "L3 a notice for a window that does not exist is readable at every size (wide font) 600×400: the notice can be read, the pill is not cut and \"Choose destination\" is offered",
+          "status": "passed"
+        },
+        {
+          "name": "L3 a notice for a window that does not exist is readable at every size (wide font) C1 an unknown destination vendor.nope-window shows the same notice",
+          "status": "passed"
+        },
+        {
+          "name": "L3 a notice for a window that does not exist is readable at every size (wide font) C1 an unknown destination nope-window shows the same notice",
+          "status": "passed"
+        },
+        {
+          "name": "L2 the status panel never scrolls sideways a plugin item that renders a fixed 1000 px wide element stays inside its row, its words and provenance reachable",
+          "status": "passed"
+        },
+        {
+          "name": "C9 closing Settings once keeps the area and leaves no Settings entry behind it Settings, browser Back, browser Forward, close: the next Back does not reopen Settings",
+          "status": "passed"
+        },
+        {
+          "name": "C9 closing Settings once keeps the area and leaves no Settings entry behind it with Settings open, Alt+Left is browser Back and Alt+Right browser Forward",
+          "status": "passed"
+        },
+        {
+          "name": "C9 closing Settings once keeps the area and leaves no Settings entry behind it reload with Settings open keeps the area underneath; closing returns to it once",
+          "status": "passed"
+        },
+        {
+          "name": "FR3 the window under Settings shows its addressed tab reload with Settings open over Library › Browse shows Browse behind Settings from the start",
+          "status": "passed"
+        },
+        {
+          "name": "FR3 the Settings section in the address wins over the one Settings remembers SD1 a legacy Settings › Developer link opens Advanced at Show developer tools, and reload keeps it, while the engine is slow to answer",
+          "status": "passed"
+        },
+        {
+          "name": "FR3 Alt+Left and Alt+Right always navigate Back into Search puts focus in its text box; Alt+Right still goes Forward and edits nothing",
+          "status": "passed"
+        },
+        {
+          "name": "FR3 a window tab is a step in history Library › Browse adds an entry; Alt+arrows, mouse buttons and browser buttons all land on the same tabs",
+          "status": "passed"
+        },
+        {
+          "name": "FR3 one history entry per navigation opening an area from the Ctrl+K palette is one step: one Back returns",
+          "status": "passed"
+        },
+        {
+          "name": "X1 forced colours the selected window tab is told apart from the others by a shape in a system colour",
+          "status": "passed"
+        },
+        {
+          "name": "X1 forced colours the dark app theme on a light system palette: every tab label is readable, the selected one too",
+          "status": "passed"
+        },
+        {
+          "name": "X1 forced colours the dark app theme on a dark system palette: every tab label is readable, the selected one too",
+          "status": "passed"
+        },
+        {
+          "name": "SG1 browser Ctrl+comma opens once from a composer and restores the editable control and caret",
+          "status": "passed"
+        },
+        {
+          "name": "SG1 command guard blocks the palette and another modal",
+          "status": "passed"
+        },
+        {
+          "name": "SG1 user and plugin chords outrank the Settings default, which opens after they are removed",
+          "status": "passed"
+        },
+        {
+          "name": "SG1 the Settings command dismisses jf-top-bar .more-trigger and closes onto its surviving trigger",
+          "status": "passed"
+        },
+        {
+          "name": "SG1 the Settings command dismisses jf-status-pill .trigger and closes onto its surviving trigger",
+          "status": "passed"
+        },
+        {
+          "name": "SG3 SG4 an addressed entry survives underlying background projection, reload and a one-step close; section changes remove its anchor",
+          "status": "failed"
+        },
+        {
+          "name": "SG8 at 600x400 and 200 percent text every section remains reachable, and Escape cancels JSON import before closing",
+          "status": "passed"
+        },
+        {
+          "name": "SG4 selecting another section removes the old Theme anchor before reload",
+          "status": "passed"
+        },
+        {
+          "name": "SG9 real Gallery and Editor keep sibling instances and editor drafts on apply and section return",
+          "status": "passed"
+        },
+        {
+          "name": "SD1 SD3 SG6 developer tools update Settings and More live and Logs opens the System member",
+          "status": "passed"
+        },
+        {
+          "name": "SD3 another browser window updates open Settings and an already open More menu",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:e6e1ccf332a4d9d67b2163dad47a8dc508a846b4cd93a2b90f269938c3973a51"
+}

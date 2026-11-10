@@ -22,6 +22,7 @@ import { deactivateProjection } from '../router/URLProjector.js';
 import { __resetJournalForTest } from '../state/NavigationJournal.js';
 import { __resetUserConfigForTest, setActiveLayoutId, setSurfaceOverride } from '../state/userConfigState.js';
 import { __resetAiStateForTest } from '../state/aiStateStore.js';
+import { mutateDocument } from '../state/UserStateDocument.js';
 import { setViewerAudience } from '../state/viewerAudienceState.js';
 import { initLayoutCatalog, registerLayout, __resetLayoutCatalogForTest } from '../layout/LayoutManifest.js';
 import { getAction, invokeAction } from '../substrates/actions/index.js';
@@ -252,13 +253,20 @@ describe('FR7 plugin windows, overrides and provenance', () => {
     expect(badge.shadowRoot!.textContent).toContain(LIBRARY);
   });
 
-  it('the Developer group follows the developer view tier (API explorer listed only when present)', async () => {
+  it('SD1 the Developer group follows Show developer tools independently of audience (API explorer listed only when present)', async () => {
     const shell = await mount();
     expect(bar(shell).developer).toBe(false);
     setViewerAudience('DEVELOPER');
     await settle(shell);
     expect(bar(shell).developer).toBe(true);
     expect(bar(shell).developerWindows).toEqual([]);
+    mutateDocument(doc => ({ ...doc, showDeveloperTools: false }));
+    await settle(shell);
+    expect(bar(shell).developer).toBe(false);
+    setViewerAudience('USER');
+    mutateDocument(doc => ({ ...doc, showDeveloperTools: true }));
+    await settle(shell);
+    expect(bar(shell).developer).toBe(true);
   });
 
   it('About opens Settings at the section that shows the version; Copy link copies this view\'s address', async () => {

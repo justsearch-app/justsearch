@@ -100,7 +100,7 @@ the top bar (banner), its area switcher (navigation) and the window area (main).
 |---|---|
 | Top bar (`chrome/TopBar.ts`, `jf-top-bar`) | Brand; the area switcher; the status pill; Settings; the More (⋯) menu |
 | Area switcher | Search, Library and AI Brain, in that order (Ctrl+1, Ctrl+2, Ctrl+3; tooltips name the shortcut). The bar chooses its layout from its own room (after the desktop window controls), measured against the text size: below 1000 px of room at standard text only the active area keeps its visible label; below 720 px the bar shows the brand dot, one button naming the active area that opens the three areas as a menu, the pill as an icon, Settings and More; below 480 px (a 600 px window with enlarged text) that button keeps only its icon and the switcher leaves the centre |
-| More (⋯) menu | System (Health, Activity, Logs), Help & shortcuts (F1) and About; windows contributed by the catalog or plugins under “More”; a Developer group (API explorer, Copy link to this view, Show backend address) only while the developer view tier is on (Settings › Advanced › View tier) |
+| More (⋯) menu | System (Health, Activity, Logs), Help & shortcuts (F1) and About; windows contributed by the catalog or plugins under “More”; a Developer group (API explorer, Copy link to this view, Show backend address, Logs) while Settings › Advanced › Show developer tools is on |
 | Window tab row | A window's own tabs at its top (Library: Folders, Browse; AI Brain: AI Brain, Memory; System: Health, Logs, Activity) and its window actions. Search has none |
 | Stage | The active window; layouts can also compose a second window in a split stage, with a picker for the second pane |
 | Details pane (`jf-details-pane`) | At most one per window, on its right edge: tabs that scroll rather than shrink, 360-560 px and resizable, inline from 980 px of window width, a sheet over the window below. Each window owns its details, so a split stage's two windows never show each other's selection |
@@ -246,7 +246,15 @@ existing appearance controls. Security & privacy mounts `core.security-surface` 
 grants, plugin permissions and local ranking feedback separate. Their catalog member IDs
 remain deep-linkable. Token Editor stays a launch link to its plugin surface, per
 [ADR-0035](../decisions/0035-fe-plugin-boundary.md). View tier and the existing audience-gated
-Workspace profiles are under Advanced. Reset to defaults is under Data & reset with its
+Workspace profiles are under Advanced, behind the always reachable Show developer tools switch.
+This local preference belongs to each user-state profile. Until explicitly toggled it follows the
+view tier (on for Developer, off for User, Operator and saved Agent); toggling never changes the
+view tier. Workspace profiles still require the Developer view tier, and Plugin permissions keep
+their own audience rule. Hidden links explain whether tools or the view tier hides the row and
+focus the switch without enabling it. Settings search, navigation and More update live when
+the preference or view tier changes. More › Developer › Logs opens System › Logs; Health keeps
+its API endpoint readout. Backend Reset to defaults leaves the preference alone; full local-data
+deletion removes it. The switch remains usable in backend Session-only mode. Reset to defaults is under Data & reset with its
 existing confirmation and recovery exception. About names the web bundle version source
 and the desktop updater's observed information when available; update actions stay in General.
 

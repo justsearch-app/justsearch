@@ -125,7 +125,7 @@ import {
   subscribeUserConfig,
 } from '../state/userConfigState.js';
 import { updateShellContext, subscribeShellContext } from '../state/shellContextState.js';
-import { getViewerAudience, subscribeViewerAudience } from '../state/viewerAudienceState.js';
+import { getShowDeveloperTools, subscribeShowDeveloperTools } from '../state/developerToolsState.js';
 // Tempdoc 543 §3.B + §20.7 A0 — Scope substrate. Direct restoreScope
 // import deliberately removed: WorkspaceProfile.activateProfile is
 // now the SOLE Scope writer in chrome boot. Anything that needs to
@@ -314,7 +314,7 @@ const HELP_SURFACE_ID = 'core.help-surface';
 const SETTINGS_SURFACE_ID = 'core.settings-surface';
 /** Health · Activity · Logs, hosted as tabs; More › System opens it. */
 const SYSTEM_SURFACE_ID = 'core.system-surface';
-/** Developer windows listed under More › Developer while the developer view tier is on. */
+/** Developer windows listed under More › Developer while the developer-tools preference is on. */
 const DEVELOPER_WINDOW_IDS = ['core.api-explorer-surface'];
 
 // Tempdoc 571 §6 — the one interaction window (561); the first area of the switcher (Ctrl+1).
@@ -381,7 +381,7 @@ export class Shell extends JfElement {
     dragActive: { state: true },
     dragKind: { state: true },
     userConfig: { state: true },
-    developerTier: { state: true },
+    showDeveloperTools: { state: true },
     initialNavigationPending: { state: true },
     engineLossCovers: { state: true },
   };
@@ -392,8 +392,8 @@ export class Shell extends JfElement {
   declare dragActive: boolean;
   declare dragKind: DragKind | null;
   declare userConfig: RendererUserConfig;
-  /** The developer view tier (Settings › Developer › View tier): shows More › Developer. */
-  declare developerTier: boolean;
+  /** The developer-tools preference (Settings › Advanced › Show developer tools): shows More › Developer. */
+  declare showDeveloperTools: boolean;
   /** Draft cutover must wait for URL, native cold ingress and journal restore. */
   private declare initialNavigationPending: boolean;
   /** S5c — the engine-loss treatment dims the window area: it takes no input until the engine is back. */
@@ -403,7 +403,7 @@ export class Shell extends JfElement {
   private dragUnsubscribe: (() => void) | null = null;
   private userConfigUnsubscribe: (() => void) | null = null;
   private catalogUnsubscribe: (() => void) | null = null;
-  private viewerAudienceUnsubscribe: (() => void) | null = null;
+  private developerToolsUnsubscribe: (() => void) | null = null;
   /**
    * Slice 490 Group B4 — Shell-owned AdvisoryStore. Passed to the three advisory
    * chrome elements via property bindings; replaces the previous module-level
@@ -609,7 +609,7 @@ export class Shell extends JfElement {
     this.dragActive = false;
     this.dragKind = null;
     this.userConfig = getUserConfig();
-    this.developerTier = getViewerAudience() === 'DEVELOPER';
+    this.showDeveloperTools = getShowDeveloperTools();
   }
 
   static styles = css`
@@ -1349,9 +1349,9 @@ export class Shell extends JfElement {
       this.userConfig = cfg;
       this.refreshSurfaces();
     });
-    // More › Developer follows the developer view tier (Settings › Developer › View tier).
-    this.viewerAudienceUnsubscribe = subscribeViewerAudience((audience) => {
-      this.developerTier = audience === 'DEVELOPER';
+    // More › Developer follows the developer-tools preference (Settings › Advanced › Show developer tools).
+    this.developerToolsUnsubscribe = subscribeShowDeveloperTools((show) => {
+      this.showDeveloperTools = show;
     });
     // Slice 471 / 469 — re-filter the window list when SurfaceCatalog mutates
     // (plugin install/uninstall via mergePluginSurfaceContributions
@@ -1820,8 +1820,8 @@ export class Shell extends JfElement {
     setInspectorOwnerResolver(() => null);
     this.userConfigUnsubscribe?.();
     this.catalogUnsubscribe?.();
-    this.viewerAudienceUnsubscribe?.();
-    this.viewerAudienceUnsubscribe = null;
+    this.developerToolsUnsubscribe?.();
+    this.developerToolsUnsubscribe = null;
     this.keybindingTeardown?.();
     this._aiUnsub?.();
     this.engineLossUnsubscribe?.();
@@ -2106,6 +2106,7 @@ export class Shell extends JfElement {
     if (selection.kind === 'area') this.switchArea(selection.id);
     // About is an observed version/update summary; update actions stay in General.
     else if (selection.kind === 'window' && selection.id === 'about') this.activateSurface(SETTINGS_SURFACE_ID, { section: 'about' }, 'BUTTON');
+    else if (selection.kind === 'logs') this.activateSurface('core.logs-surface', {}, 'BUTTON');
     else if (selection.kind === 'window') this.activateSurface(selection.id, {}, 'BUTTON');
     else if (selection.kind === 'settings') this.activateSurface(SETTINGS_SURFACE_ID, {}, 'BUTTON');
     else void this.copyLink();
@@ -2443,7 +2444,7 @@ export class Shell extends JfElement {
         .about=${getSurface(SETTINGS_SURFACE_ID) ? { id: 'about', label: 'About JustSearch', icon: 'info' as const } : null}
         .windows=${this.pluginWindows()}
         .developerWindows=${DEVELOPER_WINDOW_IDS.map(known).filter((d): d is TopBarDestination => d !== null)}
-        .developer=${this.developerTier}
+        .developer=${this.showDeveloperTools}
         .backendAddress=${this.apiBase || window.location.origin}
         @top-bar-select=${(e: CustomEvent<TopBarSelection>) => this.onTopBarSelect(e.detail)}
       >

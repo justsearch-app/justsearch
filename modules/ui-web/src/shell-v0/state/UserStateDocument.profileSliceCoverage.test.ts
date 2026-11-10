@@ -44,6 +44,7 @@ describe('UserStateDocument — flatSlicesFromProfile per-slice coverage (F11 gu
         },
       ],
       viewerAudience: 'OPERATOR',
+      showDeveloperTools: true,
       activePresentationId: 'user.my-skin',
     };
 

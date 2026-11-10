@@ -1,0 +1,646 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
+  },
+  "createdAt": "2026-11-10T21:56:38.486Z",
+  "revision": "50c26d710c5f2a9223623c46516285881970a4ff",
+  "tree": "23c3220bc6c1828bc712a89ec44d307243ee1c6d",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/UserStateDocument.developerTools.test.ts\" \"src/shell-v0/state/developerToolsState.test.ts\" \"src/shell-v0/views/SettingsSurface.developerTools.test.ts\" \"src/shell-v0/views/SettingsSurface.sections.test.ts\" \"src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts\" \"src/shell-v0/views/settingsRegister.test.ts\" \"src/shell-v0/chrome/Shell.frame.test.ts\" \"src/shell-v0/chrome/TopBar.test.ts\" \"src/boot/factoryReset.developerTools.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/5bb7bl3g/tmp/test-intent-vitest-3-1794347793945.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 4540
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/state/UserStateDocument.developerTools.test.ts",
+      "file": "modules/ui-web/src/shell-v0/state/UserStateDocument.developerTools.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4c0e09e41a63ef50ff363f86372d7fe3e684cf310eae6af0b1c05c15430f0c71",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SD5 round-trip and user-state export/import retain explicit true",
+          "status": "passed"
+        },
+        {
+          "name": "SD5 round-trip and user-state export/import retain explicit false",
+          "status": "passed"
+        },
+        {
+          "name": "SD5 implicit and explicit profile bases copy true without touching the basis",
+          "status": "passed"
+        },
+        {
+          "name": "SD5 implicit and explicit profile bases copy false without touching the basis",
+          "status": "passed"
+        },
+        {
+          "name": "SD5 schema-2 boot and read-only projection leave the absent field and original bytes alone",
+          "status": "passed"
+        },
+        {
+          "name": "SD5 newer-schema boot is not overwritten",
+          "status": "passed"
+        },
+        {
+          "name": "SD5 accepts the new boolean, rejects invalid values and keeps the unknown-field contract",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/developerToolsState.test.ts",
+      "file": "modules/ui-web/src/shell-v0/state/developerToolsState.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:173e0b3aeb5f3a541f3681d89eeee081ee4f84b11e7f7d38b5c6ac36a9417b2f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SD2 SD3 notifies only effective changes, including audience and equal-value profile switches",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.developerTools.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.developerTools.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:180e16be93141d511bf1bbfbde861379c4fc6f6253be88de8e6f8e2323320872",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SD1 SD2 untouched USER defaults without saving; toggles write only the current profile field",
+          "status": "passed"
+        },
+        {
+          "name": "SD1 SD2 untouched OPERATOR defaults without saving; toggles write only the current profile field",
+          "status": "passed"
+        },
+        {
+          "name": "SD1 SD2 untouched DEVELOPER defaults without saving; toggles write only the current profile field",
+          "status": "passed"
+        },
+        {
+          "name": "SD1 SD2 untouched AGENT defaults without saving; toggles write only the current profile field",
+          "status": "passed"
+        },
+        {
+          "name": "SD2 amended audience matrix retains explicit undefined and never materializes absence",
+          "status": "passed"
+        },
+        {
+          "name": "SD2 amended audience matrix retains explicit true and never materializes absence",
+          "status": "passed"
+        },
+        {
+          "name": "SD2 amended audience matrix retains explicit false and never materializes absence",
+          "status": "passed"
+        },
+        {
+          "name": "SD3 amended A to B to A at 'USER' with undefined, equal effective values and reload isolates profiles",
+          "status": "passed"
+        },
+        {
+          "name": "SD3 amended A to B to A at 'USER' with true, equal effective values and reload isolates profiles",
+          "status": "passed"
+        },
+        {
+          "name": "SD3 amended A to B to A at 'USER' with false, equal effective values and reload isolates profiles",
+          "status": "passed"
+        },
+        {
+          "name": "SD3 amended A to B to A at 'OPERATOR' with undefined, equal effective values and reload isolates profiles",
+          "status": "passed"
+        },
+        {
+          "name": "SD3 amended A to B to A at 'OPERATOR' with true, equal effective values and reload isolates profiles",
+          "status": "passed"
+        },
+        {
+          "name": "SD3 amended A to B to A at 'OPERATOR' with false, equal effective values and reload isolates profiles",
+          "status": "passed"
+        },
+        {
+          "name": "SD3 amended A to B to A at 'DEVELOPER' with undefined, equal effective values and reload isolates profiles",
+          "status": "passed"
+        },
+        {
+          "name": "SD3 amended A to B to A at 'DEVELOPER' with true, equal effective values and reload isolates profiles",
+          "status": "passed"
+        },
+        {
+          "name": "SD3 amended A to B to A at 'DEVELOPER' with false, equal effective values and reload isolates profiles",
+          "status": "passed"
+        },
+        {
+          "name": "SD3 amended A to B to A at 'AGENT' with undefined, equal effective values and reload isolates profiles",
+          "status": "passed"
+        },
+        {
+          "name": "SD3 amended A to B to A at 'AGENT' with true, equal effective values and reload isolates profiles",
+          "status": "passed"
+        },
+        {
+          "name": "SD3 amended A to B to A at 'AGENT' with false, equal effective values and reload isolates profiles",
+          "status": "passed"
+        },
+        {
+          "name": "SD3 same-profile storage adoption updates the open switch, content, unchanged search and anchors",
+          "status": "passed"
+        },
+        {
+          "name": "SD3 SG6 disappearing focused 'content' row on 'audience' change moves focus to the switch",
+          "status": "passed"
+        },
+        {
+          "name": "SD3 SG6 disappearing focused 'content' row on 'tools' change moves focus to the switch",
+          "status": "passed"
+        },
+        {
+          "name": "SD3 SG6 disappearing focused 'navigation' row on 'audience' change moves focus to the switch",
+          "status": "passed"
+        },
+        {
+          "name": "SD3 SG6 disappearing focused 'navigation' row on 'tools' change moves focus to the switch",
+          "status": "passed"
+        },
+        {
+          "name": "SD3 SG6 disappearing focused 'search' row on 'audience' change moves focus to the switch",
+          "status": "passed"
+        },
+        {
+          "name": "SD3 SG6 disappearing focused 'search' row on 'tools' change moves focus to the switch",
+          "status": "passed"
+        },
+        {
+          "name": "SD3 SG6 pending hidden links explain the correct gate and never enable tools",
+          "status": "passed"
+        },
+        {
+          "name": "SD3 SG6 live hidden links explain the correct gate and never enable tools",
+          "status": "passed"
+        },
+        {
+          "name": "SD4 plugin permissions at USER stay independent of tools",
+          "status": "passed"
+        },
+        {
+          "name": "SD4 plugin permissions at OPERATOR stay independent of tools",
+          "status": "passed"
+        },
+        {
+          "name": "SD4 plugin permissions at DEVELOPER stay independent of tools",
+          "status": "passed"
+        },
+        {
+          "name": "SD4 plugin permissions at AGENT stay independent of tools",
+          "status": "passed"
+        },
+        {
+          "name": "SD2 failed preference save keeps the session value, records the error and reload uses stored value",
+          "status": "passed"
+        },
+        {
+          "name": "SD6 developer tools stay usable in backend Session-only mode",
+          "status": "passed"
+        },
+        {
+          "name": "SD4 Health keeps the API endpoint readout at USER with developer tools off",
+          "status": "passed"
+        },
+        {
+          "name": "SD4 Health keeps the API endpoint readout at OPERATOR with developer tools off",
+          "status": "passed"
+        },
+        {
+          "name": "SD4 Health keeps the API endpoint readout at DEVELOPER with developer tools off",
+          "status": "passed"
+        },
+        {
+          "name": "SD4 Health keeps the API endpoint readout at AGENT with developer tools off",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.sections.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.sections.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f0caf9285b790a66401bb16c94584614c239ab954bc145c60e0e97adf7664c49",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SG2 the seven sections contain every native and member entry once in its settled order",
+          "status": "passed"
+        },
+        {
+          "name": "SG4 every legacy category and entry resolves centrally, with explicit entries winning",
+          "status": "passed"
+        },
+        {
+          "name": "SG3 SG4 latest pending and live arrivals select section and anchor without saved-state writes",
+          "status": "passed"
+        },
+        {
+          "name": "SG4 superseding pending arrivals focus and scroll only the latest anchor",
+          "status": "passed"
+        },
+        {
+          "name": "SG4 superseding live arrivals focus and scroll only the latest anchor",
+          "status": "passed"
+        },
+        {
+          "name": "SG6 audience changes update unchanged search and navigation and rescue a disappearing focused row",
+          "status": "passed"
+        },
+        {
+          "name": "SG6 audience changes rescue a disappearing focused navigation entry without changing section",
+          "status": "passed"
+        },
+        {
+          "name": "SG6 audience changes rescue a disappearing focused content entry without changing section",
+          "status": "passed"
+        },
+        {
+          "name": "SG5 recovery selects Data & reset and the existing Reset anchor without invoking reset",
+          "status": "passed"
+        },
+        {
+          "name": "SG7 About names the version sources and observed states and keeps actions in General",
+          "status": "passed"
+        },
+        {
+          "name": "SG7 About says the bundle version is unknown when its metadata is absent",
+          "status": "passed"
+        },
+        {
+          "name": "SG8 Escape consumes theme JSON import and rename before the enclosing window can close",
+          "status": "passed"
+        },
+        {
+          "name": "SG9 Gallery and Editor coexist with stable independent instances and sibling controls during rerenders",
+          "status": "passed"
+        },
+        {
+          "name": "SG9 a missing Gallery leaves the Editor and native sibling controls usable",
+          "status": "passed"
+        },
+        {
+          "name": "SG9 a loading Gallery leaves the Editor and native sibling controls usable",
+          "status": "passed"
+        },
+        {
+          "name": "SG9 a unregistered Gallery leaves the Editor and native sibling controls usable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7aec33aaf6c7a0af887be45ba8f00ca7722629cbd34e33b75f07c7457f19c01a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CR37c settings recovery R2 retains recovery route focus until the first status reveals the hold",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R2 retains the pending hand-off across app focus moves inside shadow roots",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R2 drops pending recovery focus when the user moves focus, even if they return",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R2 drops pending recovery focus after pointerdown outside the Settings dialog",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R2 drops pending recovery focus after keydown outside the Settings dialog",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R2 drops pending recovery focus after blur outside the Settings dialog",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R2 cancels user keydown focus movement inside a shadow root",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R2 cancels user pointerdown focus movement inside a shadow root",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R2 drops pending recovery focus when Settings closes and is reopened normally",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R2 drops pending recovery focus when the first status reports no recovery hold",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R2 fulfills pending recovery focus from a stale reported recovery hold",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R2 never steals focus moved during the existing asynchronous focus walk",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R2 cancels a repeated recovery route when the user moves focus before the window updates",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R1 R4 preserves confirmation and Yes focus through stale polling and a status gap (USER)",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R1 R4 preserves confirmation and Yes focus through stale polling and a status gap (OPERATOR)",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R1 R4 preserves confirmation and Yes focus through stale polling and a status gap (DEVELOPER)",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R1 exposes the existing reset in every tier only for the observed recovery hold",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R1 preserves confirmation, cancellation, errors and successful reset handling in User tier",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery SG5 R2 selects Data & reset from another section and focuses Reset in every tier without invoking it",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R3 preserves normal audience visibility outside recovery (null)",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R3 preserves normal audience visibility outside recovery (user_paused)",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R3 preserves normal audience visibility outside recovery (game_mode)",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R1 R3 removes the exception on a remote clear and restores focus only when Reset had focus",
+          "status": "passed"
+        },
+        {
+          "name": "CR37c settings recovery R1 R3 restores focus when pending confirmation blurs before the recovery hold clears",
+          "status": "passed"
+        },
+        {
+          "name": "SD6 Reset to defaults keeps explicit developer tools true",
+          "status": "passed"
+        },
+        {
+          "name": "SD6 Reset to defaults keeps explicit developer tools false",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/settingsRegister.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/settingsRegister.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:bd2ebae6142373903e9cb9df4198373e6939166fb4bf93fdedce51e9fcd667eb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "searchRegister an empty (or whitespace-only) query returns no results",
+          "status": "passed"
+        },
+        {
+          "name": "searchRegister matches a native category label, case-insensitively",
+          "status": "passed"
+        },
+        {
+          "name": "searchRegister matches a member category label via present()",
+          "status": "passed"
+        },
+        {
+          "name": "searchRegister matches a sub-anchor section label and carries its category",
+          "status": "passed"
+        },
+        {
+          "name": "searchRegister a group-label match fans out to every category in that group",
+          "status": "passed"
+        },
+        {
+          "name": "searchRegister respects audience gating: a USER querying a DEVELOPER-only section gets no hit",
+          "status": "passed"
+        },
+        {
+          "name": "searchRegister a DEVELOPER querying the same term DOES get the hit",
+          "status": "passed"
+        },
+        {
+          "name": "searchRegister SD1 View tier search follows developer tools independently of audience",
+          "status": "passed"
+        },
+        {
+          "name": "searchRegister no match returns an empty array",
+          "status": "passed"
+        },
+        {
+          "name": "categoryLabel resolves a native category through localizeResourceKey",
+          "status": "passed"
+        },
+        {
+          "name": "the Layout sub-anchor in the shipped words (shell slice 2) the Settings search indexes the switcher list by the nav's own label: \"switcher\" finds it, \"rail\" does not",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame.test.ts",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.frame.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:53e98cae406d41ab1ca890e2ba79b8afd767ad8f80f6713fe82eeb08d49f4207",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FR1 / FR4 / FR8 the frame is one top bar over the window area has a banner (the top bar), a navigation (the switcher) and one main with the page heading",
+          "status": "passed"
+        },
+        {
+          "name": "FR1 / FR4 / FR8 the frame is one top bar over the window area carries no rail, back/forward buttons, recents, bookmarks, Copy URL, Simple/Detailed toggle or backend address",
+          "status": "passed"
+        },
+        {
+          "name": "FR1 / FR4 / FR8 the frame is one top bar over the window area the status pill sits in the top bar and its name states its state",
+          "status": "passed"
+        },
+        {
+          "name": "FR1 / FR4 / FR8 the frame is one top bar over the window area Ctrl+1/2/3 switch areas and the switcher follows",
+          "status": "passed"
+        },
+        {
+          "name": "FR1 / FR4 / FR8 the frame is one top bar over the window area F1 opens Help & shortcuts",
+          "status": "passed"
+        },
+        {
+          "name": "FR5 saved layouts map onto the frame core.focus (rail.visible:false) hides the switcher; Ctrl+2 and the palette still reach the areas",
+          "status": "passed"
+        },
+        {
+          "name": "FR5 saved layouts map onto the frame core.zen (rail.visible:false) hides the switcher; Ctrl+2 and the palette still reach the areas",
+          "status": "passed"
+        },
+        {
+          "name": "FR5 saved layouts map onto the frame acme.custom-no-rail (rail.visible:false) hides the switcher; Ctrl+2 and the palette still reach the areas",
+          "status": "passed"
+        },
+        {
+          "name": "FR5 saved layouts map onto the frame statusBar.visible:false hides plugin status in the pill only",
+          "status": "passed"
+        },
+        {
+          "name": "FR5 saved layouts map onto the frame a split layout keeps the second window pane with its picker",
+          "status": "passed"
+        },
+        {
+          "name": "FR5 saved layouts map onto the frame the window list respects a layout's rail.surfaces (switcher and More list only what it names)",
+          "status": "passed"
+        },
+        {
+          "name": "FR7 plugin windows, overrides and provenance a catalog window contribution is listed under More › More and mounts with host injection",
+          "status": "passed"
+        },
+        {
+          "name": "FR7 plugin windows, overrides and provenance a surface override mounts the override and the provenance badge says a non-core element is active",
+          "status": "passed"
+        },
+        {
+          "name": "FR7 plugin windows, overrides and provenance SD1 the Developer group follows Show developer tools independently of audience (API explorer listed only when present)",
+          "status": "passed"
+        },
+        {
+          "name": "FR7 plugin windows, overrides and provenance About opens Settings at the section that shows the version; Copy link copies this view's address",
+          "status": "passed"
+        },
+        {
+          "name": "FR8 F6 cycles top bar → window tabs → content → details pane moves through the present regions in order, wraps, and Shift+F6 goes back",
+          "status": "passed"
+        },
+        {
+          "name": "FR8 F6 cycles top bar → window tabs → content → details pane skips a region a window does not have (Search has no tab row here)",
+          "status": "passed"
+        },
+        {
+          "name": "L3 the unknown-destination notice names what happened in words that fit the top bar and offers the destinations",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/TopBar.test.ts",
+      "file": "modules/ui-web/src/shell-v0/chrome/TopBar.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:fd23fb25b11b8ded4493d8fc59f240c8f4fc04b5de1511dfffc7b8b2a85ef143",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FR1 the top bar: brand, switcher, status slot, Settings, More renders the brand, three areas in order with the active one current, a status slot, Settings and More",
+          "status": "passed"
+        },
+        {
+          "name": "FR1 the top bar: brand, switcher, status slot, Settings, More tooltips show the shortcuts, and assistive tech gets the same shortcut",
+          "status": "passed"
+        },
+        {
+          "name": "FR1 the top bar: brand, switcher, status slot, Settings, More an area, Settings and a More row each report one selection",
+          "status": "passed"
+        },
+        {
+          "name": "FR1 the top bar: brand, switcher, status slot, Settings, More every area and window is addressable by exactly one data-surface-id while a menu is closed",
+          "status": "passed"
+        },
+        {
+          "name": "FR7 the More (⋯) menu holds System, Help & shortcuts (F1) and About; plugin windows under \"More\"; no Developer group by default",
+          "status": "passed"
+        },
+        {
+          "name": "FR7 the More (⋯) menu SD1 shows the Developer group while tools are on: API explorer, Copy link, backend address and Logs",
+          "status": "passed"
+        },
+        {
+          "name": "FR7 the More (⋯) menu About reports its own selection without claiming a window id",
+          "status": "passed"
+        },
+        {
+          "name": "FR7 the More (⋯) menu opens with focus on the first row; arrows move, Escape closes and returns focus to ⋯",
+          "status": "passed"
+        },
+        {
+          "name": "FR7 the More (⋯) menu closes on an outside click",
+          "status": "passed"
+        },
+        {
+          "name": "FR2 / FR5 the switcher at the minimal size and under a layout that hides it the minimal bar's area button names the active area and opens the three areas as a radio menu",
+          "status": "passed"
+        },
+        {
+          "name": "FR2 / FR5 the switcher at the minimal size and under a layout that hides it switcherVisible=false hides the switcher (and its navigation landmark); Settings and More stay",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/factoryReset.developerTools.test.ts",
+      "file": "modules/ui-web/src/boot/factoryReset.developerTools.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0b8cbdf9cf12b1a97cf6702256f5724b0309560696bccaa575cb50ca2caedfea",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SD6 full local-data deletion clears developer tools in every user-state profile before acknowledging cleanup",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:318beda5a5f80619bf30eb3be9cc50b37445f35addcc960cf73cf80104d80b9b"
+}

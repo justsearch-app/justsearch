@@ -19,7 +19,7 @@ const homes: Record<string, string[]> = {
   'security-privacy': ['core.security-surface', 'durable-grants', 'plugin-permissions', 'agent-autonomy', 'feedback-capture'],
   'data-reset': ['reset-settings', 'data'],
   plugins: ['plugins', 'delivered-contributions'],
-  advanced: ['view-tier', 'workspace-profiles'],
+  advanced: ['show-developer-tools', 'view-tier', 'workspace-profiles'],
   about: ['version', 'update-information'],
 };
 const settle = async (el: SettingsSurface) => { await el.updateComplete; await new Promise(r => setTimeout(r, 0)); await el.updateComplete; };
@@ -68,7 +68,7 @@ it('SG4 every legacy category and entry resolves centrally, with explicit entrie
   const aliases: Record<string, [string, string]> = {
     appearance: ['appearance', 'interface'], layout: ['appearance', 'layout'], notifications: ['general', 'notifications'],
     agent: ['security-privacy', 'agent-autonomy'], desktop: ['general', 'desktop'], indexing: ['general', 'indexing'],
-    developer: ['advanced', 'view-tier'], data: ['data-reset', 'data'], plugins: ['plugins', 'plugins'],
+    developer: ['advanced', 'show-developer-tools'], data: ['data-reset', 'data'], plugins: ['plugins', 'plugins'],
     'privacy-trust': ['security-privacy', 'core.security-surface'],
   };
   for (const [id, [section, anchor]] of Object.entries(aliases)) expect(resolve(id)).toEqual({ section, anchor });
@@ -121,7 +121,7 @@ it('SG6 audience changes update unchanged search and navigation and rescue a dis
   setViewerAudience('USER'); await settle(el); await nav.updateComplete;
   expect(nav.query).toBe('workspace-profiles');
   expect(nav.shadowRoot!.querySelector('.search-result-row')).toBeNull();
-  expect(nav.shadowRoot!.activeElement?.classList.contains('search-input')).toBe(true);
+  expect(el.shadowRoot!.activeElement?.id).toBe('show-developer-tools');
   expect(el.shadowRoot!.querySelector('[data-settings-anchor="workspace-profiles"]')).toBeNull();
   nav.query = ''; await nav.updateComplete;
   expect(nav.shadowRoot!.querySelector('[data-settings-anchor="workspace-profiles"]')).toBeNull();
@@ -140,7 +140,7 @@ it.each(['navigation', 'content'])('SG6 audience changes rescue a disappearing f
   expect(row).not.toBeNull(); row!.focus();
   setViewerAudience('USER'); await settle(el); await nav.updateComplete;
   expect(root.querySelector('[data-settings-anchor="workspace-profiles"]')).toBeNull();
-  expect(nav.shadowRoot!.activeElement?.classList.contains('category-row')).toBe(true);
+  expect(el.shadowRoot!.activeElement?.id).toBe('show-developer-tools');
   expect(el.activeCategory).toBe('advanced');
 });
 

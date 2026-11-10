@@ -12,6 +12,7 @@ import { registerOperationButtonStrategy } from '../aggregate-substrate/strategi
 import { createMockHostApi } from '../plugin-api/testHostApi.js';
 import { __feedForTest, __feedContactForTest, __resetAiStateForTest, type StatusSnapshot } from '../state/aiStateStore.js';
 import { getViewerAudience, setViewerAudience } from '../state/viewerAudienceState.js';
+import { getDocument, mutateDocument } from '../state/UserStateDocument.js';
 import { deepActiveElement } from '../utils/keyboardHandler.js';
 
 const reset: Operation = {
@@ -398,4 +399,18 @@ describe('CR37c settings recovery', () => {
     expect(invokeButton(surface)).toBeNull();
     expect(deepActiveElement()).toBe(surface.shadowRoot!.querySelector('h2'));
   });
+});
+
+
+it.each([true, false])('SD6 Reset to defaults keeps explicit developer tools %s', async value => {
+  setViewerAudience('OPERATOR');
+  mutateDocument(doc => ({ ...doc, showDeveloperTools: value }));
+  const before = localStorage.getItem('justsearch.userState.v2');
+  fetchMock.mockResolvedValue(Response.json({ success: true, message: 'Settings reset' }));
+  const surface = await mount();
+  invokeButton(surface)!.click(); await settle(surface);
+  bandAnswer(surface, 'confirm').click(); await settle(surface);
+  expect(fetchMock.mock.calls.filter(call => String(call[0]).endsWith('/core.reset-settings/invoke'))).toHaveLength(1);
+  expect(getDocument().showDeveloperTools).toBe(value);
+  expect(localStorage.getItem('justsearch.userState.v2')).toBe(before);
 });

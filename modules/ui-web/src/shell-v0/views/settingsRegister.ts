@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /** The one Settings register: navigation, content, search and incoming coordinates. */
+import { getShowDeveloperTools } from '../state/developerToolsState.js';
 import { getViewerAudience } from '../state/viewerAudienceState.js';
 import { localizeResourceKey } from '../../i18n/resourceCatalog.js';
 import { present } from '../display/present.js';
@@ -101,8 +102,9 @@ export const SETTINGS_REGISTER: readonly SettingsGroup[] = [
   {
     id: 'advanced', labelKey: 'settings.category.advanced', categories: [{
       id: 'advanced', kind: 'native', labelKey: 'settings.category.advanced', sections: [
-        { key: 'view-tier', labelKey: 'settings.section.view-tier' },
-        { key: 'workspace-profiles', labelKey: 'settings.section.workspace-profiles', gate: developerOnly },
+        { key: 'show-developer-tools', labelKey: 'settings.section.show-developer-tools' },
+        { key: 'view-tier', labelKey: 'settings.section.view-tier', gate: getShowDeveloperTools },
+        { key: 'workspace-profiles', labelKey: 'settings.section.workspace-profiles', gate: () => developerOnly() && getShowDeveloperTools() },
       ],
     }],
   },
@@ -125,7 +127,7 @@ export interface SettingsCoordinate {
 const CATEGORY_ALIASES: Readonly<Record<string, string>> = {
   appearance: 'interface', layout: 'layout', notifications: 'notifications',
   agent: 'agent-autonomy', indexing: 'indexing', desktop: 'desktop',
-  developer: 'view-tier', data: 'data', plugins: 'plugins',
+  developer: 'show-developer-tools', data: 'data', plugins: 'plugins',
   'privacy-trust': 'core.security-surface',
 };
 

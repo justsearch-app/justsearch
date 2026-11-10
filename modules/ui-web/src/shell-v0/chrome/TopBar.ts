@@ -42,7 +42,8 @@ export type TopBarSelection =
   | { readonly kind: 'area'; readonly id: string }
   | { readonly kind: 'window'; readonly id: string }
   | { readonly kind: 'settings' }
-  | { readonly kind: 'copy-link' };
+  | { readonly kind: 'copy-link' }
+  | { readonly kind: 'logs' };
 
 type OpenMenu = 'more' | 'areas' | null;
 
@@ -75,7 +76,7 @@ export class TopBar extends JfElement {
   declare about: TopBarDestination | null;
   /** Plugin windows (catalog contributions outside the three areas): ⋯ › More. */
   declare windows: readonly TopBarDestination[];
-  /** Developer windows (API explorer): ⋯ › Developer, only while the developer view tier is on. */
+  /** Developer windows (API explorer): ⋯ › Developer, while Show developer tools is on. */
   declare developerWindows: readonly TopBarDestination[];
   declare developer: boolean;
   declare backendAddress: string;
@@ -350,6 +351,8 @@ export class TopBar extends JfElement {
           @click=${() => this.select({ kind: 'copy-link' })}>${icon({ name: 'copy', size: 16 })}<span class="item-label">Copy link to this view</span></button>
         <button type="button" role="menuitem" tabindex="-1" data-menu-action="backend-address" aria-expanded=${String(this.showBackend)}
           @click=${() => { this.showBackend = !this.showBackend; }}>${icon({ name: 'database', size: 16 })}<span class="item-label">Show backend address</span></button>
+        <button type="button" role="menuitem" tabindex="-1" data-menu-action="logs"
+          @click=${() => this.select({ kind: 'logs' })}>${icon({ name: 'file-text', size: 16 })}<span class="item-label">Logs</span></button>
         ${this.showBackend ? html`<div class="backend" data-testid="backend-address">${this.backendAddress}</div>` : nothing}
       </div>` : nothing}
     </div>`;
