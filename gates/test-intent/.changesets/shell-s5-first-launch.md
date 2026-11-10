@@ -970,7 +970,7 @@ progress-bar witnesses. Independent acceptance remains pending.
       "moved": [
         "input re-encoding"
       ],
-      "whatMoved": "The schema-valid live synthetic status fixture supplies ownSearchableDocuments beside searchableDocuments, both 104 for this fixture of user files. No other fixture expectation changes; schema and frontend suites execute against it.",
+      "whatMoved": "The schema-valid live synthetic status fixture supplies ownSearchableDocuments beside searchableDocuments, both 0, matching its known empty index (indexedDocumentsUnknown false). No other fixture expectation changes; schema and frontend suites execute against it.",
       "sources": [
         {
           "kind": "delegated-choice",
