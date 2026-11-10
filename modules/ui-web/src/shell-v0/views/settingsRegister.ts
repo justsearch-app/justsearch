@@ -140,9 +140,7 @@ export const SETTINGS_REGISTER: readonly SettingsGroup[] = [
         labelKey: 'settings.category.agent',
         sections: [
           { key: 'agent-autonomy', labelKey: 'settings.section.agent-autonomy' },
-          // Tempdoc 883 D-A.7 — `contextLength` never had a control. It has one now, but a
-          // DIAGNOSTIC one: the window is a derived resource (ADR-0047), so the section is a
-          // read-only readout of what the engine was actually launched with, plus an escape hatch.
+          // Navigation to the sole Reading memory control in AI Brain.
           { key: 'context-window', labelKey: 'settings.section.context-window' },
         ],
       },

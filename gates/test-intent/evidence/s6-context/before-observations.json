@@ -1,0 +1,85 @@
+{
+  "baseline": "611a433d52b83eda253c96cc690d03a2d3d1cfa2",
+  "command": "npx vitest run src/shell-v0/views/ContextWindow.home.test.ts --maxWorkers=2 --reporter=json",
+  "tests": [
+    {
+      "name": "Context window has one home Settings links to AI Brain and has no second context control",
+      "status": "failed",
+      "assertion": "AssertionError: expected <input \u2026(7)></input> to be null"
+    },
+    {
+      "name": "Context window has one home Settings search finds context window at the link",
+      "status": "failed",
+      "assertion": "AssertionError: expected '\\n      \\n        \\n    \\n   Context \u2026' to contain 'Reading memory (context window)'"
+    },
+    {
+      "name": "Context window has one home Settings search finds reading memory at the link",
+      "status": "failed",
+      "assertion": "AssertionError: the register finds the context link: expected undefined to be defined"
+    },
+    {
+      "name": "Context window has one home arrival opens Answers and focuses Reading memory when cold",
+      "status": "failed",
+      "assertion": "AssertionError: the Reading memory (context window) link exists: expected undefined to be defined"
+    },
+    {
+      "name": "Context window has one home arrival opens Answers and focuses Reading memory when mounted",
+      "status": "failed",
+      "assertion": "AssertionError: the Reading memory (context window) link exists: expected undefined to be defined"
+    },
+    {
+      "name": "Context window has one home preserves the saved value 0 in AI Brain",
+      "status": "passed"
+    },
+    {
+      "name": "Context window has one home preserves the saved value 512 in AI Brain",
+      "status": "passed"
+    },
+    {
+      "name": "Context window has one home preserves the saved value 196608 in AI Brain",
+      "status": "passed"
+    },
+    {
+      "name": "Context window has one home floors a positive save at 512 and writes only the narrow wire field",
+      "status": "passed"
+    },
+    {
+      "name": "Context window has one home shows the running value and explains a different saved choice beside Reading memory",
+      "status": "failed",
+      "assertion": "AssertionError: expected '\\n      Reading memoryHow much text i\u2026' to contain 'Running now: 8,192 tokens (override, \u2026'"
+    },
+    {
+      "name": "Context window has one home a saved Automatic choice explains an explicit window still running",
+      "status": "failed",
+      "assertion": "AssertionError: expected '\\n      Reading memoryHow much text i\u2026' to contain 'Saved: Automatic. Takes effect the ne\u2026'"
+    },
+    {
+      "name": "Context window has one home Automatic shows the derived running window without claiming a pending change",
+      "status": "failed",
+      "assertion": "AssertionError: expected '\\n      Reading memoryHow much text i\u2026' to contain 'Running now: 32,768 tokens (top-rung,\u2026'"
+    },
+    {
+      "name": "Context window has one home describes unknown running memory without claiming it is current",
+      "status": "failed",
+      "assertion": "AssertionError: expected '\\n      Reading memoryHow much text i\u2026' to contain 'Checking running reading memory'"
+    },
+    {
+      "name": "Context window has one home describes offline running memory without claiming it is current",
+      "status": "failed",
+      "assertion": "AssertionError: expected '\\n      Reading memoryHow much text i\u2026' to contain 'Reading memory is set when the answer\u2026'"
+    },
+    {
+      "name": "Context window has one home describes stale running memory without claiming it is current",
+      "status": "failed",
+      "assertion": "AssertionError: expected '\\n      Reading memoryHow much text i\u2026' to contain 'Last observed: 8,192 tokens'"
+    },
+    {
+      "name": "Context window has one home a refused save (500) shows an error and the previous saved value",
+      "status": "passed"
+    },
+    {
+      "name": "Context window has one home a refused save (409) shows an error and the previous saved value",
+      "status": "passed"
+    }
+  ]
+}

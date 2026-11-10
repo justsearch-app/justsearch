@@ -1,0 +1,31 @@
+--- a/scripts/governance/gates/test-intent/run-evidence.mjs
++++ b/scripts/governance/gates/test-intent/run-evidence.mjs
+@@ -50,7 +50,7 @@
+ import { extractTestItems, testModuleFiles } from './rust-tests.mjs';
+ 
+ const HERE = path.dirname(fileURLToPath(import.meta.url));
+-const REPO_ROOT = path.resolve(HERE, '..', '..', '..', '..');
++const REPO_ROOT = process.cwd();
+ const IS_WIN = process.platform === 'win32';
+ 
+ function sh(command, cwd) {
+@@ -317,8 +317,7 @@
+   // not only the node_modules link we created: a check or partial checkout can leave others.
+   // An unreadable directory or failed unlink aborts removal, leaving the tree for inspection.
+   unlinkWorktreeLinks(worktree);
+-  const removed = spawnSync('git', ['-c', 'core.longpaths=true', 'worktree', 'remove', '--force', worktree], { cwd: REPO_ROOT });
+-  if (removed.status !== 0) throw new Error(`before-state cleanup failed (${worktree}): ${removed.error?.message ?? removed.stderr}`);
++  fs.rmSync(worktree, { recursive: true, force: true });
+ }
+ 
+ function parseArgs(argv) {
+@@ -384,7 +383,8 @@
+     try {
+       // Git accepts the reserved empty directory. Keep creation inside the cleanup scope so a
+       // failed checkout cannot leave links behind without even attempting to detach them.
+-      gitOut(['worktree', 'add', '--detach', wt, args.before], REPO_ROOT);
++      gitOut(['clone', '--quiet', '--shared', '--no-checkout', REPO_ROOT, wt], REPO_ROOT);
++      gitOut(['checkout', '--quiet', '--detach', args.before], wt);
+       created = true;
+       // Explicit compatibility scaffolding for checks using newly added interfaces. Its bytes are
+       // part of the evidence; repaired behavior must remain absent from this before-state patch.

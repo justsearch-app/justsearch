@@ -1,0 +1,35 @@
+7:08:36 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+7:08:36 PM [vite] (client) [console.warn] Element jf-settings-surface scheduled an update (generally because a property was set) after an update completed, causing a new update to be scheduled. This is inefficient and should be avoided unless the next update can only be scheduled as a side effect of the previous update. See https://lit.dev/msg/change-in-update for more information.
+7:08:39 PM [vite] (client) [console.warn] Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+7:08:43 PM [vite] (client) [console.warn] Element jf-settings-surface scheduled an update (generally because a property was set) after an update completed, causing a new update to be scheduled. This is inefficient and should be avoided unless the next update can only be scheduled as a side effect of the previous update. See https://lit.dev/msg/change-in-update for more information.
+{
+  "browser": "157.0.8103.38",
+  "results": [
+    {
+      "timing": "cold",
+      "passed": true,
+      "arrival": {
+        "visible": true,
+        "animations": [
+          {
+            "name": "reading-memory-arrival",
+            "state": "running"
+          }
+        ]
+      }
+    },
+    {
+      "timing": "retained",
+      "passed": true,
+      "arrival": {
+        "visible": true,
+        "animations": [
+          {
+            "name": "reading-memory-arrival",
+            "state": "running"
+          }
+        ]
+      }
+    }
+  ]
+}

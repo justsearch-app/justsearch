@@ -20,11 +20,6 @@
 
 import { html, css, nothing, type TemplateResult, type PropertyValues } from 'lit';
 import { captureSettingsPatch, saveAbsoluteSettings, type SettingsPatch } from '../../api/settingsAttempt.js';
-// Tempdoc 883 D-A.7 — the override field must resync to STATE, not to Lit's memo of the last
-// committed value: a rejected/floored/collapsed write leaves the DOM value the user typed, and a
-// plain `.value=` binding sees no change and skips the update. `live()` compares against the live
-// DOM property, which is the only comparison that can notice.
-import { live } from 'lit/directives/live.js';
 import { ifDefined } from 'lit/directives/if-defined.js';
 import { keyed } from 'lit/directives/keyed.js';
 import { JfElement } from '../primitives/JfElement.js';
@@ -37,15 +32,11 @@ import { authorizedFetch } from '../api/authorizedFetch.js';
 // host_.platform.capabilities so the legacy isTauriRuntime import was
 // dropped as part of the surface migration.
 import { icon } from '../components/Icon.js';
-import { requestIndexingRuleNavigation } from '../controllers/navigateRequest.js';
+import { requestIndexingRuleNavigation, requestReadingMemoryNavigation } from '../controllers/navigateRequest.js';
 import type { JfButton } from '../components/Button.js';
 // §2.A: rail-customization labels resolve through the one surface-label
 // authority — never the raw `core.*-surface` id.
 import { present } from '../display/present.js';
-// Tempdoc 883 D-A.7 — the context-window readout projects the SAME `core.ai.contextWindow` fact
-// Brain renders (the one Display-value authority, 594 §9.2), so the two cannot word it differently.
-import { projectFact } from '../display/facts.js';
-import { formatCount } from '../display/format.js';
 import { subscribeAiState, type AiState } from '../state/aiStateStore.js';
 import { selectIndexingProgress } from '../state/indexingProgress.js';
 import '../components/IndexingControls.js';
@@ -171,19 +162,8 @@ interface UISettings {
   indexingPause?: NonNullable<SettingsV2['ui']>['indexingPause'];
 }
 
-/**
- * Tempdoc 883 D-A.7 — the LLM slice of `GET/POST /api/settings/v2` this surface reads and writes.
- * `contextWindow` is the wire name; `SettingsPatch.merge` maps it onto
- * `UiSettings.contextLength`, where `0` means AUTO (the window is derived at launch) and a positive
- * value is an explicit override floored at 512.
- */
-interface LLMSettings {
-  contextWindow?: number;
-}
-
 interface AllSettings {
   ui?: UISettings;
-  llm?: LLMSettings;
   settingsMode?: string;
 }
 
@@ -210,10 +190,7 @@ export class SettingsSurface extends JfElement {
     apiBase: { attribute: 'api-base', type: String },
     host_: { attribute: false },
     ui: { state: true },
-    // Tempdoc 883 D-A.7 — the LLM settings slice (today: the context-window override).
-    llm: { state: true },
-    // Tempdoc 883 D-A.7 — the live AI snapshot, for the DERIVED context-window readout. The
-    // window is not a stored preference, so the readout's source is the running engine, not `llm`.
+    // Shared observation for indexing status.
     aiSnapshot: { state: true },
     readOnly: { state: true },
     saving: { state: true },
@@ -280,7 +257,6 @@ export class SettingsSurface extends JfElement {
   declare apiBase: string;
   declare host_: PluginHostApi;
   declare ui: UISettings;
-  declare llm: LLMSettings;
   declare aiSnapshot: AiState | null;
   declare readOnly: boolean;
   declare saving: boolean;
@@ -371,7 +347,7 @@ export class SettingsSurface extends JfElement {
   private memberTabUnsub: (() => void) | null = null;
   // Tempdoc 511-followup Track A
   private viewerAudienceUnsub: (() => void) | null = null;
-  // Tempdoc 883 D-A.7 — shared AI-snapshot subscription (the derived context-window readout).
+  // Shared AI-snapshot subscription for indexing status.
   private aiStateUnsub: (() => void) | null = null;
   // Tempdoc 543 §20.7 B6 — WorkspaceProfile registry subscription.
   private workspaceProfilesUnsub: (() => void) | null = null;
@@ -393,7 +369,6 @@ export class SettingsSurface extends JfElement {
     this.apiBase = '';
     this.host_ = undefined as unknown as PluginHostApi;
     this.ui = {};
-    this.llm = {};
     this.aiSnapshot = null;
     this.readOnly = false;
     this.saving = false;
@@ -986,8 +961,7 @@ export class SettingsSurface extends JfElement {
     this.viewerAudienceUnsub = subscribeViewerAudience((a) => {
       this.viewerAudience = a;
     });
-    // Tempdoc 883 D-A.7 — the shared always-on AI snapshot feeds the DERIVED context-window
-    // readout. No second poll: this is the same store Brain and the status bar read.
+    // Shared indexing observations; use the same store as Brain and the status bar.
     this.aiStateUnsub = subscribeAiState((s) => {
       const indexing = s.status?.operating?.indexing;
       if (indexing) this.settingsRecovery = indexing.reasons.includes('settings_recovery');
@@ -1208,7 +1182,6 @@ export class SettingsSurface extends JfElement {
       ));
       this.ui = { ...(data.ui ?? {}), ...newerFields, mode: getUiMode() };
       this.applyAppearance();
-      this.llm = data.llm ?? {};
       this.readOnly = data.settingsMode === 'in_memory';
 
     } catch (err) {
@@ -3123,7 +3096,7 @@ export class SettingsSurface extends JfElement {
       rail: () => this.renderRail(),
       keyboard: () => this.renderKeyboard(),
       'agent-autonomy': () => this.renderAutonomyDial(),
-      'context-window': () => this.renderContextWindow(),
+      'context-window': () => this.renderReadingMemoryLink(),
       plugins: () => this.renderPlugins(),
       'plugin-permissions': () => this.renderPluginPermissions(),
       'durable-grants': () => this.renderDurableGrants(),
@@ -3324,104 +3297,12 @@ export class SettingsSurface extends JfElement {
     `;
   }
 
-  /**
-   * Tempdoc 883 D-A.7 / ADR-0047 — the context window is a DERIVED resource, so this section is a
-   * readout first and a control second.
-   *
-   * The readout's source is the running engine (`/api/inference/status`, via the shared AI store),
-   * NOT `llm.contextWindow`: the stored value is `0` (auto) on virtually every installation, so
-   * rendering the setting would show "0" where the user wants "32,768". It projects the SAME
-   * `core.ai.contextWindow` fact the Brain surface renders rather than re-formatting the numbers
-   * here — one Display-value authority (594 §9.2), so the two readouts cannot word it differently.
-   *
-   * The override exists because a derived resource still needs an escape hatch, and it is labelled
-   * as what it is: honoured verbatim or the launch fails loudly. There is no silent fallback — an
-   * explicit `justsearch.context.size` is a ONE-RUNG ladder, so a value the card cannot hold aborts
-   * the launch instead of quietly stepping down (ADR-0047).
-   */
-  private renderContextWindow(): TemplateResult {
-    const override = this.contextOverrideTokens();
-    const fact = this.aiSnapshot ? projectFact('core.ai.contextWindow', this.aiSnapshot) : null;
-    // Tri-state, deliberately: `present` is a real launched window; `absent` is a polled engine
-    // that reports none (offline / nothing launched); null-or-`unknown` is NOT-YET-POLLED and must
-    // not be rendered as "no window" (594 §11.3 #3 — never fabricate the settled case).
-    const launched =
-      fact && fact.presence === 'present' && fact.value
-        ? fact.value
-        : fact && fact.presence === 'absent'
-          ? null
-          : undefined;
-    return html`
-      <div class="section" data-testid="settings-context-window">
-        <h3>${icon({ name: 'layers', size: 12 })} Context window</h3>
-        <p class="toggle-desc" data-testid="context-window-readout">
-          ${override > 0
-            ? html`Override ${formatCount(override)} tokens${launched
-                  ? html` &rarr; ${launched}`
-                  : nothing}`
-            : launched
-              ? html`Auto &rarr; ${launched}`
-              : launched === null
-                ? html`Auto &mdash; derived when the assistant starts`
-                : html`Auto &mdash; checking&hellip;`}
-        </p>
-        <div class="plugin-loader" style="margin-top: 0.5rem; display: flex; gap: 0.5rem; align-items: center;">
-          <label for="context-window-override">Override</label>
-          <input
-            id="context-window-override"
-            type="number"
-            class="filter-input context-window-override"
-            min="512"
-            step="512"
-            placeholder="Auto"
-            aria-describedby="context-window-help"
-            ?disabled=${this.readOnly}
-            .value=${live(override > 0 ? String(override) : '')}
-            @change=${(e: Event) =>
-              void this.saveContextOverride((e.target as HTMLInputElement).value)}
-          />
-        </div>
-        <p class="help" id="context-window-help" style="margin: 0.5rem 0 0">
-          Leave blank for Auto: the window is derived from your hardware each time the assistant
-          starts, and the readout above says which size it got and why. An override is honoured
-          <em>verbatim</em> &mdash; if the graphics card cannot hold it the assistant fails to start
-          and says so, rather than quietly falling back to a smaller window. Minimum 512 tokens.
-        </p>
-      </div>
-    `;
-  }
-
-  /** The stored override in tokens; `0` means auto (the wire's own encoding — `UiSettings`). */
-  private contextOverrideTokens(): number {
-    const v = this.llm.contextWindow;
-    return typeof v === 'number' && v > 0 ? v : 0;
-  }
-
-  /**
-   * Persist the context-window override. Blank / non-numeric / non-positive all mean AUTO (`0`) —
-   * the same collapse `UiSettings.setContextLength` performs, so clearing the field is a real
-   * "back to auto" rather than an unrepresentable state. A positive value is floored at 512 here
-   * too, so the field cannot post a number the backend will silently rewrite.
-   *
-   * Written straight through `POST /api/settings/v2` (not the appearance statechart, which owns the
-   * `ui` block only). The body carries just the `llm` slice; `SettingsPatch.merge` merges
-   * field-by-field, so nothing else is clobbered.
-   */
-  private async saveContextOverride(raw: string): Promise<void> {
-    if (this.readOnly) return;
-    const previous = this.llm;
-    const parsed = Number.parseInt(raw.trim(), 10);
-    const next = Number.isFinite(parsed) && parsed > 0 ? Math.max(512, parsed) : 0;
-    this.llm = { ...this.llm, contextWindow: next };
-    this.saving = true;
-    try {
-      await saveAbsoluteSettings((path, init) => this.doFetch(path, init), { llm: { contextWindow: next } });
-    } catch (err) {
-      this.llm = previous;
-      this.error = err instanceof Error ? err.message : String(err);
-    } finally {
-      this.saving = false;
-    }
+  private renderReadingMemoryLink(): TemplateResult {
+    return html`<div class="section" data-testid="settings-context-window">
+      <jf-button variant="ghost" label="Reading memory (context window)"
+        .onActivate=${() => requestReadingMemoryNavigation()}>Reading memory (context window)</jf-button>
+      <p class="help">Change how much text the answer model reads at once in AI Brain → Advanced → Answers.</p>
+    </div>`;
   }
 
   /**
