@@ -359,10 +359,9 @@ The script handles three kinds of check:
 - Frontend checks run through vitest and are read from its JSON report.
 - Rust checks run through `cargo test` and are read from the libtest output.
 
-If a Java method's cases cannot be matched by name in the grouped report, the script reruns that
-method alone with Gradle's `--tests` filter and reads its fresh class report; custom JUnit display
-names do not need to include the method name. This extra command is recorded for both candidate
-and before-state runs.
+Each Java method check runs alone with Gradle's `--tests` filter and reads every case of that exact
+class from its fresh report; display names do not determine method attribution. Class-wide checks
+keep a grouped run. Every command is recorded for both candidate and before-state runs.
 
 For each check the script records the revision, the working-tree hash, the commands, the
 environment, a content digest of each check's file, and whether the check executed or was skipped.

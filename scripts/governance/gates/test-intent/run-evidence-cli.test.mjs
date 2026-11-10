@@ -305,6 +305,40 @@ function gradleRuns(scratch) {
   return fs.readFileSync(path.join(scratch, 'gradle-runs.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
 }
 
+test('CLI: a method-like display name cannot hide another invocation of the same method', async () => {
+  const id = CHECK.replace('#probe', '#partial');
+  await fixture({ checks: [id], gradle: { methods: { partial: [
+    { name: 'partial()', before: 'passed' },
+    { name: 'other-custom', status: 'assertion', before: 'assertion' },
+  ] } } }, ({ result, output, out }) => {
+    assert.equal(result.status, 1, output);
+    const evidence = readEvidence(out);
+    assert.deepEqual(evidence.checks[0].cases, [
+      { name: 'partial()', status: 'passed' },
+      { name: 'other-custom', status: 'failed' },
+    ]);
+    assert.equal(evidence.checks[0].outcome, 'failed');
+    assert.equal(evidence.failBefore.checks[0].classification, 'assertion');
+  });
+});
+
+test('CLI: a sibling display name cannot impersonate a passing method or supply its fail-before', async () => {
+  const classId = CHECK.split('#')[0];
+  const checks = [`${classId}#innocent`, `${classId}#imposter`];
+  await fixture({ checks, gradle: { methods: {
+    innocent: [{ name: 'innocent()', before: 'passed' }],
+    imposter: [{ name: 'innocent()', status: 'assertion', before: 'assertion' }],
+  } } }, ({ result, output, out }) => {
+    assert.equal(result.status, 1, output);
+    const evidence = readEvidence(out);
+    assert.deepEqual(evidence.checks.map(c => [c.outcome, c.cases]), [
+      ['passed', [{ name: 'innocent()', status: 'passed' }]],
+      ['failed', [{ name: 'innocent()', status: 'failed' }]],
+    ]);
+    assert.deepEqual(evidence.failBefore.checks.map(c => c.classification), ['passed', 'assertion']);
+  });
+});
+
 for (const [task, fqcn] of [['test', 'io.x.ProbeTest'], ['integrationTest', 'io.x.IntegrationProbeTest']]) {
   test(`CLI: ${task} custom display names preserve invocations and assertion fail-before (${fqcn})`, async () => {
     const id = `modules/core/src/${task}/java/${fqcn.replaceAll('.', '/')}.java#probe`;
@@ -324,7 +358,7 @@ for (const [task, fqcn] of [['test', 'io.x.ProbeTest'], ['integrationTest', 'io.
       assert.equal(evidence.checks[0].contentDigest, contentDigest(fs.readFileSync(path.join(root, id.split('#')[0]), 'utf8')));
       assert.equal(evidence.producer.scriptDigest, contentDigest(fs.readFileSync(path.join(root, CLI), 'utf8')));
       for (const runs of [evidence.runs, evidence.failBefore.runs]) {
-        assert.equal(runs.length, 2, 'grouped run plus the isolated fallback must be recorded');
+        assert.equal(runs.length, 1, 'the method runs alone, without a grouped run');
         for (const run of runs) {
           assert.ok(run.command.includes(`${fqcn}.probe`));
           assert.match(run.command, /--rerun -PskipWebBuild=true --console=plain/);
@@ -332,7 +366,7 @@ for (const [task, fqcn] of [['test', 'io.x.ProbeTest'], ['integrationTest', 'io.
           assert.ok(run.command.includes(`:modules:core:${task}`));
         }
       }
-      assert.equal(gradleRuns(scratch).length, 4);
+      assert.equal(gradleRuns(scratch).length, 2);
       assert.ok(gradleRuns(scratch).every(run => !run.reportExisted), 'every run starts without old class XML');
       assert.deepEqual(validateEvidence({ evidenceText: fs.readFileSync(out, 'utf8'), evidencePath: out,
         newChecks: [id], requireFailBefore: true, readWorking: rel => fs.readFileSync(path.join(root, rel), 'utf8') }), []);
@@ -355,8 +389,10 @@ test('CLI: identical display names, class-wide results and failing siblings stay
     ]);
     assert.deepEqual(evidence.failBefore.checks.map(c => c.classification), ['passed', 'assertion', 'assertion', 'assertion']);
     for (const runs of [evidence.runs, evidence.failBefore.runs]) {
-      assert.equal(runs.length, 3, 'only the two unmatched methods need fallback');
-      assert.deepEqual(runs.slice(1).map(run => run.command.match(/--tests "([^"]+)"/)[1]), ['io.x.ProbeTest.probe', 'io.x.ProbeTest.other']);
+      assert.equal(runs.length, 4, 'one class-wide run and one isolated run per method');
+      assert.deepEqual(runs.map(run => run.command.match(/--tests "([^"]+)"/)[1]),
+        ['io.x.ProbeTest', 'io.x.ProbeTest.probe', 'io.x.ProbeTest.other', 'io.x.ProbeTest.sibling']);
+      assert.ok(runs.every(run => (run.command.match(/--tests /g) ?? []).length === 1));
     }
     assert.ok(gradleRuns(scratch).every(run => !run.reportExisted));
   });
@@ -378,8 +414,8 @@ test('CLI: absent and excluded methods cannot reuse earlier XML or another class
       ...checks.slice(1).map(() => ['not-found', false, []]),
     ]);
     assert.deepEqual(evidence.failBefore.checks.map(c => c.classification), ['assertion', 'environment', 'environment', 'environment']);
-    assert.equal(evidence.runs.length, 5);
-    assert.equal(evidence.failBefore.runs.length, 5);
+    assert.equal(evidence.runs.length, 4);
+    assert.equal(evidence.failBefore.runs.length, 4);
     assert.ok(gradleRuns(scratch).every(run => !run.reportExisted), 'clear both seeded stale XML and XML from the last isolated method');
   });
 });
