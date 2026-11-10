@@ -39,7 +39,7 @@ beforeAll(async () => {
   browser=await chromium.connect(browserServer.wsEndpoint());
 },60_000);
 afterAll(async()=>{await browser?.close(); await browserServer?.close();await server?.close();if(output)await rm(output,{recursive:true,force:true});});
-it.each(['light','dark','forced'] as const)('L12 failed-file Cancel/Retry match nearby compact buttons (%s), including narrow/wide-font keyboard focus',async theme=>{
+it.each(['light','dark','forced'] as const)('L12 failed-file Cancel/Retry use compact text and shared button styling (%s), including narrow/wide-font keyboard focus',async theme=>{
   const page=await browser.newPage({viewport:{width:420,height:600},colorScheme:theme==='dark'?'dark':'light',forcedColors:theme==='forced'?'active':'none'});
   page.setDefaultTimeout(5000);
   try {
@@ -49,13 +49,17 @@ it.each(['light','dark','forced'] as const)('L12 failed-file Cancel/Retry match 
     await page.locator('body[data-ready="true"]').waitFor({state:'attached',timeout:20_000}).catch(error=>{throw new Error(`${String(error)}\nPage errors: ${errors.join('\n')}`);});
     await page.locator('html').evaluate((el,theme)=>{el.dataset.theme=theme==='dark'?'dark':'light';},theme);
     const nearby=page.locator('jf-button[label="Try again"] button'); await nearby.waitFor();
-    const compact=await nearby.evaluate(el=>({font:getComputedStyle(el).fontSize,height:el.getBoundingClientRect().height}));
+    const compactFont=await nearby.evaluate(el=>getComputedStyle(el).fontSize);
+    const sharedStyle=(el:Element)=>{
+      const css=getComputedStyle(el);
+      return {border:css.border,background:css.background,padding:css.padding,radius:css.borderRadius};
+    };
+    const shared=await page.getByRole('button',{name:'Other action'}).evaluate(sharedStyle);
     const actionFor=(verb:string)=>page.locator(`jf-action-button[operation-id="core.${verb}-indexing-job"] button.invoke`);
     for(const verb of ['retry','cancel']) {
       const action=actionFor(verb);
-      const size=await action.evaluate(el=>({font:getComputedStyle(el).fontSize,height:el.getBoundingClientRect().height}));
-      console.info(theme,verb,{compact,action:size});
-      expect(size.font).toBe(compact.font); expect(Math.abs(size.height-compact.height)).toBeLessThanOrEqual(1);
+      expect(await action.evaluate(el=>getComputedStyle(el).fontSize)).toBe(compactFont);
+      expect(await action.evaluate(sharedStyle)).toEqual(shared);
       for(let i=0;i<12&&!await action.evaluate(el=>el.matches(':focus'));i++)await page.keyboard.press('Tab');
       expect(await action.evaluate(el=>el.matches(':focus-visible')&&getComputedStyle(el).outlineStyle!=='none')).toBe(true);
     }

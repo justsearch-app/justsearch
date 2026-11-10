@@ -73,10 +73,29 @@ These are agent technical choices under the quoted owner decision, not owner-ado
         }
       ],
       "conflictSearch": "decision records searched for a conflict: none (docs/decisions, docs/reference and docs/explanation searched for the rebuild label and retry wording)"
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/FailedFilesList.buttons-lockdown.test.ts"
+      ],
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "Issues in the windows (Recommended)",
+          "delegationLocation": "task t-20261109-windowfix request",
+          "delegationScope": "Recheck and fix the Library and AI Brain window issues listed in the relayed option.",
+          "choice": "Narrowed L12: Cancel and Retry take only the nearby compact Try again text size, preserving the shared ActionButton border, background, padding and radius. Retire the full-height match, which required overriding the shared padding and broke the frame DP3 styling contract. Keep light, dark, forced-colors, narrow-window, wide-font, keyboard-focus and unrelated-ActionButton preservation checks.",
+          "label": "agent choice \u2014 narrowed L12 repair under delegated window-issue fixes"
+        }
+      ],
+      "conflictSearch": "decision records searched for a conflict: none (docs/decisions, docs/reference and docs/explanation searched for failed-file actions, compact buttons and shared ActionButton styling); the existing Shell.details-lockdown.test.ts DP3 styling contract is preserved."
     }
   ]
 }
 ```
+
+L12 now compares only text size with the compact Try again button, and compares border, background, padding and radius with an unrelated shared ActionButton. Full-file candidate execution evidence for all three theme cases is regenerated in gates/test-intent/evidence/windowfix-w1-buttons.json. In a private shared clone of e3a479db7d with the revised test overlaid, all three cases fail the text-size assertion (expected 13px, received 16px); on f68be006c6 before the padding repair, all three fail the shared-padding assertion (expected 8px 16px, received 6.4px 12px). Existing acceptance records are retained for independent re-review of this repair.
 
 ## Acceptance records
 
