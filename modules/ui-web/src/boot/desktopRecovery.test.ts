@@ -32,7 +32,7 @@ describe('desktop boot recovery', () => {
       ? terminal : { state: 'available', currentVersion: '1.0', availableVersion: '1.1' });
     document.body.innerHTML = '<div id="root"></div>';
   });
-  afterEach(() => { document.body.innerHTML = ''; });
+  afterEach(() => { document.body.innerHTML = ''; delete window.__justsearchBootFailure; });
 
   it('subscribes before API discovery and exposes host installation without an API', async () => {
     mocks.endpoint.mockImplementation(async () => {
@@ -211,9 +211,13 @@ describe('desktop boot recovery', () => {
 
   it('keeps browser unresolved behavior and never invokes native recovery commands', async () => {
     mocks.native.mockReturnValue(false);
+    const failure = Object.assign(vi.fn(), { started: true });
+    window.__justsearchBootFailure = failure;
     const root = document.getElementById('root')!;
     expect(await resolveBootWithRecovery(root)).toBeNull();
-    expect(root.querySelector('[role="alert"]')?.textContent).toBe('Unable to connect to the JustSearch backend.');
+    // SA8: the script-free failure page owns browser no-address presentation.
+    expect(failure).toHaveBeenCalledWith('no-engine-address');
+    expect(root.querySelector('[role="alert"]')).toBeNull();
     expect(mocks.invoke).not.toHaveBeenCalled();
     expect(mocks.listen).not.toHaveBeenCalled();
   });

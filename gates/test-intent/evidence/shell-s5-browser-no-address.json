@@ -1,0 +1,67 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-09T20:56:16.023Z",
+  "revision": "e3a479db7d1547a2d31df44c73334c982c31e15d",
+  "tree": "9c71eb43c9140d5cbbb5df74a0754a36a45bc0f9",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/boot/desktopRecovery.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/fda85xea/tmp/test-intent-vitest-7-1794257772011.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 745
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/boot/desktopRecovery.test.ts#keeps browser unresolved behavior and never invokes native recovery commands",
+      "file": "modules/ui-web/src/boot/desktopRecovery.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:dc03533bf84e1d7b74d801cbb1df5d5edda00bda20d0fe89cb6a216345606f58",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "desktop boot recovery keeps browser unresolved behavior and never invokes native recovery commands",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "e3a479db7d",
+    "revision": "e3a479db7d1547a2d31df44c73334c982c31e15d",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/boot/desktopRecovery.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/fda85xea/tmp/test-intent-vitest-7-1794257774789.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 886,
+        "output": "JSON report written to /home/elias/.cache/am/fda85xea/tmp/test-intent-vitest-7-1794257774789.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/boot/desktopRecovery.test.ts#keeps browser unresolved behavior and never invokes native recovery commands",
+        "classification": "assertion",
+        "detail": "desktop boot recovery keeps browser unresolved behavior and never invokes native recovery commands:  AssertionError: expected \"vi.fn()\" to be called with arguments: [ 'no-engine-address' ]\n\nNumber of calls: 0\n\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/shell-s5/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1487:10)\n    at Proxy.<anonymous> (file:///home"
+      }
+    ]
+  },
+  "digest": "sha256:731198d3a4d898a655948df3094d656bf129e574ef155666614e8a70e709aebc"
+}

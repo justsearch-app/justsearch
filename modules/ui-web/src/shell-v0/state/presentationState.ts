@@ -21,7 +21,7 @@ import { isSafeTokenValue } from '../themes/designTokenTree.js';
 import { listCustomPresentations } from '../themes/presentationCatalog.js';
 import { BUILTIN_PRESENTATIONS, CORE_DECLARED } from '../themes/builtinPresentations.js';
 import type { PresentationDeclaration } from '../themes/presentationDeclaration.js';
-import { getDocument, mutateDocument } from './UserStateDocument.js';
+import { getDocument, hasNewerStoredUserState, mutateDocument } from './UserStateDocument.js';
 
 /** 569 §19 Seam 6 — cap the apply history so it cannot grow unbounded. */
 const PRESENTATION_HISTORY_CAP = 50;
@@ -108,6 +108,9 @@ export function restoreActivePresentationOnBoot(): ApplyResult {
     const decl = listPresentations().find((p) => p.id === id);
     if (decl) return applyPresentation(decl);
   }
+  // A future document gives this build only an in-memory default view. Applying the default's
+  // bodies is safe; persisting its identity/history here would destroy that document on every boot.
+  if (hasNewerStoredUserState()) return applyPresentationBodies(CORE_DECLARED);
   return applyPresentation(CORE_DECLARED);
 }
 
