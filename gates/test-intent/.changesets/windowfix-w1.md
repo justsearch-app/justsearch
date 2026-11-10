@@ -118,3 +118,13 @@ L12 now compares only text size with the compact Try again button, and compares 
   "digest": "sha256:d0f0c8f5d0d94c67f7dce4335947325647d292f4775b8b71db51ed510f5a489c"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "windowfix-w1-verifier-8narsndl",
+  "verdict": "accept",
+  "digest": "sha256:eda09974b36195f35a69a5325f462d8f09b13d8108017045ad4b25b44e465af5"
+}
+```
