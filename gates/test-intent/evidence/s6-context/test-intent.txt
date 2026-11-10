@@ -1,0 +1,52 @@
+test-intent: FAIL (base 3e160cbc3430 via explicit origin/main; event local)
+!!!! WARNING test-intent/reconsider-rate (does not fail the gate) !!!!
+  Reconsider (tempdoc 966 Measurement): over the last 28 days on origin/main, PRs with a reviewer disagreement or third-reviewer tie-break were 13 of 49 audited PRs (26.5%), above one in ten. The orchestrator must report this as a finding in its next delivery. This warning never fails the gate.
+Flagged items (22):
+  [uncovered] M modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/AsciiFirstUtf8QueuedRestartTest.java — JVM test source set 'test'
+  [uncovered] D modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/CaseDistinctPageEdgesQueuedRestartTest.java — JVM test source set 'test'
+  [uncovered] M modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/Utf8QueuedRestartTest.java — JVM test source set 'test'
+  [uncovered] M modules/indexing/src/test/java/io/justsearch/indexing/extraction/StructuredDocumentFidelityTest.java — JVM test source set 'test'
+  [uncovered] D modules/ui-web/src/shell-v0/display/date-call-sites-lockdown.test.ts — frontend lockdown test
+  [uncovered] D modules/ui-web/src/shell-v0/display/dateLocaleGuard.test.ts — frontend test file
+  [uncovered] M modules/ui-web/src/shell-v0/state/uncountedIndex.test.ts — frontend test file
+  [covered] A modules/ui-web/src/shell-v0/views/ContextWindow.home-lockdown.test.ts — frontend lockdown test
+  [covered] A modules/ui-web/src/shell-v0/views/ContextWindow.home.test.ts — frontend test file
+  [uncovered] M modules/ui-web/src/shell-v0/views/HealthSurface.render.test.ts — frontend test file
+  [covered] D modules/ui-web/src/shell-v0/views/SettingsSurface.contextWindow.test.ts — frontend test file
+  [uncovered] M modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts — frontend test file
+  [uncovered] M modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8ExtractionTest.java — JVM test source set 'test'
+  [uncovered] M modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PolicyTest.java — JVM test source set 'test'
+  [uncovered] M modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionRoutingTest.java — JVM test source set 'test'
+  [uncovered] M modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java — JVM test source set 'test'
+  [uncovered] M modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/StructuredExtractionIntegrationTest.java — JVM test source set 'test'
+  [uncovered] M modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/TikaExtractionPolicyWorkerLimitsTest.java — JVM test source set 'test'
+  [uncovered] M modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java — JVM test source set 'test'
+  [uncovered] M modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf8WithoutBomExtractionTest.java — JVM test source set 'test'
+  [uncovered] M modules/worker-services/src/test/resources/fixtures/format-capability/expected-state.v1.json — JVM test source set 'test'
+  [uncovered] M modules/worker-services/src/testFixtures/java/io/justsearch/indexerworker/fixtures/FormatCapabilityExpectedState.java — JVM test source set 'testFixtures'
+Problems (20):
+  test-intent/uncovered: modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/AsciiFirstUtf8QueuedRestartTest.java has no test-intent entry
+  test-intent/uncovered: modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/CaseDistinctPageEdgesQueuedRestartTest.java has no test-intent entry
+  test-intent/uncovered: modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/Utf8QueuedRestartTest.java has no test-intent entry
+  test-intent/uncovered: modules/indexing/src/test/java/io/justsearch/indexing/extraction/StructuredDocumentFidelityTest.java has no test-intent entry
+  test-intent/uncovered: modules/ui-web/src/shell-v0/display/date-call-sites-lockdown.test.ts has no test-intent entry
+  test-intent/uncovered: modules/ui-web/src/shell-v0/display/dateLocaleGuard.test.ts has no test-intent entry
+  test-intent/uncovered: modules/ui-web/src/shell-v0/state/uncountedIndex.test.ts has no test-intent entry
+  test-intent/uncovered: modules/ui-web/src/shell-v0/views/HealthSurface.render.test.ts has no test-intent entry
+  test-intent/uncovered: modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.branch.test.ts has no test-intent entry
+  test-intent/uncovered: modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8ExtractionTest.java has no test-intent entry
+  test-intent/uncovered: modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PolicyTest.java has no test-intent entry
+  test-intent/uncovered: modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionRoutingTest.java has no test-intent entry
+  test-intent/uncovered: modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java has no test-intent entry
+  test-intent/uncovered: modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/StructuredExtractionIntegrationTest.java has no test-intent entry
+  test-intent/uncovered: modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/TikaExtractionPolicyWorkerLimitsTest.java has no test-intent entry
+  test-intent/uncovered: modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java has no test-intent entry
+  test-intent/uncovered: modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf8WithoutBomExtractionTest.java has no test-intent entry
+  test-intent/uncovered: modules/worker-services/src/test/resources/fixtures/format-capability/expected-state.v1.json has no test-intent entry
+  test-intent/uncovered: modules/worker-services/src/testFixtures/java/io/justsearch/indexerworker/fixtures/FormatCapabilityExpectedState.java has no test-intent entry
+  test-intent/acceptance-missing: gates/test-intent/.changesets/s6-context.md: no acceptance record (current digest sha256:87dfe868608b78b36a803e251ff9f95f4323c040b39e2fd6d87a2fb864e27ac5)
+Changeset gates/test-intent/.changesets/s6-context.md: current digest sha256:87dfe868608b78b36a803e251ff9f95f4323c040b39e2fd6d87a2fb864e27ac5 — gates/test-intent/.changesets/s6-context.md: no acceptance record (current digest sha256:87dfe868608b78b36a803e251ff9f95f4323c040b39e2fd6d87a2fb864e27ac5)
+Out of scope by design (tempdoc 966 D1): script and gate self-tests under scripts/ and the jseval suite (governance tooling, not product tests).
+How to fix: read docs/reference/testing/test-intent.md.
+  Write a skeleton for the uncovered items: node scripts/governance/gates/test-intent/cli.mjs --skeleton <name>
+  Acceptance records go under '## Acceptance records' and are written by the acceptor: cli.mjs accept <changeset> ...

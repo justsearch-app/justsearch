@@ -239,7 +239,11 @@ Sections in render order:
    - "Restart worker to apply embedding model" button
 
 10. **Inference settings** _(inside Models section, Detailed UI only)_:
-    - Context Window slider (512–32768 tokens, step 512)
+    - Reading memory (context window) lives in AI Brain → Advanced → Answers. Automatic writes
+      `llm.contextWindow: 0`; explicit positive values floor at 512. The saved value remains
+      `contextLength` in `ui/settings.json`. The running count and a differing saved choice appear
+      beside the control. Settings → AI offers a link that opens, focuses and briefly highlights
+      Reading memory instead of a second editor.
     - Max tokens slider (64–16384 tokens, step 64)
     - GPU Layers: "Auto (CPU-only)" checkbox (default on, hides slider). When unchecked, slider appears (1–100 layers). Explanatory text above: v1 ships CPU-only runtime, manual offloading requires GPU-capable runtime.
     - llama library path (text input, optional)

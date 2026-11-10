@@ -1,0 +1,1033 @@
+CWD: modules/ui-web
+COMMAND: npx vitest run --maxWorkers=4
+EXIT: 0
+
+ RUN  v4.1.12 /home/elias/dev/justsearch/.claude/worktrees/s6-context/modules/ui-web
+
+GET http://127.0.0.1:37863/api/ai/install/status 503 (Service Unavailable)
+POST http://127.0.0.1:37863/api/operations/core.rebuild-index/invoke 500 (Internal Server Error)
+Error: connect ECONNREFUSED 127.0.0.1:37863
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+  errno: -111,
+  code: 'ECONNREFUSED',
+  syscall: 'connect',
+  address: '127.0.0.1',
+  port: 37863
+}
+GET http://127.0.0.1:39787/api/ai/install/status 503 (Service Unavailable)
+POST http://127.0.0.1:39787/api/operations/core.rebuild-index/invoke 500 (Internal Server Error)
+Error: connect ECONNRESET 127.0.0.1:39787
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+  errno: -104,
+  code: 'ECONNRESET',
+  syscall: 'connect',
+  address: '127.0.0.1',
+  port: 39787
+}
+GET http://127.0.0.1:36105/api/settings/v2 503 (Service Unavailable)
+POST http://127.0.0.1:36105/api/operations/core.rebuild-index/invoke 500 (Internal Server Error)
+GET http://127.0.0.1:32991/api/settings/v2 503 (Service Unavailable)
+POST http://127.0.0.1:32991/api/operations/core.rebuild-index/invoke 500 (Internal Server Error)
+GET http://127.0.0.1:37825/api/ai/install/status 503 (Service Unavailable)
+POST http://127.0.0.1:37825/api/operations/core.rebuild-index/invoke 500 (Internal Server Error)
+Error: connect ECONNREFUSED 127.0.0.1:37825
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+  errno: -111,
+  code: 'ECONNREFUSED',
+  syscall: 'connect',
+  address: '127.0.0.1',
+  port: 37825
+}
+GET http://127.0.0.1:42991/api/ai/install/status 503 (Service Unavailable)
+POST http://127.0.0.1:42991/api/operations/core.rebuild-index/invoke 500 (Internal Server Error)
+Error: connect ECONNRESET 127.0.0.1:42991
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+  errno: -104,
+  code: 'ECONNRESET',
+  syscall: 'connect',
+  address: '127.0.0.1',
+  port: 42991
+}
+GET http://127.0.0.1:34165/api/settings/v2 503 (Service Unavailable)
+POST http://127.0.0.1:34165/api/operations/core.activate-installed-models/invoke 500 (Internal Server Error)
+GET http://127.0.0.1:45853/api/settings/v2 503 (Service Unavailable)
+POST http://127.0.0.1:45853/api/operations/core.activate-installed-models/invoke 500 (Internal Server Error)
+GET http://127.0.0.1:39643/api/ai/install/status 503 (Service Unavailable)
+GET http://127.0.0.1:39643/api/ai/install/status 503 (Service Unavailable)
+GET http://127.0.0.1:39643/api/ai/install/status 503 (Service Unavailable)
+GET http://127.0.0.1:37177/api/settings/v2 503 (Service Unavailable)
+GET http://127.0.0.1:33565/api/ai/install/status 503 (Service Unavailable)
+GET http://127.0.0.1:33565/api/ai/install/status 503 (Service Unavailable)
+GET http://127.0.0.1:33565/api/ai/install/status 503 (Service Unavailable)
+GET http://127.0.0.1:38511/api/settings/v2 503 (Service Unavailable)
+GET http://127.0.0.1:33679/api/ai/install/status 503 (Service Unavailable)
+POST http://127.0.0.1:33679/api/operations/core.rebuild-index/invoke 500 (Internal Server Error)
+GET http://127.0.0.1:33679/api/ai/install/status 503 (Service Unavailable)
+GET http://127.0.0.1:42117/api/settings/v2 503 (Service Unavailable)
+POST http://127.0.0.1:42117/api/operations/core.rebuild-index/invoke 500 (Internal Server Error)
+GET http://127.0.0.1:40363/api/ai/install/status 503 (Service Unavailable)
+POST http://127.0.0.1:40363/api/operations/core.rebuild-index/invoke 500 (Internal Server Error)
+GET http://127.0.0.1:40363/api/ai/install/status 503 (Service Unavailable)
+GET http://127.0.0.1:40969/api/settings/v2 503 (Service Unavailable)
+POST http://127.0.0.1:40969/api/operations/core.activate-installed-models/invoke 500 (Internal Server Error)
+GET http://127.0.0.1:37539/api/ai/install/status 503 (Service Unavailable)
+POST http://127.0.0.1:37539/api/operations/core.rebuild-index/invoke 500 (Internal Server Error)
+Error: connect ECONNREFUSED 127.0.0.1:37539
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:2083:16) {
+  errno: -111,
+  code: 'ECONNREFUSED',
+  syscall: 'connect',
+  address: '127.0.0.1',
+  port: 37539
+}
+GET http://127.0.0.1:40709/api/settings/v2 503 (Service Unavailable)
+POST http://127.0.0.1:40709/api/operations/core.rebuild-index/invoke 500 (Internal Server Error)
+POST http://127.0.0.1:35099/api/operations/core.cancel-reindex/invoke 500 (Internal Server Error)
+POST http://127.0.0.1:43517/api/operations/core.accept-gaps/invoke 500 (Internal Server Error)
+POST http://127.0.0.1:39925/api/operations/core.trigger-offline-processing/invoke 500 (Internal Server Error)
+AggregateError: 
+    at internalConnectMultiple (node:net:1492:18)
+    at afterConnectMultiple (node:net:2161:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 3000
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 3000
+    }
+  ]
+}
+AggregateError: 
+    at internalConnectMultiple (node:net:1492:18)
+    at afterConnectMultiple (node:net:2161:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 3000
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 3000
+    }
+  ]
+}
+AggregateError: 
+    at internalConnectMultiple (node:net:1492:18)
+    at afterConnectMultiple (node:net:2161:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 3000
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 3000
+    }
+  ]
+}
+AggregateError: 
+    at internalConnectMultiple (node:net:1492:18)
+    at afterConnectMultiple (node:net:2161:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 3000
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 3000
+    }
+  ]
+}
+AggregateError: 
+    at internalConnectMultiple (node:net:1492:18)
+    at afterConnectMultiple (node:net:2161:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 3000
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 3000
+    }
+  ]
+}
+AggregateError: 
+    at internalConnectMultiple (node:net:1492:18)
+    at afterConnectMultiple (node:net:2161:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 3000
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 3000
+    }
+  ]
+}
+Error: socket hang up
+    at Socket.socketCloseListener (node:_http_client:747:27)
+    at Socket.emit (node:events:526:24)
+    at TCP.<anonymous> (node:net:362:12) {
+  code: 'ECONNRESET'
+}
+AggregateError: 
+    at internalConnectMultiple (node:net:1492:18)
+    at afterConnectMultiple (node:net:2161:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 3000
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 3000
+    }
+  ]
+}
+AggregateError: 
+    at internalConnectMultiple (node:net:1492:18)
+    at afterConnectMultiple (node:net:2161:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 3000
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 3000
+    }
+  ]
+}
+Error: socket hang up
+    at _destroy (node:_http_client:1169:15)
+    at onSocketNT (node:_http_client:1196:5)
+    at processTicksAndRejections (node:internal/process/task_queues:91:21) {
+  code: 'ECONNRESET'
+}
+Error: socket hang up
+    at _destroy (node:_http_client:1169:15)
+    at onSocketNT (node:_http_client:1196:5)
+    at processTicksAndRejections (node:internal/process/task_queues:91:21) {
+  code: 'ECONNRESET'
+}
+Error: socket hang up
+    at _destroy (node:_http_client:1169:15)
+    at onSocketNT (node:_http_client:1196:5)
+    at processTicksAndRejections (node:internal/process/task_queues:91:21) {
+  code: 'ECONNRESET'
+}
+Error: socket hang up
+    at _destroy (node:_http_client:1169:15)
+    at onSocketNT (node:_http_client:1196:5)
+    at processTicksAndRejections (node:internal/process/task_queues:91:21) {
+  code: 'ECONNRESET'
+}
+Error: socket hang up
+    at _destroy (node:_http_client:1169:15)
+    at onSocketNT (node:_http_client:1196:5)
+    at processTicksAndRejections (node:internal/process/task_queues:91:21) {
+  code: 'ECONNRESET'
+}
+Error: socket hang up
+    at _destroy (node:_http_client:1169:15)
+    at onSocketNT (node:_http_client:1196:5)
+    at processTicksAndRejections (node:internal/process/task_queues:91:21) {
+  code: 'ECONNRESET'
+}
+Error: socket hang up
+    at _destroy (node:_http_client:1169:15)
+    at onSocketNT (node:_http_client:1196:5)
+    at processTicksAndRejections (node:internal/process/task_queues:91:21) {
+  code: 'ECONNRESET'
+}
+AggregateError: 
+    at internalConnectMultiple (node:net:1492:18)
+    at afterConnectMultiple (node:net:2161:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 3000
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 3000
+    }
+  ]
+}
+Error: socket hang up
+    at _destroy (node:_http_client:1169:15)
+    at onSocketNT (node:_http_client:1196:5)
+    at processTicksAndRejections (node:internal/process/task_queues:91:21)
+    at runNextTicks (node:internal/process/task_queues:69:3)
+    at listOnTimeout (node:internal/timers:644:9)
+    at processTimers (node:internal/timers:618:7) {
+  code: 'ECONNRESET'
+}
+AggregateError: 
+    at internalConnectMultiple (node:net:1492:18)
+    at afterConnectMultiple (node:net:2161:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 3000
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 3000
+    }
+  ]
+}
+Error: socket hang up
+    at _destroy (node:_http_client:1169:15)
+    at onSocketNT (node:_http_client:1196:5)
+    at processTicksAndRejections (node:internal/process/task_queues:91:21) {
+  code: 'ECONNRESET'
+}
+Error: socket hang up
+    at _destroy (node:_http_client:1169:15)
+    at onSocketNT (node:_http_client:1196:5)
+    at processTicksAndRejections (node:internal/process/task_queues:91:21) {
+  code: 'ECONNRESET'
+}
+Error: socket hang up
+    at _destroy (node:_http_client:1169:15)
+    at onSocketNT (node:_http_client:1196:5)
+    at processTicksAndRejections (node:internal/process/task_queues:91:21) {
+  code: 'ECONNRESET'
+}
+Error: socket hang up
+    at _destroy (node:_http_client:1169:15)
+    at onSocketNT (node:_http_client:1196:5)
+    at processTicksAndRejections (node:internal/process/task_queues:91:21) {
+  code: 'ECONNRESET'
+}
+Error: socket hang up
+    at _destroy (node:_http_client:1169:15)
+    at onSocketNT (node:_http_client:1196:5)
+    at processTicksAndRejections (node:internal/process/task_queues:91:21) {
+  code: 'ECONNRESET'
+}
+Error: socket hang up
+    at _destroy (node:_http_client:1169:15)
+    at onSocketNT (node:_http_client:1196:5)
+    at processTicksAndRejections (node:internal/process/task_queues:91:21) {
+  code: 'ECONNRESET'
+}
+AggregateError: 
+    at internalConnectMultiple (node:net:1492:18)
+    at afterConnectMultiple (node:net:2161:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 3000
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 3000
+    }
+  ]
+}
+AggregateError: 
+    at internalConnectMultiple (node:net:1492:18)
+    at afterConnectMultiple (node:net:2161:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 3000
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 3000
+    }
+  ]
+}
+AggregateError: 
+    at internalConnectMultiple (node:net:1492:18)
+    at afterConnectMultiple (node:net:2161:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 3000
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 3000
+    }
+  ]
+}
+AggregateError: 
+    at internalConnectMultiple (node:net:1492:18)
+    at afterConnectMultiple (node:net:2161:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 3000
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 3000
+    }
+  ]
+}
+Error: socket hang up
+    at _destroy (node:_http_client:1169:15)
+    at onSocketNT (node:_http_client:1196:5)
+    at processTicksAndRejections (node:internal/process/task_queues:91:21) {
+  code: 'ECONNRESET'
+}
+Error: socket hang up
+    at _destroy (node:_http_client:1169:15)
+    at onSocketNT (node:_http_client:1196:5)
+    at processTicksAndRejections (node:internal/process/task_queues:91:21) {
+  code: 'ECONNRESET'
+}
+Error: socket hang up
+    at _destroy (node:_http_client:1169:15)
+    at onSocketNT (node:_http_client:1196:5)
+    at processTicksAndRejections (node:internal/process/task_queues:91:21) {
+  code: 'ECONNRESET'
+}
+Error: socket hang up
+    at _destroy (node:_http_client:1169:15)
+    at onSocketNT (node:_http_client:1196:5)
+    at processTicksAndRejections (node:internal/process/task_queues:91:21) {
+  code: 'ECONNRESET'
+}
+Error: socket hang up
+    at _destroy (node:_http_client:1169:15)
+    at onSocketNT (node:_http_client:1196:5)
+    at processTicksAndRejections (node:internal/process/task_queues:91:21) {
+  code: 'ECONNRESET'
+}
+Error: socket hang up
+    at _destroy (node:_http_client:1169:15)
+    at onSocketNT (node:_http_client:1196:5)
+    at processTicksAndRejections (node:internal/process/task_queues:91:21) {
+  code: 'ECONNRESET'
+}
+Error: socket hang up
+    at _destroy (node:_http_client:1169:15)
+    at onSocketNT (node:_http_client:1196:5)
+    at processTicksAndRejections (node:internal/process/task_queues:91:21) {
+  code: 'ECONNRESET'
+}
+Error: socket hang up
+    at _destroy (node:_http_client:1169:15)
+    at onSocketNT (node:_http_client:1196:5)
+    at processTicksAndRejections (node:internal/process/task_queues:91:21) {
+  code: 'ECONNRESET'
+}
+AggregateError: 
+    at internalConnectMultiple (node:net:1492:18)
+    at afterConnectMultiple (node:net:2161:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 3000
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 3000
+    }
+  ]
+}
+Error: socket hang up
+    at _destroy (node:_http_client:1169:15)
+    at onSocketNT (node:_http_client:1196:5)
+    at processTicksAndRejections (node:internal/process/task_queues:91:21)
+    at runNextTicks (node:internal/process/task_queues:69:3)
+    at listOnTimeout (node:internal/timers:644:9)
+    at processTimers (node:internal/timers:618:7) {
+  code: 'ECONNRESET'
+}
+Error: socket hang up
+    at _destroy (node:_http_client:1169:15)
+    at onSocketNT (node:_http_client:1196:5)
+    at processTicksAndRejections (node:internal/process/task_queues:91:21) {
+  code: 'ECONNRESET'
+}
+Error: socket hang up
+    at _destroy (node:_http_client:1169:15)
+    at onSocketNT (node:_http_client:1196:5)
+    at processTicksAndRejections (node:internal/process/task_queues:91:21) {
+  code: 'ECONNRESET'
+}
+Error: socket hang up
+    at _destroy (node:_http_client:1169:15)
+    at onSocketNT (node:_http_client:1196:5)
+    at processTicksAndRejections (node:internal/process/task_queues:91:21) {
+  code: 'ECONNRESET'
+}
+Error: socket hang up
+    at _destroy (node:_http_client:1169:15)
+    at onSocketNT (node:_http_client:1196:5)
+    at processTicksAndRejections (node:internal/process/task_queues:91:21) {
+  code: 'ECONNRESET'
+}
+Error: socket hang up
+    at _destroy (node:_http_client:1169:15)
+    at onSocketNT (node:_http_client:1196:5)
+    at processTicksAndRejections (node:internal/process/task_queues:91:21) {
+  code: 'ECONNRESET'
+}
+Error: socket hang up
+    at _destroy (node:_http_client:1169:15)
+    at onSocketNT (node:_http_client:1196:5)
+    at processTicksAndRejections (node:internal/process/task_queues:91:21) {
+  code: 'ECONNRESET'
+}
+Error: socket hang up
+    at _destroy (node:_http_client:1169:15)
+    at onSocketNT (node:_http_client:1196:5)
+    at processTicksAndRejections (node:internal/process/task_queues:91:21) {
+  code: 'ECONNRESET'
+}
+Error: socket hang up
+    at _destroy (node:_http_client:1169:15)
+    at onSocketNT (node:_http_client:1196:5)
+    at processTicksAndRejections (node:internal/process/task_queues:91:21) {
+  code: 'ECONNRESET'
+}
+Error: socket hang up
+    at Socket.socketCloseListener (node:_http_client:747:27)
+    at Socket.emit (node:events:526:24)
+    at TCP.<anonymous> (node:net:362:12) {
+  code: 'ECONNRESET'
+}
+Error: socket hang up
+    at Socket.socketCloseListener (node:_http_client:747:27)
+    at Socket.emit (node:events:526:24)
+    at TCP.<anonymous> (node:net:362:12) {
+  code: 'ECONNRESET'
+}
+Error: socket hang up
+    at Socket.socketCloseListener (node:_http_client:747:27)
+    at Socket.emit (node:events:526:24)
+    at TCP.<anonymous> (node:net:362:12) {
+  code: 'ECONNRESET'
+}
+Error: socket hang up
+    at Socket.socketCloseListener (node:_http_client:747:27)
+    at Socket.emit (node:events:526:24)
+    at TCP.<anonymous> (node:net:362:12) {
+  code: 'ECONNRESET'
+}
+Error: socket hang up
+    at Socket.socketCloseListener (node:_http_client:747:27)
+    at Socket.emit (node:events:526:24)
+    at TCP.<anonymous> (node:net:362:12) {
+  code: 'ECONNRESET'
+}
+Error: socket hang up
+    at Socket.socketCloseListener (node:_http_client:747:27)
+    at Socket.emit (node:events:526:24)
+    at TCP.<anonymous> (node:net:362:12) {
+  code: 'ECONNRESET'
+}
+Error: socket hang up
+    at Socket.socketCloseListener (node:_http_client:747:27)
+    at Socket.emit (node:events:526:24)
+    at TCP.<anonymous> (node:net:362:12) {
+  code: 'ECONNRESET'
+}
+Error: socket hang up
+    at Socket.socketCloseListener (node:_http_client:747:27)
+    at Socket.emit (node:events:526:24)
+    at TCP.<anonymous> (node:net:362:12) {
+  code: 'ECONNRESET'
+}
+AggregateError: 
+    at internalConnectMultiple (node:net:1492:18)
+    at afterConnectMultiple (node:net:2161:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 3000
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 3000
+    }
+  ]
+}
+AggregateError: 
+    at internalConnectMultiple (node:net:1492:18)
+    at afterConnectMultiple (node:net:2161:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 3000
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 3000
+    }
+  ]
+}
+Error: socket hang up
+    at _destroy (node:_http_client:1169:15)
+    at onSocketNT (node:_http_client:1196:5)
+    at processTicksAndRejections (node:internal/process/task_queues:91:21) {
+  code: 'ECONNRESET'
+}
+Error: socket hang up
+    at _destroy (node:_http_client:1169:15)
+    at onSocketNT (node:_http_client:1196:5)
+    at processTicksAndRejections (node:internal/process/task_queues:91:21) {
+  code: 'ECONNRESET'
+}
+Error: socket hang up
+    at _destroy (node:_http_client:1169:15)
+    at onSocketNT (node:_http_client:1196:5)
+    at processTicksAndRejections (node:internal/process/task_queues:91:21) {
+  code: 'ECONNRESET'
+}
+AggregateError: 
+    at internalConnectMultiple (node:net:1492:18)
+    at afterConnectMultiple (node:net:2161:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 3000
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 3000
+    }
+  ]
+}
+Error: socket hang up
+    at _destroy (node:_http_client:1169:15)
+    at onSocketNT (node:_http_client:1196:5)
+    at processTicksAndRejections (node:internal/process/task_queues:91:21) {
+  code: 'ECONNRESET'
+}
+AggregateError: 
+    at internalConnectMultiple (node:net:1492:18)
+    at afterConnectMultiple (node:net:2161:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 3000
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 3000
+    }
+  ]
+}
+Error: socket hang up
+    at Socket.socketCloseListener (node:_http_client:747:27)
+    at Socket.emit (node:events:526:24)
+    at TCP.<anonymous> (node:net:362:12) {
+  code: 'ECONNRESET'
+}
+AggregateError: 
+    at internalConnectMultiple (node:net:1492:18)
+    at afterConnectMultiple (node:net:2161:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 3000
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 3000
+    }
+  ]
+}
+AggregateError: 
+    at internalConnectMultiple (node:net:1492:18)
+    at afterConnectMultiple (node:net:2161:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 3000
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 3000
+    }
+  ]
+}
+AggregateError: 
+    at internalConnectMultiple (node:net:1492:18)
+    at afterConnectMultiple (node:net:2161:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 3000
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 3000
+    }
+  ]
+}
+AggregateError: 
+    at internalConnectMultiple (node:net:1492:18)
+    at afterConnectMultiple (node:net:2161:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 3000
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 3000
+    }
+  ]
+}
+AggregateError: 
+    at internalConnectMultiple (node:net:1492:18)
+    at afterConnectMultiple (node:net:2161:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 3000
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 3000
+    }
+  ]
+}
+AggregateError: 
+    at internalConnectMultiple (node:net:1492:18)
+    at afterConnectMultiple (node:net:2161:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 3000
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 3000
+    }
+  ]
+}
+AggregateError: 
+    at internalConnectMultiple (node:net:1492:18)
+    at afterConnectMultiple (node:net:2161:7) {
+  code: 'ECONNREFUSED',
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 3000
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:3000
+        at createConnectionError (node:net:2124:14)
+        at afterConnectMultiple (node:net:2154:16) {
+      errno: -111,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 3000
+    }
+  ]
+}
+
+ Test Files  748 passed (748)
+      Tests  9488 passed (9488)
+   Start at  19:15:30
+   Duration  123.44s (transform 11.49s, setup 5.29s, import 84.00s, tests 251.51s, environment 89.76s)
+
+
+CWD: modules/ui-web
+COMMAND: npx vitest run --config vitest.config.lockdown.ts --maxWorkers=2
+EXIT: 0
+
+ RUN  v4.1.12 /home/elias/dev/justsearch/.claude/worktrees/s6-context/modules/ui-web
+
+
+ Test Files  26 passed (26)
+      Tests  486 passed (486)
+   Start at  19:17:47
+   Duration  417.07s (transform 772ms, setup 0ms, import 7.49s, tests 823.89s, environment 184ms)
+
+

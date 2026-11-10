@@ -26,6 +26,7 @@ import type { SettingsV2 } from '../../api/generated/schema-types/settings-v2.js
 import { present } from '../display/present.js';
 import { formatBytes } from '../display/format.js';
 import { projectFact } from '../display/facts.js';
+import { takeReadingMemoryFocus, subscribeReadingMemoryFocus } from '../router/readingMemoryIntent.js';
 import { takeMemberTabIntent, subscribeMemberTab, requestMemberTab } from '../router/memberTabIntent.js';
 import '../components/OpButton.js';
 import '../components/Button.js';
@@ -683,6 +684,9 @@ export class BrainSurface extends JfElement {
     close: () => this.closeFeatureInfo(),
   });
   private readonly onWindowFocus = () => { void this.refreshAll(); };
+  private readingMemoryUnsub: (() => void) | null = null;
+  private readingMemoryArrival = false;
+  private readingMemoryFrame: number | null = null;
   private memberTabUnsub: (() => void) | null = null;
   private pollSettings: number | null = null;
 
@@ -1193,6 +1197,14 @@ export class BrainSurface extends JfElement {
     .picture-branch::after { content: ''; left: 50%; height: 2.5rem; position: absolute; bottom: -2.5rem; border-left: 1px dashed var(--border-subtle); }
     .graphics-card { display: grid; grid-template-columns: max-content minmax(3rem, 1fr) minmax(8rem, max-content); align-items: center; gap: 1.5rem; font-size: var(--font-size-sm); }
     .graphics-card .progress-bar { background: var(--accent-tint); }
+    @keyframes reading-memory-arrival {
+      from { outline: 2px solid var(--accent, Highlight); outline-offset: 4px; }
+      to { outline: 2px solid transparent; outline-offset: 4px; }
+    }
+    .reading-memory-arrival { animation: reading-memory-arrival 2s ease-out; }
+    @media (prefers-reduced-motion: reduce) {
+      .reading-memory-arrival { animation-timing-function: step-end; }
+    }
     .brain-links { align-items: center; font-size: var(--font-size-sm); color: var(--text-secondary); gap: 1.5rem; }
     .brain-links a { display: inline-flex; align-items: center; gap: 0.4rem; color: inherit; text-decoration: none; }
     .feature-panel { position: absolute; top: calc(100% + 0.75rem); right: 0; width: min(25rem, calc(100vw - 6rem)); max-height: min(24rem, 60vh, calc(100vh - 8rem)); overflow: auto; text-align: left; padding: 1rem; box-sizing: border-box; background: var(--surface-2); color: var(--text-primary); border: 1px solid var(--border-subtle); border-radius: 0.75rem; z-index: 1; box-shadow: 0 0.5rem 2rem #0004; }
@@ -1274,6 +1286,8 @@ export class BrainSurface extends JfElement {
       this.activeTab = memberId;
       return true;
     });
+    this.readingMemoryUnsub = subscribeReadingMemoryFocus(() => this.requestReadingMemoryArrival());
+    if (takeReadingMemoryFocus()) this.requestReadingMemoryArrival();
     void this.refreshAll();
     window.addEventListener('focus', this.onWindowFocus);
     this.startSettingsPolling();
@@ -1322,6 +1336,13 @@ export class BrainSurface extends JfElement {
     });
   }
 
+  private requestReadingMemoryArrival(): void {
+    this.activeTab = 'runtime';
+    this.expanded = { ...this.expanded, advanced: true };
+    this.readingMemoryArrival = true;
+    this.requestUpdate();
+  }
+
   /** Tempdoc 609 — settle transient state on hide (in-flight refresh / op errors / per-op busy locks)
    *  so a return doesn't show a stale spinner or a locked control. Statuses, expanded sections, and the
    *  active tab are recoverable and untouched. */
@@ -1359,6 +1380,20 @@ export class BrainSurface extends JfElement {
   /** 574 §22.G — drive the modal contract from the declarative `installConsentOpen` state. */
   protected override updated(changed: Map<string, unknown>): void {
     super.updated(changed);
+    if (this.readingMemoryArrival && this.readingMemoryFrame === null) {
+      // Let the navigation close Settings' modal before trying to focus the area underneath it.
+      this.readingMemoryFrame = requestAnimationFrame(() => {
+        this.readingMemoryFrame = null;
+        this.readingMemoryArrival = false;
+        const control = this.shadowRoot?.querySelector<HTMLInputElement>('#brain-contextWindow');
+        if (!this.isConnected || !control || this.activeTab !== 'runtime' || !this.expanded.advanced) return;
+        control.focus({ preventScroll: true });
+        control.scrollIntoView?.({ block: 'center' });
+        const row = control.closest('.advanced-row')!;
+        row.classList.add('reading-memory-arrival');
+        row.addEventListener('animationend', () => row.classList.remove('reading-memory-arrival'), { once: true });
+      });
+    }
     if (this.pendingRemovalFocus) {
       const active = deepActiveElement();
       // A later poll may settle the operation. Restore only the focus lost with the band;
@@ -1384,6 +1419,12 @@ export class BrainSurface extends JfElement {
   override disconnectedCallback(): void {
     super.disconnectedCallback();
     this.stopAllPolling();
+    this.readingMemoryUnsub?.();
+    this.readingMemoryUnsub = null;
+    this.readingMemoryArrival = false;
+    if (this.readingMemoryFrame !== null) cancelAnimationFrame(this.readingMemoryFrame);
+    this.readingMemoryFrame = null;
+    this.shadowRoot?.querySelector('.reading-memory-arrival')?.classList.remove('reading-memory-arrival');
     window.removeEventListener('focus', this.onWindowFocus);
     ++this.refreshRevision;
     ++this.planRevision;
@@ -1460,9 +1501,10 @@ export class BrainSurface extends JfElement {
     }
     this.rerankerSettings = settings;
     this.settings = { ...(settings.ui ?? {}), mode: getUiMode() } as UiSettings;
-    // Drafts own their values even after focus moves to another surface. Revisions
-    // also cover edits and witnessed saves completed while this read was pending.
-    if (llmRevision === this.llmRevision && this.llmPending === 0 && this.llmDrafts.size === 0) this.llm = (settings.llm ?? {}) as LlmSettings;
+    // Drafts overlay the saved observation separately. A refusal must return to
+    // the latest saved value, including reads received while the save was pending.
+    // Revisions reject reads begun before a newer edit or witnessed completion.
+    if (llmRevision === this.llmRevision) this.llm = (settings.llm ?? {}) as LlmSettings;
   }
 
   /** Only a runtime read started after the last picture change speaks for it; unknown order never does. */
@@ -2474,12 +2516,15 @@ export class BrainSurface extends JfElement {
     } finally {
       ++this.llmRevision;
       --this.llmPending;
+      const queued = this.queuedLlm;
+      this.queuedLlm = null;
       for (const key of Object.keys(updates) as Array<keyof LlmSettings>) {
         if (this.llmDrafts.get(key) === drafts.get(key)) this.llmDrafts.delete(key);
       }
+      // Refusal discards queued Reading memory changes too. Their draft no
+      // longer owns a request and must not mask the saved value or the next poll.
+      if (!completed && (updates.contextWindow !== undefined || queued?.contextWindow !== undefined)) this.llmDrafts.delete('contextWindow');
       this.requestUpdate();
-      const queued = this.queuedLlm;
-      this.queuedLlm = null;
       if (queued && completed) await this.patchLlm(queued);
     }
   }
@@ -3567,16 +3612,34 @@ export class BrainSurface extends JfElement {
     const automatic = key === 'gpuLayers' ? value == null : key === 'contextWindow' && value === 0;
     const shown = automatic ? 'Automatic' : value == null ? 'Not configured' : key === 'gpuLayers' && value === 0 ? '0 layers · processor only' : `${NUM.format(value!)} ${key === 'gpuLayers' ? 'layers' : 'tokens'}`;
     return html`<div class="advanced-row">
-      <div><label for=${`brain-${key}`}>${label}</label><p>${description}</p></div>
+      <div><label for=${`brain-${key}`}>${label}</label><p>${description}</p>${key === 'contextWindow' ? this.renderReadingMemoryObservation() : nothing}</div>
       <div class="slider-setting"><input id=${`brain-${key}`} type="range" min=${key === 'maxTokens' ? 16 : 0} max=${Math.max(max, saved ?? 0)} step="1"
-        .value=${String(automatic && key === 'gpuLayers' ? Math.max(max, saved ?? 0) : value ?? 0)} aria-label=${label} aria-valuetext=${shown}
+        .value=${String(automatic && key === 'gpuLayers' ? Math.max(max, saved ?? 0) : value ?? 0)} aria-label=${label} aria-valuetext=${`${shown}${draft == null ? '' : ' · Not yet saved'}`}
+        aria-describedby=${key === 'contextWindow' ? 'brain-reading-memory-status brain-reading-memory-help' : nothing}
         @input=${(event: Event) => this.editLlm(key, (event.target as HTMLInputElement).value)}
         @change=${(event: Event) => void this.patchLlm({ [key]: Number((event.target as HTMLInputElement).value) })}>
-        <output for=${`brain-${key}`}>${shown}</output>
-        ${key === 'contextWindow' ? html`<jf-button variant="ghost" label=${`Automatic ${label.toLowerCase()}`} ?disabled=${this.llmPending > 0 || value === 0}
-          .onActivate=${() => void this.patchLlm({ contextWindow: 0 })}>${icon({ name: 'refresh-cw', size: 12 })} Automatic</jf-button>` : nothing}
+        <output for=${`brain-${key}`}>${shown}${draft == null ? nothing : html` · Not yet saved`}</output>
+        ${key === 'contextWindow' ? html`<jf-button variant="ghost" label=${`Automatic ${label.toLowerCase()}`} ?disabled=${value === 0}
+          .onActivate=${() => { this.editLlm(key, '0'); void this.patchLlm({ contextWindow: 0 }); }}>${icon({ name: 'refresh-cw', size: 12 })} Automatic</jf-button>` : nothing}
       </div>
     </div>`;
+  }
+
+  private renderReadingMemoryObservation(): TemplateResult {
+    const state = this._unifiedAiState;
+    const fact = state?.runtime ? projectFact('core.ai.contextWindow', state) : null;
+    const running = state?.runtime?.contextWindow;
+    const saved = this.llm.contextWindow;
+    const pending = saved != null && (saved > 0 ? running !== saved : state?.runtime?.contextWindowDerived?.reason === 'override');
+    const observed = fact?.presence === 'present' && fact.value;
+    const live = state?.snapshotLive === true;
+    return html`<p id="brain-reading-memory-status" role="status">
+      ${observed ? html`${live ? 'Running now' : 'Last observed'}: ${fact.value}.`
+        : fact?.presence === 'absent' ? 'Reading memory is set when the answer model starts.'
+        : 'Checking running reading memory…'}
+      ${live && observed && this.settingsRead && pending
+        ? html`Saved: ${saved === 0 ? 'Automatic' : `${NUM.format(saved!)} tokens`}. Takes effect the next time the answer model starts.` : nothing}
+    </p>`;
   }
 
   private runtimeAvailability() {
@@ -3649,6 +3712,7 @@ export class BrainSurface extends JfElement {
             : this.rerankerSettings?.pauseAnswersWhileIndexing === true ? 'On' : 'Off'}</span>
         </div></div>
         ${this.renderSlider('contextWindow', 'Reading memory', 'How much text it reads at once', 131072)}
+        <p class="advanced-note" id="brain-reading-memory-help">Automatic derives the window from your hardware when the answer model starts. An explicit value uses at least 512 tokens; if it cannot fit, the model reports a start failure instead of using a smaller window.</p>
         ${this.renderSlider('maxTokens', 'Longest answer', 'Upper limit for one answer', 16384)}
       </section>
       ${this.renderRuntimeSection()}
