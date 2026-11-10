@@ -989,3 +989,13 @@ progress-bar witnesses. Independent acceptance remains pending.
 ## Acceptance records
 
 Independent acceptance is pending.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "nc8zp4zv-s5-final-verifier",
+  "verdict": "accept",
+  "digest": "sha256:11e10b484270e14591cbaad77e133072085bc6806a7e54a41ddd8aef9f24af5f"
+}
+```
