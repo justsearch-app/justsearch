@@ -4409,10 +4409,33 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         if (!Objects.equals(row, file.expectedRow())) return false;
         freshProof.run();
         if (activeClaims.containsKey(file.path()) || row != null && STATE_PROCESSING.equals(row.get("state"))) return false;
-        if (row != null && (row.get("walk_seen_epoch") != null
-            || row.get("unit_revision") != null && (row.get("unit_revision").startsWith("release030") || releaseRecovery != null && releaseRecovery.retiringBuild() && (row.get("unit_revision").startsWith("root1:") || row.get("unit_revision").startsWith("root2:")))
-            || release030ExactFiles.contains(path) || release030IndependentDebt.contains(path)
-            || recordedWatcherRow(row))) return independentWatcherEffect(file, row, debt);
+        if (row != null && (row.get("unit_revision") != null
+            && (row.get("unit_revision").startsWith("release030") || releaseRecovery != null && releaseRecovery.retiringBuild()
+                && (row.get("unit_revision").startsWith("root1:") || row.get("unit_revision").startsWith("root2:")))
+            || release030ExactFiles.contains(path) || release030IndependentDebt.contains(path)))
+          return independentWatcherEffect(file, row, debt);
+
+        // A returned root is automatic discovery too. Reuse ordinary policy admission
+        // before preserving a failed source owner, and replace its candidate receipt in
+        // the same transaction so a later replay cannot reinstall the stale failure.
+        if (!file.sourceSha256().isEmpty() && row != null
+            && Objects.equals(rootOwner(debt.collection()), rootOwner(row.get("collection")))) {
+          var entry = new EnqueueEntry(path, file.size(), null, file.sourceSha256(), Path.of(debt.root()));
+          var declared = declaredCollectionRoots.get();
+          if (needsExtractionPolicyRetry(entry, declared)) {
+            var source = observeAdmissionSource(entry, null, debt.collection(), true);
+            if (source == null || !source.stillCurrent(path) || !file.sourceSha256().equals(source.sha256())) return false;
+            if (enqueueEntriesInTransaction(List.of(entry), debt.collection(), null,
+                System.currentTimeMillis(), true, null, false, declared, Map.of(entry, source)).covered() != 1)
+              throw new SQLException("Returned-root extraction policy admission refused");
+            bufferAdmittedFile(file.candidate(), entry);
+            freshProof.run();
+            return false; // The new receipt requires a fresh frozen journal on the next attempt.
+          }
+        }
+
+        if (row != null && (row.get("walk_seen_epoch") != null || recordedWatcherRow(row)))
+          return independentWatcherEffect(file, row, debt);
 
         SwitchBufferOp predecessor = null;
         boolean laterAdmission = false;

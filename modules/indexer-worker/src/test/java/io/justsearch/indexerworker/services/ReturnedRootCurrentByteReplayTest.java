@@ -41,6 +41,81 @@ import tools.jackson.databind.ObjectMapper;
 final class ReturnedRootCurrentByteReplayTest extends LuceneExecutorTestBase {
   @TempDir Path temporary;
 
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void returnedRootReplayRetriesRealExtractionFailureOnceAfterPolicyChange(boolean capturedRebuild) throws Exception {
+    var limited = io.justsearch.indexerworker.extract.TikaExtractionPolicy.fromWorkerLimits(
+        new ResolvedConfig.Worker(1000, 128));
+    Path file;
+    String scan = "01900000-0000-7000-8000-000000000061";
+    JobQueue.WalkProgress settled = null;
+    try (var f = new Fixture(limited)) {
+      file = Files.writeString(f.root.resolve("file.txt"), "returnedpolicytoken ".repeat(400));
+      if (capturedRebuild) {
+        var walk = f.queue.beginCapturedWalk(scan, "a".repeat(64), true);
+        var entry = new JobQueue.EnqueueEntry(file, Files.size(file),
+            new JobQueue.EnqueueProvenance("user", "HTTP"), SourceContentHash.sha256(file)).withinRoot(f.root);
+        assertEquals(1, f.queue.enqueueRecordedEntries(scan, walk.enumerationEpoch(), List.of(entry), "notes"));
+        f.queue.closeRecordedWalkEnumeration(scan, walk.enumerationEpoch(), JobQueue.WalkEnumerationOutcome.COMPLETE);
+      } else {
+        assertEquals(1, f.queue.enqueueAndBufferFilesForGeneration("green",
+            List.of(JobQueue.EnqueueEntry.stat(file, new JobQueue.EnqueueProvenance("user", "HTTP")).withinRoot(f.root)),
+            "notes", scan));
+      }
+      f.loop.start();
+      long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
+      while (!"FAILED".equals(f.row(file).get("state")) && System.nanoTime() < deadline) Thread.sleep(20);
+      assertEquals("FAILED", f.row(file).get("state"));
+      assertEquals("BUDGET_EXCEEDED", f.row(file).get("last_outcome_class"));
+      assertEquals(limited.policyId(), f.row(file).get("extraction_policy_id"));
+      assertNull(f.runtime.documentFieldOps().getDocumentContent(file.toString()));
+      if (capturedRebuild) {
+        settled = f.queue.trySealRecordedWalk(scan);
+        assertNotNull(settled.sealedAt());
+      }
+    }
+    try (var f = new Fixture(limited)) {
+      var saved = f.row(file);
+      f.returnRoot();
+      var receipts = f.queue.listSwitchBufferOpsStrict();
+      try (var replay = rootPreflight(f, receipts)) { prepareRoot(replay, receipts); }
+      assertEquals(saved, f.row(file), "same-policy returned-root replay preserves the failed attempt");
+    }
+    try (var f = new Fixture(io.justsearch.indexerworker.extract.TikaExtractionPolicy.defaults())) {
+      f.returnRoot();
+      var receipts = f.queue.listSwitchBufferOpsStrict();
+      try (var replay = rootPreflight(f, receipts)) { prepareRoot(replay, receipts); }
+      assertEquals("PENDING", f.row(file).get("state"),
+          "returned-root replay must admit the changed-policy extraction attempt");
+      assertEquals(scan, f.row(file).get("scan_id"));
+      assertEquals("user", f.row(file).get("originator"));
+      assertEquals("HTTP", f.row(file).get("transport"));
+      assertNull(f.row(file).get("walk_seen_epoch"));
+      f.loop.start();
+      long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
+      while (!"SUCCESS_FULL".equals(f.row(file).get("last_outcome_class")) && System.nanoTime() < deadline) Thread.sleep(20);
+      assertTrue(f.prepare().isPresent(), "promotion must settle the replacement extraction");
+      assertEquals("SUCCESS_FULL", f.row(file).get("last_outcome_class"));
+      assertEquals(io.justsearch.indexerworker.extract.TikaExtractionPolicy.defaults().policyId(),
+          f.row(file).get("extraction_policy_id"));
+      assertTrue(f.runtime.documentFieldOps().getDocumentContent(file.toString()).contains("returnedpolicytoken"));
+      assertTrue(f.runtime.readPathOps().search(new org.apache.lucene.search.TermQuery(
+          new org.apache.lucene.index.Term(SchemaFields.CONTENT, "returnedpolicytoken")),
+          10, java.util.Set.of(SchemaFields.DOC_ID), null, null).totalHits() > 0);
+      assertEquals(2, ledgerCount(f.database), "one old failure and one successful policy retry");
+      if (capturedRebuild) assertEquals(settled, f.queue.recordedWalk(scan).orElseThrow());
+    }
+  }
+
+  private static long ledgerCount(Path database) throws Exception {
+    try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + database);
+         var query = connection.createStatement();
+         var rows = query.executeQuery("SELECT COUNT(*) FROM ingestion_ledger")) {
+      assertTrue(rows.next());
+      return rows.getLong(1);
+    }
+  }
+
   @Test
   void C11ReturnedRootRechecksAbsenceUnderThePublicationFence() throws Exception {
     try (var f = new Fixture()) {
@@ -682,7 +757,7 @@ final class ReturnedRootCurrentByteReplayTest extends LuceneExecutorTestBase {
   private final class Fixture implements AutoCloseable {
     final Path root = Files.createDirectories(temporary.resolve("root"));
     final Path database = temporary.resolve("jobs.db");
-    final SqliteJobQueue queue = new SqliteJobQueue(database);
+    final SqliteJobQueue queue;
     final TestEngineExecutors executors = new TestEngineExecutors();
     final WorkerExecutorRegistrations registrations = new WorkerExecutorRegistrations(executors);
     final RunningRuntime runtime;
@@ -693,7 +768,11 @@ final class ReturnedRootCurrentByteReplayTest extends LuceneExecutorTestBase {
         new java.util.concurrent.atomic.AtomicReference<>(() -> {});
     String candidate = "green";
 
-    Fixture() throws Exception {
+    Fixture() throws Exception { this(null); }
+
+    Fixture(io.justsearch.indexerworker.extract.TikaExtractionPolicy policy) throws Exception {
+      queue = policy == null ? new SqliteJobQueue(database)
+          : new SqliteJobQueue(database, ignored -> JobQueue.RecordedClaimDecision.ALLOW);
       queue.open();
       identities = new SqliteDocumentIdentityStore(database);
       runtime = withTestExecutors(IndexSchema.fromCatalog(new JustSearchConfigurationLoader().loadFieldCatalog())
@@ -706,7 +785,10 @@ final class ReturnedRootCurrentByteReplayTest extends LuceneExecutorTestBase {
         }
         @Override public String detectMimeType(Path path) { return "text/plain"; }
       };
-      var content = new TimeboxedContentExtractor(registrations.extractionTimebox(), provider);
+      ContentExtractorProvider extractor = policy == null ? provider
+          : new io.justsearch.indexerworker.extract.PolicyDrivenTikaExtractor(
+              java.util.concurrent.Executors::newFixedThreadPool, policy);
+      var content = new TimeboxedContentExtractor(registrations.extractionTimebox(), extractor);
       var configuration = ResolvedConfig.builder()
           .putDefault("justsearch.data.dir", temporary.toString())
           .putDefault("justsearch.ssot.path", temporary.resolve("SSOT").toString())
@@ -725,6 +807,16 @@ final class ReturnedRootCurrentByteReplayTest extends LuceneExecutorTestBase {
       assertTrue(((RootWitness) publisher.rootCheck()).recordAdded(root));
       publisher.setDeclaredRootsDirectory(temporary);
       loop.useRootCheck(publisher.rootCheck());
+      if (policy != null) publisher.setExtractionPolicy(policy);
+    }
+
+    void returnRoot() throws Exception {
+      var debt = new WatcherRootReconciliation(root.toString(), RootIdentity.capture(root).toString(), "notes");
+      Path away = temporary.resolve("away");
+      Files.move(root, away);
+      assertFalse(Files.exists(root));
+      Files.move(away, root);
+      assertTrue(queue.putSwitchBuffer(debt.key(), WatcherRootReconciliation.OPERATION, debt.encode()));
     }
 
     Path admit(String text) throws Exception { return admit(text, false); }
