@@ -536,3 +536,13 @@ Candidate G follows the settled SG1–SG10 amendments. SD developer-tools change
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "filrj6kl-verifier",
+  "verdict": "accept",
+  "digest": "sha256:345668e7467280f4d908d86d54752e3e277e8fa9acf7b753b601b37a033e695f"
+}
+```
