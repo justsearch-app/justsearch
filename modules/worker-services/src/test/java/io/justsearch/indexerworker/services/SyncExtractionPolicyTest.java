@@ -97,6 +97,9 @@ final class SyncExtractionPolicyTest {
       assertEquals(0, ops.execute(temporary.toString(), false, null, () -> false, null,
           SyncDirectoryOps.AdmissionMode.MAINTENANCE).getFilesAdded());
       assertTrue(admitted.isEmpty(), "repaired evidence becomes stable");
-    } else verifyNoInteractions(queue);
+    } else {
+      verify(queue, atLeastOnce()).extractionPolicyRetryPaths(anyCollection(), eq(policy.policyId()));
+      verifyNoMoreInteractions(queue);
+    }
   }
 }

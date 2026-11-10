@@ -73,8 +73,8 @@ final class Release030UpgradeCharacterizationTest {
     long waitingUntil = System.currentTimeMillis() + TimeUnit.DAYS.toMillis(1);
     sql(root, "UPDATE jobs SET retry_after=" + waitingUntil
         + " WHERE last_outcome_class IN ('PARSER_TIMEOUT','IO_FAILED')");
-    // Copy the authentic terminal row under a watched root too: automatic startup scans must
-    // not turn an unchanged terminal failure into new work. Its outside-root original stays too.
+    // Copy the authentic extraction failure under a watched root too. Its unknown legacy
+    // policy now permits one attempt (C3); the outside-root original remains protected.
     java.nio.file.Files.copy(root.resolve("orphan/failed.bin"), root.resolve("roots/alpha/failed.bin"),
         java.nio.file.StandardCopyOption.COPY_ATTRIBUTES);
     sql(root, "INSERT INTO jobs(path,state,attempts,last_updated,collection,last_outcome_class,"
@@ -116,7 +116,13 @@ final class Release030UpgradeCharacterizationTest {
             assertEquals(0, count(root, "last_reason_code='MISSING_INGESTION_BOUNDARY'"));
             assertEquals(2, count(root, "retry_after=" + waitingUntil
                 + " AND last_outcome_class IN ('PARSER_TIMEOUT','IO_FAILED')"), "U18: unrelated waits survive");
-            assertEquals(2, count(root, "state='FAILED'"), "U12: terminal failures inside/outside roots are retained");
+            assertEquals(1, count(root, "state='FAILED' AND path='" + key(root.resolve("orphan/failed.bin")) + "'"),
+                "U12: the unwatched terminal failure remains protected");
+            assertEquals(1, count(root, "state='DONE' AND extraction_policy_id IS NOT NULL AND path='"
+                + key(root.resolve("roots/alpha/failed.bin")) + "'"),
+                "C3: the watched legacy extraction failure gets one durable current-policy attempt");
+            assertTrue(search(server, "copper").contains(key(root.resolve("roots/alpha/failed.bin"))),
+                "the retry publishes the real source text");
             assertEquals(0, count(root, "path='" + key(root.resolve("neighbor.txt")) + "'"),
                 "U8: exact queued files never grant parent-folder authority");
             assertEquals("IDLE", state(root).migration_state());

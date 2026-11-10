@@ -458,7 +458,50 @@ final class SqliteQueueMigrationOps {
           }
         }
       }
+      case 29 -> {
+        addColumnIfMissing(conn, "extraction_policy_id", "ALTER TABLE jobs ADD COLUMN extraction_policy_id TEXT");
+        backfillExtractionPolicies(conn);
+      }
       default -> throw new SQLException("Unknown migration version: " + version);
+    }
+  }
+
+  /** Ambiguous or pruned legacy history deliberately remains unknown, allowing one fresh attempt. */
+  private static void backfillExtractionPolicies(Connection conn) throws SQLException {
+    try (var jobs = conn.createStatement(); var rows = jobs.executeQuery("""
+        SELECT path, collection, last_outcome_at, last_outcome_class, last_reason_code, last_retry_policy,
+          scan_id, unit_revision, planned_source_sha256 FROM jobs
+        WHERE state='FAILED' AND extraction_policy_id IS NULL AND last_retry_policy='NONE'
+          AND last_outcome_class IN ('BUDGET_EXCEEDED','PARSER_FAILED','PARSER_TIMEOUT','UNSUPPORTED')
+        """);
+        var evidence = conn.prepareStatement("""
+        SELECT policy_id FROM ingestion_ledger WHERE path_hash=? AND collection IS ?
+          AND observed_at=? AND outcome_class=? AND reason_code=? AND retry_policy=?
+          AND operation_key IS ? AND unit_revision=? AND planned_source_sha256 IS ?
+          AND policy_id NOT IN ('UNKNOWN','n/a','')
+        """);
+        var update = conn.prepareStatement("UPDATE jobs SET extraction_policy_id=? WHERE path=?")) {
+      while (rows.next()) {
+        // Contextless legacy ledger entries cannot prove which admission revision they judged.
+        if (rows.getString("unit_revision") == null) continue;
+        evidence.setString(1, io.justsearch.indexing.chunking.ChunkParentRevision.sha256Hex(rows.getString("path")));
+        evidence.setString(2, rows.getString("collection"));
+        evidence.setLong(3, rows.getLong("last_outcome_at"));
+        evidence.setString(4, rows.getString("last_outcome_class"));
+        evidence.setString(5, rows.getString("last_reason_code"));
+        evidence.setString(6, rows.getString("last_retry_policy"));
+        evidence.setString(7, rows.getString("scan_id"));
+        evidence.setString(8, rows.getString("unit_revision"));
+        evidence.setString(9, rows.getString("planned_source_sha256"));
+        try (var match = evidence.executeQuery()) {
+          if (!match.next()) continue;
+          String policy = match.getString(1);
+          if (match.next()) continue;
+          update.setString(1, policy);
+          update.setString(2, rows.getString("path"));
+          update.executeUpdate();
+        }
+      }
     }
   }
 

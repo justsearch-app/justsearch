@@ -28,7 +28,7 @@ final class ImportOriginBindingMigrationTest {
     try (var queue = new SqliteJobQueue(db)) {
       assertDoesNotThrow(queue::open);
       try (var connection = DriverManager.getConnection("jdbc:sqlite:" + db); var statement = connection.createStatement()) {
-        try (var rows = statement.executeQuery("PRAGMA user_version")) { assertTrue(rows.next()); assertEquals(28, rows.getInt(1), "origin restart bindings require v28"); }
+        try (var rows = statement.executeQuery("PRAGMA user_version")) { assertTrue(rows.next()); assertEquals(SqliteSchema.TARGET_VERSION, rows.getInt(1), "origin restart bindings require v28"); }
         try (var rows = statement.executeQuery("SELECT count(*) FROM pragma_table_info('source_origin') WHERE name IN "
             + "('restart_binding_version','approval_binding_id','approval_plan_hash','predecessor_origin_id')")) {
           assertTrue(rows.next()); assertEquals(4, rows.getInt(1));

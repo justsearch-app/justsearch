@@ -210,7 +210,8 @@ final class SyncDirectoryOpsChangedStampTest
           "at most one family lookup is added for each suppressed file");
       System.out.printf("P6 %s: censusQueries=%d, familyPointQueries=%d, admissionBatches=%d, totalIndexQueries=%d%n",
           mode, censusReads, familyReads, batches.size(), censusReads + familyReads);
-      verifyNoInteractions(queue);
+      verify(queue, times(batches.size())).extractionPolicyRetryPaths(anyCollection(), anyString());
+      verifyNoMoreInteractions(queue);
     }
   }
   @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
@@ -410,7 +411,8 @@ final class SyncDirectoryOpsChangedStampTest
         assertTrue(result.deletions().isEmpty());
         result.requireCurrentRootIdentity();
       }
-      verifyNoInteractions(queue);
+      verify(queue, atMostOnce()).extractionPolicyRetryPaths(anyCollection(), anyString());
+      verifyNoMoreInteractions(queue);
     } else {
       for (var mode : List.of(SyncDirectoryOps.AdmissionMode.DEFAULT, SyncDirectoryOps.AdmissionMode.MAINTENANCE)) {
         admitted.clear();
