@@ -1,6 +1,6 @@
 ---
 schema: test-intent.v1
-task: t-20261110-shell-s5a-commit-race
+task: t-20261103-shell
 author-role: builder
 author-session: shell-s5a-commit-race-builder
 ---
@@ -143,17 +143,7 @@ this explicit base. No fetch or rebase is performed.
       "moved": [
         "instrumentation"
       ],
-      "whatMoved": "Observe the inline script's theme/frame output after commit with explicit 4000 ms bounds; observe completed held-shell renders, actual animation-frame samples and opened menus instead of assuming elapsed time is sufficient. Every original expected value, input, fault injection, precondition, tag and deadline is retained. The official producer regenerated execution evidence for all 67 checks in gates/test-intent/evidence/shell-s5a-commit-race.json. A parser-blocked baseline SA3 fails with null instead of dark; the candidate passes that delay, and fails when the isolated clone's inline script ignores the query theme.",
-      "sources": [
-        {
-          "kind": "delegated-choice",
-          "delegationQuote": "make each wait for the observable condition it asserts (for example with page.waitForFunction on the attribute or element), with a bounded timeout, without weakening what is asserted.",
-          "delegationLocation": "task t-20261110-shell-s5a-commit-race request",
-          "delegationScope": "Repair timing assumptions in boot-frame-lockdown.test.ts only, preserve the product assertions, demonstrate SA3 still rejects wrong behavior in a shared clone, and regenerate execution evidence.",
-          "choice": "Use four-second state waits, the existing animation-frame sampler and a test-harness completed-render counter; keep commit navigation and all product expectations.",
-          "label": "agent choice"
-        }
-      ]
+      "whatMoved": "Observe the inline script's theme/frame output after commit with explicit 4000 ms bounds; observe completed held-shell renders, actual animation-frame samples and opened menus instead of assuming elapsed time is sufficient. Every original expected value, input, fault injection, precondition, tag and deadline is retained. The official producer regenerated execution evidence for all 67 checks in gates/test-intent/evidence/shell-s5a-commit-race.json. A parser-blocked baseline SA3 fails with null instead of dark; the candidate passes that delay, and fails when the isolated clone's inline script ignores the query theme."
     },
     {
       "items": [
@@ -163,17 +153,7 @@ this explicit base. No fetch or rebase is performed.
       "moved": [
         "instrumentation"
       ],
-      "whatMoved": "Keep every summon/focus/draft/URL/journal expectation. Own setTimeout/clearTimeout with a fake clock in the real Search v3 composer test, assert typing schedules work, and advance through the quick pass so the refined-pass and slow-hint timers are pending. After shell removal and existing cleanup, reset the shared search store through its existing resetSearchState API; assert zero pending timers before restoring the real clock. The settle helper advances the fake clock only when active. No product code or Vitest error settings change. Execution evidence for all 18 checks is in gates/test-intent/evidence/shell-s5a-search-summon.json. The baseline shared clone with this instrumentation but without the cleanup reset fails the zero-timer assertion with 2 pending timers; the candidate passes.",
-      "sources": [
-        {
-          "kind": "delegated-choice",
-          "delegationQuote": "Fix the root cause so no search timer outlives its test: preferably in the test's own cleanup, using an existing reset or cancel in searchState.ts if one exists.",
-          "delegationLocation": "task t-20261110-shell-s5a-commit-race request",
-          "delegationScope": "Identify and repair the Shell.searchSummon.test.ts timer leak, add a failing-before cleanup check, preserve existing startup-frame repairs and product behavior, and regenerate evidence for every changed test file.",
-          "choice": "Use resetSearchState in file cleanup and fake-clock pending-timer assertions around the existing real-composer draft test.",
-          "label": "agent choice"
-        }
-      ]
+      "whatMoved": "Keep every summon/focus/draft/URL/journal expectation. Own setTimeout/clearTimeout with a fake clock in the real Search v3 composer test, assert typing schedules work, and advance through the quick pass so the refined-pass and slow-hint timers are pending. After shell removal and existing cleanup, reset the shared search store through its existing resetSearchState API; assert zero pending timers before restoring the real clock. The settle helper advances the fake clock only when active. No product code or Vitest error settings change. Execution evidence for all 18 checks is in gates/test-intent/evidence/shell-s5a-search-summon.json. The baseline shared clone with this instrumentation but without the cleanup reset fails the zero-timer assertion with 2 pending timers; the candidate passes."
     }
   ]
 }
