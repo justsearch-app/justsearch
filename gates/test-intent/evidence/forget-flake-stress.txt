@@ -1,0 +1,38 @@
+Started UTC: 2026-11-10T10:49:35.763531+00:00
+Command (each of ten runs): js-gradle-slot ./gradlew -PskipWebBuild=true :modules:app-engine:test --tests *EngineForgetInProcessTest* --rerun --console=plain
+Owned CPU load: two continuous Python integer loops at nice 10; pids=4,5
+Run 01: exit=0, seconds=81.6
+  TEST-io.justsearch.app.engine.EngineForgetInProcessTest.xml: {'tests': 6, 'skipped': 0, 'failures': 0, 'errors': 0}
+  TEST-io.justsearch.app.engine.EngineForgetInProcessTestHostAssumptionsTest.xml: {'tests': 3, 'skipped': 0, 'failures': 0, 'errors': 0}
+Run 02: exit=0, seconds=122.4
+  TEST-io.justsearch.app.engine.EngineForgetInProcessTest.xml: {'tests': 6, 'skipped': 0, 'failures': 0, 'errors': 0}
+  TEST-io.justsearch.app.engine.EngineForgetInProcessTestHostAssumptionsTest.xml: {'tests': 3, 'skipped': 0, 'failures': 0, 'errors': 0}
+Run 03: exit=0, seconds=109.0
+  TEST-io.justsearch.app.engine.EngineForgetInProcessTest.xml: {'tests': 6, 'skipped': 0, 'failures': 0, 'errors': 0}
+  TEST-io.justsearch.app.engine.EngineForgetInProcessTestHostAssumptionsTest.xml: {'tests': 3, 'skipped': 0, 'failures': 0, 'errors': 0}
+Run 04: exit=0, seconds=242.4
+  TEST-io.justsearch.app.engine.EngineForgetInProcessTest.xml: {'tests': 6, 'skipped': 0, 'failures': 0, 'errors': 0}
+  TEST-io.justsearch.app.engine.EngineForgetInProcessTestHostAssumptionsTest.xml: {'tests': 3, 'skipped': 0, 'failures': 0, 'errors': 0}
+Run 05: exit=0, seconds=147.6
+  TEST-io.justsearch.app.engine.EngineForgetInProcessTest.xml: {'tests': 6, 'skipped': 0, 'failures': 0, 'errors': 0}
+  TEST-io.justsearch.app.engine.EngineForgetInProcessTestHostAssumptionsTest.xml: {'tests': 3, 'skipped': 0, 'failures': 0, 'errors': 0}
+Run 06: exit=0, seconds=129.6
+  TEST-io.justsearch.app.engine.EngineForgetInProcessTest.xml: {'tests': 6, 'skipped': 0, 'failures': 0, 'errors': 0}
+  TEST-io.justsearch.app.engine.EngineForgetInProcessTestHostAssumptionsTest.xml: {'tests': 3, 'skipped': 0, 'failures': 0, 'errors': 0}
+Run 07: exit=0, seconds=92.1
+  TEST-io.justsearch.app.engine.EngineForgetInProcessTest.xml: {'tests': 6, 'skipped': 0, 'failures': 0, 'errors': 0}
+  TEST-io.justsearch.app.engine.EngineForgetInProcessTestHostAssumptionsTest.xml: {'tests': 3, 'skipped': 0, 'failures': 0, 'errors': 0}
+Run 08: exit=0, seconds=1093.9
+  TEST-io.justsearch.app.engine.EngineForgetInProcessTest.xml: {'tests': 6, 'skipped': 0, 'failures': 0, 'errors': 0}
+  TEST-io.justsearch.app.engine.EngineForgetInProcessTestHostAssumptionsTest.xml: {'tests': 3, 'skipped': 0, 'failures': 0, 'errors': 0}
+Run 09: exit=0, seconds=109.6
+  TEST-io.justsearch.app.engine.EngineForgetInProcessTest.xml: {'tests': 6, 'skipped': 0, 'failures': 0, 'errors': 0}
+  TEST-io.justsearch.app.engine.EngineForgetInProcessTestHostAssumptionsTest.xml: {'tests': 3, 'skipped': 0, 'failures': 0, 'errors': 0}
+Run 10: exit=0, seconds=154.0
+  TEST-io.justsearch.app.engine.EngineForgetInProcessTest.xml: {'tests': 6, 'skipped': 0, 'failures': 0, 'errors': 0}
+  TEST-io.justsearch.app.engine.EngineForgetInProcessTestHostAssumptionsTest.xml: {'tests': 3, 'skipped': 0, 'failures': 0, 'errors': 0}
+Load pid=4: user_ticks=227777, system_ticks=28
+Load pid=5: user_ticks=227743, system_ticks=31
+Owned load stopped: pid=4, exit=-15
+Owned load stopped: pid=5, exit=-15
+Finished UTC: 2026-11-10T11:27:38.052432+00:00
