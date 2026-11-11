@@ -811,3 +811,151 @@ mod linux_identity_tests {
 #[cfg(all(test, target_os = "linux"))]
 #[path = "shell_connection_tests.rs"]
 mod connection_tests;
+
+#[cfg(all(test, windows))]
+mod windows_identity_tests {
+    use super::*;
+    use std::process::{Child, Command, Stdio};
+
+    /// A child that stays alive until its stdin closes, then exits with `code`.
+    fn held_child(code: u32) -> Child {
+        use std::os::windows::process::CommandExt;
+        Command::new("cmd")
+            .args(["/d", "/c"])
+            .raw_arg(format!("set /p hold= & exit {code}"))
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap()
+    }
+
+    /// End the child and reap it; the caller keeps the `Child` and with it a process handle.
+    fn end(child: &mut Child) -> i32 {
+        drop(child.stdin.take());
+        child.wait().unwrap().code().unwrap()
+    }
+
+    fn actuator(dir: &Path, pid: u32) -> ShellActuator {
+        ShellActuator::new(
+            Arc::new(EngineHost::default()),
+            dir.into(),
+            move || Ok(pid),
+            |_| {},
+        )
+    }
+
+    fn owner_died(dir: &Path) -> Vec<Value> {
+        exit_ledger::read_ledger(
+            &exit_ledger::ledger_directory(dir),
+            exit_ledger::Family::Engine,
+        )
+        .unwrap()
+        .records
+        .into_iter()
+        .filter(|r| r["type"] == "engine-owner-died")
+        .collect()
+    }
+
+    #[test]
+    fn ended_process_is_gone_for_every_exit_code_while_a_handle_is_held() {
+        for code in [0u32, 7, 259] {
+            let mut child = held_child(code);
+            let record = process_record(child.id());
+            assert!(record["creationFileTime"].is_string(), "{record}");
+            let alive = identity_check(&record);
+            let exited = end(&mut child);
+            let verdict = identity_check(&record);
+            assert_eq!(alive, "ALIVE_MATCH", "exit code {code}");
+            assert_eq!(exited as u32, code);
+            assert_eq!(
+                verdict, "GONE",
+                "ended child with exit code {code}, handle held"
+            );
+            drop(child);
+        }
+    }
+
+    #[test]
+    fn live_and_nonexistent_processes_keep_their_verdicts() {
+        let mut child = held_child(0);
+        let record = process_record(child.id());
+        let live = identity_check(&record);
+        let mut other = record.clone();
+        other["creationFileTime"] = json!("123");
+        let reused = identity_check(&other);
+        let mut unsaved = record.clone();
+        unsaved["creationFileTime"] = Value::Null;
+        let unknown = identity_check(&unsaved);
+        let survived = child.try_wait().unwrap().is_none();
+        end(&mut child);
+        assert_eq!(live, "ALIVE_MATCH");
+        assert_eq!(
+            reused, "GONE",
+            "a different creation identity is not the recorded Engine"
+        );
+        assert_eq!(
+            unknown, "IDENTITY_UNKNOWN",
+            "a live process without saved birth"
+        );
+        assert!(survived, "the check never ends a process");
+        let nonexistent = json!({"pid":0xFFFF_FFF0u32, "creationFileTime":"123"});
+        assert_eq!(identity_check(&nonexistent), "GONE");
+    }
+
+    #[test]
+    fn engine_ended_before_the_next_shell_is_recorded_owner_died() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut child = held_child(1);
+        actuator(dir.path(), child.id()).spawn_engine().unwrap();
+        end(&mut child);
+        let successor = actuator(dir.path(), 0);
+        let records = owner_died(dir.path());
+        drop(child);
+        assert_eq!(records.len(), 1, "{records:?}");
+        assert_eq!(records[0]["osCheck"], "GONE", "{}", records[0]);
+        assert_eq!(records[0]["exitClass"], "OWNER_DIED");
+        assert_eq!(records[0]["basis"], "OPEN_START");
+        assert!(
+            !successor.lock_holder_gone(),
+            "no live holder was recovered"
+        );
+    }
+
+    #[test]
+    fn ledger_lock_holder_is_gone_once_it_ends() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut child = held_child(1);
+        actuator(dir.path(), child.id()).spawn_engine().unwrap();
+        let successor = actuator(dir.path(), 0);
+        let while_alive = successor.lock_holder_gone();
+        end(&mut child);
+        let after_end = successor.lock_holder_gone();
+        let records = owner_died(dir.path());
+        drop(child);
+        assert_eq!(records[0]["osCheck"], "ALIVE_MATCH", "{}", records[0]);
+        assert_eq!(records[0]["exitClass"], "UNKNOWN");
+        assert!(!while_alive, "a live holder still holds the data folder");
+        assert!(after_end, "an ended holder releases the early retry");
+    }
+
+    #[test]
+    fn record_exit_lock_holder_is_gone_once_it_ends() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut child = held_child(7);
+        let mut owner = actuator(dir.path(), child.id());
+        owner.spawn_engine().unwrap();
+        let code = end(&mut child);
+        let decision = Decision {
+            action: supervisor::Action::Stop,
+            reason: None,
+            exit_class: None,
+            cooldown_ms: None,
+            counted: false,
+        };
+        owner.record_exit(code, "running", &decision);
+        let gone = owner.lock_holder_gone();
+        drop(child);
+        assert!(gone, "the holder saved by record_exit has ended");
+    }
+}
