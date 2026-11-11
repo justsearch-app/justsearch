@@ -583,3 +583,13 @@ changes.
   "note": "Entry 13 is warranted by the supplied draft section 3 classification table/indexing set, section 7 scenarios and settled amendments. Entry 14 remains rejected: draft A19 requires distinguishable selection, focus, unread and outcome without colour alone, but does not choose the asserted 2px selected/1px unselected borders, Highlight border and solid Highlight focus outline, or CanvasText unread fill. Its delegated-choice says to check these features in a browser, not to adopt these exact visual choices. The broad delegation permits making such choices; record the specific choices as an independently checkable source or test the sourced behavioural requirement. A16/A20 are otherwise supported. The remaining 20 entries pass this intent review; no Adaptation hides a changed existing oracle. This is a source-warrant rejection, not a product defect verdict."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1cbf3-d60a-7ce0-9e3b-b0efaa7cf450",
+  "verdict": "accept",
+  "digest": "sha256:0037471e716183fe68f0d94ec35af657c8373528b1d4989ca2386980523ffd15"
+}
+```
