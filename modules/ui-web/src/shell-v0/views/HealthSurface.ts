@@ -68,6 +68,7 @@ import {
 // Tempdoc 662 post-implementation: the connection-budget runtime-peak signal was
 // collected but shown nowhere — surfaced here alongside the other connection facts.
 import { getCurrentOpenChannelCount, getPeakOpenChannelCount } from '../state/liveChannelBudget.js';
+import { getLastOriginContactMs } from '../state/originContact.js';
 import { type SystemHealthVerdict } from '../state/verdict.js';
 import { formatRelativeMs } from '../../utils/relativeTime.js';
 import { noteHealthOnScreen, subscribeEngineLoss, engineLossReason, type EngineLoss } from '../state/engineLoss.js';
@@ -993,6 +994,13 @@ export class HealthSurface extends JfElement {
   private headCurrent(): boolean {
     return healthObservationCurrent(getStatusReceivedAtMs(), Date.now(), HEAD_HEALTH_MAX_AGE_MS);
   }
+  /** The age of whichever observation is out of date: the status receipt, else the worker sample it carries. */
+  private statusAges(): string {
+    const at = getStatusReceivedAtMs();
+    if (at == null) return 'no status received';
+    const sample = this.status?.meta?.workerRpcAtMs;
+    return this.headCurrent() && sample != null ? `worker sample ${formatRelativeMs(Math.min(at, sample))}` : `status received ${formatRelativeMs(at)}`;
+  }
 
 
 
@@ -1265,6 +1273,14 @@ export class HealthSurface extends JfElement {
     const indexState = [activity.summary, activity.detail].filter(Boolean).join(' — ');
     const failure = this.status?.worker?.core?.indexState === 'FAILED' ? 'Indexing failed'
       : this.status?.worker?.core?.indexState === 'ERROR' ? 'Indexing error' : null;
+    // Each age is dated by its own source: the status body's receipt, the worker's sample inside it,
+    // the last answer or frame on any channel (contact) and the last stream frame. Uptime is as of
+    // the status receipt, and says so once that receipt is no longer current.
+    const statusAt = getStatusReceivedAtMs();
+    const reportedSample = this.status?.meta?.workerRpcAtMs;
+    const sampledAt = statusAt != null && reportedSample != null ? Math.min(statusAt, reportedSample) : null;
+    const uptime = formatUptime(this.status?.uptimeMs);
+    const streamAt = getLastOriginContactMs();
     // Endpoint / index-state / uptime are content (data), shared by both renders.
     const rows = html`
       <div class="data-row">
@@ -1285,20 +1301,20 @@ export class HealthSurface extends JfElement {
       </div>
       <div class="data-row">
         <span class="key">Uptime</span>
-        <span class="val">${formatUptime(this.status?.uptimeMs)}</span>
+        <span class="val">${uptime !== '—' && !this.headCurrent() ? `${uptime} as of ${formatRelativeMs(statusAt)}` : uptime}</span>
       </div>
       <div class="data-row">
-        <span class="key">Backend reachable</span>
+        <span class="key">Last contact</span>
         <span class="val">${formatRelativeMs(this.aiState?.connection.lastContactMs ?? null)}</span>
       </div>
       <div class="data-row">
-        <span class="key">Data updated</span>
-        <span class="val">${formatRelativeMs(this.aiState?.connection.lastSuccessMs ?? null)}</span>
+        <span class="key">Status updated</span>
+        <span class="val">${formatRelativeMs(statusAt)}${sampledAt == null ? '' : ` · worker sample ${formatRelativeMs(sampledAt)}`}</span>
       </div>
       <div class="data-row">
         <span class="key">Connections</span>
         <span class="val"
-          >${getCurrentOpenChannelCount()} open (peak ${getPeakOpenChannelCount()})</span
+          >${getCurrentOpenChannelCount()} open (peak ${getPeakOpenChannelCount()}) · last frame ${formatRelativeMs(streamAt)}</span
         >
       </div>
     `;
@@ -1361,7 +1377,7 @@ export class HealthSurface extends JfElement {
               ? 'Healthy'
               : indexHealthy === false
                 ? 'Unhealthy'
-                : 'Unknown'}${confirmed ? '' : ' (last observed)'}</span
+                : 'Unknown'}${confirmed ? '' : ` (last observed) · ${this.statusAges()}`}</span
           >
         </div>
 
@@ -1625,7 +1641,8 @@ export class HealthSurface extends JfElement {
 
   private renderAiEngine(): TemplateResult | typeof nothing {
     if (!this.inference) return html`<section id="ai-engine" tabindex="-1" class="card section"><h3>AI Engine</h3><p>Engine status unavailable.</p>${this.renderTransitionTimeline()}${this.renderTraceExplorer()}</section>`;
-    const inferenceCurrent = healthObservationCurrent(getInferenceReceivedAtMs(), Date.now(), 10_000);
+    const inferenceAt = getInferenceReceivedAtMs();
+    const inferenceCurrent = healthObservationCurrent(inferenceAt, Date.now(), 10_000);
     const mode = this.headCurrent() && inferenceCurrent ? this.aiState?.runtime?.mode ?? this.inference.mode ?? 'unknown' : 'Status unconfirmed';
     const isOnline = mode === 'online';
     const failure = this.aiState?.chatFailureReason ?? null;
@@ -1660,6 +1677,7 @@ export class HealthSurface extends JfElement {
                   ? reasonFor(failure, activity).wording
                   : 'Offline'}</span
           >
+          <span style="font-size: var(--font-size-xs); color: var(--text-secondary)">· AI state updated ${formatRelativeMs(inferenceAt)}</span>
         </div>
         <p data-testid="health-ai-indexing-activity">${activity.summary}${activity.detail ? ` — ${activity.detail}` : ''}</p>
         <div
@@ -1756,7 +1774,7 @@ export class HealthSurface extends JfElement {
     const color = ratio > 0.9 ? 'red' : ratio > 0.75 ? 'amber' : 'green';
     return html`
       <div class="card section">
-        ${!this.headCurrent() ? html`<p>Last observed graphics-card data — current status unconfirmed.</p>` : nothing}
+        ${!this.headCurrent() ? html`<p>Last observed graphics-card data (${this.statusAges()}) — current status unconfirmed.</p>` : nothing}
         <h3>${icon({ name: 'cpu', size: 12 })} GPU
           <span
             style="float:right; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-weight: 500; ${gpu.available
@@ -1833,7 +1851,7 @@ export class HealthSurface extends JfElement {
   private renderAtRest(): TemplateResult | typeof nothing {
     // 629 remaining-work: the card markup now lives in the shared `renderAtRestCard` so the Security &
     // Privacy surface renders the identical card. HealthSurface's own `.card`/`.data-row` styles cover it.
-    return html`${!this.headCurrent() ? html`<p>Data protection: last observed; current status unconfirmed.</p>` : nothing}${renderAtRestCard(this.status)}`;
+    return html`${!this.headCurrent() ? html`<p>Data protection: last observed (${this.statusAges()}); current status unconfirmed.</p>` : nothing}${renderAtRestCard(this.status)}`;
   }
 
   /**
@@ -1983,7 +2001,7 @@ export class HealthSurface extends JfElement {
     if (this.failedJobs.length === 0) return current ? nothing : html`<section class="card section"><h3>Failed files</h3><p>Failed-file status unconfirmed.</p></section>`;
     return html`
       <div class="card section">
-        ${!current ? html`<p>Last observed failures — current status unconfirmed.</p>` : nothing}
+        ${!current ? html`<p>Last observed failures${this.failedAtMs != null ? `, read ${formatRelativeMs(this.failedAtMs)}` : ''} — current status unconfirmed.</p>` : nothing}
         <h3>
           ${icon({ name: 'alert-circle', size: 12 })} Failed files
           (${this.failedJobs.length})
@@ -2005,14 +2023,15 @@ export class HealthSurface extends JfElement {
       return html`
         <div class="card section">
           <h3>Recent events</h3>
-          <div class="empty">${this.eventsConnected && this.eventsAtMs != null ? 'No events yet.' : 'Event history unconfirmed.'}</div>
+          <div class="empty">${this.eventsConnected && this.eventsAtMs != null ? 'No events yet.' : this.eventsAtMs != null
+            ? `Event history unconfirmed — the stream last answered ${formatRelativeMs(this.eventsAtMs)}.` : 'Event history unconfirmed.'}</div>
         </div>
       `;
     }
     return html`
       <div class="card section">
         <h3>Recent events</h3>
-        ${!this.eventsConnected || !healthObservationCurrent(this.eventsAtMs, Date.now(), REMOTE_HEALTH_MAX_AGE_MS) ? html`<p>Last observed events — current stream unconfirmed.</p>` : nothing}
+        ${!this.eventsConnected || !healthObservationCurrent(this.eventsAtMs, Date.now(), REMOTE_HEALTH_MAX_AGE_MS) ? html`<p>Last observed events, received ${formatRelativeMs(this.eventsAtMs)} — current stream unconfirmed.</p>` : nothing}
         <div class="events-list">
           ${this.events
             .slice(-30)
@@ -2132,7 +2151,7 @@ export class HealthSurface extends JfElement {
         </section>`)}
         <details .open=${this.diagnosticsOpen} @toggle=${(event: Event) => { this.diagnosticsOpen = (event.target as HTMLDetailsElement).open; diagnosticsExpanded = this.diagnosticsOpen; }}>
           <summary>Diagnostics</summary>
-          ${!this.headCurrent() || !this.aiState?.indexingStatusLive ? html`<p class="diagnostic-currency">Diagnostic values are last observed; current status is unconfirmed.</p>` : nothing}
+          ${!this.headCurrent() || !this.aiState?.indexingStatusLive ? html`<p class="diagnostic-currency">Diagnostic values are last observed (${this.statusAges()}); current status is unconfirmed.</p>` : nothing}
         ${this.renderStats()}
         <!-- Tempdoc 596 §16.5 — "what can I do right now": every capability affordance's availability +
              its inline remedy, projected from the same authority the live controls read. -->

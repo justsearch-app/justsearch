@@ -13,7 +13,10 @@ fail-before checks and need no entry: `HealthSurface.quiet.test.ts` and `HealthS
 in `gates/test-intent/evidence/s6-health-repaired.json` (and one preservation check in `gates/test-intent/evidence/s6-health-new.json`).
 The verifier repair (SH13 row navigation, SH16 reflow, SH7 failure retirement) adds the isolated `HealthSurface.frame-lockdown.test.ts`
 and one case in `HealthSurface.quiet.test.ts`; their entries below point at `gates/test-intent/evidence/s6-health-verifier-1.json`
-(fail-before on 394467ba1d). The frame check's 900x700 and 1280x720 layout reference was recorded on 394467ba1d. Independent acceptance is pending.
+(fail-before on 394467ba1d). The second verifier repair (SH3 per-source ages in Diagnostics, SH14 a section intent kept across
+engine loss and recovery) adds the isolated `HealthSurface.freshness-lockdown.test.ts`; its entry points at
+`gates/test-intent/evidence/s6-health-verifier-2.json` (fail-before on bf1b6b5688). Its third case, recovery without a pending
+intent still moving focus to the main content, is a preservation check and passes on bf1b6b5688 too. The frame check's 900x700 and 1280x720 layout reference was recorded on 394467ba1d. Independent acceptance is pending.
 
 What each Obsolete entry removes:
 
@@ -421,6 +424,35 @@ What each Obsolete entry removes:
         "modules/ui-web/src/shell-v0/views/HealthSurface.frame-lockdown.test.ts#every row action and Diagnostics remedy reaches its window through the shell and the address follows (current status, GPU telemetry unavailable, GPU-backed model)",
         "modules/ui-web/src/shell-v0/views/HealthSurface.frame-lockdown.test.ts#every row action and Diagnostics remedy reaches its window through the shell and the address follows (engine starting)",
         "modules/ui-web/src/shell-v0/views/HealthSurface.frame-lockdown.test.ts#600x400 with 200% text: Health and the open Diagnostics never scroll sideways and long values stay readable"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/HealthSurface.freshness-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "SH3: in real Chromium, with status refused for 45 s while inference keeps answering, every age in the expanded Diagnostics is dated by its own source: the status age by the status receipt (about 48 s) with the worker sample it carries, contact by the last answer on any channel (just now), uptime as of the status receipt, the AI Engine card by the inference receipt, and the stream frame age by the last stream frame. SH14: AI Brain's engine-history intent arriving while the shell is in engine loss with Health open keeps its destination: after recovery Diagnostics is expanded and focus stays on the AI Engine section.",
+      "repaired": true,
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "design decisions of the frame build, within the canonical design",
+          "choice": "Settled piece 8 scenarios SH3 and SH14 with the amendments 'every source has its own freshness', 'expanded Diagnostics makes no stale claims' and 'AI Brain's engine-history link expands and focuses its section': Health's Connection card reads the status receipt for its data age instead of the combined last-success time, and the engine-loss treatment, on recovery, returns focus only when it is still in the treatment or nowhere, so a section a window focused during recovery keeps it.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design.",
+          "location": "task t-20261103-shell user turn requesting S6 piece 8, quoted in the piece 8 builder brief, 2026-11-11",
+          "label": "owner request for this piece"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-health-verifier-2.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/HealthSurface.freshness-lockdown.test.ts#status stops for 45 s while inference answers: the status age reads its own receipt, contact and inference stay just now",
+        "modules/ui-web/src/shell-v0/views/HealthSurface.freshness-lockdown.test.ts#AI Brain's engine-history intent during the loss: after recovery Diagnostics is open and focus stays on the AI Engine section"
       ]
     }
   ]

@@ -196,6 +196,9 @@ export class EngineLossTreatment extends JfElement {
     if (!inTreatment && !lostFocus) return;
     // The Shell drops `inert` from the window area in the same update.
     await Promise.resolve();
+    // A window that placed focus while the engine came back (a section it was asked to show) keeps it.
+    const now = deepActiveElement();
+    if (now && now !== document.body && now !== this && this.shadowRoot?.contains(now) !== true) return;
     if (target instanceof HTMLElement && target.isConnected && !target.closest('[inert]')) {
       target.focus();
       if (deepActiveElement() === target) return;
