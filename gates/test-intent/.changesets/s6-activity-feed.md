@@ -414,3 +414,13 @@ in the windowed feed were repaired; those checks have fail-before evidence again
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1cb23-9c67-7590-8404-d16895df7d0d",
+  "verdict": "accept",
+  "digest": "sha256:a098bc0bfd48715bda483b371e08168beeae660170e0ac21e7183d37b8241db4"
+}
+```
