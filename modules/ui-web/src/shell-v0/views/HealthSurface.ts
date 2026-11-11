@@ -468,10 +468,13 @@ export class HealthSurface extends JfElement {
     }
     .stats {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(min(12rem, 100%), 1fr));
       gap: 0.75rem;
     }
+    /* SH16 — a readout never widens its column: unbroken values (paths, names, reasons) wrap. */
     .card {
+      min-width: 0;
+      overflow-wrap: anywhere;
       padding: 0.875rem;
       background: var(--surface-secondary);
       border: 1px solid var(--border-subtle);
@@ -573,11 +576,11 @@ export class HealthSurface extends JfElement {
     }
     .grid-2 {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 0.75rem;
     }
     @media (max-width: 60rem) {
-      .grid-2 { grid-template-columns: 1fr; }
+      .grid-2 { grid-template-columns: minmax(0, 1fr); }
     }
     .section h3 {
       margin: 0 0 0.5rem 0;
@@ -1606,7 +1609,7 @@ export class HealthSurface extends JfElement {
                 <span style="color: var(--text-secondary)">
                   ${s.start ? formatTime(new Date(s.start)) : '—'}
                 </span>
-                <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 18rem">
+                <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 18rem; min-width: 0" title=${s.name ?? ''}>
                   ${s.name ?? '(unnamed)'}
                 </span>
                 <span style="color: var(--text-secondary)">
@@ -1988,7 +1991,7 @@ export class HealthSurface extends JfElement {
         ${this.failedJobs.slice(0, 10).map(
           (j) => html`
             <div class="failed-row">
-              <div class="path" title=${j.path ?? ''}>${j.path ?? j.pathHash ?? 'unknown'}</div>
+              <div class="path" title=${j.path ?? j.pathHash ?? ''}>${j.path ?? j.pathHash ?? 'unknown'}</div>
               ${j.errorMessage ? html`<div class="err">${j.errorMessage}</div>` : nothing}
             </div>
           `,
@@ -2120,7 +2123,7 @@ export class HealthSurface extends JfElement {
         <dl class="health-rows" aria-label="System health">
           ${this.healthRows().map(row => html`<div class="health-row" data-health-row=${row.id}>
             <dt>${row.label}</dt><dd>${row.status ? html`<p>${row.status}</p><jf-button label=${row.action}
-              .onActivate=${() => this.dispatchEvent(new CustomEvent('navigate-with-context', { detail: { surfaceId: row.destination }, bubbles: true, composed: true }))}>${row.action}</jf-button>` : nothing}</dd>
+              .onActivate=${() => this.dispatchEvent(new CustomEvent('navigate-with-context', { detail: { target: row.destination, state: {} }, bubbles: true, composed: true }))}>${row.action}</jf-button>` : nothing}</dd>
           </div>`)}
         </dl>
         ${this.renderRecommendedActions()}

@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
   },
-  "createdAt": "2026-11-11T13:29:01.342Z",
-  "revision": "716017c61f87ff6bfbae502b5fa5f06d777f5246",
-  "tree": "83605275a884203fc91cf447e9ee6cd17bcf3bfc",
+  "createdAt": "2026-11-11T14:30:51.047Z",
+  "revision": "394467ba1dfffd53f64bdae13d3dd66d77628ec1",
+  "tree": "c5c5438251cde98fd22f362b7cdee2ae01f309f0",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/StatusPill.notices.test.ts\" \"src/shell-v0/components/indexingSurfaceSweep.test.ts\" \"src/shell-v0/views/HealthSurface.truthfulness.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/ajttfihz/tmp/test-intent-vitest-88106-1794403735965.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/StatusPill.notices.test.ts\" \"src/shell-v0/components/indexingSurfaceSweep.test.ts\" \"src/shell-v0/views/HealthSurface.truthfulness.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/ukop8nnn/tmp/test-intent-vitest-24672-1794407447908.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 5375
+      "durationMs": 3137
     }
   ],
   "checks": [
@@ -72,5 +72,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:fba5ee220f3118202197e263dcde0199fd5289737b607e5f639cf4096312bc29"
+  "digest": "sha256:2b6a87d15c706e058e7645488b4f782ed23276d6d102d7bcdf4617473a3c5f35"
 }

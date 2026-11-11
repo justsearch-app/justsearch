@@ -32,7 +32,7 @@ import { getSeenCursor, subscribeSeenCursor } from '../substrates/recall/recallC
 import { getIndexedRoots, readIndexedRoots, subscribeIndexedRoots } from '../state/indexedRoots.js';
 import { subscribeProfileSwitch } from '../state/UserStateDocument.js';
 import { subscribeStatusEpoch } from '../../api/statusInvalidation.js';
-import { healthObservationCurrent, publishHealthObservations, REMOTE_HEALTH_MAX_AGE_MS } from '../state/systemHealth.js';
+import { failureSuperseded, healthObservationCurrent, publishHealthObservations, REMOTE_HEALTH_MAX_AGE_MS } from '../state/systemHealth.js';
 import { needsTypedConfirm } from '../components/acceptPendingEffect.js';
 import { agentRequestNotice, endEventId, needsYouCount, routeDesktopNotice, workFailedNotice, workFinishedNotice, type DesktopNotice } from '../state/noticePolicy.js';
 import { getNotifications } from '../state/notificationsState.js';
@@ -92,6 +92,11 @@ export class FrameStatusController implements ReactiveController {
   private stopActivity: (() => void) | undefined;
   private activity: readonly UnifiedActionEntry[] = [];
   private operations = new Map<string, DurableStatusOperation & { activeSince?: number; seenAtGap?: number }>();
+  /**
+   * 13:00Z — failed receipts a later success of the same operation retired. Receipts are immutable,
+   * so the retirement outlives both receipts leaving the bounded ledger history.
+   */
+  private readonly retiredFailures = new Set<string>();
   private roots: readonly IndexedRootView[] = [];
   private rootsLive = false;
   private readonly rootPaths = new Map<string, string>();
@@ -232,6 +237,7 @@ export class FrameStatusController implements ReactiveController {
     if (!multiplex || !this.connected) return;
     this.stopActivity = openActionLedgerStream({ multiplex, onActivity: activity => {
       this.activity = activity;
+      this.retireSupersededFailures();
       for (const entry of activity) if (entry.operationOutcomeKey) {
         const previous = this.operations.get(entry.operationOutcomeKey);
         this.operations.set(entry.operationOutcomeKey, previous ? { ...previous, operationId: entry.operationId }
@@ -241,9 +247,14 @@ export class FrameStatusController implements ReactiveController {
       for (const [key, operation] of this.operations) if (!retained.has(key)
         && operation.outcome?.phase !== 'awaiting_acceptance'
         && (operation.outcome?.state === 'complete' || operation.outcome?.state === 'expired'
-          || operation.outcome?.state === 'failed' && (operation.outcome.completedAt ?? Infinity) <= Date.parse(getSeenCursor()))) this.operations.delete(key);
+          || operation.outcome?.state === 'failed' && (this.retiredFailures.has(key)
+            || (operation.outcome.completedAt ?? Infinity) <= Date.parse(getSeenCursor())))) this.operations.delete(key);
       this.refresh(); void this.readRemote();
     } });
+  }
+  private retireSupersededFailures(): void {
+    const operations = [...this.operations.values()];
+    for (const [key, operation] of this.operations) if (failureSuperseded(operation, operations)) this.retiredFailures.add(key);
   }
   private observeRoots(): void {
     const observation = getIndexedRoots();
@@ -389,10 +400,11 @@ export class FrameStatusController implements ReactiveController {
       title: 'Plugin load failed', detail: `${key}: ${error.message}`,
       actions: [{ kind: 'navigate', target: 'core.settings-surface', label: 'Open plugin settings' },
         { kind: 'plugin-copy', target: key, label: 'Copy details' }, { kind: 'dismiss-plugin', target: key, label: 'Dismiss' }] }));
+    this.retireSupersededFailures();
     // Health applies its own expiry to a published copy; the panel's live-end evidence is not rewritten.
     // Terminal receipts are immutable, so only an unfinished outcome can go out of date.
     publishHealthObservations({ presence: this.presence, presenceLive: this.presenceLive,
-      presenceAtMs: this.presenceAtMs, operations: [...this.operations.values()].map(operation =>
+      presenceAtMs: this.presenceAtMs, operations: [...this.operations.values()].filter(operation => !this.retiredFailures.has(operation.id)).map(operation =>
         operation.fresh && !(operation.outcome && ['complete', 'failed'].includes(operation.outcome.state) && operation.outcome.phase !== 'awaiting_acceptance')
           && !healthObservationCurrent(operation.observedAtMs, now, REMOTE_HEALTH_MAX_AGE_MS) ? { ...operation, fresh: false } : operation) });
     const authorizationHost = this.host.authorizationHost?.() ?? null;

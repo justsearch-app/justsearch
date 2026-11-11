@@ -128,7 +128,13 @@ export function unresolvedHealthOperations(operations: readonly DurableStatusOpe
     if (outcome?.state !== 'failed') return true;
     const ended = outcome.completedAt ?? 0;
     if (ended > 0 && new Date(ended).toISOString() <= seenCursor) return false;
-    return !operations.some(later => operation.operationId !== undefined && later.operationId === operation.operationId && later.outcome?.state === 'complete'
-      && (later.outcome.completedAt ?? 0) > ended);
+    return !failureSuperseded(operation, operations);
   });
+}
+/** A failed receipt that a later successful invocation of the same operation retired. */
+export function failureSuperseded(operation: DurableStatusOperation, operations: readonly DurableStatusOperation[]): boolean {
+  const ended = operation.outcome?.completedAt ?? 0;
+  return operation.outcome?.state === 'failed' && operation.operationId !== undefined
+    && operations.some(later => later.operationId === operation.operationId && later.outcome?.state === 'complete'
+      && (later.outcome.completedAt ?? 0) > ended);
 }

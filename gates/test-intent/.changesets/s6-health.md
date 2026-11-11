@@ -10,7 +10,10 @@ author-session: s6-health-builder-2-20261111
 Sources are the owner's delegation for the frame build and the owner's request for this piece; each choice names the settled
 piece 8 scenario or amendment (scenarios settled 2026-11-11T12:40Z, decisions 13:00Z). Two new isolated files carry further
 fail-before checks and need no entry: `HealthSurface.quiet.test.ts` and `HealthSurface.truthfulness.test.ts`; their checks are
-in `gates/test-intent/evidence/s6-health-repaired.json` (and one preservation check in `gates/test-intent/evidence/s6-health-new.json`). Independent acceptance is pending.
+in `gates/test-intent/evidence/s6-health-repaired.json` (and one preservation check in `gates/test-intent/evidence/s6-health-new.json`).
+The verifier repair (SH13 row navigation, SH16 reflow, SH7 failure retirement) adds the isolated `HealthSurface.frame-lockdown.test.ts`
+and one case in `HealthSurface.quiet.test.ts`; their entries below point at `gates/test-intent/evidence/s6-health-verifier-1.json`
+(fail-before on 394467ba1d). The frame check's 900x700 and 1280x720 layout reference was recorded on 394467ba1d. Independent acceptance is pending.
 
 What each Obsolete entry removes:
 
@@ -360,6 +363,64 @@ What each Obsolete entry removes:
       "evidence": "gates/test-intent/evidence/s6-health-repaired.json",
       "newChecks": [
         "modules/app-observability/src/test/java/io/justsearch/app/observability/surface/CoreSurfaceCatalogTest.java#systemHubShape"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/HealthSurface.quiet.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "SH7 and the 13:00Z failure-retirement rule: a failed operation receipt retired by a later successful invocation of the same operation, or marked read through the shared seen cursor, stays retired when its receipts leave the bounded ledger history; a new failure is still reported in the Background work row.",
+      "repaired": true,
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "design decisions of the frame build, within the canonical design",
+          "choice": "Piece 8 decision 2026-11-11T13:00Z: a failed operation receipt counts as a current problem until a later invocation of the same operation succeeds or the user marks it read through the shared seen cursor (justsearch.recall.seen-cursor.v1). Receipts are immutable, so the status controller keeps the retirement when both receipts leave the bounded retained history; a later failure is a new receipt and is reported.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design.",
+          "location": "task t-20261103-shell user turn requesting S6 piece 8, quoted in the piece 8 builder brief, 2026-11-11",
+          "label": "owner request for this piece"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-health-verifier-1.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/HealthSurface.quiet.test.ts#SH7 a retired failure stays retired when its receipts leave the bounded history; a new failure is reported"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/HealthSurface.frame-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "SH13: in real Chromium, every Health row action (Open Logs, Open Library, Open AI Brain, Recent activity) and every remedy declared in Diagnostics reaches its window through the shell's navigate-with-context path and the address follows, including the Graphics card row with GPU telemetry unavailable and a GPU-backed model. SH16: at 600x400 with 200% root text Health and its open Diagnostics never scroll sideways and truncated values keep their full text; 900x700 and 1280x720 at 100% keep the layout recorded on 394467ba1d.",
+      "repaired": true,
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "design decisions of the frame build, within the canonical design",
+          "choice": "Settled piece 8 scenarios SH13 (navigation from Health's rows) and SH16 (600x400 at 200% text): a row action uses the same navigate-with-context contract (target, state) as jf-control and the capability map, so the shell activates the destination; Diagnostics readouts wrap long unbroken values inside their column instead of widening it, and a truncated span name carries its full text as a title.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design.",
+          "location": "task t-20261103-shell user turn requesting S6 piece 8, quoted in the piece 8 builder brief, 2026-11-11",
+          "label": "owner request for this piece"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-health-verifier-1.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/HealthSurface.frame-lockdown.test.ts#every row action and Diagnostics remedy reaches its window through the shell and the address follows (current status, GPU telemetry unavailable, GPU-backed model)",
+        "modules/ui-web/src/shell-v0/views/HealthSurface.frame-lockdown.test.ts#every row action and Diagnostics remedy reaches its window through the shell and the address follows (engine starting)",
+        "modules/ui-web/src/shell-v0/views/HealthSurface.frame-lockdown.test.ts#600x400 with 200% text: Health and the open Diagnostics never scroll sideways and long values stay readable"
       ]
     }
   ]

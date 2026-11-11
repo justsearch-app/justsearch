@@ -8,6 +8,7 @@ import { createMockHostApi } from '../plugin-api/testHostApi.js';
 import { readIndexedRoots } from '../state/indexedRoots.js';
 import { __resetTasksForTest, bindTaskOperation, startTask } from '../substrates/tasks/index.js';
 import { __resetRecallCursor, markSeen } from '../substrates/recall/recallCursor.js';
+import type { MultiplexedStream } from '../streaming/MultiplexedStream.js';
 
 const status = (): StatusSnapshot => ({
   status: 'ok',
@@ -24,6 +25,7 @@ let failPresence = false;
 let gpu = status().gpu;
 let cpuModel = true;
 let outcome: unknown = null;
+let outcomes: Record<string, unknown> = {};
 async function mount(ready = true): Promise<HealthSurface> {
   if (ready) {
     startAiStateStore('');
@@ -43,10 +45,21 @@ async function mount(ready = true): Promise<HealthSurface> {
   return el;
 }
 const row = (id: string) => el!.shadowRoot!.querySelector(`[data-health-row=${id}] dd`);
+/** The retained action-ledger history, as the shell's multiplexed stream delivers each snapshot. */
+function ledger(): (keys: readonly [string, 'SUCCESS' | 'FAILURE'][]) => Promise<void> {
+  let deliver: ((snapshot: { payload: unknown[] }) => void) | undefined;
+  controller!.setMultiplex({ subscribe: (_id: string, _config: unknown, listener: typeof deliver) => { deliver = listener; return () => undefined; } } as unknown as MultiplexedStream);
+  return async keys => {
+    deliver!({ payload: keys.map(([key, result]) => ({ id: `operation:${key}`, kind: 'operation', occurredAt: '2026-11-11T11:58:00Z',
+      originator: 'USER', operationId: 'core.rebuild-index', outcome: result })) });
+    for (let i = 0; i < 5; i++) await new Promise(resolve => setTimeout(resolve, 0));
+    await el!.updateComplete;
+  };
+}
 
 beforeEach(() => {
   __resetAiStateForTest(); __resetTasksForTest(); __resetRecallCursor();
-  failRecovery = false; failPresence = false; gpu = status().gpu; cpuModel = true; outcome = null;
+  failRecovery = false; failPresence = false; gpu = status().gpu; cpuModel = true; outcome = null; outcomes = {};
   vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-11-11T12:00:00Z'));
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
     const path = String(input);
@@ -57,6 +70,8 @@ beforeEach(() => {
     if (path.includes('/api/status')) return json({ ...status(), gpu });
     if (path.includes('/api/presence')) return json({ runs: [] }, failPresence ? 503 : 200);
     if (path.includes('indexing-roots')) return json({ items: [], count: 0 });
+    const key = path.split('/api/operation-history/')[1];
+    if (key && outcomes[key]) return json(outcomes[key]);
     if (outcome && path.includes('/api/operation-history/')) return json(outcome);
     return json({});
   }));
@@ -123,6 +138,27 @@ describe('quiet System Health', () => {
     expect(el!.shadowRoot!.querySelector('[role=status]')?.textContent).not.toBe('Everything is working');
     markSeen(new Date(completedAt + 1_000).toISOString());
     await vi.waitFor(() => expect(row('work')?.textContent ?? '').not.toContain('Rebuild search'));
+  });
+  it('SH7 a retired failure stays retired when its receipts leave the bounded history; a new failure is reported', async () => {
+    const key = (n: number) => `01970000-0000-7000-8000-00000000000${n}`;
+    const failed = (minute: number) => ({ state: 'failed', historySince: 0, completedAt: Date.parse(`2026-11-11T11:${minute}:00Z`), message: 'Could not rebuild the index' });
+    outcomes = { [key(1)]: failed(50), [key(2)]: { state: 'complete', historySince: 0, completedAt: Date.parse('2026-11-11T11:51:00Z') } };
+    await mount();
+    const history = ledger();
+    const work = () => row('work')?.textContent ?? '';
+    await history([[key(1), 'FAILURE']]);
+    await vi.waitFor(() => expect(work()).toContain(': failed'), { timeout: 10_000 });
+    await history([[key(1), 'FAILURE'], [key(2), 'SUCCESS']]);
+    await vi.waitFor(() => expect(work()).not.toContain(': failed'), { timeout: 10_000 });
+    await history([]);
+    expect(work(), 'retired by a later success').not.toContain(': failed');
+    outcomes[key(3)] = failed(52);
+    await history([[key(3), 'FAILURE']]);
+    await vi.waitFor(() => expect(work(), 'a new failure').toContain(': failed'), { timeout: 10_000 });
+    markSeen('2026-11-11T11:53:00.000Z');
+    await vi.waitFor(() => expect(work()).not.toContain(': failed'));
+    await history([]);
+    expect(work(), 'retired by mark-read').not.toContain(': failed');
   });
   it('unknown job counts keep a successful folder response unconfirmed', async () => {
     await mount();
