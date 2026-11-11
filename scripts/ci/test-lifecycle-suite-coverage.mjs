@@ -53,14 +53,38 @@ for (const expected of uploadPolicy.uploads) {
 }
 
 // Bounded child logs supplement the existing complete fixture artifacts.
-test('both installed Engine tiers always collect and upload additional child logs', () => {
+// Evaluate a retention value for one job status. Only a literal day count or the
+// `job.status == '<status>' && <days> || <days>` form is accepted, so another expression fails here.
+function retentionFor(value, status) {
+  if (Number.isInteger(value)) return value;
+  const match = /^\$\{\{\s*job\.status\s*==\s*'(success|failure|cancelled)'\s*&&\s*(\d+)\s*\|\|\s*(\d+)\s*\}\}$/.exec(String(value));
+  assert.ok(match, `unsupported retention expression: ${value}`);
+  return status === match[1] ? Number(match[2]) : Number(match[3]);
+}
+
+test('both installed Engine tiers always collect and upload child logs, kept longer when the job failed', () => {
+  const jobs = load(workflow).jobs;
   for (const id of ['integration-tests', 'lifecycle-integration-tests']) {
     const job = workflowJobs(workflow).find((entry) => entry.id === id);
     const collection = job.runs.find((run) => run.text === 'node scripts/ci/collect-e2e-child-logs.mjs');
     assert.equal(collection?.step?.if, 'always()', id);
-    assert.match(job.text, /name: Upload E2E child process logs\n        if: always\(\)/);
-    assert.match(job.text, /path: build\/ci\/e2e-child-logs\/\*\*/);
-    assert.match(job.text, /retention-days: 3/);
+    const steps = jobs[id].steps;
+    const artifact = `${id}-child-logs-attempt-\${{ github.run_attempt }}`;
+    const uploads = steps.filter((step) => step.uses?.startsWith('actions/upload-artifact@'));
+    const matching = uploads.filter((step) => step.with?.name === artifact);
+    assert.equal(matching.length, 1, `${id}: exactly one upload of ${artifact}`);
+    const [upload] = matching;
+    assert.equal(upload.if, 'always()', `${id}: child logs upload on every outcome`);
+    assert.equal(upload.with.path, 'build/ci/e2e-child-logs/**', id);
+    assert.equal(upload.with['if-no-files-found'], 'error', id);
+    // Retention reads the job status when the step runs, so every other upload that can fail runs first.
+    assert.equal(uploads.at(-1), upload, `${id}: child logs upload comes after the job's other uploads`);
+    assert.equal(steps.at(-1), upload, `${id}: child logs upload is the job's final step, so no later step can fail after retention is chosen`);
+    const collect = steps.findIndex((step) => step.run === 'node scripts/ci/collect-e2e-child-logs.mjs');
+    assert.ok(collect >= 0 && steps.indexOf(upload) > collect, `${id}: upload follows collection`);
+    for (const [status, days] of [['failure', 30], ['success', 3], ['cancelled', 3]]) {
+      assert.equal(retentionFor(upload.with['retention-days'], status), days, `${id}: retention when ${status}`);
+    }
   }
 });
 
