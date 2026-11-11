@@ -2,6 +2,7 @@
 package io.justsearch.app.api.indexing;
 
 import java.util.Objects;
+import io.justsearch.agent.api.registry.Nullable;
 
 /**
  * Head-side wire record for a single watched-root row. Backs the
@@ -39,7 +40,7 @@ import java.util.Objects;
  *   <li>{@link #inFlightCount}: PENDING+PROCESSING indexing jobs under this
  *       root's path prefix (tempdoc 599 §9.2). Drives the per-folder
  *       "indexing · N remaining → searchable" projection. Reaper-bounded
- *       (no zombie PROCESSING rows). Zero is valid (drained or never-started).
+ *       (no zombie PROCESSING rows). Zero is valid (drained or never-started); null means the count failed.
  *   <li>{@link #failedCount}: permanently FAILED jobs under this root's prefix.
  *   <li>{@link #walkCompleted}: whether the folder's filesystem walk has
  *       terminated at least once (tempdoc 599 Fix 1). Lets the FE distinguish
@@ -72,8 +73,7 @@ import java.util.Objects;
  *       {@link #chunkDocsSettled} over {@link #chunkDocsTotal} is never "N of M
  *       files". Numerator discipline: "settled" = terminal state (COMPLETED +
  *       COMPLETED_EMPTY where the stage defines it + FAILED), so a permanently
- *       failed document does not pin the folder below 100% forever. All zero
- *       when the Worker's index runtime is unavailable.
+ *       failed document does not pin the folder below 100% forever. Null when the root's count query fails.
  * </ul>
  */
 public record IndexedRootView(
@@ -83,21 +83,21 @@ public record IndexedRootView(
     String lastIndexedIsoTime,
     String status,
     String walkError,
-    long inFlightCount,
-    long failedCount,
+    @Nullable Long inFlightCount,
+    @Nullable Long failedCount,
     boolean walkCompleted,
     boolean deleteDetectionUnverified,
     String lastVerifiedIsoTime,
-    long parentDocsTotalEmbedding,
-    long parentDocsSettledEmbedding,
-    long parentDocsTotalSplade,
-    long parentDocsSettledSplade,
-    long parentDocsTotalNer,
-    long parentDocsSettledNer,
-    long chunkDocsTotal,
-    long chunkDocsSettled,
-    java.util.Map<String, Boolean> failedStages,
-    java.util.Map<String, Boolean> missingArtifactStages) {
+    @Nullable Long parentDocsTotalEmbedding,
+    @Nullable Long parentDocsSettledEmbedding,
+    @Nullable Long parentDocsTotalSplade,
+    @Nullable Long parentDocsSettledSplade,
+    @Nullable Long parentDocsTotalNer,
+    @Nullable Long parentDocsSettledNer,
+    @Nullable Long chunkDocsTotal,
+    @Nullable Long chunkDocsSettled,
+    @Nullable java.util.Map<String, Boolean> failedStages,
+    @Nullable java.util.Map<String, Boolean> missingArtifactStages) {
 
   public IndexedRootView {
     Objects.requireNonNull(pathHash, "pathHash");

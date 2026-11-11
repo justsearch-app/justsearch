@@ -46,11 +46,13 @@ final class IndexedRootViewSchemaTest {
         new JacksonModule(
             JacksonOption.RESPECT_JSONPROPERTY_ORDER,
             JacksonOption.RESPECT_JSONPROPERTY_REQUIRED);
-    SchemaGeneratorConfig config =
+    SchemaGeneratorConfigBuilder builder =
         new SchemaGeneratorConfigBuilder(SchemaVersion.DRAFT_2020_12, OptionPreset.PLAIN_JSON)
             .with(jacksonModule)
-            .with(com.github.victools.jsonschema.generator.Option.MAP_VALUES_AS_ADDITIONAL_PROPERTIES)
-            .build();
+            .with(com.github.victools.jsonschema.generator.Option.MAP_VALUES_AS_ADDITIONAL_PROPERTIES);
+    builder.forFields().withNullableCheck(field ->
+        field.getAnnotationConsideringFieldAndGetter(io.justsearch.agent.api.registry.Nullable.class) != null ? true : null);
+    SchemaGeneratorConfig config = builder.build();
     schemaGenerator = new SchemaGenerator(config);
     Path cursor = Path.of("").toAbsolutePath();
     while (cursor != null && !Files.isDirectory(cursor.resolve("SSOT/schemas"))) {
@@ -87,9 +89,9 @@ final class IndexedRootViewSchemaTest {
         }) {
       assertTrue(properties.has(field), "Baseline is missing coverage field " + field);
       assertEquals(
-          "integer",
-          properties.path(field).path("type").asString(),
-          field + " must be an integer on the wire");
+          MAPPER.readTree("[\"integer\",\"null\"]"),
+          properties.path(field).path("type"),
+          field + " must allow an unknown count on the wire");
     }
   }
 

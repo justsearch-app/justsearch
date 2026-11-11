@@ -16,6 +16,12 @@
  * Side-effect registers `<jf-health-surface>`.
  */
 
+import { getIndexedRoots, subscribeIndexedRoots } from '../state/indexedRoots.js';
+import { getStatusEpoch, subscribeStatusEpoch } from '../../api/statusInvalidation.js';
+import { subscribeProfileSwitch } from '../state/UserStateDocument.js';
+import { listTasks } from '../substrates/tasks/index.js';
+import { getSeenCursor, subscribeSeenCursor } from '../substrates/recall/recallCursor.js';
+import { projectSystemHealth, unresolvedHealthOperations, getHealthRemoteObservations, subscribeHealthObservations, healthObservationCurrent, HEAD_HEALTH_MAX_AGE_MS, REMOTE_HEALTH_MAX_AGE_MS } from '../state/systemHealth.js';
 import { activateOnKey } from '../utils/keyboardHandler.js';
 import { takeMemberTabIntent, subscribeMemberTab } from '../router/memberTabIntent.js';
 import { html, css, nothing, type TemplateResult } from 'lit';
@@ -51,6 +57,7 @@ import {
   subscribeAiState,
   hasLiveDocumentCount,
   getStatusReceivedAtMs,
+  getInferenceReceivedAtMs,
   type AiState,
   type StatusSnapshot,
   type InferenceSnapshot,
@@ -61,14 +68,14 @@ import {
 // Tempdoc 662 post-implementation: the connection-budget runtime-peak signal was
 // collected but shown nowhere — surfaced here alongside the other connection facts.
 import { getCurrentOpenChannelCount, getPeakOpenChannelCount } from '../state/liveChannelBudget.js';
-import { presentVerdict, type SystemHealthVerdict } from '../state/verdict.js';
+import { type SystemHealthVerdict } from '../state/verdict.js';
 import { formatRelativeMs } from '../../utils/relativeTime.js';
 import { noteHealthOnScreen, subscribeEngineLoss, engineLossReason, type EngineLoss } from '../state/engineLoss.js';
 import { engineLossAge } from '../components/EngineLoss.js';
 import { type Maybe, UNKNOWN } from '../state/known.js';
 import { unavailableBecause } from '../state/availability.js';
 import { readinessNotice, reasonFor } from '../state/readinessNotice.js';
-import { selectIndexingProgress } from '../state/indexingProgress.js';
+import { isWorkerReportedIndex, selectIndexingProgress } from '../state/indexingProgress.js';
 import '../components/IndexingControls.js';
 import {
   ENRICHMENT_BLOCKED_LABEL,
@@ -173,6 +180,8 @@ interface FailedJob {
 // component now owns the row rendering off the canonical wire shape.
 
 const NUM = new Intl.NumberFormat();
+// In memory for this window; tab replacement does not reset an expanded disclosure.
+let diagnosticsExpanded = false;
 
 function formatUptime(ms: number | undefined): string {
   if (ms == null || ms <= 0) return '—';
@@ -211,6 +220,7 @@ export class HealthSurface extends JfElement {
     error: { state: true },
     recommendedActions: { state: true },
     engineLoss: { state: true },
+    diagnosticsOpen: { state: true },
   };
 
   declare transitions: TransitionRecord[];
@@ -260,6 +270,18 @@ export class HealthSurface extends JfElement {
    */
   declare recommendedActions: Map<string, RecoveryAction>;
 
+  declare diagnosticsOpen: boolean;
+  private observationsUnsub: (() => void)[] = [];
+  private recoveryAtMs: number | null = null;
+  private recoveryFailed = false;
+  private recoveryStreamRevision = 0;
+  private recoveryRead: AbortController | null = null;
+  private failedRead: AbortController | null = null;
+  private failedAtMs: number | null = null;
+  private failedReadError = false;
+  private eventsAtMs: number | null = null;
+  private eventsConnected = false;
+  private pendingAiEngineFocus = false;
   private pollStatus: number | null = null;
   private unsubAi: (() => void) | null = null;
   /** S5c — while the engine is lost, Health shows its last known facts, each with its age. */
@@ -302,6 +324,7 @@ export class HealthSurface extends JfElement {
     this.bulkError = null;
     this.error = null;
     this.recommendedActions = new Map();
+    this.diagnosticsOpen = diagnosticsExpanded;
   }
 
   /**
@@ -314,28 +337,63 @@ export class HealthSurface extends JfElement {
     const controller = new AbortController();
     this.recoveryIndexStreamAbort = controller;
     this.recommendedActions = new Map();
-    // The initial REST request is a fallback until this connection receives SSE.
-    // Backend versions reset on restart, so precedence belongs to the connection.
-    let receivedStream = false;
-    const accept = (index: RecoveryIndexWire, fromStream: boolean): void => {
-      if (controller.signal.aborted || this.recoveryIndexStreamAbort !== controller) return;
-      if (!fromStream && receivedStream) return;
-      const actions = recoveryActions(index);
-      if (fromStream) receivedStream = true;
-      this.recommendedActions = actions;
+    this.recoveryAtMs = null; this.recoveryFailed = false;
+    this.recoveryStreamRevision = 0;
+    const epoch = getStatusEpoch();
+    const accept = (index: RecoveryIndexWire): void => {
+      if (controller.signal.aborted || this.recoveryIndexStreamAbort !== controller
+        || (epoch !== null && epoch !== getStatusEpoch())) return;
+      this.recommendedActions = recoveryActions(index);
+      this.recoveryAtMs = Date.now(); this.recoveryFailed = false;
+      this.recoveryStreamRevision++;
+      this.requestUpdate();
     };
-    void this.fetchRecoveryIndex(controller.signal, index => accept(index, false));
-    void this.startRecoveryIndexStream(controller.signal, index => accept(index, true));
+    void this.fetchRecoveryIndex();
+    void this.startRecoveryIndexStream(controller.signal, accept);
   }
 
-  private async fetchRecoveryIndex(signal: AbortSignal, accept: (index: RecoveryIndexWire) => void): Promise<void> {
+  private recoveryCurrent(): boolean {
+    return !this.recoveryFailed && healthObservationCurrent(this.recoveryAtMs, Date.now(), REMOTE_HEALTH_MAX_AGE_MS);
+  }
+
+  /** Bound includes the response body, even if a transport ignores cancellation. */
+  private async readHealthJson(path: string, signal: AbortSignal): Promise<unknown> {
+    let abandoned!: () => void;
+    const cancelled = new Promise<never>((_resolve, reject) => {
+      abandoned = () => reject(new DOMException('Health read abandoned', 'AbortError'));
+      signal.addEventListener('abort', abandoned, { once: true });
+      if (signal.aborted) abandoned();
+    });
     try {
-      const r = await this.doFetch('/api/condition-recovery-index', { signal });
-      if (!r.ok) return;
-      accept((await r.json()) as RecoveryIndexWire);
-    } catch {
-      // Silent failure — Quick Actions section still renders without the
-      // Recommended sub-section.
+      return await Promise.race([(async () => {
+        const response = await this.doFetch(path, { signal });
+        if (!response.ok) throw new Error(`Health observation unavailable (${response.status})`);
+        return response.json() as Promise<unknown>;
+      })(), cancelled]);
+    } finally { signal.removeEventListener('abort', abandoned); }
+  }
+
+  private async fetchRecoveryIndex(): Promise<void> {
+    if (this.recoveryRead) return;
+    const parent = this.recoveryIndexStreamAbort;
+    if (!parent || parent.signal.aborted) return;
+    const read = new AbortController(); this.recoveryRead = read;
+    const signal = AbortSignal.any([read.signal, parent.signal]);
+    const revision = this.recoveryStreamRevision;
+    const timer = setTimeout(() => read.abort(), 5_000);
+    const current = () => this.isConnected && this.recoveryIndexStreamAbort === parent && !parent.signal.aborted && revision === this.recoveryStreamRevision;
+    try {
+      const index = await this.readHealthJson('/api/condition-recovery-index', signal) as RecoveryIndexWire;
+      if (!Array.isArray(index.entries)) throw new Error('Recovery conditions unavailable');
+      if (current() && !signal.aborted) {
+        this.recommendedActions = recoveryActions(index);
+        this.recoveryAtMs = Date.now(); this.recoveryFailed = false;
+      }
+    } catch { if (current()) this.recoveryFailed = true; }
+    finally {
+      clearTimeout(timer);
+      if (this.recoveryRead === read) this.recoveryRead = null;
+      this.requestUpdate();
     }
   }
 
@@ -345,6 +403,27 @@ export class HealthSurface extends JfElement {
     :host {
       min-width: 0;
       max-width: 100%;
+    }
+    .health-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(8rem, 100%), 1fr)); gap: .75rem; margin: 0; }
+    .health-metrics dd { margin: .25rem 0 0; font-size: 1.2rem; overflow-wrap: anywhere; }
+    .health-rows { margin: 0; }
+    .health-row { display: grid; grid-template-columns: minmax(8rem, 1fr) minmax(0, 3fr); gap: 1rem; padding: .8rem 0; border-bottom: 1px solid var(--border-subtle); }
+    .health-row dt { font-weight: 600; }
+    .health-row dd { margin: 0; overflow-wrap: anywhere; }
+    .health-row p { margin: 0 0 .4rem; }
+    details { min-width: 0; margin-top: 1rem; }
+    summary { cursor: pointer; padding: .75rem 0; font-weight: 600; }
+    summary:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 2px; }
+    .diagnostic-currency { color: var(--text-secondary); }
+    @media (max-width: 35rem) {
+      .health-row { grid-template-columns: minmax(0, 1fr); gap: .4rem; }
+      .grid-2, .stats { grid-template-columns: minmax(0, 1fr); }
+      .header-left { flex-wrap: wrap; }
+      .data-row { flex-wrap: wrap; }
+      .body { padding: .75rem; }
+    }
+    @media (forced-colors: active) {
+      .health-row { border-color: CanvasText; }
     }
     .header {
       flex-wrap: wrap;
@@ -634,10 +713,14 @@ export class HealthSurface extends JfElement {
       this.verdict = s.verdict;
       this.provisional = s.stability.kind === 'provisional';
     });
+    this.observationsUnsub = [subscribeIndexedRoots(() => this.requestUpdate()),
+      subscribeHealthObservations(() => this.requestUpdate()), subscribeSeenCursor(() => this.requestUpdate()),
+      subscribeStatusEpoch(() => this.resetObservations()), subscribeProfileSwitch(() => this.resetObservations())];
+    document.addEventListener('visibilitychange', this.resumeHealth);
     noteHealthOnScreen(true);
-    this.unsubEngineLoss = subscribeEngineLoss((loss) => { this.engineLoss = loss; });
+    this.unsubEngineLoss = subscribeEngineLoss((loss) => { this.engineLoss = loss; if (!loss.lost && this.pendingAiEngineFocus) void this.focusAiEngine(); });
     // Ages move on while nothing else does.
-    this.engineLossClock = window.setInterval(() => { if (this.engineLoss?.lost) this.requestUpdate(); }, 1_000);
+    this.engineLossClock = window.setInterval(() => this.requestUpdate(), 1_000);
     void this.refreshTelemetry();
     this.telemetryTimer = window.setInterval(() => { if (this.autoRefresh) void this.refreshTelemetry(); }, 5000);
     this.sectionUnsub = subscribeMemberTab((hostId, section) => {
@@ -666,6 +749,11 @@ export class HealthSurface extends JfElement {
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
+    for (const stop of this.observationsUnsub) stop();
+    this.observationsUnsub = [];
+    document.removeEventListener('visibilitychange', this.resumeHealth);
+    this.failedRead?.abort(); this.failedRead = null;
+    this.recoveryRead?.abort(); this.recoveryRead = null;
     // Tempdoc 609 §R (P2) — stop polling on hide AND null the id, so a retained-then-reconnected Health
     // surface restarts cleanly rather than holding a stale (already-cleared) interval id.
     if (this.pollStatus !== null) {
@@ -700,13 +788,15 @@ export class HealthSurface extends JfElement {
   private startPolling(): void {
     if (this.pollStatus !== null) window.clearInterval(this.pollStatus);
     this.pollStatus = window.setInterval(() => {
-      if (this.autoRefresh) void this.refresh();
+      if (this.autoRefresh) { void this.refresh(); void this.fetchRecoveryIndex(); if (!this.eventsConnected) void this.startEventStream(); }
     }, 5000);
   }
 
   private async startEventStream(): Promise<void> {
     this.eventStreamAbort?.abort();
-    this.eventStreamAbort = new AbortController();
+    const controller = new AbortController(); this.eventStreamAbort = controller;
+    this.eventsConnected = false;
+    const current = () => this.isConnected && this.eventStreamAbort === controller && !controller.signal.aborted;
     try {
       // Tempdoc 511-followup-D: Javalin's SSE endpoint negotiates the
       // response content type from the request's Accept header. Without
@@ -717,16 +807,19 @@ export class HealthSurface extends JfElement {
       // probe (proxy + direct, with + without header); see tempdoc 511
       // §511-indirect Spike A.
       const res = await this.doFetch('/api/health/events/stream', {
-        signal: this.eventStreamAbort.signal,
+        signal: controller.signal,
         headers: { Accept: 'text/event-stream' },
       });
       if (!res.ok || !res.body) return;
+      if (!current()) return;
+      this.eventsConnected = true; this.requestUpdate();
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
       while (true) {
         const { done, value } = await reader.read();
-        if (done) break;
+        if (done || !current()) break;
+        this.eventsAtMs = Date.now();
         buffer += decoder.decode(value, { stream: true });
         buffer = parseSseBuffer(buffer, ({ data }) => {
           if (!data) return;
@@ -766,8 +859,10 @@ export class HealthSurface extends JfElement {
       }
     } catch (err) {
       if ((err as Error).name !== 'AbortError') {
-        // Stream interrupted; silently retry next refresh
+        // The last snapshot is retained with its own currency label.
       }
+    } finally {
+      if (this.eventStreamAbort === controller) { this.eventsConnected = false; this.requestUpdate(); }
     }
   }
 
@@ -847,49 +942,67 @@ export class HealthSurface extends JfElement {
       this.initialPollComplete = true;
       return;
     }
+    this.failedRead?.abort();
+    const read = new AbortController(); this.failedRead = read;
+    const timer = setTimeout(() => read.abort(), 5_000);
     this.loading = true;
     try {
-      const fj = await this.doFetch('/api/indexing/failed-jobs?limit=20').then((r) =>
-        r.ok ? r.json() : null,
-      );
-      if (fj?.jobs) this.failedJobs = fj.jobs as FailedJob[];
+      const fj = await this.readHealthJson('/api/indexing/failed-jobs?limit=20', read.signal) as { jobs?: FailedJob[] };
+      if (!Array.isArray(fj.jobs)) throw new Error('Failed-file observation unavailable');
+      if (this.isConnected && this.failedRead === read && !read.signal.aborted) {
+        this.failedJobs = fj.jobs; this.failedAtMs = Date.now(); this.failedReadError = false;
+      }
     } catch (err) {
-      if (!this.ownershipRefusal()) this.error = err instanceof Error ? err.message : String(err);
+      if (this.isConnected && this.failedRead === read) { this.failedReadError = true; this.error = err instanceof Error ? err.message : String(err); }
     } finally {
-      this.loading = false;
-      this.initialPollComplete = true;
+      clearTimeout(timer);
+      if (this.failedRead === read) { this.failedRead = null; this.loading = false; this.initialPollComplete = true; }
     }
   }
 
+  private readonly resumeHealth = (): void => { this.requestUpdate(); if (document.visibilityState !== 'hidden') { void this.refresh(); void this.fetchRecoveryIndex(); } };
+  private resetObservations(): void {
+    this.failedRead?.abort(); this.failedRead = null;
+    this.failedJobs = []; this.failedAtMs = null;
+    this.recoveryRead?.abort(); this.recoveryRead = null;
+    this.startRecoveryIndex();
+    this.events = []; this.eventsAtMs = null;
+    this.startEventStream();
+    void this.refresh();
+  }
+  private healthRows() {
+    return projectSystemHealth({ ai: this.aiState, statusAtMs: getStatusReceivedAtMs(), now: Date.now(),
+      roots: getIndexedRoots(), remote: getHealthRemoteObservations(), recoveryCurrent: this.recoveryCurrent(),
+      recoveryCount: this.recommendedActions.size, seenCursor: getSeenCursor(),
+      activeTasks: listTasks().filter(task => ['running', 'queued'].includes(task.status) && !task.operationKey && !task.id.startsWith('idxjob:')).map(task => task.label) });
+  }
+  private renderOverviewMetrics(): TemplateResult {
+    const progress = this.indexingProgress();
+    const current = this.aiState?.indexingStatusLive === true;
+    const metric = (label: string, value: string) => html`<div><dt>${label}</dt><dd>${value}</dd></div>`;
+    return html`<dl class="health-metrics" aria-label="System measurements">
+      ${metric('Files', current ? projectFact('core.files', this.aiState).value ?? '—' : '—')}
+      ${metric('Size', current ? projectFact('core.size', this.aiState).value ?? '—' : '—')}
+      ${metric('Memory', this.headCurrent() && this.status?.memoryUsedBytes != null ? projectFact('core.memory', this.aiState).value ?? '—' : '—')}
+      ${metric('Queue', current && progress.activity.confirmed ? formatCount(progress.jobsPending) : '—')}
+    </dl>`;
+  }
+  private headCurrent(): boolean {
+    return healthObservationCurrent(getStatusReceivedAtMs(), Date.now(), HEAD_HEALTH_MAX_AGE_MS);
+  }
+
+
 
   private renderHeader(): TemplateResult {
-    // Slice 456 §gap-fix: overall-health badge intentionally EXCLUDES the
-    // inference (AI) component — fresh installs have AI offline by design,
-    // and the React HealthView's overallHealth check matches this. Lifecycle
-    // state DEGRADED with reason 'inference.offline' is NOT a system fault.
-    // 595 §4.2 — the verdict is the ONE derived authority (computed in
-    // aiStateStore from stability + readiness); the header CONSUMES it, it does
-    // not recompute. HealthSurface layers only its LOCAL `attention` overlay
-    // (open recovery conditions) on top, and only when the system is otherwise
-    // green — so it can never re-introduce the header/footer split (§1.1).
-    const verdict = this.verdict;
-    const present = presentVerdict(verdict);
-    const hasOpenConditions = this.recommendedActions.size > 0;
-    const attention =
-      hasOpenConditions && (verdict.kind === 'operational' || verdict.kind === 'checking');
-    const activity = this.indexingProgress().activity;
-    const label = !activity.confirmed
-      ? verdict.kind === 'connecting' ? `${present.headline} — ${activity.summary}` : activity.summary
-      : attention ? 'Attention needed' : present.headline;
-    const tone = !activity.confirmed || attention ? 'warning' : present.tone;
+    const rows = this.healthRows();
+    const allFine = rows.every(row => row.status === '');
+    const meaningful = rows.find(row => row.status && !row.status.toLowerCase().includes('unconfirmed'));
+    const label = allFine ? 'Everything is working' : meaningful?.status ?? 'Checking system status';
     return html`
       <div class="header">
         <div class="header-left">
-          <h2>${icon({ name: 'server', size: 16 })} System Health</h2>
-          <jf-status-badge tone=${tone}>
-            <span class="dot"></span>
-            ${label}
-          </jf-status-badge>
+          <h2>Health</h2>
+          <p role="status">${label}</p>
         </div>
         <div style="display: flex; align-items: center; gap: 0.5rem">
           <label class="checkbox">
@@ -1004,7 +1117,8 @@ export class HealthSurface extends JfElement {
     // `size` now comes from projectFact('core.size'); only `docs` (tone) + `memUsed` (memRatio) numbers remain.
     const memUsed = this.status?.memoryUsedBytes ?? 0;
     const memMax = this.status?.memoryMaxBytes ?? 0;
-    const memRatio = memMax > 0 ? memUsed / memMax : 0;
+    const memoryKnown = this.headCurrent() && this.status?.memoryUsedBytes != null && memMax > 0;
+    const memRatio = memoryKnown ? memUsed / memMax : 0;
     // 813 §3b — the Queue card's number comes from the ONE indexing-progress projection, the same
     // authority `queueSubLabel` reads, so the card's value and its sub-text cannot disagree.
     const progress = selectIndexingProgress(
@@ -1015,22 +1129,22 @@ export class HealthSurface extends JfElement {
     );
     const queue = progress.jobsPending;
     const memColor = memRatio > 0.9 ? 'red' : memRatio > 0.8 ? 'amber' : 'green';
-    const memDot = memRatio > 0.9 ? 'error' : memRatio > 0.8 ? 'warning' : 'healthy';
+    const memDot = !memoryKnown ? 'neutral' : memRatio > 0.9 ? 'error' : memRatio > 0.8 ? 'warning' : 'healthy';
     // §2.B: when no status has arrived, the honest value is "—" (unknown),
     // never a confident "0" (the zero-as-unknown defect). B7: status comes from
     // the shared store, so its presence is the have-data signal.
-    const known = this.status != null;
+    const known = this.headCurrent();
     // 594 §17.2 — Files/Size/Memory VALUES derive from the ONE value authority (projectFact);
     // `?? '—'` preserves the unknown→"—" tri-state. `formatBytes` (the shared util) still formats the
     // non-fact memMax sub + GPU VRAM. The raw numbers above stay for tone/sub logic.
     const filesVal = projectFact('core.files', this.aiState).value ?? '—';
     const sizeVal = projectFact('core.size', this.aiState).value ?? '—';
-    const memVal = projectFact('core.memory', this.aiState).value ?? '—';
+    const memVal = memoryKnown ? projectFact('core.memory', this.aiState).value ?? '—' : '—';
     // 595 §4.3 — worker-sourced stats (Files/Size/Queue) are PROVISIONAL during a transition (the
     // worker fallback reports 0, which must not render as a settled count); show "…" while provisional.
     // Memory is Head-process state (not worker-dependent), so it uses memVal directly, unaffected.
     const wkr = (formatted: string): string =>
-      this.provisional ? '…' : known ? formatted : '—';
+      this.provisional ? '…' : this.aiState?.indexingStatusLive ? formatted : '—';
     // 595 §15.3 (E2) — Files/Size keep showing the last SETTLED value (dimmed) during a provisional
     // window instead of collapsing to '…', so a healthy rebuild stops reading as data loss. Falls back
     // to '…' only before any settled poll. Queue has no meaningful last-settled, so it keeps `wkr`.
@@ -1051,7 +1165,7 @@ export class HealthSurface extends JfElement {
     const statsBody = activeBodyFor(HEALTH_STATS_REGION);
     if (statsBody) {
       const metrics = [
-        { label: 'Files', value: filesDisp, icon: 'file-text', tone: !this.provisional && known && docs > 0 ? 'success' : 'neutral', sub: lastKnownFiles ? 'Last known' : undefined },
+        { label: 'Files', value: filesDisp, icon: 'file-text', tone: !this.provisional && this.aiState?.indexingStatusLive && docs > 0 ? 'success' : 'neutral', sub: lastKnownFiles ? 'Last known' : undefined },
         { label: 'Size', value: sizeDisp, icon: 'database', tone: 'neutral', sub: lastKnownSize ? 'Last known' : undefined },
         { label: 'Memory', value: memVal, icon: 'memory-stick', tone: memDot === 'healthy' ? 'success' : memDot, sub: memMax > 0 ? `of ${formatBytes(memMax)}` : undefined },
         { label: 'Queue', value: wkr(NUM.format(queue)), icon: 'zap', tone: progress.activity.confirmed && !this.provisional && queue > 0 ? 'warning' : 'neutral', sub: this.queueSubLabel(queue, known) },
@@ -1074,7 +1188,7 @@ export class HealthSurface extends JfElement {
               <span class="card-icon-box teal">${icon({ name: 'file-text', size: 14 })}</span>
               <span class="card-label">Files</span>
             </div>
-            <jf-status-dot tone=${!this.provisional && known && docs > 0 ? 'success' : 'neutral'}></jf-status-dot>
+            <jf-status-dot tone=${!this.provisional && this.aiState?.indexingStatusLive && docs > 0 ? 'success' : 'neutral'}></jf-status-dot>
           </div>
           <div class="card-value" title=${lastKnownFiles ? 'Last known — updating' : nothing}>${filesDisp}</div>
           ${lastKnownFiles ? html`<div class="card-sub">Last known</div>` : nothing}
@@ -1101,7 +1215,7 @@ export class HealthSurface extends JfElement {
             <jf-status-dot tone=${memDot === 'healthy' ? 'success' : memDot}></jf-status-dot>
           </div>
           <div class="card-value">${memVal}</div>
-          ${memMax > 0
+          ${memoryKnown
             ? html`
                 <div class="card-sub">of ${formatBytes(memMax)}</div>
                 <div class="progress">
@@ -1136,13 +1250,13 @@ export class HealthSurface extends JfElement {
   private renderConnection(): TemplateResult {
     // (observations.md `#270`) Pre-first-poll renders 'connecting…' instead of
     // 'disconnected' so the surface doesn't lie about the boot state.
-    const apiStatus = this.status
+    const apiStatus = this.headCurrent() ? this.status
       ? this.connPhase === 'stale'
         ? 'reconnecting…'
         : 'connected'
       : this.connPhase === 'connecting'
         ? 'connecting…'
-        : 'disconnected';
+        : 'disconnected' : 'Status unconfirmed';
     const progress = this.indexingProgress();
     const activity = progress.activity;
     const indexState = [activity.summary, activity.detail].filter(Boolean).join(' — ');
@@ -1247,23 +1361,20 @@ export class HealthSurface extends JfElement {
                 : 'Unknown'}${confirmed ? '' : ' (last observed)'}</span
           >
         </div>
-        <div class="data-row">
-          <span class="key">Last backup</span>
-          <span class="val" style="color: var(--text-secondary)">Not configured</span>
-        </div>
-        <div class="data-row">
-          <span class="key">Integrity check</span>
-          <span class="val" style="color: var(--text-secondary)">—</span>
-        </div>
+
       </div>
     `;
   }
 
   private async focusAiEngine(): Promise<void> {
+    this.pendingAiEngineFocus = true;
+    if (this.engineLoss?.lost) return;
+    this.diagnosticsOpen = true; diagnosticsExpanded = true;
     await this.updateComplete;
     const section = this.shadowRoot?.querySelector<HTMLElement>('#ai-engine');
     section?.scrollIntoView?.({ block: 'start' });
     section?.focus({ preventScroll: true });
+    if (section) this.pendingAiEngineFocus = false;
   }
 
   private async refreshTelemetry(): Promise<void> {
@@ -1511,7 +1622,8 @@ export class HealthSurface extends JfElement {
 
   private renderAiEngine(): TemplateResult | typeof nothing {
     if (!this.inference) return html`<section id="ai-engine" tabindex="-1" class="card section"><h3>AI Engine</h3><p>Engine status unavailable.</p>${this.renderTransitionTimeline()}${this.renderTraceExplorer()}</section>`;
-    const mode = this.aiState?.runtime?.mode ?? this.inference.mode ?? 'unknown';
+    const inferenceCurrent = healthObservationCurrent(getInferenceReceivedAtMs(), Date.now(), 10_000);
+    const mode = this.headCurrent() && inferenceCurrent ? this.aiState?.runtime?.mode ?? this.inference.mode ?? 'unknown' : 'Status unconfirmed';
     const isOnline = mode === 'online';
     const failure = this.aiState?.chatFailureReason ?? null;
     const progress = this.indexingProgress();
@@ -1537,6 +1649,7 @@ export class HealthSurface extends JfElement {
           <span style="font-size: var(--font-size-sm)"
             >${isOnline
               ? 'Online'
+              : mode === 'Status unconfirmed' ? 'Last observed AI state — current status unconfirmed'
               : mode === 'transitioning'
                 ? 'Starting…'
                 : // Spec A step 7 (F1): a failed chat says why, in the readiness notice's words.
@@ -1547,7 +1660,7 @@ export class HealthSurface extends JfElement {
         </div>
         <p data-testid="health-ai-indexing-activity">${activity.summary}${activity.detail ? ` — ${activity.detail}` : ''}</p>
         <div
-          style="display: grid; grid-template-columns: max-content 1fr max-content 1fr; gap: 0.375rem 1rem; margin-top: 0.5rem; font-size: var(--font-size-sm)"
+          style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0.375rem 1rem; margin-top: 0.5rem; font-size: var(--font-size-sm)"
         >
           <span class="key" style="color: var(--text-secondary)">${activity.confirmed ? 'Embed queue' : 'Last observed embed queue'}</span>
           <span class="val" style="font-family: monospace; text-align: right"
@@ -1640,6 +1753,7 @@ export class HealthSurface extends JfElement {
     const color = ratio > 0.9 ? 'red' : ratio > 0.75 ? 'amber' : 'green';
     return html`
       <div class="card section">
+        ${!this.headCurrent() ? html`<p>Last observed graphics-card data — current status unconfirmed.</p>` : nothing}
         <h3>${icon({ name: 'cpu', size: 12 })} GPU
           <span
             style="float:right; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-weight: 500; ${gpu.available
@@ -1699,7 +1813,7 @@ export class HealthSurface extends JfElement {
                 : nothing}
             `
           : html`<div class="empty" style="padding: 0.5rem 0">
-              No GPU detected. Inference runs on CPU.
+              Graphics-card telemetry unavailable; CPU-only operation is not established by this probe.
             </div>`}
       </div>
     `;
@@ -1716,7 +1830,7 @@ export class HealthSurface extends JfElement {
   private renderAtRest(): TemplateResult | typeof nothing {
     // 629 remaining-work: the card markup now lives in the shared `renderAtRestCard` so the Security &
     // Privacy surface renders the identical card. HealthSurface's own `.card`/`.data-row` styles cover it.
-    return renderAtRestCard(this.status);
+    return html`${!this.headCurrent() ? html`<p>Data protection: last observed; current status unconfirmed.</p>` : nothing}${renderAtRestCard(this.status)}`;
   }
 
   /**
@@ -1730,34 +1844,10 @@ export class HealthSurface extends JfElement {
   private renderRecommendedActions(): TemplateResult {
     const refusal = this.ownershipRefusal();
     if (refusal) return html`<div class="card section recommended"><h3>${refusal.headline}</h3><p>${refusal.body}</p></div>`;
-    // 595 §4.2 — the footer rollup CONSUMES the same one verdict the header does,
-    // so the two can no longer disagree on a boundary value (the §1.1 split: a
-    // 'Service degraded' header beside a '✓ Up to date' footer). The
-    // verdict already encodes connecting / transitioning / checking / degraded /
-    // unreachable; the footer only adds the green "✓" affordance for operational.
-    const progress = this.indexingProgress();
-    const activity = progress.activity;
-    const indexingSummary = html`<p data-testid="health-indexing-summary">${activity.summary}${activity.detail ? ` — ${activity.detail}` : ''}</p>`;
-    if (this.recommendedActions.size === 0) {
-      const v = this.verdict;
-      if (v.kind === 'operational' && activity.confirmed) {
-        return html`
-          <div class="card section recommended all-healthy">
-            <h3>✓ ${progress.phase === 'ready' ? 'Up to date' : 'Search available'}</h3>
-            <p>No recoverable conditions active.</p>
-            ${indexingSummary}
-          </div>
-        `;
-      }
-      const present = presentVerdict(v);
-      return html`
-        <div class="card section recommended">
-          <h3>${v.kind === 'operational' && !activity.confirmed ? activity.summary : present.headline}</h3>
-          <p>${present.body}</p>
-          ${indexingSummary}
-        </div>
-      `;
-    }
+    const indexingSummary = nothing;
+    if (!this.recoveryCurrent()) return html`<section class="recommended"><h3>Recovery conditions unconfirmed</h3>
+      ${this.recommendedActions.size ? html`<p>Last observed: ${this.recommendedActions.size} recoverable conditions. Checking before offering actions.</p>` : nothing}</section>`;
+    if (this.recommendedActions.size === 0) return html`${nothing}`;
     const entries = Array.from(this.recommendedActions.entries()).sort(
       ([a], [b]) => a.localeCompare(b),
     );
@@ -1886,9 +1976,11 @@ export class HealthSurface extends JfElement {
   }
 
   private renderFailed(): TemplateResult | typeof nothing {
-    if (this.failedJobs.length === 0) return nothing;
+    const current = !this.failedReadError && healthObservationCurrent(this.failedAtMs, Date.now(), REMOTE_HEALTH_MAX_AGE_MS);
+    if (this.failedJobs.length === 0) return current ? nothing : html`<section class="card section"><h3>Failed files</h3><p>Failed-file status unconfirmed.</p></section>`;
     return html`
       <div class="card section">
+        ${!current ? html`<p>Last observed failures — current status unconfirmed.</p>` : nothing}
         <h3>
           ${icon({ name: 'alert-circle', size: 12 })} Failed files
           (${this.failedJobs.length})
@@ -1910,13 +2002,14 @@ export class HealthSurface extends JfElement {
       return html`
         <div class="card section">
           <h3>Recent events</h3>
-          <div class="empty">No events yet.</div>
+          <div class="empty">${this.eventsConnected && this.eventsAtMs != null ? 'No events yet.' : 'Event history unconfirmed.'}</div>
         </div>
       `;
     }
     return html`
       <div class="card section">
         <h3>Recent events</h3>
+        ${!this.eventsConnected || !healthObservationCurrent(this.eventsAtMs, Date.now(), REMOTE_HEALTH_MAX_AGE_MS) ? html`<p>Last observed events — current stream unconfirmed.</p>` : nothing}
         <div class="events-list">
           ${this.events
             .slice(-30)
@@ -1953,22 +2046,33 @@ export class HealthSurface extends JfElement {
     };
     const ai = this.aiState;
     const core = ai?.status?.worker?.core;
-    // Each fact is dated by its own observation: these come from the held status body.
+    // Each fact is dated by its own observation: these come from the held status body, received then.
     const observed = getStatusReceivedAtMs();
-    const count = core?.ownSearchableDocuments ?? core?.searchableDocuments;
+    // A response can carry an older worker sample. Its age is stated beside the receipt, never instead.
+    const sampledAt = ai?.status?.meta?.workerRpcAtMs;
+    const frozen = observed != null && sampledAt != null && (ai?.status?.meta?.workerRpcStale === true
+      || observed - sampledAt > (ai?.status?.operating?.freshness?.staleAfterMs ?? 30_000));
+    const sample = frozen ? `sampled by the engine ${engineLossAge(sampledAt, now) ?? ''}`.trim() : undefined;
+    // A fallback block's zeros are absence, and an uncounted index is no count (never an observed zero).
+    const fallbackZero = (value: number | null | undefined) => value === 0 && !isWorkerReportedIndex(ai?.status);
+    const countObservations = ai?.status?.worker?.countObservations;
+    const rawCount = core?.ownSearchableDocuments ?? core?.searchableDocuments;
+    const count = rawCount == null || rawCount < 0 || core?.indexedDocumentsUnknown || fallbackZero(rawCount)
+      || countObservations?.searchable?.state === 'unknown' || countObservations?.active?.state === 'unknown' ? null : rawCount;
+    const pending = core?.pendingJobs == null || fallbackZero(core.pendingJobs) ? null : core.pendingJobs;
     const reason = engineLossReason(loss);
     const supervisorWords: Record<string, string> = {
       starting: 'Starting', running: 'Running', stopping: 'Stopping', restarting: 'Restarting',
       exhausted: 'Stopped after repeated failures', stopped: 'Stopped',
     };
-    const facts: { label: string; value: string; when: string }[] = [
+    const facts: { label: string; value: string; when: string; sample?: string }[] = [
       { label: 'Engine', value: loss.action.kind === 'restarting' ? 'Restarting' : loss.cause === 'not-ready' ? 'Not ready' : 'Can’t be reached', when: `last connected ${engineLossAge(ai?.connection.lastContactMs ?? null, now) ?? 'never'}` },
       ...(loss.supervisor ? [{ label: 'Engine process', value: supervisorWords[loss.supervisor.state] ?? loss.supervisor.state,
         when: `reported ${engineLossAge(loss.supervisorAtMs, now) ?? ''}`.trim() }] : []),
       ...(loss.supervisor?.notReady ? [{ label: 'Engine said', value: loss.supervisor.notReady, when: `reported ${engineLossAge(loss.supervisorAtMs, now) ?? ''}`.trim() }] : []),
-      { label: 'Index', value: core?.indexState ? core.indexState.charAt(0) + core.indexState.slice(1).toLowerCase().replaceAll('_', ' ') : 'Unknown', when: seen(core?.indexState ? observed : null) },
-      { label: 'Searchable files', value: count == null ? 'Unknown' : NUM.format(count), when: seen(count == null ? null : observed) },
-      { label: 'Files waiting', value: core?.pendingJobs == null ? 'Unknown' : NUM.format(core.pendingJobs), when: seen(core?.pendingJobs == null ? null : observed) },
+      { label: 'Index', value: core?.indexState ? core.indexState.charAt(0) + core.indexState.slice(1).toLowerCase().replaceAll('_', ' ') : 'Unknown', when: seen(core?.indexState ? observed : null), sample: core?.indexState ? sample : undefined },
+      { label: 'Searchable files', value: count == null ? 'Unknown' : NUM.format(count), when: seen(count == null ? null : observed), sample: count == null ? undefined : sample },
+      { label: 'Files waiting', value: pending == null ? 'Unknown' : NUM.format(pending), when: seen(pending == null ? null : observed), sample: pending == null ? undefined : sample },
     ];
     return html`
       <div class="header">
@@ -1983,7 +2087,7 @@ export class HealthSurface extends JfElement {
           <p>${reason ? `${reason} ` : ''}These are the last facts JustSearch saw, each with when it saw them. Nothing here is live.</p>
           ${facts.map(fact => html`<div class="data-row" data-fact=${fact.label}>
             <span class="key">${fact.label}</span>
-            <span class="val">${fact.value} <span class="when">· ${fact.when}</span></span>
+            <span class="val">${fact.value} <span class="when">· ${fact.when}</span>${fact.sample ? html` <span class="sample">· ${fact.sample}</span>` : nothing}</span>
           </div>`)}
         </div>
       </div>
@@ -2012,7 +2116,20 @@ export class HealthSurface extends JfElement {
           : nothing}
         <!-- 578 Workstream A — the live "Now" strip (what's running right now), folded in above the
              snapshot. Reuses <jf-system-self-view> in compact mode; no own heading. -->
-        <jf-system-self-view variant="strip" api-base=${this.apiBase}></jf-system-self-view>
+        ${this.renderOverviewMetrics()}
+        <dl class="health-rows" aria-label="System health">
+          ${this.healthRows().map(row => html`<div class="health-row" data-health-row=${row.id}>
+            <dt>${row.label}</dt><dd>${row.status ? html`<p>${row.status}</p><jf-button label=${row.action}
+              .onActivate=${() => this.dispatchEvent(new CustomEvent('navigate-with-context', { detail: { surfaceId: row.destination }, bubbles: true, composed: true }))}>${row.action}</jf-button>` : nothing}</dd>
+          </div>`)}
+        </dl>
+        ${this.renderRecommendedActions()}
+        ${unresolvedHealthOperations(getHealthRemoteObservations().operations, getSeenCursor()).map(operation => html`<section class="card section" aria-label=${operation.label}>
+          <h3>${operation.label}</h3><p>${operation.fresh ? operation.outcome?.message ?? operation.outcome?.phase ?? operation.outcome?.state ?? 'Outcome unconfirmed' : 'Last observed — outcome unconfirmed'}</p>
+        </section>`)}
+        <details .open=${this.diagnosticsOpen} @toggle=${(event: Event) => { this.diagnosticsOpen = (event.target as HTMLDetailsElement).open; diagnosticsExpanded = this.diagnosticsOpen; }}>
+          <summary>Diagnostics</summary>
+          ${!this.headCurrent() || !this.aiState?.indexingStatusLive ? html`<p class="diagnostic-currency">Diagnostic values are last observed; current status is unconfirmed.</p>` : nothing}
         ${this.renderStats()}
         <!-- Tempdoc 596 §16.5 — "what can I do right now": every capability affordance's availability +
              its inline remedy, projected from the same authority the live controls read. -->
@@ -2021,15 +2138,15 @@ export class HealthSurface extends JfElement {
         <div class="grid-2">${this.renderQueueDb()} ${this.renderAiEngine()}</div>
         <div class="grid-2">${this.renderAtRest()}</div>
         ${this.renderFailed()}
-        ${this.renderRecommendedActions()}
         ${this.renderActions()}
+        ${this.renderEvents()}
+        </details>
         ${this.bulkError ? html`<jf-error-alert tone="error" .onDismiss=${() => (this.bulkError = null)}>
           ${this.bulkError.message}
           ${this.bulkError.errorCode && !this.bulkError.message.endsWith(` (Code: ${this.bulkError.errorCode})`) ? html`<small style="display: block">Code: ${this.bulkError.errorCode}</small>` : nothing}
         </jf-error-alert>` : nothing}
         ${this.bulkOutcomeKey ? html`<jf-operation-outcome-detail
           operation-key=${this.bulkOutcomeKey} api-base=${this.apiBase}></jf-operation-outcome-detail>` : nothing}
-        ${this.renderEvents()}
       </div>
     `;
   }

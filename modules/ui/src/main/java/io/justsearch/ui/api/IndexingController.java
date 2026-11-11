@@ -895,7 +895,7 @@ public class IndexingController {
                     }
                     // Per-folder job counts are CHEAP (a SQLite GROUP BY on the worker) — always
                     // returned so the row's truthful state derives from job drain (tempdoc 599 §9.2).
-                    IndexingService.JobCounts jobCounts = IndexingService.JobCounts.zero();
+                    IndexingService.JobCounts jobCounts = null;
                     try {
                       jobCounts = indexing.countJobsByPathPrefix(root.path(), RequestEngineContext.get(ctx));
                     } catch (Exception e) {
@@ -927,8 +927,8 @@ public class IndexingController {
                     m.put("lastIndexedIsoTime", lastIndexedIsoTime);
                     m.put("status", status);
                     m.put("walkError", walkError);
-                    m.put("inFlightCount", jobCounts.inFlight());
-                    m.put("failedCount", jobCounts.failed());
+                    m.put("inFlightCount", jobCounts == null ? null : jobCounts.inFlight());
+                    m.put("failedCount", jobCounts == null ? null : jobCounts.failed());
                     // Tempdoc 599 Fix 1 — distinguishes "walked, nothing to index" (empty) from
                     // "walk in progress / never walked" (scanning) on the FE seam.
                     m.put("walkCompleted", root.walkCompleted());
@@ -949,17 +949,17 @@ public class IndexingController {
                     // totals exclude chunk docs; the chunk tier is its own denominator.
                     // Each parent stage carries its OWN denominator: a doc without that stage's
                     // status field is outside the stage (post-798), never a permanent deficit.
-                    IndexingService.RootCoverage coverage = jobCounts.coverage();
-                    m.put("parentDocsTotalEmbedding", coverage.parentDocsTotalEmbedding());
-                    m.put("parentDocsSettledEmbedding", coverage.parentDocsSettledEmbedding());
-                    m.put("parentDocsTotalSplade", coverage.parentDocsTotalSplade());
-                    m.put("parentDocsSettledSplade", coverage.parentDocsSettledSplade());
-                    m.put("parentDocsTotalNer", coverage.parentDocsTotalNer());
-                    m.put("parentDocsSettledNer", coverage.parentDocsSettledNer());
-                    m.put("chunkDocsTotal", coverage.chunkDocsTotal());
-                    m.put("chunkDocsSettled", coverage.chunkDocsSettled());
-                    m.put("failedStages", coverage.failedStages());
-                    m.put("missingArtifactStages", coverage.missingArtifactStages());
+                    IndexingService.RootCoverage coverage = jobCounts == null ? null : jobCounts.coverage();
+                    m.put("parentDocsTotalEmbedding", coverage == null ? null : coverage.parentDocsTotalEmbedding());
+                    m.put("parentDocsSettledEmbedding", coverage == null ? null : coverage.parentDocsSettledEmbedding());
+                    m.put("parentDocsTotalSplade", coverage == null ? null : coverage.parentDocsTotalSplade());
+                    m.put("parentDocsSettledSplade", coverage == null ? null : coverage.parentDocsSettledSplade());
+                    m.put("parentDocsTotalNer", coverage == null ? null : coverage.parentDocsTotalNer());
+                    m.put("parentDocsSettledNer", coverage == null ? null : coverage.parentDocsSettledNer());
+                    m.put("chunkDocsTotal", coverage == null ? null : coverage.chunkDocsTotal());
+                    m.put("chunkDocsSettled", coverage == null ? null : coverage.chunkDocsSettled());
+                    m.put("failedStages", coverage == null ? null : coverage.failedStages());
+                    m.put("missingArtifactStages", coverage == null ? null : coverage.missingArtifactStages());
                     return m;
                   })
               .toList();

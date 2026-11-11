@@ -1,0 +1,76 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
+  },
+  "createdAt": "2026-11-11T13:29:01.342Z",
+  "revision": "716017c61f87ff6bfbae502b5fa5f06d777f5246",
+  "tree": "83605275a884203fc91cf447e9ee6cd17bcf3bfc",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/StatusPill.notices.test.ts\" \"src/shell-v0/components/indexingSurfaceSweep.test.ts\" \"src/shell-v0/views/HealthSurface.truthfulness.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/ajttfihz/tmp/test-intent-vitest-88106-1794403735965.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 5375
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#an operation ending across a detach is silent",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:92e7df09acf28879df163e9c75e15283af48d9f8982fc63e559777fe84ac6d0b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "C6 work ending across a gap in observation an operation ending across a detach is silent",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/indexingSurfaceSweep.test.ts#S33.4 SH8 Health rows keep each hold explanation and withhold fine claims for all unconfirmed observations",
+      "file": "modules/ui-web/src/shell-v0/components/indexingSurfaceSweep.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:553320f0e78c11bee73e788e8b3df92eccd31b1a5f4170885ab383d2847c0173",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.3 complete surface sweep S33.4 SH8 Health rows keep each hold explanation and withhold fine claims for all unconfirmed observations",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HealthSurface.truthfulness.test.ts#learning the engine's identity for the first time is not a restart: the remedy stays",
+      "file": "modules/ui-web/src/shell-v0/views/HealthSurface.truthfulness.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5d0f078e792feca8c9e735df521882341f074b136f605baae5ed95229174e330",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "late and retired reads learning the engine's identity for the first time is not a restart: the remedy stays",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:fba5ee220f3118202197e263dcde0199fd5289737b607e5f639cf4096312bc29"
+}

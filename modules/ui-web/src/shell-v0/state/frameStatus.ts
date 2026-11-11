@@ -104,7 +104,9 @@ interface PendingStatusAuthorization {
 export interface DurableStatusOperation {
   readonly id: string; readonly label: string; readonly outcome: OperationOutcomeView | null;
   readonly invocationTaskId?: string;
+  readonly operationId?: string;
   readonly fresh?: boolean;
+  readonly observedAtMs?: number;
 }
 interface FrameStatusInput {
   readonly gettingStarted?: { readonly visible: boolean; readonly known: boolean; readonly currentStep: number };
@@ -528,7 +530,7 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
     const outcome = operation.outcome;
     const gaps = outcome?.phase === 'awaiting_acceptance';
     add({ id: `operation:${operation.id}`, section: gaps ? 'needs' : outcome?.state === 'failed' ? 'problems'
-      : outcome?.state === 'complete' ? 'earlier' : 'running', title: operation.label,
+      : outcome?.state === 'complete' || outcome?.state === 'expired' ? 'earlier' : outcome?.state === 'unknown' ? 'problems' : 'running', title: operation.label,
     detail: gaps ? 'Completed with gaps — review before continuing.' : outcome?.message ?? (outcome ? OPERATION_STATE_WORDS[outcome.state] ?? undefined : 'Last seen running · checking'),
     tone: gaps ? 'warning' : outcome?.state === 'failed' ? 'failure' : outcome?.state === 'complete' ? 'success' : 'neutral',
     stale: operation.fresh === false || !outcome || ['unknown', 'expired'].includes(outcome.state),

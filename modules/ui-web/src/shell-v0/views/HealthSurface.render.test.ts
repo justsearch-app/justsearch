@@ -36,6 +36,29 @@ function teardown(el: HealthSurface): void {
   el.remove();
 }
 
+/** The page summary and one row's status, as Health's overview renders them. */
+const headline = (el: HealthSurface) => el.shadowRoot?.querySelector('.header [role="status"]')?.textContent ?? '';
+/** Everything Health shows outside its collapsed Diagnostics disclosure. */
+const overview = (el: HealthSurface) => [...(el.shadowRoot?.querySelector('.body')?.children ?? [])]
+  .filter(node => node.localName !== 'details').map(node => node.textContent).join(' ') + headline(el);
+const rowStatus = (el: HealthSurface, id: string) => el.shadowRoot?.querySelector(`[data-health-row="${id}"] dd`)?.textContent?.trim() ?? '';
+
+/** Mounts Health with remedies that arrive through its recovery-index read, the only current authority for them. */
+async function mountWithRemedies(entries: Array<[string, string]>): Promise<HealthSurface> {
+  const index = { entries: entries.map(([key, target]) => {
+    const [conditionId, subject] = key.split('|');
+    return { target, conditions: [{ conditionId, subject, defaultArgsJson: '{}' }] };
+  }) };
+  vi.mocked(fetch).mockImplementation(async (path) => String(path).endsWith('/api/condition-recovery-index')
+    ? Response.json(index) : new Response('{}', { headers: { 'Content-Type': 'application/json' } }));
+  const el = document.createElement('jf-health-surface') as HealthSurface;
+  el.host_ = { data: { fetch: (path: string, init?: RequestInit) => fetch(path, init) } } as unknown as HealthSurface['host_'];
+  document.body.appendChild(el);
+  await vi.waitFor(() => expect(el.recommendedActions.size).toBe(entries.length));
+  await el.updateComplete;
+  return el;
+}
+
 describe('HealthSurface — recommendedActions panel', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
@@ -188,13 +211,14 @@ describe('HealthSurface — recommendedActions panel', () => {
     expect(text).toContain('Offline');
   });
 
-  it('renders "All healthy" when recommendedActions is empty and the verdict is operational', async () => {
+  it('SH2: no recovery conditions alone never claims health while other rows are unconfirmed', async () => {
     feedReady();
     const el = await mount();
     try {
-      const section = el.shadowRoot?.querySelector('.card.section.recommended');
-      expect(section).not.toBeNull();
-      expect(section?.textContent).toContain('Up to date');
+      expect(overview(el)).not.toContain('Up to date');
+      expect(el.shadowRoot?.textContent).not.toContain('No recoverable conditions active');
+      expect(headline(el)).not.toContain('Everything is working');
+      expect(rowStatus(el, 'engine')).not.toBe('');
     } finally {
       teardown(el);
     }
@@ -232,7 +256,7 @@ describe('HealthSurface — recommendedActions panel', () => {
     }
   });
 
-  it('595 §1.1: header and footer agree on the unknown boundary — both "Checking…", NEVER a split', async () => {
+  it('595 §1.1 SH1: headline and Index row agree on the unknown boundary — both "Checking…", NEVER a split', async () => {
     // retrieval 'unknown' (settled) was the boundary where the header alarmed
     // ("Service degraded") while the footer greened ("✓ Up to date").
     // With one verdict, both must read the SAME non-green, non-alarming "Checking…".
@@ -250,19 +274,17 @@ describe('HealthSurface — recommendedActions panel', () => {
     __tickClockForTest();
     const el = await mount();
     try {
-      const badge = el.shadowRoot?.querySelector('.header jf-status-badge');
-      const footer = el.shadowRoot?.querySelector('.card.section.recommended');
-      expect(badge?.textContent).toContain('Checking');
-      expect(footer?.textContent).toContain('Checking');
-      // The contradiction must be GONE on both surfaces.
-      expect(badge?.textContent).not.toContain('Service degraded');
-      expect(footer?.textContent).not.toContain('Up to date');
+      // One summary, derived from the rows: the Index row and the headline both read Checking.
+      expect(rowStatus(el, 'index')).toContain('Checking');
+      expect(headline(el)).toContain('Checking');
+      expect(headline(el)).not.toContain('Service degraded');
+      expect(overview(el)).not.toContain('Up to date');
     } finally {
       teardown(el);
     }
   });
 
-  it('595 §10.3: a cosmetic degradation (LambdaMART) reads calm on both surfaces (not an alarm)', async () => {
+  it('595 §10.3: a cosmetic degradation (LambdaMART) reads calm in the Index row and headline (not an alarm)', async () => {
     feedReady({
       readiness: {
         composites: {
@@ -273,36 +295,33 @@ describe('HealthSurface — recommendedActions panel', () => {
     });
     const el = await mount();
     try {
-      const badge = el.shadowRoot?.querySelector('.header jf-status-badge');
-      expect(badge?.textContent).toContain('Reduced capability');
-      expect(badge?.getAttribute('tone')).toBe('info'); // calm, not 'warning'
-      const footer = el.shadowRoot?.querySelector('.card.section.recommended');
-      expect(footer?.textContent).toContain('Reduced capability');
+      expect(rowStatus(el, 'index')).toContain('Reduced capability');
+      expect(headline(el)).toContain('Reduced capability');
+      // Calm, not an alarm.
+      expect(headline(el)).not.toMatch(/degraded|attention/i);
     } finally {
       teardown(el);
     }
   });
 
-  it('§2.C: shows "Connecting…" (not all-operational) before health data arrives', async () => {
+  it('§2.C SH1: every row is checking (not all-operational) before health data arrives', async () => {
     const el = await mount();
     try {
       // Fresh mount, no poll completed → must NOT fail-open to "operational".
-      const section = el.shadowRoot?.querySelector('.card.section.recommended');
-      expect(section?.textContent).toContain('Connecting');
-      expect(section?.textContent).not.toContain('Up to date');
+      for (const id of ['engine', 'folders', 'index', 'models', 'gpu', 'work']) expect(rowStatus(el, id), id).toMatch(/unconfirmed/);
+      expect(headline(el)).toContain('Checking');
+      expect(overview(el)).not.toContain('Up to date');
     } finally {
       teardown(el);
     }
   });
 
   it('renders one catalog action per entry when recommendedActions is populated', async () => {
-    const el = await mount();
+    const el = await mountWithRemedies([
+      ['schema.reindex-required|worker.schema', 'core.reindex'],
+      ['index.unavailable|worker', 'core.rebuild-index'],
+    ]);
     try {
-      el.recommendedActions = new Map([
-        ['schema.reindex-required|worker.schema', { target: 'core.reindex', args: {} }],
-        ['index.unavailable|worker', { target: 'core.rebuild-index', args: {} }],
-      ]);
-      await el.updateComplete;
 
       const section = el.shadowRoot?.querySelector('.card.section.recommended');
       expect(section).not.toBeNull();
@@ -327,14 +346,12 @@ describe('HealthSurface — recommendedActions panel', () => {
   });
 
   it('renders entries in sorted (conditionId, subject) order for stable display', async () => {
-    const el = await mount();
+    // Insertion order is reverse-alphabetical; the render should sort by key.
+    const el = await mountWithRemedies([
+      ['z.condition|sub', 'core.z-op'],
+      ['a.condition|sub', 'core.a-op'],
+    ]);
     try {
-      // Insertion order is reverse-alphabetical; the render should sort by key.
-      el.recommendedActions = new Map([
-        ['z.condition|sub', { target: 'core.z-op', args: {} }],
-        ['a.condition|sub', { target: 'core.a-op', args: {} }],
-      ]);
-      await el.updateComplete;
 
       const buttons = el.shadowRoot?.querySelectorAll(
         '.card.section.recommended .recommended-action',
@@ -365,21 +382,17 @@ describe('HealthSurface — recommendedActions panel', () => {
     __tickClockForTest();
     const el = await mount();
     try {
-      const section = el.shadowRoot?.querySelector('.card.section.recommended');
-      expect(section?.textContent).toContain('Service degraded');
-      expect(section?.textContent).not.toContain('Up to date');
+      expect(rowStatus(el, 'index')).toContain('Service degraded');
+      expect(headline(el)).toContain('Service degraded');
+      expect(overview(el)).not.toContain('Up to date');
     } finally {
       teardown(el);
     }
   });
 
   it('recommendation title includes the conditionId and subject for accessibility', async () => {
-    const el = await mount();
+    const el = await mountWithRemedies([['schema.reindex-required|worker.schema', 'core.reindex']]);
     try {
-      el.recommendedActions = new Map([
-        ['schema.reindex-required|worker.schema', { target: 'core.reindex', args: {} }],
-      ]);
-      await el.updateComplete;
 
       const button = el.shadowRoot?.querySelector(
         '.card.section.recommended .recommended-action',
@@ -424,7 +437,7 @@ describe('HealthSurface — recommendedActions panel', () => {
     }
   });
 
-  it('595 §15.2 (E4): an OVERDUE rebuild escalates the header to "taking longer than expected" (warning)', async () => {
+  it('595 §15.2 (E4) SH8: an OVERDUE rebuild escalates the Index row and headline to "taking longer than expected"', async () => {
     __feedForTest({
       status: {
         worker: {
@@ -445,9 +458,9 @@ describe('HealthSurface — recommendedActions panel', () => {
     __tickClockForTest();
     const el = await mount();
     try {
-      const badge = el.shadowRoot?.querySelector('.header jf-status-badge');
-      expect(badge?.textContent).toContain('taking longer than expected');
-      expect(badge?.getAttribute('tone')).toBe('warning'); // escalated, no longer calm
+      // Escalated: the overdue rebuild is the page's most consequential fact.
+      expect(rowStatus(el, 'index')).toContain('taking longer than expected');
+      expect(headline(el)).toContain('taking longer than expected');
     } finally {
       teardown(el);
     }

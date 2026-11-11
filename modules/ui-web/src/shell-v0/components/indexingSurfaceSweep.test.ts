@@ -32,6 +32,7 @@ type Harness = {
   progress: ReturnType<typeof selectIndexingProgress>; filesOpen: boolean;
   inference: AiState['inference']; host_: unknown; enrichmentStages: unknown; enrichmentPending: boolean;
   indexingActivity: ReturnType<typeof selectIndexingProgress>['activity']; provisional: boolean;
+  healthRows(): { id: string; status: string }[];
   inferenceChipReadout(): { label: string }; renderCoreItem(id: string): TemplateResult; renderConnection(): TemplateResult; renderHeader(): TemplateResult; renderRecommendedActions(): TemplateResult;
   renderRebuildProgress(): TemplateResult; renderSimplePanel(): TemplateResult; renderEnrichmentProgress(): TemplateResult;
   renderCompatibilityCallouts(): TemplateResult; renderDegradationBanner(): TemplateResult; renderAiEngine(): TemplateResult; renderQueueDb(): TemplateResult; renderCardsRegion(): TemplateResult; renderCard(root: IndexedRootView): TemplateResult; render(): TemplateResult;
@@ -113,16 +114,17 @@ describe('WP3.3 complete surface sweep', () => {
       if (pending > 0) expect(row.textContent).not.toMatch(/Index state\s*Ready/);
     }
   });
-  it('S33.4 Health header and summary withhold operational claims for all unconfirmed observations', () => {
+  it('S33.4 SH8 Health rows keep each hold explanation and withhold fine claims for all unconfirmed observations', () => {
     for (const which of CASES) {
       const el = harness('jf-health-surface', observe(which));
-      const summary = dom(el.renderRecommendedActions());
-      expect(summary.textContent, which).toContain(expectedReason(which));
+      const rows = new Map(el.healthRows().map(row => [row.id, row.status]));
+      const header = dom(el.renderHeader()).textContent ?? '';
+      expect(header, which).not.toContain('Everything is working');
       if (unconfirmed(which)) {
-        const header = dom(el.renderHeader());
-        expect(header.textContent, which).toContain(UNCONFIRMED);
-        expect(summary.textContent).not.toContain('All systems operational');
-        expect(header.querySelector('jf-status-badge')?.getAttribute('tone')).not.toBe('success');
+        expect(rows.get('index'), which).toBe(UNCONFIRMED);
+        expect(rows.get('work'), which).not.toBe('');
+      } else {
+        expect(rows.get('work'), which).toContain(expectedReason(which));
       }
     }
   });

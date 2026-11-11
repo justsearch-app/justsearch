@@ -71,6 +71,7 @@ export class CapabilityMap extends JfElement {
     li {
       display: flex;
       align-items: baseline;
+      flex-wrap: wrap;
       gap: 0.5rem;
       padding: 0.4rem 0.5rem;
       border: 1px solid var(--border-subtle);
@@ -79,7 +80,7 @@ export class CapabilityMap extends JfElement {
       font-size: var(--font-size-sm);
     }
     .cap-name {
-      flex: 0 0 14rem;
+      flex: 1 1 10rem;
       color: var(--text-primary);
     }
     .cap-status {
@@ -117,7 +118,7 @@ export class CapabilityMap extends JfElement {
             ? unavailableBecause(reasonFor('binding.unreachable').wording)
             : this.aiState?.verdict?.reasons.includes('index.ownership_unproven')
               ? unavailableBecause(reasonFor('index.ownership_unproven').wording)
-              : AVAILABLE,
+              : !this.aiState?.status || !this.aiState.indexingStatusLive ? unavailableBecause('Search status unconfirmed', true) : AVAILABLE,
       },
     ];
     for (const a of AFFORDANCES) {
