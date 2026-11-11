@@ -433,3 +433,14 @@ env -u DISPLAY -u WAYLAND_DISPLAY -u TESSDATA_PREFIX js-gradle-slot -w 10 node s
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1cc40-f3c3-7af2-9aae-2fda6df7f4d0",
+  "verdict": "accept",
+  "digest": "sha256:f5e3c4f14f6cd8c1db77b78380b5b3bd2356703711ef9638cd79ac1a32aaa254",
+  "note": "Transcribed by the orchestrator from the acceptor's answer (its sandbox could not spawn git)."
+}
+```
