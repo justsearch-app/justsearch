@@ -56,8 +56,8 @@ describe('CommandPaletteProjection (§21.C)', () => {
     const hit = results.find((r) => r.entry.id === 'shell.toggle-palette');
     expect(hit).toBeDefined();
     expect(hit!.entry.label).toBe('Toggle Command Palette');
-    expect(hit!.entry.shortcut).toBe('mod+k');
-    expect(hit!.entry.category).toBe('Navigation');
+    expect(hit!.entry.shortcut).toBeUndefined();
+    expect(hit!.entry.category).toBe('Actions');
     expect(hit!.entry.origin).toBe('action');
   });
 

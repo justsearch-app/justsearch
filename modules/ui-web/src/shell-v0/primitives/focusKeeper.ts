@@ -35,10 +35,10 @@ function focusables(root: ParentNode, out: HTMLElement[] = []): HTMLElement[] {
 }
 
 /** Every keyed row under `root` in tree order, through open shadow roots. */
-function rowsUnder(root: ParentNode, out: HTMLElement[] = []): HTMLElement[] {
+export function focusRowsUnder(root: ParentNode, out: HTMLElement[] = []): HTMLElement[] {
   for (const el of root.querySelectorAll<HTMLElement>('*')) {
     if (el.getAttribute(ROW)) out.push(el);
-    if (el.shadowRoot) rowsUnder(el.shadowRoot, out);
+    if (el.shadowRoot) focusRowsUnder(el.shadowRoot, out);
   }
   return out;
 }
@@ -180,7 +180,7 @@ export class FocusKeeper implements ReactiveController {
   private readonly onPress = (): void => { this.pressedAt = performance.now(); };
 
   private rows(): Snapshot['rows'] {
-    return rowsUnder(this.root).map(row => ({ key: row.getAttribute(ROW)!, list: row.parentNode }));
+    return focusRowsUnder(this.root).map(row => ({ key: row.getAttribute(ROW)!, list: row.parentNode }));
   }
 
   /**
@@ -258,7 +258,7 @@ export class FocusKeeper implements ReactiveController {
       return same?.length === 1 ? same[0]! : null;
     };
     const live = new Map<string, HTMLElement>();
-    for (const el of rowsUnder(this.root)) live.set(el.getAttribute(ROW)!, el);
+    for (const el of focusRowsUnder(this.root)) live.set(el.getAttribute(ROW)!, el);
     // The control itself, found again; for a control inside a band, the control that opened it.
     const candidates: (HTMLElement | null)[] = [current(element), current(anchor)];
     if (row && role) {

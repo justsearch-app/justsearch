@@ -68,7 +68,8 @@ CSS_SETTINGS_WINDOW_SECURITY_CONTENT = 'jf-settings-window jf-settings-surface j
 CSS_SV3_WINDOW = 'jf-sv3-window'
 CSS_SV3_DEGRADATION_COMPACT = 'jf-sv3-window [data-testid="sv3-degradation"][data-open="false"]'
 CSS_SV3_COMPOSER_TEXTAREA = 'jf-sv3-window textarea[data-testid="sv3-composer-input"]'
-CSS_SV3_PALETTE = 'jf-sv3-window jf-sv3-palette'
+# The app's one palette (shell S6): a native modal dialog in the shell's overlay host, opened from any area.
+CSS_PALETTE = 'jf-command-palette'
 # Search v3's Search mode renders its results on the shared `<jf-results-card>`, inside its own
 # results region, so the row is the card's `search-result-row` scoped to that region.
 CSS_SV3_RESULT_ROW = 'jf-sv3-window jf-sv3-results [data-testid="search-result-row"]'
@@ -127,10 +128,19 @@ SEARCH_STATE_WITNESSES = {
     "sv3-search-results": ['[data-testid="search-result-row"]'],
     "sv3-hero-forced-colors": ['[data-testid="sv3-composer-headline"]', 'jf-sv3-composer textarea'],
     "sv3-docked-forced-colors": ['[data-testid="sv3-turn-answer"]'],
-    "sv3-palette-forced-colors": ['jf-sv3-palette [role="option"]'],
     "sv3-citation-selected": ['.cite-ref.cite-selected', 'jf-document-pane :is(.blocks, .source)'],
     "sv3-citation-dropped": ['[data-testid="sv3-turn-citations"] .inclusion', 'jf-document-pane :is(.blocks, .source)'],
     "legacy-token-plugin": ['jf-sv3-composer textarea'],
+}
+# The app's one palette is not inside Search: it lives in the shell's overlay host, a sibling of
+# every window, so its witnesses are read under CSS_PALETTE, never under CSS_SV3_WINDOW. Same rule as
+# above: they run immediately before the screenshot and the axe measurement, and a palette step whose
+# palette is not open fails there instead of measuring whatever is beneath.
+PALETTE_STATE_WITNESSES = {
+    "palette-forced-colors": ['dialog:modal input[role="combobox"]',
+                              'dialog:modal [role="option"][aria-selected="true"]'],
+    "palette-600x400-text-200": ['dialog:modal input[role="combobox"]',
+                                 'dialog:modal #palette-actions [role="option"][aria-selected="true"]'],
 }
 
 @dataclass(frozen=True)

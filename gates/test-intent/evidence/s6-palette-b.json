@@ -1,0 +1,791 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
+  },
+  "createdAt": "2026-11-11T09:03:34.582Z",
+  "revision": "dfaee4315bb2b208f5c313faf08cfdcb6283f51c",
+  "tree": "fe8bd811311291468af7def94126ca0a01dabbfe",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/commands/CommandPalette.overlay.test.ts\" \"src/shell-v0/chrome/Shell.palette.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.paletteActions.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.memory.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.pane.test.ts\" \"src/shell-v0/views/search-v3/Sv3Empty.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/360jwr8w/tmp/test-intent-vitest-14281-1794387794311.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 9022
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/commands/CommandPalette.overlay.test.ts",
+      "file": "modules/ui-web/src/shell-v0/commands/CommandPalette.overlay.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:20e07cb5b4ca1b611620435f053fbbd3323518fde827be489c8d1a978f49cf72",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SP5 Tab shows each result kind's actions, primary first; Escape returns to the results",
+          "status": "passed"
+        },
+        {
+          "name": "SP5 Escape or Shift Tab returns with query, selection and scroll kept, and a second Escape closes",
+          "status": "passed"
+        },
+        {
+          "name": "SP5 a folder's Remove from Library hands off to Library's confirmation and never deletes from the palette",
+          "status": "passed"
+        },
+        {
+          "name": "SP5 with no result, Tab opens no stale actions and keeps focus in the dialog",
+          "status": "passed"
+        },
+        {
+          "name": "SP5 keys that steer an IME composition invoke, move, show actions or dismiss nothing",
+          "status": "passed"
+        },
+        {
+          "name": "SP4-SP9 shown actions follow their result: a removed or replaced registration runs nothing and says so",
+          "status": "passed"
+        },
+        {
+          "name": "SP4c a lock observed by the status poll takes the conversation's text out of an open actions view, and unlock brings it back only after a fresh read",
+          "status": "passed"
+        },
+        {
+          "name": "SP8 a modal dialog with a labelled combobox, a listbox of labelled groups, positions and count, and the active option scrolled into view",
+          "status": "passed"
+        },
+        {
+          "name": "SP8 the result count and the empty, loading and error states are announced",
+          "status": "passed"
+        },
+        {
+          "name": "SP8 every match is reachable by arrow keys alone: moving past a group's first rows shows the rest",
+          "status": "passed"
+        },
+        {
+          "name": "SP8 forced colours keep the active option and the field's focus distinguishable, and a short window keeps field and list",
+          "status": "passed"
+        },
+        {
+          "name": "SP9 dismissal returns focus to the invoker, or to the main region when the invoker is gone",
+          "status": "passed"
+        },
+        {
+          "name": "SP9 the palette's Escape is its own: nothing beneath it hears the key",
+          "status": "passed"
+        },
+        {
+          "name": "SP10c an Alt peek ends on Alt release and leaves no listener behind",
+          "status": "passed"
+        },
+        {
+          "name": "SP10c an Alt peek ends on leaving the row and leaves no listener behind",
+          "status": "passed"
+        },
+        {
+          "name": "SP10c an Alt peek ends on removal of the row and leaves no listener behind",
+          "status": "passed"
+        },
+        {
+          "name": "SP10c an Alt peek ends on dismissal and leaves no listener behind",
+          "status": "passed"
+        },
+        {
+          "name": "SP10c an Alt peek ends on disconnect and leaves no listener behind",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.palette.test.ts",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.palette.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7717a7f0477eb428905d10674d06ed1e956ce0b134a5739aa1f4f8a37c789205",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SP1 one chord, one palette SP1 one chord press toggles exactly one palette from Search's composer, Library, AI Brain and a contributed window",
+          "status": "passed"
+        },
+        {
+          "name": "SP1 one chord, one palette SP1 the Search topbar button opens the same palette through the toggle action",
+          "status": "passed"
+        },
+        {
+          "name": "SP1 one chord, one palette SP1 under Settings, a confirmation or any other modal, the chord and the toggle action leave that dialog in control",
+          "status": "passed"
+        },
+        {
+          "name": "SP1 one chord, one palette SP1 IME composition, key repeat, extra modifiers and AltGraph never toggle; Cmd K on macOS and Ctrl K elsewhere",
+          "status": "passed"
+        },
+        {
+          "name": "SP1 one chord, one palette SP1 a keydown the IME is processing (keyCode 229, isComposing still false) runs no binding: neither Ctrl K nor Settings Ctrl comma",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.paletteActions.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.paletteActions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1025e5636ca068bf7fdfc9a493eb7bf233f8e77ae551cb1c7c1dddb48fb98106",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SP7 Search's working commands are app palette actions under their ids; the seven inert entries and the second palette are gone",
+          "status": "passed"
+        },
+        {
+          "name": "SP7 the topbar button asks the app's one toggle action, once per press",
+          "status": "passed"
+        },
+        {
+          "name": "SP7 exactly one owner across departure, retained return, split-layout re-parenting and previews; teardown removes only its own",
+          "status": "passed"
+        },
+        {
+          "name": "SP7 \"Search everything\" searches the composer draft and \"Search for\" the palette text; opening, filtering or cancelling submits neither",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.memory.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.memory.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:bd833a3355f8f8db0e5aee8e34407d51cdb9f1603116c953cc89dd32e7dc444d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SP7 opens the existing Memory surface from the app palette’s \"Open AI Brain › Memory\" (S53.3, DM1)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:56c5710096e3d775333688ab6989143b6a99df35ee90162bb00fce6733f2c195",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HO1 HO2 a cold address query arrives intact and is consumed from the address",
+          "status": "passed"
+        },
+        {
+          "name": "HO3 HO4 HO5 core.rag-ask prepares the chosen files and waits",
+          "status": "passed"
+        },
+        {
+          "name": "HO3 HO4 HO5 core.summarize prepares the chosen files and waits",
+          "status": "passed"
+        },
+        {
+          "name": "HO3 HO4 HO5 core.extract prepares the chosen files and waits",
+          "status": "passed"
+        },
+        {
+          "name": "HO3 HO5 HO9 a selection is local to its prepared turn",
+          "status": "passed"
+        },
+        {
+          "name": "HO3 HO5 the real Explain sender with empty docIds sends the ranking trace",
+          "status": "passed"
+        },
+        {
+          "name": "HO5 editing Explain instructions keeps its model trace inspectable in the submitted turn",
+          "status": "passed"
+        },
+        {
+          "name": "HO4 HO13 a file-incompatible forced mode becomes a visibly file-limited Ask",
+          "status": "passed"
+        },
+        {
+          "name": "HO8 two arrivals replace preparation without sending",
+          "status": "passed"
+        },
+        {
+          "name": "HO8 an incoming query replaces typed Search without creating a conversation place",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 HO8 cold third-snapshot intake refuses without replacing the raw or typed draft",
+          "status": "passed"
+        },
+        {
+          "name": "HO11 an answer link ignores agent affordance and conversation and waits",
+          "status": "passed"
+        },
+        {
+          "name": "HO13 an empty file hand-off cannot widen to the whole index",
+          "status": "passed"
+        },
+        {
+          "name": "HO7 a reloaded summary Retry menu names the original summary inputs",
+          "status": "passed"
+        },
+        {
+          "name": "HO7 a reloaded summary retry states its missing inputs and never sends an all-files Ask",
+          "status": "passed"
+        },
+        {
+          "name": "HO7 a reloaded summary edit states its missing inputs and never sends an all-files Ask",
+          "status": "passed"
+        },
+        {
+          "name": "HO8 an outgoing conversation keeps its unsent draft and files one click away",
+          "status": "passed"
+        },
+        {
+          "name": "HO9 abandoning a prepared selection cannot attach it to another mode send",
+          "status": "passed"
+        },
+        {
+          "name": "HO9 abandoning a hand-off for an unvisited conversation clears its file scope",
+          "status": "passed"
+        },
+        {
+          "name": "HO9 leaving the window retires prepared context while a layout reparent keeps it",
+          "status": "passed"
+        },
+        {
+          "name": "HO10 unavailable chat still shows the prepared task and chosen files",
+          "status": "passed"
+        },
+        {
+          "name": "HO12 an incoming task puts keyboard focus in the composer",
+          "status": "passed"
+        },
+        {
+          "name": "HO13 malformed selection data is refused visibly without a crash",
+          "status": "passed"
+        },
+        {
+          "name": "HO8 a streaming Ask stays live and keeps its draft and files across a hand-off",
+          "status": "passed"
+        },
+        {
+          "name": "HO8 a held real controller keeps its decision and reopens from the sidebar",
+          "status": "passed"
+        },
+        {
+          "name": "HO8 a locked conversation is left intact by incoming preparation",
+          "status": "passed"
+        },
+        {
+          "name": "CP5 a failed Ask handoff restores only the unchanged post-send draft: unchanged",
+          "status": "passed"
+        },
+        {
+          "name": "CP5 a failed Ask handoff restores only the unchanged post-send draft: identical assignment",
+          "status": "passed"
+        },
+        {
+          "name": "CP5 a failed Ask handoff restores only the unchanged post-send draft: A-B-A",
+          "status": "passed"
+        },
+        {
+          "name": "CP5 a failed Ask handoff restores only the unchanged post-send draft: newer input",
+          "status": "passed"
+        },
+        {
+          "name": "CP5 a failed Ask handoff restores only the unchanged post-send draft: composition start",
+          "status": "passed"
+        },
+        {
+          "name": "HO13 a refused unreadable-document hand-off keeps the instruction and files",
+          "status": "passed"
+        },
+        {
+          "name": "HO3 D7 a Structured hand-off with no files uses typed text and waits for send",
+          "status": "passed"
+        },
+        {
+          "name": "SP7 HO12 the app palette's \"Search everything\" after a hand-off searches in Search mode and returns focus to the composer",
+          "status": "passed"
+        },
+        {
+          "name": "HO5 a reloaded Explain Retry menu states its actual restoration limit",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 HO5 a reloaded Explain retry refuses before fork and preserves unrelated B",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 HO5 a reloaded Explain edit refuses before fork and preserves unrelated B",
+          "status": "passed"
+        },
+        {
+          "name": "merge model action after a no-match hand-off preserves the prepared draft and excludes its selection",
+          "status": "passed"
+        },
+        {
+          "name": "merge an unscoped Summarize input failure is not a no-matching-files result",
+          "status": "passed"
+        },
+        {
+          "name": "HO5 edited Explain keeps selection identity before send: 'inline trace'",
+          "status": "passed"
+        },
+        {
+          "name": "HO5 edited Explain keeps selection identity before send: 'shortened'",
+          "status": "passed"
+        },
+        {
+          "name": "HO5 edited Explain keeps selection identity before send: 'different question'",
+          "status": "passed"
+        },
+        {
+          "name": "HO5 edited Explain keeps selection identity before send: 'emptied'",
+          "status": "passed"
+        },
+        {
+          "name": "C4 A1 transfers the legacy draft durably once and never resurrects it after Clear",
+          "status": "passed"
+        },
+        {
+          "name": "C4 A1 keeps an existing Search draft and permanently leaves the legacy value untouched",
+          "status": "passed"
+        },
+        {
+          "name": "C4 A1 defers legacy transfer for an explicit arrival until a later clean mount",
+          "status": "passed"
+        },
+        {
+          "name": "C4 A1 a failed durable write leaves the legacy draft recoverable",
+          "status": "passed"
+        },
+        {
+          "name": "C8 a compatibility mount for core.rag-ask prepares its mode without sending",
+          "status": "passed"
+        },
+        {
+          "name": "C8 a compatibility mount for core.free-chat prepares its mode without sending",
+          "status": "passed"
+        },
+        {
+          "name": "C8 a compatibility mount for core.extract prepares its mode without sending",
+          "status": "passed"
+        },
+        {
+          "name": "C8 a workflow compatibility mount announces its unavailable disposition",
+          "status": "passed"
+        },
+        {
+          "name": "C2 A2 visibly refuses invalid task data {\"query\":\"keep text\",\"mode\":[\"ask\",\"search\"]} without losing its text or widening scope",
+          "status": "passed"
+        },
+        {
+          "name": "C2 A2 visibly refuses invalid task data {\"query\":\"keep text\",\"forceShapeId\":[]} without losing its text or widening scope",
+          "status": "passed"
+        },
+        {
+          "name": "C2 A2 visibly refuses invalid task data {\"query\":\"keep text\",\"docIds\":[\"\",\"chosen.md\"]} without losing its text or widening scope",
+          "status": "passed"
+        },
+        {
+          "name": "C9 A3 the shared inspector opens one reader, keeps the passage and follows close and return",
+          "status": "passed"
+        },
+        {
+          "name": "C8 W3 a workflow answer link stays unprepared and announces its unavailable disposition",
+          "status": "passed"
+        },
+        {
+          "name": "C7 C8 an outgoing compatibility view cannot consume the main window arrival",
+          "status": "passed"
+        },
+        {
+          "name": "C9 A3 a shared line passage is highlighted without inventing a missing citation position",
+          "status": "passed"
+        },
+        {
+          "name": "C9 A3 changing the address place keeps the shared reader until explicitly closed",
+          "status": "passed"
+        },
+        {
+          "name": "C4 A1 a first clean mount with no legacy text cannot later revive a stale old tab draft",
+          "status": "passed"
+        },
+        {
+          "name": "C4 A1 C7 a retained window cannot lose its migrated draft when disconnected before its next render",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 allows two whole same-text proposals, refusing a third before replacement or a request",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 ordinary compatibility model tier changes retain the actual no-retrieval proposal before any leave",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 rejected fresh hash intake preserves live conversation B and both snapshots before traversal clearing",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 bare history restoration cannot retire live B when both existing recovery slots are needed",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 bare history restoration cannot retire review B when both existing recovery slots are needed",
+          "status": "passed"
+        },
+        {
+          "name": "DS1 one-slot automatic hero navigation retains B at its origin while explicit New retains current B",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.pane.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.pane.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:76185abae32759e8e9c4d9436f43b33389f60410668b8290a11e86f170c597a9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "an in-window citation opens the WINDOW pane and nothing else opens the pane at the cited range and leaves the shared inspector selection untouched",
+          "status": "passed"
+        },
+        {
+          "name": "an in-window citation opens the WINDOW pane and nothing else proves the probe has teeth — the same event from an UNGUARDED node does escape",
+          "status": "passed"
+        },
+        {
+          "name": "an in-window citation opens the WINDOW pane and nothing else follows an inline [n] mark through the same guarded handler",
+          "status": "passed"
+        },
+        {
+          "name": "the pane is mounted exactly while a cited document is open is absent before the first citation and after pane-close",
+          "status": "passed"
+        },
+        {
+          "name": "the pane is mounted exactly while a cited document is open closes when a new session starts — the citation belonged to the old conversation",
+          "status": "passed"
+        },
+        {
+          "name": "the pane is mounted exactly while a cited document is open does not let the inline track width outvote the overlay presentation",
+          "status": "passed"
+        },
+        {
+          "name": "the pane is mounted exactly while a cited document is open adds NO second emphasis of its own — the landing is the shared reader's decay",
+          "status": "passed"
+        },
+        {
+          "name": "the pane closes on a real conversation switch, and only a real one closes when a sidebar row-click switches to a different conversation",
+          "status": "passed"
+        },
+        {
+          "name": "the pane closes on a real conversation switch, and only a real one closes when the conversation it switches to left its pane closed",
+          "status": "passed"
+        },
+        {
+          "name": "the pane closes on a real conversation switch, and only a real one does NOT close when the already-active row is clicked again",
+          "status": "passed"
+        },
+        {
+          "name": "the pane closes on a real conversation switch, and only a real one does NOT close on a non-switching update (the late-match claim upgrade)",
+          "status": "passed"
+        },
+        {
+          "name": "the pane closes on a real conversation switch, and only a real one closes when the version pager selects a DIFFERENT session",
+          "status": "passed"
+        },
+        {
+          "name": "Escape closes the pane FIRST SP9 one chord in the composer opens only the app palette, and its Escape closes the palette while the pane stays open",
+          "status": "passed"
+        },
+        {
+          "name": "Escape closes the pane FIRST yields to a rename in progress — the edit is the most local transient state",
+          "status": "passed"
+        },
+        {
+          "name": "Escape closes the pane FIRST does not eat Escape in the composer when no document is open",
+          "status": "passed"
+        },
+        {
+          "name": "Escape closes the pane FIRST 864: an Escape that is dismissing an IME candidate window does not flip to hero",
+          "status": "passed"
+        },
+        {
+          "name": "the two boundaries leave the main column its 640 clamps the SIDEBAR against the open pane, not against an empty window",
+          "status": "passed"
+        },
+        {
+          "name": "the two boundaries leave the main column its 640 clamps the PANE against the open sidebar",
+          "status": "passed"
+        },
+        {
+          "name": "the two boundaries leave the main column its 640 persists the chosen width on pointerUP, and reverts a cancelled gesture",
+          "status": "passed"
+        },
+        {
+          "name": "the two boundaries leave the main column its 640 lands the drag width on the fallback when the page stops delivering frames (860 P3)",
+          "status": "passed"
+        },
+        {
+          "name": "the two boundaries leave the main column its 640 moves and resets from the keyboard, and a double-click FORGETS",
+          "status": "passed"
+        },
+        {
+          "name": "the two boundaries leave the main column its 640 reopens at a remembered width the current box still allows",
+          "status": "passed"
+        },
+        {
+          "name": "below the spec 980 the pane is a window-scoped overlay overlays, dims, and hides the grip",
+          "status": "passed"
+        },
+        {
+          "name": "below the spec 980 the pane is a window-scoped overlay stays INLINE above the switch",
+          "status": "passed"
+        },
+        {
+          "name": "below the spec 980 the pane is a window-scoped overlay takes NO room from the sidebar while it is overlaid",
+          "status": "passed"
+        },
+        {
+          "name": "a claim match that arrives after the pane opened upgrades the OPEN pane with the sentence it grounded",
+          "status": "passed"
+        },
+        {
+          "name": "a claim match that arrives after the pane opened leaves the pane alone when the match belongs to a DIFFERENT TURN",
+          "status": "passed"
+        },
+        {
+          "name": "a claim match that arrives after the pane opened leaves the pane alone when the match belongs to a DIFFERENT source",
+          "status": "passed"
+        },
+        {
+          "name": "the pane is told what the citation that opened it can honestly say reads the header OFF THE RECORD, not off the event",
+          "status": "passed"
+        },
+        {
+          "name": "the pane is told what the citation that opened it can honestly say the header follows the LATE claim match onto the open pane",
+          "status": "passed"
+        },
+        {
+          "name": "the pane is told what the citation that opened it can honestly say a DROPPED source never gains a grounding claim, however the match lands",
+          "status": "passed"
+        },
+        {
+          "name": "the pane is told what the citation that opened it can honestly say refreshes the header of a SPAN-UNUSABLE pane when the match lands (review LOW-5)",
+          "status": "passed"
+        },
+        {
+          "name": "the pane is told what the citation that opened it can honestly say 849 S10 — a DEGENERATE span opens a pane that says so",
+          "status": "passed"
+        },
+        {
+          "name": "the pane reads CITED documents and nothing else has no attribute route into the document it shows",
+          "status": "passed"
+        },
+        {
+          "name": "the pane reads CITED documents and nothing else has exactly ONE writer of the open document in the window",
+          "status": "passed"
+        },
+        {
+          "name": "the pane reads CITED documents and nothing else imports the shared reader directly, never through another window",
+          "status": "passed"
+        },
+        {
+          "name": "DP1 the details pane shows tabs per cited source plus Context offers a tab per cited source, numbered, then Context",
+          "status": "passed"
+        },
+        {
+          "name": "DP1 the details pane shows tabs per cited source plus Context moves the reader to the chosen source and its passage, and marks it in the answer",
+          "status": "passed"
+        },
+        {
+          "name": "DP1 the details pane shows tabs per cited source plus Context keeps the reader mounted under Context, so coming back keeps its place",
+          "status": "passed"
+        },
+        {
+          "name": "DP1 the details pane shows tabs per cited source plus Context a citation the answer did not cite still gets its own tab, and a result gets a plain one",
+          "status": "passed"
+        },
+        {
+          "name": "DP1 Escape or close returns focus to what opened the pane Escape returns focus to the citation that opened it",
+          "status": "passed"
+        },
+        {
+          "name": "DP1 Escape or close returns focus to what opened the pane the close control returns focus the same way",
+          "status": "passed"
+        },
+        {
+          "name": "DP1 Escape or close returns focus to what opened the pane moving between tabs keeps the citation that opened the pane as what gets focus back",
+          "status": "passed"
+        },
+        {
+          "name": "DP1 Escape or close returns focus to what opened the pane an opener that has left falls back to the composer, never the page",
+          "status": "passed"
+        },
+        {
+          "name": "DP1 Escape or close returns focus to what opened the pane opens with the keyboard in the pane, and Escape during a composition stays with the composition",
+          "status": "passed"
+        },
+        {
+          "name": "DP1 the pane remembers each conversation returns to the tab and source each conversation last showed",
+          "status": "passed"
+        },
+        {
+          "name": "DP1 the pane remembers each conversation a reload comes back to the source being read, without taking the keyboard",
+          "status": "passed"
+        },
+        {
+          "name": "DP1 the pane remembers each conversation a pane closed by the reader stays closed on return",
+          "status": "passed"
+        },
+        {
+          "name": "DP1 the pane remembers each conversation a remembered source its record no longer holds opens nothing",
+          "status": "passed"
+        },
+        {
+          "name": "C4 the pane never shows another conversation, window or profile rapid selection lands on the last choice",
+          "status": "passed"
+        },
+        {
+          "name": "C4 the pane never shows another conversation, window or profile a late record for the conversation left behind restores nothing here",
+          "status": "passed"
+        },
+        {
+          "name": "C4 the pane never shows another conversation, window or profile answers a selection placed in this window, or by no frame, and ignores another window’s",
+          "status": "passed"
+        },
+        {
+          "name": "C4 the pane never shows another conversation, window or profile another window closing its selection leaves this window’s reader open",
+          "status": "passed"
+        },
+        {
+          "name": "C4 the pane never shows another conversation, window or profile a profile change closes the pane",
+          "status": "passed"
+        },
+        {
+          "name": "DP5 hiding a source from the assistant keeps working from the pane hides and restores the source on show, naming the channel the assistant got it by",
+          "status": "passed"
+        },
+        {
+          "name": "DP5 hiding a source from the assistant keeps working from the pane says so when the hide could not be saved, and the source stays as it was",
+          "status": "passed"
+        },
+        {
+          "name": "DP5 hiding a source from the assistant keeps working from the pane each conversation starts from its own hidden sources",
+          "status": "passed"
+        },
+        {
+          "name": "DP4 plugin inspector tabs are details-pane tabs appear after Context, receive the document on show, and leave without stranding the pane",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Empty.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Empty.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e9d29bb02049ff9a3a1bcb278bc03ddb2033a8c0d3ad31464b762935e0d1d8de",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the empty states are one pattern in two regions renders the sidebar variant before this window has searched anything",
+          "status": "passed"
+        },
+        {
+          "name": "the empty states are one pattern in two regions builds the media as a fanned three-card stack, two of them hidden from assistive tech",
+          "status": "passed"
+        },
+        {
+          "name": "the empty states are one pattern in two regions yields to the rows the moment the panel has a session to show",
+          "status": "passed"
+        },
+        {
+          "name": "the empty states are one pattern in two regions keeps the empty state out of the heading outline the shell already owns",
+          "status": "passed"
+        },
+        {
+          "name": "the slice-4 elements join the closed component vocabulary names the empty state, and no longer the retired Search palette",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "545232c4d8fbb5345d73b5f484c9839fa04b0905",
+    "revision": "545232c4d8fbb5345d73b5f484c9839fa04b0905",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/commands/CommandPalette.overlay.test.ts\" \"src/shell-v0/chrome/Shell.palette.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.paletteActions.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.memory.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.pane.test.ts\" \"src/shell-v0/views/search-v3/Sv3Empty.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/360jwr8w/tmp/test-intent-vitest-14281-1794387805295.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 8789,
+        "output": "JSON report written to /home/elias/.cache/am/360jwr8w/tmp/test-intent-vitest-14281-1794387805295.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/commands/CommandPalette.overlay.test.ts",
+        "classification": "assertion",
+        "detail": "SP5 Tab shows each result kind's actions, primary first; Escape returns to the results:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/360jwr8w/tmp/test-intent-before-IXO2mx/modules/ui-web/src/shell-v0/commands/CommandPalette.overlay.test.ts:100:59\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///hom | SP5 Escape or Shift Tab returns with query, selection and scroll kept, and a second Escape closes:  Assertio"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.palette.test.ts",
+        "classification": "assertion",
+        "detail": "SP1 one chord, one palette SP1 one chord press toggles exactly one palette from Search's composer, Library, AI Brain and a contributed window:  AssertionError: core.search-v3-surface: expected null to be <textarea rows=\"1\" …(7)></textarea> // Object.is equality\n    at /home/elias/.cache/am/360jwr8w/tmp/test-intent-before-IXO2mx/modules/ui-web/src/shell-v0/chrome/Shell.palette.test.ts:128:146\n    at file:///home/elias/dev/justsearch/.claude/ | SP1 one chord, one palette SP1 the Search topbar butt"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.paletteActions.test.ts",
+        "classification": "assertion",
+        "detail": "SP7 Search's working commands are app palette actions under their ids; the seven inert entries and the second palette are gone:  AssertionError: expected undefined to be 'Search everything' // Object.is equality\n    at /home/elias/.cache/am/360jwr8w/tmp/test-intent-before-IXO2mx/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.paletteActions.test.ts:72:46\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-p | SP7 the topbar button asks the app's one toggle action, once per pre"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.memory.test.ts",
+        "classification": "assertion",
+        "detail": "SP7 opens the existing Memory surface from the app palette’s \"Open AI Brain › Memory\" (S53.3, DM1):  AssertionError: expected '\\n                  AI Brain › Readin…' to contain 'Open AI Brain › Memory'\n    at /home/elias/.cache/am/360jwr8w/tmp/test-intent-before-IXO2mx/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.memory.test.ts:39:40\n    at processTicksAndRejections (node:internal/proc"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
+        "classification": "assertion",
+        "detail": "SP7 HO12 the app palette's \"Search everything\" after a hand-off searches in Search mode and returns focus to the composer:  AssertionError: expected 'ask' to be 'search' // Object.is equality\n    at /home/elias/.cache/am/360jwr8w/tmp/test-intent-before-IXO2mx/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:477:42\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-palette-b/modules/ui-"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.pane.test.ts",
+        "classification": "assertion",
+        "detail": "Escape closes the pane FIRST SP9 one chord in the composer opens only the app palette, and its Escape closes the palette while the pane stays open:  AssertionError: expected <jf-sv3-palette …(1)></jf-sv3-palette> to be null\n    at /home/elias/.cache/am/360jwr8w/tmp/test-intent-before-IXO2mx/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.pane.test.ts:565:100\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-palette-b/modules"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Empty.test.ts",
+        "classification": "assertion",
+        "detail": "the slice-4 elements join the closed component vocabulary names the empty state, and no longer the retired Search palette:  AssertionError: expected [ 'jf-action-button', …(162) ] to not include 'jf-sv3-palette'\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/s6-palette-b/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1319:15)\n    at Proxy.<anonymous> (file:///home/elias/dev/justse"
+      }
+    ]
+  },
+  "digest": "sha256:a6495aaada58c5246b6382143485b409cc06aba68e2b50713d443ac39f67c08e"
+}

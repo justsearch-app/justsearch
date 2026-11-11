@@ -247,13 +247,18 @@
       "knownRules": []
     },
     {
-      "surface": "search",
-      "uiShotStep": "sv3-palette-forced-colors",
+      "surface": "palette",
+      "uiShotStep": "palette-forced-colors",
       "knownRules": []
     },
     {
-      "surface": "search",
-      "uiShotStep": "sv3-palette-forced-colors-light",
+      "surface": "palette",
+      "uiShotStep": "palette-forced-colors-light",
+      "knownRules": []
+    },
+    {
+      "surface": "palette",
+      "uiShotStep": "palette-600x400-text-200",
       "knownRules": []
     },
     {

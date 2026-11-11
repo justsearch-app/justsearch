@@ -329,15 +329,16 @@ final class PdfOcrEngine implements AutoCloseable {
           } else if (page.failureReason() != null) {
             spawnFailure = page.failureReason();
           }
-          if (page.text() != null && !page.text().isBlank()) {
+          String pageText = PdfTextNormalization.joinLineEndHyphens(page.text());
+          if (!pageText.isBlank()) {
             int before = merged.length();
-            boolean pageTruncated = appendPage(merged, page.text(), task.pageIndex(), maxOcrChars);
+            boolean pageTruncated = appendPage(merged, pageText, task.pageIndex(), maxOcrChars);
             String marker = "\n\n--- OCR page " + (task.pageIndex() + 1) + " ---\n";
             int textStart = before + marker.length();
             if (merged.length() > textStart) {
               confidences.add(page.confidence());
               pagesProcessed++;
-              if (merged.length() - textStart >= page.text().length()
+              if (merged.length() - textStart >= pageText.length()
                   || VisualPageEvidencePolicy.hasReadableText(merged.substring(textStart))) {
                 coveredPages.add(task.pageIndex());
               }

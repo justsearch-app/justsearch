@@ -84,6 +84,7 @@
         "modules/ui-web/src/shell-v0/state/folderStatus.ts",
         "modules/ui-web/src/shell-v0/state/frameStatus.ts",
         "modules/ui-web/src/shell-v0/state/firstUse.ts",
+        "modules/ui-web/src/shell-v0/state/indexedRoots.ts",
         "modules/ui-web/src/shell-v0/controllers/frameStatusController.ts"
       ]
     },

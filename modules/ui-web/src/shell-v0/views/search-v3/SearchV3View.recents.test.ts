@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 // SPDX-License-Identifier: Apache-2.0
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { invokeCommandWithResult } from '../../commands/CommandRegistry.js';
 import './SearchV3View.js';
 import type { SearchV3View } from './SearchV3View.js';
 import type { Sv3Composer } from './Sv3Composer.js';
@@ -116,7 +117,7 @@ it('Y2 records only accepted explicit Search actions with exact dedup and an eig
   for (const text of ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'failed', '"']) await search(el, text);
   await focusEmpty(el); expect(labels(el, 'search')).toEqual(['"', 'failed', 'seven', 'six', 'five', 'four', 'three', 'two']);
   await search(el, '  three  '); await search(el, 'Three'); await search(el, 'three  words'); await search(el, 'three words');
-  await type(el, 'palette'); el.shadowRoot!.querySelector('jf-sv3-palette')!.dispatchEvent(new CustomEvent('sv3-palette-run', { detail: { id: 'cmd-everything' } })); await settle(el);
+  await type(el, 'palette'); await invokeCommandWithResult('cmd-everything'); await settle(el);
   await focusEmpty(el); expect(labels(el, 'search').slice(0, 5)).toEqual(['palette', 'three words', 'three  words', 'Three', 'three']);
   const before = labels(el, 'search');
   await type(el, 'automatic'); await new Promise(resolve => setTimeout(resolve, 750));

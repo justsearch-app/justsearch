@@ -81,7 +81,9 @@ vi.mock('../../state/agentSessionStore.js', () => ({
 }));
 
 import './SearchV3View.js';
+import '../../commands/CommandPalette.js';
 import type { SearchV3View } from './SearchV3View.js';
+import type { CommandPalette } from '../../commands/CommandPalette.js';
 import {
   addScopeChip,
   buildSearchIntent,
@@ -1247,16 +1249,22 @@ describe('S1.11 — the palette’s search uses Search mode', () => {
     const el = await mount();
     await chooseTier(el, 'ask');
     await type(el, 'lease');
-    const palette = el.shadowRoot?.querySelector('jf-sv3-palette') as
-      | (Mounted & { show(i: HTMLElement | null): Promise<void> })
-      | null;
-    await palette?.show(null);
-    await palette?.updateComplete;
-    expect(palette?.shadowRoot?.querySelector('#sv3-palette-item-cmd-search-text')).toBeNull();
-    palette?.shadowRoot?.querySelector<HTMLElement>('#sv3-palette-item-cmd-everything')?.click();
+    // The app's one palette, where this window registers "Search everything".
+    const palette = document.createElement('jf-command-palette') as CommandPalette;
+    document.body.append(palette);
+    palette.show();
+    await palette.updateComplete;
+    const field = palette.shadowRoot!.querySelector('input')!;
+    field.value = 'Search';
+    field.dispatchEvent(new Event('input'));
+    await palette.updateComplete;
+    const options = [...palette.shadowRoot!.querySelectorAll<HTMLElement>('[role="option"]')];
+    expect(options.some((o) => o.textContent?.includes('Search this text'))).toBe(false);
+    options.find((o) => o.querySelector('.result-label')?.textContent === 'Search everything')?.click();
     await settle(el);
     expect(el.tier).toBe('search');
     expect(await rowTitles(el)).toEqual(['a.md']);
+    palette.remove();
   });
 });
 

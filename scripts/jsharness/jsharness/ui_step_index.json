@@ -52,8 +52,12 @@
     "sv3-filters-hero-normal-dark", "sv3-filters-hero-normal-light", "sv3-filters-hero-normal-forced", "sv3-filters-hero-narrow-dark", "sv3-filters-hero-narrow-light", "sv3-filters-hero-narrow-forced", "sv3-filters-hero-1280x720-dark", "sv3-filters-hero-1280x720-light", "sv3-filters-hero-1280x720-forced", "sv3-filters-hero-600x400-dark", "sv3-filters-hero-600x400-light", "sv3-filters-hero-600x400-forced", "sv3-filters-docked-normal-dark", "sv3-filters-docked-normal-light", "sv3-filters-docked-normal-forced", "sv3-filters-docked-narrow-dark", "sv3-filters-docked-narrow-light", "sv3-filters-docked-narrow-forced", "sv3-filters-docked-1280x720-dark", "sv3-filters-docked-1280x720-light", "sv3-filters-docked-1280x720-forced", "sv3-filters-docked-600x400-dark", "sv3-filters-docked-600x400-light", "sv3-filters-docked-600x400-forced","sv3-search-results"],
   "shell-v0/views/search-v3/sv3-tokens.css.ts": [
     "sv3-citation-selected", "sv3-composer-occlusion",
-    "sv3-hero-forced-colors", "sv3-docked-forced-colors", "sv3-palette-forced-colors",
+    "sv3-hero-forced-colors", "sv3-docked-forced-colors",
     "sv3-search-results"
+  ],
+  "shell-v0/commands/CommandPalette.ts": [
+    "palette-forced-colors", "palette-forced-colors-light", "palette-600x400-text-200",
+    "library-arrival-palette-1280x720", "library-arrival-palette-600x400"
   ],
   "shell-v0/views/search-v3/Sv3Pane.ts": [
     "sv3-citation-selected", "sv3-citation-dropped", "chat-occlusion",

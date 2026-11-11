@@ -27,7 +27,7 @@ import {
   __resetAiStateForTest,
 } from '../../state/aiStateStore.js';
 import type { StatusSnapshot } from '../../utils/statusPoll.js';
-import { SV3_COMMAND_SEARCH } from './fixtures.js';
+import { invokeCommandWithResult } from '../../commands/CommandRegistry.js';
 import { __resetConversationListForTest } from '../../state/conversationListStore.js';
 import { __resetDraftProvidersForTest } from '../../controllers/draftPersistence.js';
 import { __resetDraftKeptForTest } from '../../controllers/draftKeptHint.js';
@@ -512,18 +512,8 @@ describe('the in-motion dot belongs to the running session alone', () => {
     field.value = draft;
     field.dispatchEvent(new Event('input'));
     await composer.updateComplete;
-    const palette = el.shadowRoot?.querySelector('jf-sv3-palette') as
-      | (HTMLElement & {
-          show(i: HTMLElement | null): Promise<void>;
-          updateComplete: Promise<unknown>;
-        })
-      | null;
-    if (!palette) throw new Error('no palette in the window');
-    await palette.show(null);
-    await palette.updateComplete;
-    palette.shadowRoot
-      ?.querySelector<HTMLElement>(`#sv3-palette-item-${SV3_COMMAND_SEARCH}`)
-      ?.click();
+    // "Search everything" in the app's palette: the action this window registers under its id.
+    expect((await invokeCommandWithResult('cmd-everything')).ok).toBe(true);
     await el.updateComplete;
   }
 });

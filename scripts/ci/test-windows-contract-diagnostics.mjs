@@ -37,11 +37,11 @@ for (const id of ['windows-native-contracts', 'windows-native-contracts-2']) {
   }
 }
 
-test('Windows conformance evidence uploads on failure for seven days', () => {
+test('Windows conformance evidence uploads on failure for thirty days', () => {
   const upload = job.steps.find(step => step.name === 'Preserve supervisor conformance diagnostics');
   assert.equal(upload.if, 'failure()');
   assert.equal(upload.uses, 'actions/upload-artifact@v7');
   assert.equal(upload.with.path, 'tmp/supervisor-conformance/**');
-  assert.equal(upload.with['retention-days'], 7);
+  assert.equal(upload.with['retention-days'], 30);
   assert.match(upload.with.name, /github.run_attempt/);
 });

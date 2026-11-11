@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /** Search command preservation at the mounted window boundary; no catalog observations. */
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { invokeCommandWithResult } from '../../commands/CommandRegistry.js';
 import './SearchV3View.js';
 import type { SearchV3View } from './SearchV3View.js';
 import type { Sv3Composer } from './Sv3Composer.js';
@@ -30,8 +31,8 @@ const searches = () => http.mock.calls.filter(call => String(call[0]).includes('
 function runSearch(view: SearchV3View, action: string): void {
   if (action === 'Enter') emit(view, 'sv3-composer-submit', { tier: 'search', query: 'current draft' });
   if (action === 'typing') emit(view, 'sv3-composer-draft', { previous: 'previous draft', text: 'current draft' });
-  if (action === 'palette') view.shadowRoot!.querySelector('jf-sv3-palette')!.dispatchEvent(
-    new CustomEvent('sv3-palette-run', { detail: { id: 'cmd-everything' } }));
+  // The app palette's "Search everything": the action this window registers under its id.
+  if (action === 'palette') void invokeCommandWithResult('cmd-everything');
 }
 function prepareAsk(view: SearchV3View, action: 'card' | 'chosen'): void {
   if (action === 'card') emit(view, 'card-scope-file', { path: '/chosen.txt' });
@@ -163,8 +164,7 @@ it.each(['card', 'chosen'] as const)('preparing %s-file Ask succeeds when attach
 it('blank palette Search changes preparation without submitting', async () => {
   const view = await mount(); emit(view, 'sv3-tier-change', { tier: 'ask' }); await settle(view);
   composer(view).draft = '  ';
-  view.shadowRoot!.querySelector('jf-sv3-palette')!.dispatchEvent(
-    new CustomEvent('sv3-palette-run', { detail: { id: 'cmd-everything' } }));
+  void invokeCommandWithResult('cmd-everything');
   await settle(view);
   expect(composer(view).tier).toBe('search'); expect(composer(view).draft).toBe('  ');
   expect(searches()).toHaveLength(0);

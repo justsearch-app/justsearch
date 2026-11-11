@@ -13,8 +13,9 @@
  *  2. **Both boundaries leave the main column its 640.** The window-level half of
  *     `sv3-boundaries.test.ts`'s both-open probe: a real drag, against a measured box, with the pane
  *     open.
- *  3. **Escape order** (rename > pane > palette > composer flip, Phase F9). The pane closes before
- *     an open palette, and BOTH yield to an inline rename — the most local transient state wins.
+ *  3. **Escape order** (rename > pane > composer flip, Phase F9). The pane yields to an inline rename —
+ *     the most local transient state wins — and the app's palette, above the window, keeps its own
+ *     Escape: closing it never closes the pane (S6 SP9).
  *  4. **Cited documents only.** Structural, because behaviour cannot prove an absence: the window has
  *     exactly one writer of the pane's document, and the pane has no attribute route into it.
  *
@@ -26,6 +27,10 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SearchV3View } from './SearchV3View.js';
+import '../../commands/CommandPalette.js';
+import type { CommandPalette } from '../../commands/CommandPalette.js';
+import { attachKeybindingDispatcher, registerKeybinding, __resetForTest as resetKeybindings } from '../../commands/KeybindingRegistry.js';
+import { CORE_PROVENANCE } from '../../primitives/provenance.js';
 import { SV3_CITATION_OPEN } from './Sv3Main.js';
 import { Sv3Pane, SV3_PANE_CLOSE } from './Sv3Pane.js';
 import type { Sv3SessionRow } from './Sv3SessionRow.js';
@@ -541,38 +546,31 @@ describe('the pane closes on a real conversation switch, and only a real one', (
 /* ── 3. Escape order ─────────────────────────────────────────────────────────────────────────── */
 
 describe('Escape closes the pane FIRST', () => {
-  it('closes the pane and leaves an open palette open', async () => {
-    const el = await mount();
-    await openPane(el);
-    el.togglePalette(null);
-    const palette = (await region(el, 'jf-sv3-palette')) as unknown as HTMLElement & { open: boolean; shadowRoot: ShadowRoot | null };
-    await el.updateComplete;
-    expect(palette.open).toBe(true);
+  it('SP9 one chord in the composer opens only the app palette, and its Escape closes the palette while the pane stays open', async () => {
+    // The app's one palette and its one chord binding, as the Shell wires them.
+    const palette = document.createElement('jf-command-palette') as CommandPalette;
+    document.body.append(palette);
+    registerKeybinding({ key: 'mod+k', commandId: 'shell.toggle-palette', source: 'default', provenance: CORE_PROVENANCE });
+    const detach = attachKeybindingDispatcher((id) => { if (id === 'shell.toggle-palette') { if (palette.open) palette.hide(); else palette.show(); } });
+    try {
+      const el = await mount();
+      await openPane(el);
+      const composer = await region(el, 'jf-sv3-composer');
+      const textarea = composer.shadowRoot!.querySelector('textarea')!;
+      textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true, composed: true, cancelable: true }));
+      await settle(el);
+      await palette.updateComplete;
+      expect(palette.open).toBe(true);
+      // No second palette anywhere in the window.
+      expect(el.shadowRoot?.querySelector('[role="dialog"], [aria-modal="true"], jf-sv3-palette')).toBeNull();
 
-    const field = palette.shadowRoot?.querySelector('input');
-    expect(field).not.toBeNull();
-    field?.dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, composed: true, cancelable: true }),
-    );
-    await el.updateComplete;
-
-    // The pane went; the palette — whose own Escape handler would otherwise have run — stayed.
-    expect(el.shadowRoot?.querySelector('jf-sv3-pane')).toBeNull();
-    expect(palette.open).toBe(true);
-  });
-
-  it('leaves the palette its Escape once the pane is closed', async () => {
-    const el = await mount();
-    el.togglePalette(null);
-    const palette = (await region(el, 'jf-sv3-palette')) as unknown as HTMLElement & { open: boolean; shadowRoot: ShadowRoot | null };
-    await el.updateComplete;
-    palette.shadowRoot
-      ?.querySelector('input')
-      ?.dispatchEvent(
+      palette.shadowRoot!.querySelector('input')!.dispatchEvent(
         new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, composed: true, cancelable: true }),
       );
-    await el.updateComplete;
-    expect(palette.open).toBe(false);
+      await settle(el);
+      expect(palette.open).toBe(false);
+      expect(el.shadowRoot?.querySelector('jf-sv3-pane')).not.toBeNull();
+    } finally { detach(); resetKeybindings(); }
   });
 
   it('yields to a rename in progress — the edit is the most local transient state', async () => {

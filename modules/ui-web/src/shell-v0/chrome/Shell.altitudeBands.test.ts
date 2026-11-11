@@ -1,8 +1,7 @@
 // @vitest-environment happy-dom
 
 import { describe, expect, it } from 'vitest';
-import './Shell.js'; // side-effect: registers the custom elements + exports the helper
-import { clampReorderToAltitudeBands } from './Shell.js';
+import { clampReorderToAltitudeBands } from '../layout/frameAreas.js';
 import type { Surface } from '../../api/types/surface.js';
 
 /** Minimal Surface fixture — only id + altitude drive the cross-altitude move-ban clamp. */

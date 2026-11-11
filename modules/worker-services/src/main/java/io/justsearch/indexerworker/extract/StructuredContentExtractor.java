@@ -110,7 +110,7 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
           StructuredDocumentSummary.empty());
     }
 
-    ParseContext context = parseContextWithMarkedPdfContent();
+    ParseContext context = parseContextWithPdfText();
     EmbeddedResourceBudget budget =
         new EmbeddedResourceBudget(policy, input.size(), context, input.expansion());
     context.set(org.apache.tika.parser.Parser.class, parser);
@@ -196,14 +196,10 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
     Path file = input.source();
     log.debug("Structured extraction from: {} ({} bytes)", file.getFileName(), input.size());
 
-    StructuredContentHandler handler = new StructuredContentHandler(maxContentLength);
+    StructuredContentHandler handler = new StructuredContentHandler(
+        maxContentLength, "application/pdf".equals(input.detect(tika)));
     Metadata metadata = input.metadata();
 
-    // Enable marked content extraction for tagged PDFs — this enables table, heading,
-    // and list extraction for the subset of PDFs that have accessibility tags.
-    // Falls back gracefully for untagged PDFs (no additional cost).
-    // PDFParserConfig is in tika-parsers-standard (runtimeOnly), so we configure via reflection
-    // to avoid a compile-time dependency.
     // No owner window: this parser graph cannot launch Tesseract (OwnedTikaParsers excludes it).
     try (InputStream is = input.openParserStream(tika)) {
       parser.parse(is, handler, metadata, parseContext);
@@ -247,25 +243,25 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
             .map(Map.Entry::getKey).collect(java.util.stream.Collectors.toUnmodifiableSet()));
   }
 
-  private static ParseContext parseContextWithMarkedPdfContent() {
+  private static ParseContext parseContextWithPdfText() {
     ParseContext parseContext = new ParseContext();
-    configurePdfMarkedContent(parseContext);
+    configurePdfText(parseContext);
     configureTesseractSkipOcr(parseContext);
     return parseContext;
   }
 
   /**
-   * Configures PDF marked content extraction via reflection. PDFParserConfig is in
+   * Configures physical PDF text extraction via reflection. PDFParserConfig is in
    * tika-parsers-standard (runtimeOnly dependency), so we avoid a compile-time import.
    */
   @SuppressWarnings("unchecked")
-  private static void configurePdfMarkedContent(ParseContext parseContext) {
+  private static void configurePdfText(ParseContext parseContext) {
     try {
       Class<?> configClass = Class.forName("org.apache.tika.parser.pdf.PDFParserConfig");
       Object config = configClass.getDeclaredConstructor().newInstance();
       configClass
           .getMethod("setExtractMarkedContent", boolean.class)
-          .invoke(config, true);
+          .invoke(config, false);
       configurePdfOcrStrategy(configClass, config, "NO_OCR");
       invokeIfPresent(configClass, config, "setExtractInlineImages", boolean.class, false);
       // ParseContext.set(Class<T>, T) — use raw types to match
@@ -273,9 +269,9 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
           .getClass()
           .getMethod("set", Class.class, Object.class)
           .invoke(parseContext, configClass, config);
-      log.debug("PDF marked content extraction enabled");
+      log.debug("PDF physical text extraction configured");
     } catch (Exception e) {
-      log.debug("Could not enable PDF marked content extraction: {}", e.getMessage());
+      log.debug("Could not configure PDF physical text extraction: {}", e.getMessage());
       // Non-fatal: structured extraction still works for page boundaries and paragraphs
     }
   }

@@ -10,7 +10,7 @@
  * transition, not "no folders configured".
  */
 
-import { describe, expect, it, beforeEach, afterEach } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import './LibrarySurface.js';
 import { folderRowLabel, type LibrarySurface } from './LibrarySurface.js';
 import { folderStatus } from '../state/folderStatus.js';
@@ -203,6 +203,7 @@ describe('LibrarySurface — a folder row never names itself with a hash (804 F8
     } as unknown as PluginHostApi;
     document.body.appendChild(el);
     await el.updateComplete;
+    await vi.waitFor(() => expect(el.loading).toBe(false));
     try {
       el.roots = [
         {
@@ -287,6 +288,7 @@ describe('LibrarySurface — the folder row consults enrichment coverage (809 fi
     } as unknown as PluginHostApi;
     document.body.appendChild(el);
     await el.updateComplete;
+    await vi.waitFor(() => expect(el.loading).toBe(false));
     el.roots = [
       {
         pathHash: HASH,
@@ -410,6 +412,7 @@ it('L1 library retry waiting appears once outside folder rows', async () => {
   el.host_ = { ...stubHost, utilities: { formatRelativeTime: () => 'just now' } } as unknown as PluginHostApi;
   document.body.appendChild(el);
   await el.updateComplete;
+  await vi.waitFor(() => expect(el.loading).toBe(false));
   try {
     const root = { pathHash: 'wait-root', collection: 'notes', fileCount: 37,
       indexed: true, inFlightCount: 8, failedCount: 0 } as IndexedRootView;

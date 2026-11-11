@@ -64,9 +64,9 @@ export function deepActiveElement(doc: Document = document): Element | null {
 /**
  * Tempdoc 864 Layer 2(b) — the two guards EVERY global key handler owes the reader, in ONE place.
  *
- * - `isComposing` — a keystroke that is feeding an IME candidate window belongs to the IME, not to a
- *   shortcut. The typing guard alone does not cover it: composition can be driven from a control the
- *   predicate correctly reports as non-editable.
+ * - `isComposing` or `keyCode` 229 ({@link isImeComposition}) — a keystroke that is feeding an IME
+ *   candidate window belongs to the IME, not to a shortcut. The typing guard alone does not cover
+ *   it: composition can be driven from a control the predicate correctly reports as non-editable.
  * - `repeat` — an auto-repeating key is one intent held down, not N intents. A global command fired
  *   per repeat flaps state (`Ctrl+D` bookmark on/off/on) or floods navigation.
  *
@@ -78,7 +78,17 @@ export function deepActiveElement(doc: Document = document): Element | null {
  * (b1) is the better end state and is deferred, not done: see §3.2(b).
  */
 export function shouldIgnoreKeyEvent(e: KeyboardEvent): boolean {
-  return e.isComposing === true || e.repeat === true;
+  return isImeComposition(e) || e.repeat === true;
+}
+
+/**
+ * Shell S6 SP1 — a keystroke the IME is processing. Chromium and WebKit report the first keydown of
+ * a composition (and every keydown the IME consumes) with `keyCode` 229 while `isComposing` is still
+ * false, so `isComposing` alone lets that keydown reach a shortcut: with Search's composer focused,
+ * Ctrl K typed into an IME opened the palette. Both signals mean "this key belongs to the IME".
+ */
+export function isImeComposition(e: KeyboardEvent): boolean {
+  return e.isComposing === true || e.keyCode === 229;
 }
 
 export function isTypingTarget(el: Element | null): boolean {

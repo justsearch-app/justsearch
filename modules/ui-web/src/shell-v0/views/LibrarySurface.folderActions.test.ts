@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { afterEach, expect, it, vi } from 'vitest';
 import './LibrarySurface.js';
+import * as paletteProjection from '../commands/CommandPaletteProjection.js';
 import './BrowseSurface.js';
 import type { LibrarySurface } from './LibrarySurface.js';
 import type { SurfaceTabs } from '../components/SurfaceTabs.js';
@@ -370,4 +371,37 @@ it('R1 a late picker selects Folders, but a response from before reconnect canno
   el.remove(); document.body.append(el); await pump(el);
   obsolete.resolve('/obsolete'); await pump(el);
   expect(el.showManualInput).toBe(false); expect(el.pendingPath).not.toBe('/obsolete');
+});
+
+it('SP5 palette folder opening expands and focuses that exact Library root', async () => {
+  const h = await mount();
+  vi.mocked(globalThis.fetch).mockImplementation(async input => h.fetch(String(input)));
+  // Close both rows; the arrival has to expand its own identity.
+  for (const button of h.el.shadowRoot!.querySelectorAll<HTMLButtonElement>('.folder-toggle')) button.click();
+  await pump(h.el);
+  const entry = paletteProjection.searchPaletteEntries('').find(row => row.entry.id === 'folder:b')?.entry;
+  expect(entry).toBeDefined(); if (entry) await paletteProjection.invokePaletteEntry?.(entry); await pump(h.el);
+  const b = h.el.shadowRoot!.querySelector<HTMLElement>('[data-focus-row="b"]')!;
+  expect(b.querySelector('.folder-toggle')?.getAttribute('aria-expanded')).toBe('true');
+  expect(h.el.shadowRoot!.activeElement).toBe(b.querySelector('.folder-toggle'));
+  expect(h.invoke).not.toHaveBeenCalled();
+});
+it('SP5 palette Remove hands off to Library confirmation and never deletes directly', async () => {
+  const h = await mount(); vi.mocked(globalThis.fetch).mockImplementation(async input => h.fetch(String(input)));
+  const entry = paletteProjection.searchPaletteEntries('').find(row => row.entry.id === 'folder:a')?.entry;
+  expect(entry).toBeDefined();
+  if (entry) await paletteProjection.invokePaletteEntry?.(entry, entry.actions[1]!.target); await pump(h.el);
+  expect(band(h.el)?.heading).toBe('Remove docs from your library?');
+  expect(h.invoke).not.toHaveBeenCalled();
+});
+it('SP5-SP9 a root removed while its Library arrival is pending is reported absent without substituting a neighbour', async () => {
+  const h = await mount();
+  const entry = paletteProjection.searchPaletteEntries('').find(row => row.entry.id === 'folder:a')?.entry;
+  expect(entry).toBeDefined();
+  vi.mocked(globalThis.fetch).mockResolvedValue(Response.json({ items: [root('a'), root('b')] }));
+  const pending = deferred<Response>(); h.fetch.mockImplementationOnce(() => pending.promise);
+  if (entry) await paletteProjection.invokePaletteEntry?.(entry, entry.actions[1]!.target);
+  h.setRows([root('b')]); pending.resolve(Response.json({ items: [root('b')] })); await pump(h.el);
+  expect(h.el.error).toContain('no longer in your library'); expect(band(h.el)).toBeNull();
+  expect(h.invoke).not.toHaveBeenCalled();
 });

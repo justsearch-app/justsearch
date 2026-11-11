@@ -14,6 +14,7 @@
  * clicked a row instead would pass with the whole projection deleted.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { invokeCommandWithResult } from '../../commands/CommandRegistry.js';
 import './SearchV3View.js';
 import type { SearchV3View } from './SearchV3View.js';
 import { createNavigationHandler } from '../../router/navigationHandler.js';
@@ -377,8 +378,7 @@ describe('New retention at the public boundary', () => {
     expect(el.shadowRoot!.querySelector('[data-testid="sv3-residency-notice"]')?.textContent).toMatch(/address.*moved.*view.*not/i);
     const calls = fetchMock.mock.calls.length;
     field().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, composed: true }));
-    expect(el.shadowRoot!.querySelector('jf-sv3-palette')).not.toBeNull();
-    el.shadowRoot!.querySelector('jf-sv3-palette')!.dispatchEvent(new CustomEvent('sv3-palette-run', { bubbles: true, composed: true, detail: { id: 'cmd-everything' } }));
+    void invokeCommandWithResult('cmd-everything');
     await settle(el);
     expect(fetchMock.mock.calls.slice(calls).filter(c => /\/(knowledge\/search|chat\/dispatch)/.test(String(c[0])))).toHaveLength(0);
     expect(sessionStorage.getItem(key)).toBe(before);
