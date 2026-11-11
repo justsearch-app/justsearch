@@ -45,7 +45,7 @@ final class SystemicBatchDeferralTest {
     db = tempDir.resolve("jobs.db");
     queue = spy(new SqliteJobQueue(db));
     queue.open();
-    writer = mock(IndexingCoordinator.class);
+    writer = PipelineTestFixture.coordinator();
     identities = mock(DocumentIdentityStore.class);
     doAnswer(call -> { if (infrastructureDown.get()) throw new IllegalStateException("shared identity unavailable"); return null; })
         .when(identities).probe();

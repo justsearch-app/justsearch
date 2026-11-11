@@ -216,7 +216,7 @@ final class ServiceOutageBoundaryTest {
     final SqliteJobQueue actualQueue = new SqliteJobQueue(db);
     SqliteJobQueue queue = actualQueue;
     volatile SqliteDocumentIdentityStore store;
-    final IndexingCoordinator writer = mock(IndexingCoordinator.class);
+    final IndexingCoordinator writer = PipelineTestFixture.coordinator();
     final TimeboxedContentExtractor content = mock(TimeboxedContentExtractor.class);
     IndexingLoop loop;
     WorkerIngestService service;

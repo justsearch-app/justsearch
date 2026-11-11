@@ -94,6 +94,7 @@ final class PipelineHealthProofTest {
     var fault = new java.util.concurrent.atomic.AtomicBoolean(true);
     var writes = new AtomicInteger(); var probes = new AtomicInteger();
     var projectionWriter = mock(IndexingCoordinator.class, call -> {
+      if (call.getMethod().getName().equals("replaceTextFamily")) return PipelineTestFixture.publicationAnswer(call);
       String method = call.getMethod().getName();
       if (method.equals("indexSingle")) writes.incrementAndGet();
       if (method.equals("probeIngestion")) probes.incrementAndGet();

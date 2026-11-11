@@ -77,6 +77,30 @@ public final class CommitOps {
    */
   private volatile LuceneRuntimeTypes.BuildState currentBuildState;
 
+  // A new generation has no open-time metadata. Pin its first successful commit's identity,
+  // rather than letting later metadata commits certify artifacts from an earlier model.
+  private volatile Map<String, String> firstCommittedArtifactIdentity = Map.of();
+  private boolean artifactIdentityMayStartHere;
+
+  void captureArtifactReuseOrigin() {
+    try {
+      artifactIdentityMayStartHere = session.indexCountOps.docCountOrThrow() == 0;
+    } catch (IOException | RuntimeException unknown) {
+      // An unreadable or legacy origin can never be certified by a later metadata commit.
+      artifactIdentityMayStartHere = false;
+      log.debug("Cannot establish an empty artifact identity origin", unknown);
+    }
+  }
+
+  Map<String, String> artifactReuseMetadata() {
+    var opened = session.openTimeCommitUserData();
+    return opened.isEmpty() ? firstCommittedArtifactIdentity : opened;
+  }
+
+  boolean artifactReuseStartedEmpty() {
+    return artifactIdentityMayStartHere;
+  }
+
   CommitOps(RuntimeSession session, LuceneRuntimeTypes.BuildState initialBuildState) {
     this.session = session;
     this.currentBuildState =
@@ -123,6 +147,9 @@ public final class CommitOps {
           w.setLiveCommitData(ud != null ? ud.entrySet() : Collections.emptyList());
           long start = System.nanoTime();
           w.commit();
+          if (artifactIdentityMayStartHere && firstCommittedArtifactIdentity.isEmpty() && ud != null) {
+            firstCommittedArtifactIdentity = Map.copyOf(ud);
+          }
           admissionCommitEpoch++;
           refreshAdmissionReader();
           admissionReaderEpoch = admissionCommitEpoch;

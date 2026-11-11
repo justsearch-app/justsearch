@@ -1,0 +1,1125 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
+  },
+  "createdAt": "2026-11-11T06:53:36.159Z",
+  "revision": "6049dc10b6615aa84f317190a5bc41d156370926",
+  "tree": "f013629d61988cdf2c807bf32d241033e12b2df4",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.loop.CanaryWritePathCoverageTest\" --tests \"io.justsearch.indexerworker.loop.DocValuesServiceOutageTest\" --tests \"io.justsearch.indexerworker.loop.ExistingSchemaHealthTest\" --tests \"io.justsearch.indexerworker.loop.ExtractionInfrastructureTest\" --tests \"io.justsearch.indexerworker.loop.InvalidTokenPositionOutageTest\" --tests \"io.justsearch.indexerworker.loop.LiveWriterLockHealthTest\" --tests \"io.justsearch.indexerworker.loop.OutageLifecycleTest\" --tests \"io.justsearch.indexerworker.loop.OutageWaitingStatusTest\" --tests \"io.justsearch.indexerworker.loop.PersistentByteIoSourceTest\" --tests \"io.justsearch.indexerworker.loop.PipelineHealthProofTest\" --tests \"io.justsearch.indexerworker.loop.ServiceOutageBoundaryTest\" --tests \"io.justsearch.indexerworker.loop.SharedMappingLinkageTest\" --tests \"io.justsearch.indexerworker.loop.SharedNormOutageTest\" --tests \"io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest\" --tests \"io.justsearch.indexerworker.loop.SystemicBatchDeferralTest\" --tests \"io.justsearch.indexerworker.loop.UnavailableIdentityBatchTest\" --tests \"io.justsearch.indexerworker.loop.VerifierCappedBacklogStatusTest\" --tests \"io.justsearch.indexerworker.loop.VerifierReadOnlyWriterTest\" --tests \"io.justsearch.indexerworker.loop.WriterAliasRetargetTest\" --tests \"io.justsearch.indexerworker.loop.WriterDocumentIoTest\" --tests \"io.justsearch.indexerworker.loop.WriterLegacyRetargetSourceTest\" --tests \"io.justsearch.indexerworker.loop.WriterLegacySourceStreamTest\" --tests \"io.justsearch.indexerworker.loop.WriterUnreadableAliasTest\" --tests \"io.justsearch.indexerworker.loop.WriterVanishedAliasTest\" --tests \"io.justsearch.indexerworker.loop.AdmissionLookupLivenessTest\" --tests \"io.justsearch.indexerworker.loop.OriginBoundaryAdmissionTest\" --tests \"io.justsearch.indexerworker.loop.VanishedCanonicalSourceTest\" --tests \"io.justsearch.indexerworker.loop.VerifierGeneralCasesTest\" --tests \"io.justsearch.indexerworker.loop.VerifierIdentityLimitTest\" --tests \"io.justsearch.indexerworker.loop.VerifierInterleavedPoisonTest\" --tests \"io.justsearch.indexerworker.loop.VerifierMissingChildSupportTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 468306
+    },
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.extract.AdversarialCorpusIngestionTest\" --tests \"io.justsearch.indexerworker.loop.IndexingLoopRestartTest\" --tests \"io.justsearch.indexerworker.loop.IndexingLoopTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 14517
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/CanaryWritePathCoverageTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/CanaryWritePathCoverageTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3a7f598533abf3c52018721612a39d12334817a557abfbb66d7261528885e2a5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "closedSharedAnalyzerCannotBeProvenHealthyByDirectoryOnlyCanary()",
+          "status": "passed"
+        },
+        {
+          "name": "companionIsDeferredDuringOutageAndChargedInFirstRecoveredBatch()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/DocValuesServiceOutageTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/DocValuesServiceOutageTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ffcd3eb0c3c51d2bf51d371310ca9a75d9ec8cb662bfd3f30f6db297b5ec283f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "textOnlyCanaryMustExerciseSharedDocValuesWriteService()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExistingSchemaHealthTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExistingSchemaHealthTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6467a79f7b411b60c6322a55d704527b6166722335d7961e5200bf96b7624514",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ordinaryStoredSchemaStillPassesWithoutPublishingPendingWork()",
+          "status": "passed"
+        },
+        {
+          "name": "incompatibleStoredTextSchemaMustNotChargeEveryHealthySource()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExtractionInfrastructureTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExtractionInfrastructureTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a9e5fa01f5dda7106342531b8513e927e16a944f6b72dc9c895dbcbc77401eb8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "untypedInfrastructureFailureIsProvenByTheSameExtractionCanary()",
+          "status": "passed"
+        },
+        {
+          "name": "poisonCanary(mixed)",
+          "status": "passed"
+        },
+        {
+          "name": "poisonCanary(one)",
+          "status": "passed"
+        },
+        {
+          "name": "poisonCanary(all)",
+          "status": "passed"
+        },
+        {
+          "name": "snapshotStorage(readonly)",
+          "status": "passed"
+        },
+        {
+          "name": "snapshotStorage(lost-directory)",
+          "status": "passed"
+        },
+        {
+          "name": "snapshotStorage(readonly-child)",
+          "status": "passed"
+        },
+        {
+          "name": "snapshotStorage(lost-directory-child)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/InvalidTokenPositionOutageTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/InvalidTokenPositionOutageTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:33c8317536843f14942dc009581fab3ae07d9a4717b8a649ad4e9e2324040769",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "brokenSharedTokenPositionsMustFailPipelineCanary()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/LiveWriterLockHealthTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/LiveWriterLockHealthTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:eb5a65e577558622e423862669c7ce8513703efd449d178c11d2b1fa88c02b72",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "repeatedProbeLeavesLiveDocumentsAndSharedAnalyzerUsable()",
+          "status": "passed"
+        },
+        {
+          "name": "replacementLockCannotImpersonateTheHeldNativeLock()",
+          "status": "passed"
+        },
+        {
+          "name": "lostLiveNativeWriteLockMustNotPassHealthProof()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/OutageLifecycleTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/OutageLifecycleTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c3255630d6aa82fd4ef3dbde5046cac5394108fe80f51d787d260789cc168879",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "closedLuceneRuntimeDefersBeyondGraceAndRecoversThroughTheRunningLoop()",
+          "status": "passed"
+        },
+        {
+          "name": "stopDuringCappedOutagePauseWakesWithoutInterruptingOrChargingRows()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/OutageWaitingStatusTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/OutageWaitingStatusTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f52c2c750025c82f86386df225ba70bba3ef706b29baabccaa27dbc03db9f2fc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "outageBacklogWaitsUntilTheLoopResumesAndRecoversWithinSeconds(writer)",
+          "status": "passed"
+        },
+        {
+          "name": "outageBacklogWaitsUntilTheLoopResumesAndRecoversWithinSeconds(identity)",
+          "status": "passed"
+        },
+        {
+          "name": "outageBacklogWaitsUntilTheLoopResumesAndRecoversWithinSeconds(draining)",
+          "status": "passed"
+        },
+        {
+          "name": "outageBacklogWaitsUntilTheLoopResumesAndRecoversWithinSeconds(mixed)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PersistentByteIoSourceTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PersistentByteIoSourceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1b0aa3441fcbbbca7fba8c1f5844d0b75be411990e5ccfb4ae72fbcb7c428562",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "sourcePolicyDependsOnActualAccessAndPreservesHealthyOutage(String) [1] persistent-byte-eio",
+          "status": "passed"
+        },
+        {
+          "name": "sourcePolicyDependsOnActualAccessAndPreservesHealthyOutage(String) [2] captured-byte-eio",
+          "status": "passed"
+        },
+        {
+          "name": "sourcePolicyDependsOnActualAccessAndPreservesHealthyOutage(String) [3] readable",
+          "status": "passed"
+        },
+        {
+          "name": "sourcePolicyDependsOnActualAccessAndPreservesHealthyOutage(String) [4] readable-empty",
+          "status": "passed"
+        },
+        {
+          "name": "sourcePolicyDependsOnActualAccessAndPreservesHealthyOutage(String) [5] submitted-fifo",
+          "status": "passed"
+        },
+        {
+          "name": "sourcePolicyDependsOnActualAccessAndPreservesHealthyOutage(String) [6] captured-fifo",
+          "status": "passed"
+        },
+        {
+          "name": "sourcePolicyDependsOnActualAccessAndPreservesHealthyOutage(String) [7] submitted-regular",
+          "status": "passed"
+        },
+        {
+          "name": "sourcePolicyDependsOnActualAccessAndPreservesHealthyOutage(String) [8] captured-regular",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PipelineHealthProofTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PipelineHealthProofTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e3c40f01a03bc74491c1b9326305810ee587e38a2872afef064cdaecd7cfe0d2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "documentValueLimitIsChargedWhenNormalCanaryRoundTripPasses()",
+          "status": "passed"
+        },
+        {
+          "name": "invalidSharedParserOutputCannotProvePipelineHealth()",
+          "status": "passed"
+        },
+        {
+          "name": "interleavedTerminalPoison(false)",
+          "status": "passed"
+        },
+        {
+          "name": "interleavedTerminalPoison(true)",
+          "status": "passed"
+        },
+        {
+          "name": "unavailableProjectionWriterCannotHideBehindHealthyDestination()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ServiceOutageBoundaryTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ServiceOutageBoundaryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:25cd1584dd23ba548bacedd789676d6b02757d55df528afe6d2c1ce96638a950",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "readonlyQueuePollUsesGrowingServicePauseAndRecoversWithoutCharging()",
+          "status": "passed"
+        },
+        {
+          "name": "persistentJobsReadonlyAfterFourthBatchRetainsOutagePacingAndBoundedLogs()",
+          "status": "passed"
+        },
+        {
+          "name": "publicStatusDuringActualEarlyOutagePauseWithFreshLaterBacklog()",
+          "status": "passed"
+        },
+        {
+          "name": "readonlyCommittedQueueOutcomesKeepOwnersAndUseGrowingPause()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedMappingLinkageTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedMappingLinkageTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d79ea9a8c0e9a50b208934e9c8d63bdc01f962dc1f89cff9c0eb7d3697636df7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "failedSharedMappingAndItsCanaryMustNotStrandClaimedRows()",
+          "status": "passed"
+        },
+        {
+          "name": "vmProbeFailureStillReturnsClaimsAndPropagates()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedNormOutageTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedNormOutageTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6e28389e0948f83fe845f22e8848cb233d050a332b8f07e63293028ca23397a4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "sharedInvalidNormMustFailPipelineCanary()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:11d0c59a2875425a05bf761467e10f0afc3c4da7d1172c90f5f9b77422b3f9eb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "PATH_CLOSED",
+          "status": "passed"
+        },
+        {
+          "name": "PATH_CONNECTION_LOST",
+          "status": "passed"
+        },
+        {
+          "name": "PATH_READ_ONLY",
+          "status": "passed"
+        },
+        {
+          "name": "PATH_SCHEMA_LOST",
+          "status": "passed"
+        },
+        {
+          "name": "PATH_OPEN_FAILED",
+          "status": "passed"
+        },
+        {
+          "name": "EXTRACTOR_CLOSED",
+          "status": "passed"
+        },
+        {
+          "name": "EXTRACTION_EXECUTOR_CLOSED",
+          "status": "passed"
+        },
+        {
+          "name": "EXTRACTION_SANDBOX_CLOSED",
+          "status": "passed"
+        },
+        {
+          "name": "EXTRACTION_START_FAILED",
+          "status": "passed"
+        },
+        {
+          "name": "EXTRACTION_READER_CLOSED",
+          "status": "passed"
+        },
+        {
+          "name": "EXTRACTOR_CLOSING",
+          "status": "passed"
+        },
+        {
+          "name": "EXTRACTION_SANDBOX_CLOSING",
+          "status": "passed"
+        },
+        {
+          "name": "EXTRACTOR_REGISTRY_CLOSED",
+          "status": "passed"
+        },
+        {
+          "name": "EXTRACTOR_REGISTRY_EMPTY",
+          "status": "passed"
+        },
+        {
+          "name": "EXTRACTOR_REGISTRY_CLOSING",
+          "status": "passed"
+        },
+        {
+          "name": "EXTRACTOR_POLICY_CLOSED",
+          "status": "passed"
+        },
+        {
+          "name": "EXTRACTOR_STRUCTURED_CLOSED",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SystemicBatchDeferralTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SystemicBatchDeferralTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8b38d59a64f1bc8b8520f1d6494e9330cf234f3710a8631a4d431898730557a0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "healthyBatchCannotRenewFreeGraceForPoison()",
+          "status": "passed"
+        },
+        {
+          "name": "repeatedSystemicFaultsStayBoundedWithoutChargingAttempts()",
+          "status": "passed"
+        },
+        {
+          "name": "writerOutageDefersWholeBatchWithoutAttemptsAndRecoversPromptly()",
+          "status": "passed"
+        },
+        {
+          "name": "isolatedWriterFailureUsesLadderAndDoesNotStarveLaterFiles()",
+          "status": "passed"
+        },
+        {
+          "name": "documentArgumentFailureUsesLadderEvenWithoutSuccessfulPeers()",
+          "status": "passed"
+        },
+        {
+          "name": "isolatedIdentityFailureUsesLadderAndDoesNotStarveLaterFiles()",
+          "status": "passed"
+        },
+        {
+          "name": "poisonEventuallyUsesLadder(1: 1, false, java.lang.IllegalStateException: poison)",
+          "status": "passed"
+        },
+        {
+          "name": "poisonEventuallyUsesLadder(2: 1, false, java.lang.NullPointerException: poison)",
+          "status": "passed"
+        },
+        {
+          "name": "poisonEventuallyUsesLadder(3: 3, false, java.lang.IllegalStateException: poison)",
+          "status": "passed"
+        },
+        {
+          "name": "poisonEventuallyUsesLadder(4: 3, false, io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException: document IO)",
+          "status": "passed"
+        },
+        {
+          "name": "poisonEventuallyUsesLadder(5: 3, false, io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException: missing_uid_field)",
+          "status": "passed"
+        },
+        {
+          "name": "poisonEventuallyUsesLadder(6: 3, true, java.lang.IllegalStateException: poison identity)",
+          "status": "passed"
+        },
+        {
+          "name": "systemicOutagePausesBetweenBatchesEvenWithReadyBacklog(1: false, java.lang.IllegalStateException: shared writer unavailable)",
+          "status": "passed"
+        },
+        {
+          "name": "systemicOutagePausesBetweenBatchesEvenWithReadyBacklog(2: false, io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException: draining)",
+          "status": "passed"
+        },
+        {
+          "name": "systemicOutagePausesBetweenBatchesEvenWithReadyBacklog(3: true, java.lang.IllegalStateException: identity store unavailable)",
+          "status": "passed"
+        },
+        {
+          "name": "provenOutageBacksOffCapsLogsAndResets(false)",
+          "status": "passed"
+        },
+        {
+          "name": "provenOutageBacksOffCapsLogsAndResets(true)",
+          "status": "passed"
+        },
+        {
+          "name": "identityOutageDefersWholeBatchWithoutAttemptsAndRecoversPromptly()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/UnavailableIdentityBatchTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/UnavailableIdentityBatchTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0b287c163367ee23248c89d3aef074c4790b9bd5a73d1541edf2efa960f7e541",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unavailableIdentityReceiverNeverChargesTheBatch()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierCappedBacklogStatusTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierCappedBacklogStatusTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9f70061dfcf47256f24deca15bdeea88f7e0a5a514e078044db503da29dd98cc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "extendingServiceDeferralsPreservesMixedFileRetriesAndNeverMovesDeadlinesBackwards()",
+          "status": "passed"
+        },
+        {
+          "name": "previouslyDeferredBacklogIsNotReadyDuringLaterCappedPause()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0a8325502bd1517435939cd4efdbffd7884e833cc852c2245d052224bbe09ed7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "provenSharedOutageRemainsFreeAfterSuccessfulPeer()",
+          "status": "passed"
+        },
+        {
+          "name": "realUnwritableIndexDoesNotChargeHealthySourceFiles()",
+          "status": "passed"
+        },
+        {
+          "name": "actualDirectoryFailureRemainsFreeBeyondGrace()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterAliasRetargetTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterAliasRetargetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:912862b880254d695d6ed63c33c36978eb92bdde5f4de4ad96f3a49787f874d2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "retargetedSourceParentStillCostsAFileAttemptWhileOldCanonicalFileExists()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterDocumentIoTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterDocumentIoTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6083cf72a6f91c4ca71595cf4bbf255a53328230ff24002b3b7874877614b633",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] plain",
+          "status": "passed"
+        },
+        {
+          "name": "[2] outside-path",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterLegacyRetargetSourceTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterLegacyRetargetSourceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9a915ac73caf036570df3ef09ba43f4ca74f279d2d2cba49ef7f0c78210e18ff",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "capturedCanonicalUnreadableSourceStillCostsOneAttemptAfterReadableRetarget()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterLegacySourceStreamTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterLegacySourceStreamTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7444b8eb3e4ac563bf2c3c344ac73f8dd36ad2c7ec7522786e6c3041b7cea067",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "legacy-source-stream-false",
+          "status": "passed"
+        },
+        {
+          "name": "legacy-source-stream-true",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterUnreadableAliasTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterUnreadableAliasTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8db31921ffb5eb49cbf25b195b65826572a6a0f5b80b7cecbb52c4b86bcc508e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] false",
+          "status": "passed"
+        },
+        {
+          "name": "[2] true",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterVanishedAliasTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterVanishedAliasTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f634cd709fb8b63157c2847e0ec87648a750b05b667ed53a60ff40507409db5f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "canonicalSourceVanishingDuringRealWriteStillCostsAFileAttemptDuringOutage()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/AdmissionLookupLivenessTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/AdmissionLookupLivenessTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:235200b5de813b1aa03100a03f2e40aac52e01ff615866e9fd3bcd1f3331a40a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] admission-query",
+          "status": "passed"
+        },
+        {
+          "name": "[2] presence-lookup",
+          "status": "passed"
+        },
+        {
+          "name": "[3] io-presence-lookup",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/OriginBoundaryAdmissionTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/OriginBoundaryAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a6d04488e68829dffc8bbe1a26f76ba49bcfd335ee25048163393e5d73c0be26",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "runningLoopRejectsAQueuedAncestorReplacementBeforeOpeningContent()",
+          "status": "passed"
+        },
+        {
+          "name": "unwatchedScanKeepsBoundaryAcrossRestartAndWatchRemoval()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VanishedCanonicalSourceTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VanishedCanonicalSourceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0a6aba5bd6c25185846919e62a04901c4518cb7ce0e4bf81dcbf276c06e67af4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "vanishedCanonicalSourceKeepsFilePolicyDuringWriterOutage()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierGeneralCasesTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierGeneralCasesTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b86d97813ce2fb59a2e0beed17dd8204aaa4f048c851c44719da01f812a23fd3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "documentPathProvenance(symlink-canonical-source)",
+          "status": "passed"
+        },
+        {
+          "name": "documentPathProvenance(source-companion-under-temp)",
+          "status": "passed"
+        },
+        {
+          "name": "unknownSharedProtocolFailureUsesCanaryAndSummarizesLogs()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierIdentityLimitTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierIdentityLimitTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d7ea1538f79baa83b6042f29de2c9ec5315b76bfb2ebd81a29a76c483f296985",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "nativeIdentityRowLimitMustNotChargeHealthyFilesEvenWhenExtractionCanaryPasses()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierInterleavedPoisonTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierInterleavedPoisonTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0b8ee7d25150860624d01cdd7a5ae110b45ca005a71461378f3b8652f22fa7a4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "singletonPoisonCannotRenewItsFreeGraceByInterleavingHealthyBatches()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierMissingChildSupportTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierMissingChildSupportTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:799494ef45971cb0ccc1dd40b865d0a25bf0ee207474ad2538898f39184c4e2b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "realMissingChildJvmSupportJarIsCanaryDiagnosedAndRecoveredWithoutAttempts()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AdversarialCorpusIngestionTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AdversarialCorpusIngestionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:70183d1af06ef794691c036fdd727f3f28793d3f8d2d7c64ab7ab2875b226e33",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "successful extraction stores the SHA-256 of its source bytes",
+          "status": "passed"
+        },
+        {
+          "name": "directoryIsAdmissionSkipped()",
+          "status": "passed"
+        },
+        {
+          "name": "invalid UTF-8 sequence admits and reaches SUCCESS_FULL (Tika handles gracefully)",
+          "status": "passed"
+        },
+        {
+          "name": "symlink loop is classified without stack overflow (POSIX)",
+          "status": "passed"
+        },
+        {
+          "name": "single very long line admits within policy and reaches SUCCESS_FULL",
+          "status": "passed"
+        },
+        {
+          "name": "same-size source rewrite with restored mtime is rejected by content hash",
+          "status": "passed"
+        },
+        {
+          "name": "realUtf8LossIsPartialOnDocumentAndLedger()",
+          "status": "passed"
+        },
+        {
+          "name": "Python bytecode file is skipped by extension policy without parser invocation",
+          "status": "passed"
+        },
+        {
+          "name": "real Tika truncation produces SUCCESS_PARTIAL ledger event end-to-end",
+          "status": "passed"
+        },
+        {
+          "name": "Word/Office tilde temp file is skipped by name-prefix policy",
+          "status": "passed"
+        },
+        {
+          "name": "file truncated mid-extraction surfaces as STALE_SOURCE/SIZE_CHANGED_AFTER_SNAPSHOT",
+          "status": "passed"
+        },
+        {
+          "name": "dropoutOverridesOnlyDocumentReasonWhenDecodingLosesCharacters()",
+          "status": "passed"
+        },
+        {
+          "name": "zero-byte file admits and produces SUCCESS_EMPTY outcome on commit drain",
+          "status": "passed"
+        },
+        {
+          "name": "malformed ZIP triggers a typed parser/budget outcome (not a placeholder document)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopRestartTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopRestartTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7d52082a00dfca92165c8e626266d996d81ca96ebd889c10adb76f9bba3bbeee",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "start → idle → close → new instance → start → idle → close: second instance restarts cleanly (403 Tier C bug class)",
+          "status": "passed"
+        },
+        {
+          "name": "interruptedCloserRetainsExtractorAndNerUntilOwnerExitsThenRetryClosesThem()",
+          "status": "passed"
+        },
+        {
+          "name": "preparedSuccessorCannotClaimJobsUntilActivated()",
+          "status": "passed"
+        },
+        {
+          "name": "timedOutCloserRetainsExtractorAndNerUntilOwnerExitsThenRetryClosesThem()",
+          "status": "passed"
+        },
+        {
+          "name": "start → idle → close cycle: state returns to IDLE; loopThread terminates",
+          "status": "passed"
+        },
+        {
+          "name": "abandonedPreparedSuccessorExitsWithoutClaimingJobs()",
+          "status": "passed"
+        },
+        {
+          "name": "closeWaitsForLuceneOwnerWithoutInterruptAndFinishesShutdownCommitCleanly(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "extractorCloseFailureRetainsNerForRetry()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4836c6bfa2f18651b90b47758fcf564d642d1ba6938d46da056a5e41de40ac26",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "staleSourceHandlerMarksIdentityOnlyForAVerifiedAbsentSource()",
+          "status": "passed"
+        },
+        {
+          "name": "nonRegularSourceRetiresTheActiveGenerationsTextToo()",
+          "status": "passed"
+        },
+        {
+          "name": "missingSourceRetiresTheActiveGenerationsTextToo()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "5cc78ebcb4",
+    "revision": "5cc78ebcb40ed0bbc24dbdd31cf09a73e5660d50",
+    "overlays": [
+      "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PipelineTestFixture.java",
+      "modules/adapters-lucene/src/testFixtures/java/io/justsearch/adapters/lucene/runtime/CoordinatorPublicationFixture.java"
+    ],
+    "patches": [],
+    "runs": [
+      {
+        "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.loop.CanaryWritePathCoverageTest\" --tests \"io.justsearch.indexerworker.loop.DocValuesServiceOutageTest\" --tests \"io.justsearch.indexerworker.loop.ExistingSchemaHealthTest\" --tests \"io.justsearch.indexerworker.loop.ExtractionInfrastructureTest\" --tests \"io.justsearch.indexerworker.loop.InvalidTokenPositionOutageTest\" --tests \"io.justsearch.indexerworker.loop.LiveWriterLockHealthTest\" --tests \"io.justsearch.indexerworker.loop.OutageLifecycleTest\" --tests \"io.justsearch.indexerworker.loop.OutageWaitingStatusTest\" --tests \"io.justsearch.indexerworker.loop.PersistentByteIoSourceTest\" --tests \"io.justsearch.indexerworker.loop.PipelineHealthProofTest\" --tests \"io.justsearch.indexerworker.loop.ServiceOutageBoundaryTest\" --tests \"io.justsearch.indexerworker.loop.SharedMappingLinkageTest\" --tests \"io.justsearch.indexerworker.loop.SharedNormOutageTest\" --tests \"io.justsearch.indexerworker.loop.SharedServiceAvailabilityTest\" --tests \"io.justsearch.indexerworker.loop.SystemicBatchDeferralTest\" --tests \"io.justsearch.indexerworker.loop.UnavailableIdentityBatchTest\" --tests \"io.justsearch.indexerworker.loop.VerifierCappedBacklogStatusTest\" --tests \"io.justsearch.indexerworker.loop.VerifierReadOnlyWriterTest\" --tests \"io.justsearch.indexerworker.loop.WriterAliasRetargetTest\" --tests \"io.justsearch.indexerworker.loop.WriterDocumentIoTest\" --tests \"io.justsearch.indexerworker.loop.WriterLegacyRetargetSourceTest\" --tests \"io.justsearch.indexerworker.loop.WriterLegacySourceStreamTest\" --tests \"io.justsearch.indexerworker.loop.WriterUnreadableAliasTest\" --tests \"io.justsearch.indexerworker.loop.WriterVanishedAliasTest\" --tests \"io.justsearch.indexerworker.loop.AdmissionLookupLivenessTest\" --tests \"io.justsearch.indexerworker.loop.OriginBoundaryAdmissionTest\" --tests \"io.justsearch.indexerworker.loop.VanishedCanonicalSourceTest\" --tests \"io.justsearch.indexerworker.loop.VerifierGeneralCasesTest\" --tests \"io.justsearch.indexerworker.loop.VerifierIdentityLimitTest\" --tests \"io.justsearch.indexerworker.loop.VerifierInterleavedPoisonTest\" --tests \"io.justsearch.indexerworker.loop.VerifierMissingChildSupportTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 476688
+      },
+      {
+        "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.extract.AdversarialCorpusIngestionTest\" --tests \"io.justsearch.indexerworker.loop.IndexingLoopRestartTest\" --tests \"io.justsearch.indexerworker.loop.IndexingLoopTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 36208
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/CanaryWritePathCoverageTest.java",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/DocValuesServiceOutageTest.java",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExistingSchemaHealthTest.java",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ExtractionInfrastructureTest.java",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/InvalidTokenPositionOutageTest.java",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/LiveWriterLockHealthTest.java",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/OutageLifecycleTest.java",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/OutageWaitingStatusTest.java",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PersistentByteIoSourceTest.java",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/PipelineHealthProofTest.java",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/ServiceOutageBoundaryTest.java",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedMappingLinkageTest.java",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedNormOutageTest.java",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SharedServiceAvailabilityTest.java",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/SystemicBatchDeferralTest.java",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/UnavailableIdentityBatchTest.java",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierCappedBacklogStatusTest.java",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierReadOnlyWriterTest.java",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterAliasRetargetTest.java",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterDocumentIoTest.java",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterLegacyRetargetSourceTest.java",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterLegacySourceStreamTest.java",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterUnreadableAliasTest.java",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/WriterVanishedAliasTest.java",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/AdmissionLookupLivenessTest.java",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/OriginBoundaryAdmissionTest.java",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VanishedCanonicalSourceTest.java",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierGeneralCasesTest.java",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierIdentityLimitTest.java",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierInterleavedPoisonTest.java",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VerifierMissingChildSupportTest.java",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AdversarialCorpusIngestionTest.java",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopRestartTest.java",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/IndexingLoopTest.java",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:278907392fdd3145d2be0c44e1bb98e514cbbb25c62dbe322e68125db31ed1a1"
+}

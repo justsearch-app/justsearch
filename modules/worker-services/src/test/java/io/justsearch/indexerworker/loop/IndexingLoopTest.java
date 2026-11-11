@@ -67,6 +67,17 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith({MockitoExtension.class, io.justsearch.indexerworker.services.NoVolumeIdentityExtension.class})
 class IndexingLoopTest {
 
+  private static IndexingCoordinator coordinatorMock() {
+    return mock(IndexingCoordinator.class, call -> {
+      if (call.getMethod().getName().equals("replaceTextFamily")) {
+        return io.justsearch.adapters.lucene.runtime.CoordinatorPublicationFixture.publish(
+            (IndexingCoordinator) call.getMock(), call.getArgument(0), call.getArgument(1),
+            call.getArguments().length == 4 ? call.getArgument(3) : null);
+      }
+      return org.mockito.Answers.RETURNS_DEFAULTS.answer(call);
+    });
+  }
+
   private static SourcePresence.RootCheck addedFolder(Path folder) {
     var witness = io.justsearch.indexerworker.services.RootWitness.inMemory();
     assertTrue(witness.admits(folder), "present-folder admission records the fixture's volume");
@@ -117,7 +128,7 @@ class IndexingLoopTest {
 
   private static IndexingCoordinator wireActive(IndexingLoop loop) {
     RunningRuntime active = mock(RunningRuntime.class);
-    IndexingCoordinator activeWrites = mock(IndexingCoordinator.class);
+    IndexingCoordinator activeWrites = coordinatorMock();
     when(active.indexingCoordinator()).thenReturn(activeWrites);
     when(active.commitOps()).thenReturn(mock(CommitOps.class));
     loop.wireActiveLexicalSource(active);
@@ -713,7 +724,7 @@ class IndexingLoopTest {
         };
     StaleSourceHandler handler =
         new StaleSourceHandler(
-            mock(IndexingCoordinator.class), recorder);
+            coordinatorMock(), recorder);
 
     Path stillThere = Files.writeString(Files.createTempFile("js-stale-present", ".txt"), "body");
     assertThrows(IllegalStateException.class, () -> handler.deleteMissingSource(
@@ -744,7 +755,7 @@ class IndexingLoopTest {
               long now = invocation.getArgument(1);
               return new DocumentIdentityStore.Identity(hash, "test-uid-" + hash, now, now);
             });
-    queue.indexingCoordinator = mock(IndexingCoordinator.class);
+    queue.indexingCoordinator = coordinatorMock();
     return new IndexingLoop(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocr(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
         queue,
         queue.indexingCoordinator,
@@ -1037,7 +1048,7 @@ class IndexingLoopTest {
       RecordingQueue queue = new RecordingQueue();
       IndexingLoop loop = newLoop(queue, providerReturning("body"));
       RunningRuntime active = mock(RunningRuntime.class);
-      IndexingCoordinator activeWrites = mock(IndexingCoordinator.class);
+      IndexingCoordinator activeWrites = coordinatorMock();
       CommitOps activeCommits = mock(CommitOps.class);
       when(active.indexingCoordinator()).thenReturn(activeWrites);
       when(active.documentFieldOps()).thenReturn(mock(DocumentFieldOps.class));
@@ -1086,7 +1097,7 @@ class IndexingLoopTest {
           io.justsearch.indexing.chunking.ChunkParentRevision.sha256Hex("body"),
           SchemaFields.SIZE_BYTES, Long.toString(claim.envelope().sizeBytes()),
           SchemaFields.MODIFIED_AT, Long.toString(claim.envelope().modifiedAtMs()));
-      var activeCoordinator = mock(IndexingCoordinator.class);
+      var activeCoordinator = coordinatorMock();
       when(active.indexingCoordinator()).thenReturn(activeCoordinator);
       when(active.documentFieldOps()).thenReturn(activeFields);
       when(active.commitOps()).thenReturn(mock(CommitOps.class));
@@ -1116,7 +1127,7 @@ class IndexingLoopTest {
           claim.startTime(), claim.envelope(), claim.sourceSha256(), claim.docUid());
       RunningRuntime active = mock(RunningRuntime.class);
       DocumentFieldOps activeFields = mock(DocumentFieldOps.class);
-      IndexingCoordinator activeWrites = mock(IndexingCoordinator.class);
+      IndexingCoordinator activeWrites = coordinatorMock();
       when(active.documentFieldOps()).thenReturn(activeFields);
       when(active.indexingCoordinator()).thenReturn(activeWrites);
       when(activeFields.getDocumentFieldOrThrow(
@@ -1162,7 +1173,7 @@ class IndexingLoopTest {
       RecordingQueue queue = new RecordingQueue();
       IndexingLoop loop = newLoop(queue, providerReturning("body"));
       RunningRuntime active = mock(RunningRuntime.class);
-      IndexingCoordinator activeWrites = mock(IndexingCoordinator.class);
+      IndexingCoordinator activeWrites = coordinatorMock();
       when(active.indexingCoordinator()).thenReturn(activeWrites);
       when(active.documentFieldOps()).thenReturn(mock(DocumentFieldOps.class));
       doThrow(new RuntimeException("A write failed")).when(activeWrites).indexSingle(any());
@@ -1307,7 +1318,7 @@ class IndexingLoopTest {
       RecordingQueue queue = new RecordingQueue();
       IndexingLoop loop = newLoop(queue, providerReturning("body"));
       RunningRuntime active = mock(RunningRuntime.class);
-      IndexingCoordinator activeWrites = mock(IndexingCoordinator.class);
+      IndexingCoordinator activeWrites = coordinatorMock();
       when(active.indexingCoordinator()).thenReturn(activeWrites);
       when(active.documentFieldOps()).thenReturn(mock(DocumentFieldOps.class));
       loop.wireActiveLexicalSource(active);
@@ -1362,7 +1373,7 @@ class IndexingLoopTest {
       RunningRuntime active = mock(RunningRuntime.class);
       CommitOps activeCommits = mock(CommitOps.class);
       CommitOps greenCommits = mock(CommitOps.class);
-      when(active.indexingCoordinator()).thenReturn(mock(IndexingCoordinator.class));
+      when(active.indexingCoordinator()).thenReturn(coordinatorMock());
       when(active.documentFieldOps()).thenReturn(mock(DocumentFieldOps.class));
       when(active.commitOps()).thenReturn(activeCommits);
       loop.wireActiveLexicalSource(active);
@@ -1392,7 +1403,7 @@ class IndexingLoopTest {
       RunningRuntime active = mock(RunningRuntime.class);
       CommitOps activeCommits = mock(CommitOps.class);
       CommitOps greenCommits = mock(CommitOps.class);
-      when(active.indexingCoordinator()).thenReturn(mock(IndexingCoordinator.class));
+      when(active.indexingCoordinator()).thenReturn(coordinatorMock());
       when(active.documentFieldOps()).thenReturn(mock(DocumentFieldOps.class));
       when(active.commitOps()).thenReturn(activeCommits);
       loop.wireActiveLexicalSource(active);
@@ -1745,7 +1756,7 @@ class IndexingLoopTest {
     @DisplayName(
         "StaleSourceHandler returns 1 on success and propagates deletion failure for retry")
     void staleSourceHandlerReturnsOneOnSuccessAndPropagatesFailure() throws Exception {
-      IndexingCoordinator successCoordinator = mock(IndexingCoordinator.class);
+      IndexingCoordinator successCoordinator = coordinatorMock();
       StaleSourceHandler okHandler =
           new StaleSourceHandler(successCoordinator);
       Path file = Files.writeString(Files.createTempFile("js-stale-ok", ".txt"), "body");
@@ -1756,7 +1767,7 @@ class IndexingLoopTest {
               + "indexedSinceCommit. The cross-seam contract Appendix A.1 named.");
       verify(successCoordinator).pruneFile(anyString(), any(), any());
 
-      IndexingCoordinator throwingCoordinator = mock(IndexingCoordinator.class);
+      IndexingCoordinator throwingCoordinator = coordinatorMock();
       doThrow(new RuntimeException("simulated lucene failure"))
           .when(throwingCoordinator).pruneFile(anyString(), any(), any());
       StaleSourceHandler failHandler =
@@ -1845,7 +1856,7 @@ class IndexingLoopTest {
       DocumentFieldOps documentFieldOps = mock(DocumentFieldOps.class);
       IndexCountOps indexCountOps = mock(IndexCountOps.class);
       WorkerSignalBus signalBus = mock(WorkerSignalBus.class);
-      queue.indexingCoordinator = mock(IndexingCoordinator.class);
+      queue.indexingCoordinator = coordinatorMock();
       when(indexCountOps.countByFieldOrThrow(any(), any())).thenReturn(0);
 
       IndexingLoop loop =
@@ -1921,7 +1932,7 @@ class IndexingLoopTest {
       DocumentFieldOps documentFieldOps = mock(DocumentFieldOps.class);
       IndexCountOps indexCountOps = mock(IndexCountOps.class);
       WorkerSignalBus signalBus = mock(WorkerSignalBus.class);
-      queue.indexingCoordinator = mock(IndexingCoordinator.class);
+      queue.indexingCoordinator = coordinatorMock();
       when(indexCountOps.countByFieldOrThrow(any(), any())).thenReturn(0);
 
       IndexingLoop loop =
@@ -2308,7 +2319,7 @@ class IndexingLoopTest {
                 return result;
               });
 
-      IndexingCoordinator coordinator = mock(IndexingCoordinator.class);
+      IndexingCoordinator coordinator = coordinatorMock();
       lenient()
           .when(coordinator.updateDocumentsBatch(anyList()))
           .thenAnswer(

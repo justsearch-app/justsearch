@@ -6916,6 +6916,7 @@ public final class KnowledgeServer implements Closeable {
     // Apply vector dimension override for BGE-M3 (1024-dim vs nomic-embed's 768-dim)
     String sparseModel = boundSelection == null ? runtimeConfig.ai().sparseModel()
         : boundSelection.sparseModel().orElseThrow();
+    String denseModelRole = "bge-m3".equalsIgnoreCase(sparseModel) ? "splade" : "embedding";
     if (boundSelection != null) {
       catalog = catalog.withVectorDimension(boundSelection.vectorDimension().orElseThrow());
     } else if ("bge-m3".equalsIgnoreCase(sparseModel)) {
@@ -6929,12 +6930,12 @@ public final class KnowledgeServer implements Closeable {
             ? () -> {
               var inputs = runtimeFingerprints.runtimeFingerprintInputs();
               return new EmbeddingMetadataOverlay(
-                  new SsotCommitMetadataSource(runtimeConfig, inputs),
+                  new SsotCommitMetadataSource(runtimeConfig, inputs, denseModelRole),
                   () -> generationEmbeddingFingerprintForCommit(indexPath, fingerprintSupplier,
                       inputs.embeddingModel().sha(), servingAtOpen),
                   () -> java.util.Optional.ofNullable(inputs.spladeModel().sha()));
             } : () -> new EmbeddingMetadataOverlay(
-                 new SsotCommitMetadataSource(runtimeConfig, boundInputs),
+                 new SsotCommitMetadataSource(runtimeConfig, boundInputs, denseModelRole),
                  boundSelection == null ? fingerprintSupplier
                      : () -> generationEmbeddingFingerprintForCommit(indexPath, fingerprintSupplier,
                          boundInputs.embeddingModel().sha(), servingAtOpen),
@@ -7061,8 +7062,11 @@ public final class KnowledgeServer implements Closeable {
     }
     var inputs = selection == null ? configuredRuntimeFingerprintInputs(startupConfiguration)
         : selection.runtimeFingerprintInputs();
+    String sparseModel = selection == null ? startupConfiguration.ai().sparseModel()
+        : selection.sparseModel().orElse(null);
     var metadata = new EmbeddingMetadataOverlay(
-        new SsotCommitMetadataSource(startupConfiguration, inputs),
+        new SsotCommitMetadataSource(startupConfiguration, inputs,
+            sparseModel == null ? null : "bge-m3".equalsIgnoreCase(sparseModel) ? "splade" : "embedding"),
         () -> java.util.Optional.ofNullable(inputs.embeddingModel().sha()),
         () -> java.util.Optional.ofNullable(inputs.spladeModel().sha()));
     LuceneRuntimeBuilder builder = new IndexSchema(

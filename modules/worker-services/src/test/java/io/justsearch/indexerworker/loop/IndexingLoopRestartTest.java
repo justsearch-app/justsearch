@@ -160,7 +160,14 @@ final class IndexingLoopRestartTest {
   void closeWaitsForLuceneOwnerWithoutInterruptAndFinishesShutdownCommitCleanly(@TempDir Path directory) throws Exception {
     Path file = Files.writeString(directory.resolve("indexing-close-owner.txt"), "content");
     JobQueue queue = mock(JobQueue.class);
-    IndexingCoordinator indexingCoordinator = mock(IndexingCoordinator.class);
+    IndexingCoordinator indexingCoordinator = mock(IndexingCoordinator.class, call -> {
+      if (call.getMethod().getName().equals("replaceTextFamily")) {
+        return io.justsearch.adapters.lucene.runtime.CoordinatorPublicationFixture.publish(
+            (IndexingCoordinator) call.getMock(), call.getArgument(0), call.getArgument(1),
+            call.getArguments().length == 4 ? call.getArgument(3) : null);
+      }
+      return org.mockito.Answers.RETURNS_DEFAULTS.answer(call);
+    });
     CommitOps commitOps = mock(CommitOps.class);
     CountDownLatch writeEntered = new CountDownLatch(1);
     CountDownLatch releaseWrite = new CountDownLatch(1);

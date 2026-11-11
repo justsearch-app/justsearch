@@ -44,6 +44,7 @@ final class DocValuesServiceOutageTest extends LuceneExecutorTestBase {
    catch(java.lang.reflect.InvocationTargetException expected) {System.out.println("Canary rejected actual codec fault: "+expected.getCause());}
    int faultCountAfterProbe=faults.get();
    h.writer=mock(IndexingCoordinator.class,call->{
+      if (call.getMethod().getName().equals("replaceTextFamily")) return PipelineTestFixture.publicationAnswer(call);
     try {return call.getMethod().invoke(runtime.indexingCoordinator(),call.getArguments());}
     catch(java.lang.reflect.InvocationTargetException e) {if(call.getMethod().getName().equals("indexSingle"))writeFailures.add(e.getCause());throw e.getCause();}
    });

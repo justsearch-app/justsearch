@@ -20,7 +20,14 @@ public record ExtractedJob(
     FileEnvelope envelope,
     String sourceSha256,
     String docUid,
-    Path sourceRealPath) {
+    Path sourceRealPath,
+    boolean forceReindex) {
+
+  public ExtractedJob(JobQueue.IndexJob claim, ValidatedExtractionArtifact artifact, long startTime,
+      FileEnvelope envelope, String sourceSha256, String docUid, Path sourceRealPath) {
+    this(claim, artifact, startTime, envelope, sourceSha256, docUid, sourceRealPath,
+        claim.forceReindex() || claim.recordedForce());
+  }
 
   /** Legacy fixture without a captured source identity; production captures it while readable. */
   public ExtractedJob(JobQueue.IndexJob claim, ValidatedExtractionArtifact artifact, long startTime,

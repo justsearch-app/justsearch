@@ -46,7 +46,7 @@ final class OutageWaitingStatusTest {
     var unavailable = new AtomicBoolean(true);
     var written = new AtomicInteger();
     var signals = mock(WorkerSignalBus.class);
-    var writer = mock(IndexingCoordinator.class);
+    var writer = PipelineTestFixture.coordinator();
     doAnswer(call -> {
       if (unavailable.get() && !service.equals("identity")) {
         throw new IndexRuntimeIOException(service.equals("draining")

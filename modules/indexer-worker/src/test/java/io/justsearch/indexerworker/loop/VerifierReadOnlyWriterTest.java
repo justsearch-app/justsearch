@@ -42,7 +42,7 @@ final class VerifierReadOnlyWriterTest extends LuceneExecutorTestBase {
       scenario.commitOps=runtime.commitOps();
       Files.setPosixFilePermissions(index,Set.of(PosixFilePermission.OWNER_READ,PosixFilePermission.OWNER_EXECUTE));
       assertFalse(Files.isWritable(index),"real index directory must be unwritable to this process");
-      scenario.writer=mock(IndexingCoordinator.class, org.mockito.AdditionalAnswers.delegatesTo(runtime.indexingCoordinator()));
+      scenario.writer=PipelineTestFixture.coordinatorDelegate(runtime.indexingCoordinator());
       doAnswer(call -> {
         try { runtime.indexingCoordinator().indexSingle(call.getArgument(0)); }
         catch (RuntimeException failure) { failures.add(failure); throw failure; }

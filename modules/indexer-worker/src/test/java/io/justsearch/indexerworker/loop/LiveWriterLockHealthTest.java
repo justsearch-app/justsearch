@@ -27,7 +27,8 @@ final class LiveWriterLockHealthTest extends LuceneExecutorTestBase {
       var owners=new TestEngineExecutors();var provider=new PolicyDrivenTikaExtractor(java.util.concurrent.Executors::newFixedThreadPool);
       var box=new TimeboxedContentExtractor(PipelineTestFixture.registration(owners,"lock-proof",1),provider,Duration.ofSeconds(5),null)) {
    var live=writer(runtime);runtime.onTerminalWriterFailure(fatal::add);
-   h.writer=mock(IndexingCoordinator.class,call->{try{return call.getMethod().invoke(runtime.indexingCoordinator(),call.getArguments());}
+   h.writer=mock(IndexingCoordinator.class,call->{
+      if (call.getMethod().getName().equals("replaceTextFamily")) return PipelineTestFixture.publicationAnswer(call);try{return call.getMethod().invoke(runtime.indexingCoordinator(),call.getArguments());}
     catch(java.lang.reflect.InvocationTargetException ex){if(call.getMethod().getName().equals("indexSingle"))actualFailures.add(ex.getCause());throw ex.getCause();}});
    h.commitOps=runtime.commitOps();h.enqueue("warmup.txt");h.loop=PipelineTestFixture.withExtractor(h,box);h.loop.start();h.awaitAllState("DONE",12);
    Path lock=temp.resolve("index/write.lock");assertTrue(Files.isRegularFile(lock),"real native writer lock must exist");Files.delete(lock);

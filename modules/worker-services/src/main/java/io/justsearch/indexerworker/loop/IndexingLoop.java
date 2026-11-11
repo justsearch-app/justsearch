@@ -1178,20 +1178,26 @@ public class IndexingLoop implements Closeable {
 
     if (canBatchEmbed) {
       Span embedSpan = maybeSpan("indexing.embed_batch");
-      embedSpan.setAttribute("embed.batch_size", (long) extracted.size());
       embedSpan.setAttribute("embed.gpu", provider.isUsingGpu());
       try {
         List<String> texts = new ArrayList<>(extracted.size());
-        for (ExtractedJob ex : extracted) {
-          texts.add(ex.artifact().result().content());
+        List<Integer> embeddingIndexes = new ArrayList<>(extracted.size());
+        for (int i = 0; i < extracted.size(); i++) {
+          ExtractedJob ex = extracted.get(i);
+          if (!writer.canReuseDocumentEmbedding(ex)) {
+            embeddingIndexes.add(i);
+            texts.add(ex.artifact().result().content());
+          }
         }
+        embedSpan.setAttribute("embed.batch_size", (long) texts.size());
         long embedStart = System.currentTimeMillis();
-        List<float[]> vectors = provider.embedDocumentBatch(texts);
+        List<float[]> vectors = texts.isEmpty() ? List.of() : provider.embedDocumentBatch(texts);
         long embedMs = System.currentTimeMillis() - embedStart;
-        recordStageMs("analyze_batch", embedMs, "batch_size=" + extracted.size());
+        if (!texts.isEmpty()) recordStageMs("analyze_batch", embedMs, "batch_size=" + texts.size());
 
-        if (vectors != null && vectors.size() == extracted.size()) {
-          embeddings = vectors.toArray(new float[0][]);
+        if (vectors != null && vectors.size() == texts.size()) {
+          embeddings = new float[extracted.size()][];
+          for (int i = 0; i < vectors.size(); i++) embeddings[embeddingIndexes.get(i)] = vectors.get(i);
           embedSpan.setAttribute("embed.success", true);
         } else {
           embedSpan.setAttribute("embed.success", false);
