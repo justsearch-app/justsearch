@@ -44,3 +44,14 @@ planted-defect runs are in `gates/test-intent/evidence/boot-frame-speed-timings.
 ## Acceptance records
 
 Pending independent review. The builder has not recorded acceptance.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "boot-frame-round3-verifier-20261111",
+  "verdict": "accept",
+  "digest": "sha256:f9ab2d288b990553857ad6b6b726ca4303430784bb9f7a4e3eb749537da75910",
+  "note": "Independent round 3: all 5184 settled measurements match; the 15 raw differences exactly coincide with early baseline engine-recovery samples. Real Tab and pointer input matches CDP styles and compositor pixels on all 12 surfaces. Both planted faults rejected by all 12 cases on both trees. Full suites, controlled load, and ten loaded SA6 repetitions pass; reverse palette order preserves all measurements."
+}
+```
