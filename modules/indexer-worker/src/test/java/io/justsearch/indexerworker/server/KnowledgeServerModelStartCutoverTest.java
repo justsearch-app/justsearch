@@ -330,6 +330,12 @@ final class KnowledgeServerModelStartCutoverTest {
           return null;
         }).when(server).initializeDisambiguationService(any(), any());
       }
+      var preparedSuccessors = new CopyOnWriteArrayList<DefaultWorkerAppServices>();
+      doAnswer(invocation -> {
+        var prepared = (DefaultWorkerAppServices) invocation.callRealMethod();
+        preparedSuccessors.add(prepared);
+        return prepared;
+      }).when(server).prepareServingSuccessor(any());
       server.start();
       forced.attached(server);
       forced.initializer = () -> composeWithReranker(server);
@@ -366,6 +372,15 @@ final class KnowledgeServerModelStartCutoverTest {
         var published = queryBindings(serving.services());
         assertAll(wired.keySet().stream().map(name -> () -> assertSame(wired.get(name),
             published.get(name), name + " of the published successor is the one the start left")));
+        // The successor prepared before the start was abandoned: closed, its projection aborted;
+        // the producer it borrowed stays with the published successor and usable.
+        var first = preparedSuccessors.getFirst();
+        assertTrue(first != serving.services(), "the published successor was prepared again");
+        assertTrue(first.producerClosed(), "the abandoned successor is closed");
+        assertTrue(lifecycle.firstAborted.get(), "its prepared projection was aborted");
+        var producer = (DefaultWorkerAppServices) serving.services();
+        assertFalse(producer.producerClosed(), "the published successor's producer is usable");
+        assertTrue(producer.ownsNativeProducer(), "the published successor owns the producer");
         if (!failAfterWiring) {
           var view = getDeclared(serving, "captured");
           var query = (QueryRoleSet) getDeclared(view, "queryRoleSet");
@@ -450,6 +465,46 @@ final class KnowledgeServerModelStartCutoverTest {
     }
   }
 
+  /**
+   * The wiring bound runs only while the switch is otherwise ready (SWITCHING, unpaused): a
+   * migration still building, or one an operator paused, outlives an in-flight model start's bound
+   * and completes once the start finishes (P5, the existing pause behaviour).
+   */
+  @org.junit.jupiter.params.ParameterizedTest(name = "paused: {0}")
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void aModelStartInFlightPastTheBoundDoesNotFailAMigrationThatIsNotReadyToSwitch(boolean paused)
+      throws Exception {
+    try (var forced = new Forced(true)) {
+      forced.releaseOnSwitchRetry = false;
+      forced.enumerationGate = new CountDownLatch(1);
+      var target = plainServer(tempDir);
+      shortenModelWiringBound(target, 1_000L);
+      var server = forced.boot(target);
+      forced.migrateLive();
+      if (paused) forced.manager.setMigrationPaused(true, "operator pause (test)");
+      forced.startModels();
+      assertTrue(forced.startHeld.await(60, TimeUnit.SECONDS), "the start is held");
+      // Paused: enumeration finishes; the pause alone keeps the switch from becoming ready.
+      if (paused) forced.enumerationGate.countDown();
+
+      // Three times the bound, while the start stays in flight.
+      assertFalse(QueryPrewarmFixture.waitFor(java.time.Duration.ofSeconds(3), () ->
+          "FAILED".equals(forced.manager.readStateBestEffort().migration_state())
+              || !cutoverAlive(server)), "the migration is not failed by the wiring bound");
+      var state = forced.manager.readStateBestEffort();
+      assertEquals("MIGRATING", state.migration_state());
+      assertEquals(paused, Boolean.TRUE.equals(state.migration_paused()), "the pause is kept");
+      assertTrue(forced.matching("model wiring timeout").isEmpty());
+
+      forced.releaseHeld.countDown();
+      server.deferredModelInit.handle((ignored, failure) -> null).get(60, TimeUnit.SECONDS);
+      if (paused) forced.manager.setMigrationPaused(false, null);
+      else forced.enumerationGate.countDown();
+      assertTrue(server.awaitMigrationCutoverExitForTests(60, TimeUnit.SECONDS), "the switch ends");
+      forced.assertSuccessorModelsAndRetirement(server);
+    }
+  }
+
   // --- harness ---------------------------------------------------------------------------------
 
   /** The forced order, the migration it switches, and the Engine log it observes. */
@@ -466,6 +521,7 @@ final class KnowledgeServerModelStartCutoverTest {
     final AtomicInteger restarts = new AtomicInteger();
     final List<ILoggingEvent> events = new CopyOnWriteArrayList<>();
     volatile boolean failHeldStart;
+    volatile CountDownLatch enumerationGate;
     volatile boolean captureAtSwitch;
     volatile KnowledgeServer.ServingLease issuedAtSwitch;
     volatile boolean releaseOnSwitchRetry = true;
@@ -533,6 +589,15 @@ final class KnowledgeServerModelStartCutoverTest {
       target.installProjectionSeedSources(List.of(new ProjectionSeedSource() {
         @Override public String sourceId() { return "memory"; }
         @Override public void enumerate(java.util.function.Consumer<AcceptedProjection> sink) {
+          var gate = enumerationGate;
+          try {
+            if (gate != null && !gate.await(90, TimeUnit.SECONDS)) {
+              throw new IllegalStateException("enumeration gate not released");
+            }
+          } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(interrupted);
+          }
           sink.accept(new AcceptedProjection("memory", "note", 1,
               AcceptedProjection.Kind.UPSERT, "{\"content\":\"revision 1\"}"));
         }
@@ -618,10 +683,10 @@ final class KnowledgeServerModelStartCutoverTest {
               "previous_generation is cleared"),
           () -> {
             try (var entries = Files.list(indices)) {
-              // Generation representations are directories; sibling control files are not.
+              // Exactly the old generation's canonical directory or a representation of it.
               assertEquals(List.of(), entries.filter(Files::isDirectory)
                   .map(path -> path.getFileName().toString())
-                  .filter(name -> name.contains(oldGeneration)).toList(),
+                  .filter(name -> representsGeneration(name, oldGeneration)).toList(),
                   "neither the old generation nor a marked-for-deletion copy remains");
             }
           });
@@ -665,10 +730,10 @@ final class KnowledgeServerModelStartCutoverTest {
               "previous_generation is cleared"),
           () -> {
             try (var entries = Files.list(indices)) {
-              // Generation representations are directories; sibling control files are not.
+              // Exactly the old generation's canonical directory or a representation of it.
               assertEquals(List.of(), entries.filter(Files::isDirectory)
                   .map(path -> path.getFileName().toString())
-                  .filter(name -> name.contains(oldGeneration)).toList(),
+                  .filter(name -> representsGeneration(name, oldGeneration)).toList(),
                   "neither the old generation nor a marked-for-deletion copy remains");
             }
           },
@@ -763,6 +828,15 @@ final class KnowledgeServerModelStartCutoverTest {
   }
 
   /** Test seam for the bound, where it exists; before the change there is no bound to shorten. */
+  private static boolean cutoverAlive(KnowledgeServer server) {
+    try {
+      var cutover = (Thread) getField(server, "migrationCutoverThread");
+      return cutover != null && cutover.isAlive();
+    } catch (Exception unavailable) {
+      return false;
+    }
+  }
+
   private static void shortenModelWiringBound(KnowledgeServer server, long millis) {
     try {
       var bound = KnowledgeServer.class.getDeclaredMethod("modelWiringBoundMillis");
@@ -781,6 +855,7 @@ final class KnowledgeServerModelStartCutoverTest {
     final CountDownLatch preparing = new CountDownLatch(1);
     final CountDownLatch resume = new CountDownLatch(1);
     final AtomicInteger preparations = new AtomicInteger();
+    final AtomicBoolean firstAborted = new AtomicBoolean();
     volatile String source;
     volatile String fingerprint;
     volatile boolean authorized;
@@ -810,16 +885,36 @@ final class KnowledgeServerModelStartCutoverTest {
     }
     @Override public PreparedCompositeProjection prepareRecordedGenerationProjection(String key,
         io.justsearch.indexerworker.queue.JobQueue queue) throws java.io.IOException {
-      if (preparations.incrementAndGet() == 1) {
-        preparing.countDown();
-        try {
-          if (!resume.await(60, TimeUnit.SECONDS)) throw new java.io.IOException("not resumed");
-        } catch (InterruptedException interrupted) {
-          Thread.currentThread().interrupt();
-          throw new java.io.IOException(interrupted);
-        }
+      var prepared = RecordedIngestionLifecycle.super.prepareRecordedGenerationProjection(key, queue);
+      if (preparations.incrementAndGet() != 1) return prepared;
+      preparing.countDown();
+      try {
+        if (!resume.await(60, TimeUnit.SECONDS)) throw new java.io.IOException("not resumed");
+      } catch (InterruptedException interrupted) {
+        Thread.currentThread().interrupt();
+        throw new java.io.IOException(interrupted);
       }
-      return RecordedIngestionLifecycle.super.prepareRecordedGenerationProjection(key, queue);
+      return new PreparedCompositeProjection() {
+        @Override public IndexGenerationManager.State withOwnerLocks(CheckedPromotion promotion)
+            throws java.io.IOException {
+          return prepared.withOwnerLocks(promotion);
+        }
+        @Override public CommittedProjection callbacks() { return prepared.callbacks(); }
+        @Override public void abortBeforePointer() {
+          firstAborted.set(true);
+          prepared.abortBeforePointer();
+        }
+      };
+    }
+  }
+
+  /** Whether a directory name is {@code generation} itself or a backup or marked copy of it. */
+  private static boolean representsGeneration(String name, String generation) {
+    try {
+      return io.justsearch.adapters.lucene.runtime.IndexOwnership.representation(name).identity()
+          .equals(generation);
+    } catch (java.io.IOException notAGeneration) {
+      return false;
     }
   }
 
