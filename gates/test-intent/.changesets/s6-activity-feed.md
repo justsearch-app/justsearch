@@ -498,3 +498,14 @@ row under Your actions. The acceptance record below predates these changes.
   "digest": "sha256:a098bc0bfd48715bda483b371e08168beeae660170e0ac21e7183d37b8241db4"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1cb7a-d9ac-7e23-b364-4cb288c03c9d",
+  "verdict": "accept",
+  "digest": "sha256:4038c6eee90e75e461546c59f8a8b26b486c2710b2c64fa84895f68f5c4247e4",
+  "note": "Test expectations and cited intent accepted. This is not product acceptance: independent Chromium verification fails amendment 13 when a hidden connected Activity consumes the section request before a visible consumer."
+}
+```
