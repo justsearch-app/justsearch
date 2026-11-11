@@ -441,11 +441,10 @@ describe('jf-settings-nav', () => {
   // deep-link boot (this nav mounts before the async backend catalog fetch resolves) and, before
   // this fix, nothing re-rendered once it arrived: the raw key stuck around forever.
   describe('re-renders on a late-arriving catalog (855 fix-round F2 S2)', () => {
-    it('a group label mounted BEFORE its catalog key exists shows the raw key, then resolves once the catalog arrives', async () => {
+    it('a section label mounted BEFORE its catalog key exists shows the raw key, then resolves once the catalog arrives', async () => {
       // Mount with the group label key deliberately UNSEEDED — the raw-key fallback SettingsNav
       // would show on a cold deep-link boot before the backend catalog fetch settles.
       const preArrival = {
-        'settings.category.appearance': 'Appearance',
         'settings.category.data': 'Data',
         'settings.section.interface': 'Interface',
         'settings.section.theme': 'Theme',
@@ -457,16 +456,16 @@ describe('jf-settings-nav', () => {
       __resetForTest();
       __seedForTest(preArrival);
       const el = await mountNav('appearance');
-      const header = () => el.shadowRoot!.querySelector('.group-header');
-      expect(header()?.textContent?.trim()).toBe('settings.group.general');
+      const header = () => el.shadowRoot!.querySelector('.category-row');
+      expect(header()?.textContent?.trim()).toBe('settings.category.appearance');
 
       // The catalog "arrives" — `__seedForTest` fires the SAME `onCatalogUpdated` notify a real
       // bootMessageCatalog-family merge takes; re-seed with the union (a real merge is additive,
       // never a replace) to keep the already-seeded keys resolved too.
-      __seedForTest({ ...preArrival, 'settings.group.general': 'General' });
+      __seedForTest({ ...preArrival, 'settings.category.appearance': 'Appearance' });
       await el.updateComplete;
 
-      expect(header()?.textContent?.trim()).toBe('General');
+      expect(header()?.textContent?.trim()).toBe('Appearance');
     });
   });
 });

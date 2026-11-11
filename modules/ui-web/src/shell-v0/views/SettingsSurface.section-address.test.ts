@@ -31,8 +31,8 @@ it('reports each section it shows â€” on mount and when a section is requested â
   // A section address (deep link, reload, Back/Forward) arrives as a request for that section.
   requestMemberTab('core.settings-surface', 'privacy-trust');
   await el.updateComplete;
-  expect(el.activeCategory).toBe('privacy-trust');
-  expect(sections.at(-1)).toBe('privacy-trust');
+  expect(el.activeCategory).toBe('security-privacy');
+  expect(sections.at(-1)).toBe('security-privacy');
   // The event leaves the surface's shadow tree, so the frame hears it.
   expect(sections).toHaveLength(2);
 });

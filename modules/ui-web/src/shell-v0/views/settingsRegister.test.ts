@@ -14,7 +14,7 @@ import { resolve } from 'node:path';
 import { searchRegister, categoryLabel, SETTINGS_REGISTER, type SettingsGroup } from './settingsRegister.js';
 import { __seedForTest, __resetForTest } from '../../i18n/resourceCatalog.js';
 import { getViewerAudience, setViewerAudience } from '../state/viewerAudienceState.js';
-import { __resetUserStateForTest } from '../state/UserStateDocument.js';
+import { __resetUserStateForTest, mutateDocument } from '../state/UserStateDocument.js';
 import {
   __seedForTest as seedSurfaceCatalog,
   __resetForTest as resetSurfaceCatalog,
@@ -55,7 +55,7 @@ const FIXTURE_REGISTER: readonly SettingsGroup[] = [
           {
             key: 'workspace-profiles',
             labelKey: 'settings.section.workspace-profiles',
-            gate: () => getViewerAudience() === 'DEVELOPER',
+            audience: () => getViewerAudience() === 'DEVELOPER',
           },
         ],
       },
@@ -156,11 +156,16 @@ describe('searchRegister', () => {
     expect(results[0]!.section?.key).toBe('workspace-profiles');
   });
 
-  it('an ungated section (view tier) matches regardless of audience', () => {
+  it('SD1 View tier search follows developer tools independently of audience', () => {
     setViewerAudience('USER');
-    const results = searchRegister('view tier', FIXTURE_REGISTER);
+    expect(searchRegister('view tier', SETTINGS_REGISTER)).toEqual([]);
+    mutateDocument(doc => ({ ...doc, showDeveloperTools: true }));
+    const results = searchRegister('view tier', SETTINGS_REGISTER);
     expect(results).toHaveLength(1);
     expect(results[0]!.section?.key).toBe('view-tier');
+    setViewerAudience('DEVELOPER');
+    mutateDocument(doc => ({ ...doc, showDeveloperTools: false }));
+    expect(searchRegister('view tier', SETTINGS_REGISTER)).toEqual([]);
   });
 
   it('no match returns an empty array', () => {
@@ -194,7 +199,7 @@ describe('the Layout sub-anchor in the shipped words (shell slice 2)', () => {
     __seedForTest(Object.fromEntries(bundle.split(/\r?\n/).filter((line) => line.startsWith('settings.'))
       .map((line) => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)])));
     const hits = (query: string) => searchRegister(query, SETTINGS_REGISTER)
-      .filter((r) => r.category.id === 'layout' && r.section?.key === 'rail');
+      .filter((r) => r.category.id === 'appearance' && r.section?.key === 'rail');
     expect(hits('switcher')).toHaveLength(1);
     expect(hits('rail')).toEqual([]);
   });

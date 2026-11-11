@@ -78,19 +78,10 @@ export function isMac(): boolean {
 
 function matchesEvent(parsed: ParsedKey, e: KeyboardEvent): boolean {
   if (e.key.toLowerCase() !== parsed.key) return false;
-  const modKey = isMac() ? e.metaKey : e.ctrlKey;
-  if (parsed.mod && !modKey) return false;
-  if (parsed.ctrl && !e.ctrlKey) return false;
-  if (parsed.meta && !e.metaKey) return false;
-  if (parsed.alt !== e.altKey) return false;
-  if (parsed.shift !== e.shiftKey) return false;
-  // If `mod` was specified, we already validated above. Don't also
-  // require ctrl/meta to be exactly off — just require the platform's
-  // mod key to be on.
-  if (!parsed.mod && !parsed.ctrl && !parsed.meta) {
-    // No mod required — neither ctrl nor meta should be pressed.
-    if (e.ctrlKey || e.metaKey) return false;
-  }
+  const ctrl = parsed.ctrl || (parsed.mod && !isMac());
+  const meta = parsed.meta || (parsed.mod && isMac());
+  if (e.ctrlKey !== ctrl || e.metaKey !== meta || e.altKey !== parsed.alt || e.shiftKey !== parsed.shift) return false;
+  if (e.getModifierState?.('AltGraph')) return false;
   return true;
 }
 

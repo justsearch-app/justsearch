@@ -140,7 +140,7 @@
     "ai-brain-components-light", "ai-brain-consent-light"
   ],
   "shell-v0/views/SettingsSurface.ts": [
-    "settings", "settings-light",
+    "settings", "settings-light", "settings-appearance", "settings-appearance-light",
     "search-results-light", "search-results-compact", "search-results-rich",
     "search-simple-mode", "search-advanced-mode", "settings-forced-colors"
   ],
@@ -157,5 +157,7 @@
   "shell-v0/views/search-v3/Sv3Filters.ts": ["sv3-filters-hero-normal-dark", "sv3-filters-hero-normal-light", "sv3-filters-hero-normal-forced", "sv3-filters-hero-narrow-dark", "sv3-filters-hero-narrow-light", "sv3-filters-hero-narrow-forced", "sv3-filters-hero-1280x720-dark", "sv3-filters-hero-1280x720-light", "sv3-filters-hero-1280x720-forced", "sv3-filters-hero-600x400-dark", "sv3-filters-hero-600x400-light", "sv3-filters-hero-600x400-forced", "sv3-filters-docked-normal-dark", "sv3-filters-docked-normal-light", "sv3-filters-docked-normal-forced", "sv3-filters-docked-narrow-dark", "sv3-filters-docked-narrow-light", "sv3-filters-docked-narrow-forced", "sv3-filters-docked-1280x720-dark", "sv3-filters-docked-1280x720-light", "sv3-filters-docked-1280x720-forced", "sv3-filters-docked-600x400-dark", "sv3-filters-docked-600x400-light", "sv3-filters-docked-600x400-forced"],
   "shell-v0/views/search-v3/sv3-filter-input.ts": ["sv3-filters-hero-normal-dark", "sv3-filters-hero-normal-light", "sv3-filters-hero-normal-forced", "sv3-filters-hero-narrow-dark", "sv3-filters-hero-narrow-light", "sv3-filters-hero-narrow-forced", "sv3-filters-hero-1280x720-dark", "sv3-filters-hero-1280x720-light", "sv3-filters-hero-1280x720-forced", "sv3-filters-hero-600x400-dark", "sv3-filters-hero-600x400-light", "sv3-filters-hero-600x400-forced", "sv3-filters-docked-normal-dark", "sv3-filters-docked-normal-light", "sv3-filters-docked-normal-forced", "sv3-filters-docked-narrow-dark", "sv3-filters-docked-narrow-light", "sv3-filters-docked-narrow-forced", "sv3-filters-docked-1280x720-dark", "sv3-filters-docked-1280x720-light", "sv3-filters-docked-1280x720-forced", "sv3-filters-docked-600x400-dark", "sv3-filters-docked-600x400-light", "sv3-filters-docked-600x400-forced"],
   "shell-v0/state/aiStateStore.ts": ["library-poll-cadence-fresh", "library-poll-cadence-frozen", "library-poll-cadence-failed"],
-  "shell-v0/utils/statusPoll.ts": ["library-poll-cadence-fresh", "library-poll-cadence-frozen", "library-poll-cadence-failed"]
+  "shell-v0/utils/statusPoll.ts": ["library-poll-cadence-fresh", "library-poll-cadence-frozen", "library-poll-cadence-failed"],
+  "shell-v0/views/settingsRegister.ts": ["settings", "settings-appearance", "settings-appearance-light", "settings-forced-colors"],
+  "shell-v0/components/SettingsNav.ts": ["settings", "settings-appearance", "settings-appearance-light", "settings-forced-colors"]
 }

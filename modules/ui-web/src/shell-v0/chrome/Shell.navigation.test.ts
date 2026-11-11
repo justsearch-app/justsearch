@@ -389,7 +389,7 @@ describe('C9 / FR3 the Settings section is part of the address', () => {
       // The Settings surface reports its section; the address follows without a new entry.
       settingsWindow(shell).dispatchEvent(new CustomEvent('settings-section-change',
         { detail: { id: 'privacy-trust' }, bubbles: true, composed: true }));
-      expect(address()).toBe(`${SETTINGS}?section=privacy-trust`);
+      expect(address()).toBe(`${SETTINGS}?section=security-privacy`);
       expect(window.history.length).toBe(length + 1);
       // Escape closes in one step onto the area underneath; no second Back is needed.
       const back = vi.spyOn(window.history, 'back');
@@ -469,3 +469,36 @@ describe('FR6 / C11 saved navigation state and bookmarks load after the upgrade'
     expect(getUserConfig().surfaceVisibility).toEqual({ [SYSTEM]: false });
   });
 });
+
+describe('SG1 Settings command and default chord', () => {
+  it('SG1 Ctrl+comma opens over Search, repeats in place and honours typing, IME, repeat and modifier guards', async () => {
+    const shell = await mount();
+    const input = document.createElement('input'); document.body.append(input); input.focus();
+    for (const extra of [{ repeat: true }, { isComposing: true }, { shiftKey: true }, { altKey: true }, { metaKey: true }]) {
+      key({ key: ',', ctrlKey: true, ...extra }); await settle(shell);
+      expect(shell.shadowRoot!.querySelector<SettingsWindow>('jf-settings-window')!.open).toBe(false);
+    }
+    key({ key: ',', ctrlKey: true }); await settle(shell);
+    const win = shell.shadowRoot!.querySelector<SettingsWindow>('jf-settings-window')!;
+    expect(win.open).toBe(true); expect(stageTag(shell)).toBe('jf-nav-search-probe');
+    const length = window.history.length, hash = window.location.hash;
+    key({ key: ',', ctrlKey: true }); await settle(shell);
+    expect(win.open).toBe(true); expect(window.location.hash).toBe(hash); expect(window.history.length).toBe(length);
+    input.remove();
+  });
+});
+
+it.each(['section=layout&entry=keyboard', 'category=layout&entry=keyboard', 'tab=layout&anchor=keyboard'])(
+  'SG4 legacy coordinate %s arrives at General and the Keyboard anchor', async query => {
+    const shell = await mount();
+    const requested: { section: string; anchor?: string }[] = [];
+    const stop = subscribeMemberTab((host, section, anchor) => {
+      if (host === SETTINGS) requested.push({ section, anchor });
+    });
+    try {
+      await arrive(shell, `justsearch://surface/${SETTINGS}?${query}`);
+      expect(address()).toBe(`${SETTINGS}?anchor=keyboard&section=general`);
+      expect(requested.at(-1)).toEqual({ section: 'general', anchor: 'keyboard' });
+    } finally { stop(); }
+  },
+);

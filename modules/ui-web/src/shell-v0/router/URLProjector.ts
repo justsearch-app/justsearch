@@ -25,6 +25,7 @@
  *     had no room for that.
  */
 
+import { getSurface } from '../../api/registry/SurfaceCatalogClient.js';
 import { canonicalize, parseUrl } from './parser.js';
 import { getStore } from './storeRegistry.js';
 import { getJournalState, recordNavigation } from '../state/NavigationJournal.js';
@@ -44,6 +45,13 @@ interface ActiveProjection {
 }
 
 let active: ActiveProjection | null = null;
+
+/**
+ * A modal (Settings) owns the browser address while the window under it keeps running. The newest
+ * address that window would have written waits here, with the modal entry's position, until the
+ * browser returns to the entry under the modal (see {@link resumeUnderModal}).
+ */
+let underModal: { surfaceId: string; modalIndex: number } | null = null;
 
 /**
  * Slice 489 T1/G2 — trailing debounce for subscribe-driven URL writes.
@@ -145,6 +153,7 @@ export function activateProjection(surfaceId: string): void {
 /** Tear down all store subscriptions. Safe to call when no projection is active. */
 export function deactivateProjection(): void {
   clearPendingWrite();
+  underModal = null;
   if (!active) return;
   for (const unsub of active.unsubscribers) {
     try {
@@ -154,6 +163,23 @@ export function deactivateProjection(): void {
     }
   }
   active = null;
+}
+
+/**
+ * Call when the browser has moved to another entry, before that entry's address is realized.
+ * Dismissing a modal returns to the entry under it, which still names the window's state from when
+ * the modal opened; the window has since moved on (a background claim, a finished task). That entry
+ * now names the current state, so realizing it keeps the window as it is instead of rewinding it,
+ * and a reload shows it. Any other traversal leaves the entry as it is.
+ */
+export function resumeUnderModal(): void {
+  const current = currentAddress();
+  if (!underModal || (current && getSurface(current.target)?.placement === 'MODAL')) return;
+  const { surfaceId, modalIndex } = underModal;
+  underModal = null;
+  if (active?.surfaceId !== surfaceId || current?.target !== surfaceId || historyIndex() !== modalIndex - 1) return;
+  clearPendingWrite();
+  writeUrl(surfaceId, active.schema);
 }
 
 /** Replace accepted transient address inputs with the current durable navigation state. */
@@ -324,6 +350,13 @@ export function currentAddress(): ShellAddressNavigation | null {
 // ----- helpers -----
 
 function writeUrl(surfaceId: string, schema: ResolvedSchema, push = false): void {
+  // A modal owns the address while the window under it keeps updating: no write and no entry now;
+  // the entry under the modal takes the newest state when the modal is dismissed.
+  const current = currentAddress();
+  if (current && current.target !== surfaceId && getSurface(current.target)?.placement === 'MODAL') {
+    underModal = { surfaceId, modalIndex: historyIndex() };
+    return;
+  }
   const state = collectState(schema);
   const addr: ShellAddressNavigation = {
     kind: 'navigate',

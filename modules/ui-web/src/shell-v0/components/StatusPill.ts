@@ -239,7 +239,7 @@ export class StatusPill extends JfElement {
    * Another window or the Settings window takes over: close, and return focus to the pill only
    * when it was inside the panel (so the next window's own focus target is not stolen).
    */
-  dismissForWindowChange(): void { this.close(document.activeElement === this); }
+  dismissForWindowChange(): void { this.close(!!this.shadowRoot?.activeElement); }
   private readonly windowBlur = (): void => this.close(false);
   private readonly visibility = (): void => { if (document.hidden) this.close(false); };
   private readonly keydown = (event: KeyboardEvent): void => {

@@ -11,6 +11,10 @@ import { chromium, type Browser, type BrowserContext, type BrowserServer, type P
 import { mkdtemp, mkdir, rm } from 'node:fs/promises';
 import path from 'node:path';
 
+declare global {
+  interface Window { loadSettingsModule<T>(id: string): Promise<T> }
+}
+
 const SEARCH = 'core.search-v3-surface';
 const LIBRARY = 'core.library-surface';
 const BROWSE = 'core.browse-surface';
@@ -28,10 +32,24 @@ const json = (body) => new Response(JSON.stringify(body), { status: 200, headers
 // ?registryDelay=<ms> holds the boot's window-catalog response, as a busy engine does: the app
 // keeps starting (Settings mounts ahead of its first opening) before the address is applied.
 const registryDelay = Number(new URLSearchParams(location.search).get('registryDelay') ?? 0);
+// ?engineDelay=<ms> answers the Security window's reads late with an Engine's real replies: the
+// captured /api/status body (Data protection card) and a chat encryption not yet set up.
+const engineDelay = Number(new URLSearchParams(location.search).get('engineDelay') ?? 0);
+const { default: liveStatus } = engineDelay ? await import('/src/api/__fixtures__/status-response-live.json') : {};
 window.fetch = async (input) => {
-  if (registryDelay && String(input).endsWith('/api/registry/surfaces')) await new Promise(r => setTimeout(r, registryDelay));
-  return json({ entries: [] });
+  const path = new URL(String(input instanceof Request ? input.url : input), location.href).pathname;
+  if (registryDelay && path.endsWith('/api/registry/surfaces')) await new Promise(r => setTimeout(r, registryDelay));
+  if (engineDelay && path.endsWith('/api/status')) {
+    await new Promise(r => setTimeout(r, engineDelay));
+    return json({ ...liveStatus, conversationProtection: { state: 'not_configured' } });
+  }
+  if (engineDelay && path.endsWith('/api/conversations/encryption')) {
+    await new Promise(r => setTimeout(r, engineDelay));
+    return json({ state: 'not_configured' });
+  }
+  return json({ entries: [], conversations: [], messages: [] });
 };
+window.loadSettingsModule = id => import(id);
 window.EventSource = class { constructor() { this.readyState = 0; } addEventListener() {} removeEventListener() {} close() {} };
 const { __seedForTest } = await import('/src/api/registry/SurfaceCatalogClient.ts');
 await import('/src/shell-v0/index.ts');
@@ -47,12 +65,17 @@ const surface = (id, mountTag, extra = {}) => ({ id, mountTag, audience: 'USER',
   presentation: { labelKey: id, descriptionKey: id }, consumes: { operations: [], resources: [], prompts: [], diagnosticChannels: [] },
   provenance: { tier: 'CORE', contributorId: 'core', version: '1.0.0' }, ...extra });
 __seedForTest({ schemaVersion: '1.0.0', catalogVersion: 1, namespace: 'core', primitive: 'Surface', entries: [
-  surface('${SEARCH}', 'jf-frame-search-probe'),
+  surface('${SEARCH}', new URLSearchParams(location.search).has('realSearch') ? 'jf-sv3-window' : 'jf-frame-search-probe'),
   surface('${LIBRARY}', 'jf-library-surface', { members: ['${BROWSE}'] }),
   surface('${BROWSE}', 'jf-browse-surface', { placement: 'DEEPLINK' }),
   surface('${BRAIN}', 'jf-brain-surface'),
-  surface('core.system-surface', 'jf-system-surface'),
-  surface('${SETTINGS}', 'jf-settings-surface', { placement: 'MODAL' }),
+  surface('core.system-surface', 'jf-system-surface', { members: ['core.health-surface', 'core.logs-surface'] }),
+  surface('core.health-surface', 'jf-health-surface', { placement: 'DEEPLINK' }),
+  surface('core.logs-surface', 'jf-logs-surface', { placement: 'DEEPLINK' }),
+  surface('${SETTINGS}', 'jf-settings-surface', { placement: 'MODAL', members: ['core.security-surface', 'core.presentation-gallery-surface', 'core.presentation-editor-surface'] }),
+  surface('core.security-surface', 'jf-security-surface', { placement: 'DEEPLINK' }),
+  surface('core.presentation-gallery-surface', 'jf-presentation-gallery-surface', { placement: 'DEEPLINK' }),
+  surface('core.presentation-editor-surface', 'jf-presentation-editor-surface', { placement: 'DEEPLINK' }),
 ] });
 document.body.append(document.createElement('jf-shell'));
 document.body.dataset.ready = 'true';
@@ -140,6 +163,19 @@ async function where(page: Page): Promise<{ stage: string | undefined; address: 
     const settings = (shell.querySelector('jf-settings-window') as HTMLElement & { open: boolean }).open;
     return { stage: shown, address: decodeURIComponent(location.hash.replace(/^#justsearch:\/\/surface\//, '')), settings };
   });
+}
+
+/** Reload and wait for the harness to boot again: `reload()` returns at `load`, before the app's module graph has run. */
+async function reload(page: Page): Promise<void> {
+  await page.reload();
+  await page.locator('body[data-ready="true"]').waitFor({ timeout: 45_000 });
+  await page.locator('jf-top-bar').waitFor();
+}
+
+/** Reload an addressed Settings window and wait until it has reopened at `section`. */
+async function reloadIntoSettings(page: Page, section: string): Promise<void> {
+  await reload(page);
+  await expect.poll(async () => ((await where(page)).settings ? settingsSection(page) : undefined), { timeout: 10_000 }).toBe(section);
 }
 
 async function area(page: Page, id: string): Promise<void> {
@@ -365,16 +401,16 @@ describe('FR3 the window under Settings shows its addressed tab', () => {
 });
 
 describe('FR3 the Settings section in the address wins over the one Settings remembers', () => {
-  it('a link to Settings › Developer opens Developer, and reload keeps it, while the engine is slow to answer', async () => {
+  it('SD1 a legacy Settings › Developer link opens Advanced at Show developer tools, and reload keeps it, while the engine is slow to answer', async () => {
     const page = await open(1280, 800, '?registryDelay=1500', `#justsearch://surface/${SETTINGS}?section=developer`);
     await settle(page, 2500);
-    expect(await where(page)).toMatchObject({ settings: true, address: `${SETTINGS}?section=developer` });
-    expect(await settingsSection(page)).toBe('developer');
+    expect(await where(page)).toMatchObject({ settings: true, address: `${SETTINGS}?anchor=show-developer-tools&section=advanced` });
+    expect(await settingsSection(page)).toBe('advanced');
     await page.reload();
     await page.locator('body[data-ready="true"]').waitFor({ timeout: 45_000 });
     await settle(page, 2500);
-    expect(await where(page)).toMatchObject({ settings: true, address: `${SETTINGS}?section=developer` });
-    expect(await settingsSection(page)).toBe('developer');
+    expect(await where(page)).toMatchObject({ settings: true, address: `${SETTINGS}?anchor=show-developer-tools&section=advanced` });
+    expect(await settingsSection(page)).toBe('advanced');
   }, 120_000);
 });
 
@@ -489,3 +525,407 @@ describe('X1 forced colours', () => {
     }
   }, 120_000);
 });
+
+it('SG1 browser Ctrl+comma opens once from a composer and restores the editable control and caret', async () => {
+  const page = await open();
+  const composer = page.locator('jf-frame-search-probe textarea');
+  await composer.fill('keep this draft');
+  await composer.evaluate((el: HTMLTextAreaElement) => { el.focus(); el.setSelectionRange(5, 9); });
+  const count = await page.evaluate(() => history.length);
+  await page.keyboard.press('Control+,'); await settle(page);
+  expect((await where(page)).settings).toBe(true);
+  expect((await where(page)).stage).toBe('jf-frame-search-probe');
+  expect(await composer.inputValue()).toBe('keep this draft');
+  await page.locator('jf-settings-nav [data-settings-category="appearance"]').click();
+  const address = (await where(page)).address;
+  await page.keyboard.press('Control+,'); await settle(page);
+  expect((await where(page)).address).toBe(address);
+  expect(await page.evaluate(() => history.length)).toBe(count + 1);
+  await page.keyboard.press('Escape'); await settle(page);
+  expect((await where(page)).settings).toBe(false);
+  expect(await composer.evaluate((el: HTMLTextAreaElement) => [el.matches(':focus'), el.selectionStart, el.selectionEnd])).toEqual([true, 5, 9]);
+}, 30_000);
+
+it('SG1 command guard blocks the palette and another modal', async () => {
+  const page = await open();
+  await page.keyboard.press('Control+k'); await settle(page);
+  expect(await page.locator('jf-command-palette').evaluate((el: HTMLElement & { open: boolean }) => el.open)).toBe(true);
+  const before = (await where(page)).address;
+  await page.keyboard.press('Control+,'); await settle(page);
+  expect((await where(page)).settings).toBe(false); expect((await where(page)).address).toBe(before);
+  // Invoke the command directly too: the protection belongs to the command, not just its binding.
+  await page.evaluate(async () => {
+    const commands = await window.loadSettingsModule<typeof import('../commands/CommandRegistry.js')>('/src/shell-v0/commands/CommandRegistry.ts');
+    await commands.invokeCommand('shell.go-to-settings');
+  });
+  expect((await where(page)).settings).toBe(false);
+  await page.keyboard.press('Escape'); await settle(page);
+  await page.evaluate(async () => {
+    const { ModalityController } = await window.loadSettingsModule<typeof import('../primitives/modality.js')>('/src/shell-v0/primitives/modality.ts');
+    const host = { addController() {}, removeController() {}, requestUpdate() {}, updateComplete: Promise.resolve(true) };
+    const modal = new ModalityController(host); modal.enter();
+    (window as unknown as { releaseSettingsGuard(): void }).releaseSettingsGuard = () => modal.exit();
+  });
+  await page.keyboard.press('Control+,'); await settle(page); expect((await where(page)).settings).toBe(false);
+  await page.evaluate(() => (window as unknown as { releaseSettingsGuard(): void }).releaseSettingsGuard());
+}, 30_000);
+
+it('SG1 user and plugin chords outrank the Settings default, which opens after they are removed', async () => {
+  const page = await open();
+  for (const source of ['plugin', 'user'] as const) {
+    await page.evaluate(async source => {
+      const registry = await window.loadSettingsModule<typeof import('../commands/KeybindingRegistry.js')>('/src/shell-v0/commands/KeybindingRegistry.ts');
+      const { makeCoreProvenance } = await window.loadSettingsModule<typeof import('../primitives/provenance.js')>('/src/shell-v0/primitives/provenance.ts');
+      registry.registerKeybinding({ key: 'mod+,', commandId: 'shell.focus-composer', source, provenance: makeCoreProvenance() });
+    }, source);
+    await page.keyboard.press('Control+,'); await settle(page); expect((await where(page)).settings).toBe(false);
+  }
+  await page.evaluate(async () => {
+    const registry = await window.loadSettingsModule<typeof import('../commands/KeybindingRegistry.js')>('/src/shell-v0/commands/KeybindingRegistry.ts');
+    registry.unregisterKeybinding('mod+,', 'shell.focus-composer');
+  });
+  await page.keyboard.press('Control+,'); await settle(page);
+  expect((await where(page)).settings).toBe(true);
+}, 30_000);
+
+it.each(['jf-top-bar .more-trigger', 'jf-status-pill .trigger'])('SG1 the Settings command dismisses %s and closes onto its surviving trigger', async selector => {
+  const page = await open();
+  await page.locator(selector).click(); await settle(page);
+  await page.evaluate(async () => {
+    const commands = await window.loadSettingsModule<typeof import('../commands/CommandRegistry.js')>('/src/shell-v0/commands/CommandRegistry.ts');
+    await commands.invokeCommand('shell.go-to-settings');
+  }); await settle(page);
+  expect((await where(page)).settings).toBe(true);
+  expect(await page.locator('jf-top-bar [role="menu"]').count()).toBe(0);
+  expect(await page.locator('jf-status-pill').evaluate((el: HTMLElement & { open: boolean }) => el.open)).toBe(false);
+  await page.keyboard.press('Escape'); await settle(page);
+  expect(await page.locator(selector).evaluate(el => el.matches(':focus')), `return focus to ${selector}`).toBe(true);
+}, 30_000);
+
+it('SG3 SG4 an addressed entry survives underlying background projection, reload and a one-step close; section changes remove its anchor', async () => {
+  const page = await open();
+  await page.evaluate(async () => {
+    const { setQuery } = await window.loadSettingsModule<typeof import('../state/searchState.js')>('/src/shell-v0/state/searchState.ts');
+    setQuery('pending search');
+    location.hash = 'justsearch://surface/core.settings-surface?section=layout&anchor=keyboard';
+  });
+  await settle(page, 300);
+  expect((await where(page)).settings).toBe(true);
+  expect((await where(page)).address).toBe(`${SETTINGS}?anchor=keyboard&section=general`);
+  await page.evaluate(async () => {
+    const { setQuery } = await window.loadSettingsModule<typeof import('../state/searchState.js')>('/src/shell-v0/state/searchState.ts'); setQuery('background update');
+  });
+  await settle(page, 300);
+  expect((await where(page)).address).toBe(`${SETTINGS}?anchor=keyboard&section=general`);
+  await reloadIntoSettings(page, 'general'); await settle(page, 300);
+  expect((await where(page)).address).toBe(`${SETTINGS}?anchor=keyboard&section=general`);
+  await page.keyboard.press('Escape'); await settle(page); expect((await where(page)).settings).toBe(false);
+  expect((await where(page)).stage).toBe('jf-frame-search-probe');
+  await page.evaluate(() => { location.hash = 'justsearch://surface/core.settings-surface?section=appearance&anchor=theme'; });
+  await settle(page);
+  await page.locator('jf-settings-nav [data-settings-category="general"]').click(); await settle(page);
+  expect((await where(page)).address).toBe(`${SETTINGS}?section=general`);
+  await reloadIntoSettings(page, 'general'); await settle(page, 300);
+  expect((await where(page)).address).toBe(`${SETTINGS}?section=general`);
+}, 30_000);
+
+it('SG8 at 600x400 and 200 percent text every section remains reachable, and Escape cancels JSON import before closing', async () => {
+  const page = await open(600, 400);
+  await page.evaluate(() => { document.documentElement.style.fontSize = '200%'; });
+  await openSettings(page);
+  for (const id of ['general', 'appearance', 'security-privacy', 'data-reset', 'plugins', 'advanced', 'about']) {
+    const row = page.locator(`jf-settings-nav [data-settings-category="${id}"]`);
+    expect(await row.count(), `section ${id} is rendered`).toBe(1);
+    await row.focus(); await page.keyboard.press('Enter'); await settle(page);
+    expect(await row.getAttribute('aria-current')).toBe('true');
+    expect(await row.evaluate(el => { const r = el.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; }), `${id}: ${await row.evaluate(el => JSON.stringify([el.getBoundingClientRect().top, el.getBoundingClientRect().bottom, (document.querySelector('jf-shell')!.shadowRoot!.querySelector('jf-settings-window')!.querySelector('jf-settings-surface') ?? document.body).localName]))}`).toBe(true);
+  }
+  await page.locator('jf-settings-nav [data-settings-category="appearance"]').focus(); await page.keyboard.press('Enter');
+  await page.locator('jf-button[label="Import a theme from JSON"] button').focus(); await page.keyboard.press('Enter');
+  await page.locator('textarea.theme-import-json').fill('unfinished draft');
+  await page.keyboard.press('Escape'); await settle(page);
+  expect(await page.locator('textarea.theme-import-json').count()).toBe(0);
+  expect((await where(page)).settings).toBe(true);
+  await page.keyboard.press('Escape'); await settle(page); expect((await where(page)).settings).toBe(false);
+}, 30_000);
+
+it('SG4 selecting another section removes the old Theme anchor before reload', async () => {
+  const page = await open(1280, 800, '', `#justsearch://surface/${SETTINGS}?section=appearance&anchor=theme`);
+  await page.locator('jf-settings-nav [data-settings-category="plugins"]').click(); await settle(page);
+  expect((await where(page)).address).toBe(`${SETTINGS}?section=plugins`);
+  await page.reload();
+  await expect.poll(() => settingsSection(page), { timeout: 5000 }).toBe('plugins');
+  expect((await where(page)).address).not.toContain('anchor=theme');
+}, 30_000);
+
+it('SG9 real Gallery and Editor keep sibling instances and editor drafts on apply and section return', async () => {
+  const page = await open(); await openSettings(page);
+  await page.locator('jf-settings-nav [data-settings-category="appearance"]').click();
+  const editor = page.locator('jf-presentation-editor-surface'); const gallery = page.locator('jf-presentation-gallery-surface');
+  await expect.poll(() => gallery.count(), { message: 'Appearance contains the Gallery alongside its native controls' }).toBe(1);
+  await expect.poll(() => editor.count(), { message: 'Appearance contains the Editor alongside the Gallery' }).toBe(1);
+  await editor.locator('textarea[aria-label="Presentation declaration JSON"]').fill('{"draft":"keep me"}');
+  await editor.evaluate(el => { el.setAttribute('data-instance-witness', 'retained'); });
+  await gallery.evaluate(el => { el.setAttribute('data-instance-witness', 'retained'); });
+  await gallery.getByRole('button', { name: 'Apply', exact: true }).first().click(); await settle(page);
+  expect(await editor.getAttribute('data-instance-witness')).toBe('retained');
+  expect(await editor.locator('textarea[aria-label="Presentation declaration JSON"]').inputValue()).toBe('{"draft":"keep me"}');
+  await page.locator('jf-settings-nav [data-settings-category="general"]').click(); await settle(page);
+  expect(await editor.count()).toBe(0);
+  await page.locator('jf-settings-nav [data-settings-category="appearance"]').click(); await settle(page);
+  expect(await editor.getAttribute('data-instance-witness')).toBe('retained'); expect(await gallery.getAttribute('data-instance-witness')).toBe('retained');
+  expect(await editor.locator('textarea[aria-label="Presentation declaration JSON"]').inputValue()).toBe('{"draft":"keep me"}');
+}, 30_000);
+
+
+it('SD1 SD3 SG6 developer tools update Settings and More live and Logs opens the System member', async () => {
+  const page = await open();
+  await page.locator('jf-top-bar .settings-trigger').click();
+  const settings = page.locator('jf-settings-surface');
+  await settings.locator('jf-settings-nav [data-settings-category="advanced"]').click();
+  const tools = settings.getByRole('switch', { name: 'Show developer tools' });
+  await settle(page);
+  expect(await tools.count()).toBe(1);
+  expect(await tools.isChecked()).toBe(false);
+  await tools.check();
+  expect(await tools.isChecked()).toBe(true);
+  const tier = settings.locator('div[data-settings-anchor="view-tier"]');
+  await tier.waitFor();
+  await tier.locator('jf-option-button-group').getByRole('radio', { name: /Developer/ }).click();
+  await settings.locator('div[data-settings-anchor="workspace-profiles"]').waitFor();
+  // A focused navigation row disappearing after a storage update returns to the switch.
+  const nav = settings.locator('jf-settings-nav');
+  const focused = nav.locator('[data-settings-anchor="workspace-profiles"]');
+  await focused.focus();
+  await page.evaluate(async () => {
+    const { setViewerAudience } = await window.loadSettingsModule<{ setViewerAudience(value: string): void }>('/src/shell-v0/state/viewerAudienceState.ts');
+    setViewerAudience('USER');
+  });
+  await expect.poll(() => tools.evaluate(el => el.matches(':focus'))).toBe(true);
+  expect(await tools.isChecked()).toBe(true);
+  await page.locator('jf-settings-window button.close').click();
+  await page.locator('jf-top-bar .more-trigger').click();
+  await page.locator('jf-top-bar [data-menu-action="logs"]').click();
+  await settle(page);
+  expect((await where(page)).address).toContain('core.system-surface');
+  expect((await where(page)).address).toContain('core.logs-surface');
+  await page.locator('jf-top-bar .settings-trigger').click();
+  await tools.uncheck();
+  await page.locator('jf-settings-window button.close').click();
+  await page.locator('jf-top-bar .more-trigger').click();
+  expect(await page.locator('jf-top-bar #developer-label').count()).toBe(0);
+}, 30_000);
+
+it('SD3 another browser window updates open Settings and an already open More menu', async () => {
+  const first = await open();
+  await first.locator('jf-top-bar .settings-trigger').click();
+  await first.locator('jf-settings-nav [data-settings-category="advanced"]').click();
+  const firstTools = first.locator('jf-settings-surface').getByRole('switch', { name: 'Show developer tools' });
+  await settle(first);
+  expect(await firstTools.count()).toBe(1);
+  const second = await context!.newPage();
+  await second.goto(url);
+  await second.locator('body[data-ready="true"]').waitFor();
+  await second.locator('jf-top-bar').waitFor();
+  await settle(second);
+  // The new window may restore the first window's open Settings from the journal.
+  if (!(await where(second)).settings) await second.locator('jf-top-bar .settings-trigger').click();
+  await second.locator('jf-settings-nav [data-settings-category="advanced"]').click();
+  const secondTools = second.locator('jf-settings-surface').getByRole('switch', { name: 'Show developer tools' });
+  await secondTools.check();
+  await expect.poll(() => firstTools.isChecked()).toBe(true);
+  await first.locator('jf-settings-window button.close').click();
+  await first.locator('jf-top-bar .more-trigger').click();
+  await first.locator('jf-top-bar #developer-label').waitFor();
+  await secondTools.uncheck();
+  await first.locator('jf-top-bar #developer-label').waitFor({ state: 'detached' });
+  await first.locator('jf-top-bar .more-trigger').click();
+  await first.locator('jf-top-bar .settings-trigger').click();
+  expect(await firstTools.isChecked()).toBe(false);
+}, 30_000);
+
+it.each(['Escape', 'Back', 'Close'])('SG3 dismissal by %s preserves the real Search window current conversation and reload address', async (dismissal) => {
+  const page = await open(1280, 720, '?realSearch=1');
+  await page.locator('jf-sv3-window').waitFor();
+  const claim = async (id: string): Promise<void> => {
+    await page.evaluate(async (conversation) => {
+      const { setActiveConversation } = await window.loadSettingsModule<typeof import('../state/conversationListStore.js')>('/src/shell-v0/state/conversationListStore.ts');
+      setActiveConversation(conversation);
+    }, id);
+    await settle(page, 300);
+  };
+  const active = () => page.evaluate(async () => {
+    const { getConversationListState } = await window.loadSettingsModule<typeof import('../state/conversationListStore.js')>('/src/shell-v0/state/conversationListStore.ts');
+    return getConversationListState().activeId;
+  });
+  await claim('settings-conversation-A');
+  expect((await where(page)).address).toContain('conversationId=settings-conversation-A');
+  await openSettings(page);
+  const settingsAddress = (await where(page)).address;
+  await claim('settings-conversation-B');
+  expect(await active()).toBe('settings-conversation-B');
+  expect((await where(page)).address).toBe(settingsAddress);
+  const length = await page.evaluate(() => history.length);
+  if (dismissal === 'Back') await page.goBack();
+  else if (dismissal === 'Close') await page.locator('jf-settings-window button.close').click();
+  else await page.keyboard.press('Escape');
+  await settle(page, 300);
+  expect((await where(page)).settings).toBe(false);
+  expect(await active()).toBe('settings-conversation-B');
+  expect((await where(page)).address).toContain('conversationId=settings-conversation-B');
+  expect((await where(page)).stage).toBe('jf-sv3-window');
+  expect(await page.evaluate(() => history.length)).toBe(length);
+  await page.goForward(); await settle(page);
+  expect((await where(page)).settings).toBe(true);
+  await page.keyboard.press('Escape'); await settle(page);
+  expect((await where(page)).settings).toBe(false);
+  expect(await active()).toBe('settings-conversation-B');
+  await reload(page); await settle(page, 400);
+  expect(await active()).toBe('settings-conversation-B');
+  expect((await where(page)).address).toContain('conversationId=settings-conversation-B');
+  expect((await where(page)).settings).toBe(false);
+}, 30_000);
+
+it.each([
+  ['core.security-surface', 'security-privacy'],
+  ['core.presentation-gallery-surface', 'appearance'],
+  ['core.presentation-editor-surface', 'appearance'],
+])('SG4 member %s arrivals replace the address before and after Settings mounts without another history entry', async (member, section) => {
+  const page = await open(1280, 720, '', `#justsearch://surface/${member}`);
+  expect((await where(page)).address).toBe(`${SETTINGS}?anchor=${member}&section=${section}`);
+  expect(await page.evaluate(() => history.length)).toBe(2);
+  for (const mounted of [false, true]) {
+    await page.keyboard.press('Escape'); await settle(page);
+    if (mounted) await openSettings(page);
+    const length = await page.evaluate(() => history.length);
+    await page.evaluate((id) => { location.hash = `justsearch://surface/${id}`; }, member);
+    await settle(page, 400);
+    expect((await where(page)).address).toBe(`${SETTINGS}?anchor=${member}&section=${section}`);
+    expect(await settingsSection(page)).toBe(section);
+    expect(await page.evaluate(() => history.length)).toBe(length + 1);
+    expect(await page.locator(`div[data-settings-anchor="${member}"]`).evaluate(el => (el.getRootNode() as ShadowRoot).activeElement === el)).toBe(true);
+  }
+}, 30_000);
+
+/** The row's top is inside the window, nothing covers it, and it holds keyboard focus. */
+async function rowInViewAndFocused(page: Page, anchor: string): Promise<{ inView: boolean; focused: boolean; top: number }> {
+  return page.locator(`div[data-settings-anchor="${anchor}"]`).evaluate(el => {
+    const rect = el.getBoundingClientRect();
+    const x = rect.left + 8;
+    const y = rect.top + 8;
+    let top: Element | null = document.elementFromPoint(x, y);
+    while (top?.shadowRoot?.elementFromPoint(x, y) && top.shadowRoot.elementFromPoint(x, y) !== top) top = top.shadowRoot.elementFromPoint(x, y);
+    let shown = false;
+    for (let node: Node | null = top; node; node = (node as Element).parentElement ?? ((node.getRootNode() as ShadowRoot).host ?? null)) {
+      if (node === el) { shown = true; break; }
+    }
+    return { inView: rect.top >= 0 && rect.top + 24 <= innerHeight && shown,
+      focused: (el.getRootNode() as ShadowRoot).activeElement === el, top: Math.round(rect.top) };
+  });
+}
+
+it.each([
+  ['section=agent', 'agent-autonomy'],
+  ['section=plugins&anchor=durable-grants', 'durable-grants'],
+  ['section=desktop&anchor=feedback-capture', 'feedback-capture'],
+])('SG4 a cold %s arrival below the Security panel ends in view and focused after the Engine answers late, also on reload', async (address, anchor) => {
+  const page = await open(1280, 720, '?engineDelay=1500', `#justsearch://surface/${SETTINGS}?${address}`);
+  for (const reloaded of [false, true]) {
+    if (reloaded) await reloadIntoSettings(page, 'security-privacy');
+    expect((await where(page)).address).toBe(`${SETTINGS}?anchor=${anchor}&section=security-privacy`);
+    // The Security panel has settled: both late Engine replies are rendered.
+    await page.locator('jf-security-surface .card.section').waitFor({ timeout: 10_000 });
+    await page.locator('jf-security-surface #enc-pass').waitFor({ timeout: 10_000 });
+    await settle(page, 300);
+    const settled = await rowInViewAndFocused(page, anchor);
+    expect(settled, `${reloaded ? 'reload' : 'launch'}: ${JSON.stringify(settled)}`).toMatchObject({ inView: true, focused: true });
+    await settle(page, 1500);
+    expect(await rowInViewAndFocused(page, anchor), 'no later jump').toEqual(settled);
+  }
+}, 60_000);
+
+/**
+ * SG8 oracle, per section: every enabled control Tab reaches is in view once focused (its box meets
+ * every clipping ancestor; one taller than that viewport shows its caret line), no visible button is
+ * cut off sideways, and, in a short window, the Settings content has exactly one scroll container.
+ */
+function sg8Probe(root: Element): { controls: string[]; focused: number; visible: boolean; detail: string; sideways: string[]; scrollers: string[] } {
+  const all: HTMLElement[] = [root as HTMLElement];
+  const visit = (node: ParentNode): void => {
+    for (const el of node.querySelectorAll<HTMLElement>('*')) { all.push(el); if (el.shadowRoot) visit(el.shadowRoot); }
+  };
+  visit(root);
+  const up = (el: Element): Element | null => el.parentElement ?? ((el.getRootNode() as ShadowRoot).host ?? null);
+  const pane = (root.getRootNode() as ShadowRoot).querySelector('.settings-content-pane')!;
+  const inPane = (el: Element): boolean => { for (let p: Element | null = el; p; p = up(p)) if (p === pane) return true; return false; };
+  const enabled = all.filter(el => inPane(el) && el.matches('button, input, select, textarea, a[href], [tabindex]') &&
+    !(el instanceof HTMLInputElement && el.type === 'radio' && !el.checked) && el.tabIndex >= 0 &&
+    !el.matches(':disabled') && el.getClientRects().length > 0 && getComputedStyle(el).visibility === 'visible');
+  const sideways = all.filter(el => el.localName === 'button' && el.getClientRects().length > 0).flatMap(button => {
+    const r = button.getBoundingClientRect();
+    let cut = r.left < -1 || r.right > innerWidth + 1 ||
+      (getComputedStyle(button).overflowX !== 'visible' && button.scrollWidth > button.clientWidth + 1);
+    for (let p = up(button); p && !cut; p = up(p)) {
+      const b = p.getBoundingClientRect();
+      if (getComputedStyle(p).overflowX !== 'visible' && (r.left < b.left - 1 || r.right > b.right + 1)) cut = true;
+    }
+    const host = (button.getRootNode() as ShadowRoot).host;
+    return cut ? [`${(host ?? button).textContent?.trim().replace(/\s+/g, ' ').slice(0, 60)} ${JSON.stringify([r.left, r.right])}`] : [];
+  });
+  const scrollers = all.filter(el => !el.matches('textarea, input, select') && ['auto', 'scroll'].includes(getComputedStyle(el).overflowY) &&
+    el.scrollHeight > el.clientHeight + 1).map(el => `${el.localName}.${el.className}`);
+  let el = document.activeElement as HTMLElement | null;
+  while (el?.shadowRoot?.activeElement) el = el.shadowRoot.activeElement as HTMLElement;
+  const focused = el ? enabled.indexOf(el) : -1;
+  let visible = false; let detail = '';
+  if (el && focused >= 0) {
+    const r = el.getBoundingClientRect();
+    let top = 0; let bottom = innerHeight; let left = 0; let right = innerWidth;
+    for (let p = up(el); p; p = up(p)) {
+      const style = getComputedStyle(p); const b = p.getBoundingClientRect();
+      if (style.overflowY !== 'visible') { top = Math.max(top, b.top); bottom = Math.min(bottom, b.bottom); }
+      if (style.overflowX !== 'visible') { left = Math.max(left, b.left); right = Math.min(right, b.right); }
+    }
+    let caretTop = r.top; let caretBottom = r.bottom;
+    if (el instanceof HTMLTextAreaElement && r.height > bottom - top) {
+      // The caret line: lay the text before the caret out the way the textarea does.
+      const style = getComputedStyle(el); const mirror = document.createElement('div');
+      for (const key of ['font', 'letterSpacing', 'lineHeight', 'padding', 'border', 'boxSizing', 'width', 'tabSize'] as const) mirror.style[key] = style[key];
+      Object.assign(mirror.style, { position: 'absolute', visibility: 'hidden', whiteSpace: 'pre-wrap', overflowWrap: 'break-word' });
+      mirror.textContent = el.value.slice(0, el.selectionStart ?? 0);
+      const caret = document.createElement('span'); caret.textContent = '\u200b'; mirror.append(caret);
+      document.body.append(mirror);
+      caretTop = r.top + caret.offsetTop - el.scrollTop; caretBottom = caretTop + caret.offsetHeight;
+      mirror.remove();
+    }
+    const meets = Math.min(r.bottom, bottom) - Math.max(r.top, top) > 0 && Math.min(r.right, right) - Math.max(r.left, left) > 0;
+    visible = meets && (r.height <= bottom - top || (caretTop >= top - 1 && caretBottom <= bottom + 1));
+    detail = JSON.stringify({ el: el.outerHTML.slice(0, 160), rect: [r.top, r.bottom, r.left, r.right], caret: [caretTop, caretBottom], viewport: [top, bottom, left, right] });
+  }
+  return { controls: enabled.map(c => c.outerHTML.slice(0, 120)), focused, visible, detail, sideways, scrollers };
+}
+
+it.each([[600, 400, 200], [1280, 720, 100]])('SG8 at %ix%i and %i percent text every section and enabled control is in view on keyboard focus, no button is clipped sideways, one scroller when short', async (width, height, text) => {
+  const page = await open(width, height);
+  await page.evaluate((size) => { document.documentElement.style.fontSize = `${size}%`; }, text);
+  await openSettings(page);
+  await page.addScriptTag({ content: `window.sg8Probe = ${sg8Probe.toString()}` });
+  const probe = () => page.locator('jf-settings-surface .settings-root').evaluate(root => (window as unknown as { sg8Probe: typeof sg8Probe }).sg8Probe(root));
+  for (const section of ['general', 'appearance', 'security-privacy', 'data-reset', 'plugins', 'advanced', 'about']) {
+    const row = page.locator(`jf-settings-nav [data-settings-category="${section}"]`);
+    await row.focus(); await page.keyboard.press('Enter'); await settle(page);
+    expect(await row.getAttribute('aria-current')).toBe('true');
+    const layout = await probe();
+    const reached = new Set<number>();
+    for (let step = 0; step < layout.controls.length + 20 && reached.size < layout.controls.length; step++) {
+      await page.keyboard.press('Tab'); await settle(page, 50);
+      const focus = await probe();
+      if (focus.focused < 0) continue;
+      expect(focus.visible, `${section}: ${focus.detail}`).toBe(true);
+      reached.add(focus.focused);
+    }
+    expect(layout.controls.filter((_, index) => !reached.has(index)), `${section}: enabled controls not reached by Tab`).toEqual([]);
+    expect(layout.sideways, `${section}: buttons cut off sideways`).toEqual([]);
+    if (height === 400) expect(layout.scrollers, `${section}: Settings content scroll containers`).toHaveLength(1);
+  }
+}, 90_000);

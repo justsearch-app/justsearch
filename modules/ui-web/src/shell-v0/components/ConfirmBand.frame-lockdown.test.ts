@@ -68,7 +68,7 @@ beforeAll(async () => {
               settings.host_ = createMockHostApi({ platform: { capabilities: new Set(['native-notifications']) } });
               document.getElementById('slot').append(settings);
               await new Promise(r => setTimeout(r, 50));
-              settings.activeCategory = 'data'; await settings.updateComplete;
+              settings.activeCategory = 'data-reset'; await settings.updateComplete;
               settings.shadowRoot.querySelector('jf-button[label="Delete all local data"]').onActivate();
               await settings.updateComplete; await new Promise(r => setTimeout(r, 50));
             };

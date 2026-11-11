@@ -12,6 +12,7 @@ import { registerOperationButtonStrategy } from '../aggregate-substrate/strategi
 import { createMockHostApi } from '../plugin-api/testHostApi.js';
 import { __feedForTest, __feedContactForTest, __resetAiStateForTest, type StatusSnapshot } from '../state/aiStateStore.js';
 import { getViewerAudience, setViewerAudience } from '../state/viewerAudienceState.js';
+import { getDocument, mutateDocument } from '../state/UserStateDocument.js';
 import { deepActiveElement } from '../utils/keyboardHandler.js';
 
 const reset: Operation = {
@@ -67,6 +68,7 @@ function bandAnswer(surface: SettingsSurface, which: 'confirm' | 'keep'): HTMLBu
 async function mount(): Promise<SettingsSurface> {
   const surface = document.createElement('jf-settings-surface') as SettingsSurface;
   surface.host_ = createMockHostApi();
+  surface.activeCategory = 'data-reset';
   document.body.append(surface);
   await settle(surface);
   return surface;
@@ -333,15 +335,15 @@ describe('CR37c settings recovery', () => {
     expect(getViewerAudience()).toBe('USER');
   });
 
-  it('R2 focuses the actual reset control in every tier without a View-tier detour', async () => {
+  it('SG5 R2 selects Data & reset from another section and focuses Reset in every tier without invoking it', async () => {
     observe('settings_recovery');
     const surface = await mount();
     for (const tier of ['USER', 'OPERATOR', 'DEVELOPER'] as const) {
       setViewerAudience(tier); await settle(surface);
-      const category = surface.activeCategory;
+      surface.activeCategory = 'appearance'; await settle(surface);
       await surface.focusSettingsRecovery();
       await settle(surface);
-      expect(surface.activeCategory, 'recovery does not detour to developer settings').toBe(category);
+      expect(surface.activeCategory, 'recovery selects the section containing Reset').toBe('data-reset');
       expect(invokeButton(surface)).not.toBeNull();
       expect(deepActiveElement(), `${tier} focuses the actionable button`).toBe(invokeButton(surface));
       expect(getViewerAudience()).toBe(tier);
@@ -397,4 +399,18 @@ describe('CR37c settings recovery', () => {
     expect(invokeButton(surface)).toBeNull();
     expect(deepActiveElement()).toBe(surface.shadowRoot!.querySelector('h2'));
   });
+});
+
+
+it.each([true, false])('SD6 Reset to defaults keeps explicit developer tools %s', async value => {
+  setViewerAudience('OPERATOR');
+  mutateDocument(doc => ({ ...doc, showDeveloperTools: value }));
+  const before = localStorage.getItem('justsearch.userState.v2');
+  fetchMock.mockResolvedValue(Response.json({ success: true, message: 'Settings reset' }));
+  const surface = await mount();
+  invokeButton(surface)!.click(); await settle(surface);
+  bandAnswer(surface, 'confirm').click(); await settle(surface);
+  expect(fetchMock.mock.calls.filter(call => String(call[0]).endsWith('/core.reset-settings/invoke'))).toHaveLength(1);
+  expect(getDocument().showDeveloperTools).toBe(value);
+  expect(localStorage.getItem('justsearch.userState.v2')).toBe(before);
 });

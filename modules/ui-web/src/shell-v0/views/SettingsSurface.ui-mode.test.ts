@@ -75,6 +75,7 @@ describe('SettingsSurface shared detail level', () => {
         },
       },
     });
+    Object.assign(el, { activeCategory: 'appearance' });
     document.body.appendChild(el);
     await Promise.resolve();
     expect(settingsRequested).toBe(true);
@@ -117,6 +118,7 @@ describe('SettingsSurface shared detail level', () => {
         },
       },
     });
+    Object.assign(el, { activeCategory: 'appearance' });
     document.body.appendChild(el);
     await new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -166,6 +168,7 @@ it.each(['rejected', 'timed out'] as const)('rolls detail level back and clears 
     }
     return path === '/api/settings/v2' ? settingsSnapshot() : new Response('{}');
   } } });
+  Object.assign(el, { activeCategory: 'appearance' });
   document.body.appendChild(el);
   await vi.waitFor(() => expect(el.ui.mode).toBe('simple'));
   if (outcome === 'timed out') vi.useFakeTimers();

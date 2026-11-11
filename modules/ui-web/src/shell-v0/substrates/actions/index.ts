@@ -94,6 +94,7 @@ const _defaultKernelCtx: KernelCtx = Object.freeze({
     ),
 });
 import { getShellContext } from '../../state/shellContextState.js';
+import { isMac } from '../../commands/KeybindingRegistry.js';
 import { evaluateWhen } from '../../commands/whenExpression.js';
 import { recordEffect } from '../effects/index.js';
 
@@ -798,7 +799,7 @@ export function registerShellActions(deps: ShellActionDeps): void {
   // Shell slice 2 — the three areas carry the switcher's shortcuts (Shell.handleGlobalKey owns the keys).
   navigateAction('core.action.shell.go-to-search', 'Go to Search', 'core.search-v3-surface', 'Ctrl+1');
   navigateAction('core.action.shell.go-to-library', 'Go to Library', 'core.library-surface', 'Ctrl+2');
-  navigateAction('core.action.shell.go-to-settings', 'Go to Settings', 'core.settings-surface');
+  navigateAction('core.action.shell.go-to-settings', 'Go to Settings', 'core.settings-surface', isMac() ? '⌘+,' : 'Ctrl+,');
   // Rules need both saved values; open the Library editor through the shared focus route.
   shellAction('core.action.shell.go-to-indexing-rules', 'Change indexing rules', () => {
     requestIndexingRuleNavigation('hours');

@@ -209,6 +209,8 @@ export interface Profile {
    * 'USER' by the projection.
    */
   readonly viewerAudience?: Audience;
+  /** Local developer UI preference; absent follows the audience without materializing a default. */
+  readonly showDeveloperTools?: boolean;
   /**
    * 569 §19 Seam 5 — the id of the active applied Presentation Declaration (per-profile, like
    * {@link activeThemeId}, with which it stays consistent: re-applying the presentation re-derives the
@@ -324,6 +326,7 @@ export interface UserStateV1 {
   readonly keybindingOverrides?: readonly { key: string; commandId: string; source: 'user' }[];
   readonly savedViews?: readonly SavedView[];
   readonly viewerAudience?: Audience;
+  readonly showDeveloperTools?: boolean;
   readonly activePresentationId?: string | null; // 569 §19 Seam 5 (per-profile)
   // Cross-profile slices:
   readonly acknowledgedAdvisories?: readonly string[];
@@ -398,6 +401,7 @@ export function flatSlicesFromProfile(profile: Profile): {
   keybindingOverrides: Profile['keybindingOverrides'];
   savedViews: Profile['savedViews'];
   viewerAudience: Profile['viewerAudience'];
+  showDeveloperTools: Profile['showDeveloperTools'];
   activePresentationId: Profile['activePresentationId'];
 } {
   return {
@@ -407,6 +411,7 @@ export function flatSlicesFromProfile(profile: Profile): {
     keybindingOverrides: profile.keybindingOverrides,
     savedViews: profile.savedViews,
     viewerAudience: profile.viewerAudience,
+    showDeveloperTools: profile.showDeveloperTools,
     activePresentationId: profile.activePresentationId,
   };
 }
@@ -464,6 +469,7 @@ function storageFromView(view: UserStateV1): UserStateV2Storage {
     ...(view.viewerAudience !== undefined
       ? { viewerAudience: view.viewerAudience }
       : {}),
+    ...(view.showDeveloperTools !== undefined ? { showDeveloperTools: view.showDeveloperTools } : {}),
     ...(view.activePresentationId !== undefined
       ? { activePresentationId: view.activePresentationId }
       : {}),
@@ -921,6 +927,7 @@ function validateV2(candidate: unknown): UserStateV2Storage | null {
       ...(keybindingOverrides !== undefined ? { keybindingOverrides } : {}),
       ...(profileSavedViews !== undefined ? { savedViews: profileSavedViews } : {}),
       ...(profileViewerAudience !== undefined ? { viewerAudience: profileViewerAudience } : {}),
+      ...(typeof p['showDeveloperTools'] === 'boolean' ? { showDeveloperTools: p['showDeveloperTools'] } : {}),
       ...(profileActivePresentationId !== undefined
         ? { activePresentationId: profileActivePresentationId }
         : {}),
@@ -1774,6 +1781,7 @@ export function createProfile(
       userConfig: basis.userConfig,
       activeThemeId: basis.activeThemeId,
       pinnedSearches: basis.pinnedSearches,
+      ...(basis.showDeveloperTools !== undefined ? { showDeveloperTools: basis.showDeveloperTools } : {}),
       ...(basis.keybindingOverrides !== undefined
         ? { keybindingOverrides: basis.keybindingOverrides }
         : {}),

@@ -1,47 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
-/**
- * settingsRegister — tempdoc 855 §9.3: the ONE declared settings register.
- *
- * An ordered list of `{group → category → entry}`. From this single declaration project:
- * (1) `<jf-settings-nav>` (groups, category rows, accordion sub-anchors), (2) the active
- * category's content in `SettingsSurface` (native entries dispatch to one of its existing
- * `render*()` methods by `key`; member entries mount a catalog surface by id), (3) deep-link
- * targets (a member category's id IS the catalog surface id the existing member→host redirect
- * already resolves — see `router/memberTabIntent.ts`), (4) — later — settings search (855 §6
- * Phase 4). Nav and content both read this register; neither hand-maintains its own copy of the
- * tree (the projection-vs-fork discipline, ADR-0031/0033).
- *
- * Audience gating: a `gate()` predicate is attached to the SAME entries the corresponding
- * `SettingsSurface.render*()` method already self-gates on (Plugin permissions hidden for USER,
- * Workspace Profiles shown only for DEVELOPER — `SettingsSurface.ts` `renderPluginPermissions` /
- * `renderWorkspaceProfilesDeveloper`). Both sides call the identical `getViewerAudience()` read —
- * this is the same fact consumed twice (nav-visibility + content-dispatch), not a second
- * declaration of the rule that could drift.
- *
- * i18n: native group/category/section labels resolve through `settings.group.*` /
- * `settings.category.*` / `settings.section.*` keys in the existing `registry-surface` message
- * catalog (`modules/app-api/src/main/resources/messages/registry-surface.en.properties`) via
- * `localizeResourceKey` — the same backend-served catalog `present()` already boots
- * (`bootSurfaceCatalog`), so no new namespace/controller wiring is needed. Member category labels
- * resolve through `present({kind:'surface', id})` (the existing surface-label authority) instead —
- * no `EntityRef` kind exists for a bare settings category, so native labels use the resource-key
- * convention directly (855 §11.5).
- *
- * Phase 4 (855 §6 / §9.3 item 4): `searchRegister()` is the register's SECOND projection — a
- * query over the exact same tree `<jf-settings-nav>` already renders, resolved through the exact
- * same label paths (`categoryLabel()` below — extracted from `<jf-settings-nav>` so nav and search
- * share one label-resolution function instead of forking a second copy). It matches group labels
- * too: a group-label hit surfaces every category in that group (there is no single "activate a
- * group" target, so the group match fans out to its categories). Section-level audience gating
- * reuses each entry's own `gate()` — the SAME live `getViewerAudience()` read the nav's accordion
- * already filters sections with, so a USER querying a DEVELOPER-only section's label gets no hit,
- * with no second gating rule to drift.
- */
+/** The one Settings register: navigation, content, search and incoming coordinates. */
+import { getShowDeveloperTools } from '../state/developerToolsState.js';
 import { getViewerAudience } from '../state/viewerAudienceState.js';
+import { getOperation } from '../../api/registry/OperationCatalogClient.js';
+import { operationVisibleTo } from '../aggregate-substrate/queryPrimitives.js';
 import { localizeResourceKey } from '../../i18n/resourceCatalog.js';
 import { present } from '../display/present.js';
 
-export type SettingsCategoryKind = 'native' | 'member';
+type SettingsCategoryKind = 'native' | 'member';
 
 /** One sub-anchor within a native category page — dispatches to a `SettingsSurface.render*()`. */
 export interface SettingsSectionEntry {
@@ -49,8 +15,54 @@ export interface SettingsSectionEntry {
   readonly key: string;
   /** `registry-surface` catalog key resolving this sub-anchor's label. */
   readonly labelKey: string;
-  /** Optional audience gate — mirrors the section renderer's own self-gate (see file header). */
-  readonly gate?: () => boolean;
+  /** Catalog member rendered alongside native entries in this section. */
+  readonly memberSurfaceId?: string;
+  /** Platform capability (`host_.platform.capabilities`) the row's controls need. Without it the row
+   *  is not part of Settings on this platform: never listed, rendered or explained. */
+  readonly requires?: string;
+  /** Who may see the row: the view tier, or the operation policy behind its only control. */
+  readonly audience?: (viewer: SettingsViewer) => boolean;
+  /** A developer tool: shown only while Show developer tools is on. */
+  readonly developerTool?: true;
+  /** The row's only control changes the backend's saved settings. While they are session-only the
+   *  row has nothing to offer, so it is not part of Settings, like a row this platform lacks. */
+  readonly savedSettings?: true;
+}
+
+/** What Settings knows about its viewer beyond the shared audience and developer-tools stores. */
+export interface SettingsViewer {
+  readonly capabilities: ReadonlySet<string>;
+  /** Settings recovery holds indexing until Reset to defaults is confirmed (the USER exception). */
+  readonly settingsRecovery: boolean;
+  /** The backend keeps settings for this session only (`settingsMode: in_memory`). */
+  readonly settingsReadOnly: boolean;
+}
+
+const NO_VIEWER: SettingsViewer = { capabilities: new Set(), settingsRecovery: false, settingsReadOnly: false };
+
+/** Shown, or why not: an audience or developer-tools restriction (explained to arrivals), or
+ *  absent on this platform or in this settings mode. Navigation, search, content and arrivals read only this. */
+export type SettingsEntryState = 'shown' | 'audience' | 'tools' | 'absent';
+
+export function entryState(entry: SettingsSectionEntry, viewer: SettingsViewer = NO_VIEWER): SettingsEntryState {
+  if (entry.requires && !viewer.capabilities.has(entry.requires)) return 'absent';
+  if (entry.savedSettings && viewer.settingsReadOnly) return 'absent';
+  if (entry.audience && !entry.audience(viewer)) return 'audience';
+  if (entry.developerTool && !getShowDeveloperTools()) return 'tools';
+  return 'shown';
+}
+
+/** A focused row that an audience or developer-tools change removes hands focus to Show developer
+ *  tools, which explains it. Reset to defaults disappears when settings recovery ends and keeps its
+ *  own rescue (the Settings heading). */
+export function rescuedBySwitch(entry: SettingsSectionEntry, viewer?: SettingsViewer): boolean {
+  const state = entryState(entry, viewer);
+  return (state === 'audience' || state === 'tools') && entry.key !== 'reset-settings';
+}
+
+/** The entries of a category this viewer sees, in register order. */
+export function shownEntries(category: SettingsCategory, viewer?: SettingsViewer): SettingsSectionEntry[] {
+  return (category.sections ?? []).filter(entry => entryState(entry, viewer) === 'shown');
 }
 
 export interface SettingsCategory {
@@ -76,152 +88,129 @@ export interface SettingsGroup {
 
 const operatorOrAbove = (): boolean => getViewerAudience() !== 'USER';
 const developerOnly = (): boolean => getViewerAudience() === 'DEVELOPER';
+/** Reset to defaults is offered by its operation's audience policy; settings recovery offers it as
+ *  OPERATOR (the USER exception), as its renderer does. */
+const resetSettingsOffered = (viewer: SettingsViewer): boolean => {
+  const reset = getOperation('core.reset-settings');
+  return !!reset && operationVisibleTo(reset, viewer.settingsRecovery ? 'OPERATOR' : getViewerAudience());
+};
+/** Desktop, update and updater rows need the native application. */
+const NATIVE = 'native-notifications';
 
-/**
- * The declared tree (855 §4 / Phase 1 straw naming, D4 — bikeshed later, not a blocker). Category
- * ids double as CSS/test hooks and (for member categories) catalog surface ids; keep them stable.
- */
+/** Seven pages, in navigation order. Entry keys remain compatible with old addresses. */
 export const SETTINGS_REGISTER: readonly SettingsGroup[] = [
   {
-    id: 'general',
-    labelKey: 'settings.group.general',
-    categories: [
-      {
-        id: 'appearance',
-        kind: 'native',
-        labelKey: 'settings.category.appearance',
-        sections: [
-          { key: 'interface', labelKey: 'settings.section.interface' },
-          { key: 'theme', labelKey: 'settings.section.theme' },
-          { key: 'accessibility', labelKey: 'settings.section.accessibility' },
-          // Tempdoc 874 — the Search v3 chat-column width preset (FE-only, user-state document).
-          { key: 'chat-width', labelKey: 'settings.section.chat-width' },
-          // Tempdoc 855 §5 item 2 / §9.6 item 5 — Token Editor's rail placement is demoted
-          // (RAIL → DEEPLINK); this sub-anchor is its replacement launch affordance, a LINK to
-          // the plugin surface per ADR-0035 (settings never embeds plugin UI).
-          { key: 'token-editor', labelKey: 'settings.section.token-editor' },
-        ],
-      },
-      {
-        id: 'layout',
-        kind: 'native',
-        labelKey: 'settings.category.layout',
-        sections: [
-          { key: 'layout', labelKey: 'settings.section.layout' },
-          { key: 'rail', labelKey: 'settings.section.rail' },
-          { key: 'keyboard', labelKey: 'settings.section.keyboard' },
-        ],
-      },
-      {
-        id: 'notifications',
-        kind: 'native',
-        labelKey: 'settings.category.notifications',
-        sections: [{ key: 'notifications', labelKey: 'settings.section.notifications' }],
-      },
-      {
-        id: 'core.presentation-gallery-surface',
-        kind: 'member',
-        memberSurfaceId: 'core.presentation-gallery-surface',
-      },
-      {
-        id: 'core.presentation-editor-surface',
-        kind: 'member',
-        memberSurfaceId: 'core.presentation-editor-surface',
-      },
-    ],
+    id: 'general', labelKey: 'settings.category.general', categories: [{
+      id: 'general', kind: 'native', labelKey: 'settings.category.general', sections: [
+        { key: 'desktop', labelKey: 'settings.section.desktop', requires: NATIVE },
+        { key: 'notifications', labelKey: 'settings.section.notifications' },
+        { key: 'app-updates', labelKey: 'settings.section.app-updates', requires: NATIVE },
+        { key: 'keyboard', labelKey: 'settings.section.keyboard' },
+        { key: 'indexing', labelKey: 'settings.section.indexing' },
+        { key: 'context-window', labelKey: 'settings.section.context-window' },
+      ],
+    }],
   },
   {
-    id: 'ai',
-    labelKey: 'settings.group.ai',
-    categories: [
-      {
-        id: 'agent',
-        kind: 'native',
-        labelKey: 'settings.category.agent',
-        sections: [
-          { key: 'agent-autonomy', labelKey: 'settings.section.agent-autonomy' },
-          // Navigation to the sole Reading memory control in AI Brain.
-          { key: 'context-window', labelKey: 'settings.section.context-window' },
-        ],
-      },
-    ],
+    id: 'appearance', labelKey: 'settings.category.appearance', categories: [{
+      id: 'appearance', kind: 'native', labelKey: 'settings.category.appearance', sections: [
+        { key: 'interface', labelKey: 'settings.section.interface' },
+        { key: 'theme', labelKey: 'settings.section.theme' },
+        { key: 'core.presentation-gallery-surface', labelKey: 'registry-surface.core.presentation-gallery-surface.label', memberSurfaceId: 'core.presentation-gallery-surface' },
+        { key: 'core.presentation-editor-surface', labelKey: 'registry-surface.core.presentation-editor-surface.label', memberSurfaceId: 'core.presentation-editor-surface' },
+        { key: 'token-editor', labelKey: 'settings.section.token-editor' },
+        { key: 'layout', labelKey: 'settings.section.layout' },
+        { key: 'rail', labelKey: 'settings.section.rail' },
+        { key: 'chat-width', labelKey: 'settings.section.chat-width' },
+        { key: 'accessibility', labelKey: 'settings.section.accessibility' },
+      ],
+    }],
   },
   {
-    id: 'privacy-trust',
-    labelKey: 'settings.group.privacy-trust',
-    categories: [
-      {
-        // Tempdoc 855 §5 item 1 / §9.3 — absorbed member category: core.security-surface (encryption,
-        // backups, auto-lock) mounts here directly instead of a native pointer page linking out to it
-        // (629's interim placement, now superseded — the settings window is the real home).
-        id: 'core.security-surface',
-        kind: 'member',
-        memberSurfaceId: 'core.security-surface',
-      },
-      {
-        id: 'plugins',
-        kind: 'native',
-        labelKey: 'settings.category.plugins',
-        sections: [
-          { key: 'plugins', labelKey: 'settings.section.plugins' },
-          {
-            key: 'plugin-permissions',
-            labelKey: 'settings.section.plugin-permissions',
-            gate: operatorOrAbove,
-          },
-          { key: 'durable-grants', labelKey: 'settings.section.durable-grants' },
-          { key: 'delivered-contributions', labelKey: 'settings.section.delivered-contributions' },
-        ],
-      },
-    ],
+    id: 'security-privacy', labelKey: 'settings.category.security-privacy', categories: [{
+      id: 'security-privacy', kind: 'native', labelKey: 'settings.category.security-privacy', sections: [
+        { key: 'core.security-surface', labelKey: 'registry-surface.core.security-surface.label', memberSurfaceId: 'core.security-surface' },
+        { key: 'durable-grants', labelKey: 'settings.section.durable-grants' },
+        { key: 'plugin-permissions', labelKey: 'settings.section.plugin-permissions', audience: operatorOrAbove },
+        { key: 'agent-autonomy', labelKey: 'settings.section.agent-autonomy' },
+        { key: 'feedback-capture', labelKey: 'settings.section.feedback-capture' },
+      ],
+    }],
   },
   {
-    id: 'app',
-    labelKey: 'settings.group.app',
-    categories: [
-      {
-        id: 'indexing', kind: 'native', labelKey: 'settings.category.indexing',
-        sections: [{ key: 'indexing', labelKey: 'settings.section.indexing' }],
-      },
-      {
-        id: 'desktop',
-        kind: 'native',
-        labelKey: 'settings.category.desktop',
-        sections: [
-          { key: 'desktop', labelKey: 'settings.section.desktop' },
-          { key: 'app-updates', labelKey: 'settings.section.app-updates' },
-          { key: 'feedback-capture', labelKey: 'settings.section.feedback-capture' },
-        ],
-      },
-      {
-        id: 'developer',
-        kind: 'native',
-        labelKey: 'settings.category.developer',
-        sections: [
-          { key: 'view-tier', labelKey: 'settings.section.view-tier' },
-          {
-            key: 'workspace-profiles',
-            labelKey: 'settings.section.workspace-profiles',
-            gate: developerOnly,
-          },
-        ],
-      },
-    ],
+    id: 'data-reset', labelKey: 'settings.category.data-reset', danger: true, categories: [{
+      id: 'data-reset', kind: 'native', labelKey: 'settings.category.data-reset', sections: [
+        { key: 'reset-settings', labelKey: 'settings.section.reset-settings', audience: resetSettingsOffered, savedSettings: true },
+        { key: 'data', labelKey: 'settings.section.data' },
+      ],
+    }],
   },
   {
-    id: 'data',
-    labelKey: 'settings.group.data',
-    danger: true,
-    categories: [
-      {
-        id: 'data',
-        kind: 'native',
-        labelKey: 'settings.category.data',
-        sections: [{ key: 'data', labelKey: 'settings.section.data' }],
-      },
-    ],
+    id: 'plugins', labelKey: 'settings.category.plugins', categories: [{
+      id: 'plugins', kind: 'native', labelKey: 'settings.category.plugins', sections: [
+        { key: 'plugins', labelKey: 'settings.section.plugins' },
+        { key: 'delivered-contributions', labelKey: 'settings.section.delivered-contributions' },
+      ],
+    }],
+  },
+  {
+    id: 'advanced', labelKey: 'settings.category.advanced', categories: [{
+      id: 'advanced', kind: 'native', labelKey: 'settings.category.advanced', sections: [
+        { key: 'show-developer-tools', labelKey: 'settings.section.show-developer-tools' },
+        { key: 'view-tier', labelKey: 'settings.section.view-tier', developerTool: true },
+        { key: 'workspace-profiles', labelKey: 'settings.section.workspace-profiles', audience: developerOnly, developerTool: true },
+      ],
+    }],
+  },
+  {
+    id: 'about', labelKey: 'settings.category.about', categories: [{
+      id: 'about', kind: 'native', labelKey: 'settings.category.about', sections: [
+        { key: 'version', labelKey: 'settings.section.version' },
+        { key: 'update-information', labelKey: 'settings.section.update-information' },
+      ],
+    }],
   },
 ];
+
+export interface SettingsCoordinate {
+  readonly section: string;
+  readonly anchor?: string;
+}
+
+/** Historical category defaults. Entry destinations are derived from the register below. */
+const CATEGORY_ALIASES: Readonly<Record<string, string>> = {
+  appearance: 'interface', layout: 'layout', notifications: 'notifications',
+  agent: 'agent-autonomy', indexing: 'indexing', desktop: 'desktop',
+  developer: 'show-developer-tools', data: 'data', plugins: 'plugins',
+  'privacy-trust': 'core.security-surface',
+};
+
+/** Explicit entries outrank category defaults, including entries moved to another page.
+ * Undefined means an unknown coordinate: callers keep the current page (or General on first use).
+ * Audience restrictions are handled by the page; resolving never changes a preference. */
+export function resolveSettingsCoordinate(id?: string, anchor?: string): SettingsCoordinate | undefined {
+  const categories = allCategories();
+  const entry = (key: string): SettingsCoordinate | undefined => {
+    const category = categories.find(c => c.sections?.some(s => s.key === key));
+    return category ? { section: category.id, anchor: key } : undefined;
+  };
+  if (anchor) {
+    const exact = entry(anchor);
+    if (exact) return exact;
+  }
+  if (!id) return undefined;
+  // Canonical pages have no implicit anchor. Historical appearance/plugins addresses retain
+  // their original first row, which is also the canonical page's first row.
+  if (Object.hasOwn(CATEGORY_ALIASES, id)) return entry(CATEGORY_ALIASES[id]!);
+  if (findCategory(id)) return { section: id };
+  return entry(id);
+}
+
+export function entryLabel(entry: SettingsSectionEntry): string {
+  return entry.memberSurfaceId
+    ? present({ kind: 'surface', id: entry.memberSurfaceId }).label
+    : localizeResourceKey(entry.labelKey);
+}
 
 /** Flatten the register into its categories, in declared order. */
 export function allCategories(
@@ -273,6 +262,7 @@ function includesCaseInsensitive(label: string, needle: string): boolean {
 export function searchRegister(
   query: string,
   register: readonly SettingsGroup[] = SETTINGS_REGISTER,
+  viewer?: SettingsViewer,
 ): SettingsSearchResult[] {
   const needle = query.trim().toLowerCase();
   if (!needle) return [];
@@ -290,9 +280,8 @@ export function searchRegister(
       if (groupHit || includesCaseInsensitive(categoryLabel(category), needle)) {
         push({ group, category });
       }
-      for (const section of category.sections ?? []) {
-        if (section.gate && !section.gate()) continue;
-        if (includesCaseInsensitive(localizeResourceKey(section.labelKey), needle)) {
+      for (const section of shownEntries(category, viewer)) {
+        if (includesCaseInsensitive(entryLabel(section), needle)) {
           push({ group, category, section });
         }
       }

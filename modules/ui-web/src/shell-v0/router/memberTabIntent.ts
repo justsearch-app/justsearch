@@ -19,9 +19,9 @@
  * from a speculative resolution).
  */
 /** A listener returns `true` if it HANDLED the request (its host id matched and it switched tab). */
-type MemberTabListener = (hostId: string, memberId: string) => boolean | void;
+type MemberTabListener = (hostId: string, memberId: string, anchor?: string) => boolean | void;
 
-const pending = new Map<string, string>();
+const pending = new Map<string, { memberId: string; anchor?: string }>();
 const listeners = new Set<MemberTabListener>();
 
 /**
@@ -31,23 +31,29 @@ const listeners = new Set<MemberTabListener>();
  * already-mounted host switches its tab via the listener and leaves no `pending` that a later
  * navigate-away-and-back would wrongly drain.
  */
-export function requestMemberTab(hostId: string, memberId: string): void {
+export function requestMemberTab(hostId: string, memberId: string, anchor?: string): void {
   let handled = false;
   for (const l of listeners) {
     try {
-      if (l(hostId, memberId) === true) handled = true;
+      if (l(hostId, memberId, anchor) === true) handled = true;
     } catch {
       // a listener throwing must not break navigation
     }
   }
-  if (!handled) pending.set(hostId, memberId);
+  if (handled) pending.delete(hostId);
+  else pending.set(hostId, { memberId, ...(anchor ? { anchor } : {}) });
 }
 
 /** Consume (and clear) the pending member-tab intent for `hostId`, if any. Drained on host mount. */
 export function takeMemberTabIntent(hostId: string): string | undefined {
-  const m = pending.get(hostId);
-  if (m !== undefined) pending.delete(hostId);
-  return m;
+  return takeMemberTabRequest(hostId)?.memberId;
+}
+
+/** Settings also addresses individual entries within a page. Latest request wins before mount. */
+export function takeMemberTabRequest(hostId: string): { memberId: string; anchor?: string } | undefined {
+  const request = pending.get(hostId);
+  pending.delete(hostId);
+  return request;
 }
 
 /**

@@ -188,7 +188,7 @@ it('X1 the typed delete input uses the spacing token through its class', async (
   const page = await open();
   await page.evaluate(async () => {
     const settings = document.querySelector<SettingsSurface>('jf-settings-surface')!;
-    settings.activeCategory = 'data'; await settings.updateComplete;
+    settings.activeCategory = 'data-reset'; await settings.updateComplete;
   });
   await page.locator('jf-button[label="Delete all local data"]').click();
   const input = page.locator('#delete-data-typed');

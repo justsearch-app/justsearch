@@ -850,7 +850,7 @@ describe('Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4)',
     }
   });
 
-  it.each([{ label: 'in-app boolean', flag: true }, { label: 'URL string', flag: 'true' }])('R2 consumes recovery focus ($label) before Back and Forward', async ({ flag }) => {
+  it.each([{ label: 'in-app boolean', flag: true }, { label: 'URL string', flag: 'true' }])('SG5 R2 consumes recovery focus ($label) before Back and Forward; the address names Data & reset at Reset', async ({ flag }) => {
     const shell = await renderShell();
     const win = windowOf(shell);
     shell.activateSurface('core.library-surface', {}, 'RAIL');
@@ -860,7 +860,7 @@ describe('Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4)',
       shell.activateSurface(SETTINGS_ID, { focusSettingsRecovery: flag }, 'BUTTON');
       await settle();
       expect(focus).toHaveBeenCalledTimes(1);
-      expect(window.location.hash).toBe(`#justsearch://surface/${SETTINGS_ID}`);
+      expect(window.location.hash).toBe(`#justsearch://surface/${SETTINGS_ID}?anchor=reset-settings&section=data-reset`);
       expect(getJournalState().entries.every((entry) => !entry.url.includes('focusSettingsRecovery'))).toBe(true);
       window.history.back();
       await settle();
@@ -1027,12 +1027,12 @@ describe('Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4)',
   // Composition: a member of the MODAL host (Settings ⊇ Security) deep-links to its HOST, which now
   // opens as a window. Both halves must survive the MODAL branch — the window opens AND the
   // member-tab intent reaches the persistently-mounted surface (§11.2).
-  it('a member deep-link opens the window AND delivers the member intent (window closed)', async () => {
+  it('SG4 a member deep-link opens the window AND delivers the member\'s section and row (window closed)', async () => {
     const shell = await renderShell();
     const win = windowOf(shell);
-    const seen: Array<[string, string]> = [];
-    const unsubscribe = subscribeMemberTab((hostId, memberId) => {
-      seen.push([hostId, memberId]);
+    const seen: Array<[string, string, string | undefined]> = [];
+    const unsubscribe = subscribeMemberTab((hostId, memberId, anchor) => {
+      seen.push([hostId, memberId, anchor]);
       return true;
     });
 
@@ -1043,11 +1043,12 @@ describe('Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4)',
 
     expect(win.open).toBe(true);
     expect(shell.activeId).not.toBe(SETTINGS_ID);
-    expect(seen).toEqual([[SETTINGS_ID, MEMBER_ID]]);
+    // Security is a row of Security & privacy: the intent names that section and the member's row.
+    expect(seen).toEqual([[SETTINGS_ID, 'security-privacy', MEMBER_ID]]);
     unsubscribe();
   });
 
-  it('a member deep-link delivers the member intent while the window is ALREADY open', async () => {
+  it('SG4 a member deep-link delivers the member\'s section and row while the window is ALREADY open', async () => {
     const shell = await renderShell();
     const win = windowOf(shell);
 
@@ -1055,16 +1056,16 @@ describe('Shell — settings window close semantics (tempdoc 855 §11.1 D3/D4)',
     await settle();
     expect(win.open).toBe(true);
 
-    const seen: Array<[string, string]> = [];
-    const unsubscribe = subscribeMemberTab((hostId, memberId) => {
-      seen.push([hostId, memberId]);
+    const seen: Array<[string, string, string | undefined]> = [];
+    const unsubscribe = subscribeMemberTab((hostId, memberId, anchor) => {
+      seen.push([hostId, memberId, anchor]);
       return true;
     });
 
     shell.activateSurface(MEMBER_ID, {}, 'BUTTON');
     await settle();
 
-    expect(seen).toEqual([[SETTINGS_ID, MEMBER_ID]]);
+    expect(seen).toEqual([[SETTINGS_ID, 'security-privacy', MEMBER_ID]]);
     // Re-entering the host it is already showing must not stack an entry (D3) or close the window.
     expect(win.open).toBe(true);
     unsubscribe();

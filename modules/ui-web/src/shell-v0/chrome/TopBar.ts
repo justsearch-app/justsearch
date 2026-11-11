@@ -21,6 +21,7 @@
  */
 import { html, css, nothing, type TemplateResult, type PropertyValues } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
+import { isMac } from '../commands/KeybindingRegistry.js';
 import { TransientController } from '../primitives/transientController.js';
 import { icon, type IconName } from '../components/Icon.js';
 import { hasWindowLayer } from '../../utils/windowLayer.js';
@@ -41,7 +42,8 @@ export type TopBarSelection =
   | { readonly kind: 'area'; readonly id: string }
   | { readonly kind: 'window'; readonly id: string }
   | { readonly kind: 'settings' }
-  | { readonly kind: 'copy-link' };
+  | { readonly kind: 'copy-link' }
+  | { readonly kind: 'logs' };
 
 type OpenMenu = 'more' | 'areas' | null;
 
@@ -74,7 +76,7 @@ export class TopBar extends JfElement {
   declare about: TopBarDestination | null;
   /** Plugin windows (catalog contributions outside the three areas): ⋯ › More. */
   declare windows: readonly TopBarDestination[];
-  /** Developer windows (API explorer): ⋯ › Developer, only while the developer view tier is on. */
+  /** Developer windows (API explorer): ⋯ › Developer, while Show developer tools is on. */
   declare developerWindows: readonly TopBarDestination[];
   declare developer: boolean;
   declare backendAddress: string;
@@ -343,12 +345,14 @@ export class TopBar extends JfElement {
         <div class="group-label" id="more-windows-label">More</div>
         ${this.windows.map(d => this.menuRow(d, 'window'))}</div>` : nothing}
       ${this.developer ? html`<div class="group" role="group" aria-labelledby="developer-label">
-        <div class="group-label"><span id="developer-label">Developer</span><span>on in Settings › Developer</span></div>
+        <div class="group-label"><span id="developer-label">Developer</span><span>on in Settings › Advanced</span></div>
         ${this.developerWindows.map(d => this.menuRow(d, 'window'))}
         <button type="button" role="menuitem" tabindex="-1" data-menu-action="copy-link"
           @click=${() => this.select({ kind: 'copy-link' })}>${icon({ name: 'copy', size: 16 })}<span class="item-label">Copy link to this view</span></button>
         <button type="button" role="menuitem" tabindex="-1" data-menu-action="backend-address" aria-expanded=${String(this.showBackend)}
           @click=${() => { this.showBackend = !this.showBackend; }}>${icon({ name: 'database', size: 16 })}<span class="item-label">Show backend address</span></button>
+        <button type="button" role="menuitem" tabindex="-1" data-menu-action="logs"
+          @click=${() => this.select({ kind: 'logs' })}>${icon({ name: 'file-text', size: 16 })}<span class="item-label">Logs</span></button>
         ${this.showBackend ? html`<div class="backend" data-testid="backend-address">${this.backendAddress}</div>` : nothing}
       </div>` : nothing}
     </div>`;
@@ -374,7 +378,7 @@ export class TopBar extends JfElement {
       <div class="end">
         <slot name="status" data-tauri-drag-region=${this.noDrag}></slot>
         <button type="button" class="icon-button settings-trigger" data-surface-id="core.settings-surface"
-          aria-label="Settings" title="Settings" aria-haspopup="dialog"
+          aria-label="Settings" title=${isMac() ? 'Settings · ⌘+,' : 'Settings · Ctrl+,'} aria-keyshortcuts=${isMac() ? 'Meta+,' : 'Control+,'} aria-haspopup="dialog"
           @click=${() => this.select({ kind: 'settings' })}>${icon({ name: 'settings', size: 18 })}</button>
         <span class="menu-anchor">
           <button type="button" class="icon-button more-trigger" aria-label="More" title="More"

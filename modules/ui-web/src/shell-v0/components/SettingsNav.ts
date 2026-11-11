@@ -37,7 +37,11 @@ import { JfElement } from '../primitives/JfElement.js';
 import { localizeResourceKey, onCatalogUpdated } from '../../i18n/resourceCatalog.js';
 import {
   categoryLabel,
+  entryLabel,
+  rescuedBySwitch,
   searchRegister,
+  shownEntries,
+  type SettingsViewer,
   type SettingsGroup,
   type SettingsCategory,
   type SettingsSearchResult,
@@ -46,11 +50,40 @@ import {
 export class SettingsNav extends JfElement {
   static properties = {
     register: { attribute: false },
+    audience: { attribute: false },
+    showDeveloperTools: { attribute: false },
+    viewer: { attribute: false },
     activeCategory: { type: String, attribute: 'active-category' },
     activeAnchor: { type: String, attribute: 'active-anchor' },
     footerVersion: { type: String, attribute: 'footer-version' },
     query: { state: true },
   };
+
+  declare audience: string;
+  declare showDeveloperTools: boolean;
+  /** The Settings window's platform and recovery facts the register's entry gates read. */
+  declare viewer: SettingsViewer | undefined;
+  private focusedRow: HTMLElement | null = null;
+  private focusedRowHidden = false;
+
+  protected override willUpdate(): void {
+    this.focusedRow = this.shadowRoot?.activeElement as HTMLElement | null;
+    const key = this.focusedRow?.dataset.settingsAnchor;
+    this.focusedRowHidden = !!key && this.register.some(group => group.categories.some(category =>
+      category.sections?.some(entry => entry.key === key && rescuedBySwitch(entry, this.viewer))));
+  }
+
+  protected override updated(changed: Map<string, unknown>): void {
+    if (this.focusedRowHidden) {
+      this.dispatchEvent(new CustomEvent('hidden-row-focus', { bubbles: true, composed: true }));
+    } else if (this.focusedRow && !this.focusedRow.isConnected) {
+      this.shadowRoot?.querySelector<HTMLElement>(this.query ? '.search-input' : '.category-row.active')?.focus();
+    } else if (changed.has('activeCategory') && this.focusedRow?.matches(':focus')) {
+      // A section change folds the previous section's entries above the focused row away.
+      this.focusedRow.scrollIntoView({ block: 'nearest' });
+    }
+    this.focusedRow = null;
+  }
 
   declare register: readonly SettingsGroup[];
   declare activeCategory: string;
@@ -138,6 +171,10 @@ export class SettingsNav extends JfElement {
       min-height: 0;
       overflow-y: auto;
       padding: 0.75rem 0.5rem;
+    }
+    @media (max-height: 600px) {
+      :host, nav { height: auto; }
+      .groups, .results { flex: none; overflow: visible; }
     }
     .results-list {
       list-style: none;
@@ -266,6 +303,7 @@ export class SettingsNav extends JfElement {
        stay visible on that fill. */
     @media (forced-colors: active) {
       button.category-row.active,
+      button.category-row.danger.active,
       button.anchor-row.active {
         forced-color-adjust: none;
         background: Highlight;
@@ -400,13 +438,14 @@ export class SettingsNav extends JfElement {
     isRoving: boolean,
     onFocus: () => void,
   ): TemplateResult {
-    const label = result.section ? localizeResourceKey(result.section.labelKey) : categoryLabel(result.category);
+    const label = result.section ? entryLabel(result.section) : categoryLabel(result.category);
     return html`
       <li>
         <button
           type="button"
           data-nav-row
           class="search-result-row"
+          data-settings-anchor=${result.section?.key ?? nothing}
           tabindex=${isRoving ? '0' : '-1'}
           @click=${() => void this.activateSearchResult(result)}
           @focus=${onFocus}
@@ -421,7 +460,7 @@ export class SettingsNav extends JfElement {
   }
 
   private renderSearchResults(): TemplateResult {
-    const results = searchRegister(this.query, this.register);
+    const results = searchRegister(this.query, this.register, this.viewer);
     if (results.length === 0) {
       return html`<div class="search-empty" role="status">
         ${localizeResourceKey('settings.search.no-results')}
@@ -446,7 +485,7 @@ export class SettingsNav extends JfElement {
 
   private renderCategory(category: SettingsCategory, danger: boolean): TemplateResult {
     const isActive = category.id === this.activeCategory;
-    const sections = (category.sections ?? []).filter((s) => !s.gate || s.gate());
+    const sections = shownEntries(category, this.viewer);
     return html`
       <li>
         <button
@@ -476,7 +515,7 @@ export class SettingsNav extends JfElement {
                         tabindex=${anchorActive ? '0' : '-1'}
                         @click=${() => this.jump(s.key)}
                       >
-                        ${localizeResourceKey(s.labelKey)}
+                        ${entryLabel(s)}
                       </button>
                     </li>
                   `;
@@ -491,7 +530,6 @@ export class SettingsNav extends JfElement {
   private renderGroup(group: SettingsGroup): TemplateResult {
     return html`
       <div class="group ${group.danger ? 'danger' : ''}">
-        <div class="group-header">${localizeResourceKey(group.labelKey)}</div>
         <ul class="category-list">
           ${group.categories.map((c) => this.renderCategory(c, group.danger === true))}
         </ul>
