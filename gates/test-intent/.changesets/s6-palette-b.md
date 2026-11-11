@@ -686,3 +686,13 @@ No acceptance is claimed; independent verification is pending. Fail-before evide
   "digest": "sha256:a9ee69ba14db97b41487779250c3f01bf46952710852c1a7e452b51cfc7150b5"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-ku37514u",
+  "verdict": "accept",
+  "digest": "sha256:da842b4a805c3cb1750c788e3828fb44b1f097612d277538007b4d14645c6c39"
+}
+```
