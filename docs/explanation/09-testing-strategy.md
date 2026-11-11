@@ -260,11 +260,8 @@ matrix or the workflow-signal required checks.
 
 The UI jobs split frontend work: `app-ui-ui` runs frontend unit tests and
 `:modules:ui:ciUnitTest1`; `app-ui-ui-2` installs headless Chromium and runs frontend lockdown
-tests before `:modules:ui:ciUnitTest2`. The search-worker jobs split indexer-worker and
-worker-services classes between `ciUnitTest1` and `ciUnitTest2`;
-`io.justsearch.indexerworker.server.SyncRootPromotionCrashRecoveryTest` is explicitly assigned
-to indexer-worker's `ciUnitTest2` (shard value `1`). These placements balance the longer jobs
-using main CI run 43094849517.
+tests before `:modules:ui:ciUnitTest2`. Both have a 40-minute limit, because a cold Java compile
+of `ui` and its dependencies alone can take about 18 minutes.
 
 The public `Unit tests` lanes also publish unit-test attribution and advisory budget reports from
 existing Gradle/JUnit XML. Attribution shows module totals, slow suites, skips, failures, errors,

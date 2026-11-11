@@ -21,8 +21,8 @@
       "job": "Unit tests (app-ui-ui)",
       "requiredCheck": "Unit tests (app-ui)",
       "owner": "app and UI hosted unit evidence",
-      "hardTimeoutSeconds": 1500,
-      "notes": "Class-balanced from hosted per-class attribution on 2026-10-21. Main CI run 43094849517 informed moving Chromium installation and frontend lockdown tests to app-ui-ui-2; frontend unit tests remain here. Confirm total wall time after rollout.",
+      "hardTimeoutSeconds": 2400,
+      "notes": "Class-balanced from hosted per-class attribution on 2026-10-21. Runs the frontend unit tests; the lockdown tests moved to app-ui-ui-2 (hosted runs 43113951688 and 43119363223: 13.2 and 14.4 min).",
       "advisoryBudgets": {
         "maxWallSeconds": 660
       }
@@ -31,8 +31,8 @@
       "job": "Unit tests (app-ui-ui-2)",
       "requiredCheck": "Unit tests (app-ui)",
       "owner": "app and UI hosted unit evidence",
-      "hardTimeoutSeconds": 1500,
-      "notes": "Class-balanced from hosted per-class attribution on 2026-10-21. Main CI run 43094849517 informed moving Chromium installation and frontend lockdown tests here from app-ui-ui. Confirm total wall time after rollout.",
+      "hardTimeoutSeconds": 2400,
+      "notes": "Class-balanced from hosted per-class attribution on 2026-10-21. Also runs the Chromium install and the frontend lockdown tests, moved here from app-ui-ui (hosted runs 43113951688 and 43119363223: 19.5 and 16.7 min).",
       "advisoryBudgets": {
         "maxWallSeconds": 660
       }
@@ -91,8 +91,8 @@
       "job": "Unit tests (search-worker-1)",
       "requiredCheck": "Unit tests (search-worker)",
       "owner": "search and worker hosted unit evidence",
-      "hardTimeoutSeconds": 2100,
-      "notes": "Class-balanced from hosted per-class attribution on 2026-10-21. Main CI run 43094849517 informed moving indexer-worker's SyncRootPromotionCrashRecoveryTest to search-worker-2. Confirm total wall time after rollout.",
+      "hardTimeoutSeconds": 1500,
+      "notes": "Class-balanced from hosted per-class attribution on 2026-10-21; confirm total wall time after rollout.",
       "advisoryBudgets": {
         "maxWallSeconds": 660
       }
@@ -101,8 +101,8 @@
       "job": "Unit tests (search-worker-2)",
       "requiredCheck": "Unit tests (search-worker)",
       "owner": "search and worker hosted unit evidence",
-      "hardTimeoutSeconds": 2100,
-      "notes": "Class-balanced from hosted per-class attribution on 2026-10-21. Main CI run 43094849517 informed moving indexer-worker's SyncRootPromotionCrashRecoveryTest here from search-worker-1; this job runs more small modules, so it carries less summed test-class time than its sibling for a similar wall time. Confirm total wall time after rollout.",
+      "hardTimeoutSeconds": 1500,
+      "notes": "Class-balanced from hosted per-class attribution on 2026-10-21; confirm total wall time after rollout.",
       "advisoryBudgets": {
         "maxWallSeconds": 660
       }

@@ -1135,7 +1135,7 @@ jobs:
     if: needs.changes.outputs.search != 'false'
     name: Unit tests (search-worker-2)
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 25
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -1294,7 +1294,9 @@ jobs:
     if: needs.changes.outputs.ui != 'false'
     name: Unit tests (app-ui-ui)
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # The frontend unit run plus a cold Java compile of ui and its dependencies exceed
+    # 25 minutes whenever the test task cannot come from the build cache (a PR touching app-api).
+    timeout-minutes: 40
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -1372,7 +1374,9 @@ jobs:
     if: needs.changes.outputs.ui != 'false'
     name: Unit tests (app-ui-ui-2)
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # The frontend lockdown run plus a cold Java compile of ui and its dependencies exceed
+    # 25 minutes whenever the test task cannot come from the build cache (a PR touching app-api).
+    timeout-minutes: 40
     steps:
       - name: Checkout
         uses: actions/checkout@v7
