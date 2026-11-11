@@ -15,6 +15,8 @@ import java.time.Duration;
  * <p>One instance serves every service set of a process, so a service-set swap does not reset it.
  */
 public final class QueryEncoderReadiness {
+  private final java.util.concurrent.atomic.AtomicReference<String> servingModelsUnavailable =
+      new java.util.concurrent.atomic.AtomicReference<>();
   private volatile boolean reached;
   private volatile boolean bounded;
   private volatile long boundStartNanos;
@@ -32,6 +34,19 @@ public final class QueryEncoderReadiness {
     boundNanos = nanos;
     boundStartNanos = System.nanoTime();
     bounded = true;
+  }
+
+  /**
+   * Records why the serving generation's model set cannot be acquired, or {@code null} once it
+   * can; returns the previous reason. Apart from warm encoders and from a selection with no models.
+   */
+  public String servingModelsUnavailable(String reason) {
+    return servingModelsUnavailable.getAndSet(reason);
+  }
+
+  /** Why the serving generation's model set cannot be acquired, or {@code null}. */
+  public String servingModelsUnavailable() {
+    return servingModelsUnavailable.get();
   }
 
   /** Whether the embedding has been ready once, given whether its query encoders are warm now. */
