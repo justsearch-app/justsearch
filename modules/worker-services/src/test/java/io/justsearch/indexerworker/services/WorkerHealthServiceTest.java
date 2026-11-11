@@ -107,6 +107,44 @@ final class WorkerHealthServiceTest {
   }
 
   @Test
+  // M2: an unacquirable serving model set is apart from warm and from no models; readiness bounded
+  void unavailableServingModelsAreReportedApartFromWarmAndFromNoModels() {
+    EmbeddingService embeddingService = mock(EmbeddingService.class);
+    when(embeddingService.isAvailable()).thenReturn(true);
+    WorkerHealthService warm = new WorkerHealthService("1.0.0", null, null, embeddingService);
+    WorkerHealthService noModels = new WorkerHealthService("1.0.0", null, null, null);
+    WorkerHealthService unavailable = new WorkerHealthService("1.0.0", null, null, embeddingService);
+    unavailable.queryReadiness().startBound(java.time.Duration.ofDays(1));
+    assertEquals(null, unavailable.queryReadiness().servingModelsUnavailable("Encoder set is retiring"));
+
+    HealthCheckResponse warmResponse = warm.check(HealthCheckRequest.getDefaultInstance());
+    HealthCheckResponse noModelsResponse = noModels.check(HealthCheckRequest.getDefaultInstance());
+    HealthCheckResponse response = unavailable.check(HealthCheckRequest.getDefaultInstance());
+
+    assertFalse(warmResponse.getQueryEncodersCold());
+    assertFalse(warmResponse.getVersion().contains("Query models unavailable"));
+    assertFalse(noModelsResponse.getAiReady());
+    assertFalse(noModelsResponse.getQueryEncodersCold());
+    assertFalse(noModelsResponse.getVersion().contains("Query models unavailable"));
+    assertTrue(response.getServing(), "lexical search keeps serving");
+    assertTrue(response.getQueryEncodersCold(), "not warm");
+    assertTrue(response.getVersion().contains("Query models unavailable: Encoder set is retiring"),
+        response::getVersion);
+    assertFalse(response.getEmbeddingReady(), "not ready before the readiness bound");
+
+    // The existing bound still releases readiness.
+    WorkerHealthService bounded = new WorkerHealthService("1.0.0", null, null, embeddingService);
+    bounded.queryReadiness().startBound(java.time.Duration.ZERO);
+    bounded.queryReadiness().servingModelsUnavailable("Encoder set is retiring");
+    assertTrue(bounded.check(HealthCheckRequest.getDefaultInstance()).getEmbeddingReady(),
+        "the readiness bound is not extended");
+
+    assertEquals("Encoder set is retiring", unavailable.queryReadiness().servingModelsUnavailable(null));
+    assertFalse(unavailable.check(HealthCheckRequest.getDefaultInstance()).getVersion()
+        .contains("Query models unavailable"), "cleared once the set can be acquired");
+  }
+
+  @Test
   void fatalLoopStateIsVisibleWithoutDisablingHealthySearchServing() {
     WorkerHealthService service =
         new WorkerHealthService("1.0.0", null, null, null, () -> "FAILED", List.of());
