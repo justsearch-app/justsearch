@@ -48,3 +48,14 @@ Balancing the two longest hosted unit-test jobs: pure moves of test work between
   "note": "Class Structural rule kept holds: on 718e761989 vs 579e52b2e5 the parsed ci.yml has the same 29 jobs, names, needs, if, runs-on and env; 6 npm test lines and 61 Gradle test-task occurrences on both sides; only timeout change is unit-tests-search-worker-2 25 to 35 min (declared, named in the brief, not in the owner's quoted words). Gradle dry run: indexer-worker ciUnitTest1+ciUnitTest2 are disjoint and equal test (371 classes, 2009 tests) on both sides; SyncRootPromotionCrashRecoveryTest moved shard 1 to 2 and its 8 tests executed and passed in ciUnitTest2. Policy verifier passes and rejects old policy with new workflow. Delegation quote checked against the brief only, not the task record. Not confirmed: the 28.1-minute sibling figure in whySurvives."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-2-ci-lane-balance-20261111",
+  "verdict": "accept",
+  "digest": "sha256:32d0ff083d05150849624eed255b154f985005571f38845924bb935475a81bb5",
+  "note": "Class Structural rule kept holds on 89103fbdfc vs 718e761989. Parsed ci.yml: same 29 jobs, names, needs, if, runs-on, env; the only differences are the two lockdown steps (byte-identical, unconditional) moved from app-ui-ui to app-ui-ui-2 and unit-tests-search-worker-2 timeout 25 to 35 min (declared; named in the brief, not in the owner's words). 6 npm test commands and 61 Gradle test-task occurrences on both sides; none runs twice in the unit-test lanes. Shard predicate and policy verifier unchanged; old policy with new workflow and new policy with old workflow both fail. Static mirror of the predicate over 371 indexer-worker classes: only SyncRootPromotionCrashRecoveryTest changes shard (1 to 2). Its Gradle execution in ciUnitTest2 is relied on from the check of 579e52b2e5 (identical inputs), not re-run. Hosted run 43094849517: the class took 240 s in ciUnitTest1; search-worker-1 24.7 min, search-worker-2 17.7 min. Delegation quote checked against the brief only, not the task record. No decision record conflicts. Not run: the lockdown tests in their new job, and any hosted run of this candidate."
+}
+```
