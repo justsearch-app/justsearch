@@ -8,8 +8,8 @@ Runtime:
 - License: Apache License 2.0
 - Source: https://github.com/tesseract-ocr/tesseract/releases/download/5.5.0/tesseract-ocr-w64-setup-5.5.0.20241111.exe
 
-Language data:
-- eng.traineddata from tesseract-ocr/tessdata_fast
+Language and orientation data:
+- deu.traineddata, eng.traineddata and osd.traineddata from tesseract-ocr/tessdata_fast
 - License: Apache License 2.0
 - Source: https://github.com/tesseract-ocr/tessdata_fast
 

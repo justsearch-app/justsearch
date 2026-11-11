@@ -14,10 +14,11 @@ public record OcrRoutingConfig(
     Integer maxImageDimension,
     Integer maxImagePixels,
     Integer renderDpi,
-    Integer ocrWorkers) {
+    Integer ocrWorkers,
+    boolean languagesExplicit) {
   public static final String PARSER_ID = "tika-policy-ocr";
   public static final String ENGINE = "tesseract";
-  private static final List<String> DEFAULT_LANGUAGES = List.of("eng");
+  private static final List<String> DEFAULT_LANGUAGES = List.of("deu", "eng");
   private static final int DEFAULT_PER_FILE_TIMEOUT_MS = 30_000;
   // 706 founder-delegated decision (2026-07-10): raised 50 -> 200. The aggregate per-document
   // budget (DEFAULT_PER_FILE_TIMEOUT_MS) is the cost bound now that budget expiry returns
@@ -29,6 +30,14 @@ public record OcrRoutingConfig(
   private static final int DEFAULT_RENDER_DPI = 300;
   /** 0 means "auto" — derive from available cores, see {@link PdfOcrEngine#defaultPoolSize()}. */
   private static final int AUTO_OCR_WORKERS = 0;
+
+  /** Non-empty languages supplied by a caller are an explicit selection. */
+  public OcrRoutingConfig(boolean enabled, List<String> languages, Integer perFileTimeoutMs,
+      Integer maxPages, Integer maxImageDimension, Integer maxImagePixels, Integer renderDpi,
+      Integer ocrWorkers) {
+    this(enabled, languages, perFileTimeoutMs, maxPages, maxImageDimension, maxImagePixels,
+        renderDpi, ocrWorkers, languages != null && !languages.isEmpty());
+  }
 
   public OcrRoutingConfig {
     languages =
@@ -45,7 +54,7 @@ public record OcrRoutingConfig(
   }
 
   public static OcrRoutingConfig disabled() {
-    return new OcrRoutingConfig(false, DEFAULT_LANGUAGES, null, null, null, null, null, null);
+    return new OcrRoutingConfig(false, DEFAULT_LANGUAGES, null, null, null, null, null, null, false);
   }
 
   public static OcrRoutingConfig defaults() {
@@ -57,7 +66,8 @@ public record OcrRoutingConfig(
         DEFAULT_MAX_IMAGE_DIMENSION,
         DEFAULT_MAX_IMAGE_PIXELS,
         DEFAULT_RENDER_DPI,
-        AUTO_OCR_WORKERS);
+        AUTO_OCR_WORKERS,
+        false);
   }
 
   /**
@@ -141,6 +151,7 @@ public record OcrRoutingConfig(
         maxImageDimension,
         maxImagePixels,
         renderDpi,
-        workers);
+        workers,
+        languagesExplicit);
   }
 }

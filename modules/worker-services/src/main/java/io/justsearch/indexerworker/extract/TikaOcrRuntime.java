@@ -126,16 +126,27 @@ public final class TikaOcrRuntime {
     if (explicitTessdataConfigured() && runtime.tessdataDirectory() == null) {
       return REASON_LANGUAGE_MISSING;
     }
-    Set<String> available = availableLanguages(runtime);
-    if (available.isEmpty() && !config.languages().isEmpty()) {
+    List<String> effective = effectiveLanguages(config, runtime);
+    if (effective.isEmpty() || (config.languagesExplicit() && effective.size() != config.languages().size())) {
       return REASON_LANGUAGE_MISSING;
     }
-    for (String language : config.languages()) {
-      if (!available.contains(language.toLowerCase(Locale.ROOT))) {
-        return REASON_LANGUAGE_MISSING;
-      }
-    }
     return "";
+  }
+
+  /** Defaults degrade to installed languages; explicit selections are checked as a whole. */
+  static List<String> effectiveLanguages(OcrRoutingConfig config, RuntimePaths runtime) {
+    Set<String> available = availableLanguages(runtime);
+    return config.languages().stream()
+        .filter(language -> available.contains(language.toLowerCase(Locale.ROOT)))
+        .toList();
+  }
+
+  static boolean supportsOrientation(RuntimePaths runtime) {
+    // With system tessdata the directory may be unknown; --list-langs uses that runtime's own
+    // default directory. An explicit runtime directory remains authoritative when selected.
+    return runtime != null && (runtime.tessdataDirectory() != null
+        ? Files.isRegularFile(runtime.tessdataDirectory().resolve("osd.traineddata"))
+        : availableLanguages(runtime).contains("osd"));
   }
 
   static synchronized void resetLanguageCacheForTests() {

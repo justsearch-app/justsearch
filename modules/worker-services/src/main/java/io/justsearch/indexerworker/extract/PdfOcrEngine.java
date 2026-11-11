@@ -85,7 +85,8 @@ final class PdfOcrEngine implements AutoCloseable {
         poolFactory,
         ocrConfig,
         new Invocation(
-            executable == null ? "" : executable, processStarter),
+            executable == null ? "" : executable, processStarter,
+            ocrConfig == null ? OcrRoutingConfig.defaults().tikaLanguage() : ocrConfig.tikaLanguage(), false),
         null,
         renderDpi,
         poolSize,
@@ -148,7 +149,10 @@ final class PdfOcrEngine implements AutoCloseable {
     TikaOcrRuntime.RuntimePaths runtime = runtimeSupplier.get();
     String exe =
         runtime != null && runtime.executable() != null ? runtime.executable().toString() : "";
-    return new Invocation(exe, productionStarter(runtime));
+    String languages = ocrConfig.languagesExplicit() ? ocrConfig.tikaLanguage()
+        : String.join("+", TikaOcrRuntime.effectiveLanguages(ocrConfig, runtime));
+    return new Invocation(exe, productionStarter(runtime), languages,
+        TikaOcrRuntime.supportsOrientation(runtime));
   }
 
   static int defaultPoolSize() {
@@ -199,7 +203,8 @@ final class PdfOcrEngine implements AutoCloseable {
       work = beginDocument();
       if (invocation.executable().isBlank()) return OcrEngineResult.failed(OcrSkipReason.ENGINE_MISSING);
       Path base = work.tempDir.resolve("image");
-      PageOcr page = runTesseract(invocation, work, image, base, remainingBudgetMs(deadlineNanos));
+      Path prepared = ExifImageOrientation.prepare(image, work.tempDir);
+      PageOcr page = runTesseract(invocation, work, prepared, base, remainingBudgetMs(deadlineNanos));
       if (page.failureReason() != null) {
         return OcrEngineResult.failed(page.failureReason());
       }
@@ -425,9 +430,9 @@ final class PdfOcrEngine implements AutoCloseable {
             image.toString(),
             outputBase.toString(),
             "--psm",
-            "6",
+            invocation.orientationDetection() ? "1" : "6",
             "-l",
-            ocrConfig.tikaLanguage(),
+            invocation.languages(),
             "txt",
             "tsv");
     Process process = null;
@@ -834,7 +839,8 @@ final class PdfOcrEngine implements AutoCloseable {
   }
 
   /** One engine call's resolved spawn recipe: executable plus environment-carrying starter. */
-  private record Invocation(String executable, ProcessStarter starter) {}
+  private record Invocation(String executable, ProcessStarter starter, String languages,
+      boolean orientationDetection) {}
 
   private record PageTask(int pageIndex, Future<PageOcr> future) {}
 
