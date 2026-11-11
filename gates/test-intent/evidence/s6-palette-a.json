@@ -1,0 +1,555 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
+  },
+  "createdAt": "2026-11-11T09:04:27.354Z",
+  "revision": "dfaee4315bb2b208f5c313faf08cfdcb6283f51c",
+  "tree": "3aec14923e82d7a8e3751dcc544dcd027afd6842",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/commands/CommandPalette.providers.test.ts\" \"src/shell-v0/chrome/Shell.navigation.test.ts\" \"src/shell-v0/views/LibrarySurface.folderActions.test.ts\" \"src/shell-v0/commands/CommandPaletteProjection.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/360jwr8w/tmp/test-intent-vitest-15396-1794387852523.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 6855
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/commands/CommandPalette.providers.test.ts",
+      "file": "modules/ui-web/src/shell-v0/commands/CommandPalette.providers.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3c6ec2f07ca47c7b90cee04559cd50240849ee6e3425d3227f065ce8a7fab77c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SP3 rejects interior and scattered matches while keeping Unicode word starts and any word order",
+          "status": "passed"
+        },
+        {
+          "name": "SP3 recency cannot promote a prefix above an exact label",
+          "status": "passed"
+        },
+        {
+          "name": "SP3 exact whole-word tier beats a label prefix even when the prefix was recently invoked",
+          "status": "passed"
+        },
+        {
+          "name": "SP2 keeps plugin wording and removes core implementation suffixes",
+          "status": "passed"
+        },
+        {
+          "name": "SP2 hints follow winning bindings with visible modifier names and leave saved overrides intact",
+          "status": "passed"
+        },
+        {
+          "name": "SP6 prefixes exclude other providers and never offer a prefixed search fallback",
+          "status": "passed"
+        },
+        {
+          "name": "SP4 settings rows use capabilities, tools, audience and settings mode from the real viewer",
+          "status": "passed"
+        },
+        {
+          "name": "SP4 Settings dispatch uses the returned arrival destination without recording a command invocation",
+          "status": "passed"
+        },
+        {
+          "name": "SP10a arbitrary Actions invoke their actual target once and legacy commands retain their handlers",
+          "status": "passed"
+        },
+        {
+          "name": "SP10a a canonical collision shows once and its ineligibility cannot be bypassed by the duplicate",
+          "status": "passed"
+        },
+        {
+          "name": "SP4-SP9 a removed or replaced registration cannot run from its captured result",
+          "status": "passed"
+        },
+        {
+          "name": "SP4-SP9 legacy replacement also invalidates the captured handler",
+          "status": "passed"
+        },
+        {
+          "name": "SP4-SP9 an open palette refreshes registrations and keeps a removed selection empty on Enter",
+          "status": "passed"
+        },
+        {
+          "name": "SP4a recent conversations searches only the loaded twenty and labels its source honestly",
+          "status": "passed"
+        },
+        {
+          "name": "SP5 conversation action data contains Open only for run-only conversations",
+          "status": "passed"
+        },
+        {
+          "name": "SP4c an observed lock removes conversation titles, descriptions and action data immediately",
+          "status": "passed"
+        },
+        {
+          "name": "SP4c a list read started before a lock cannot restore its content after that observation",
+          "status": "passed"
+        },
+        {
+          "name": "SP5 folder results expose only Library opening and its existing removal confirmation handoff",
+          "status": "passed"
+        },
+        {
+          "name": "SP5-SP9 a root removed during activation never navigates to its neighbour",
+          "status": "passed"
+        },
+        {
+          "name": "SP6-SP8 bounded rendering keeps every source match reachable through Show more",
+          "status": "passed"
+        },
+        {
+          "name": "SP10d profile switch refreshes shortcut hints without rewriting multiple saved bindings",
+          "status": "passed"
+        },
+        {
+          "name": "SP10 saved state keeps invocation recency at ten and destination rows outside both recents stores",
+          "status": "passed"
+        },
+        {
+          "name": "SP10b multi-slot templates complete once and close after the final slot",
+          "status": "passed"
+        },
+        {
+          "name": "SP10b Escape cancels template slots and reopening has no stale slot",
+          "status": "passed"
+        },
+        {
+          "name": "SP10b toggle cancels template slots and reopening has no stale slot",
+          "status": "passed"
+        },
+        {
+          "name": "SP10b backdrop cancels template slots and reopening has no stale slot",
+          "status": "passed"
+        },
+        {
+          "name": "SP10b disconnect cancels template slots and reopening has no stale slot",
+          "status": "passed"
+        },
+        {
+          "name": "SP10a a restored macro invokes its actual registered Action once",
+          "status": "passed"
+        },
+        {
+          "name": "SP4d trusted plugin commands use Actions while the Host API denies untrusted registration",
+          "status": "passed"
+        },
+        {
+          "name": "SP3-SP6 groups stay contiguous and ordered by best tier then provider order for a weaker action match; the fallback is outside every group",
+          "status": "passed"
+        },
+        {
+          "name": "SP3-SP6 groups stay contiguous and ordered by best tier then provider order for an exact tie created by suffix cleanup; the fallback is outside every group",
+          "status": "passed"
+        },
+        {
+          "name": "SP4c unlock restores content only after a fresh accepted list read",
+          "status": "passed"
+        },
+        {
+          "name": "SP5-SP9 failed folder refresh reports unconfirmed availability and never claims deletion",
+          "status": "passed"
+        },
+        {
+          "name": "SP4a the 21st conversation, outside the loaded twenty, is described as outside the recent list and never as missing",
+          "status": "passed"
+        },
+        {
+          "name": "SP6-SP8 a late folder label updates an open palette without retyping and an older roots read never overwrites a newer one",
+          "status": "passed"
+        },
+        {
+          "name": "SP4-SP9 eligibility changes update an open palette in results and actions and are rechecked on activation",
+          "status": "passed"
+        },
+        {
+          "name": "SP10d a profile switch with the palette open drops the previous scope and its pending reads",
+          "status": "passed"
+        },
+        {
+          "name": "SP10 saved state records failed, cancelled and shortcut invocations once each",
+          "status": "passed"
+        },
+        {
+          "name": "SP10 saved state survives a reload: recency, overrides with their source and multiple bindings, and no title cache",
+          "status": "passed"
+        },
+        {
+          "name": "SP3 equal tiers without recency order by name then identity",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.navigation.test.ts",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.navigation.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:18e4ef833ab996ca2c7048eb782778737fb21581edccc581945aac4b46099526",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FR3 Back and Forward run on browser history, which the journal follows (a) an incoming same-window address (conversation B while A is shown) keeps A: Back returns to A",
+          "status": "passed"
+        },
+        {
+          "name": "FR3 Back and Forward run on browser history, which the journal follows (b) Back then Forward after Search → Library returns to Library, and browser history agrees",
+          "status": "passed"
+        },
+        {
+          "name": "FR3 Back and Forward run on browser history, which the journal follows (c) Library → Search → Library by area clicks, then browser Back and Forward: stage, address and journal stay in step",
+          "status": "passed"
+        },
+        {
+          "name": "FR3 Back and Forward run on browser history, which the journal follows (c) with a conversation open in Search, browser Back and Forward move the journal cursor instead of appending entries",
+          "status": "passed"
+        },
+        {
+          "name": "FR3 Back and Forward run on browser history, which the journal follows Back on the first view the app owns stays in the app; the mouse back and forward buttons are Back and Forward",
+          "status": "passed"
+        },
+        {
+          "name": "FR3 Back and Forward run on browser history, which the journal follows rapid area switching lands on the last area, with each step on the Back stack",
+          "status": "passed"
+        },
+        {
+          "name": "FR3 Back and Forward run on browser history, which the journal follows a late boot response after the reader switched areas does not move them back",
+          "status": "passed"
+        },
+        {
+          "name": "FR3 Back and Forward run on browser history, which the journal follows reload mid-navigation keeps the view and its Back step",
+          "status": "passed"
+        },
+        {
+          "name": "FR3 the window tab is part of the address a tab click names the tab in the address as a new entry; Back returns to the tab before; Forward and reload restore it",
+          "status": "passed"
+        },
+        {
+          "name": "FR3 the window tab is part of the address returning to a window by the switcher keeps its tab in the address",
+          "status": "passed"
+        },
+        {
+          "name": "FR6 deep links land on the right window and tab justsearch://surface/core.search-v3-surface opens jf-nav-search-probe",
+          "status": "passed"
+        },
+        {
+          "name": "FR6 deep links land on the right window and tab justsearch://surface/core.library-surface opens jf-nav-host-probe",
+          "status": "passed"
+        },
+        {
+          "name": "FR6 deep links land on the right window and tab justsearch://surface/core.brain-surface opens jf-nav-brain-probe",
+          "status": "passed"
+        },
+        {
+          "name": "FR6 deep links land on the right window and tab justsearch://surface/core.system-surface opens jf-nav-system-probe",
+          "status": "passed"
+        },
+        {
+          "name": "FR6 deep links land on the right window and tab justsearch://surface/core.help-surface opens jf-nav-help-probe",
+          "status": "passed"
+        },
+        {
+          "name": "FR6 deep links land on the right window and tab justsearch://surface/core.unified-chat-surface opens jf-nav-search-probe",
+          "status": "passed"
+        },
+        {
+          "name": "FR6 deep links land on the right window and tab justsearch://surface/core.search-surface opens jf-nav-search-probe",
+          "status": "passed"
+        },
+        {
+          "name": "FR6 deep links land on the right window and tab a member id opens its host on that tab, and the address names the tab",
+          "status": "passed"
+        },
+        {
+          "name": "FR6 deep links land on the right window and tab Settings opens over the window it was reached from",
+          "status": "passed"
+        },
+        {
+          "name": "C9 / FR3 the Settings section is part of the address a section deep link opens that section; a section change replaces the address; Escape closes once onto the area",
+          "status": "passed"
+        },
+        {
+          "name": "C9 / FR3 the Settings section is part of the address browser Back closes Settings once and keeps the area; Forward reopens it",
+          "status": "passed"
+        },
+        {
+          "name": "C9 / FR3 the Settings section is part of the address a deep link arriving while Settings is open closes it and lands on the window and tab",
+          "status": "passed"
+        },
+        {
+          "name": "FR6 / C11 saved navigation state and bookmarks load after the upgrade a pre-change journal resumes the last view; bookmarks and co-resident values survive a userState write",
+          "status": "passed"
+        },
+        {
+          "name": "SG1 Settings command and default chord SG1 Ctrl+comma opens over Search, repeats in place and honours typing, IME, repeat and modifier guards",
+          "status": "passed"
+        },
+        {
+          "name": "SG4 legacy coordinate section=layout&entry=keyboard arrives at General and the Keyboard anchor",
+          "status": "passed"
+        },
+        {
+          "name": "SG4 legacy coordinate category=layout&entry=keyboard arrives at General and the Keyboard anchor",
+          "status": "passed"
+        },
+        {
+          "name": "SG4 legacy coordinate tab=layout&anchor=keyboard arrives at General and the Keyboard anchor",
+          "status": "passed"
+        },
+        {
+          "name": "SP4b palette conversation arrivals are one navigation through Search address selection SP4b active Search opens exactly the selected conversation with one history transition and keeps Back Forward and reload correct",
+          "status": "passed"
+        },
+        {
+          "name": "SP4b palette conversation arrivals are one navigation through Search address selection SP4b cold Search opens exactly the selected conversation with one history transition and keeps Back Forward and reload correct",
+          "status": "passed"
+        },
+        {
+          "name": "SP4b palette conversation arrivals are one navigation through Search address selection SP4b retained Search opens exactly the selected conversation with one history transition and keeps Back Forward and reload correct",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:156d74ccfc8dd47b108edd9a8868b821f7353d7734c173cb93f590197b7b84e1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "keeps a refused Add draft reachable and allows correction and retry",
+          "status": "passed"
+        },
+        {
+          "name": "explains a preview overlap (inside) and blocks click and Enter before Add",
+          "status": "passed"
+        },
+        {
+          "name": "explains a preview overlap (containing) and blocks click and Enter before Add",
+          "status": "passed"
+        },
+        {
+          "name": "submits Add once while waiting and announces its outcome",
+          "status": "passed"
+        },
+        {
+          "name": "switching member tabs during Add retains the pending outcome and draft until acceptance",
+          "status": "passed"
+        },
+        {
+          "name": "a cancelled native picker leaves a closed form and an existing draft unchanged",
+          "status": "passed"
+        },
+        {
+          "name": "exposes row removal progress, suppresses repeats and keeps the other row usable",
+          "status": "passed"
+        },
+        {
+          "name": "R3 a completed removal offers to add the same folder again, once, with its plain consequence",
+          "status": "passed"
+        },
+        {
+          "name": "L20 Ctrl+Z after another window already added the folder back says so and sends no add",
+          "status": "passed"
+        },
+        {
+          "name": "R3 a failed add-again says so and can be tried again",
+          "status": "passed"
+        },
+        {
+          "name": "a refused removal retains the row, explains retry without a live-watch claim, and retries",
+          "status": "passed"
+        },
+        {
+          "name": "reconciles an uncertain removal response with current roots (NETWORK_ERROR)",
+          "status": "passed"
+        },
+        {
+          "name": "reconciles an uncertain removal response with current roots (SERIALIZATION_ERROR)",
+          "status": "passed"
+        },
+        {
+          "name": "reconciles an uncertain removal response with current roots (HANDLER_FAILURE)",
+          "status": "passed"
+        },
+        {
+          "name": "ignores an old removal response after returning and reads the current roots",
+          "status": "passed"
+        },
+        {
+          "name": "names legacy inner folders and ancestor coverage in Remove confirmations",
+          "status": "passed"
+        },
+        {
+          "name": "distinguishes accepted reindex from the recorded completion and failure",
+          "status": "passed"
+        },
+        {
+          "name": "explains an empty reindex scope and offline folders without claiming a full reindex",
+          "status": "passed"
+        },
+        {
+          "name": "R1 browser Add reveals and focuses Folders from folders and Cancel restores focus",
+          "status": "passed"
+        },
+        {
+          "name": "R1 browser Add reveals and focuses Folders from core.browse-surface and Cancel restores focus",
+          "status": "passed"
+        },
+        {
+          "name": "R1 desktop Add reveals and focuses Folders from folders and Cancel restores focus",
+          "status": "passed"
+        },
+        {
+          "name": "R1 desktop Add reveals and focuses Folders from core.browse-surface and Cancel restores focus",
+          "status": "passed"
+        },
+        {
+          "name": "R1 a late picker selects Folders, but a response from before reconnect cannot open a form",
+          "status": "passed"
+        },
+        {
+          "name": "SP5 palette folder opening expands and focuses that exact Library root",
+          "status": "passed"
+        },
+        {
+          "name": "SP5 palette Remove hands off to Library confirmation and never deletes directly",
+          "status": "passed"
+        },
+        {
+          "name": "SP5-SP9 a root removed while its Library arrival is pending is reported absent without substituting a neighbour",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/commands/CommandPaletteProjection.test.ts",
+      "file": "modules/ui-web/src/shell-v0/commands/CommandPaletteProjection.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:49080828c5217846e0aa012fa9be4f5b50f907dff33933275625d80a97200bf8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "CommandPaletteProjection (§21.C) projects global Actions into PaletteEntry shape",
+          "status": "passed"
+        },
+        {
+          "name": "CommandPaletteProjection (§21.C) excludes non-global Actions (appliesTo set)",
+          "status": "passed"
+        },
+        {
+          "name": "CommandPaletteProjection (§21.C) WP3.8b opens indexing rules in Settings instead of invoking the operation without arguments",
+          "status": "passed"
+        },
+        {
+          "name": "CommandPaletteProjection (§21.C) back-maps core.action.op.* to legacy op.* id",
+          "status": "passed"
+        },
+        {
+          "name": "CommandPaletteProjection (§21.C) includes legacy Commands alongside Actions",
+          "status": "passed"
+        },
+        {
+          "name": "CommandPaletteProjection (§21.C) 557 P2 — commandLabel localizes a labelKey through the display projector",
+          "status": "passed"
+        },
+        {
+          "name": "CommandPaletteProjection (§21.C) 557 P2 — commandLabel falls back to the raw label when no labelKey",
+          "status": "passed"
+        },
+        {
+          "name": "CommandPaletteProjection (§21.C) 557 P2 — a Command with labelKey projects the localized label into the palette",
+          "status": "passed"
+        },
+        {
+          "name": "CommandPaletteProjection (§21.C) §8 v0 — surfaces a search-intent entry for non-empty free text",
+          "status": "passed"
+        },
+        {
+          "name": "CommandPaletteProjection (§21.C) §8 v0 — no search-intent entry for an empty query",
+          "status": "passed"
+        },
+        {
+          "name": "CommandPaletteProjection (§21.C) §8 v0 — search-intent entry is appended last (commands keep ranking)",
+          "status": "passed"
+        },
+        {
+          "name": "CommandPaletteProjection (§21.C) preserves Action over legacy Command when both share the projected id",
+          "status": "passed"
+        },
+        {
+          "name": "CommandPaletteProjection (§21.C) multi-word queries match non-leading tokens (F10) ranks the AI-install actions above the raw-search intent for \"install ai\"",
+          "status": "passed"
+        },
+        {
+          "name": "CommandPaletteProjection (§21.C) multi-word queries match non-leading tokens (F10) still matches the single-token query \"repair\" (no regression)",
+          "status": "passed"
+        },
+        {
+          "name": "CommandPaletteProjection (§21.C) multi-word queries match non-leading tokens (F10) requires EVERY token to be present (a token the label lacks still misses)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "d9921416482ec956f53fb858c67269bd8c20921b",
+    "revision": "d9921416482ec956f53fb858c67269bd8c20921b",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/commands/CommandPalette.providers.test.ts\" \"src/shell-v0/chrome/Shell.navigation.test.ts\" \"src/shell-v0/views/LibrarySurface.folderActions.test.ts\" \"src/shell-v0/commands/CommandPaletteProjection.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/360jwr8w/tmp/test-intent-vitest-15396-1794387861104.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 5928,
+        "output": "JSON report written to /home/elias/.cache/am/360jwr8w/tmp/test-intent-vitest-15396-1794387861104.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/commands/CommandPalette.providers.test.ts",
+        "classification": "assertion",
+        "detail": "SP3 rejects interior and scattered matches while keeping Unicode word starts and any word order:  AssertionError: expected [ 'library', 'intent.search' ] to not include 'library'\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/s6-palette-b/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1319:15)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.c | SP3 recency cannot promote a prefix above an exact label:  AssertionError: expected 'prefix' to be "
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.navigation.test.ts",
+        "classification": "assertion",
+        "detail": "SP4b palette conversation arrivals are one navigation through Search address selection SP4b active Search opens exactly the selected conversation with one history transition and keeps Back Forward and reload correct:  AssertionError: expected undefined to be defined\n    at open (/home/elias/.cache/am/360jwr8w/tmp/test-intent-before-ltK64r/modules/ui-web/src/shell-v0/chrome/Shell.navigation.test.ts:536:19)\n    at /home/elias/.cache/am/360jwr8w/tmp/test-intent-before-ltK64r/modules/ui-web/src/shel"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts",
+        "classification": "assertion",
+        "detail": "SP5 palette folder opening expands and focuses that exact Library root:  AssertionError: expected undefined to be defined\n    at /home/elias/.cache/am/360jwr8w/tmp/test-intent-before-ltK64r/modules/ui-web/src/shell-v0/views/LibrarySurface.folderActions.test.ts:383:17\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-palette-b/modules/ui-web/node_modules/@vite | SP5 palette Remove hands off to Library confirmation and never deletes directly:  AssertionError: expected undefined to be d"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/commands/CommandPaletteProjection.test.ts",
+        "classification": "assertion",
+        "detail": "CommandPaletteProjection (§21.C) projects global Actions into PaletteEntry shape:  AssertionError: expected 'mod+k' to be undefined\n    at /home/elias/.cache/am/360jwr8w/tmp/test-intent-before-ltK64r/modules/ui-web/src/shell-v0/commands/CommandPaletteProjection.test.ts:59:33\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-palette-b/modules/ui-web/node_modules/@vitest"
+      }
+    ]
+  },
+  "digest": "sha256:f85561e716d9c5d698fab31b469d28d68828e23a7254a6dcb51d848d7bd730bf"
+}

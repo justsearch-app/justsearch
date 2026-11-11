@@ -1,0 +1,107 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
+  },
+  "createdAt": "2026-11-11T05:21:32.712Z",
+  "revision": "ca9dfc9b8ff0dae8d92df04ef9b4ca61da7f8314",
+  "tree": "883f92eddc6b4992b44d3e26f8611b6b63fe0faf",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.paletteConversationRefusal.test.ts\" \"src/shell-v0/commands/CommandPalette.selection.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/dyqs75ml/tmp/test-intent-vitest-1936-1794374484838.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 3250
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.paletteConversationRefusal.test.ts",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.paletteConversationRefusal.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d02f93b44835a8120da973744c079e3d7b58db6daa347efad4a31fba7cacb816",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SP4b active Search refusing a palette opening keeps address, pointer, history and reload on the shown conversation",
+          "status": "passed"
+        },
+        {
+          "name": "SP4b retained Search refusing a palette opening keeps address, pointer, history and reload on the shown conversation",
+          "status": "passed"
+        },
+        {
+          "name": "SP4b active Search refusing a palette opening journals the conversation it shows, so a bare launch reopens it with its draft",
+          "status": "passed"
+        },
+        {
+          "name": "SP4b retained Search refusing a palette opening journals the conversation it shows, so a bare launch reopens it with its draft",
+          "status": "passed"
+        },
+        {
+          "name": "SP4b in a split layout with two Search windows, one window refusing a palette opening moves only its own conversation and address",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/commands/CommandPalette.selection.test.ts",
+      "file": "modules/ui-web/src/shell-v0/commands/CommandPalette.selection.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:80d815482773a2a5f62b1f6e1b584b6fbb715dc62ebf28115ab1e326d00a7569",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SP6-SP8 Show more keeps the selected Settings row by identity and Enter opens that row",
+          "status": "passed"
+        },
+        {
+          "name": "SP4-SP9 a selection that disappears after Show more leaves no selection, and Enter invokes nothing",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "ca9dfc9b8f",
+    "revision": "ca9dfc9b8ff0dae8d92df04ef9b4ca61da7f8314",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.paletteConversationRefusal.test.ts\" \"src/shell-v0/commands/CommandPalette.selection.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/dyqs75ml/tmp/test-intent-vitest-1936-1794374489397.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 3063,
+        "output": "JSON report written to /home/elias/.cache/am/dyqs75ml/tmp/test-intent-vitest-1936-1794374489397.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.paletteConversationRefusal.test.ts",
+        "classification": "assertion",
+        "detail": "SP4b active Search refusing a palette opening keeps address, pointer, history and reload on the shown conversation:  AssertionError: expected 'core.search-v3-surface?conversationId…' to be 'core.search-v3-surface?conversationId…' // Object.is equality\n    at /home/elias/.cache/am/dyqs75ml/tmp/broot/test-intent-before-gCgQME/modules/ui-web/src/shell-v0/chrome/Shell.paletteConversationRefusal.test.ts:147:23\n    at f | SP4b retained Search refusing a palette opening keeps address, pointer, history "
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/commands/CommandPalette.selection.test.ts",
+        "classification": "assertion",
+        "detail": "SP6-SP8 Show more keeps the selected Settings row by identity and Enter opens that row:  AssertionError: expected 'go-8' to be 'settings-row:general:' // Object.is equality\n    at /home/elias/.cache/am/dyqs75ml/tmp/broot/test-intent-before-gCgQME/modules/ui-web/src/shell-v0/commands/CommandPalette.selection.test.ts:73:60\n    at processTicksAndRejections (node:internal/process/task_queue | SP4-SP9 a selection that disappears after Show more leaves no selection, and Enter invokes nothing:  Asserti"
+      }
+    ]
+  },
+  "digest": "sha256:b71a7d1c14cd437d181b35a5468d429fce0f957e9e417d7242389227cc8c33ef"
+}

@@ -21,9 +21,9 @@
  */
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import './Sv3Main.js';
-import './Sv3Palette.js';
+import '../../commands/CommandPalette.js';
 import type { Sv3Main } from './Sv3Main.js';
-import type { Sv3Palette } from './Sv3Palette.js';
+import type { CommandPalette } from '../../commands/CommandPalette.js';
 import { __resetModalityForTest } from '../../primitives/modality.js';
 import { deepActiveElement, isTypingTarget } from '../../utils/keyboardHandler.js';
 import type { NavigationController } from '../../primitives/navigation.js';
@@ -825,11 +825,14 @@ describe('857 PR-A — the guards', () => {
    */
   it('864 L10: stands down while the command palette is open, wherever focus sits', async () => {
     const { nav } = await transcript();
-    const palette = document.createElement('jf-sv3-palette') as Sv3Palette;
+    // The app's one palette reads its providers while open; those reads answer empty here.
+    const reads = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => Response.json({}));
+    const palette = document.createElement('jf-command-palette') as CommandPalette;
     document.body.appendChild(palette);
-    await palette.show();
+    palette.show();
+    await palette.updateComplete;
 
-    const row = palette.shadowRoot?.querySelector<HTMLElement>('[data-testid="sv3-palette-item"]');
+    const row = palette.shadowRoot?.querySelector<HTMLElement>('[role="option"]');
     if (!row) throw new Error('no palette row rendered — the case cannot park focus inside the popup');
     row.tabIndex = -1;
     row.focus();
@@ -847,6 +850,7 @@ describe('857 PR-A — the guards', () => {
     press('j');
     expect(jumpTo, 'the guard released with the modal').toHaveBeenCalledTimes(1);
     palette.remove();
+    reads.mockRestore();
   });
   // Tempdoc 864 review F2 (the indexing overlay as a second modal) retired with that overlay in
   // the frame status slice: indexing progress moved into the non-modal status panel. The modality

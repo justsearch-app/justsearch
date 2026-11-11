@@ -234,6 +234,21 @@ export function recordNavigation(
   fireListeners();
 }
 
+/**
+ * The history entry this journal entry marks was given another address in place (Search put back
+ * the conversation it kept after the arrival was pushed): the entry names that address now, the
+ * same address a departure snapshot would read later, so a launch or a traversal restores it.
+ */
+export function describeEntry(id: string, url: string): void {
+  ensureInitialized();
+  url = canonicalSurfaceUrl(url);
+  const index = entries.findIndex(entry => entry.id === id);
+  if (index < 0 || entries[index]!.url === url) return;
+  entries[index] = { ...entries[index]!, url };
+  persist();
+  fireListeners();
+}
+
 export function getJournalState(): JournalSnapshot {
   ensureInitialized();
   return { entries: [...entries], cursor };

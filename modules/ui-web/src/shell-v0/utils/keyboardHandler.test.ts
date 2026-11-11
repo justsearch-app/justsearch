@@ -14,7 +14,7 @@
  * `nodeType` or `closest()` would break that test, which is the only coverage the descent has.
  */
 import { describe, it, expect, afterEach } from 'vitest';
-import { deepActiveElement, isTypingTarget, shouldIgnoreKeyEvent } from './keyboardHandler.js';
+import { deepActiveElement, isImeComposition, isTypingTarget, shouldIgnoreKeyEvent } from './keyboardHandler.js';
 
 afterEach(() => {
   document.body.innerHTML = '';
@@ -102,6 +102,12 @@ describe('shouldIgnoreKeyEvent (864 Layer 2(b))', () => {
 
   it('ignores a keystroke feeding an IME candidate window', () => {
     expect(shouldIgnoreKeyEvent(ev({ key: 'j', isComposing: true }))).toBe(true);
+  });
+
+  it('ignores a keydown the IME is processing (keyCode 229) before isComposing is set', () => {
+    expect(shouldIgnoreKeyEvent(ev({ key: 'k', ctrlKey: true, keyCode: 229, isComposing: false }))).toBe(true);
+    expect(isImeComposition(ev({ key: 'Process', keyCode: 229 }))).toBe(true);
+    expect(isImeComposition(ev({ key: 'k', ctrlKey: true, keyCode: 75 }))).toBe(false);
   });
 
   it('ignores an auto-repeat press — a held key is one intent, not N', () => {

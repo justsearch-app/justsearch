@@ -263,3 +263,24 @@ export function __resetForTest(): void {
   listeners.clear();
   detachKeybindingDispatcher();
 }
+
+/** Read the same priority/when/modifier resolution as dispatch, without rewriting overrides. */
+export function effectiveShortcut(commandId: string): string | undefined {
+  const ctx = getShellContext() as unknown as Record<string, unknown>;
+  const entries = [...bindings.values()].sort((a, b) =>
+    ({ user: 0, plugin: 1, default: 2 }[a.source] - { user: 0, plugin: 1, default: 2 }[b.source]));
+  for (const entry of entries) {
+    if (entry.commandId !== commandId || !evaluateWhen(entry.when, ctx)) continue;
+    const key = parseKey(entry.key);
+    const event = new KeyboardEvent('keydown', {
+      key: key.key, ctrlKey: key.ctrl || (key.mod && !isMac()), metaKey: key.meta || (key.mod && isMac()),
+      altKey: key.alt, shiftKey: key.shift,
+    });
+    const winner = entries.find(candidate => matchesEvent(parseKey(candidate.key), event) && evaluateWhen(candidate.when, ctx));
+    if (winner !== entry) continue;
+    return [event.ctrlKey ? 'Ctrl' : '', event.metaKey ? 'Cmd' : '', event.altKey ? 'Alt' : '',
+      event.shiftKey ? 'Shift' : '', key.key.length === 1 ? key.key.toUpperCase() : key.key]
+      .filter(Boolean).join(' ');
+  }
+  return undefined;
+}

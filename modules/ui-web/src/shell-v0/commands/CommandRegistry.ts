@@ -14,6 +14,7 @@
 
 import type { Provenance } from '../primitives/provenance.js';
 import { present } from '../display/present.js';
+import { getAction, listActions, invokeAndApply, type Action } from '../substrates/actions/index.js';
 
 export interface Command {
   readonly id: string;
@@ -90,28 +91,25 @@ export function listCommands(): Command[] {
   return Array.from(_registry.list());
 }
 
+/** A captured registration is never substituted by a later registration under the same id. */
+export async function invokePaletteCommand(target: Action | Command, commandId: string): Promise<InvocationResult> {
+  const action = 'title' in target;
+  if (action ? getAction(target.id) !== target || !listActions().includes(target)
+    : commands.get(target.id) !== target || !evaluateWhen(target.when, getShellContext() as unknown as Record<string, unknown>)) {
+    return { ok: false, error: 'This action is no longer available.' };
+  }
+  recordRecentCommand(commandId);
+  notifyInvocation(commandId);
+  try {
+    const value = action ? await invokeAndApply(target.id) : await target.handler();
+    return { ok: true, output: typeof value === 'string' ? value : '' };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
 export function invokeCommand(id: string): void {
-  // §21.B — Action is canonical. Look up in Action substrate first;
-  // fall back to legacy Command map for back-compat with TemplateCatalog
-  // + plugin HostApi.registerCommand callsites that still use the
-  // imperative Command path.
-  const actionId = resolveActionIdFromCommandId(id);
-  if (actionId !== null) {
-    recordRecentCommand(id);
-    notifyInvocation(id);
-    // Dynamic import keeps the dependency loose-coupled in case of
-    // module-load ordering shenanigans during boot.
-    void import('../substrates/actions/index.js').then(({ invokeAndApply }) => {
-      void invokeAndApply(actionId);
-    });
-    return;
-  }
-  const cmd = commands.get(id);
-  if (cmd) {
-    recordRecentCommand(id);
-    notifyInvocation(id);
-    void Promise.resolve(cmd.handler());
-  }
+  void invokeCommandWithResult(id);
 }
 
 /**
@@ -168,12 +166,12 @@ export async function invokeCommandWithResult(
   // shaped invocations through invokeAndApply with originator='agent'
   // so the resulting Journal entry attributes correctly.
   const actionId = resolveActionIdFromCommandId(id);
-  if (actionId !== null) {
+  const action = getAction(actionId ?? id);
+  if (action) {
     recordRecentCommand(id);
     notifyInvocation(id);
     try {
-      const { invokeAndApply } = await import('../substrates/actions/index.js');
-      await invokeAndApply(actionId, {}, null, undefined, originator);
+      await invokeAndApply(action.id, {}, null, undefined, originator);
       return { ok: true, output: '' };
     } catch (e) {
       return { ok: false, error: e instanceof Error ? e.message : String(e) };

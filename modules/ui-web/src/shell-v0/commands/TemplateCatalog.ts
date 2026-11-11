@@ -142,9 +142,11 @@ const templates = _registry._map;
  */
 type SlotPromptProvider = (slot: NamedArgumentSlot, templateId: string) => Promise<string | null>;
 let slotPromptProvider: SlotPromptProvider | null = null;
+let slotPromptLifecycle: ((phase: 'start' | 'end') => void) | undefined;
 
-export function setSlotPromptProvider(fn: SlotPromptProvider | null): void {
+export function setSlotPromptProvider(fn: SlotPromptProvider | null, lifecycle?: (phase: 'start' | 'end') => void): void {
   slotPromptProvider = fn;
+  slotPromptLifecycle = lifecycle;
 }
 
 export class TemplateValidationError extends Error {}
@@ -370,10 +372,14 @@ export function registerTemplate(reg: TemplateRegistration): void {
       // provider (the CommandPalette wizard) when one is attached;
       // fall back to window.prompt for headless / pre-boot scenarios.
       const provider = slotPromptProvider;
-      const expanded = await expandTemplate(parsed, reg.id, provider ?? defaultPromptFn);
-      if (expanded === null) return { kind: 'noop' as const };
-      await reg.onInvoke(expanded);
-      return { kind: 'noop' as const };
+      const lifecycle = slotPromptLifecycle;
+      lifecycle?.('start');
+      try {
+        const expanded = await expandTemplate(parsed, reg.id, provider ?? defaultPromptFn);
+        if (expanded === null) return { kind: 'noop' as const };
+        await reg.onInvoke(expanded);
+        return { kind: 'noop' as const };
+      } finally { lifecycle?.('end'); }
     },
   });
 }

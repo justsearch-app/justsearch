@@ -38,13 +38,15 @@ import type { SurfaceTabs, SurfaceTabItem } from '../components/SurfaceTabs.js';
 import { getSurface } from '../../api/registry/SurfaceCatalogClient.js';
 import { present } from '../display/present.js';
 import { offerReversal, ReversalClosedError } from '../state/ownReversals.js';
-import { FocusKeeper } from '../primitives/focusKeeper.js';
+import { FocusKeeper, focusRowsUnder } from '../primitives/focusKeeper.js';
 import '../components/ConfirmBand.js';
 import { emitEphemeralToast } from '../components/advisory/ephemeralToast.js';
 import type { ConfirmBand } from '../components/ConfirmBand.js';
 import { folderName } from '../state/frameStatus.js';
 import { takeIndexingRuleFocus, subscribeIndexingRuleFocus, type IndexingRuleControl } from '../router/indexingRuleIntent.js';
 import { takeMemberTabIntent, subscribeMemberTab } from '../router/memberTabIntent.js';
+import { readIndexedRoots, subscribeIndexedRoots, getIndexedRoots, forgetIndexedRoots } from '../state/indexedRoots.js';
+import { takeLibraryRoot, subscribeLibraryRoot, type LibraryRootRequest } from '../router/libraryRootIntent.js';
 import { resolvePathLazy } from '../hooks/resolvePathLazy.js';
 import { icon } from '../components/Icon.js';
 // 569 §14 — render the indexed-folder cards through the projection engine (the 2nd real surface).
@@ -62,7 +64,6 @@ import type { PluginHostApi } from '../plugin-api/plugin-types.js';
 import { z } from 'zod';
 import { parseWireContract } from '../../api/schemas.js';
 import {
-  indexedRootViewSchema,
   type IndexedRootView,
 } from '../../api/generated/schema-types/indexed-root-view.js';
 import { operationOutcomeViewSchema, type OperationOutcomeView } from '../../api/generated/schema-types/index.js';
@@ -99,14 +100,6 @@ import { UNKNOWN, type Maybe } from '../state/known.js';
 import { FolderAddFlow, focusFolderAdd, type FolderPreview } from '../controllers/FolderAddFlow.js';
 // Tempdoc 914 D3 — the failed chip's shared look (one authority for both render sites).
 import { failedChipStyles } from '../components/failedChipPresentation.js';
-
-// The substrate list response: a thin {items, count} envelope around the generated IndexedRootView.
-const listResponseSchema = z
-  .object({
-    items: z.array(indexedRootViewSchema),
-    count: z.number().optional(),
-  })
-  .loose();
 
 const excludesPolicySchema = z.object({
   source: z.string(), sourceDetail: z.string().nullable(), patterns: z.array(z.string()),
@@ -203,7 +196,6 @@ export function folderRowLabel(
 }
 
 const RESOURCE_ID = 'core.indexed-roots';
-const ENDPOINT = '/api/indexing-roots/substrate';
 const OP_ADD = 'core.add-watched-root';
 const OP_REMOVE = 'core.remove-watched-root';
 const OP_PREVIEW = 'core.preview-excludes';
@@ -755,8 +747,46 @@ export class LibrarySurface extends JfElement {
     });
   }
 
+  private rootsUnsub?: () => void;
+  private rootArrivalUnsub?: () => void;
+  private rootArrivalSerial = 0;
+
+  private async receiveRoot(request: LibraryRootRequest): Promise<void> {
+    const serial = ++this.rootArrivalSerial;
+    this.activeTab = 'folders';
+    const confirmed = await this.refresh({ live: true, force: true });
+    if (!this.isConnected || serial !== this.rootArrivalSerial) return;
+    if (!confirmed) { this.error = 'Folder availability is unconfirmed. Retry when Library can refresh.'; return; }
+    if (!this.roots.some(root => root.pathHash === request.pathHash)) {
+      this.error = 'This folder is no longer in your library.';
+      return;
+    }
+    this.expandedFolders.add(request.pathHash);
+    this.requestUpdate();
+    await this.updateComplete;
+    if (!this.isConnected || serial !== this.rootArrivalSerial) return;
+    const declared = this.renderRoot.querySelector<HTMLElement & { updateComplete: Promise<unknown> }>('jf-declared-surface');
+    if (declared) await declared.updateComplete;
+    if (!this.isConnected || serial !== this.rootArrivalSerial || !this.roots.some(root => root.pathHash === request.pathHash)) {
+      this.error = 'This folder is no longer in your library.';
+      return;
+    }
+    const row = focusRowsUnder(this.renderRoot).find(element => element.dataset.focusRow === request.pathHash);
+    row?.scrollIntoView?.({ block: 'nearest' });
+    row?.querySelector<HTMLElement>('.folder-toggle')?.focus();
+    if (request.action === 'remove') await this.handleRemoveRoot(request.pathHash);
+  }
+
   override connectedCallback(): void {
     super.connectedCallback();
+    this.rootsUnsub = subscribeIndexedRoots(() => {
+      const observation = getIndexedRoots();
+      if (observation.confirmed) this.roots = observation.roots;
+      this.resolvedPaths = { ...this.resolvedPaths, ...observation.paths };
+    });
+    this.rootArrivalUnsub = subscribeLibraryRoot(request => { void this.receiveRoot(request); });
+    const rootArrival = takeLibraryRoot();
+    if (rootArrival) void this.receiveRoot(rootArrival);
     this.indexingRuleUnsub = subscribeIndexingRuleFocus(control => this.requestIndexingFocus(control));
     const ruleFocus = takeIndexingRuleFocus();
     if (ruleFocus) this.requestIndexingFocus(ruleFocus);
@@ -774,7 +804,7 @@ export class LibrarySurface extends JfElement {
     if (this.host_) {
       this.isTauri = this.host_.platform.capabilities.has('folder-picker');
     }
-    void this.refresh();
+    if (!rootArrival) void this.refresh();
     if (this.reindexOutcomeKey) void this.checkReindexOutcome();
     if (!this.excludesLoadStarted) void this.loadExcludes();
     else void this.refreshExcludes();
@@ -866,6 +896,9 @@ export class LibrarySurface extends JfElement {
   }
 
   override disconnectedCallback(): void {
+    this.rootsUnsub?.();
+    this.rootArrivalUnsub?.();
+    this.rootArrivalSerial++;
     window.removeEventListener('focus', this.onWindowFocus);
     this.excludesRefreshRead = null;
     this.indexingRuleUnsub?.();
@@ -1179,22 +1212,13 @@ export class LibrarySurface extends JfElement {
       this.error = null;
     }
     try {
-      const res = await this.doFetch(live ? ENDPOINT : ENDPOINT + '?counts=true');
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`);
-      }
-      const body = parseWireContract(listResponseSchema, await res.json(), ENDPOINT);
+      const observation = await readIndexedRoots(path => this.doFetch(path), !live, this.apiBase);
       if (serial !== this.refreshSerial) return false;
-      let items = body.items ?? [];
-      if (live) {
-        // Counts-free rows carry fileCount=-1; keep the last-known filesystem count per folder.
-        const prev = new Map(this.roots.map((r) => [r.pathHash, r.fileCount]));
-        items = items.map((r) => {
-          if (r.fileCount != null && r.fileCount >= 0) return r;
-          const known = r.pathHash ? prev.get(r.pathHash) : undefined;
-          return known != null && known >= 0 ? { ...r, fileCount: known } : r;
-        });
+      if (!observation) {
+        if (!live) this.error = getIndexedRoots().error;
+        return false;
       }
+      const items = observation.roots;
       // Tempdoc 914 D3 — fold the newest counts into the bounded last-known-failed memory BEFORE
       // the rows render, so a poll that lands mid-retry (failures re-queued ⟹ `failedCount` 0,
       // `inFlightCount` > 0) still renders a reachable "N failed" chip. The retention rule lives in
@@ -1204,17 +1228,7 @@ export class LibrarySurface extends JfElement {
       });
       this.roots = items;
       this.rootsObserved = true;
-      // Lazy-resolve hashes via core.resolve-path-hash (slice 450 §1.1).
-      for (const r of this.roots) {
-        const hash = r.pathHash;
-        if (hash && !this.resolvedPaths[hash]) {
-          void resolvePathLazy(RESOURCE_ID, hash, { apiBase: this.apiBase }).then((path) => {
-            if (path) {
-              this.resolvedPaths = { ...this.resolvedPaths, [hash]: path };
-            }
-          });
-        }
-      }
+      this.resolvedPaths = { ...this.resolvedPaths, ...observation.paths };
       // Tempdoc 811 C-2a — only on a full refresh. The probe is a corpus-wide facet scan, far too
       // heavy for the 4-second aiState tick, and non-root sources only change on an ingest.
       if (!live) {
@@ -1724,6 +1738,7 @@ export class LibrarySurface extends JfElement {
       this.renderRoot.querySelector('jf-confirm-band')?.focusKeep();
       return;
     }
+    if (!this.roots.some(root => root.pathHash === pathHash)) { this.error = 'This folder is no longer in your library.'; return; }
     const resolved = this.resolvedPaths[pathHash];
     if (!resolved) {
       this.error = 'Path resolution pending; retry in a moment.';
@@ -1740,6 +1755,7 @@ export class LibrarySurface extends JfElement {
         if (path && serial === this.surfaceSerial) this.resolvedPaths = { ...this.resolvedPaths, [hash]: path };
       }));
       if (serial !== this.surfaceSerial) return;
+      if (!this.roots.some(root => root.pathHash === pathHash)) { this.error = 'This folder is no longer in your library.'; return; }
       if (this.roots.some(root => root.pathHash && !this.resolvedPaths[root.pathHash])) {
         this.error = 'Could not check which watched folders this removal affects. Retry when their paths are available.';
         return;
@@ -1818,6 +1834,7 @@ export class LibrarySurface extends JfElement {
       if (removed) {
         // The synchronous result proves removal; invalidate older list reads before publishing it.
         this.refreshSerial++;
+        forgetIndexedRoots(affected);
         this.roots = this.roots.filter(root => !affected.includes(root.pathHash ?? ''));
         this.actionMessage = plan.enclosing ? 'Folder removed. Its files stay searchable through the enclosing watched folder.' : 'Folder removed from Library and search results.';
         this.offerAddAgain(resolved, collection, nestedHashes.length);

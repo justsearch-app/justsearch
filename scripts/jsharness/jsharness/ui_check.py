@@ -1460,17 +1460,51 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         await page.locator(S.CSS_SV3_COMPOSER_TEXTAREA).first.focus()
         await _settle_focus_marks(page)
 
-    async def setup_sv3_palette_forced_colors(page):
+    async def setup_palette_forced_colors(page):
+        # The app's one palette, opened from Search's topbar button (the same toggle as the chord).
         await _open_sv3_window(page)
         await page.locator(S.CSS_SV3_WINDOW).get_by_role(
             "button", name="Open command palette", exact=True
         ).click()
-        await page.locator(S.CSS_SV3_PALETTE).get_by_role("option").first.wait_for(
+        await page.locator(S.CSS_PALETTE).get_by_role("option").first.wait_for(
             state="visible", timeout=10_000
         )
-        # Move the highlight off the selected option, so the capture shows the selected and the
-        # highlighted option as two different rows.
+        # Move the active option off the first row, so the capture shows the active option's
+        # outline apart from the field's focus mark.
         await page.keyboard.press("ArrowDown")
+        await _settle_focus_marks(page)
+
+    async def setup_palette_minimum_large_text(page):
+        # 600x400 with text at 200%: the field, the active option and a result's actions stay
+        # reachable (inside the viewport and the dialog's own scroll box), opened by the real chord.
+        await _open_sv3_window(page)
+        await page.set_viewport_size({"width": 600, "height": 400})
+        await page.evaluate("() => { document.documentElement.style.fontSize = '200%'; }")
+        await page.keyboard.press("ControlOrMeta+k")
+        field = page.locator(S.CSS_PALETTE).get_by_role("combobox")
+        await field.wait_for(state="visible", timeout=10_000)
+        for _ in range(12):
+            await page.keyboard.press("ArrowDown")
+        reachable = """el => {
+            const root = el.getRootNode();
+            const active = root.getElementById(el.getAttribute('aria-activedescendant') || '');
+            const box = r => ({top: r.top, bottom: r.bottom, left: r.left, right: r.right});
+            const inside = (r, c) => r.height > 0 && r.top >= c.top - 1 && r.bottom <= c.bottom + 1
+                && r.left >= c.left - 1 && r.right <= c.right + 1;
+            const view = {top: 0, bottom: innerHeight, left: 0, right: innerWidth};
+            const list = root.querySelector('.results').getBoundingClientRect();
+            const field = el.getBoundingClientRect();
+            const option = active ? active.getBoundingClientRect() : null;
+            return {field: inside(field, view), option: !!option && inside(option, view) && inside(option, list),
+                    focused: root.activeElement === el, rects: {field: box(field), option: option && box(option), list: box(list)}};
+        }"""
+        rows = await field.evaluate(reachable)
+        assert rows["field"] and rows["option"] and rows["focused"], f"palette 600x400 at 200% text, results: {rows}"
+        await page.keyboard.press("Tab")
+        await page.locator(S.CSS_PALETTE).locator('[role="listbox"]#palette-actions [role="option"]').first.wait_for(state="visible")
+        actions = await field.evaluate(reachable)
+        assert actions["field"] and actions["option"] and actions["focused"], f"palette 600x400 at 200% text, actions: {actions}"
+        print(f"Palette 600x400 at 200% text: field, active option and actions reachable {actions['rects']}")
         await _settle_focus_marks(page)
 
     _settings_setup = _view_setup("settings")
@@ -1527,8 +1561,10 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
             elif route != "attention":
                 await _view_setup("home")(page)
             if route == "palette":
-                await page.keyboard.press("Control+k")
-                await page.get_by_role("option").filter(has_text="Change indexing rules").click()
+                await page.keyboard.press("ControlOrMeta+k")
+                # Filter first: an empty query shows only the first rows of each group.
+                await page.locator(S.CSS_PALETTE).get_by_role("combobox").fill("Change indexing rules")
+                await page.get_by_role("option").filter(has_text="Change indexing rules").first.click()
             elif route in ("status", "browse", "tasks", "warm", "reduced"):
                 # Frame status S1: the status bar and the task tray retired into one status panel,
                 # opened from the title-bar pill; the indexing hold row keeps its "Change hours".
@@ -2356,8 +2392,9 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
              forced_colors="active"),
         Step("sv3-docked-forced-colors", setup=setup_sv3_docked_forced_colors, isolated=True,
              fixtures_variant="sv3-sources", forced_colors="active"),
-        Step("sv3-palette-forced-colors", setup=setup_sv3_palette_forced_colors, isolated=True,
+        Step("palette-forced-colors", setup=setup_palette_forced_colors, isolated=True,
              forced_colors="active"),
+        Step("palette-600x400-text-200", setup=setup_palette_minimum_large_text, isolated=True),
         *[Step(f"library-indexing-rules-{theme}", setup=setup_indexing_rules(), isolated=True,
                fixtures_variant="indexing-rules", color_scheme="light" if theme == "light" else "dark",
                forced_colors="active" if theme == "forced" else None)
@@ -2448,9 +2485,9 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
     ]
 
     # Theme is a rendered state. Reuse the same interaction, not a separate camera recipe.
-    search_steps = set(S.SEARCH_STATE_WITNESSES) - {
+    search_steps = (set(S.SEARCH_STATE_WITNESSES) - {
         "home", "legacy-token-plugin", "sv3-citation-selected", "sv3-citation-dropped",
-    }
+    }) | {"palette-forced-colors"}
     return steps + [replace(step, name=step.name + "-light", color_scheme="light")
                     for step in steps if step.name in search_steps]
 
