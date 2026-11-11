@@ -15,6 +15,8 @@ d3a21166b7 (s6-activity-details-p1-before.patch for the happy-dom protections,
 s6-activity-details-p2-before.patch for the browser ones). The amendment 6 check is a preservation
 check and has no fail-before.
 
+Repair after verification v1 (three defects): Escape with the keyboard on the page now closes Activity's details (Shell → System host → active member), a burst's details say its duration and source, and the rendered member oracle of the retired in-row expansion is restored at its new home, the details pane (ActivitySurface.group-details.test.ts). Entries 11 and 12 are reclassified Obsolete for the retired in-row assertions; the details-pane checks are New. Checks of what this repair fixes fail before at fedc486273 (the candidate before it); checks of the new home fail before at d3a21166b7; the page-Escape protections fail before against s6-activity-details-p3-before.patch (this repair's production code with only those protections removed, applied to fedc486273).
+
 ```json
 {
   "entries": [
@@ -275,43 +277,47 @@ check and has no fail-before.
       "items": [
         "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts"
       ],
-      "class": "Adaptation",
-      "moved": [
-        "instrumentation",
-        "rename"
-      ],
-      "whatMoved": "Two burst tests (A10 and A9) reached a burst's members by clicking its in-row expand control and reading the expanded member rows; rows hold no controls now, so they select the burst (a click on its entry, as its owner would hold the selection) and read the members the feed publishes for that selection, which the details list. Inputs (the same index rows and Indexing filter), the burst label assertions, the member count (3; 2) and the member labels ('Index state unknown (PAUSED) · docs', 'Indexed · docs') are unchanged. The A10 title changed from 'expands to every member' to 'its details list every member'.",
+      "class": "Obsolete",
       "sources": [
+        {
+          "kind": "removal",
+          "removed": [
+            "modules/ui-web/src/shell-v0/components/ActionLedgerView.ts#toggleExpanded"
+          ]
+        },
         {
           "kind": "delegated-choice",
           "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
           "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
           "delegationScope": "the shell redesign's slices including Settings and secondary pages",
           "label": "agent choice",
-          "choice": "A17 as settled (no nested interactive row controls; a burst's surviving members are reached in its details, draft section 4 index/legacy scan row)"
+          "choice": "A17 as settled (the feed is a list box: no interactive control nested in a row, so a burst no longer expands in its row) and draft section 4 (a burst's members are read in its details). The two burst tests (A10, A9) keep their inputs and their in-row assertions (one burst, its label counting failures or the unknown state); only the in-row expansion and the member rows it drew are retired, and A10's title drops 'and expands to every member'. The rendered member oracle (counts, the 'Index state unknown (PAUSED) · docs' and 'Indexed · docs' labels, a resolved name and the short-hash fallback) moves to its new home, the details pane, as New checks in ActivitySurface.group-details.test.ts."
         }
-      ]
+      ],
+      "conflictSearch": "Searched docs/decisions (54 records) with grep -rliE \"burst|scan rollup|rollup|expand(ed|s)? (to|the) (per-document|member)|ledger-burst|ledger-scan|toggleExpanded\": no match. \"escape\" matches only unrelated uses (0035 renderer escape hatches, 0013 Unicode escapes, 0030 and 0040 escape hatches). No decision record covers these oracles."
     },
     {
       "items": [
         "modules/ui-web/src/shell-v0/components/ActionLedgerView.test.ts"
       ],
-      "class": "Adaptation",
-      "moved": [
-        "instrumentation",
-        "rename"
-      ],
-      "whatMoved": "The scan rollup test reached the per-document rows of a scan by its in-row expand control; it now selects the rollup's entry and reads the members the feed publishes for that selection (shown in the details). The two scans, the resolver answer, the count (scan-a's three documents, not scan-b's two) and the label checks (the resolved 'scifact/report.pdf' and the short-hash fallback) are unchanged. The control's aria-expanded false/true became the entry's aria-selected false/true, because the record is now selected, not expanded. The title changed from 'expands to the per-document rows' to 'lists the per-document rows ... in its details'.",
+      "class": "Obsolete",
       "sources": [
+        {
+          "kind": "removal",
+          "removed": [
+            "modules/ui-web/src/shell-v0/components/ActionLedgerView.ts#toggleExpanded"
+          ]
+        },
         {
           "kind": "delegated-choice",
           "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
           "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
           "delegationScope": "the shell redesign's slices including Settings and secondary pages",
           "label": "agent choice",
-          "choice": "A17 as settled (no nested interactive row controls) and draft section 4 (a legacy scan's surviving members are shown in its details)."
+          "choice": "A17 as settled (no interactive control nested in a row, so a scan rollup no longer expands in its row) and draft section 4 (a legacy scan's surviving per-document records are shown in its details). The test 'a scan rollup expands to the per-document rows OF THAT SCAN (matched by scanId)' observed only the in-row expansion (its control's aria-expanded and the child rows it drew), so it is removed whole. Its oracle (two scans, the resolver answer, scan-a's three documents not scan-b's two, the resolved 'scifact/report.pdf' and the short-hash fallback) moves to the details pane as a New check in ActivitySurface.group-details.test.ts."
         }
-      ]
+      ],
+      "conflictSearch": "Searched docs/decisions (54 records) with grep -rliE \"burst|scan rollup|rollup|expand(ed|s)? (to|the) (per-document|member)|ledger-burst|ledger-scan|toggleExpanded\": no match. \"escape\" matches only unrelated uses (0035 renderer escape hatches, 0013 Unicode escapes, 0030 and 0040 escape hatches). No decision record covers these oracles."
     },
     {
       "items": [
@@ -332,6 +338,107 @@ check and has no fail-before.
           "choice": "A17 (selecting a record opens its details; Escape returns to the opener) and the decided sheet presentation below 980 px."
         }
       ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "A grouped record's members are read in the details pane, as rendered there (fail before at d3a21166b7, where Activity had no selection or details). A burst of a DONE and a PAUSED record lists both: 'Index state unknown (PAUSED) · docs' and 'Indexed · docs'. A burst of three, one failed, lists three: the member whose file resolved reads as its name ('Indexed · docs/report.pdf'), the others keep the short-hash label ('Index failed · docs (hash2)', 'Indexed · docs (hash3)'). A scan rollup lists that scan's documents, matched by scanId (scan-a's three, not scan-b's two), the resolved one as 'scifact/report.pdf' and the rest by short hash. A scan's details say its duration and source from its own rollup record (372 000 ms recorded: '6m 12s'; SYSTEM_INTERNAL: 'The engine').",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "Draft section 4 as settled (a burst's members and a legacy scan's surviving members are shown in the record's details), A9 and A10 (a burst counts and names what each state establishes), tempdoc 812 D4 item 5 as the replaced ActionLedgerView tests stated it (a resolved row reads as a name; an unresolvable hash keeps its short-hash label), and the 14:10Z decision (details show each record's duration and source), here for a scan from the rollup record that is the scan's own audit record."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-activity-details-group-members.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts#a burst of a known and an unknown state lists both: the unknown state named, never as indexed",
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts#a member whose file resolved reads as its name; one that did not keeps the short-hash label",
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts#lists that scan's documents (matched by scanId, not another scan's): a resolved one by name, the rest by short hash",
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts#says how long the scan took and where it came from, from its own rollup record"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "A burst's details say how long it took and where it came from, like every record's (fail before at fedc486273, where a burst's details omitted both). Duration: from the earliest member's start (its recorded time less its recorded duration) to the latest member's end (its recorded time), only when every member's duration is recorded; otherwise 'Not recorded', as an ordinary record says. Source: the source every member names, in the words an ordinary record uses; members naming different sources (or some none) give 'Several: ' and each, in the order the members are listed (newest first); none recorded gives 'Not recorded'. Index records without duration or transport: 'Not recorded' twice; two records of 4 s ending 10:00:10 and 3 s ending 10:00:20, both SYSTEM_INTERNAL: '14s' and 'The engine'; SCHEDULED and SYSTEM_INTERNAL with one duration missing: 'Not recorded' and 'Several: A schedule · The engine'.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "The 14:10Z decision (candidate 2's details pane shows each record's duration and source), applied to grouped records: a burst's duration is its members' span from first start to last end, known only when every member's is, and its source is the members' shared source or each of theirs; an unknown value is disclosed as 'Not recorded' exactly as an ordinary record discloses it."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-activity-details-group-facts.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts#members that record neither: the burst says both are not recorded, as an ordinary record does",
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts#members that record both: from the first start to the last end, and the source they share",
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts#members from different sources, one with a duration not recorded: each source named as the members are listed, the duration not recorded"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "In real Chromium with the real Shell (System › Activity over the shared stream), Escape with the keyboard on the page (nothing focused) closes Activity's open details and returns the keyboard to the record they were for, as Escape inside the details does (fail before at fedc486273, where the details stayed open): at 1280×720 inline; after the windowed list dropped the record's row (the list brings it back); at 600×400 with 200% text, where the details are a sheet, and the window behind is live again; in forced colours, where the record then has no selection bar and shows the focus ring; and with System in the Split layout's second pane, once that pane is the window in use.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "A17 (Escape closes the details and returns the keyboard to the logical opener: the selected record, or the list when the record is no longer shown) applied to Escape with the keyboard on the page, where the Shell's DP1 page Escape already closes the details of the window in use (Search's, the Shell's window details); the decided sheet presentation below 980 px; forced colours keeping selected and focused records apart."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-activity-details-page-escape.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts#at 1280×720, Escape with the keyboard on the page closes Activity's details and returns the keyboard to the record",
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts#the windowed list dropped the record's row: Escape on the page still returns the keyboard to that record",
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts#at 600×400 with 200% text, Escape on the page closes the sheet, the window behind is live again, and the keyboard is on the record",
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts#in forced colours, Escape on the page closes the details: the record loses its selection bar and shows the focus ring",
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts#System in the second pane: Escape on the page closes Activity's details only when that pane is the window in use"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Escape on the page leaves Activity's details alone where it belongs to something else. A dialog (an elicit request), the command palette and Settings take Escape and close; Activity's details stay open with the record selected. With System in the Split layout's second pane and the other pane the window in use, Escape on the page leaves Activity's details open. With Activity not on show (another area is), Escape on the page changes nothing, and back on Activity its details are still open. These pass at fedc486273, which had no page Escape for Activity, so they fail before against s6-activity-details-p3-before.patch: this change's production code with only these protections removed (the Shell's dialog guard on page Escape, the choice of the window in use and of windows on show, and the System host's check that its member is on show).",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "The Shell's established Escape order (DP1 page Escape bubbles after anything more local, and stands down while a dialog, the palette or Settings is open: modalOwnsFocus), and A17 and amendment 10 for two panes: Escape on the page closes only the details of the window in use and on show."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-activity-details-page-escape-guards.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts#a dialog open: Escape is the dialog's, Activity's details stay open",
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts#the command palette open: Escape is the palette's, Activity's details stay open",
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts#Settings open: Escape is Settings', Activity's details stay open",
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts#Activity not on show: Escape on the page leaves its details as they were",
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts#System in the second pane: Escape on the page closes Activity's details only when that pane is the window in use"
+      ],
+      "repaired": true
     }
   ]
 }

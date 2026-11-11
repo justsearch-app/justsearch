@@ -1,0 +1,237 @@
+diff --git a/modules/ui-web/src/shell-v0/chrome/Shell.ts b/modules/ui-web/src/shell-v0/chrome/Shell.ts
+index b1d150643b..2f59cb9e20 100644
+--- a/modules/ui-web/src/shell-v0/chrome/Shell.ts
++++ b/modules/ui-web/src/shell-v0/chrome/Shell.ts
+@@ -2138,7 +2138,7 @@ export class Shell extends JfElement {
+    * in use close (DP1). Bubbling, so anything more local has already had the key.
+    */
+   private readonly onPageEscape = (e: KeyboardEvent): void => {
+-    if (e.key !== 'Escape' || e.defaultPrevented || e.isComposing || modalOwnsFocus()) return;
++    if (e.key !== 'Escape' || e.defaultPrevented || e.isComposing) return;
+     const active = deepActiveElement();
+     if (active !== null && active !== document.body && active !== this.shadowRoot?.querySelector('.stage')) return;
+     if (this.shadowRoot?.querySelector<Stage>('jf-stage')?.closeDetails()) e.preventDefault();
+@@ -2522,15 +2522,15 @@ export class Stage extends JfElement {
+     this.windowInUse = this.windowOf(event.composedPath()[0] as Node) ?? this.windowInUse;
+   };
+ 
+-  /** Close the details of the window in use, else the primary's. False when there are none to close. */
++  /**
++   * Close the details of the window in use, else the primary's: the Shell's details pane for that
++   * window first, else the window's own (Search's, or Activity's through the System host). False when
++   * there are none to close.
++   */
+   closeDetails(): boolean {
+-    const windows = this.shownWindows();
+-    const surface = windows.find(candidate => canonicalSplitSurfaceId(candidate.id) === this.windowInUse) ?? windows[0];
+-    if (!surface) return false;
+-    const id = canonicalSplitSurfaceId(surface.id);
+-    const details = [...this.renderRoot.querySelectorAll('jf-window-details')].find(pane => pane.windowId === id);
+-    const own = this._surfaceElCache.get(surface.id) as (HTMLElement & { closeDetails?(): boolean }) | undefined;
+-    return details?.closeDetails() ?? own?.closeDetails?.() ?? false;
++    let closed = false;
++    for (const own of this._surfaceElCache.values()) closed = ((own as HTMLElement & { closeDetails?(): boolean }).closeDetails?.() ?? false) || closed;
++    return closed;
+   }
+ 
+   /** Target a single retained element; never broadcast to both search implementations. */
+diff --git a/modules/ui-web/src/shell-v0/components/ActivityDetails.ts b/modules/ui-web/src/shell-v0/components/ActivityDetails.ts
+index 41f25557f2..d611086c1e 100644
+--- a/modules/ui-web/src/shell-v0/components/ActivityDetails.ts
++++ b/modules/ui-web/src/shell-v0/components/ActivityDetails.ts
+@@ -5,7 +5,9 @@
+  * a pane, and holds no selection of its own.
+  *
+  * Every record says when it happened, how long it took, who did it, where it came from and which
+- * records it joins. By kind:
++ * records it joins. A burst says how long and from where across its members: from the earliest
++ * start to the latest end (only when every member's duration is recorded), and their shared source or
++ * each of theirs. A scan says it from its own rollup record. By kind:
+  *   - an operation reads its receipt (`/api/operation-history/{key}`) through a {@link ReceiptWatch},
+  *     which follows a running invocation and never moves back from a terminal state; a receipt that
+  *     is unknown, expired or unreadable is said as such, never as a failed execution;
+@@ -27,6 +29,7 @@ import './EffectLine.js';
+ import {
+   contributionsOf,
+   durationOf,
++  groupDurationOf,
+   operationKeyOf,
+   runOf,
+   transportOf,
+@@ -102,6 +105,23 @@ function count(n: number, noun: string): string {
+   return `${n} ${noun}${n === 1 ? '' : 's'}`;
+ }
+ 
++/** Where a record came from, in words: its recorded transport, this window's journal, or not recorded. */
++function sourceWords(row: FeedRow): string {
++  const transport = transportOf(row);
++  return transport ? (SOURCE_WORDS[transport] ?? transport) : row.journal ? 'This window' : 'Not recorded';
++}
++
++/** A group's source: the one its members share, else each of theirs, in the order the members are listed. */
++function groupSourceWords(members: readonly FeedRow[]): string {
++  const words = [...new Set(members.map(sourceWords))];
++  if (words.length === 0) return 'Not recorded';
++  return words.length === 1 ? words[0]! : `Several: ${words.join(' · ')}`;
++}
++
++function durationWords(ms: number | undefined): string {
++  return ms !== undefined ? (formatScanDuration(ms) || 'Under a second') : 'Not recorded';
++}
++
+ function when(iso: string): string {
+   const parsed = new Date(iso);
+   return Number.isNaN(parsed.getTime()) ? iso : formatDateTime(parsed);
+@@ -229,7 +249,7 @@ export class ActivityDetails extends JfElement {
+       <h3 data-testid="activity-details-title">${record.label}</h3>
+       ${this.evicted ? html`<p class="evicted" role="status" data-testid="activity-details-evicted">This record is no longer
+         among the loaded records. What it showed when it was last loaded is kept below; its actions are not offered.</p>` : nothing}
+-      ${record.row ? this.renderFacts(record.row) : html`<dl><dt>When</dt><dd>${when(record.occurredAt)}</dd></dl>`}
++      ${record.row ? this.renderFacts(record.row) : this.renderGroupFacts(record)}
+       ${record.row ? this.renderKind(record.row, record) : nothing}
+       ${record.members.length || record.kind !== 'record' ? this.renderMembers(record) : nothing}
+       ${record.related.length ? this.renderRelated(record.related) : nothing}
+@@ -242,20 +262,25 @@ export class ActivityDetails extends JfElement {
+ 
+   /** When, how long, who, from where, and which records this row joins. */
+   private renderFacts(row: FeedRow): TemplateResult {
+-    const duration = durationOf(row) ?? this.receiptDuration();
+-    const transport = transportOf(row);
+     return html`<dl data-testid="activity-details-facts">
+       <dt>When</dt><dd>${when(row.entry.occurredAt)}</dd>
+-      <dt>Duration</dt><dd data-testid="activity-details-duration">${duration !== undefined
+-        ? (formatScanDuration(duration) || 'Under a second') : 'Not recorded'}</dd>
++      <dt>Duration</dt><dd data-testid="activity-details-duration">${durationWords(durationOf(row) ?? this.receiptDuration())}</dd>
+       <dt>Who</dt><dd>${WHO_WORDS[row.entry.originator] ?? row.entry.originator}</dd>
+-      <dt>Source</dt><dd data-testid="activity-details-source">${transport ? (SOURCE_WORDS[transport] ?? transport)
+-        : row.journal ? 'This window' : 'Not recorded'}</dd>
++      <dt>Source</dt><dd data-testid="activity-details-source">${sourceWords(row)}</dd>
+       <dt>Recorded in</dt><dd data-testid="activity-details-records">${contributionsOf(row).map((r) => RECORD_WORDS[r]).join(' · ')}</dd>
+       ${row.entry.kind === 'operation' || operationKeyOf(row) ? html`<dt>Outcome</dt><dd data-testid="activity-details-outcome">${this.outcomeWords(row)}</dd>` : nothing}
+     </dl>`;
+   }
+ 
++  /** A burst is a summary of its members: when, and how long and from where, across them. */
++  private renderGroupFacts(record: SelectedRecord): TemplateResult {
++    return html`<dl data-testid="activity-details-facts">
++      <dt>When</dt><dd>${when(record.occurredAt)}</dd>
++      <dt>Duration</dt><dd data-testid="activity-details-duration">${durationWords(groupDurationOf(record.members))}</dd>
++      <dt>Source</dt><dd data-testid="activity-details-source">${groupSourceWords(record.members)}</dd>
++    </dl>`;
++  }
++
+   private receiptDuration(): number | undefined {
+     const outcome = this.receipt?.outcome;
+     return outcome?.acceptedAt !== undefined && outcome.completedAt !== undefined && outcome.completedAt >= outcome.acceptedAt
+diff --git a/modules/ui-web/src/shell-v0/components/SurfaceTabs.ts b/modules/ui-web/src/shell-v0/components/SurfaceTabs.ts
+index 3d233208e2..3ea19154bf 100644
+--- a/modules/ui-web/src/shell-v0/components/SurfaceTabs.ts
++++ b/modules/ui-web/src/shell-v0/components/SurfaceTabs.ts
+@@ -218,6 +218,15 @@ export class SurfaceTabs extends JfElement {
+     });
+   }
+ 
++  /**
++   * Close the details of the member on show (Escape with the keyboard on the page reaches a composed
++   * host through here). False when the member has none open, or keeps no details of its own.
++   */
++  closeDetails(): boolean {
++    const member = this._activeEl as (HTMLElement & { closeDetails?(): boolean }) | null;
++    return member?.closeDetails?.() ?? false;
++  }
++
+   private renderPanel(item: SurfaceTabItem): TemplateResult {
+     if (!item.surfaceId && item.slot) {
+       // Host-provided body via a named slot — the host's shadow CSS styles the projected content.
+diff --git a/modules/ui-web/src/shell-v0/operations/activityFeed.ts b/modules/ui-web/src/shell-v0/operations/activityFeed.ts
+index 409f1c58ad..4f3f6e69e2 100644
+--- a/modules/ui-web/src/shell-v0/operations/activityFeed.ts
++++ b/modules/ui-web/src/shell-v0/operations/activityFeed.ts
+@@ -365,6 +365,24 @@ export function durationOf(row: FeedRow): number | undefined {
+   return typeof recorded === 'number' && Number.isFinite(recorded) && recorded >= 0 ? recorded : undefined;
+ }
+ 
++/**
++ * How long a group of records (an indexing burst) took: from its earliest member's start to its
++ * latest member's end, where a member ends when it was recorded and starts its duration before that.
++ * Known only when every member's duration is (per-file index records carry none).
++ */
++export function groupDurationOf(members: readonly FeedRow[]): number | undefined {
++  let start = Number.POSITIVE_INFINITY;
++  let end = Number.NEGATIVE_INFINITY;
++  for (const member of members) {
++    const ms = durationOf(member);
++    const at = Date.parse(member.entry.occurredAt);
++    if (ms === undefined || !Number.isFinite(at)) return undefined;
++    start = Math.min(start, at - ms);
++    end = Math.max(end, at);
++  }
++  return members.length ? end - start : undefined;
++}
++
+ /** The transport a record names as its source, if any (history provenance, else the ledger's). */
+ export function transportOf(row: FeedRow): string | undefined {
+   return row.history.find((h) => h.provenance?.transport)?.provenance?.transport ?? row.ledger?.transport ?? undefined;
+diff --git a/modules/ui-web/src/shell-v0/views/ActivitySurface.ts b/modules/ui-web/src/shell-v0/views/ActivitySurface.ts
+index 2284241764..763ecefb69 100644
+--- a/modules/ui-web/src/shell-v0/views/ActivitySurface.ts
++++ b/modules/ui-web/src/shell-v0/views/ActivitySurface.ts
+@@ -225,11 +225,12 @@ export class ActivitySurface extends JfElement {
+   /**
+    * Close the details and put the keyboard back on the record they were for: the feed brings it
+    * back into its windowed list if it scrolled away; if it is no longer shown, the list itself.
++   * The Shell calls this for Escape with the keyboard on the page (through the System host).
+    */
+   closeDetails(): boolean {
+     const key = this.selectedKey;
+     if (key === null) return false;
+-    const returnFocus = this.matches(':focus-within') || deepActiveElement() === null;
++    const returnFocus = this.keyboardHereOrNowhere();
+     this.selectedKey = null;
+     this.record = null;
+     this.evicted = false;
+@@ -243,6 +244,19 @@ export class ActivitySurface extends JfElement {
+     return true;
+   }
+ 
++  /**
++   * The keyboard is in Activity, or on nothing in particular: no element, the page, or a container
++   * Activity sits in (the Shell's stage). Anywhere else it stays where it is when the details close.
++   */
++  private keyboardHereOrNowhere(): boolean {
++    const active = deepActiveElement();
++    if (active === null || active === document.body || this.matches(':focus-within')) return true;
++    for (let node: Node | null = this; node !== null; node = node.parentNode ?? (node as ShadowRoot).host ?? null) {
++      if (node === active) return true;
++    }
++    return false;
++  }
++
+   private readonly onKeydown = (event: KeyboardEvent): void => {
+     if (event.key !== 'Escape' || event.isComposing || event.defaultPrevented || this.selectedKey === null || modalOwnsFocus()) return;
+     event.preventDefault();
+diff --git a/modules/ui-web/src/shell-v0/views/SystemSurface.ts b/modules/ui-web/src/shell-v0/views/SystemSurface.ts
+index ed6f8faa49..0efdbba8b3 100644
+--- a/modules/ui-web/src/shell-v0/views/SystemSurface.ts
++++ b/modules/ui-web/src/shell-v0/views/SystemSurface.ts
+@@ -18,7 +18,7 @@
+ import { html, css, nothing, type TemplateResult } from 'lit';
+ import { JfElement } from '../primitives/JfElement.js';
+ import '../components/SurfaceTabs.js';
+-import type { SurfaceTabItem } from '../components/SurfaceTabs.js';
++import type { SurfaceTabItem, SurfaceTabs } from '../components/SurfaceTabs.js';
+ import { getSurface } from '../../api/registry/SurfaceCatalogClient.js';
+ import { present } from '../display/present.js';
+ import { takeMemberTabIntent, subscribeMemberTab } from '../router/memberTabIntent.js';
+@@ -74,6 +74,11 @@ export class SystemSurface extends JfElement {
+     this.memberTabUnsub = null;
+   }
+ 
++  /** Escape with the keyboard on the page: the member on show closes its details (Activity's). */
++  closeDetails(): boolean {
++    return this.renderRoot.querySelector<SurfaceTabs>('jf-surface-tabs')?.closeDetails() ?? false;
++  }
++
+   override render(): TemplateResult {
+     const members = getSurface(SYSTEM_SURFACE_ID)?.members ?? [];
+     if (members.length === 0) return html`${nothing}`;

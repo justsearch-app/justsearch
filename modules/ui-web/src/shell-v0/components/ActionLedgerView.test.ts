@@ -646,44 +646,6 @@ describe('<jf-action-ledger> (tempdoc 550 C1 / thesis II — live read-view)', (
       expect(toggle!.textContent).toContain('(12)');
     });
 
-    it('a scan rollup lists the per-document rows OF THAT SCAN (matched by scanId) in its details', async () => {
-      const src = mount();
-      src.emitFrame(
-        snapshotFrame([
-          ...scanWithDocs(3, 'scan-a'),
-          ...scanWithDocs(2, 'scan-b'),
-        ]),
-      );
-      host.resolveHash = async (_resource: string, hash: string) =>
-        hash === 'hash1' ? 'C:/corpus/scifact/report.pdf' : null;
-      await host.updateComplete;
-
-      const rollups = Array.from(
-        host.shadowRoot!.querySelectorAll('[data-testid="ledger-scan-rollup"]'),
-      );
-      expect(rollups.length).toBe(2);
-      const scanA = rollups.find((r) => r.getAttribute('data-scan-id') === 'scan-a')!;
-      // Selecting the rollup (its row is the option) publishes what it stands for to the owner's details.
-      const option = scanA.closest('.entry') as HTMLElement;
-      expect(option.getAttribute('aria-selected')).toBe('false');
-      let record: { members: Array<{ entry: { label: string } }> } | null = null;
-      host.addEventListener('feed-select', (e) => { host.selectedKey = (e as CustomEvent<{ key: string }>).detail.key; });
-      host.addEventListener('feed-record', (e) => { record = (e as CustomEvent).detail.record; });
-      option.click();
-      await host.updateComplete;
-      await flushMicrotasks();
-      await host.updateComplete;
-
-      const children = (record as { members: Array<{ entry: { label: string } }> } | null)?.members ?? [];
-      expect(children.length).toBe(3); // scan-a's three docs, NOT scan-b's two
-      const text = children.map((c) => c.entry.label).join('|');
-      // D4 item 5 — the resolved row reads as a name; an unresolvable hash degrades to the
-      // short-hash label it had before, never to a blank or a wrong name.
-      expect(text).toContain('scifact/report.pdf');
-      expect(text).toContain('(hash2'.slice(0, 6)); // the 6-char fallback prefix for the rest
-      expect((scanA.closest('.entry') as HTMLElement).getAttribute('aria-selected')).toBe('true');
-    });
-
     it('grant and gate rows are NEVER hidden by the default tier, under any classification path', async () => {
       const src = mount();
       src.emitFrame(

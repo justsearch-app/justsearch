@@ -365,6 +365,24 @@ export function durationOf(row: FeedRow): number | undefined {
   return typeof recorded === 'number' && Number.isFinite(recorded) && recorded >= 0 ? recorded : undefined;
 }
 
+/**
+ * How long a group of records (an indexing burst) took: from its earliest member's start to its
+ * latest member's end, where a member ends when it was recorded and starts its duration before that.
+ * Known only when every member's duration is (per-file index records carry none).
+ */
+export function groupDurationOf(members: readonly FeedRow[]): number | undefined {
+  let start = Number.POSITIVE_INFINITY;
+  let end = Number.NEGATIVE_INFINITY;
+  for (const member of members) {
+    const ms = durationOf(member);
+    const at = Date.parse(member.entry.occurredAt);
+    if (ms === undefined || !Number.isFinite(at)) return undefined;
+    start = Math.min(start, at - ms);
+    end = Math.max(end, at);
+  }
+  return members.length ? end - start : undefined;
+}
+
 /** The transport a record names as its source, if any (history provenance, else the ledger's). */
 export function transportOf(row: FeedRow): string | undefined {
   return row.history.find((h) => h.provenance?.transport)?.provenance?.transport ?? row.ledger?.transport ?? undefined;

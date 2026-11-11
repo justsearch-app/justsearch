@@ -5,7 +5,9 @@
  * a pane, and holds no selection of its own.
  *
  * Every record says when it happened, how long it took, who did it, where it came from and which
- * records it joins. By kind:
+ * records it joins. A burst says how long and from where across its members: from the earliest
+ * start to the latest end (only when every member's duration is recorded), and their shared source or
+ * each of theirs. A scan says it from its own rollup record. By kind:
  *   - an operation reads its receipt (`/api/operation-history/{key}`) through a {@link ReceiptWatch},
  *     which follows a running invocation and never moves back from a terminal state; a receipt that
  *     is unknown, expired or unreadable is said as such, never as a failed execution;
@@ -27,6 +29,7 @@ import './EffectLine.js';
 import {
   contributionsOf,
   durationOf,
+  groupDurationOf,
   operationKeyOf,
   runOf,
   transportOf,
@@ -100,6 +103,23 @@ const RECEIPT_WORDS: Record<string, string> = {
 
 function count(n: number, noun: string): string {
   return `${n} ${noun}${n === 1 ? '' : 's'}`;
+}
+
+/** Where a record came from, in words: its recorded transport, this window's journal, or not recorded. */
+function sourceWords(row: FeedRow): string {
+  const transport = transportOf(row);
+  return transport ? (SOURCE_WORDS[transport] ?? transport) : row.journal ? 'This window' : 'Not recorded';
+}
+
+/** A group's source: the one its members share, else each of theirs, in the order the members are listed. */
+function groupSourceWords(members: readonly FeedRow[]): string {
+  const words = [...new Set(members.map(sourceWords))];
+  if (words.length === 0) return 'Not recorded';
+  return words.length === 1 ? words[0]! : `Several: ${words.join(' · ')}`;
+}
+
+function durationWords(ms: number | undefined): string {
+  return ms !== undefined ? (formatScanDuration(ms) || 'Under a second') : 'Not recorded';
 }
 
 function when(iso: string): string {
@@ -229,7 +249,7 @@ export class ActivityDetails extends JfElement {
       <h3 data-testid="activity-details-title">${record.label}</h3>
       ${this.evicted ? html`<p class="evicted" role="status" data-testid="activity-details-evicted">This record is no longer
         among the loaded records. What it showed when it was last loaded is kept below; its actions are not offered.</p>` : nothing}
-      ${record.row ? this.renderFacts(record.row) : html`<dl><dt>When</dt><dd>${when(record.occurredAt)}</dd></dl>`}
+      ${record.row ? this.renderFacts(record.row) : this.renderGroupFacts(record)}
       ${record.row ? this.renderKind(record.row, record) : nothing}
       ${record.members.length || record.kind !== 'record' ? this.renderMembers(record) : nothing}
       ${record.related.length ? this.renderRelated(record.related) : nothing}
@@ -242,17 +262,22 @@ export class ActivityDetails extends JfElement {
 
   /** When, how long, who, from where, and which records this row joins. */
   private renderFacts(row: FeedRow): TemplateResult {
-    const duration = durationOf(row) ?? this.receiptDuration();
-    const transport = transportOf(row);
     return html`<dl data-testid="activity-details-facts">
       <dt>When</dt><dd>${when(row.entry.occurredAt)}</dd>
-      <dt>Duration</dt><dd data-testid="activity-details-duration">${duration !== undefined
-        ? (formatScanDuration(duration) || 'Under a second') : 'Not recorded'}</dd>
+      <dt>Duration</dt><dd data-testid="activity-details-duration">${durationWords(durationOf(row) ?? this.receiptDuration())}</dd>
       <dt>Who</dt><dd>${WHO_WORDS[row.entry.originator] ?? row.entry.originator}</dd>
-      <dt>Source</dt><dd data-testid="activity-details-source">${transport ? (SOURCE_WORDS[transport] ?? transport)
-        : row.journal ? 'This window' : 'Not recorded'}</dd>
+      <dt>Source</dt><dd data-testid="activity-details-source">${sourceWords(row)}</dd>
       <dt>Recorded in</dt><dd data-testid="activity-details-records">${contributionsOf(row).map((r) => RECORD_WORDS[r]).join(' · ')}</dd>
       ${row.entry.kind === 'operation' || operationKeyOf(row) ? html`<dt>Outcome</dt><dd data-testid="activity-details-outcome">${this.outcomeWords(row)}</dd>` : nothing}
+    </dl>`;
+  }
+
+  /** A burst is a summary of its members: when, and how long and from where, across them. */
+  private renderGroupFacts(record: SelectedRecord): TemplateResult {
+    return html`<dl data-testid="activity-details-facts">
+      <dt>When</dt><dd>${when(record.occurredAt)}</dd>
+      <dt>Duration</dt><dd data-testid="activity-details-duration">${durationWords(groupDurationOf(record.members))}</dd>
+      <dt>Source</dt><dd data-testid="activity-details-source">${groupSourceWords(record.members)}</dd>
     </dl>`;
   }
 

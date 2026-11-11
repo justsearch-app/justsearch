@@ -2522,7 +2522,11 @@ export class Stage extends JfElement {
     this.windowInUse = this.windowOf(event.composedPath()[0] as Node) ?? this.windowInUse;
   };
 
-  /** Close the details of the window in use, else the primary's. False when there are none to close. */
+  /**
+   * Close the details of the window in use, else the primary's: the Shell's details pane for that
+   * window first, else the window's own (Search's, or Activity's through the System host). False when
+   * there are none to close.
+   */
   closeDetails(): boolean {
     const windows = this.shownWindows();
     const surface = windows.find(candidate => canonicalSplitSurfaceId(candidate.id) === this.windowInUse) ?? windows[0];
@@ -2530,7 +2534,7 @@ export class Stage extends JfElement {
     const id = canonicalSplitSurfaceId(surface.id);
     const details = [...this.renderRoot.querySelectorAll('jf-window-details')].find(pane => pane.windowId === id);
     const own = this._surfaceElCache.get(surface.id) as (HTMLElement & { closeDetails?(): boolean }) | undefined;
-    return details?.closeDetails() ?? own?.closeDetails?.() ?? false;
+    return (details?.closeDetails() ?? false) || (own?.closeDetails?.() ?? false);
   }
 
   /** Target a single retained element; never broadcast to both search implementations. */

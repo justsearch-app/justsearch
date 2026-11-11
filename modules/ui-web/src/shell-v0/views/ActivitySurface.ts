@@ -225,11 +225,12 @@ export class ActivitySurface extends JfElement {
   /**
    * Close the details and put the keyboard back on the record they were for: the feed brings it
    * back into its windowed list if it scrolled away; if it is no longer shown, the list itself.
+   * The Shell calls this for Escape with the keyboard on the page (through the System host).
    */
   closeDetails(): boolean {
     const key = this.selectedKey;
     if (key === null) return false;
-    const returnFocus = this.matches(':focus-within') || deepActiveElement() === null;
+    const returnFocus = this.keyboardHereOrNowhere();
     this.selectedKey = null;
     this.record = null;
     this.evicted = false;
@@ -241,6 +242,19 @@ export class ActivitySurface extends JfElement {
       });
     }
     return true;
+  }
+
+  /**
+   * The keyboard is in Activity, or on nothing in particular: no element, the page, or a container
+   * Activity sits in (the Shell's stage). Anywhere else it stays where it is when the details close.
+   */
+  private keyboardHereOrNowhere(): boolean {
+    const active = deepActiveElement();
+    if (active === null || active === document.body || this.matches(':focus-within')) return true;
+    for (let node: Node | null = this; node !== null; node = node.parentNode ?? (node as ShadowRoot).host ?? null) {
+      if (node === active) return true;
+    }
+    return false;
   }
 
   private readonly onKeydown = (event: KeyboardEvent): void => {

@@ -85,25 +85,6 @@ async function settle(el: ActionLedgerView = host): Promise<void> {
   }
 }
 
-/**
- * Select the record `row` shows, as its owner would (the feed publishes the selection's record), and
- * return the member labels its details list.
- */
-async function selectedMembers(row: Element, el: ActionLedgerView = host): Promise<string[]> {
-  let members: string[] = [];
-  const onSelect = (e: Event): void => { el.selectedKey = (e as CustomEvent<{ key: string }>).detail.key; };
-  const onRecord = (e: Event): void => {
-    members = ((e as CustomEvent).detail.record?.members ?? []).map((m: { entry: { label: string } }) => m.entry.label);
-  };
-  el.addEventListener('feed-select', onSelect);
-  el.addEventListener('feed-record', onRecord);
-  (row.closest('.entry') as HTMLElement).click();
-  await settle(el);
-  el.removeEventListener('feed-select', onSelect);
-  el.removeEventListener('feed-record', onRecord);
-  return members;
-}
-
 /** The operation-history stream the feed opened (the feed reads that source itself). */
 function historyStream(): FakeEventSource {
   expect(history, 'the feed opens the operation-history stream').toBeDefined();
@@ -545,7 +526,7 @@ describe('classification and quick filters (A9, A10)', () => {
     expect(keys()).toEqual(['index:1']);
   });
 
-  it('A10 — a burst never reads as an unqualified success: it counts failures and its details list every member', async () => {
+  it('A10 — a burst never reads as an unqualified success: it counts failures', async () => {
     mount();
     ledger.snapshot([index(1, 'DONE', 'docs'), index(2, 'FAILED', 'docs'), index(3, 'DONE', 'docs')]);
     host.filter = { ...host.filter, quick: 'indexing' };
@@ -553,7 +534,6 @@ describe('classification and quick filters (A9, A10)', () => {
     const burst = q('[data-testid="ledger-burst"]');
     expect(burst).toHaveLength(1);
     expect(burst[0]!.textContent).toContain('Indexed 2 · 1 failed · docs');
-    expect((await selectedMembers(burst[0]!)).length).toBe(3);
   });
 
   it('A9 — a burst counts a record only as its state establishes; an unknown state is counted and named, never indexed', async () => {
@@ -565,10 +545,6 @@ describe('classification and quick filters (A9, A10)', () => {
     expect(burst).toHaveLength(1);
     expect(burst[0]!.textContent).not.toContain('Indexed 2');
     expect(burst[0]!.textContent).toContain('Indexed 1 · 1 with unknown state · docs');
-    const members = await selectedMembers(burst[0]!);
-    expect(members).toHaveLength(2);
-    expect(members.some((m) => m.includes('Index state unknown (PAUSED) · docs'))).toBe(true);
-    expect(members.some((m) => m.includes('Indexed · docs'))).toBe(true);
   });
 
   it('A9 — a resolved file name keeps what the state established: failed, gave up and unknown never read as indexed', async () => {

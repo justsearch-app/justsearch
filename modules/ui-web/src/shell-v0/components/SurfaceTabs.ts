@@ -218,6 +218,15 @@ export class SurfaceTabs extends JfElement {
     });
   }
 
+  /**
+   * Close the details of the member on show (Escape with the keyboard on the page reaches a composed
+   * host through here). False when the member has none open, or keeps no details of its own.
+   */
+  closeDetails(): boolean {
+    const member = this._activeEl as (HTMLElement & { closeDetails?(): boolean }) | null;
+    return member?.isConnected ? member.closeDetails?.() ?? false : false;
+  }
+
   private renderPanel(item: SurfaceTabItem): TemplateResult {
     if (!item.surfaceId && item.slot) {
       // Host-provided body via a named slot — the host's shadow CSS styles the projected content.
