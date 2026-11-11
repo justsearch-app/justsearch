@@ -54,3 +54,14 @@ are in an isolated new file (exempt).
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1cad6-cc8c-7043-96e5-e0209752850b",
+  "verdict": "accept",
+  "digest": "sha256:c1e1052f831796243f1a426e716896d674ab5fa075a8c6928c16ad793fda8c36",
+  "note": "M2 intent and execution evidence match; signature adaptation preserves the oracle."
+}
+```
