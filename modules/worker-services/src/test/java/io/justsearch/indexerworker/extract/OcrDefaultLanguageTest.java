@@ -13,13 +13,27 @@ import org.junit.jupiter.api.io.TempDir;
 import tools.jackson.databind.json.JsonMapper;
 
 class OcrDefaultLanguageTest {
+  private static final String TESSERACT_PATH = "justsearch.tesseract.path";
+  private static final String TESSDATA_PATH = "justsearch.tessdata.path";
+
   @TempDir Path tempDir;
 
+  private final String priorTesseractPath = System.getProperty(TESSERACT_PATH);
+  private final String priorTessdataPath = System.getProperty(TESSDATA_PATH);
+
   @AfterEach
-  void clear() {
-    System.clearProperty("justsearch.tesseract.path");
-    System.clearProperty("justsearch.tessdata.path");
+  void restore() {
+    restore(TESSERACT_PATH, priorTesseractPath);
+    restore(TESSDATA_PATH, priorTessdataPath);
     TikaOcrRuntime.resetLanguageCacheForTests();
+  }
+
+  private static void restore(String key, String prior) {
+    if (prior == null) {
+      System.clearProperty(key);
+    } else {
+      System.setProperty(key, prior);
+    }
   }
 
   @Test
