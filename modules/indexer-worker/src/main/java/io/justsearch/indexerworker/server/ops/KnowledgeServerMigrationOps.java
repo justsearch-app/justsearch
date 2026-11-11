@@ -54,6 +54,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -92,6 +93,12 @@ public final class KnowledgeServerMigrationOps {
      * certify. Returns true when it did; its obligations stay for the refusal cleanup.
      */
     default boolean refuseUncertifiable() { return false; }
+
+    /** Whether a deferred model start holds its wiring leases now; promotion waits for it. */
+    default boolean modelWiringInFlight() { return false; }
+
+    /** How long the switch waits for one in-flight model start before it fails. */
+    default long modelWiringMaxDurationMs() { return Long.MAX_VALUE; }
   }
 
   public record CutoverContext(
@@ -278,6 +285,10 @@ public final class KnowledgeServerMigrationOps {
     if (context.indexGenerationManager() == null || context.jobQueue() == null) {
       return;
     }
+    // The in-flight model start's own bound. It runs only in SWITCHING and unpaused, apart from
+    // queue and finalization deferrals and the watcher-debt exemption; a pause or a gap wait
+    // suspends it, and it is armed again from zero afterwards.
+    Long modelWiringSinceNanos = null;
     while (context.runningSupplier().getAsBoolean() && !Thread.currentThread().isInterrupted()) {
       try {
         Throwable enumerationFailure = context.migrationEnumeratorFailureSupplier().get();
@@ -296,11 +307,13 @@ public final class KnowledgeServerMigrationOps {
         }
 
         if (state != null && Boolean.TRUE.equals(state.migration_paused())) {
+          modelWiringSinceNanos = null;
           Thread.sleep(1_000);
           continue;
         }
 
         if (ms == IndexGenerationManager.MigrationState.AWAITING_ACCEPTANCE) {
+          modelWiringSinceNanos = null;
           if (!context.liveCutover().enterGapWait()) {
             Thread.sleep(1_000);
             continue;
@@ -348,6 +361,28 @@ public final class KnowledgeServerMigrationOps {
 
         if (ms != IndexGenerationManager.MigrationState.SWITCHING) {
           return;
+        }
+
+        // Ready to switch: only the in-flight model start, the queue, embedding finalization or
+        // watcher debt stand between this candidate and promotion.
+        if (context.liveCutover().modelWiringInFlight()) {
+          long wiringNow = System.nanoTime();
+          long boundMs = context.liveCutover().modelWiringMaxDurationMs();
+          if (modelWiringSinceNanos == null) {
+            modelWiringSinceNanos = wiringNow;
+          } else if (wiringNow - modelWiringSinceNanos > TimeUnit.MILLISECONDS.toNanos(boundMs)) {
+            context.log().warn(
+                "Migration cutover failed: the deferred model start is still wiring after {}ms"
+                    + " (model wiring timeout); keeping Blue active",
+                boundMs);
+            context
+                .indexGenerationManager()
+                .updateMigrationState(IndexGenerationManager.MigrationState.FAILED);
+            context.drainSwitchBufferAction().run();
+            return;
+          }
+        } else {
+          modelWiringSinceNanos = null;
         }
 
         long now = System.currentTimeMillis();

@@ -19,4 +19,12 @@ public interface CommitMetadataSource {
   default List<String> indeterminateFingerprintInputs() {
     return List.of();
   }
+
+  /**
+   * The generation's actual dense-output producer: {@code embedding} or {@code splade} (BGE-M3).
+   * Null means unknown. This is runtime authority, never an additional committed field.
+   */
+  default String denseModelRole() {
+    return null;
+  }
 }

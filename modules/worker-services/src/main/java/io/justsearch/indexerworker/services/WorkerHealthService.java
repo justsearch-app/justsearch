@@ -295,9 +295,15 @@ public final class WorkerHealthService {
     // BGE-M3 replaces EmbeddingProvider when active — report ready if either is available.
     // Spec D §4.2: the embedding is first ready once a query would not create a session, or once
     // the readiness bound passed; it then stays ready and a cold query encoder is reported apart.
+    // An unacquirable serving model set is neither warm nor "no models"; readiness keeps its bound.
+    String modelsUnavailable = queryReadiness.servingModelsUnavailable();
+    if (modelsUnavailable != null) {
+      issues.add("Query models unavailable: " + modelsUnavailable);
+      queryEncodersCold = true;
+    }
     if (bgeM3Encoder != null || embeddingProvider.isAvailable()) {
       aiReady = true;
-      boolean warm = queryEncodersWarm();
+      boolean warm = modelsUnavailable == null && queryEncodersWarm();
       queryEncodersCold = !warm;
       embeddingReady = queryReadiness.ready(warm);
       if (queryEncodersCold) log.debug("Query encoders not warm (prewarm pending)");

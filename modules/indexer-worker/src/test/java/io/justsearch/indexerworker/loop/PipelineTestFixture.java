@@ -21,6 +21,24 @@ import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
 
 final class PipelineTestFixture {
+  static IndexingCoordinator coordinator() {
+    return mock(IndexingCoordinator.class, PipelineTestFixture::publicationAnswer);
+  }
+
+  static Object publicationAnswer(org.mockito.invocation.InvocationOnMock call) throws Throwable {
+    if (call.getMethod().getName().equals("replaceTextFamily")) {
+      return CoordinatorPublicationFixture.publish((IndexingCoordinator) call.getMock(),
+          call.getArgument(0), call.getArgument(1),
+          call.getArguments().length == 4 ? call.getArgument(3) : null);
+    }
+    return org.mockito.Answers.RETURNS_DEFAULTS.answer(call);
+  }
+
+  static IndexingCoordinator coordinatorDelegate(IndexingCoordinator actual) {
+    return mock(IndexingCoordinator.class, call -> call.getMethod().getName().equals("replaceTextFamily")
+        ? publicationAnswer(call) : org.mockito.AdditionalAnswers.delegatesTo(actual).answer(call));
+  }
+
   static EngineExecutorRegistry.Registration registration(TestEngineExecutors owners,String name,int threads) {
     return owners.register(new EngineExecutorSpec(name,EngineExecutorSpec.Kind.BACKGROUND,
         EngineExecutorSpec.Mode.PLATFORM,threads,8,2));
@@ -44,7 +62,7 @@ final class PipelineTestFixture {
   void init() throws Exception {
     db = temp.resolve("jobs.db");
     openQueue();
-    writer = mock(IndexingCoordinator.class);
+    writer = coordinator();
   }
   void openQueue() throws Exception { queue = new SqliteJobQueue(db); queue.open(); }
   void openStore(boolean readOnly) {
