@@ -315,13 +315,15 @@ public final class JobBatchExtractor {
         return null;
       }
       boolean unchanged = false;
+      // Carry the consumed legacy force marker to publication. A recorded migration source hash
+      // requires extraction but is not itself a person's request to recompute model outputs.
+      boolean forceReindex = true;
       try {
         String normalizedPath = envelope.normalizedPath();
-        boolean forceReindex = claim.plannedSourceSha256() != null
-            || (claim.walkEpoch() != null
-                ? claim.recordedForce() : claim.forceReindex() || forcedPaths.remove(normalizedPath));
+        forceReindex = claim.walkEpoch() != null
+            ? claim.recordedForce() : claim.forceReindex() || forcedPaths.remove(normalizedPath);
         // Skip isUnmodified() on empty index — every doc is new (312 item 10).
-        if (!forceReindex && !indexEmptyForBatch) {
+        if (!forceReindex && claim.plannedSourceSha256() == null && !indexEmptyForBatch) {
           unchanged = documentFieldOps.isUnmodified(normalizedPath, envelope.modifiedAtMs(), envelope.sizeBytes(),
                   sourceSha256, contentExtractor.extractionPolicy().policyId())
               && Objects.equals(collection == null || collection.isBlank() ? null : collection,
@@ -399,7 +401,7 @@ public final class JobBatchExtractor {
       }
 
       return new ExtractedJob(
-          claim, artifact, startTime, envelope, sourceSha256, docUid, sourceRealPath);
+          claim, artifact, startTime, envelope, sourceSha256, docUid, sourceRealPath, forceReindex);
 
     } catch (IngestionServiceUnavailableException
         | EngineExecutorRejectedException

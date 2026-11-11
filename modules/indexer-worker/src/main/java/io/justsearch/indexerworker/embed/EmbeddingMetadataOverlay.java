@@ -75,6 +75,11 @@ public final class EmbeddingMetadataOverlay implements CommitMetadataSource {
     return delegate.indeterminateFingerprintInputs();
   }
 
+  @Override
+  public String denseModelRole() {
+    return delegate.denseModelRole();
+  }
+
   /**
    * Creates a supplier that produces overlaid metadata sources on demand.
    *

@@ -36,7 +36,8 @@ final class ExistingSchemaHealthTest extends LuceneExecutorTestBase {
       var owners=new TestEngineExecutors();var provider=new PolicyDrivenTikaExtractor(java.util.concurrent.Executors::newFixedThreadPool);
       var box=new TimeboxedContentExtractor(PipelineTestFixture.registration(owners,"stored-schema",1),provider,Duration.ofSeconds(5),null)) {
    var live=LiveWriterLockHealthTest.writer(runtime);
-   h.writer=mock(IndexingCoordinator.class,call->{try{return call.getMethod().invoke(runtime.indexingCoordinator(),call.getArguments());}
+   h.writer=mock(IndexingCoordinator.class,call->{
+      if (call.getMethod().getName().equals("replaceTextFamily")) return PipelineTestFixture.publicationAnswer(call);try{return call.getMethod().invoke(runtime.indexingCoordinator(),call.getArguments());}
     catch(java.lang.reflect.InvocationTargetException ex){if(call.getMethod().getName().equals("indexSingle"))failures.add(ex.getCause());throw ex.getCause();}});
    h.commitOps=runtime.commitOps();var files=h.enqueue("healthy-a.txt","healthy-b.txt");
    assertTrue(provider.extractArtifact(files.getFirst()).result().content().contains("healthy readable content"));

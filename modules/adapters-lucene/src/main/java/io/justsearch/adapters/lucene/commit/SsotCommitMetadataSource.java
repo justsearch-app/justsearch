@@ -44,6 +44,7 @@ public final class SsotCommitMetadataSource implements CommitMetadataSource {
   private final SsotAnalyzerRegistry.AnalyzerFingerprintingService fingerprintingService;
   private final ResolvedConfig resolvedConfigSnapshot;
   private final RuntimeFingerprintInputs runtimeFingerprintInputs;
+  private final String denseModelRole;
   private volatile String cachedAnalyzerFingerprint;
 
   public SsotCommitMetadataSource() {
@@ -70,18 +71,40 @@ public final class SsotCommitMetadataSource implements CommitMetadataSource {
         Objects.requireNonNull(runtimeFingerprintInputs, "runtimeFingerprintInputs"));
   }
 
+  /** The selected producer can differ from desired settings; null preserves unknown authority. */
+  public SsotCommitMetadataSource(ResolvedConfig snapshot, RuntimeFingerprintInputs runtimeFingerprintInputs,
+      String denseModelRole) {
+    this(snapshot, true, Objects.requireNonNull(runtimeFingerprintInputs, "runtimeFingerprintInputs"),
+        denseModelRole);
+  }
+
   private SsotCommitMetadataSource(
       ResolvedConfig snapshot,
       boolean requireSnapshot,
       RuntimeFingerprintInputs runtimeFingerprintInputs) {
+    this(snapshot, requireSnapshot, runtimeFingerprintInputs, snapshot == null ? null
+        : "bge-m3".equalsIgnoreCase(snapshot.ai().sparseModel()) ? "splade" : "embedding");
+  }
+
+  private SsotCommitMetadataSource(ResolvedConfig snapshot, boolean requireSnapshot,
+      RuntimeFingerprintInputs runtimeFingerprintInputs, String denseModelRole) {
     if (requireSnapshot) {
       Objects.requireNonNull(snapshot, "snapshot");
     }
     this.resolvedConfigSnapshot = snapshot;
     this.runtimeFingerprintInputs = runtimeFingerprintInputs;
+    if (denseModelRole != null && !List.of("embedding", "splade").contains(denseModelRole)) {
+      throw new IllegalArgumentException("Unknown dense model role: " + denseModelRole);
+    }
+    this.denseModelRole = denseModelRole;
     this.repoRoot = resolveRepoRoot();
     this.analyzerRegistry = new SsotAnalyzerRegistry();
     this.fingerprintingService = new SsotAnalyzerRegistry.AnalyzerFingerprintingService();
+  }
+
+  @Override
+  public String denseModelRole() {
+    return denseModelRole;
   }
 
   /**

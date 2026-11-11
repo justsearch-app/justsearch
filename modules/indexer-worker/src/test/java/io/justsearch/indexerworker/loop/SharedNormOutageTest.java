@@ -79,6 +79,7 @@ final class SharedNormOutageTest extends LuceneExecutorTestBase {
    var fatalExits=new CopyOnWriteArrayList<Throwable>();
    runtime.onTerminalWriterFailure(fatalExits::add);
    h.writer=mock(IndexingCoordinator.class,call->{
+      if (call.getMethod().getName().equals("replaceTextFamily")) return PipelineTestFixture.publicationAnswer(call);
     try {
      Object result=call.getMethod().invoke(runtime.indexingCoordinator(),call.getArguments());
      if(call.getMethod().getName().equals("probeIngestion")) probes.incrementAndGet();

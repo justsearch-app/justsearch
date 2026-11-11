@@ -34,7 +34,7 @@ final class UnavailableIdentityBatchTest {
       queue.open();
       var content = mock(TimeboxedContentExtractor.class);
       when(content.extractionPolicy()).thenReturn(TikaExtractionPolicy.defaults());
-      var writer = mock(IndexingCoordinator.class);
+      var writer = PipelineTestFixture.coordinator();
       var loop = new IndexingLoop(null, null, queue, writer, mock(CommitOps.class),
           mock(DocumentFieldOps.class), mock(IndexCountOps.class), () -> null,
           mock(WorkerSignalBus.class), IndexingPacing.unthrottled(), null, null, null, null,

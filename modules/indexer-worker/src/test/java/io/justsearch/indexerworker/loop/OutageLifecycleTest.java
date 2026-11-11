@@ -70,7 +70,7 @@ final class OutageLifecycleTest extends LuceneExecutorTestBase {
 
   @Test
   void stopDuringCappedOutagePauseWakesWithoutInterruptingOrChargingRows() throws Exception {
-    var writer = mock(IndexingCoordinator.class);
+    var writer = PipelineTestFixture.coordinator();
     doThrow(new io.justsearch.adapters.lucene.runtime.IndexWriterUnavailableException(
         "outage during shutdown")).when(writer).indexSingle(any());
     loop = newLoop(writer, mock(CommitOps.class));
@@ -102,7 +102,7 @@ final class OutageLifecycleTest extends LuceneExecutorTestBase {
     var active = new AtomicReference<>(runtime);
     runtime.close();
     var failedWrites = new AtomicInteger();
-    var writer = mock(IndexingCoordinator.class);
+    var writer = PipelineTestFixture.coordinator();
     doAnswer(call -> {
       try {
         active.get().indexingCoordinator().indexSingle(call.getArgument(0));

@@ -186,7 +186,7 @@ class SharedServiceAvailabilityTest extends LuceneExecutorTestBase {
             requested = nonDirectory.resolve("index");
           }
           Path opening = requested;
-          var unavailable = mock(IndexingCoordinator.class);
+          var unavailable = PipelineTestFixture.coordinator();
           doAnswer(call -> {
             try (var candidate = builder(opening).open()) {
               candidate.indexingCoordinator().indexSingle(call.getArgument(0));
@@ -420,7 +420,7 @@ class SharedServiceAvailabilityTest extends LuceneExecutorTestBase {
     }
 
     IndexingLoop newLoop() throws Exception {
-      var routedWriter = mock(IndexingCoordinator.class);
+      var routedWriter = PipelineTestFixture.coordinator();
       doAnswer(call -> {
         try {
           io.justsearch.indexing.api.IndexDocument document = call.getArgument(0);

@@ -145,7 +145,7 @@ public final class IndexingDocumentOps {
 
   /**
    * {@code document} (built by {@link #buildDocument}) carrying {@code chunkPlan}'s chunk-set
-   * declaration, so {@link #indexDeclaredChunks} needs no separate parent rewrite. The plan must be
+   * declaration, so {@link #buildDeclaredChunks} needs no separate parent rewrite. The plan must be
    * {@link #chunkPlan} of the same content.
    */
   public static IndexDocument withChunkDeclaration(
@@ -485,7 +485,7 @@ public final class IndexingDocumentOps {
   }
 
   /**
-   * The chunk set {@link #indexDeclaredChunks} writes for this extraction, split once per parent
+   * The chunk set {@link #buildDeclaredChunks} writes for this extraction, split once per parent
    * so the same plan can be declared on the parent ({@link #withChunkDeclaration}).
    */
   public static ChunkDocumentWriter.ChunkPlan chunkPlan(
@@ -501,30 +501,11 @@ public final class IndexingDocumentOps {
     return ChunkDocumentWriter.plan(content, metadata.mimeBase(), metadata.fileKind());
   }
 
-  /**
-   * Writes the chunks of a parent that was just indexed carrying the same {@code chunkPlan}'s
-   * chunk-set declaration ({@link #withChunkDeclaration}). Unlike
-   * {@link #indexChunks}, this never rewrites the parent: no blocking refresh, no read-back.
-   */
-  public static int indexDeclaredChunks(
-      Path filePath,
-      ExtractionResult extraction,
-      IndexingCoordinator indexingCoordinator,
-      ParentIndexMetadata parentMetadata,
-      String collection,
-      String parentDocUid,
-      boolean chunkSpladeEnabled,
-      ChunkDocumentWriter.ChunkPlan chunkPlan) {
-    return indexDeclaredChunks(filePath, extraction, indexingCoordinator, parentMetadata, collection,
-        parentDocUid, chunkSpladeEnabled, chunkPlan, Map.of());
-  }
-
-  /** Publishes each chunk with its own copy of the parent's admission/storage evidence. */
-  public static int indexDeclaredChunks(
-      Path filePath, ExtractionResult extraction, IndexingCoordinator indexingCoordinator,
+  /** Canonical fresh child rows, built before a family replacement reads the old artifacts. */
+  public static java.util.List<IndexDocument> buildDeclaredChunks(
+      Path filePath, ExtractionResult extraction,
       ParentIndexMetadata parentMetadata, String collection, String parentDocUid,
-      boolean chunkSpladeEnabled, ChunkDocumentWriter.ChunkPlan chunkPlan,
-      Map<String, Object> envelope) {
+      boolean chunkSpladeEnabled, ChunkDocumentWriter.ChunkPlan chunkPlan, Map<String, Object> envelope) {
     String content = extraction.content();
     String parentDocId = PathNormalizer.normalizeKey(filePath);
     ChunkDocumentWriter.ParentChunkMetadata chunkMetadata = null;
@@ -536,8 +517,8 @@ public final class IndexingDocumentOps {
       chunkMetadata = new ChunkDocumentWriter.ParentChunkMetadata(metadata.mime(), metadata.mimeBase(),
           metadata.fileKind(), metadata.language(), metadata.parentTokenCount(), collection, parentDocUid, envelope);
     }
-    return ChunkDocumentWriter.replaceDeclaredChunks(
-        indexingCoordinator, parentDocId, content, chunkMetadata, chunkPlan, chunkSpladeEnabled);
+    return ChunkDocumentWriter.buildDeclaredChunks(
+        parentDocId, content, chunkMetadata, chunkPlan, chunkSpladeEnabled);
   }
 
   public static ParentIndexMetadata deriveParentMetadata(

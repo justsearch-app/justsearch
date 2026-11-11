@@ -397,10 +397,10 @@ public final class WritePathOps {
     }
   }
 
-  private record SparseRead(Map<Integer, Map<String, Float>> features,
+  record SparseRead(Map<Integer, Map<String, Float>> features,
       Map<Integer, IOException> failures) {}
 
-  private SparseRead sparseFeatures(IndexSearcher searcher, Set<Integer> documents) {
+  SparseRead sparseFeatures(IndexSearcher searcher, Set<Integer> documents) {
     var result = new HashMap<Integer, Map<String, Float>>();
     var failures = new HashMap<Integer, IOException>();
     long started = System.nanoTime();
@@ -1499,7 +1499,7 @@ public final class WritePathOps {
    * {@code getFloatVectorValues(field)} -> iterator advance -> {@code vectorValue(ord)} (derisk E1,
    * tempdoc 711). Used by the {@code preserve-reread} RMW lane.
    */
-  private static float[] readFloatVector(IndexSearcher searcher, int globalDocId, String field)
+  static float[] readFloatVector(IndexSearcher searcher, int globalDocId, String field)
       throws IOException {
     List<LeafReaderContext> leaves = searcher.getIndexReader().leaves();
     int leafIndex = ReaderUtil.subIndex(globalDocId, leaves);

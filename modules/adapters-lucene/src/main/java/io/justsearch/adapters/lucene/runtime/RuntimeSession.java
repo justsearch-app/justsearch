@@ -564,6 +564,7 @@ final class RuntimeSession implements AutoCloseable {
     if (openTimeCommitUserData == null) {
       this.openTimeCommitUserData = latestCommitUserDataBestEffort();
     }
+    commitOps.captureArtifactReuseOrigin();
 
     // 7. Derive queue depth from writer config + read validation mode.
     ResolvedConfig.Index idx = components.resolvedConfig().index();
