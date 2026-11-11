@@ -11,7 +11,7 @@ import { onStatusBarChange } from '../commands/StatusBarRegistry.js';
 import type { AdvisorySnapshot, AdvisoryStore } from '../components/advisory/AdvisoryStore.js';
 import { authorizedFetch } from '../api/authorizedFetch.js';
 import { z } from 'zod';
-import { indexedRootViewSchema, type IndexedRootView } from '../../api/generated/schema-types/indexed-root-view.js';
+import { type IndexedRootView } from '../../api/generated/schema-types/indexed-root-view.js';
 import { operationOutcomeViewSchema } from '../../api/generated/schema-types/operation-outcome-view.js';
 import { openActionLedgerStream, type UnifiedActionEntry } from '../operations/ActionLedgerClient.js';
 import type { MultiplexedStream } from '../streaming/MultiplexedStream.js';
@@ -28,7 +28,11 @@ import { onWindowFocusChange } from '../../utils/windowFocusChange.js';
 import { presentVerdict, type VerdictPresentation } from '../state/verdict.js';
 import { presentAiEngineVerdict, type AiEngineVerdictPresentation } from '../state/aiVerdict.js';
 import { isIndexingObservation } from '../state/readinessNotice.js';
-import { resolvePathLazy } from '../hooks/resolvePathLazy.js';
+import { getSeenCursor, subscribeSeenCursor } from '../substrates/recall/recallCursor.js';
+import { getIndexedRoots, readIndexedRoots, subscribeIndexedRoots } from '../state/indexedRoots.js';
+import { subscribeProfileSwitch } from '../state/UserStateDocument.js';
+import { subscribeStatusEpoch } from '../../api/statusInvalidation.js';
+import { failureSuperseded, healthObservationCurrent, publishHealthObservations, REMOTE_HEALTH_MAX_AGE_MS } from '../state/systemHealth.js';
 import { needsTypedConfirm } from '../components/acceptPendingEffect.js';
 import { agentRequestNotice, endEventId, needsYouCount, routeDesktopNotice, workFailedNotice, workFinishedNotice, type DesktopNotice } from '../state/noticePolicy.js';
 import { getNotifications } from '../state/notificationsState.js';
@@ -88,6 +92,11 @@ export class FrameStatusController implements ReactiveController {
   private stopActivity: (() => void) | undefined;
   private activity: readonly UnifiedActionEntry[] = [];
   private operations = new Map<string, DurableStatusOperation & { activeSince?: number; seenAtGap?: number }>();
+  /**
+   * 13:00Z — failed receipts a later success of the same operation retired. Receipts are immutable,
+   * so the retirement outlives both receipts leaving the bounded ledger history.
+   */
+  private readonly retiredFailures = new Set<string>();
   private roots: readonly IndexedRootView[] = [];
   private rootsLive = false;
   private readonly rootPaths = new Map<string, string>();
@@ -97,6 +106,7 @@ export class FrameStatusController implements ReactiveController {
   private remoteAbort: AbortController | null = null;
   private presence: readonly PresenceRun[] = [];
   private presenceLive = false;
+  private presenceAtMs: number | null = null;
   private deadlines = new Map<string, string>();
   /** Agent requests already announced in this window: one announcement per arrival (DE3). */
   private readonly announced = new Set<string>();
@@ -138,9 +148,13 @@ export class FrameStatusController implements ReactiveController {
     }),
       subscribeTasks(() => this.refresh()), subscribePending(() => this.refresh()),
       subscribeConsent(() => this.refresh()), subscribeAppUpdate(() => this.refresh()),
-      onStatusBarChange(() => this.host.requestUpdate()), subscribeFirstUse(() => this.refresh())];
+      onStatusBarChange(() => this.host.requestUpdate()), subscribeFirstUse(() => this.refresh()),
+      subscribeIndexedRoots(() => this.observeRoots()), subscribeSeenCursor(() => this.refresh()),
+      subscribeStatusEpoch(() => this.invalidateRemote()),
+      subscribeProfileSwitch(() => this.invalidateRemote())];
+    this.observeRoots();
     this.timer = setInterval(() => this.refresh(), 1_000);
-    this.stopFocusWatch = onWindowFocusChange(() => { this.focusChanges++; });
+    this.stopFocusWatch = onWindowFocusChange(() => { this.focusChanges++; this.refresh(); void this.readRemote(); });
     document.addEventListener('jf-first-use-folder-added', this.folderAdded);
     document.addEventListener('jf-plugin-load-error', this.pluginError);
     document.addEventListener('jf-plugin-loaded', this.pluginLoaded);
@@ -148,6 +162,7 @@ export class FrameStatusController implements ReactiveController {
   }
   hostDisconnected(): void {
     this.connected = false;
+    publishHealthObservations(null);
     this.lifecycle++;
     this.gaps++;
     this.stopFocusWatch?.(); this.stopFocusWatch = undefined;
@@ -222,13 +237,44 @@ export class FrameStatusController implements ReactiveController {
     if (!multiplex || !this.connected) return;
     this.stopActivity = openActionLedgerStream({ multiplex, onActivity: activity => {
       this.activity = activity;
-      for (const entry of activity) if (entry.operationOutcomeKey && !this.operations.has(entry.operationOutcomeKey)) {
-        this.operations.set(entry.operationOutcomeKey, { id: entry.operationOutcomeKey, label: entry.label, outcome: null });
+      this.retireSupersededFailures();
+      for (const entry of activity) if (entry.operationOutcomeKey) {
+        const previous = this.operations.get(entry.operationOutcomeKey);
+        this.operations.set(entry.operationOutcomeKey, previous ? { ...previous, operationId: entry.operationId }
+          : { id: entry.operationOutcomeKey, label: entry.label, operationId: entry.operationId, outcome: null });
       }
+      const retained = new Set(activity.map(entry => entry.operationOutcomeKey));
+      for (const [key, operation] of this.operations) if (!retained.has(key)
+        && operation.outcome?.phase !== 'awaiting_acceptance'
+        && (operation.outcome?.state === 'complete' || operation.outcome?.state === 'expired'
+          || operation.outcome?.state === 'failed' && (this.retiredFailures.has(key)
+            || (operation.outcome.completedAt ?? Infinity) <= Date.parse(getSeenCursor())))) this.operations.delete(key);
       this.refresh(); void this.readRemote();
     } });
   }
-  /** Reuses the shared status cadence. Read serially, retain values on failure, ignore late teardown responses. */
+  private retireSupersededFailures(): void {
+    const operations = [...this.operations.values()];
+    for (const [key, operation] of this.operations) if (failureSuperseded(operation, operations)) this.retiredFailures.add(key);
+  }
+  private observeRoots(): void {
+    const observation = getIndexedRoots();
+    this.roots = observation.roots;
+    this.rootsLive = observation.confirmed;
+    this.rootPaths.clear();
+    for (const [hash, path] of Object.entries(observation.paths)) this.rootPaths.set(hash, path);
+    setFirstUseRoots(observation.confirmed ? observation.roots : null, this.rootPaths);
+    this.refresh();
+  }
+  private invalidateRemote(): void {
+    this.lifecycle++;
+    this.remoteAbort?.abort(); this.remoteAbort = null;
+    this.remoteBusy = false;
+    this.presence = []; this.presenceLive = false; this.presenceAtMs = null;
+    this.operations.clear(); this.deadlines.clear(); this.activity = [];
+    this.observeRoots();
+    void this.readRemote();
+  }
+  /** The shared cadence requests independent bounded sources; names never hold their facts. */
   private readonly folderAdded = (): void => { void this.readRemote(); };
   private async readRemote(): Promise<void> {
     if (this.remoteBusy || !this.connected || this.lastRemoteStamp === null) return;
@@ -237,53 +283,36 @@ export class FrameStatusController implements ReactiveController {
     const observationStamp = this.lastRemoteStamp;
     const abort = new AbortController(); this.remoteAbort = abort;
     const alive = (): boolean => this.connected && this.lifecycle === lifecycle;
-    const current = (): boolean => alive() && observationStamp === this.lastRemoteStamp;
-    try {
-      const response = await authorizedFetch(`${this.host.apiBase}/api/indexing-roots/substrate`, { signal: abort.signal });
-      if (!response.ok) throw new Error('Folder observation unavailable');
-      const roots = z.object({ items: z.array(indexedRootViewSchema) }).parse(await response.json());
-      if (current()) { this.roots = roots.items; this.rootsLive = true; }
-    } catch { if (current()) this.rootsLive = false; }
-    if (current() && !this.rootsLive) setFirstUseRoots(null, this.rootPaths);
-    // R4 — folder rows are named by folder; the observation carries hashes only (memoized resolver).
-    for (const root of this.roots) {
-      if (!current()) break;
-      const hash = root.pathHash;
-      if (!hash || this.rootPaths.has(hash)) continue;
-      const path = await resolvePathLazy('core.indexed-roots', hash, { apiBase: this.host.apiBase }).catch(() => null);
-      if (path && current()) this.rootPaths.set(hash, path);
-    }
-    if (current()) setFirstUseRoots(this.rootsLive ? this.roots : null, this.rootPaths);
-    if (current()) try {
-      const response = await authorizedFetch(`${this.host.apiBase}/api/presence`, { signal: abort.signal });
-      if (!response.ok) throw new Error('Background observation unavailable');
-      const presence = z.object({ runs: z.array(z.object({ sessionId: z.string(), state: z.string(), actor: z.string(),
-        toolCalls: z.number(), turns: z.number(), iterations: z.number() })) }).parse(await response.json());
-      if (current()) { this.presence = presence.runs; this.presenceLive = true; }
-    } catch { if (current()) this.presenceLive = false; }
-    for (const request of this.host.authorizationHost?.()?.statusRequests() ?? []) {
-      if (!current()) break;
-      // Only the engine's pending store is asked here. A run's own tool approval (owningRunId) is not
-      // a pending-store id: its run withdraws it (cancelAuthorizationsForRun), never a 404 from here.
-      if (request.kind !== 'authorize' || request.prompt.pendingId.startsWith('proposal:') || request.prompt.owningRunId) continue;
+    const read = async (work: (signal: AbortSignal, current: () => boolean) => Promise<void>): Promise<void> => {
+      const bound = new AbortController();
+      const signal = AbortSignal.any([abort.signal, bound.signal]);
+      let abandon!: () => void;
+      const abandoned = new Promise<void>(resolve => { abandon = resolve; signal.addEventListener('abort', abandon, { once: true }); });
+      const timer = setTimeout(() => bound.abort(), 5_000);
+      try { await Promise.race([work(signal, () => alive() && !signal.aborted), abandoned]); }
+      finally { clearTimeout(timer); signal.removeEventListener('abort', abandon); }
+    };
+    await Promise.allSettled([
+      read(async (signal) => { await readIndexedRoots(path => authorizedFetch(this.host.apiBase + path, { signal }), false, this.host.apiBase, signal); }),
+      read(async (signal, current) => {
+        try {
+          const response = await authorizedFetch(`${this.host.apiBase}/api/presence`, { signal });
+          if (!response.ok) throw new Error('Background observation unavailable');
+          const presence = z.object({ runs: z.array(z.object({ sessionId: z.string(), state: z.string(), actor: z.string(),
+            toolCalls: z.number(), turns: z.number(), iterations: z.number() })) }).parse(await response.json());
+          if (current()) { this.presence = presence.runs; this.presenceLive = true; this.presenceAtMs = Date.now(); }
+        } catch { if (current()) this.presenceLive = false; }
+      }),
+      ...[...this.operations].map(([key, operation]) => read(async (signal, current) => {
+        if (operation.fresh && ['complete', 'failed'].includes(operation.outcome?.state ?? '') && operation.outcome?.phase !== 'awaiting_acceptance') return;
       try {
-        const detail = await getOperationClient(this.host.apiBase).peekPending(request.prompt.pendingId);
-        if (!current()) break;
-        if (!detail) withdrawAuthorization(request.prompt.pendingId);
-        else if (typeof detail.expiresAt === 'string') this.deadlines.set(request.prompt.pendingId, detail.expiresAt);
-      } catch { /* A failed read never expires or withdraws a decision. */ }
-    }
-    for (const [key, operation] of this.operations) {
-      if (!current()) break;
-      if (operation.fresh && ['complete', 'failed'].includes(operation.outcome?.state ?? '') && operation.outcome?.phase !== 'awaiting_acceptance') continue;
-      try {
-        const response = await authorizedFetch(`${this.host.apiBase}/api/operation-history/${encodeURIComponent(key)}`, { signal: abort.signal });
+        const response = await authorizedFetch(`${this.host.apiBase}/api/operation-history/${encodeURIComponent(key)}`, { signal });
         if (!response.ok) throw new Error('Operation observation unavailable');
         const outcome = operationOutcomeViewSchema.parse(await response.json());
-        if (!current() || this.operations.get(key) !== operation) continue;
+        if (!current() || this.operations.get(key) !== operation) return;
         const activeSince = ['accepted', 'running'].includes(outcome.state) && outcome.phase !== 'awaiting_acceptance'
           ? operation.activeSince ?? Date.now() : undefined;
-        this.operations.set(key, { ...operation, outcome, fresh: true, activeSince, seenAtGap: this.gaps });
+        this.operations.set(key, { ...operation, outcome, fresh: true, observedAtMs: Date.now(), activeSince, seenAtGap: this.gaps });
         // ST6 — the invocation task finishes with the durable operation, never on invocation return.
         if (operation.invocationTaskId && outcome.phase !== 'awaiting_acceptance' && ['complete', 'failed'].includes(outcome.state)) {
           completeTask(operation.invocationTaskId, outcome.state === 'complete' ? 'succeeded' : 'failed');
@@ -301,9 +330,20 @@ export class FrameStatusController implements ReactiveController {
       } catch {
         if (current() && this.operations.get(key) === operation) this.operations.set(key, { ...operation, fresh: false });
       }
-    }
+      })),
+      ...[...this.host.authorizationHost?.()?.statusRequests() ?? []].map(request => read(async (_signal, current) => {
+        if (request.kind !== 'authorize' || request.prompt.pendingId.startsWith('proposal:') || request.prompt.owningRunId) return;
+        try {
+          const detail = await getOperationClient(this.host.apiBase).peekPending(request.prompt.pendingId);
+          if (!current()) return;
+          if (!detail) withdrawAuthorization(request.prompt.pendingId);
+          else if (typeof detail.expiresAt === 'string') this.deadlines.set(request.prompt.pendingId, detail.expiresAt);
+        } catch { /* A failed read cannot withdraw an outstanding decision. */ }
+      })),
+    ]);
     if (alive()) {
       this.remoteBusy = false; this.remoteAbort = null;
+      // An observation that arrived while this batch ran gets its own read.
       if (observationStamp !== this.lastRemoteStamp) void this.readRemote();
       else this.refresh();
     }
@@ -360,6 +400,13 @@ export class FrameStatusController implements ReactiveController {
       title: 'Plugin load failed', detail: `${key}: ${error.message}`,
       actions: [{ kind: 'navigate', target: 'core.settings-surface', label: 'Open plugin settings' },
         { kind: 'plugin-copy', target: key, label: 'Copy details' }, { kind: 'dismiss-plugin', target: key, label: 'Dismiss' }] }));
+    this.retireSupersededFailures();
+    // Health applies its own expiry to a published copy; the panel's live-end evidence is not rewritten.
+    // Terminal receipts are immutable, so only an unfinished outcome can go out of date.
+    publishHealthObservations({ presence: this.presence, presenceLive: this.presenceLive,
+      presenceAtMs: this.presenceAtMs, operations: [...this.operations.values()].filter(operation => !this.retiredFailures.has(operation.id)).map(operation =>
+        operation.fresh && !(operation.outcome && ['complete', 'failed'].includes(operation.outcome.state) && operation.outcome.phase !== 'awaiting_acceptance')
+          && !healthObservationCurrent(operation.observedAtMs, now, REMOTE_HEALTH_MAX_AGE_MS) ? { ...operation, fresh: false } : operation) });
     const authorizationHost = this.host.authorizationHost?.() ?? null;
     const requests = authorizationHost?.statusRequests() ?? [];
     const derive = (): FrameStatus => deriveFrameStatus({ ai: this.ai, now, contactLostAt: this.contactLostAt,

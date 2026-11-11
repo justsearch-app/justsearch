@@ -22,6 +22,13 @@ let hasDisplayedSnapshot = false;
  */
 let displayGeneration = 0;
 let seenEpoch: string | null = null;
+const epochListeners = new Set<() => void>();
+/** Identity of the currently observed engine process; unrelated publications do not change it. */
+export function getStatusEpoch(): string | null { return seenEpoch; }
+export function subscribeStatusEpoch(listener: () => void): () => void {
+  epochListeners.add(listener);
+  return () => epochListeners.delete(listener);
+}
 let seenCounter = 0;
 /** The newest observed value a fresh read was started for: one fresh read per observed value. */
 let attemptedEpoch: string | null = null;
@@ -105,8 +112,11 @@ export function statusSnapshotDisplayed(response: Response, issued: number = dis
 
 function remember(epoch: string, value: number): void {
   if (seenEpoch !== epoch) {
+    const previous = seenEpoch;
     if (seenEpoch) retiredEpochs.add(seenEpoch);
     seenEpoch = epoch; seenCounter = value;
+    // Learning the first epoch is not a restart; only a change of a known producer notifies.
+    if (previous) for (const listener of epochListeners) listener();
     // Reads issued before this epoch was learned may come from an older producer.
     displayGeneration++;
     if (hasDisplayedSnapshot && displayedEpoch !== epoch) binding?.invalidate?.();

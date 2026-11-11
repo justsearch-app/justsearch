@@ -630,7 +630,7 @@ public final class CoreSurfaceCatalog implements SurfaceCatalog {
                       /* diagnosticChannels */ Set.<DiagnosticChannelRef>of()),
                   SYSTEM_MOUNT_TAG,
                   Provenance.core("1.0"))
-              .withMembers(List.of(HEALTH_SURFACE_ID, LOGS_SURFACE_ID, ACTIVITY_SURFACE_ID)),
+              .withMembers(List.of(HEALTH_SURFACE_ID, ACTIVITY_SURFACE_ID, LOGS_SURFACE_ID)),
           new Surface(
               HEALTH_SURFACE_ID,
               Presentation.of(

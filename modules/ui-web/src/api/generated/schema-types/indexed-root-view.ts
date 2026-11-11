@@ -10,50 +10,50 @@
 
 import { z } from 'zod';
 
-export type MapStringBoolean = Record<string, boolean>;
-export const mapStringBooleanSchema = z.record(z.string(), z.boolean());
+export type MapStringBooleanNullable = Record<string, boolean> | null;
+export const mapStringBooleanNullableSchema = z.record(z.string(), z.boolean()).nullable();
 
 export interface IndexedRootView {
-  chunkDocsSettled?: number;
-  chunkDocsTotal?: number;
+  chunkDocsSettled?: number | null;
+  chunkDocsTotal?: number | null;
   collection?: string;
   deleteDetectionUnverified?: boolean;
-  failedCount?: number;
-  failedStages?: MapStringBoolean;
+  failedCount?: number | null;
+  failedStages?: MapStringBooleanNullable;
   fileCount?: number;
-  inFlightCount?: number;
+  inFlightCount?: number | null;
   lastIndexedIsoTime?: string;
   lastVerifiedIsoTime?: string;
-  missingArtifactStages?: MapStringBoolean;
-  parentDocsSettledEmbedding?: number;
-  parentDocsSettledNer?: number;
-  parentDocsSettledSplade?: number;
-  parentDocsTotalEmbedding?: number;
-  parentDocsTotalNer?: number;
-  parentDocsTotalSplade?: number;
+  missingArtifactStages?: MapStringBooleanNullable;
+  parentDocsSettledEmbedding?: number | null;
+  parentDocsSettledNer?: number | null;
+  parentDocsSettledSplade?: number | null;
+  parentDocsTotalEmbedding?: number | null;
+  parentDocsTotalNer?: number | null;
+  parentDocsTotalSplade?: number | null;
   pathHash?: string;
   status?: string;
   walkCompleted?: boolean;
   walkError?: string;
 }
 export const indexedRootViewSchema = z.strictObject({
-  "chunkDocsSettled": z.number().int().optional(),
-  "chunkDocsTotal": z.number().int().optional(),
+  "chunkDocsSettled": z.number().int().nullable().optional(),
+  "chunkDocsTotal": z.number().int().nullable().optional(),
   "collection": z.string().optional(),
   "deleteDetectionUnverified": z.boolean().optional(),
-  "failedCount": z.number().int().optional(),
-  "failedStages": mapStringBooleanSchema.optional(),
+  "failedCount": z.number().int().nullable().optional(),
+  "failedStages": mapStringBooleanNullableSchema.optional(),
   "fileCount": z.number().int().optional(),
-  "inFlightCount": z.number().int().optional(),
+  "inFlightCount": z.number().int().nullable().optional(),
   "lastIndexedIsoTime": z.string().optional(),
   "lastVerifiedIsoTime": z.string().optional(),
-  "missingArtifactStages": mapStringBooleanSchema.optional(),
-  "parentDocsSettledEmbedding": z.number().int().optional(),
-  "parentDocsSettledNer": z.number().int().optional(),
-  "parentDocsSettledSplade": z.number().int().optional(),
-  "parentDocsTotalEmbedding": z.number().int().optional(),
-  "parentDocsTotalNer": z.number().int().optional(),
-  "parentDocsTotalSplade": z.number().int().optional(),
+  "missingArtifactStages": mapStringBooleanNullableSchema.optional(),
+  "parentDocsSettledEmbedding": z.number().int().nullable().optional(),
+  "parentDocsSettledNer": z.number().int().nullable().optional(),
+  "parentDocsSettledSplade": z.number().int().nullable().optional(),
+  "parentDocsTotalEmbedding": z.number().int().nullable().optional(),
+  "parentDocsTotalNer": z.number().int().nullable().optional(),
+  "parentDocsTotalSplade": z.number().int().nullable().optional(),
   "pathHash": z.string().optional(),
   "status": z.string().optional(),
   "walkCompleted": z.boolean().optional(),

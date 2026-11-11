@@ -71,7 +71,6 @@ import { operationOutcomeViewSchema, type OperationOutcomeView } from '../../api
 import {
   folderAttention,
   folderStatus,
-  rememberFailedCounts,
   rootCoverage,
   type FolderStatus,
 } from '../state/folderStatus.js';
@@ -782,6 +781,7 @@ export class LibrarySurface extends JfElement {
     this.rootsUnsub = subscribeIndexedRoots(() => {
       const observation = getIndexedRoots();
       if (observation.confirmed) this.roots = observation.roots;
+      this.lastKnownFailed = { ...observation.lastKnownFailed };
       this.resolvedPaths = { ...this.resolvedPaths, ...observation.paths };
     });
     this.rootArrivalUnsub = subscribeLibraryRoot(request => { void this.receiveRoot(request); });
@@ -1219,13 +1219,7 @@ export class LibrarySurface extends JfElement {
         return false;
       }
       const items = observation.roots;
-      // Tempdoc 914 D3 — fold the newest counts into the bounded last-known-failed memory BEFORE
-      // the rows render, so a poll that lands mid-retry (failures re-queued ⟹ `failedCount` 0,
-      // `inFlightCount` > 0) still renders a reachable "N failed" chip. The retention rule lives in
-      // the pure fold next to the seam that reads it.
-      this.lastKnownFailed = rememberFailedCounts(this.lastKnownFailed, items, {
-        provisional: this.provisional,
-      });
+      this.lastKnownFailed = { ...observation.lastKnownFailed };
       this.roots = items;
       this.rootsObserved = true;
       this.resolvedPaths = { ...this.resolvedPaths, ...observation.paths };

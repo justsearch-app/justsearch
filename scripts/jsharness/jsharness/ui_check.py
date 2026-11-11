@@ -1167,6 +1167,8 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
 
         await page.route("**/api/health/events/stream", health_stream)
         await _goto_surface(page, S.RAIL_SURFACE_HEALTH)
+        # Recent events live in Health's Diagnostics disclosure, collapsed by default.
+        await page.locator("jf-health-surface details > summary").click()
         for code, suffix, severity, wording in cases:
             row = page.locator(f'.event-row[title="agent.session.{suffix}"]')
             await row.wait_for(state="visible", timeout=15_000)

@@ -1,0 +1,87 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
+  },
+  "createdAt": "2026-11-11T15:14:57.387Z",
+  "revision": "bf1b6b5688a0a917dbfdbbab586e645760dd39c0",
+  "tree": "b519d632c0c25ddef1577cc8e6e7860596ef1bcf",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/HealthSurface.freshness-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/p_xuy294/tmp/test-intent-vitest-10392-1794410079833.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 7883
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HealthSurface.freshness-lockdown.test.ts#status stops for 45 s while inference answers: the status age reads its own receipt, contact and inference stay just now",
+      "file": "modules/ui-web/src/shell-v0/views/HealthSurface.freshness-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6ae9dc49304c61e05f9efb0afa6baf238599284c3f0a9cb8eff59ed3d86fd78f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SH3 every Diagnostics age is dated by its own source status stops for 45 s while inference answers: the status age reads its own receipt, contact and inference stay just now",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HealthSurface.freshness-lockdown.test.ts#AI Brain's engine-history intent during the loss: after recovery Diagnostics is open and focus stays on the AI Engine section",
+      "file": "modules/ui-web/src/shell-v0/views/HealthSurface.freshness-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6ae9dc49304c61e05f9efb0afa6baf238599284c3f0a9cb8eff59ed3d86fd78f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SH14 a section intent keeps its destination across engine loss and recovery AI Brain's engine-history intent during the loss: after recovery Diagnostics is open and focus stays on the AI Engine section",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "bf1b6b5688",
+    "revision": "bf1b6b5688a0a917dbfdbbab586e645760dd39c0",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/HealthSurface.freshness-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/p_xuy294/tmp/test-intent-vitest-10392-1794410089658.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 7460,
+        "output": "JSON report written to /home/elias/.cache/am/p_xuy294/tmp/test-intent-vitest-10392-1794410089658.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/HealthSurface.freshness-lockdown.test.ts#status stops for 45 s while inference answers: the status age reads its own receipt, contact and inference stay just now",
+        "classification": "assertion",
+        "detail": "SH3 every Diagnostics age is dated by its own source status stops for 45 s while inference answers: the status age reads its own receipt, contact and inference stay just now:  AssertionError: status data age: expected 'just now' to match /^(4\\d|5\\d)s ago\\b/\n    at /home/elias/.cache/am/p_xuy294/tmp/test-intent-before-YpIMFo/modules/ui-web/src/shell-v0/views/HealthSurface.freshness-lockdown.test.ts:152:44\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-health"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/HealthSurface.freshness-lockdown.test.ts#AI Brain's engine-history intent during the loss: after recovery Diagnostics is open and focus stays on the AI Engine section",
+        "classification": "assertion",
+        "detail": "SH14 a section intent keeps its destination across engine loss and recovery AI Brain's engine-history intent during the loss: after recovery Diagnostics is open and focus stays on the AI Engine section:  AssertionError: focus on the requested section: expected { id: '', tag: 'div', …(1) } to match object { id: 'ai-engine' }\n(2 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/s6-health/modules/ui-web/node_modules/@vitest/expect"
+      }
+    ]
+  },
+  "digest": "sha256:227f57b7ce1d2cbdf30a654056d42745a328c0de3bca0d17beb811aed440cb1e"
+}

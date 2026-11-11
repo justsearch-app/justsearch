@@ -47,10 +47,10 @@ describe('CapabilityMap (jf-capability-map)', () => {
     document.body.innerHTML = '';
   });
 
-  it('always lists keyword search as available, regardless of AI state', async () => {
+  it('keeps cold-start keyword availability unconfirmed', async () => {
     const el = await mount(null);
     const rows = rowTexts(el);
-    expect(rows.some((t) => /Search \(keyword\)/.test(t) && /Available/.test(t))).toBe(true);
+    expect(rows.some((t) => /Search \(keyword\)/.test(t) && /unconfirmed/.test(t))).toBe(true);
   });
 
   it('AI offline → the AI affordances read their reason', async () => {

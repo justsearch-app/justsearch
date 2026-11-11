@@ -313,9 +313,14 @@ describe('C6 work ending across a gap in observation', () => {
     const advance = operation('gap-detach', 'Rebuild search', { state: 'running', historySince: 0 });
     await advance();
     elapsed += 60_000;
-    pill.remove(); document.body.append(pill); await flush();
-    await advance({ state: 'complete', historySince: 0 });
+    pill.remove();
+    // The operation ends while this window is detached; the first read after return sees it complete.
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => String(url).includes('/api/operation-history/gap-detach')
+      ? Response.json({ state: 'complete', historySince: 0 }) : new Response('{}', { status: 503 })));
+    document.body.append(pill); await flush();
     await advance();
+    await advance();
+    expect(Object.values(panel().model!.sections).flat().find(row => row.id === 'operation:gap-detach')?.detail).not.toMatch(/running/i);
     expect(sendDesktopNotification).not.toHaveBeenCalled();
   });
   it('a poll that lagged while contact held is not a gap, so the end still notifies', async () => {

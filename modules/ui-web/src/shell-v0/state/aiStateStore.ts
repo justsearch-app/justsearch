@@ -44,6 +44,7 @@ import {
 import {
   subscribeAiInstall,
   isAiObservationLive,
+  aiObservationReceivedAtMs,
   type AiObservation,
   setAiInstallApiBase,
   __resetAiInstallPollForTest,
@@ -349,6 +350,8 @@ export interface AiState {
   runtimeStatus: AiRuntimeStatus | null;
   packStatus: PackImportStatus | null;
   installObservationLive: boolean;
+  installObservedAtMs?: number;
+  runtimeObservedAtMs?: number;
   runtimeObservationLive: boolean;
   packObservationLive: boolean;
   /**
@@ -988,6 +991,8 @@ function buildSnapshot(): AiState {
     installStatus,
     runtimeStatus,
     packStatus: packStatusSig.get(),
+    installObservedAtMs: installObservationSig.get() ? aiObservationReceivedAtMs('install') : undefined,
+    runtimeObservedAtMs: runtimeObservationSig.get() ? aiObservationReceivedAtMs('runtime') : undefined,
     installObservationLive: isAiObservationLive(installObservationSig.get()),
     runtimeObservationLive: isAiObservationLive(runtimeObservationSig.get()),
     packObservationLive: isAiObservationLive(packObservationSig.get()),
@@ -1276,6 +1281,10 @@ export function refreshStatusNow(): Promise<void> {
  * When the status body now held arrived (`null` while none is held): the observation time of every
  * fact read from it. Unlike `connection.lastSuccessMs`, inference answers and stream frames never move it.
  */
+export function getInferenceReceivedAtMs(): number | null {
+  return inferenceSig.get() ? lastInferenceSuccessSig.get() : null;
+}
+
 export function getStatusReceivedAtMs(): number | null {
   return statusSig.get() ? lastStatusSuccessSig.get() : null;
 }

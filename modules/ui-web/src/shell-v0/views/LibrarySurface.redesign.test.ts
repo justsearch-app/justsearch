@@ -10,6 +10,7 @@ import type { FolderCardRenderer } from '../renderers/controls/FolderCardRendere
 import { createMockHostApi } from '../plugin-api/testHostApi.js';
 import { __feedForTest, __resetAiStateForTest, __tickClockForTest, type StatusSnapshot } from '../state/aiStateStore.js';
 import type { IndexedRootView } from '../../api/generated/schema-types/indexed-root-view.js';
+import { readIndexedRoots } from '../state/indexedRoots.js';
 import type { FailedFilesList } from '../components/FailedFilesList.js';
 import { applyPresentationBodies, clearPresentation } from '../state/presentationRuntime.js';
 import { CORE_DECLARED } from '../themes/builtinPresentations.js';
@@ -216,7 +217,9 @@ it.each(['fallback', 'themed'])('V1 %s disclosure retains focus on toggle and li
 
 it('D1 keeps attention and retried files through 25 alternating unconfirmed polls and clears on a settled observation', async () => {
   observe(20); const { el } = await mount();
-  el.roots = [{ ...root('a'), failedCount: 1 }];
+  // Folder observations arrive through the shared roots read, which owns the retained failure memory.
+  const folders = (items: IndexedRootView[]) => readIndexedRoots(async () => Response.json({ items }));
+  await folders([{ ...root('a'), failedCount: 1 }]);
   const receivedAt = Date.now();
   const now = vi.spyOn(Date, 'now');
   for (let second = 0; second < 25; second++) {
@@ -225,10 +228,7 @@ it('D1 keeps attention and retried files through 25 alternating unconfirmed poll
       operating: { indexing: { state: 'PAUSED', reasons: ['user_paused'] } },
       worker: { core: { indexedDocuments: 20, indexState: 'WAITING', pendingJobs: 1, indexHealthy: true } }
     } as unknown as StatusSnapshot });
-    if (second === 1) {
-      Object.assign(el, { lastKnownFailed: { a: 1 } });
-      el.roots = [{ ...root('a'), inFlightCount: 1 }];
-    }
+    if (second === 1) await folders([{ ...root('a'), inFlightCount: 1 }]);
     await settle(el);
     expect(el.shadowRoot!.querySelector('h2')!.textContent).toBe('2 things need your attention');
     expect(el.shadowRoot!.querySelector('.attention')!.textContent).toContain('Indexing paused');
@@ -238,7 +238,7 @@ it('D1 keeps attention and retried files through 25 alternating unconfirmed poll
   now.mockReturnValue(receivedAt + 41000); __tickClockForTest(); await settle(el);
   expect(el.shadowRoot!.querySelector('h2')!.textContent).toBe('Indexing status unconfirmed');
   expect(el.shadowRoot!.querySelector('.attention')!.textContent).toContain('Indexing paused');
-  observe(20); el.roots = [root('a')]; await settle(el);
+  observe(20); await folders([root('a')]); await settle(el);
   expect(el.shadowRoot!.querySelector('.attention-item')).toBeNull();
   expect(el.shadowRoot!.querySelector('h2')!.textContent).toBe('Your files are searchable');
 });

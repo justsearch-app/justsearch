@@ -3,6 +3,7 @@ package io.justsearch.ui.api;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -96,6 +97,27 @@ final class IndexingControllerFailureTest {
       controller(indexing, mock(ExcludesService.class)).handleListRootsSubstrate(ctx);
 
       assertCapacityRefusal(ctx);
+    }
+  }
+
+  @Test
+  void ordinaryJobCountFailureReportsUnknownInsteadOfZero() {
+    var indexing = mock(IndexingService.class);
+    when(indexing.getWatchedRoots(any(EngineContext.class)))
+        .thenReturn(List.of(new IndexingService.WatchedRoot("notes", root)));
+    when(indexing.countJobsByPathPrefix(eq(root), any(EngineContext.class)))
+        .thenThrow(new IllegalStateException("count unavailable"));
+    var ctx = context();
+
+    controller(indexing, mock(ExcludesService.class)).handleListRootsSubstrate(ctx);
+
+    @SuppressWarnings("unchecked")
+    var items = (List<Map<String, Object>>) response(ctx).get("items");
+    assertEquals(1, items.size());
+    for (String field : List.of("inFlightCount", "failedCount", "parentDocsTotalEmbedding",
+        "parentDocsSettledEmbedding", "chunkDocsTotal", "chunkDocsSettled")) {
+      assertTrue(items.getFirst().containsKey(field), field + " must distinguish unknown from absent");
+      assertNull(items.getFirst().get(field), field + " must not fabricate an observed zero after counting fails");
     }
   }
 

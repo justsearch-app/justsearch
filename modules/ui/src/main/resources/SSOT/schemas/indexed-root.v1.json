@@ -1,8 +1,8 @@
 {
   "$schema" : "https://json-schema.org/draft/2020-12/schema",
   "$defs" : {
-    "Map(String,Boolean)" : {
-      "type" : "object",
+    "Map(String,Boolean)-nullable" : {
+      "type" : [ "object", "null" ],
       "additionalProperties" : {
         "type" : "boolean"
       }
@@ -11,10 +11,10 @@
   "type" : "object",
   "properties" : {
     "chunkDocsSettled" : {
-      "type" : "integer"
+      "type" : [ "integer", "null" ]
     },
     "chunkDocsTotal" : {
-      "type" : "integer"
+      "type" : [ "integer", "null" ]
     },
     "collection" : {
       "type" : "string"
@@ -23,16 +23,16 @@
       "type" : "boolean"
     },
     "failedCount" : {
-      "type" : "integer"
+      "type" : [ "integer", "null" ]
     },
     "failedStages" : {
-      "$ref" : "#/$defs/Map(String,Boolean)"
+      "$ref" : "#/$defs/Map(String,Boolean)-nullable"
     },
     "fileCount" : {
       "type" : "integer"
     },
     "inFlightCount" : {
-      "type" : "integer"
+      "type" : [ "integer", "null" ]
     },
     "lastIndexedIsoTime" : {
       "type" : "string"
@@ -41,25 +41,25 @@
       "type" : "string"
     },
     "missingArtifactStages" : {
-      "$ref" : "#/$defs/Map(String,Boolean)"
+      "$ref" : "#/$defs/Map(String,Boolean)-nullable"
     },
     "parentDocsSettledEmbedding" : {
-      "type" : "integer"
+      "type" : [ "integer", "null" ]
     },
     "parentDocsSettledNer" : {
-      "type" : "integer"
+      "type" : [ "integer", "null" ]
     },
     "parentDocsSettledSplade" : {
-      "type" : "integer"
+      "type" : [ "integer", "null" ]
     },
     "parentDocsTotalEmbedding" : {
-      "type" : "integer"
+      "type" : [ "integer", "null" ]
     },
     "parentDocsTotalNer" : {
-      "type" : "integer"
+      "type" : [ "integer", "null" ]
     },
     "parentDocsTotalSplade" : {
-      "type" : "integer"
+      "type" : [ "integer", "null" ]
     },
     "pathHash" : {
       "type" : "string"
