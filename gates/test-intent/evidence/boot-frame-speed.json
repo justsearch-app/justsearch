@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
   },
-  "createdAt": "2026-11-11T09:52:42.615Z",
-  "revision": "b908eb3150ba8ba9af8a7830a4d1055cf497857a",
-  "tree": "d03bf8750c60504731fa95b5132aff9c45ddbe9a",
+  "createdAt": "2026-11-11T11:02:12.274Z",
+  "revision": "72264cac15007efc6b605244294c3d811560bac1",
+  "tree": "2d5ac0e778fb381998976a12e341faf458f78e28",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/boot/boot-frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/tmp/test-intent-vitest-2067291-1794390658601.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/boot/boot-frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/2h2zrhqs/tmp/test-intent-vitest-49958-1794394816090.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 104014
+      "durationMs": 116184
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:760d45bae8fc231953f318e09d2c583710d63c90f206f810bd97b1d0e194bf02",
+      "contentDigest": "sha256:a1e005470addf8fbce49298d02c9e56da74764802121317d1516dbdb166d6600",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -578,5 +578,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:71637231a03cbd4a7ea020622ca55ab6aca72e95f2f11fbbb62afe9585d9d726"
+  "digest": "sha256:0dd2a47fb38cbf7eec528c1b51dbc8d572327064487461aabca9953b9234a087"
 }

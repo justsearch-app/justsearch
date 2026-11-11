@@ -1237,8 +1237,8 @@ async function realInputMeasures(page: Page, name: string) {
  * them): these surfaces take their colours from the app's tokens, which a palette changes at
  * runtime, so each case applies its palette to them through the app's own appearance writer. The
  * other surfaces boot per palette: the start-up frame, failure page and hand-off paint the saved
- * copy the early HTML script reads once at boot, and connecting, engine recovery and factory reset paint before the
- * saved palette is restored.
+ * copy the early HTML script reads once at boot; connecting and factory reset paint before the saved
+ * palette is restored; and engine recovery restores it while the app boots behind it.
  */
 const livePages = new Map<'dark' | 'light', Promise<[string, Page][]>>();
 function livePagesFor(mode: 'dark' | 'light') {
@@ -1305,7 +1305,7 @@ legibilityCases.forEach(({ palette, mode }, caseIndex) => it(`SW5 X1 window cont
     ['failure page without a saved copy', () => start({ storage: noCopy }, true, true)],
     ['hand-off', () => handOff({ storage })],
     ['hand-off without a saved copy', async () => { const page = live.get('hand-off without a saved copy')!; await apply(page); return page; }],
-    // These paint before the saved palette is restored, so each boots with this palette's storage as a start would.
+    // Each boots with this palette's storage as a start would.
     ['connecting', () => opened({ storage, discoveryHold: true }, '#root > jf-engine-recovery')],
     ['engine recovery', () => opened({ storage, supervisor: exhausted }, '#root > jf-engine-recovery')],
     ['factory reset', () => opened({ storage, phase: 'complete' }, '#root > jf-factory-reset-recovery')],
@@ -1313,10 +1313,10 @@ legibilityCases.forEach(({ palette, mode }, caseIndex) => it(`SW5 X1 window cont
   for (const [surface, open] of states) {
     const page = await open();
     try {
-      if (surface.startsWith('hand-off')) {
-        await page.waitForFunction(palette => document.querySelector(`style[data-theme-id="${palette}"]`) !== null, palette);
-        expect({ surface, frame: await page.locator('#boot-frame').count() }).toEqual({ surface, frame: 1 });
-      }
+      // Measured once the saved palette is applied: the hand-offs under the frame, and engine recovery
+      // while the app boots behind it (it mounts first, and the palette follows some frames later).
+      if (surface.startsWith('hand-off') || surface === 'engine recovery') await page.waitForFunction(palette => document.querySelector(`style[data-theme-id="${palette}"]`) !== null, palette);
+      if (surface.startsWith('hand-off')) expect({ surface, frame: await page.locator('#boot-frame').count() }).toEqual({ surface, frame: 1 });
       expect({ surface, labels: await controlLabels(page) }).toEqual({ surface, labels: ['Minimize', 'Maximize', 'Close'] });
       await measureSurface(page, surface);
     } finally { if (!live.has(surface)) await page.close(); }
