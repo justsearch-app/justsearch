@@ -1763,7 +1763,7 @@ jobs:
         with:
           name: supervisor-conformance-windows-attempt-${{ github.run_attempt }}
           path: tmp/supervisor-conformance/**
-          retention-days: 7
+          retention-days: 30
 
   windows-native-contracts:
     needs: changes
@@ -2135,15 +2135,6 @@ jobs:
         if: always()
         run: node scripts/ci/collect-e2e-child-logs.mjs
 
-      - name: Upload E2E child process logs
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: integration-tests-child-logs-attempt-${{ github.run_attempt }}
-          path: build/ci/e2e-child-logs/**
-          retention-days: 3
-          if-no-files-found: error
-
       - name: Upload integration-test results
         if: always()
         uses: actions/upload-artifact@v7
@@ -2157,6 +2148,18 @@ jobs:
             build/ci/integration-test-attribution.json
             build/ci/integration-test-attribution.md
           if-no-files-found: warn
+
+      # Last upload, after every other fallible upload step, so its retention sees the job's
+      # status: a failed job's logs are kept 30 days for a later diagnosis, any other 3 days.
+      # Status is read here; a failure in this step or in later post-job actions cannot change it.
+      - name: Upload E2E child process logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: integration-tests-child-logs-attempt-${{ github.run_attempt }}
+          path: build/ci/e2e-child-logs/**
+          retention-days: ${{ job.status == 'failure' && 30 || 3 }}
+          if-no-files-found: error
 
   # Main/dispatch coverage for the integration source sets outside system-tests.
   # Advisory check: keep it out of requiredStatusChecks and PR input selection.
@@ -2242,15 +2245,6 @@ jobs:
         if: always()
         run: node scripts/ci/collect-e2e-child-logs.mjs
 
-      - name: Upload E2E child process logs
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: lifecycle-integration-tests-child-logs-attempt-${{ github.run_attempt }}
-          path: build/ci/e2e-child-logs/**
-          retention-days: 3
-          if-no-files-found: error
-
       - name: Upload lifecycle-test results
         if: always()
         uses: actions/upload-artifact@v7
@@ -2261,6 +2255,18 @@ jobs:
             modules/system-tests/build/reports/tests/lifecycleIntegrationTest/**
             tmp/lane-f-takeover/writer-junit-*/**
           if-no-files-found: warn
+
+      # Last upload, after every other fallible upload step, so its retention sees the job's
+      # status: a failed job's logs are kept 30 days for a later diagnosis, any other 3 days.
+      # Status is read here; a failure in this step or in later post-job actions cannot change it.
+      - name: Upload E2E child process logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: lifecycle-integration-tests-child-logs-attempt-${{ github.run_attempt }}
+          path: build/ci/e2e-child-logs/**
+          retention-days: ${{ job.status == 'failure' && 30 || 3 }}
+          if-no-files-found: error
 
   # Runs the MIT-licensed gitleaks CLI directly instead of gitleaks/gitleaks-action.
   # The action is a wrapper that (a) demands a paid GITLEAKS_LICENSE secret as soon as
