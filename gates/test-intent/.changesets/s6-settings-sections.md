@@ -734,3 +734,13 @@ Candidate G follows the settled SG1–SG10 amendments. SD developer-tools change
   "note": "Against the specified whole-branch baseline c46bf1a6cc, current evidence has 23 evidence-invalid failures: final test files differ from s6-settings-adapted/sections/browser/repairs/guards runs. Refresh the final-file evidence and superseded legacy Developer View tier check. Runtime rechecks do not repair these committed evidence digests."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1c850-d13a-7e82-9414-69c4d92f8a2d",
+  "verdict": "accept",
+  "digest": "sha256:7ecd0eb2f0b9e414011d0365420e83db72ccfe8e803678035c78f18a471e58c0"
+}
+```

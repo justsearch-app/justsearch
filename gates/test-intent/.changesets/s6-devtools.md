@@ -361,3 +361,13 @@ Candidate D implements the settled SD1–SD6 and SG6 amendments. Fail-before run
   "digest": "sha256:d8299bcc80677ce47b76b1f1ebf5aefd60a37f3f9a01fffbabc5b9e47c4bb39e"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1c850-d13a-7e82-9414-69c4d92f8a2d",
+  "verdict": "accept",
+  "digest": "sha256:f62d355692c147e70c47757ab62f49f4c5238ee0b5008265fc9e354e668aa0cb"
+}
+```
