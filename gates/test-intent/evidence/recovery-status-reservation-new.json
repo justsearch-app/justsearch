@@ -1,0 +1,100 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
+  },
+  "createdAt": "2026-11-11T02:18:10.890Z",
+  "revision": "e0c83179b6f3a64a93a40e290919adc5984b9d43",
+  "tree": "6f714a839747d47b5aaa1853a22f8a6b66ac0175",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineRootIndexRecoveryTest.workThatUsesTheIndexStillRefusesRecoveryCloseAndIsCounted\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 6525
+    },
+    {
+      "command": "./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineAdmissionControllerTest.shutdownDrainWaitsForAHeldStatusReservationThatTheIndexCloseDoesNotCount\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3544
+    },
+    {
+      "command": "./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineAdmissionControllerTest.concurrentStatusChurnNeverMasksOrUnderflowsTheIndexRetainingCount\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2829
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootIndexRecoveryTest.java#workThatUsesTheIndexStillRefusesRecoveryCloseAndIsCounted",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootIndexRecoveryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:cbb165215167c8795747392413f8d89ac6e411984aa7960eb972414c2aad176a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] admitted",
+          "status": "passed"
+        },
+        {
+          "name": "[2] retained",
+          "status": "passed"
+        },
+        {
+          "name": "[3] internal-attach",
+          "status": "passed"
+        },
+        {
+          "name": "[4] admitted-with-status",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineAdmissionControllerTest.java#shutdownDrainWaitsForAHeldStatusReservationThatTheIndexCloseDoesNotCount",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineAdmissionControllerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f8732189a1a2f382d3dfbfb580fd4106809023bb18716c9c07bb52aa40a37969",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "shutdownDrainWaitsForAHeldStatusReservationThatTheIndexCloseDoesNotCount()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineAdmissionControllerTest.java#concurrentStatusChurnNeverMasksOrUnderflowsTheIndexRetainingCount",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineAdmissionControllerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f8732189a1a2f382d3dfbfb580fd4106809023bb18716c9c07bb52aa40a37969",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "concurrentStatusChurnNeverMasksOrUnderflowsTheIndexRetainingCount()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:81eb7e9fe0967df06a394f94936e92a99586a720076514839c003288d743112d"
+}
