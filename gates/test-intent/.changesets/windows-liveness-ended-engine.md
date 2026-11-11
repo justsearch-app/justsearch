@@ -80,3 +80,14 @@ transplanted tests call and leaves the before-state's liveness check unchanged.
   "note": "Six Windows checks match the delegated cases; four repair checks assertion-fail before. Coverage gaps remain in the verification report."
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "reviewer-615419cb-cee5-4f0e-9235-f388c1d8574d",
+  "verdict": "accept",
+  "digest": "sha256:9da49ffa1e89d498716a0b28e47087efd9089377d13d6f3eddef2c88c23a68c6",
+  "note": "Expectations match the delegated liveness choices. Six Windows checks passed; four repair checks assertion-failed against unchanged base production behavior. File, patch, producer and evidence digests match."
+}
+```
