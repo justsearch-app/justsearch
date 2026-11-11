@@ -56,6 +56,30 @@ final class PdfOcrEngineTest {
 
   @Test
   @Timeout(30)
+  void rejoinsHyphenatedOcrPerPageBeforeCappingAndCoverage() throws Exception {
+    try (var engine = engine(CONFIG, 2, command -> {
+      Path base = Path.of(command.get(2));
+      int page = pageIndexOf(command);
+      Files.writeString(Path.of(base + ".txt"),
+          page == 0 ? "beratun-\r\n gen Rech-\nnung E-\nMail Ab-" : "schluss Anträ‐\n ge");
+      return new StubProcess(0, 0);
+    })) {
+      String expected = "\n\n--- OCR page 1 ---\nberatungen Rechnung E-\nMail Ab-\n"
+          + "\n\n--- OCR page 2 ---\nschluss Anträge\n";
+      Path pdf = blankPdf(2);
+      var result = engine.ocrPdf(pdf, expected.length());
+      assertEquals(expected, result.text());
+      assertFalse(result.truncated(), "cap counts normalized text");
+      assertEquals(java.util.Set.of(0, 1), result.coveredPages(), "coverage uses stored page text");
+      assertEquals(2, result.pagesProcessed());
+      var capped = engine.ocrPdf(pdf, expected.length() - 3);
+      assertTrue(capped.truncated());
+      assertEquals(expected.substring(0, expected.length() - 3), capped.text());
+    }
+  }
+
+  @Test
+  @Timeout(30)
   void joinsPagesInPageOrderRegardlessOfCompletionOrder() throws Exception {
     Path pdf = blankPdf(3);
     // Later pages complete first; page-order join must still order the markers 1,2,3.
