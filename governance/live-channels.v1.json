@@ -129,6 +129,20 @@
       "note": "Opens only when the Log surface mounts (the diagnostic-channels/engine-log stream)."
     },
     {
+      "file": "modules/ui-web/src/shell-v0/components/ActionLedgerView.ts",
+      "openerId": "envelope-stream-direct",
+      "class": "lazy",
+      "demandClass": "depth",
+      "note": "The Activity feed's core.operation-history stream: opened from connectedCallback once the catalog declares the Resource, stopped on disconnect. It replaces the <jf-resource> history view Activity used to mount (ResourceView's pooled lazy socket), so the connection count while Activity is open is unchanged: one. It cannot reuse that pooled socket because the pool takes its reducer and transport from whichever subscriber comes first. The feed's reducer holds snapshot arbitration state (updates survive until a snapshot contains them) and its transport reports a failure before the first snapshot. Neither can be shared with ResourceView's plain strategy reducer. The shared multiplex carries no operation-history channel (ShellEventsStreamController assembles 7 fixed sources)."
+    },
+    {
+      "file": "modules/ui-web/src/shell-v0/components/ActionLedgerView.ts",
+      "openerId": "fetch-event-source",
+      "class": "lazy",
+      "demandClass": "depth",
+      "note": "The default transport factory for the same lazy operation-history channel (the envelope-stream-direct row above). Not a second connection."
+    },
+    {
       "file": "modules/ui-web/src/shell-v0/components/ResourceView.ts",
       "openerId": "envelope-stream-pool",
       "class": "lazy",
