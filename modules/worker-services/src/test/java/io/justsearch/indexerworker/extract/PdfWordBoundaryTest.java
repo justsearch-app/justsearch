@@ -33,6 +33,7 @@ import org.xml.sax.helpers.AttributesImpl;
 class PdfWordBoundaryTest {
   @TempDir Path tempDir;
   private static final AttributesImpl EMPTY = new AttributesImpl();
+  private static final String SOFT_HYPHEN = String.valueOf((char) 0xAD);
 
   @ParameterizedTest
   @ValueSource(strings = {"p", "h2", "td", "li"})
@@ -109,7 +110,7 @@ class PdfWordBoundaryTest {
     var handler = handler(1000, true);
     start(handler, "p");
     chars(handler, "Rech");
-    chars(handler, "\u00ad");
+    chars(handler, SOFT_HYPHEN);
     for (int i = 0; i < separator.length(); i++) whitespace(handler, separator.substring(i, i + 1));
     chars(handler, "nung");
     end(handler, "p");
@@ -117,8 +118,9 @@ class PdfWordBoundaryTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"Rech\u00ad\nNung", "Rech\u00adnung"})
-  void softHyphensArePreservedWithoutLowercaseLineContinuation(String text) throws Exception {
+  @ValueSource(strings = {"Rech<SHY>\nNung", "Rech<SHY>nung"})
+  void softHyphensArePreservedWithoutLowercaseLineContinuation(String template) throws Exception {
+    String text = template.replace("<SHY>", SOFT_HYPHEN);
     var handler = handler(1000, true);
     start(handler, "p");
     chars(handler, text);
