@@ -1234,33 +1234,31 @@ async function realInputMeasures(page: Page, name: string) {
 }
 /**
  * Booted once per mode, outside any one case's contexts (closing the browser after all cases closes
- * them): these surfaces take their colours from the app's tokens, which a palette changes at
- * runtime, so each case applies its palette to them through the app's own appearance writer. The
- * other surfaces boot per palette: the start-up frame, failure page and hand-off paint the saved
- * copy the early HTML script reads once at boot; connecting and factory reset paint before the saved
- * palette is restored; and engine recovery restores it while the app boots behind it.
+ * them): the running app takes its colours from the app's tokens, which a palette changes at
+ * runtime, so each case applies its palette to it through the app's own appearance writer. The
+ * other surfaces boot per case: the start-up frame, failure page and hand-off paint the saved copy
+ * the early HTML script reads once at boot; connecting and factory reset paint before the saved
+ * palette is restored; and engine recovery restores it while the app boots behind it. A hand-off
+ * is a start still in progress, so it cannot be kept: the start-up script replaces a frame shown
+ * for 60 s with the failure page.
  */
-const livePages = new Map<'dark' | 'light', Promise<[string, Page][]>>();
-function livePagesFor(mode: 'dark' | 'light') {
-  if (!livePages.has(mode)) livePages.set(mode, (async () => {
-    const open = async (surface: string, options: Options, ready: string) => {
-      const page = await create({ os: mode, theme: mode, ...options });
-      contexts.delete(page.context());
-      await page.goto(url); await page.waitForSelector(ready, { state: 'attached' });
-      await page.addScriptTag({ type: 'module', url: new URL(probe, url).href });
-      await page.waitForFunction(() => 'frameProbe' in window);
-      return [surface, page] as [string, Page];
-    };
-    // The running app writes the saved frame copy the next start paints.
-    return [await open('running app', {}, 'jf-top-bar .more-trigger'),
-      await open('hand-off without a saved copy', { renderHold: true }, 'jf-top-bar .more-trigger')];
+const runningApps = new Map<'dark' | 'light', Promise<Page>>();
+function runningAppFor(mode: 'dark' | 'light') {
+  if (!runningApps.has(mode)) runningApps.set(mode, (async () => {
+    const page = await create({ os: mode, theme: mode });
+    contexts.delete(page.context());
+    await page.goto(url); await page.waitForSelector('jf-top-bar .more-trigger', { state: 'attached' });
+    await page.addScriptTag({ type: 'module', url: new URL(probe, url).href });
+    await page.waitForFunction(() => 'frameProbe' in window);
+    // It writes the saved frame copy the next start paints.
+    return page;
   })());
-  return livePages.get(mode)!;
+  return runningApps.get(mode)!;
 }
 const legibilityCases = shippedPalettes.flatMap(palette => (['dark', 'light'] as const).map(mode => ({ palette, mode })));
 legibilityCases.forEach(({ palette, mode }, caseIndex) => it(`SW5 X1 window controls are legible over every surface with ${palette} ${mode}, and in forced colours`, async () => {
   const failures: string[] = [];
-  const live = new Map(await livePagesFor(mode));
+  const app = await runningAppFor(mode);
   // Every surface is also measured under real keyboard and pointer input once across these cases.
   let surfaceIndex = 0;
   const measureSurface = async (page: Page, surface: string) => {
@@ -1272,11 +1270,9 @@ legibilityCases.forEach(({ palette, mode }, caseIndex) => it(`SW5 X1 window cont
         .toEqual({ surface, name, real: measures.map(({ forced, state, measured }) => ({ forced, state, measured: measured[index] })) });
     }
   };
-  const apply = (page: Page) => page.evaluate(({ palette, mode }) => window.frameProbe.applyAppearance({ paletteId: palette, theme: mode }), { palette, mode });
-  const app = live.get('running app')!;
   await expect.poll(() => app.locator('#boot-frame').count()).toBe(0);
   expect(await controlLabels(app)).toEqual(['Minimize', 'Maximize', 'Close']);
-  await apply(app);
+  await app.evaluate(({ palette, mode }) => window.frameProbe.applyAppearance({ paletteId: palette, theme: mode }), { palette, mode });
   await expect.poll(() => app.evaluate(key => JSON.parse(localStorage.getItem(key) ?? 'null')?.text === getComputedStyle(document.documentElement).getPropertyValue('--text-primary').trim(), key)).toBe(true);
   await measureSurface(app, 'running app');
   const storage: Record<string, string> = await app.evaluate(() => Object.fromEntries(Object.entries(localStorage)));
@@ -1304,7 +1300,7 @@ legibilityCases.forEach(({ palette, mode }, caseIndex) => it(`SW5 X1 window cont
     ['failure page', () => start({ storage }, true, true)],
     ['failure page without a saved copy', () => start({ storage: noCopy }, true, true)],
     ['hand-off', () => handOff({ storage })],
-    ['hand-off without a saved copy', async () => { const page = live.get('hand-off without a saved copy')!; await apply(page); return page; }],
+    ['hand-off without a saved copy', () => handOff({ storage: noCopy })],
     // Each boots with this palette's storage as a start would.
     ['connecting', () => opened({ storage, discoveryHold: true }, '#root > jf-engine-recovery')],
     ['engine recovery', () => opened({ storage, supervisor: exhausted }, '#root > jf-engine-recovery')],
@@ -1319,7 +1315,7 @@ legibilityCases.forEach(({ palette, mode }, caseIndex) => it(`SW5 X1 window cont
       if (surface.startsWith('hand-off')) expect({ surface, frame: await page.locator('#boot-frame').count() }).toEqual({ surface, frame: 1 });
       expect({ surface, labels: await controlLabels(page) }).toEqual({ surface, labels: ['Minimize', 'Maximize', 'Close'] });
       await measureSurface(page, surface);
-    } finally { if (!live.has(surface)) await page.close(); }
+    } finally { await page.close(); }
   }
   expect(failures).toEqual([]);
 }, 90_000));
