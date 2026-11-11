@@ -20,12 +20,12 @@
 import { journalEventId, type JournalEntry, type EffectOriginator } from '../substrates/effects/index.js';
 import { compareInstants } from '../primitives/instant.js';
 import {
+  indexResultOf,
   projectBackend,
   projectEffect,
   type BackendLedgerEntry,
   type UnifiedActionEntry,
 } from './ActionLedgerClient.js';
-import { JOB_STATE_RETRY_EXHAUSTED } from '../state/indexingJobStates.js';
 
 /** A `core.operation-history` wire row (OperationHistoryEntry), as the stream delivers it. */
 export interface OperationHistoryRow {
@@ -121,7 +121,7 @@ function ledgerIsProblem(e: BackendLedgerEntry): boolean {
     case 'operation':
       return e.outcome === 'FAILURE' || e.outcome === 'PARTIAL' || (e.docsFailed ?? 0) > 0;
     case 'index':
-      return e.state === 'FAILED' || e.state === JOB_STATE_RETRY_EXHAUSTED;
+      return indexResultOf(e.state) === 'failed';
     case 'gate':
       return e.disposition === 'DENIED' || e.disposition === 'EXPIRED';
     case 'effect':

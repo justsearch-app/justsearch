@@ -12,7 +12,9 @@ repaired: undo-all reported Engine undo success from dispatch alone, and the sha
 compared timestamps as strings. The replayed-run and mark-all-read-scope checks are preservation
 checks and pass before as well. After verification of candidate 1 (ef84062e5e), snapshot
 arbitration in both streams, the history source's unavailable state and the undoable reset fixture
-were repaired; those checks have their own fail-before evidence against ef84062e5e.
+were repaired; those checks have their own fail-before evidence against ef84062e5e. After verification
+of 81b02ecadf, index-state classification in burst summaries and resolved labels and keyboard reach
+in the windowed feed were repaired; those checks have fail-before evidence against 81b02ecadf.
 
 ```json
 {
@@ -356,6 +358,54 @@ were repaired; those checks have their own fail-before evidence against ef84062e
         "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts#a ledger UPDATE no snapshot has contained survives a reconnect snapshot that lacks it; only a reset voids it",
         "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts#a history snapshot cannot erase a newer UPDATE it lacks; a reset voids it and later snapshots do not bring it back",
         "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts#the history stream failing before its first snapshot says it is unavailable, not loading, until a snapshot reads it"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Index classification repaired after verification of candidate 1 (fail before at 81b02ecadf; the defect is also at 716017c61f): an indexing burst counts a record only in the category its state establishes (DONE indexed; FAILED and RETRY_EXHAUSTED failed), so one DONE and one unknown-state record read Indexed 1 · 1 with unknown state, never Indexed 2, and both members stay reachable, the unknown one named Index state unknown with its state; a row relabelled with its resolved file name keeps what its state established (Index failed, Index gave up, Index state unknown, Indexed), where before every resolved row read Indexed.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "Scenario A9 as the verifier applied it: summaries and counts include a record only in the category its known state establishes; unknown states are counted and named as unknown, never folded into success; the members stay reachable. One classifier of index states serves the row label, the resolved-name label, the problem flag and the burst counts."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-activity-feed-repair2.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts#A9 — a burst counts a record only as its state establishes; an unknown state is counted and named, never indexed",
+        "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts#A9 — a resolved file name keeps what the state established: failed, gave up and unknown never read as indexed"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Windowed feed keyboard reach repaired after verification of candidate 1 (fail before at 81b02ecadf): in real Chromium with 1,040 loaded records, at 1280x720 and at 600x400 with 200 percent text, after reading down the feed with the wheel and clicking a record, Ctrl+Home, Ctrl+End, Home and End focus the newest and the oldest loaded record, rendered and on screen; PageUp and PageDown move by a screenful, each step rendered, focused and on screen, until they reach the newest or oldest record. Before, Ctrl+Home stopped partway down with the newest record absent. With focus on the page instead (the wheel, then a click on the scroller beside the records, which takes no focus), the browser's own Ctrl+Home, Ctrl+End, Home and End take the feed's scroller to its start and its end, the newest record's start and the oldest record on screen, and PageUp and PageDown move it a page at a time without passing a row unseen until they reach either end; focus stays on the page. Before, Ctrl+Home with focus on the page stopped partway down. A live arrival keeps the reader in place (preservation, covered by the whole-file check).",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "Scenario A16 as the verifier applied it, against the unwindowed list at 716017c61f that reached both ends: the feed handles Home, End, Ctrl+Home, Ctrl+End, PageUp and PageDown itself and focuses the entry reached (each entry is a list item with its position; one entry is in the Tab order), because the browser's smooth scroll for these keys is cut short when the windowed list corrects for newly measured rows, and the virtualizer's own scroll-to-index renders nothing inside an outer scroller that has moved. When focus is not in the feed's entries, the browser keeps these keys and chooses the scroller; once it has scrolled the feed's scroller and that scroll ends, the feed takes it the rest of the way at once (the start or end, held while rows are measured; a page of seven eighths of the view measured on an entry that was on screen), and leaves alone keys another handler took, text fields, open modals and the reader's own wheel, touch or click."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-activity-feed-repair2.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts#A16 — at 1280×720, Home, End, Ctrl+Home, Ctrl+End, PageUp and PageDown reach the newest and oldest loaded rows, rendered and focused",
+        "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts#A16 — at 600×400 with text at 200 percent, Home, End, Ctrl+Home, Ctrl+End, PageUp and PageDown reach the newest and oldest loaded rows, rendered and focused",
+        "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts#A16 — at 1280×720, with focus on the page, not the feed, the scrolling keys move the feed to its newest and oldest loaded rows",
+        "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts#A16 — at 600×400 with text at 200 percent, with focus on the page, not the feed, the scrolling keys move the feed to its newest and oldest loaded rows"
       ],
       "repaired": true
     }

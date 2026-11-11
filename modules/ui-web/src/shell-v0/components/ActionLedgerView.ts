@@ -26,6 +26,8 @@ import '@lit-labs/virtualizer';
 import { JfElement } from '../primitives/JfElement.js';
 import {
   ActionLedgerClient,
+  indexLabel,
+  indexResultOf,
   openLedgerSource,
   type BackendLedgerEntry,
   type LedgerStreamState,
@@ -64,6 +66,8 @@ import './FilterChip.js';
 // tempdoc 612 §UX/§CI R1 — the ONE shared "seen" authority (577 §2.14), read here and advanced by
 // "mark all read"; a second cursor would re-create the two-authorities bug 577 removed.
 import { getSeenCursor, markSeen, subscribeSeenCursor } from '../substrates/recall/recallCursor.js';
+import { deepActiveElement, isImeComposition, isTypingTarget } from '../utils/keyboardHandler.js';
+import { modalOwnsFocus } from '../primitives/modality.js';
 
 /** A collapsed indexing burst — adjacent same-group index rows summarized, members kept. */
 interface IndexBurstSummary {
@@ -71,7 +75,10 @@ interface IndexBurstSummary {
   readonly key: string;
   readonly collection: string;
   readonly members: readonly FeedRow[];
+  /** Members per what their state establishes (`indexResultOf`); unknown is never counted as indexed. */
+  readonly indexed: number;
   readonly failed: number;
+  readonly unknown: number;
   readonly occurredAt: string;
 }
 
@@ -88,6 +95,12 @@ function scrollerOf(start: Element): Element {
         && node.scrollHeight > node.clientHeight) return node;
   }
   return document.scrollingElement ?? document.documentElement;
+}
+
+/** The part of the window a scroller shows, in viewport coordinates. */
+function viewOf(scroller: Element): { top: number; bottom: number } {
+  return scroller === document.scrollingElement || scroller === document.documentElement
+    ? { top: 0, bottom: window.innerHeight } : scroller.getBoundingClientRect();
 }
 
 /** The Resource whose `privacy.resolver` (core.resolve-path-hash) resolves an index row's hash. */
@@ -183,6 +196,10 @@ export class ActionLedgerView extends JfElement {
   private retryHistory: (() => void) | null = null;
   /** The first record on screen before new records arrive, when the reader has scrolled into the list. */
   private readingAnchor: { key: string; top: number } | null = null;
+  /** The feed entry Tab lands on: the one last focused, else the newest. */
+  private tabStop = 0;
+  /** Bumped by each scrolling key and by the reader's own wheel or pointer: the latest one wins. */
+  private keyScroll = 0;
 
   constructor() {
     super();
@@ -256,6 +273,7 @@ export class ActionLedgerView extends JfElement {
       .quick button:focus-visible,
       .link:focus-visible,
       .expand:focus-visible,
+      .entry:focus-visible,
       summary:focus-visible,
       select:focus-visible {
         outline: 2px solid var(--focus-ring-color);
@@ -268,6 +286,7 @@ export class ActionLedgerView extends JfElement {
         .quick button:focus-visible,
         .link:focus-visible,
         .expand:focus-visible,
+        .entry:focus-visible,
         summary:focus-visible,
         select:focus-visible {
           outline-color: Highlight;
@@ -346,6 +365,11 @@ export class ActionLedgerView extends JfElement {
       lit-virtualizer {
         width: 100%;
       }
+      /* An entry spans the row, so a click anywhere on it focuses it for the feed's keys. */
+      .entry {
+        box-sizing: border-box;
+        width: 100%;
+      }
     `,
   ];
 
@@ -370,6 +394,8 @@ export class ActionLedgerView extends JfElement {
     this.seenCursor = getSeenCursor();
     this.stops.push(subscribeSeenCursor(() => { this.seenCursor = getSeenCursor(); }));
     this.armMidnight();
+    window.addEventListener('keydown', this.onPageKey);
+    this.stops.push(() => window.removeEventListener('keydown', this.onPageKey));
   }
 
   override disconnectedCallback(): void {
@@ -582,7 +608,7 @@ export class ActionLedgerView extends JfElement {
     this.ensureResolvedName(row.pathHash);
     const name = this.resolvedNames[row.pathHash];
     if (!name) return row;
-    return { ...row, label: `${row.outcome === 'FAILED' ? 'Index failed' : 'Indexed'} · ${name}` };
+    return { ...row, label: indexLabel(row.indexState, name) };
   }
 
   private toggleExpanded(key: string): void {
@@ -736,13 +762,13 @@ export class ActionLedgerView extends JfElement {
     const key = `burst:${burst.key}`;
     const expanded = this.expanded.includes(key);
     const isNew = this.isNew(burst.occurredAt);
-    const ok = burst.members.length - burst.failed;
+    const label = [`Indexed ${burst.indexed}`, burst.failed ? `${burst.failed} failed` : '',
+      burst.unknown ? `${burst.unknown} with unknown state` : '', burst.collection].filter(Boolean).join(' · ');
     return html`<div class="row" data-testid="ledger-burst" data-kind="index" ?data-new=${isNew} ?data-problem=${burst.failed > 0}>
         ${this.newDot(isNew)}
         <span class="who" data-originator="system">system</span>
         <button type="button" class="expand" data-testid="ledger-burst-expand" aria-expanded=${expanded ? 'true' : 'false'}
-          @click=${() => this.toggleExpanded(key)}>${expanded ? '▾' : '▸'} <span class="label">${burst.failed
-            ? `Indexed ${ok} · ${burst.failed} failed · ${burst.collection}` : `Indexed ${burst.members.length} · ${burst.collection}`}</span></button>
+          @click=${() => this.toggleExpanded(key)}>${expanded ? '▾' : '▸'} <span class="label">${label}</span></button>
         <span class="src">backend</span>
         ${renderEventWhen(burst.occurredAt)}
       </div>
@@ -758,6 +784,184 @@ export class ActionLedgerView extends JfElement {
       .filter(Boolean).join(' ');
     return html`<div class="item" data-key=${item.key} data-sources=${sources} ?data-problem=${item.problem}>${renderEventRow(this.withResolvedLabel(item.entry),
       { isNew: this.isNew(item.entry.occurredAt, item.entry.isRoutine), apiBase: this.apiBase })}${this.renderNotes(item)}</div>`;
+  }
+
+  /**
+   * The feed's own keys: Home and End (with or without Ctrl) go to the newest and oldest loaded
+   * entry, PageUp and PageDown by a screenful, and the entry reached is focused. The browser's own
+   * scrolling for these keys cannot be relied on over the windowed list: its smooth scroll is cut
+   * short whenever newly measured rows correct the position.
+   */
+  private onListKey(e: KeyboardEvent, count: number): void {
+    if (e.altKey || e.shiftKey || e.metaKey) return;
+    const target = e.target as Element;
+    if (target.closest('input, select, textarea, [contenteditable]')) return;
+    const current = Number(target.closest<HTMLElement>('.entry')?.dataset.index ?? this.tabStop);
+    let next: number;
+    switch (e.key) {
+      case 'Home': next = 0; break;
+      case 'End': next = count - 1; break;
+      case 'PageUp': next = current - this.pageSize(); break;
+      case 'PageDown': next = current + this.pageSize(); break;
+      default: return;
+    }
+    e.preventDefault();
+    void this.focusEntry(Math.max(0, Math.min(count - 1, next)), count, next <= current ? 'start' : 'end');
+  }
+
+  /**
+   * The browser's own Home, End (with or without Ctrl), PageUp and PageDown when focus is not in the
+   * feed's entries: on the page, or on a control beside the feed. Which scroller they move is the
+   * browser's choice, so nothing is done unless it starts moving the feed's scroller. Over the
+   * windowed list the browser's smooth scroll stops short: the list's correction for the rows it has
+   * just measured is a scroll of its own, which ends the smooth one partway. So once that scroll has
+   * ended, the feed's scroller is taken the rest of the way to the key's destination, instantly. Keys
+   * already handled (the feed's entries, other areas' own keys), a text field or an open modal are
+   * left alone, and the reader's own wheel, touch or click cancels the rest.
+   */
+  private readonly onPageKey = (e: KeyboardEvent): void => {
+    if (e.defaultPrevented || e.altKey || e.shiftKey || e.metaKey || isImeComposition(e) || modalOwnsFocus()) return;
+    if (!['Home', 'End', 'PageUp', 'PageDown'].includes(e.key) || (e.ctrlKey && e.key.startsWith('Page'))) return;
+    if (isTypingTarget(deepActiveElement()) || !this.renderRoot.querySelector('lit-virtualizer')) return;
+    const scroller = scrollerOf(this);
+    const events: EventTarget = scroller === document.scrollingElement || scroller === document.documentElement
+      ? document : scroller;
+    const from = { top: scroller.scrollTop, entry: this.rowOnScreen(scroller, e.key === 'PageDown' ? 'last' : 'first') };
+    const token = ++this.keyScroll;
+    const cancel = (): void => { this.keyScroll += 1; };
+    const reader = ['wheel', 'pointerdown', 'touchstart'] as const;
+    for (const type of reader) window.addEventListener(type, cancel, { capture: true, passive: true });
+    const stop = (): void => {
+      events.removeEventListener('scroll', started);
+      events.removeEventListener('scrollend', ended);
+      for (const type of reader) window.removeEventListener(type, cancel, { capture: true });
+      clearTimeout(timer);
+    };
+    // No scroll on the feed's scroller soon after the key: the browser moved something else, or nothing.
+    let timer = setTimeout(stop, 500);
+    const started = (): void => {
+      events.removeEventListener('scroll', started);
+      clearTimeout(timer);
+      timer = setTimeout(ended, 2_000);
+    };
+    const ended = (): void => {
+      stop();
+      if (token === this.keyScroll && this.isConnected) void this.finishKeyScroll(scroller, e.key, from, token);
+    };
+    events.addEventListener('scroll', started);
+    events.addEventListener('scrollend', ended);
+  };
+
+  /** The first or last entry at least partly on screen, and where its top is within the view. */
+  private rowOnScreen(scroller: Element, which: 'first' | 'last'): { index: string; top: number } | null {
+    const view = viewOf(scroller);
+    let found: { index: string; top: number } | null = null;
+    for (const entry of this.renderRoot.querySelectorAll<HTMLElement>('.entry')) {
+      const box = entry.getBoundingClientRect();
+      if (box.bottom <= view.top || box.top >= view.bottom) continue;
+      if (!found || (which === 'first' ? box.top < found.top : box.top > found.top)) {
+        found = { index: entry.dataset.index ?? '', top: box.top - view.top };
+      }
+    }
+    return found;
+  }
+
+  /**
+   * Take the scroller to where `key` goes, instantly, and hold it there while the windowed list
+   * measures the rows it brings in and corrects for them, until the reader scrolls themselves. Home
+   * and End go to the start and the end. PageUp and PageDown move what was on screen by the browser's
+   * own page, seven eighths of the view, measured on an entry that was on screen (`from.entry`), so a
+   * correction cannot carry the scroll past a row the reader has not seen; with no entry on screen,
+   * from where the scroller was (`from.top`).
+   */
+  private async finishKeyScroll(scroller: Element, key: string,
+    from: { top: number; entry: { index: string; top: number } | null }, token: number): Promise<void> {
+    const max = (): number => scroller.scrollHeight - scroller.clientHeight;
+    const step = Math.max(1, scroller.clientHeight * 0.875) * (key === 'PageUp' ? -1 : 1);
+    const page = key === 'PageUp' || key === 'PageDown';
+    /** How far the scroller still has to move: by the reference entry for a page, else to the end. */
+    const remaining = (): number => {
+      const top = scroller.scrollTop;
+      if (!page) return (key === 'Home' ? 0 : max()) - top;
+      const entry = from.entry && this.renderRoot.querySelector<HTMLElement>(`.entry[data-index="${from.entry.index}"]`);
+      const by = from.entry && entry
+        ? entry.getBoundingClientRect().top - viewOf(scroller).top - (from.entry.top - step)
+        : from.top + step - top;
+      return Math.max(-top, Math.min(max() - top, by));
+    };
+    const cancel = (): void => { this.keyScroll += 1; };
+    const reader = ['wheel', 'pointerdown', 'touchstart', 'keydown'] as const;
+    for (const type of reader) window.addEventListener(type, cancel, { capture: true, passive: true });
+    try {
+      await this.listSettled();
+      for (let round = 0, still = 0; round < 60 && still < 2 && token === this.keyScroll && this.isConnected; round += 1) {
+        const by = remaining();
+        if (Math.abs(by) < 1) still += 1;
+        else {
+          still = 0;
+          scroller.scrollTo({ top: scroller.scrollTop + by, behavior: 'instant' });
+        }
+        await this.listSettled();
+      }
+    } finally {
+      for (const type of reader) window.removeEventListener(type, cancel, { capture: true });
+    }
+  }
+
+  /** The windowed list has measured the rows it shows (or a moment has passed). */
+  private listSettled(): Promise<unknown> {
+    const list = this.renderRoot.querySelector('lit-virtualizer') as { layoutComplete?: Promise<void> } | null;
+    return Promise.race([list?.layoutComplete?.catch(() => undefined),
+      new Promise((resolve) => setTimeout(resolve, 250))]);
+  }
+
+  /** How many entries fit on screen, less one kept for context; at least one. */
+  private pageSize(): number {
+    const view = viewOf(scrollerOf(this));
+    let shown = 0;
+    for (const entry of this.renderRoot.querySelectorAll<HTMLElement>('.entry')) {
+      const box = entry.getBoundingClientRect();
+      if (box.top >= view.top && box.bottom <= view.bottom) shown += 1;
+    }
+    return Math.max(1, shown - 1);
+  }
+
+  /**
+   * Focus entry `index`. The windowed list renders only entries near the screen, so until it is
+   * rendered the scroller is moved to where the entry is estimated to be, and again once the rows
+   * there are measured. (The virtualizer's own scroll-to-index is not used: inside an outer
+   * scroller that has moved it counts the list's offset twice and renders nothing.)
+   */
+  private async focusEntry(index: number, count: number, block: ScrollLogicalPosition): Promise<void> {
+    this.tabStop = index;
+    const find = (): HTMLElement | null => this.renderRoot.querySelector<HTMLElement>(`.entry[data-index="${index}"]`);
+    for (let attempt = 0; attempt < 10 && !find(); attempt += 1) {
+      const list = this.renderRoot.querySelector('lit-virtualizer');
+      if (!list || !this.isConnected || this.tabStop !== index) return;
+      const scroller = scrollerOf(this);
+      const view = viewOf(scroller);
+      const box = list.getBoundingClientRect();
+      const estimate = box.top + (box.height * (index + 0.5)) / count;
+      scroller.scrollTo({ top: scroller.scrollTop + estimate - (view.top + view.bottom) / 2, behavior: 'instant' });
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    }
+    const entry = find();
+    if (!entry || this.tabStop !== index) return;
+    this.moveTabStop(entry);
+    entry.focus({ preventScroll: true });
+    entry.scrollIntoView({ block, behavior: 'instant' });
+  }
+
+  /** One entry is in the Tab order; it follows focus without a re-render. */
+  private moveTabStop(entry: HTMLElement): void {
+    this.tabStop = Number(entry.dataset.index);
+    for (const other of this.renderRoot.querySelectorAll<HTMLElement>('.entry[tabindex="0"]')) other.tabIndex = -1;
+    entry.tabIndex = 0;
+  }
+
+  private renderEntry(item: FeedRow | IndexBurstSummary, index: number, count: number, feed: readonly FeedRow[]): TemplateResult {
+    return html`<div class="entry" role="listitem" data-index=${index} aria-posinset=${index + 1} aria-setsize=${count}
+      tabindex=${index === Math.min(this.tabStop, count - 1) ? '0' : '-1'}>${this.renderItem(item, feed)}</div>`;
   }
 
   override render(): TemplateResult {
@@ -814,14 +1018,23 @@ export class ActionLedgerView extends JfElement {
         key: `${groupKey}:${items[0]?.key ?? ''}`,
         collection: items[0]?.entry.collection ?? groupKey,
         members: items,
-        failed: items.filter((item) => item.problem).length,
+        indexed: items.filter((item) => indexResultOf(item.entry.indexState) === 'indexed').length,
+        failed: items.filter((item) => indexResultOf(item.entry.indexState) === 'failed').length,
+        unknown: items.filter((item) => indexResultOf(item.entry.indexState) === 'unknown').length,
         occurredAt: items[0]?.entry.occurredAt ?? '',
       }),
     });
-    return html`${header}<div class="list" data-testid="feed-list">${projected.length <= VIRTUALIZE_ABOVE
-      ? projected.map((item) => this.renderItem(item, feed))
+    const count = projected.length;
+    return html`${header}<div class="list" data-testid="feed-list" role="list" aria-label="Activity"
+      @keydown=${(e: KeyboardEvent) => this.onListKey(e, count)}
+      @focusin=${(e: FocusEvent) => {
+        const entry = (e.target as Element).closest<HTMLElement>('.entry');
+        if (entry) this.moveTabStop(entry);
+      }}>${count <= VIRTUALIZE_ABOVE
+      ? projected.map((item, index) => this.renderEntry(item, index, count, feed))
       : html`<lit-virtualizer .items=${projected}
-          .renderItem=${(item: FeedRow | IndexBurstSummary) => this.renderItem(item, feed)}></lit-virtualizer>`}</div>`;
+          .keyFunction=${(item: FeedRow | IndexBurstSummary) => (isBurst(item) ? `burst:${item.key}` : item.key)}
+          .renderItem=${(item: FeedRow | IndexBurstSummary, index: number) => this.renderEntry(item, index, count, feed)}></lit-virtualizer>`}</div>`;
   }
 }
 

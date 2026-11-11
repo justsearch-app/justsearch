@@ -435,6 +435,37 @@ describe('classification and quick filters (A9, A10)', () => {
     expect(q('[data-testid="ledger-burst-member"]')).toHaveLength(3);
   });
 
+  it('A9 — a burst counts a record only as its state establishes; an unknown state is counted and named, never indexed', async () => {
+    mount();
+    ledger.snapshot([index(1, 'DONE', 'docs'), index(2, 'PAUSED', 'docs')]);
+    host.filter = { ...host.filter, quick: 'indexing' };
+    await settle();
+    const burst = q('[data-testid="ledger-burst"]');
+    expect(burst).toHaveLength(1);
+    expect(burst[0]!.textContent).not.toContain('Indexed 2');
+    expect(burst[0]!.textContent).toContain('Indexed 1 · 1 with unknown state · docs');
+    (burst[0]!.querySelector('[data-testid="ledger-burst-expand"]') as HTMLButtonElement).click();
+    await settle();
+    const members = q('[data-testid="ledger-burst-member"]').map((m) => m.textContent ?? '');
+    expect(members).toHaveLength(2);
+    expect(members.some((m) => m.includes('Index state unknown (PAUSED) · docs'))).toBe(true);
+    expect(members.some((m) => m.includes('Indexed · docs'))).toBe(true);
+  });
+
+  it('A9 — a resolved file name keeps what the state established: failed, gave up and unknown never read as indexed', async () => {
+    mount();
+    host.resolveHash = async (_resource, hash) => `C:/corpus/${hash}.pdf`;
+    ledger.snapshot([index(1, 'FAILED', 'a'), index(2, 'RETRY_EXHAUSTED', 'b'), index(3, 'PAUSED', 'c'), index(4, 'DONE', 'd')]);
+    host.filter = { ...host.filter, quick: 'indexing' };
+    await settle();
+    await settle();
+    const label = (key: string): string => (q(`.item[data-key="${key}"]`)[0]?.textContent ?? '').replace(/\s+/g, ' ');
+    expect(label('index:1')).toContain('Index failed · corpus/h1.pdf');
+    expect(label('index:2')).toContain('Index gave up · corpus/h2.pdf');
+    expect(label('index:3')).toContain('Index state unknown (PAUSED) · corpus/h3.pdf');
+    expect(label('index:4')).toContain('Indexed · corpus/h4.pdf');
+  });
+
   it('an explicit advanced routine choice overrides every quick filter, as its label states', async () => {
     mount();
     ledger.snapshot([index(1, 'FAILED', 'a')]);

@@ -1,0 +1,180 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
+  },
+  "createdAt": "2026-11-11T14:52:58.433Z",
+  "revision": "81b02ecadfa9c5a3e4fd72f90a989cb6ac095884",
+  "tree": "a727dd39301f2df9a5ea4a976bc6a118cc3b2927",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/ActionLedgerView.feed.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/flvc_k1t/tmp/test-intent-vitest-5761-1794408699453.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1304
+    },
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/flvc_k1t/tmp/test-intent-vitest-5761-1794408700758.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 51458
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts#A9 — a burst counts a record only as its state establishes; an unknown state is counted and named, never indexed",
+      "file": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:68132629bf069176ce3ebe7c0bd613d36b8df2274cc36d23641d19547a704b94",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "classification and quick filters (A9, A10) A9 — a burst counts a record only as its state establishes; an unknown state is counted and named, never indexed",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts#A9 — a resolved file name keeps what the state established: failed, gave up and unknown never read as indexed",
+      "file": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:68132629bf069176ce3ebe7c0bd613d36b8df2274cc36d23641d19547a704b94",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "classification and quick filters (A9, A10) A9 — a resolved file name keeps what the state established: failed, gave up and unknown never read as indexed",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts#A16 — at 1280×720, Home, End, Ctrl+Home, Ctrl+End, PageUp and PageDown reach the newest and oldest loaded rows, rendered and focused",
+      "file": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9c7193cac524656ce9234876408eeb31e57951148f14e398cc005f7db18ad778",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "A16 — at 1280×720, Home, End, Ctrl+Home, Ctrl+End, PageUp and PageDown reach the newest and oldest loaded rows, rendered and focused",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts#A16 — at 600×400 with text at 200 percent, Home, End, Ctrl+Home, Ctrl+End, PageUp and PageDown reach the newest and oldest loaded rows, rendered and focused",
+      "file": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9c7193cac524656ce9234876408eeb31e57951148f14e398cc005f7db18ad778",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "A16 — at 600×400 with text at 200 percent, Home, End, Ctrl+Home, Ctrl+End, PageUp and PageDown reach the newest and oldest loaded rows, rendered and focused",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts#A16 — at 1280×720, with focus on the page, not the feed, the scrolling keys move the feed to its newest and oldest loaded rows",
+      "file": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9c7193cac524656ce9234876408eeb31e57951148f14e398cc005f7db18ad778",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "A16 — at 1280×720, with focus on the page, not the feed, the scrolling keys move the feed to its newest and oldest loaded rows",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts#A16 — at 600×400 with text at 200 percent, with focus on the page, not the feed, the scrolling keys move the feed to its newest and oldest loaded rows",
+      "file": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9c7193cac524656ce9234876408eeb31e57951148f14e398cc005f7db18ad778",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "A16 — at 600×400 with text at 200 percent, with focus on the page, not the feed, the scrolling keys move the feed to its newest and oldest loaded rows",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "81b02ecadf",
+    "revision": "81b02ecadfa9c5a3e4fd72f90a989cb6ac095884",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/ActionLedgerView.feed.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/flvc_k1t/tmp/test-intent-vitest-5761-1794408754000.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 2109,
+        "output": "JSON report written to /home/elias/.cache/am/flvc_k1t/tmp/test-intent-vitest-5761-1794408754000.json\n\n"
+      },
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/flvc_k1t/tmp/test-intent-vitest-5761-1794408756109.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 21972,
+        "output": "JSON report written to /home/elias/.cache/am/flvc_k1t/tmp/test-intent-vitest-5761-1794408756109.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts#A9 — a burst counts a record only as its state establishes; an unknown state is counted and named, never indexed",
+        "classification": "assertion",
+        "detail": "classification and quick filters (A9, A10) A9 — a burst counts a record only as its state establishes; an unknown state is counted and named, never indexed:  AssertionError: expected '\\n        \\n        system\\n        ▸…' not to contain 'Indexed 2'\n    at /home/elias/.cache/am/flvc_k1t/tmp/test-intent-before-XgC14v/modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts:445:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-a"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts#A9 — a resolved file name keeps what the state established: failed, gave up and unknown never read as indexed",
+        "classification": "assertion",
+        "detail": "classification and quick filters (A9, A10) A9 — a resolved file name keeps what the state established: failed, gave up and unknown never read as indexed:  AssertionError: expected ' system Indexed · corpus/h1.pdf backe…' to contain 'Index failed · corpus/h1.pdf'\n    at /home/elias/.cache/am/flvc_k1t/tmp/test-intent-before-XgC14v/modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts:463:30\n    at file:///home/elias/dev/justsearch/.claude"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts#A16 — at 1280×720, Home, End, Ctrl+Home, Ctrl+End, PageUp and PageDown reach the newest and oldest loaded rows, rendered and focused",
+        "classification": "assertion",
+        "detail": "A16 — at 1280×720, Home, End, Ctrl+Home, Ctrl+End, PageUp and PageDown reach the newest and oldest loaded rows, rendered and focused:  Error: Control+Home brings operation:k519 on screen: expected false to be true // Object.is equality\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/dev/justsearch/.claude/worktrees/s6-activity/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3748:47)\n    at press (/home/elias/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts#A16 — at 600×400 with text at 200 percent, Home, End, Ctrl+Home, Ctrl+End, PageUp and PageDown reach the newest and oldest loaded rows, rendered and focused",
+        "classification": "assertion",
+        "detail": "A16 — at 600×400 with text at 200 percent, Home, End, Ctrl+Home, Ctrl+End, PageUp and PageDown reach the newest and oldest loaded rows, rendered and focused:  Error: Control+Home brings operation:k519 on screen: expected false to be true // Object.is equality\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/dev/justsearch/.claude/worktrees/s6-activity/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3748:47)\n    at press (/home/elias/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts#A16 — at 1280×720, with focus on the page, not the feed, the scrolling keys move the feed to its newest and oldest loaded rows",
+        "classification": "assertion",
+        "detail": "A16 — at 1280×720, with focus on the page, not the feed, the scrolling keys move the feed to its newest and oldest loaded rows:  AssertionError: Control+Home reaches the start of the scroller: expected 8669 to be close to +0, received difference is 8669, but expected 0.5\n    at atStart (/home/elias/.cache/am/flvc_k1t/tmp/test-intent-before-XgC14v/modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts:29"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts#A16 — at 600×400 with text at 200 percent, with focus on the page, not the feed, the scrolling keys move the feed to its newest and oldest loaded rows",
+        "classification": "assertion",
+        "detail": "A16 — at 600×400 with text at 200 percent, with focus on the page, not the feed, the scrolling keys move the feed to its newest and oldest loaded rows:  AssertionError: Control+Home reaches the start of the scroller: expected 902 to be close to +0, received difference is 902, but expected 0.5\n    at atStart (/home/elias/.cache/am/flvc_k1t/tmp/test-intent-before-XgC14v/modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts:292:"
+      }
+    ]
+  },
+  "digest": "sha256:60fb2c37561dc9687d47e5b334628504aa501e29a30a86aed41e0a48948ad6c1"
+}

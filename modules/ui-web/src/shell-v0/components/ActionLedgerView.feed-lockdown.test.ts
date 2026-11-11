@@ -149,6 +149,189 @@ it('A16 — more than 500 ledger and 500 local records are all reachable, newest
   }
 }, 60_000);
 
+/** Where the feed's focus is, and whether that record is rendered and on screen. */
+function focusedRecord(page: Page): Promise<{ key: string | null; onScreen: boolean; rendered: boolean }> {
+  return page.evaluate(() => {
+    const root = document.querySelector('jf-action-ledger')!.shadowRoot!;
+    const view = document.getElementById('scroller')!.getBoundingClientRect();
+    const active = root.activeElement;
+    const row = active?.querySelector('[data-key]') ?? active?.closest('[data-key]') ?? null;
+    const box = row?.getBoundingClientRect();
+    return { key: row?.getAttribute('data-key') ?? null, rendered: !!row?.isConnected,
+      onScreen: !!box && box.top >= view.top - 1 && box.bottom <= view.bottom + 1 };
+  });
+}
+
+it.each([
+  [1280, 720, '', ''], [600, 400, ' with text at 200 percent', '?text=200%25'],
+] as const)('A16 — at %i×%i%s, Home, End, Ctrl+Home, Ctrl+End, PageUp and PageDown reach the newest and oldest loaded rows, rendered and focused', async (width, height, _text, query) => {
+  const context = await browser.newContext({ viewport: { width, height } });
+  try {
+    const page = await open(context, query);
+    await page.evaluate(() => (window as unknown as { __seed(a: number, b: number): void }).__seed(520, 520));
+    await expect.poll(() => renderedKeys(page)).toContain('operation:k519');
+    // The ends of the loaded feed, newest first; this run's local records share instants, so the
+    // oldest is whichever of them the feed orders last.
+    const [newest, oldest] = await page.evaluate(() => {
+      const items = (document.querySelector('jf-action-ledger')!.shadowRoot!
+        .querySelector('lit-virtualizer') as unknown as { items: Array<{ key: string }> }).items;
+      return [items[0]!.key, items[items.length - 1]!.key];
+    });
+    expect(newest).toBe('operation:k519');
+    expect(oldest).toMatch(/^fe-effect:/);
+    // Read down the feed with the wheel, then click a record there, as a reader would.
+    await page.mouse.move(width / 2, height / 2);
+    for (let i = 0; i < 30; i++) {
+      await page.mouse.wheel(0, 600);
+      await frames(page, 1);
+    }
+    await frames(page);
+    expect(await renderedKeys(page), 'scrolled away from the newest record').not.toContain(newest);
+    await page.locator('jf-action-ledger .item[data-key]').nth(2).click({ position: { x: 2, y: 2 } });
+    const onScreen = (key: string): Promise<boolean> => page.evaluate((k) => {
+      const view = document.getElementById('scroller')!.getBoundingClientRect();
+      const box = document.querySelector('jf-action-ledger')!.shadowRoot!
+        .querySelector(`.item[data-key="${k}"]`)?.getBoundingClientRect();
+      return !!box && box.top >= view.top - 1 && box.bottom <= view.bottom + 1;
+    }, key);
+    const press = async (key: string, expected: string): Promise<void> => {
+      await page.keyboard.press(key);
+      await expect.poll(() => onScreen(expected), { timeout: 5_000, message: `${key} brings ${expected} on screen` }).toBe(true);
+      await expect.poll(() => focusedRecord(page), { timeout: 5_000, message: `${key} focuses ${expected}` })
+        .toEqual({ key: expected, rendered: true, onScreen: true });
+    };
+    await press('Control+Home', newest);
+    await press('Control+End', oldest);
+    await press('Home', newest);
+    await press('End', oldest);
+    // PageUp and PageDown move a screenful, every step rendered and on screen, and reach the ends.
+    const indexOf = (key: string | null): Promise<number> => page.evaluate((k) => (document.querySelector('jf-action-ledger')!
+      .shadowRoot!.querySelector('lit-virtualizer') as unknown as { items: Array<{ key: string }> }).items
+      .findIndex((item) => item.key === k), key);
+    const pageTo = async (key: 'PageUp' | 'PageDown', expected: string): Promise<void> => {
+      let last = await indexOf((await focusedRecord(page)).key);
+      for (let step = 0; step < 5; step++) {
+        await page.keyboard.press(key);
+        await expect.poll(async () => indexOf((await focusedRecord(page)).key), { message: `${key} moves` })
+          .not.toBe(last);
+        const now = await focusedRecord(page);
+        expect(now).toMatchObject({ rendered: true, onScreen: true });
+        const index = await indexOf(now.key);
+        expect(key === 'PageUp' ? index < last : index > last, `${key} moves ${key === 'PageUp' ? 'up' : 'down'}`).toBe(true);
+        if (now.key === expected) return;
+        last = index;
+      }
+      throw new Error(`${key} did not reach ${expected}`);
+    };
+    await page.keyboard.press('PageUp');
+    await expect.poll(async () => (await focusedRecord(page)).key).not.toBe(oldest);
+    await pageTo('PageDown', oldest);
+    await press('Home', newest);
+    await page.keyboard.press('PageDown');
+    await expect.poll(async () => (await focusedRecord(page)).key).not.toBe(newest);
+    await pageTo('PageUp', newest);
+  } finally {
+    await context.close();
+  }
+}, 60_000);
+
+it.each([
+  [1280, 720, '', ''], [600, 400, ' with text at 200 percent', '?text=200%25'],
+] as const)('A16 — at %i×%i%s, with focus on the page, not the feed, the scrolling keys move the feed to its newest and oldest loaded rows', async (width, height, _text, query) => {
+  const context = await browser.newContext({ viewport: { width, height } });
+  try {
+    const page = await open(context, query);
+    await page.evaluate(() => (window as unknown as { __seed(a: number, b: number): void }).__seed(520, 520));
+    await expect.poll(() => renderedKeys(page)).toContain('operation:k519');
+    const [newest, oldest] = await page.evaluate(() => {
+      const items = (document.querySelector('jf-action-ledger')!.shadowRoot!
+        .querySelector('lit-virtualizer') as unknown as { items: Array<{ key: string }> }).items;
+      return [items[0]!.key, items[items.length - 1]!.key];
+    });
+    // Read down the feed with the wheel, then click the scroller beside the records (its padding, which
+    // takes no focus): the page keeps focus, and the browser's keys now scroll the feed's scroller.
+    await page.mouse.move(width / 2, height / 2);
+    for (let i = 0; i < 30; i++) {
+      await page.mouse.wheel(0, 600);
+      await frames(page, 1);
+    }
+    await frames(page);
+    expect(await renderedKeys(page), 'scrolled away from the newest record').not.toContain(newest);
+    await page.mouse.click(3, height / 2);
+    /** Where the scroller rests, and the feed's rows on screen: fully, and in part (by position in the feed). */
+    type Rest = { top: number; max: number; focus: string; shown: string[]; first: number; last: number; newestTop: number | null };
+    const state = (): Promise<Rest> => page.evaluate(() => {
+      const scroller = document.getElementById('scroller')!;
+      const view = scroller.getBoundingClientRect();
+      const root = document.querySelector('jf-action-ledger')!.shadowRoot!;
+      const items = (root.querySelector('lit-virtualizer') as unknown as { items: Array<{ key: string }> }).items;
+      const rows = Array.from(root.querySelectorAll('.item[data-key]')).map((row) => ({ key: row.getAttribute('data-key')!,
+        box: row.getBoundingClientRect() }));
+      const visible = rows.filter(({ box }) => box.bottom > view.top && box.top < view.bottom)
+        .map(({ key }) => items.findIndex((item) => item.key === key));
+      const newest = rows.find(({ key }) => key === items[0]!.key);
+      return { top: scroller.scrollTop, max: scroller.scrollHeight - scroller.clientHeight,
+        focus: document.activeElement?.localName ?? '',
+        shown: rows.filter(({ box }) => box.top >= view.top - 1 && box.bottom <= view.bottom + 1).map(({ key }) => key),
+        first: Math.min(...visible), last: Math.max(...visible), newestTop: newest ? newest.box.top - view.top : null };
+    });
+    expect((await state()).focus).toBe('body');
+    /** Press `key` and return where the feed comes to rest once it has been still for half a second. */
+    const settle = async (key: string): Promise<Rest> => {
+      await page.keyboard.press(key);
+      let last = await state();
+      for (let still = 0; still < 15;) {
+        await frames(page, 2);
+        const now = await state();
+        still = now.top === last.top && now.max === last.max ? still + 1 : 0;
+        last = now;
+      }
+      return last;
+    };
+    const atStart = (rest: Rest, key: string): void => {
+      expect(rest.top, `${key} reaches the start of the scroller`).toBeCloseTo(0, 0);
+      expect(rest.newestTop, `${key} shows the start of the newest record`).not.toBeNull();
+      expect(rest.newestTop!).toBeGreaterThanOrEqual(-1);
+    };
+    const atEnd = (rest: Rest, key: string): void => {
+      expect(rest.top, `${key} reaches the end of the scroller`).toBeCloseTo(rest.max, 0);
+      expect(rest.shown, `${key} brings ${oldest} on screen`).toContain(oldest);
+    };
+    for (const key of ['Control+Home', 'Control+End', 'Home', 'End'] as const) {
+      const rest = await settle(key);
+      if (key.endsWith('Home')) atStart(rest, key);
+      else atEnd(rest, key);
+      expect(rest.focus, `${key} leaves focus where it was`).toBe('body');
+    }
+    // PageUp and PageDown move a screenful at a time, never past a row unseen, and reach the ends.
+    const pageTo = async (key: 'PageUp' | 'PageDown'): Promise<void> => {
+      let before = await state();
+      for (let step = 0; step < 200; step++) {
+        const now = await settle(key);
+        expect(key === 'PageUp' ? now.top < before.top : now.top > before.top, `${key} moves`).toBe(true);
+        if (key === 'PageDown') expect(now.first, 'PageDown skips no row').toBeLessThanOrEqual(before.last + 1);
+        else expect(now.last, 'PageUp skips no row').toBeGreaterThanOrEqual(before.first - 1);
+        expect(now.focus).toBe('body');
+        if (key === 'PageUp' ? now.top < 1 : now.top > now.max - 1) {
+          if (key === 'PageUp') atStart(now, key);
+          else atEnd(now, key);
+          return;
+        }
+        before = now;
+      }
+      throw new Error(`${key} did not reach the end`);
+    };
+    await settle('Home');
+    for (let i = 0; i < 6; i++) await settle('PageDown');
+    await pageTo('PageUp');
+    await settle('End');
+    for (let i = 0; i < 6; i++) await settle('PageUp');
+    await pageTo('PageDown');
+  } finally {
+    await context.close();
+  }
+}, 120_000);
+
 it('A16 — a live arrival keeps the reader where they were', async () => {
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   try {

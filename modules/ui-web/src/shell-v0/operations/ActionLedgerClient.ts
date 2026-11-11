@@ -48,6 +48,28 @@ function removedFolderOf(e: BackendLedgerEntry): { removedFolder?: { path: strin
     ...(typeof folder.collection === 'string' && folder.collection ? { collection: folder.collection } : {}) } };
 }
 
+/**
+ * What an index row's state establishes, and nothing more: DONE is indexed, FAILED and
+ * RETRY_EXHAUSTED are failures, and any other or missing state is unknown — never a success.
+ */
+export type IndexResult = 'indexed' | 'failed' | 'unknown';
+
+export function indexResultOf(state: string | undefined): IndexResult {
+  if (state === 'DONE') return 'indexed';
+  if (state === 'FAILED' || state === JOB_STATE_RETRY_EXHAUSTED) return 'failed';
+  return 'unknown';
+}
+
+/** An index row's label for its state at `where` (a collection, or a resolved file name). */
+export function indexLabel(state: string | undefined, where: string): string {
+  // Tempdoc 885 item 21b: RETRY_EXHAUSTED is the other terminal failure — retried for a week
+  // and never readable. Named distinctly because "Index failed" would suggest a bad file.
+  if (state === 'FAILED') return `Index failed · ${where}`;
+  if (state === JOB_STATE_RETRY_EXHAUSTED) return `Index gave up · ${where}`;
+  if (state === 'DONE') return `Indexed · ${where}`;
+  return `Index state unknown${state ? ` (${state})` : ''} · ${where}`;
+}
+
 /** A backend action-ledger entry (operation or navigation). Mirrors ActionLedgerController. */
 export interface BackendLedgerEntry {
   // Tempdoc 550 thesis I: explicit, deterministic event id (kind:occurredAt:subject) — stable
@@ -169,6 +191,8 @@ export interface UnifiedActionEntry {
   readonly pathHash?: string;
   /** Present on `index` rows — the job's collection, so a collapsed burst can name it. */
   readonly collection?: string;
+  /** Present on `index` rows that carry one — the backend's job state, read via `indexResultOf`. */
+  readonly indexState?: string;
   /** Tempdoc 812 D4 — true on a scan-rollup row (an `operation` row summarizing a whole scan). */
   readonly isScanRollup?: boolean;
 }
@@ -297,15 +321,7 @@ export function projectBackend(e: BackendLedgerEntry): UnifiedActionEntry {
     // System/indexing terminal outcome: "Indexed · <collection>" / "Index failed · <collection>".
     // pathHash is a SHA-256 hex (not a raw path); a short prefix disambiguates without leaking.
     const where = `${e.collection ?? 'default'}${e.pathHash ? ' (' + e.pathHash.slice(0, 6) + ')' : ''}`;
-    // Tempdoc 885 item 21b: RETRY_EXHAUSTED is the other terminal failure — retried for a week
-    // and never readable. Named distinctly because "Index failed" would suggest a bad file.
-    if (e.state === 'FAILED') {
-      label = `Index failed · ${where}`;
-    } else if (e.state === JOB_STATE_RETRY_EXHAUSTED) {
-      label = `Index gave up · ${where}`;
-    } else {
-      label = `Indexed · ${where}`;
-    }
+    label = indexLabel(e.state, where);
   } else if (isScanRollupRow(e)) {
     // tempdoc 812 D2 — the scan rollup: ONE row for a whole directory scan, stating what it DID
     // (counts are the backend's observed terminal job states). This is the audit record the
@@ -371,6 +387,7 @@ export function projectBackend(e: BackendLedgerEntry): UnifiedActionEntry {
         collection: e.collection ?? 'default',
         ...(e.scanId ? { scanId: e.scanId } : {}),
         ...(e.pathHash ? { pathHash: e.pathHash } : {}),
+        ...(e.state ? { indexState: e.state } : {}),
       }
     : base;
 }
