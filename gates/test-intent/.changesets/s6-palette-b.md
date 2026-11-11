@@ -187,7 +187,9 @@ No acceptance is claimed; independent verification is pending. Fail-before evide
       ],
       "evidence": "gates/test-intent/evidence/s6-palette-b-repair2.json",
       "newChecks": [
-        "modules/ui-web/src/shell-v0/commands/CommandPalette.layout-lockdown.test.ts#SP8 the palette is horizontally centred inside the viewport at every size, text size and theme, its width and top unchanged"
+        "modules/ui-web/src/shell-v0/commands/CommandPalette.layout-lockdown.test.ts#SP8 the palette is horizontally centred inside the viewport at every size and text size in light, its width and top unchanged",
+        "modules/ui-web/src/shell-v0/commands/CommandPalette.layout-lockdown.test.ts#SP8 the palette is horizontally centred inside the viewport at every size and text size in dark, its width and top unchanged",
+        "modules/ui-web/src/shell-v0/commands/CommandPalette.layout-lockdown.test.ts#SP8 the palette is horizontally centred inside the viewport at every size and text size in forced-colors, its width and top unchanged"
       ],
       "repaired": true
     },

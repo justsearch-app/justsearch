@@ -96,9 +96,11 @@ const measure = (page: Page) => page.evaluate((selector) => {
     viewport: { width: innerWidth, height: innerHeight }, expected: { width: Math.min(40 * rem, innerWidth - rem), top } };
 }, PANEL);
 
-it('SP8 the palette is horizontally centred inside the viewport at every size, text size and theme, its width and top unchanged', async () => {
+// One case per theme: each boots the app (openPalette waits up to 30 s for it), so a single case
+// for all three themes outran Vitest's default 5 s limit on loaded CI runners.
+for (const theme of ['light', 'dark', 'forced-colors'] as const) it(`SP8 the palette is horizontally centred inside the viewport at every size and text size in ${theme}, its width and top unchanged`, async () => {
   const page = await openPalette();
-  for (const theme of ['light', 'dark', 'forced-colors'] as const) {
+  {
     await page.emulateMedia({ colorScheme: theme === 'light' ? 'light' : 'dark', forcedColors: theme === 'forced-colors' ? 'active' : 'none' });
     await page.evaluate(value => { document.documentElement.dataset.theme = value; }, theme === 'light' ? 'light' : 'dark');
     for (const text of ['100%', '200%']) {
@@ -116,4 +118,4 @@ it('SP8 the palette is horizontally centred inside the viewport at every size, t
       }
     }
   }
-});
+}, 30_000);
