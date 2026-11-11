@@ -1,0 +1,120 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
+  },
+  "createdAt": "2026-11-11T08:20:16.839Z",
+  "revision": "d36b2c30f7b1d7170fe80e223e7720b281ccd08f",
+  "tree": "9383b88b3b0ee882f1cb674c46d7a2b45c12506b",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/commands/CommandPalette.overlay.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/pt3fo5e2/tmp/test-intent-vitest-8585-1794385208515.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1308
+    },
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/commands/CommandPalette.layout-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/pt3fo5e2/tmp/test-intent-vitest-8585-1794385209823.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2006
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/commands/CommandPalette.overlay.test.ts#SP4c a lock observed by the status poll takes the conversation's text out of an open actions view, and unlock brings it back only after a fresh read",
+      "file": "modules/ui-web/src/shell-v0/commands/CommandPalette.overlay.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:cf21bc9ae97933ce15d9c531fe0f387e9aa389252ec0753e25df3d03891a5ac0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SP4c a lock observed by the status poll takes the conversation's text out of an open actions view, and unlock brings it back only after a fresh read",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/commands/CommandPalette.overlay.test.ts#SP4-SP9 shown actions follow their result: a removed or replaced registration runs nothing and says so",
+      "file": "modules/ui-web/src/shell-v0/commands/CommandPalette.overlay.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:cf21bc9ae97933ce15d9c531fe0f387e9aa389252ec0753e25df3d03891a5ac0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SP4-SP9 shown actions follow their result: a removed or replaced registration runs nothing and says so",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/commands/CommandPalette.layout-lockdown.test.ts#SP8 the palette is horizontally centred inside the viewport at every size, text size and theme, its width and top unchanged",
+      "file": "modules/ui-web/src/shell-v0/commands/CommandPalette.layout-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:21471f0484a4a8d1e42de960cdb5157b015510c3607973c1a784e43058aa4102",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SP8 the palette is horizontally centred inside the viewport at every size, text size and theme, its width and top unchanged",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "d36b2c30f7",
+    "revision": "d36b2c30f7b1d7170fe80e223e7720b281ccd08f",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/commands/CommandPalette.overlay.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/pt3fo5e2/tmp/test-intent-vitest-8585-1794385213482.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1270,
+        "output": "JSON report written to /home/elias/.cache/am/pt3fo5e2/tmp/test-intent-vitest-8585-1794385213482.json\n\n"
+      },
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/commands/CommandPalette.layout-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/pt3fo5e2/tmp/test-intent-vitest-8585-1794385214753.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1841,
+        "output": "JSON report written to /home/elias/.cache/am/pt3fo5e2/tmp/test-intent-vitest-8585-1794385214753.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/commands/CommandPalette.overlay.test.ts#SP4c a lock observed by the status poll takes the conversation's text out of an open actions view, and unlock brings it back only after a fresh read",
+        "classification": "assertion",
+        "detail": "SP4c a lock observed by the status poll takes the conversation's text out of an open actions view, and unlock brings it back only after a fresh read:  AssertionError: expected '<!---->\\n      <div class=\"backdrop\">…' not to contain 'Private subject'\n    at /home/elias/.cache/am/pt3fo5e2/tmp/test-intent-before-VIBQWA/modules/ui-web/src/shell-v0/commands/CommandPalette.overlay.test.ts:208:24\n    at file:///home/elias/dev/justsearch/.claude/worktrees"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/commands/CommandPalette.overlay.test.ts#SP4-SP9 shown actions follow their result: a removed or replaced registration runs nothing and says so",
+        "classification": "assertion",
+        "detail": "SP4-SP9 shown actions follow their result: a removed or replaced registration runs nothing and says so:  AssertionError: expected 'Demo tool is no longer available.' to contain 'This result is no longer available.'\n    at /home/elias/.cache/am/pt3fo5e2/tmp/test-intent-before-VIBQWA/modules/ui-web/src/shell-v0/commands/CommandPalette.overlay.test.ts:183:27\n    at file:///home/elias/dev/justsearch/.claud"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/commands/CommandPalette.layout-lockdown.test.ts#SP8 the palette is horizontally centred inside the viewport at every size, text size and theme, its width and top unchanged",
+        "classification": "assertion",
+        "detail": "SP8 the palette is horizontally centred inside the viewport at every size, text size and theme, its width and top unchanged:  AssertionError: centred: light, 1280x720, text 100%: {\"left\":0,\"right\":640,\"top\":108,\"bottom\":607.5,\"width\":640,\"viewport\":{\"width\":1280,\"height\":720},\"expected\":{\"width\":640,\"top\":108}}: expected +0 to be close to 640, received difference is 640, but expected 0.5\n    at /home/elias/.cache/am/pt3fo5"
+      }
+    ]
+  },
+  "digest": "sha256:eb7c8b1bbf581a5a58b9ea4dde0736f21bd83d6e6063cb462720e701a6be4576"
+}

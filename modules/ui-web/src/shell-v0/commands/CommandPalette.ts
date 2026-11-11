@@ -44,8 +44,11 @@ interface WizardStep {
   readonly resolver: (value: string | null) => void;
 }
 
+/** What identifies a result: its id and target. It carries none of the result's shown text. */
+type ResultIdentity = Pick<PaletteEntry, 'id' | 'target'>;
+
 /** One result: the same id and, for runnable results, the same captured registration. */
-function sameResult(entry: PaletteEntry, selected: PaletteEntry): boolean {
+function sameResult(entry: PaletteEntry, selected: ResultIdentity): boolean {
   return entry.id === selected.id
     && (selected.target.kind !== 'action' || (entry.target.kind === 'action' && entry.target.action === selected.target.action))
     && (selected.target.kind !== 'command' || (entry.target.kind === 'command' && entry.target.command === selected.target.command));
@@ -72,7 +75,13 @@ export class CommandPalette extends JfElement {
   declare query: string;
   declare results: ScoredPaletteEntry[];
   declare selectedIndex: number;
-  /** The result whose actions are shown (Tab), or null while the results are shown. */
+  /**
+   * The result whose actions are shown (Tab), exactly as the providers give it now, or null while
+   * the results are shown or once that result has left them. Its text (heading, items, the status
+   * announcement) is read only from here, the same provider snapshot as the results, so a result
+   * the providers withdraw (a conversation whose history was observed locked) leaves the actions
+   * view the moment it leaves the results.
+   */
   declare actionsFor: PaletteEntry | null;
   declare actionIndex: number;
   /** Tempdoc 508-followup §δ1 — palette is in slot-collection mode. */
@@ -86,8 +95,8 @@ export class CommandPalette extends JfElement {
   private wizardStep: WizardStep | null = null;
   private wizardCancelled = false;
   private wizardInvocationActive = false;
-  /** The shown actions' result left the providers; Enter then runs nothing. */
-  private actionsGone = false;
+  /** Which result the actions view is for: identity only, never its text. Null on the results. */
+  private actionsOf: ResultIdentity | null = null;
   /** The selected result left while shown; said once, until the reader moves on. */
   private selectionLost = false;
   /** Where the results list was scrolled when Tab showed actions. */
@@ -219,7 +228,11 @@ export class CommandPalette extends JfElement {
 
   static styles = css`
     :host {
-      /* 559 Authority I: placement owned by the OverlayHost center slot. */
+      /* 559 Authority I: placement owned by the OverlayHost center slot (fixed; inset: 0). The host
+         fills that slot, as the drag overlay does, so the panel is centred in the viewport; as a
+         content-sized item of the slot's row it sat at its left edge. */
+      position: absolute;
+      inset: 0;
       display: none;
       align-items: flex-start;
       justify-content: center;
@@ -440,14 +453,14 @@ export class CommandPalette extends JfElement {
       this.selectedIndex = this.results.findIndex(row => sameResult(row.entry, selected));
       if (this.selectedIndex < 0) this.selectionLost = true;
     }
-    if (this.actionsFor) {
-      const shown = this.actionsFor;
-      const current = results.find(row => sameResult(row.entry, shown))?.entry;
-      if (current) this.actionsFor = current;
-      else this.actionsGone = true;
-      if (this.actionIndex >= this.actionsFor.actions.length) this.actionIndex = Math.max(0, this.actionsFor.actions.length - 1);
+    if (this.actionsOf) {
+      // Once gone, the view stays gone: a same-id replacement is another result, never this one.
+      const shown = this.actionsOf;
+      this.actionsFor = this.actionsFor && (results.find(row => sameResult(row.entry, shown))?.entry ?? null);
+      const count = this.actionsFor?.actions.length ?? 0;
+      if (this.actionIndex >= count) this.actionIndex = Math.max(0, count - 1);
     }
-    if (this.peekRowId !== null && (this.actionsFor !== null || !this.results.some(row => row.entry.id === this.peekRowId))) this.dismissPeek();
+    if (this.peekRowId !== null && (this.actionsOf !== null || !this.results.some(row => row.entry.id === this.peekRowId))) this.dismissPeek();
   }
 
   private showMore(group: string): void {
@@ -539,7 +552,7 @@ export class CommandPalette extends JfElement {
       }
       return;
     }
-    if (this.actionsFor) {
+    if (this.actionsOf) {
       this.handleActionsKeydown(e, this.actionsFor);
       return;
     }
@@ -605,8 +618,8 @@ export class CommandPalette extends JfElement {
     this.selectedIndex = Math.min(this.selectedIndex + 1, this.results.length - 1);
   }
 
-  private handleActionsKeydown(e: KeyboardEvent, entry: PaletteEntry): void {
-    const actions = this.actionsGone ? [] : entry.actions;
+  private handleActionsKeydown(e: KeyboardEvent, entry: PaletteEntry | null): void {
+    const actions = entry?.actions ?? [];
     if (e.key === 'Escape' || (e.key === 'Tab' && e.shiftKey)) {
       e.preventDefault();
       e.stopPropagation();
@@ -622,21 +635,21 @@ export class CommandPalette extends JfElement {
     } else if (e.key === 'Enter') {
       e.preventDefault();
       const action = actions[this.actionIndex];
-      if (action) this.runEntry(entry, action.target);
+      if (entry && action) this.runEntry(entry, action.target);
     }
   }
 
   private showActions(entry: PaletteEntry): void {
     this.resultsScroll = this.shadowRoot?.getElementById(LIST_ID)?.scrollTop ?? 0;
     this.dismissPeek();
+    this.actionsOf = { id: entry.id, target: entry.target };
     this.actionsFor = entry;
-    this.actionsGone = false;
     this.actionIndex = 0;
   }
 
   private leaveActions(): void {
+    this.actionsOf = null;
     this.actionsFor = null;
-    this.actionsGone = false;
     this.actionIndex = 0;
   }
 
@@ -730,8 +743,8 @@ export class CommandPalette extends JfElement {
 
   /** What a screen reader hears when the list changes: the count, or the empty, loading or error state. */
   private announcement(): string {
-    if (this.actionsFor) {
-      if (this.actionsGone) return `${this.actionsFor.label} is no longer available.`;
+    if (this.actionsOf) {
+      if (!this.actionsFor) return 'This result is no longer available. Escape goes back.';
       const count = this.actionsFor.actions.length;
       return `Actions for ${this.actionsFor.label}: ${count} ${count === 1 ? 'action' : 'actions'}. Escape goes back.`;
     }
@@ -787,9 +800,9 @@ export class CommandPalette extends JfElement {
 
     const prefix = this.query.charAt(0);
     const modeLabel = prefix === '>' ? 'Actions' : prefix === '#' ? 'Areas' : prefix === '@' ? 'Settings' : '';
-    const actions = this.actionsFor;
+    const actions = this.actionsOf !== null;
     const activeId = actions
-      ? (!this.actionsGone && actions.actions[this.actionIndex] ? `palette-action-${this.actionIndex}` : '')
+      ? (this.actionsFor?.actions[this.actionIndex] ? `palette-action-${this.actionIndex}` : '')
       : (this.results[this.selectedIndex] ? `palette-opt-${this.selectedIndex}` : '');
 
     return html`
@@ -816,7 +829,7 @@ export class CommandPalette extends JfElement {
           <kbd aria-hidden="true">Esc</kbd>
         </div>
         <div class="results">
-          ${actions ? this.renderActions(actions) : this.renderResults()}
+          ${actions ? this.renderActions(this.actionsFor) : this.renderResults()}
         </div>
         <div class="visually-hidden" role="status" aria-live="polite" data-testid="palette-status">${this.announcement()}</div>
         <div class="footer" aria-hidden="true">
@@ -875,11 +888,12 @@ export class CommandPalette extends JfElement {
     `;
   }
 
-  private renderActions(entry: PaletteEntry): TemplateResult {
-    const actions = this.actionsGone ? [] : entry.actions;
+  /** The actions of the result as the providers give it now; with no result, a neutral heading. */
+  private renderActions(entry: PaletteEntry | null): TemplateResult {
+    const actions = entry?.actions ?? [];
     return html`
-      <div class="actions-of" id="palette-actions-of">Actions for ${entry.label}</div>
-      ${this.actionsGone ? html`<p class="note" role="note">This result is no longer available. Escape goes back.</p>` : nothing}
+      <div class="actions-of" id="palette-actions-of">${entry ? `Actions for ${entry.label}` : 'Actions'}</div>
+      ${entry ? nothing : html`<p class="note" role="note">This result is no longer available. Escape goes back.</p>`}
       <div role="listbox" id=${ACTIONS_ID} aria-labelledby="palette-actions-of">
         ${actions.map((action, index) => html`
           <div
@@ -890,7 +904,7 @@ export class CommandPalette extends JfElement {
             aria-posinset=${index + 1}
             aria-setsize=${actions.length}
             ?data-selected=${index === this.actionIndex}
-            @click=${() => this.runEntry(entry, action.target)}
+            @click=${() => entry && this.runEntry(entry, action.target)}
           ><span class="result-label">${action.label}</span></div>
         `)}
       </div>

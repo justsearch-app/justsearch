@@ -14,7 +14,7 @@ import { CORE_PROVENANCE } from '../primitives/provenance.js';
 import { __resetModalityForTest } from '../primitives/modality.js';
 import { __resetInMemoryStateForTest } from '../state/UserStateDocument.js';
 import { __resetConversationListForTest, loadConversations } from '../state/conversationListStore.js';
-import { __resetAiStateForTest } from '../state/aiStateStore.js';
+import { __resetAiStateForTest, startAiStateStore, stopAiStateStore, refreshStatusNow } from '../state/aiStateStore.js';
 import { __resetForTest as resetCatalog, __seedForTest as seedCatalog } from '../../api/registry/SurfaceCatalogClient.js';
 import { subscribeLibraryRoot, type LibraryRootRequest } from '../router/libraryRootIntent.js';
 import { NAVIGATE_TO_SURFACE_EVENT } from '../controllers/navigateRequest.js';
@@ -24,6 +24,8 @@ let roots: { pathHash: string; fileCount: number }[];
 let sessions: { sessionId: string; title: string; firstUserMessage: string; lastActiveAt?: number }[];
 let rootsStatus = 200;
 let conversationsHeld: Promise<void> | null = null;
+/** What the status endpoint says about conversation history; null answers without it. */
+let protection: 'locked' | 'unlocked' | null = null;
 const flush = async (): Promise<void> => { for (let i = 0; i < 40; i++) await Promise.resolve(); };
 const action = (id: string, title: string) => ({ id, title, provenance: CORE_PROVENANCE, handler: vi.fn(() => ({ kind: 'noop' as const })) });
 const surface = (id: string): Surface => ({ id, mountTag: 'jf-overlay-probe', presentation: { labelKey: id, descriptionKey: id }, audience: 'USER', placement: 'RAIL',
@@ -35,11 +37,12 @@ beforeEach(() => {
   __resetConversationListForTest(); __resetAiStateForTest(); __resetModalityForTest(); resetCatalog();
   seedCatalog({ schemaVersion: '1.0.0', catalogVersion: 1, namespace: 'core', primitive: 'Surface',
     entries: [surface('core.search-v3-surface'), surface('core.library-surface'), surface('core.brain-surface')] });
-  roots = []; sessions = []; rootsStatus = 200; conversationsHeld = null;
+  roots = []; sessions = []; rootsStatus = 200; conversationsHeld = null; protection = null;
   vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
     const url = String(input);
     if (url.includes('/api/indexing-roots/substrate')) return rootsStatus === 200 ? Response.json({ items: roots }) : new Response('', { status: rootsStatus });
     if (url.includes('/api/chat/conversations?')) { if (conversationsHeld) await conversationsHeld; return Response.json({ sessions }); }
+    if (url.includes('/api/status')) return Response.json(protection ? { conversationProtection: { state: protection } } : {});
     if (url.includes('/api/settings/v2')) return Response.json({ ui: {}, settingsMode: 'read_write' });
     return Response.json({});
   });
@@ -177,7 +180,7 @@ it('SP4-SP9 shown actions follow their result: a removed or replaced registratio
   expect(actionLabels(palette)).toEqual(['Run']);
   unregisterAction(original.id); await flush(); await palette.updateComplete;
   expect(actionLabels(palette)).toEqual([]);
-  expect(status(palette)).toContain('Demo tool is no longer available.');
+  expect(status(palette)).toContain('This result is no longer available.');
   const replacement = action('core.action.shell.demo-tool', 'Demo tool');
   registerAction(replacement); await flush(); await palette.updateComplete;
   expect(actionLabels(palette)).toEqual([]);
@@ -185,6 +188,45 @@ it('SP4-SP9 shown actions follow their result: a removed or replaced registratio
   expect(original.handler).not.toHaveBeenCalled(); expect(replacement.handler).not.toHaveBeenCalled();
   key(palette, { key: 'Escape' }); await palette.updateComplete;
   expect(palette.results.some(row => row.entry.id === 'shell.demo-tool')).toBe(true);
+});
+
+it('SP4c a lock observed by the status poll takes the conversation\'s text out of an open actions view, and unlock brings it back only after a fresh read', async () => {
+  sessions = [{ sessionId: 'conv-private', title: 'Private subject', firstUserMessage: 'Private opening', lastActiveAt: 5 }];
+  await loadConversations();
+  startAiStateStore('');
+  try {
+    const palette = await open('Private');
+    await select(palette, 'conversation:conv-private');
+    key(palette, { key: 'Tab' }); await palette.updateComplete;
+    expect(actionLabels(palette)).toEqual(['Open']);
+    const text = (): string => shadow(palette).innerHTML;
+    expect(shadow(palette).querySelector('#palette-actions-of')?.textContent).toContain('Private subject');
+    expect(status(palette)).toContain('Private subject');
+
+    protection = 'locked'; await refreshStatusNow(); await flush(); await palette.updateComplete;
+    // Heading, items, announcement and every attribute: no title, opening message or match is left.
+    expect(text()).not.toContain('Private subject');
+    expect(text()).not.toContain('Private opening');
+    expect(shadow(palette).querySelector('#palette-actions-of')?.textContent?.trim()).toBe('Actions');
+    expect(status(palette)).toBe('This result is no longer available. Escape goes back.');
+    expect(actionLabels(palette)).toEqual([]);
+    key(palette, { key: 'Enter' }); await flush();
+    expect(palette.open, 'Enter on a withdrawn result runs nothing').toBe(true);
+
+    // Unlock: nothing returns until the fresh list read it starts is accepted.
+    let release!: () => void;
+    conversationsHeld = new Promise<void>(resolve => { release = resolve; });
+    protection = 'unlocked'; await refreshStatusNow(); await flush();
+    key(palette, { key: 'Escape' }); await palette.updateComplete;
+    expect(text()).not.toContain('Private subject');
+    sessions = [{ sessionId: 'conv-private', title: 'Fresh subject', firstUserMessage: 'Fresh opening', lastActiveAt: 6 }];
+    release(); await flush(); await palette.updateComplete;
+    expect(text()).not.toContain('Private subject');
+    await type(palette, 'Fresh');
+    expect(palette.results.some(row => row.entry.id === 'conversation:conv-private')).toBe(true);
+  } finally {
+    stopAiStateStore();
+  }
 });
 
 it('SP8 a modal dialog with a labelled combobox, a listbox of labelled groups, positions and count, and the active option scrolled into view', async () => {

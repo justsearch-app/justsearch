@@ -7,7 +7,7 @@ author-session: s6-palette-b-builder
 
 # Candidate B — one palette overlay, Tab actions, Search palette retirement, chord ownership, keyboard and accessibility
 
-No acceptance is claimed; independent verification is pending. Fail-before evidence ran on 545232c4d8 (candidate A) in gates/test-intent/evidence/s6-palette-b.json; the verifier-round repairs (keyCode 229 as composition for every binding, the listbox as the palette's scroll region) ran their fail-before on 02a9eb6522 in gates/test-intent/evidence/s6-palette-b-repair.json. The palette harness steps' witness repair is a script self-test (scripts/jsharness/tests/test_ui_palette_witness.py), outside this gate's scope.
+No acceptance is claimed; independent verification is pending. Fail-before evidence ran on 545232c4d8 (candidate A) in gates/test-intent/evidence/s6-palette-b.json; the verifier-round repairs (keyCode 229 as composition for every binding, the listbox as the palette's scroll region) ran their fail-before on 02a9eb6522 in gates/test-intent/evidence/s6-palette-b-repair.json; the second verifier round's repairs (a locked conversation's text leaving an open actions view, the palette centred in its slot) ran their fail-before on d36b2c30f7 in gates/test-intent/evidence/s6-palette-b-repair2.json. The palette harness steps' witness repair is a script self-test (scripts/jsharness/tests/test_ui_palette_witness.py), outside this gate's scope.
 
 ```json
 {
@@ -143,6 +143,51 @@ No acceptance is claimed; independent verification is pending. Fail-before evide
       "newChecks": [
         "modules/ui-web/src/shell-v0/commands/CommandPalette.overlay.test.ts#SP8 forced colours keep the active option and the field's focus distinguishable, and a short window keeps field and list",
         "modules/ui-web/src/shell-v0/commands/CommandPalette.overlay.test.ts#SP5 Escape or Shift Tab returns with query, selection and scroll kept, and a second Escape closes"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/commands/CommandPalette.overlay.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "SP4c in the actions view: with a recent conversation's actions shown (Tab), history becoming locked as observed through the real status poll (the app's status store polling /api/status) takes the conversation's title and opening message out of the whole palette at once: the actions heading reads 'Actions' with no title, the items are gone, the status announcement says 'This result is no longer available. Escape goes back.', and no attribute or text in the palette holds either string; Enter runs nothing. Unlock brings nothing back while the fresh list read it starts is pending; the conversation reappears in the results only after that read is accepted. The removed-registration case announces the same neutral sentence instead of the result's name. Fail-before on d36b2c30f7: assertion (after the lock the heading still read 'Actions for Private subject' and the announcement named it; the removed action was announced as 'Demo tool is no longer available.').",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "The actions view keeps only the shown result's identity (id and target) and reads its heading, items and announcement from the current provider results, the same locked-aware snapshot as the results list; when the result leaves the providers the view shows a neutral heading and no text, rather than the copy captured at Tab."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-palette-b-repair2.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/commands/CommandPalette.overlay.test.ts#SP4c a lock observed by the status poll takes the conversation's text out of an open actions view, and unlock brings it back only after a fresh read",
+        "modules/ui-web/src/shell-v0/commands/CommandPalette.overlay.test.ts#SP4-SP9 shown actions follow their result: a removed or replaced registration runs nothing and says so"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/commands/CommandPalette.layout-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "SP8 layout in real Chromium: the app's composition (the palette inside a shadow root, an occupant of the overlay host's center slot) renders the palette's panel horizontally centred and inside the viewport at 1280x720, 900x700 and 600x400, at 100% and 200% text, in light, dark and forced colours; its width (min(40rem, viewport less 1rem)) and its top (min(15vh, 8rem), 0.5rem in a short window) are unchanged. Fail-before on d36b2c30f7: assertion (the panel sat at x=0: left 0, right 640 at 1280x720).",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "The palette's host fills the overlay host's center slot (position absolute, inset 0, as the drag overlay's own layer does), so its existing centring applies; as a content-sized item of the slot's row it sat at the slot's left edge. Nothing else about the layout changes."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-palette-b-repair2.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/commands/CommandPalette.layout-lockdown.test.ts#SP8 the palette is horizontally centred inside the viewport at every size, text size and theme, its width and top unchanged"
       ],
       "repaired": true
     },
