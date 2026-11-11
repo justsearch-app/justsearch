@@ -239,3 +239,13 @@ existing address path selects it with its own draft departure checks once connec
   "digest": "sha256:616f2025d5d0072a35a1b84be6967ec5d4d5988bda411f0dac8fd3bf18bcdfa3"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-oup6cr5o",
+  "verdict": "accept",
+  "digest": "sha256:a68047c4c51bc9b6d430071aa9b382a348b5458b1008d05e760b49ac0f9ef239"
+}
+```

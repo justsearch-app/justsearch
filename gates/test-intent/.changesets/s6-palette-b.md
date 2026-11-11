@@ -674,3 +674,13 @@ No acceptance is claimed; independent verification is pending. Fail-before evide
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-oup6cr5o",
+  "verdict": "accept",
+  "digest": "sha256:a9ee69ba14db97b41487779250c3f01bf46952710852c1a7e452b51cfc7150b5"
+}
+```
