@@ -177,7 +177,7 @@ Candidate D implements the settled SD1–SD6 and SG6 amendments. Fail-before run
           "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
           "delegationScope": "the shell redesign's slices including Settings and secondary pages",
           "label": "agent choice",
-          "choice": "SD1 adds the first Advanced switch and maps the legacy Developer destination to it; SD3 and amended SG6 move focus from gated content, navigation and search rows to the switch."
+          "choice": "SD1 owns the Show developer tools addition to the SG2 section-order check and the replacement Developer anchor in the SG4 legacy-coordinate check. SD3 and amended SG6 own the replacement focus-rescue targets for gated content, navigation and search rows: each lands on the switch."
         }
       ],
       "conflictSearch": "Decision records searched for developer-tools visibility, viewer audience and profile persistence conflicts: none. Existing view-tier access semantics remain a view preference; SD1\u2013SD6 and the settled SG6 amendment govern these projections."
@@ -187,7 +187,7 @@ Candidate D implements the settled SD1–SD6 and SG6 amendments. Fail-before run
         "modules/ui-web/src/shell-v0/views/SettingsSurface.sections.test.ts"
       ],
       "class": "New",
-      "behaviour": "SD1 adds the first Advanced switch and maps the legacy Developer destination to it; SD3 and amended SG6 move focus from gated content, navigation and search rows to the switch.",
+      "behaviour": "SD1 owns the Show developer tools addition to the SG2 section-order check and the replacement Developer anchor in the SG4 legacy-coordinate check. SD3 and amended SG6 own the replacement focus-rescue targets for gated content, navigation and search rows: each lands on the switch.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -195,7 +195,7 @@ Candidate D implements the settled SD1–SD6 and SG6 amendments. Fail-before run
           "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
           "delegationScope": "the shell redesign's slices including Settings and secondary pages",
           "label": "agent choice",
-          "choice": "SD1 adds the first Advanced switch and maps the legacy Developer destination to it; SD3 and amended SG6 move focus from gated content, navigation and search rows to the switch."
+          "choice": "SD1 owns the Show developer tools addition to the SG2 section-order check and the replacement Developer anchor in the SG4 legacy-coordinate check. SD3 and amended SG6 own the replacement focus-rescue targets for gated content, navigation and search rows: each lands on the switch."
         }
       ],
       "newChecks": [
@@ -313,7 +313,7 @@ Candidate D implements the settled SD1–SD6 and SG6 amendments. Fail-before run
         "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts"
       ],
       "class": "New",
-      "behaviour": "SD1 and amended SD3/SG6 exercise the switch, view-tier gate, focus rescue, More visibility, System Logs routing and actual two-window storage adoption in installed Chromium over a private Vite server. The fixture declares the System member catalog needed to observe Logs routing. SD1 replaces the legacy Developer address anchor with Show developer tools and preserves slow-catalog reload coverage.",
+      "behaviour": "SD1 and amended SD3/SG6 exercise the switch, view-tier gate, focus rescue, More visibility, System Logs routing and actual two-window storage adoption in installed Chromium over a private Vite server. The fixture declares the System member catalog needed to observe Logs routing. SD1 owns the renamed FR3 check: a legacy Settings › Developer link opens Advanced at Show developer tools, and reload keeps it while the engine is slow to answer. This supersedes the Settings-sections View tier anchor oracle.",
       "sources": [
         {
           "kind": "delegated-choice",

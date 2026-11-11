@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
   },
-  "createdAt": "2026-11-10T21:06:34.756Z",
-  "revision": "fa0f2213444bd62de138981efcae72a9bc8ed059",
-  "tree": "e9f5f13312b99b67e044b5d17724b14460eae79f",
+  "createdAt": "2026-11-11T00:13:40.451Z",
+  "revision": "22f682a2ca02e2d911aa3bf4e0b357babef7b9a1",
+  "tree": "466c80e32e50b7cf35270983809f05b2bc9dd994",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.frame.test.ts\" \"src/shell-v0/chrome/Shell.navigation.test.ts\" \"src/shell-v0/components/SettingsNav.test.ts\" \"src/shell-v0/views/SettingsSurface.appUpdate.test.ts\" \"src/shell-v0/views/SettingsSurface.chatWidth.test.ts\" \"src/shell-v0/views/SettingsSurface.dataReset.test.ts\" \"src/shell-v0/views/SettingsSurface.highContrast.test.ts\" \"src/shell-v0/views/SettingsSurface.notifications.test.ts\" \"src/shell-v0/views/SettingsSurface.overlap.test.ts\" \"src/shell-v0/views/SettingsSurface.ownActions.test.ts\" \"src/shell-v0/views/SettingsSurface.search.test.ts\" \"src/shell-v0/views/SettingsSurface.searchShortcut.test.ts\" \"src/shell-v0/views/SettingsSurface.section-address.test.ts\" \"src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts\" \"src/shell-v0/views/SettingsSurface.ui-mode.test.ts\" \"src/shell-v0/views/SettingsSurface.v15.test.ts\" \"src/shell-v0/views/SettingsSurface.viewerAudience.test.ts\" \"src/shell-v0/views/conversationExportWarnings.test.ts\" \"src/shell-v0/views/settingsRegister.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/oiu69mt5/tmp/test-intent-vitest-47-1794344778640.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.frame.test.ts\" \"src/shell-v0/chrome/Shell.navigation.test.ts\" \"src/shell-v0/components/SettingsNav.test.ts\" \"src/shell-v0/views/SettingsSurface.appUpdate.test.ts\" \"src/shell-v0/views/SettingsSurface.chatWidth.test.ts\" \"src/shell-v0/views/SettingsSurface.dataReset.test.ts\" \"src/shell-v0/views/SettingsSurface.highContrast.test.ts\" \"src/shell-v0/views/SettingsSurface.notifications.test.ts\" \"src/shell-v0/views/SettingsSurface.overlap.test.ts\" \"src/shell-v0/views/SettingsSurface.ownActions.test.ts\" \"src/shell-v0/views/SettingsSurface.search.test.ts\" \"src/shell-v0/views/SettingsSurface.searchShortcut.test.ts\" \"src/shell-v0/views/SettingsSurface.section-address.test.ts\" \"src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts\" \"src/shell-v0/views/SettingsSurface.ui-mode.test.ts\" \"src/shell-v0/views/SettingsSurface.v15.test.ts\" \"src/shell-v0/views/SettingsSurface.viewerAudience.test.ts\" \"src/shell-v0/views/conversationExportWarnings.test.ts\" \"src/shell-v0/views/settingsRegister.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/jzb7omdo/tmp/test-intent-vitest-5-1794356014199.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 16104
+      "durationMs": 6249
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame.test.ts",
       "file": "modules/ui-web/src/shell-v0/chrome/Shell.frame.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:3be328922e63c68ec98c53936cac4326c7f979df7419a683fd3f294f4a5cd9b3",
+      "contentDigest": "sha256:53e98cae406d41ab1ca890e2ba79b8afd767ad8f80f6713fe82eeb08d49f4207",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -87,7 +87,7 @@
           "status": "passed"
         },
         {
-          "name": "FR7 plugin windows, overrides and provenance the Developer group follows the developer view tier (API explorer listed only when present)",
+          "name": "FR7 plugin windows, overrides and provenance SD1 the Developer group follows Show developer tools independently of audience (API explorer listed only when present)",
           "status": "passed"
         },
         {
@@ -551,7 +551,7 @@
       "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.search.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.search.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:c33eaba9f6d6bf4244f171b1594e63ae8460a68e957e4afceafc9d4c2cf6680c",
+      "contentDigest": "sha256:b491fa1b78a7eef153c82973b35ffff23c99f7d32ce96a0910d38489d2a1b63a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -644,7 +644,7 @@
       "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:7fa7a6122fb581190566fade4bfaa8085ac88dcba845cdb480e8abdfa6d81091",
+      "contentDigest": "sha256:7aec33aaf6c7a0af887be45ba8f00ca7722629cbd34e33b75f07c7457f19c01a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -743,6 +743,14 @@
         },
         {
           "name": "CR37c settings recovery R1 R3 restores focus when pending confirmation blurs before the recovery hold clears",
+          "status": "passed"
+        },
+        {
+          "name": "SD6 Reset to defaults keeps explicit developer tools true",
+          "status": "passed"
+        },
+        {
+          "name": "SD6 Reset to defaults keeps explicit developer tools false",
           "status": "passed"
         }
       ]
@@ -885,7 +893,7 @@
       "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.viewerAudience.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.viewerAudience.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:a2803c9b0984d0b9e3c44a2ab402fc832a0214aed8f5dc795752282aadbe87c1",
+      "contentDigest": "sha256:1fd3530067cdd8581b805ad3f721e4c7fcba78c77b0c12f8894d6e50ffc94d44",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -939,7 +947,7 @@
       "id": "modules/ui-web/src/shell-v0/views/settingsRegister.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/settingsRegister.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:0f5059ad834ed58987fb43b42c4b5a60c1605aea37f32670621ff0493e6ebd70",
+      "contentDigest": "sha256:bd2ebae6142373903e9cb9df4198373e6939166fb4bf93fdedce51e9fcd667eb",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -973,7 +981,7 @@
           "status": "passed"
         },
         {
-          "name": "searchRegister an ungated section (view tier) matches regardless of audience",
+          "name": "searchRegister SD1 View tier search follows developer tools independently of audience",
           "status": "passed"
         },
         {
@@ -992,5 +1000,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:a53982e0dfce115190d92ed2deb50a0b3480bff820451ee9503970b839c0fe19"
+  "digest": "sha256:027f5d80d8ca15ff32620a63daa596208589558f224769bb20424bfa179d00f7"
 }

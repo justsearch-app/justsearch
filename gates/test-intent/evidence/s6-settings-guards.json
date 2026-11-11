@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
   },
-  "createdAt": "2026-11-10T22:44:47.542Z",
-  "revision": "50c26d710c5f2a9223623c46516285881970a4ff",
-  "tree": "e3c4c1ac9da2acb344adfce46236ca716924f90d",
+  "createdAt": "2026-11-11T00:24:02.832Z",
+  "revision": "22f682a2ca02e2d911aa3bf4e0b357babef7b9a1",
+  "tree": "a778079429235eebb32fef44bd389fafc37d3e0c",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/a7ihowt2/tmp/test-intent-vitest-40720-1794350524356.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/jzb7omdo/tmp/test-intent-vitest-2710-1794356479003.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 163185
+      "durationMs": 163827
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SG8 at 1280x720 and 100 percent text every section and enabled control is in view on keyboard focus, no button is clipped sideways, one scroller when short",
       "file": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:0021a93b7c44f4a492297bde1a9ebf9580d026a29ef5cbb8d86c4c89446811c6",
+      "contentDigest": "sha256:20b056921f0ae819c4c39f4f59361a9f8bc62109c3ba016bf54a5f2b371448ce",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -42,5 +42,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:aeafb59a3eb6c576e1ac9d10516a4d35d0253534e3b619316b97e6c2e90928c1"
+  "digest": "sha256:1184ae6778e70801fa0bc034d886c97a5ff75fe880f5db85847c15b1f1a42be9"
 }

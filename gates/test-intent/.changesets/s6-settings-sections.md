@@ -7,7 +7,7 @@ author-session: s6-settings-builder-g
 
 # Test-intent entries
 
-Candidate G follows the settled SG1–SG10 amendments. SD developer-tools changes are excluded.
+Candidate G follows the settled SG1–SG10 amendments. SD developer-tools changes are accounted for in s6-devtools.md, including the superseding legacy Developer-link browser check; the former View tier check is no longer selected here.
 
 ```json
 {
@@ -425,7 +425,6 @@ Candidate G follows the settled SG1–SG10 amendments. SD developer-tools change
       ],
       "evidence": "gates/test-intent/evidence/s6-settings-browser.json",
       "newChecks": [
-        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#FR3 the Settings section in the address wins over the one Settings remembers a legacy Settings › Developer link opens Advanced at View tier, and reload keeps it, while the engine is slow to answer",
         "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SG1 browser Ctrl+comma opens once from a composer and restores the editable control and caret",
         "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SG1 command guard blocks the palette and another modal",
         "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SG1 user and plugin chords outrank the Settings default, which opens after they are removed",
@@ -443,7 +442,7 @@ Candidate G follows the settled SG1–SG10 amendments. SD developer-tools change
         "modules/ui-web/src/shell-v0/views/SettingsSurface.sections.test.ts"
       ],
       "class": "New",
-      "behaviour": "SG2 seven ordered sections place every native/member entry exactly once. SG3/SG4 old categories and explicit entries resolve with entry precedence, latest pending/live arrivals alone scroll/focus and no saved-state writes. SG5 recovery selects Data & reset. SG6 live audience changes refresh content, anchors and search results and rescue disappearing focus; hidden destinations explain audience restrictions. SG7 About names bundle/updater sources and known/unknown/unavailable/observed update states, leaving actions in General. SG8 local theme import/rename Escape is consumed. SG9 member instances/drafts remain independent; missing, loading or unregistered members leave siblings usable.",
+      "behaviour": "SG2 seven ordered sections place every native/member entry exactly once. SG3/SG4 old categories and explicit entries resolve with entry precedence, latest pending/live arrivals alone scroll/focus and no saved-state writes. SG5 recovery selects Data & reset. SG6 live audience changes refresh content, anchors and search results; hidden destinations explain audience restrictions. The later Show developer tools entry, legacy Developer anchor and amended search/navigation/content focus-rescue targets in this shared test file belong to s6-devtools.md. SG7 About names bundle/updater sources and known/unknown/unavailable/observed update states, leaving actions in General. SG8 local theme import/rename Escape is consumed. SG9 member instances/drafts remain independent; missing, loading or unregistered members leave siblings usable.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -451,7 +450,7 @@ Candidate G follows the settled SG1–SG10 amendments. SD developer-tools change
           "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
           "delegationScope": "the shell redesign's slices including Settings and secondary pages",
           "label": "agent choice",
-          "choice": "SG2 seven ordered sections place every native/member entry exactly once. SG3/SG4 old categories and explicit entries resolve with entry precedence, latest pending/live arrivals alone scroll/focus and no saved-state writes. SG5 recovery selects Data & reset. SG6 live audience changes refresh content, anchors and search results and rescue disappearing focus; hidden destinations explain audience restrictions. SG7 About names bundle/updater sources and known/unknown/unavailable/observed update states, leaving actions in General. SG8 local theme import/rename Escape is consumed. SG9 member instances/drafts remain independent; missing, loading or unregistered members leave siblings usable."
+          "choice": "SG2 seven ordered sections place every native/member entry exactly once. SG3/SG4 old categories and explicit entries resolve with entry precedence, latest pending/live arrivals alone scroll/focus and no saved-state writes. SG5 recovery selects Data & reset. SG6 live audience changes refresh content, anchors and search results; hidden destinations explain audience restrictions. The later Show developer tools entry, legacy Developer anchor and amended search/navigation/content focus-rescue targets in this shared test file belong to s6-devtools.md. SG7 About names bundle/updater sources and known/unknown/unavailable/observed update states, leaving actions in General. SG8 local theme import/rename Escape is consumed. SG9 member instances/drafts remain independent; missing, loading or unregistered members leave siblings usable."
         }
       ],
       "evidence": "gates/test-intent/evidence/s6-settings-sections.json",
