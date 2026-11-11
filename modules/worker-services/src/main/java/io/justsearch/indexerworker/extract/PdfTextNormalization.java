@@ -6,7 +6,7 @@ import java.util.regex.Pattern;
 /** PDF text repair, applied only within a completed text element or OCR page. */
 final class PdfTextNormalization {
   private static final Pattern LINE_END_HYPHEN =
-      Pattern.compile("(?<=\\p{L})[-\u2010][ \\t]*(?:\\r\\n|\\r|\\n)[ \\t]*(?=\\p{Ll})");
+      Pattern.compile("(?<=\\p{L})[-\u2010\u00ad][ \\t]*(?:\\r\\n|\\r|\\n)[ \\t]*(?=\\p{Ll})");
 
   private PdfTextNormalization() {}
 

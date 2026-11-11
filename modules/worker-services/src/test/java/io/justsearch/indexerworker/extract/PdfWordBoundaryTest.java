@@ -103,6 +103,29 @@ class PdfWordBoundaryTest {
     }
   }
 
+  @ParameterizedTest
+  @ValueSource(strings = {"\n", "\r\n", "\r", " \t\r\n\t "})
+  void softHyphensAtLineEndsAreJoinedAcrossCallbacks(String separator) throws Exception {
+    var handler = handler(1000, true);
+    start(handler, "p");
+    chars(handler, "Rech");
+    chars(handler, "\u00ad");
+    for (int i = 0; i < separator.length(); i++) whitespace(handler, separator.substring(i, i + 1));
+    chars(handler, "nung");
+    end(handler, "p");
+    assertEquals("Rechnung", elementText(handler));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"Rech\u00ad\nNung", "Rech\u00adnung"})
+  void softHyphensArePreservedWithoutLowercaseLineContinuation(String text) throws Exception {
+    var handler = handler(1000, true);
+    start(handler, "p");
+    chars(handler, text);
+    end(handler, "p");
+    assertEquals(text, elementText(handler));
+  }
+
   @Test
   void characterCallbacksAreJoinedOnlyAtOneLineBreakAndInlineMarkupAddsNoSpace() throws Exception {
     var handler = handler(1000, true);
