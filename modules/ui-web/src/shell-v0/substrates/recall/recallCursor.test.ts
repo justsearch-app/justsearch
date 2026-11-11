@@ -53,4 +53,25 @@ describe('recallCursor — the one seen authority', () => {
     markSeen('2026-01-01T00:00:09Z');
     expect(hits).toBe(1); // unsubscribed
   });
+
+  // The Engine writes Instant.toString() (no fraction on a whole second, up to nine digits) and this
+  // window writes three digits: lexically "…00.100Z" < "…00Z" although it is 100 ms later.
+  it('orders whole-second, millisecond and finer timestamps by time, not by spelling', () => {
+    markSeen('2026-01-01T00:00:00Z');
+    expect(isNewSinceSeen('2026-01-01T00:00:00.100Z')).toBe(true);
+    markSeen('2026-01-01T00:00:00.100Z');
+    expect(getSeenCursor()).toBe('2026-01-01T00:00:00.100Z');
+    expect(isNewSinceSeen('2026-01-01T00:00:00.1Z')).toBe(false);
+    expect(isNewSinceSeen('2026-01-01T00:00:00.100001Z')).toBe(true);
+    markSeen('2026-01-01T00:00:00.100000500Z');
+    expect(isNewSinceSeen('2026-01-01T00:00:00.1000005Z')).toBe(false);
+    expect(isNewSinceSeen('2026-01-01T00:00:00.100001Z')).toBe(true);
+  });
+
+  it('a whole-second mark after a later millisecond mark does not rewind the cursor', () => {
+    markSeen('2026-01-01T00:00:00.900Z');
+    markSeen('2026-01-01T00:00:00Z');
+    expect(getSeenCursor()).toBe('2026-01-01T00:00:00.900Z');
+    expect(globalThis.localStorage?.getItem('justsearch.recall.seen-cursor.v1')).toBe('2026-01-01T00:00:00.900Z');
+  });
 });

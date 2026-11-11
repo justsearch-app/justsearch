@@ -591,6 +591,31 @@ describe('AgentSessionController SSE handlers (G1 migration)', () => {
     expect(getUndoableOperation(entries[0]!.id)).toEqual({ operationId: 'core_search_index', executionId: 'exec-9' });
   });
 
+  // S6 Activity — each journaled call keeps the invocation it IS, so the feed joins it to that
+  // call's ledger/history records and never to another call with the same name.
+  it('identical concurrent calls completing in reverse order each keep their own invocation; a keyed failure journals nothing', () => {
+    for (const callId of ['c1', 'c2', 'c3']) {
+      ctrl.onToolCallPending({ callId, toolName: 'core_file_operations', arguments: '{"op":"move"}', risk: 'HIGH' });
+    }
+    ctrl.onToolExecCompleted({ callId: 'c2', result: { success: true, output: 'ok', executionId: 'exec-2',
+      structuredData: { operationKey: 'key-2' } } });
+    ctrl.onToolExecCompleted({ callId: 'c3', result: { success: false, output: 'denied', structuredData: { operationKey: 'key-3' } } });
+    ctrl.onToolExecCompleted({ callId: 'c1', result: { success: true, output: 'ok', executionId: 'exec-1',
+      structuredData: { operationKey: 'key-1' } } });
+    expect(listJournalByOriginator('agent').map((e) => [e.operationKey, e.executionId]))
+      .toEqual([['key-2', 'exec-2'], ['key-1', 'exec-1']]);
+  });
+
+  it('a replayed run journals no effect and no association', () => {
+    expect(ctrl.loadReplayFromExport({ meta: { sessionId: 'replayed-1' }, events: [
+      { eventType: 'session_started', payload: { sessionId: 'replayed-1' } },
+      { eventType: 'tool_call_pending', payload: { callId: 'r1', toolName: 'core_file_operations', arguments: '{}', risk: 'HIGH' } },
+      { eventType: 'tool_exec_completed', payload: { callId: 'r1', result: { success: true, output: 'ok', executionId: 'exec-r',
+        structuredData: { operationKey: 'key-r' } } } },
+    ] })).toBe(true);
+    expect(listJournalByOriginator('agent')).toEqual([]);
+  });
+
   it('does NOT journal a failed tool-call (no state change to undo/digest)', () => {
     ctrl.onToolCallPending({ callId: 'b2', toolName: 'core_search_index', arguments: '{}', risk: 'LOW' });
     ctrl.onToolExecCompleted({ callId: 'b2', result: { success: false, output: 'err' } });

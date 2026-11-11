@@ -578,10 +578,10 @@ describe('§28.W4 — originator-grouped undo', () => {
     });
 
     it('a compensable mutation in the turn is reversed via undo-operation', async () => {
-      const { recordEffect, markUndoableOperation, undoGroup } = await import('./index.js');
+      const { recordEffect, associateOperation, undoGroup } = await import('./index.js');
       const root = recordEffect({ kind: 'open-pane', paneId: 'r' }, CORE_PROVENANCE, { originator: 'agent' });
       const mut = recordEffect({ kind: 'invoke-operation', operationId: 'core_file_operations' }, CORE_PROVENANCE, { originator: 'agent', causation: root.id });
-      markUndoableOperation(mut.id, 'core_file_operations', 'ex9');
+      associateOperation(mut.id, { executionId: 'ex9' });
       const applied: import('../effect.js').Effect[] = [];
       undoGroup(root.id, (e) => { applied.push(e); });
       expect(applied).toEqual([
@@ -634,12 +634,12 @@ describe('§28.W4 — originator-grouped undo', () => {
   // 543-fwd #5 — scoped time-travel: reverse everything after a chosen entry.
   describe('undoToEntry / previewUndoToEntry (543-fwd #5)', () => {
     it('reverses every reversible entry after the target (newest-first), skipping reads', async () => {
-      const { recordEffect, markUndoableOperation, undoToEntry, previewUndoToEntry } = await import('./index.js');
+      const { recordEffect, associateOperation, undoToEntry, previewUndoToEntry } = await import('./index.js');
       const a = recordEffect({ kind: 'open-pane', paneId: 'a' }, CORE_PROVENANCE);
       const b = recordEffect({ kind: 'open-modal', modalId: 'm' }, CORE_PROVENANCE);
       recordEffect({ kind: 'invoke-operation', operationId: 'core_search_index' }, CORE_PROVENANCE); // read — non-reversible
       const mut = recordEffect({ kind: 'invoke-operation', operationId: 'core_file_operations' }, CORE_PROVENANCE);
-      markUndoableOperation(mut.id, 'core_file_operations', 'ex1');
+      associateOperation(mut.id, { executionId: 'ex1' });
       // Preview: everything after `a` that is reversible, newest-first.
       expect(previewUndoToEntry(a.id).map((e) => e.id)).toEqual([mut.id, b.id]);
       const applied: import('../effect.js').Effect[] = [];
@@ -665,14 +665,14 @@ describe('§28.W4 — originator-grouped undo', () => {
   // scoped undos must reverse it via an undo-operation effect, not skip it.
   describe('compensating undo for agent mutations (543-fwd P1)', () => {
     it('undoAllByOriginator reverses a compensable agent op via undo-operation', async () => {
-      const { undoAllByOriginator, recordEffect, markUndoableOperation } = await import('./index.js');
+      const { undoAllByOriginator, recordEffect, associateOperation } = await import('./index.js');
       // A mutating agent op (file-operations): null FE inverse, but executionId captured.
       const mut = recordEffect(
         { kind: 'invoke-operation', operationId: 'core_file_operations' },
         CORE_PROVENANCE,
         { originator: 'agent' },
       );
-      markUndoableOperation(mut.id, 'core_file_operations', 'exec-42');
+      associateOperation(mut.id, { executionId: 'exec-42' });
       // A read (search): no executionId — non-compensable, must be skipped.
       recordEffect({ kind: 'invoke-operation', operationId: 'core_search_index' }, CORE_PROVENANCE, { originator: 'agent' });
       const applied: import('../effect.js').Effect[] = [];
@@ -684,10 +684,10 @@ describe('§28.W4 — originator-grouped undo', () => {
     });
 
     it('previewUndoAllByOriginator + peek + undoLast include the compensable entry', async () => {
-      const { previewUndoAllByOriginator, peekLastUndoableByOriginator, undoLastEffectByOriginator, recordEffect, markUndoableOperation } =
+      const { previewUndoAllByOriginator, peekLastUndoableByOriginator, undoLastEffectByOriginator, recordEffect, associateOperation } =
         await import('./index.js');
       const mut = recordEffect({ kind: 'invoke-operation', operationId: 'core_file_operations' }, CORE_PROVENANCE, { originator: 'agent' });
-      markUndoableOperation(mut.id, 'core_file_operations', 'exec-7');
+      associateOperation(mut.id, { executionId: 'exec-7' });
       // Preview lists it.
       expect(previewUndoAllByOriginator('agent').map((e) => e.id)).toEqual([mut.id]);
       // Peek names it.

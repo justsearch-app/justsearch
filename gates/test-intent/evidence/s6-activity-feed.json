@@ -1,0 +1,500 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
+  },
+  "createdAt": "2026-11-11T13:01:13.207Z",
+  "revision": "716017c61f87ff6bfbae502b5fa5f06d777f5246",
+  "tree": "a273fbac0c31589269aff43123928412db93dedb",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/substrates/recall/recallCursor.test.ts\" \"src/shell-v0/views/ActivitySurface.actions.test.ts\" \"src/shell-v0/substrates/effects/undoEntries.test.ts\" \"src/shell-v0/chrome/Shell.test.ts\" \"src/shell-v0/controllers/AgentSessionController.test.ts\" \"src/shell-v0/substrates/effects/associations.test.ts\" \"src/shell-v0/components/ActionLedgerView.feed.test.ts\" \"src/shell-v0/views/ActivitySurface.render.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/ydlugpjq/tmp/test-intent-vitest-24684-1794401977948.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 6589
+    },
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/ydlugpjq/tmp/test-intent-vitest-24684-1794401984538.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 3684
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/substrates/recall/recallCursor.test.ts#orders whole-second, millisecond and finer timestamps by time, not by spelling",
+      "file": "modules/ui-web/src/shell-v0/substrates/recall/recallCursor.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a34f3725cd01bc64728e1a2018a42c01c80cb6d86cbd70630b4d75daf4159d31",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "recallCursor — the one seen authority orders whole-second, millisecond and finer timestamps by time, not by spelling",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/substrates/recall/recallCursor.test.ts#a whole-second mark after a later millisecond mark does not rewind the cursor",
+      "file": "modules/ui-web/src/shell-v0/substrates/recall/recallCursor.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a34f3725cd01bc64728e1a2018a42c01c80cb6d86cbd70630b4d75daf4159d31",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "recallCursor — the one seen authority a whole-second mark after a later millisecond mark does not rewind the cursor",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.actions.test.ts#S6 — \"Save as macro\" takes the AI actions after the seen cursor by time, across timestamp spellings",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.actions.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6246bb20d5e2afd215a79a1569a85a7617c8d9f49d1d733627cdcfc473b4ad68",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Activity owns the retired digest actions S6 — \"Save as macro\" takes the AI actions after the seen cursor by time, across timestamp spellings",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/substrates/effects/undoEntries.test.ts#a reversal the Engine performs is returned as requested, never reversed, and settles with the Engine answer",
+      "file": "modules/ui-web/src/shell-v0/substrates/effects/undoEntries.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d3e35903b4d77f895459eaed73f9b586e5fccdc0f5bf80072795490ffd61828a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "undoEntries (DE6) a reversal the Engine performs is returned as requested, never reversed, and settles with the Engine answer",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/substrates/effects/undoEntries.test.ts#reverses the previewed entries newest first and nothing recorded after the preview",
+      "file": "modules/ui-web/src/shell-v0/substrates/effects/undoEntries.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d3e35903b4d77f895459eaed73f9b586e5fccdc0f5bf80072795490ffd61828a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "undoEntries (DE6) reverses the previewed entries newest first and nothing recorded after the preview",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#S6: undo-all says an Engine undo was asked for, then what the Engine answered (declined)",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:cd08477e7c09cd58c5afe848408f5b9324e22c2ecc2c5173b00dc59ad52be85e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Shell — slice 492 substrate integration S6: undo-all says an Engine undo was asked for, then what the Engine answered (declined)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#S6: undo-all says an Engine undo was asked for, then what the Engine answered (confirmed)",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:cd08477e7c09cd58c5afe848408f5b9324e22c2ecc2c5173b00dc59ad52be85e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Shell — slice 492 substrate integration S6: undo-all says an Engine undo was asked for, then what the Engine answered (confirmed)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#S6: identical invocations answering in reverse order each keep their invocation, a keyed failure joins as a failure, both persist",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:cd08477e7c09cd58c5afe848408f5b9324e22c2ecc2c5173b00dc59ad52be85e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Shell — slice 492 substrate integration S6: identical invocations answering in reverse order each keep their invocation, a keyed failure joins as a failure, both persist",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#identical concurrent calls completing in reverse order each keep their own invocation; a keyed failure journals nothing",
+      "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7198990d7c88b9cf8d66ba24b0712e087fa040994e920e4cb56dcc1ac9ba44a6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) identical concurrent calls completing in reverse order each keep their own invocation; a keyed failure journals nothing",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#a replayed run journals no effect and no association",
+      "file": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7198990d7c88b9cf8d66ba24b0712e087fa040994e920e4cb56dcc1ac9ba44a6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "AgentSessionController SSE handlers (G1 migration) a replayed run journals no effect and no association",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/substrates/effects/associations.test.ts",
+      "file": "modules/ui-web/src/shell-v0/substrates/effects/associations.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:282b2d254bd6286fb0b775b305231ae2fc8fbfedf999eedc2e7b90f2c0a0daee",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "journal invocation associations survive a reload a restored execution still offers its backend undo, and its invocation key is kept",
+          "status": "passed"
+        },
+        {
+          "name": "journal invocation associations survive a reload legacy entries restore unlinked; malformed associations are dropped, the entry kept as it was",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e6cb786fb804ff0374fa8a1498bc5915d664f63969975c6abfdd20dfd6b6ff6e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "one feed: joins by exact identity (A1-A5) A1 — a keyed operation in the ledger, the history and the journal is one row carrying all three",
+          "status": "passed"
+        },
+        {
+          "name": "one feed: joins by exact identity (A1-A5) A2 — same name and time with different keys stay separate; one id delivered by snapshot, update and reconnect is one row",
+          "status": "passed"
+        },
+        {
+          "name": "one feed: joins by exact identity (A1-A5) A3 — unkeyed history joins only the exact legacy identity, raw precision kept; shared legacy identities are kept and disclosed",
+          "status": "passed"
+        },
+        {
+          "name": "one feed: joins by exact identity (A1-A5) A3 — a legacy local entry whose numeric id matches a backend effect keeps both observations, each disclosing the unproven link",
+          "status": "passed"
+        },
+        {
+          "name": "one feed: joins by exact identity (A1-A5) A4 — a local effect without a ledger copy reads \"Recorded locally\"; its later delivery joins it without a second row",
+          "status": "passed"
+        },
+        {
+          "name": "one feed: joins by exact identity (A1-A5) A5 — a smaller reconnect snapshot drops what the Engine no longer holds; retained history partners stay",
+          "status": "passed"
+        },
+        {
+          "name": "one feed: joins by exact identity (A1-A5) A6 — the bounded window is disclosed and no older-records control is offered",
+          "status": "passed"
+        },
+        {
+          "name": "first load and reconnect arbitration (challenger 4) a connected or heartbeat frame alone never claims an empty ledger",
+          "status": "passed"
+        },
+        {
+          "name": "first load and reconnect arbitration (challenger 4) an UPDATE that arrived on the connection before its snapshot survives the snapshot",
+          "status": "passed"
+        },
+        {
+          "name": "first load and reconnect arbitration (challenger 4) the GET seed stands in before the stream, and gives way to its first snapshot",
+          "status": "passed"
+        },
+        {
+          "name": "first load and reconnect arbitration (challenger 4) a reset discards the rows, and a GET started before the reset cannot resurrect them",
+          "status": "passed"
+        },
+        {
+          "name": "per-source states (challenger 5) each source says loading, unavailable or last-known; rows from the others still show as partial activity",
+          "status": "passed"
+        },
+        {
+          "name": "classification and quick filters (A9, A10) A9 — Problems holds failures, partial or failing scans, failed indexing, denied and expired gates and data errors",
+          "status": "passed"
+        },
+        {
+          "name": "classification and quick filters (A9, A10) A9 — Indexing holds index events and the explicit indexing operations, by declaration or agent wire name, and their gates and grants",
+          "status": "passed"
+        },
+        {
+          "name": "classification and quick filters (A9, A10) A9 — an operation with no recorded outcome stays visible and says so",
+          "status": "passed"
+        },
+        {
+          "name": "classification and quick filters (A9, A10) A10 — failed per-file indexing is reachable in Problems and Indexing although routine; All keeps the routine default",
+          "status": "passed"
+        },
+        {
+          "name": "classification and quick filters (A9, A10) A10 — a burst never reads as an unqualified success: it counts failures and expands to every member",
+          "status": "passed"
+        },
+        {
+          "name": "classification and quick filters (A9, A10) an explicit advanced routine choice overrides every quick filter, as its label states",
+          "status": "passed"
+        },
+        {
+          "name": "proposal decisions (A11, challenger 12) normal, accepted and rejected stay independently filterable, combine with the actor, and are never outcomes",
+          "status": "passed"
+        },
+        {
+          "name": "seen cursor, panes and resolver (challenger 10, 11, 14) a millisecond record after a whole-second cursor is new",
+          "status": "passed"
+        },
+        {
+          "name": "seen cursor, panes and resolver (challenger 10, 11, 14) mark all read under an active filter marks every loaded record read",
+          "status": "passed"
+        },
+        {
+          "name": "seen cursor, panes and resolver (challenger 10, 11, 14) two feeds in one window keep independent filters",
+          "status": "passed"
+        },
+        {
+          "name": "seen cursor, panes and resolver (challenger 10, 11, 14) a path the resolver could not answer is asked again once it recovers",
+          "status": "passed"
+        },
+        {
+          "name": "bounded lifetime (challenger 15; windowing is checked in real Chromium) Today's boundary advances at local midnight",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:86c836fc76f997b0136d3acc1ddc539ca6064864cd38d78e1003f26a64077975",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "A16 — more than 500 ledger and 500 local records are all reachable, newest to oldest, through a windowed list",
+          "status": "passed"
+        },
+        {
+          "name": "A16 — a live arrival keeps the reader where they were",
+          "status": "passed"
+        },
+        {
+          "name": "A19 — on a light forced-colours palette, selection, focus, unread and outcome do not rely on colour",
+          "status": "passed"
+        },
+        {
+          "name": "A19 — on a dark forced-colours palette, selection, focus, unread and outcome do not rely on colour",
+          "status": "passed"
+        },
+        {
+          "name": "A20 — light at 600×400 with text at 200 percent: filters and advanced controls are reachable without sideways scrolling",
+          "status": "passed"
+        },
+        {
+          "name": "A20 — dark at 600×400 with text at 200 percent: filters and advanced controls are reachable without sideways scrolling",
+          "status": "passed"
+        },
+        {
+          "name": "A20 — light at 1280×800 with text at 200 percent: filters and advanced controls are reachable without sideways scrolling",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.render.test.ts#the one feed reads the ledger and the operation history from its own api-base",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.render.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f87080342a20867cd860fcf0f669bc0b9f88e4a8c39236e4b635e6048a8e49b0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "ActivitySurface (jf-activity-surface) — api-base forwarding (727 F-4) the one feed reads the ledger and the operation history from its own api-base",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.render.test.ts#an Activity closing before it renders leaves the request to another Activity, which reveals it",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.render.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f87080342a20867cd860fcf0f669bc0b9f88e4a8c39236e4b635e6048a8e49b0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Activity holds what the frame drawers held (DP3) an Activity closing before it renders leaves the request to another Activity, which reveals it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.render.test.ts#arriving at the journal clears a journal filter that would hide what the pointer named",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.render.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f87080342a20867cd860fcf0f669bc0b9f88e4a8c39236e4b635e6048a8e49b0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Activity holds what the frame drawers held (DP3) arriving at the journal clears a journal filter that would hide what the pointer named",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "716017c61f",
+    "revision": "716017c61f87ff6bfbae502b5fa5f06d777f5246",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/substrates/recall/recallCursor.test.ts\" \"src/shell-v0/views/ActivitySurface.actions.test.ts\" \"src/shell-v0/substrates/effects/undoEntries.test.ts\" \"src/shell-v0/chrome/Shell.test.ts\" \"src/shell-v0/controllers/AgentSessionController.test.ts\" \"src/shell-v0/substrates/effects/associations.test.ts\" \"src/shell-v0/components/ActionLedgerView.feed.test.ts\" \"src/shell-v0/views/ActivitySurface.render.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/ydlugpjq/tmp/test-intent-vitest-24684-1794401990813.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 8959,
+        "output": "JSON report written to /home/elias/.cache/am/ydlugpjq/tmp/test-intent-vitest-24684-1794401990813.json\n\n"
+      },
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/ydlugpjq/tmp/test-intent-vitest-24684-1794401999773.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 73155,
+        "output": "JSON report written to /home/elias/.cache/am/ydlugpjq/tmp/test-intent-vitest-24684-1794401999773.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/substrates/recall/recallCursor.test.ts#orders whole-second, millisecond and finer timestamps by time, not by spelling",
+        "classification": "assertion",
+        "detail": "recallCursor — the one seen authority orders whole-second, millisecond and finer timestamps by time, not by spelling:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/ydlugpjq/tmp/test-intent-before-x2FHjl/modules/ui-web/src/shell-v0/substrates/recall/recallCursor.test.ts:61:56\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-activity/modules/ui-web/node_modu"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/substrates/recall/recallCursor.test.ts#a whole-second mark after a later millisecond mark does not rewind the cursor",
+        "classification": "assertion",
+        "detail": "recallCursor — the one seen authority a whole-second mark after a later millisecond mark does not rewind the cursor:  AssertionError: expected '2026-01-01T00:00:00Z' to be '2026-01-01T00:00:00.900Z' // Object.is equality\n    at /home/elias/.cache/am/ydlugpjq/tmp/test-intent-before-x2FHjl/modules/ui-web/src/shell-v0/substrates/recall/recallCursor.test.ts:74:29\n    at file:///home/elias/dev/justsearch/.claude/worktre"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.actions.test.ts#S6 — \"Save as macro\" takes the AI actions after the seen cursor by time, across timestamp spellings",
+        "classification": "assertion",
+        "detail": "Activity owns the retired digest actions S6 — \"Save as macro\" takes the AI actions after the seen cursor by time, across timestamp spellings:  AssertionError: expected [] to have a length of 1 but got +0\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/s6-activity/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/s6-ac"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/substrates/effects/undoEntries.test.ts#a reversal the Engine performs is returned as requested, never reversed, and settles with the Engine answer",
+        "classification": "assertion",
+        "detail": "undoEntries (DE6) a reversal the Engine performs is returned as requested, never reversed, and settles with the Engine answer:  AssertionError: expected 2 to be 1 // Object.is equality\n    at /home/elias/.cache/am/ydlugpjq/tmp/test-intent-before-x2FHjl/modules/ui-web/src/shell-v0/substrates/effects/undoEntries.test.ts:57:30\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-activity/modules/ui-web/node_modules/@vi"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/substrates/effects/undoEntries.test.ts#reverses the previewed entries newest first and nothing recorded after the preview",
+        "classification": "assertion",
+        "detail": "undoEntries (DE6) reverses the previewed entries newest first and nothing recorded after the preview:  AssertionError: expected { reversed: 2, skipped: [] } to deeply equal { reversed: 2, requested: [], …(1) }\n    at /home/elias/.cache/am/ydlugpjq/tmp/test-intent-before-x2FHjl/modules/ui-web/src/shell-v0/substrates/effects/undoEntries.test.ts:26:21\n    at file:///home/elias/dev/justsearch/.claude/wor"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#S6: undo-all says an Engine undo was asked for, then what the Engine answered (declined)",
+        "classification": "assertion",
+        "detail": "Shell — slice 492 substrate integration S6: undo-all says an Engine undo was asked for, then what the Engine answered (declined):  AssertionError: expected [ 'Undid 1 AI action', …(1) ] to include 'The engine did not undo 1 action'\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/s6-activity/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1319:15)\n    at Proxy.<anonymous> (file:///home/elia"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#S6: undo-all says an Engine undo was asked for, then what the Engine answered (confirmed)",
+        "classification": "assertion",
+        "detail": "Shell — slice 492 substrate integration S6: undo-all says an Engine undo was asked for, then what the Engine answered (confirmed):  AssertionError: expected [ 'Undid 1 AI action' ] to include 'The engine confirmed 1 undo'\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/s6-activity/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1319:15)\n    at Proxy.<anonymous> (file:///home/elias/dev/justs"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#S6: identical invocations answering in reverse order each keep their invocation, a keyed failure joins as a failure, both persist",
+        "classification": "assertion",
+        "detail": "Shell — slice 492 substrate integration S6: identical invocations answering in reverse order each keep their invocation, a keyed failure joins as a failure, both persist:  AssertionError: expected [ undefined, undefined ] to deeply equal [ undefined, 'key-2' ]\n    at /home/elias/.cache/am/ydlugpjq/tmp/test-intent-before-x2FHjl/modules/ui-web/src/shell-v0/chrome/Shell.test.ts:337:77\n    at Timeout.checkCallback (file:///home/elias/dev/justsearch/.claude/worktrees/s6-ac"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#identical concurrent calls completing in reverse order each keep their own invocation; a keyed failure journals nothing",
+        "classification": "assertion",
+        "detail": "AgentSessionController SSE handlers (G1 migration) identical concurrent calls completing in reverse order each keep their own invocation; a keyed failure journals nothing:  AssertionError: expected [ [ undefined, undefined ], …(1) ] to deeply equal [ [ 'key-2', 'exec-2' ], …(1) ]\n    at /home/elias/.cache/am/ydlugpjq/tmp/test-intent-before-x2FHjl/modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts:606:8\n    at file:///home/elias/dev/justsearch/.claud"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#a replayed run journals no effect and no association",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/substrates/effects/associations.test.ts",
+        "classification": "assertion",
+        "detail": "journal invocation associations survive a reload a restored execution still offers its backend undo, and its invocation key is kept:  AssertionError: expected undefined to deeply equal { …(2) }\n    at /home/elias/.cache/am/ydlugpjq/tmp/test-intent-before-x2FHjl/modules/ui-web/src/shell-v0/substrates/effects/associations.test.ts:37:37\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-activity/modules/ui-web/node_modules | journal invocation associations survive a reload legacy entries"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts",
+        "classification": "assertion",
+        "detail": "one feed: joins by exact identity (A1-A5) A1 — a keyed operation in the ledger, the history and the journal is one row carrying all three:  AssertionError: the feed opens the operation-history stream: expected undefined to be defined\n    at historyStream (/home/elias/.cache/am/ydlugpjq/tmp/test-intent-before-x2FHjl/modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts:88:66)\n    at /home/elias/.cache/am/ydlugpjq/tmp/test- | one feed: joins by exact identity (A1-A5) A2 — same name "
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts",
+        "classification": "assertion",
+        "detail": "A16 — more than 500 ledger and 500 local records are all reachable, newest to oldest, through a windowed list:  Error: expected +0 to be 1 // Object.is equality\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/dev/justsearch/.claude/worktrees/s6-activity/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3748:47)\n    at open (/home/elias/.cache/am/ydlugpjq/tmp/test-intent-before-x2FHjl/modu | A16 — a live arrival keeps the reader where they were:  Error: expected +0 to be 1 //"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.render.test.ts#the one feed reads the ledger and the operation history from its own api-base",
+        "classification": "assertion",
+        "detail": "ActivitySurface (jf-activity-surface) — api-base forwarding (727 F-4) the one feed reads the ledger and the operation history from its own api-base:  AssertionError: expected [ …(4) ] to include 'http://127.0.0.1:33221/api/operation-…'\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/s6-activity/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1319:15)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearc"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.render.test.ts#an Activity closing before it renders leaves the request to another Activity, which reveals it",
+        "classification": "assertion",
+        "detail": "Activity holds what the frame drawers held (DP3) an Activity closing before it renders leaves the request to another Activity, which reveals it:  AssertionError: expected null to be <section class=\"panel\" …(3)>…(4)</section> // Object.is equality\n    at /home/elias/.cache/am/ydlugpjq/tmp/test-intent-before-x2FHjl/modules/ui-web/src/shell-v0/views/ActivitySurface.render.test.ts:160:47\n    at runNextTicks (node:internal/process/task_queues:65:5"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.render.test.ts#arriving at the journal clears a journal filter that would hide what the pointer named",
+        "classification": "assertion",
+        "detail": "Activity holds what the frame drawers held (DP3) arriving at the journal clears a journal filter that would hide what the pointer named:  AssertionError: expected [ 'system', 'rejected' ] to deeply equal [ 'all', 'all' ]\n    at /home/elias/.cache/am/ydlugpjq/tmp/test-intent-before-x2FHjl/modules/ui-web/src/shell-v0/views/ActivitySurface.render.test.ts:176:51\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTim"
+      }
+    ]
+  },
+  "digest": "sha256:91d403f5e7c70b634decfec9e9df9756d9b49238da42857085e1f727a7a18018"
+}

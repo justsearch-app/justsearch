@@ -10,11 +10,16 @@
  * (an ISO-8601 `occurredAt` timestamp), so EVERY recall surface — the catch-up digest, and any
  * "new since you looked" marker on History/Inbox — reads ONE cursor over ONE log.
  *
- * The unit is an ISO-8601 UTC timestamp string: lexical comparison IS chronological order for the
- * `Z`-suffixed timestamps the ledger emits, so "newer than seen" is a string compare (no Date
- * parse, no drift). The empty string is "never looked" (everything is new).
+ * The unit is an ISO-8601 timestamp string, stored as written. "Newer than seen" compares the
+ * parsed instants ({@link compareInstants}): the Engine writes `Instant.toString()` (no fraction on a
+ * whole second, up to nine digits otherwise) and this window writes three digits, so a string
+ * compare would put "…00.100Z" before "…00Z". The empty string is "never looked" (everything is new).
+ *
+ * Scope: one cursor per browser storage, shared by every window, profile and recall surface. Marking
+ * read moves it to the newest loaded record a surface holds, whatever that surface's filters show.
  */
 import { safeLocalStorage } from '../../primitives/storage.js';
+import { compareInstants, isInstant } from '../../primitives/instant.js';
 
 const SEEN_KEY = 'justsearch.recall.seen-cursor.v1';
 
@@ -23,8 +28,8 @@ const subscribers = new Set<() => void>();
 
 function readCursor(): string {
   const raw = safeLocalStorage()?.getItem(SEEN_KEY);
-  // An ISO-8601 string or '' (never looked). Defensive: reject anything that isn't a plausible ISO.
-  return typeof raw === 'string' && raw.length > 0 ? raw : '';
+  // An ISO-8601 string or '' (never looked). A value that is not an instant cannot order anything.
+  return isInstant(raw) ? raw : '';
 }
 
 function writeCursor(iso: string): void {
@@ -45,8 +50,8 @@ export function getSeenCursor(): string {
  * refresh can never rewind "seen"). Notifies subscribers only on a real advance.
  */
 export function markSeen(iso: string): void {
-  if (typeof iso !== 'string' || iso.length === 0) return;
-  if (iso > cursor) {
+  if (!isInstant(iso)) return;
+  if (cursor === '' || compareInstants(iso, cursor) > 0) {
     cursor = iso;
     writeCursor(iso);
     notify();
@@ -55,7 +60,7 @@ export function markSeen(iso: string): void {
 
 /** True iff `occurredAt` is newer than the seen-cursor (the "new since you looked" predicate). */
 export function isNewSinceSeen(occurredAt: string): boolean {
-  return typeof occurredAt === 'string' && occurredAt > cursor;
+  return isInstant(occurredAt) && (cursor === '' || compareInstants(occurredAt, cursor) > 0);
 }
 
 /** Subscribe to cursor advances. Returns an unsubscribe fn. */

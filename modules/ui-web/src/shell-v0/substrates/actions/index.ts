@@ -439,7 +439,7 @@ export function applyEffect(
  */
 export interface DispatchOptions {
   readonly originator?: EffectOriginator;
-  /** Only meaningful for invoke-operation (links the returned executionId). */
+  /** For invoke-/undo-operation: the request's journal entry (its association and settlement). */
   readonly journalEntryId?: number;
 }
 
@@ -502,6 +502,8 @@ export function dispatchEffectToChrome(
       dispatchDomEvent('jf-undo-operation', {
         operationId: effect.operationId,
         executionId: effect.executionId,
+        // The listener reports the Engine's answer for this request by its journal entry.
+        ...(opts.journalEntryId !== undefined ? { journalEntryId: opts.journalEntryId } : {}),
       });
       return true;
     // ──────────────────────────────────────────────────────────────

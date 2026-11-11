@@ -281,6 +281,15 @@
       "note": "Tempdoc 561 P-C: THE FE ledger projection authority (BackendLedgerEntry \u2192 UnifiedActionEntry via unifiedActivity), folding the FE Effect Journal in. The workspace Timeline (P-B2) projects through this."
     },
     {
+      "id": "fe-activity-feed-projection",
+      "kind": "projection",
+      "lang": "ts",
+      "path": "modules/ui-web/src/shell-v0/operations/activityFeed.ts",
+      "guard": "test:ActionLedgerView.feed.test.ts",
+      "consumesProjection": "fe-action-ledger-client",
+      "note": "S6 Activity one feed: a pure read-time join of the action-ledger rows (through ActionLedgerClient's BackendLedgerEntry and projectBackend), the committed core.operation-history rows and the FE Effect Journal, by exact identities only (operation:<operationKey>, the legacy projection identity rebuilt from raw history fields, the journal's ledgerId, operationKey or executionId). It keeps no lifecycle state of its own: every row is a projection of records those sources hold, and the committed history stays the authority for an operation's outcome."
+    },
+    {
       "id": "fe-agent-history-timeline",
       "kind": "projection",
       "lang": "ts",

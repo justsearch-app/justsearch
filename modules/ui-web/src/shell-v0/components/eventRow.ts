@@ -110,6 +110,13 @@ export const eventRowStyles: CSSResult = css`
     background: var(--accent-tint);
     align-self: center;
   }
+  /* Forced colours replace backgrounds: keep the unread dot visible in the system text colour. */
+  @media (forced-colors: active) {
+    .new-dot {
+      forced-color-adjust: none;
+      background: CanvasText;
+    }
+  }
   .who {
     flex: 0 0 auto;
     font-family: ui-monospace, monospace;

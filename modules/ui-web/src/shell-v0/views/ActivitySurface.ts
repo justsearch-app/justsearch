@@ -1,21 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * ActivitySurface — Lit-side Activity surface (slice 486 F15-narrow).
+ * ActivitySurface — Lit-side Activity surface (slice 486 F15-narrow; S6 one feed).
  *
- * Self-mounting Surface backed by the existing
- * `core.operation-history` EVENT_STREAM Resource (slice 444b
- * substrate). The Resource ships with a specialty renderer
- * (`<jf-table>` via `kind="operation-history"` per
- * `renderers/resourceRegistryDefaults.ts`) so this surface is
- * a thin chrome wrapper: a header + the existing
- * `<jf-resource-view>` substrate consumer.
+ * One chronological feed (`<jf-action-ledger>`) joins the action ledger, the committed
+ * `core.operation-history` stream and this window's Effect Journal by exact identities, with the
+ * Activity utilities beside it: own reversals, the AI-wide undo/preview and macro actions, background
+ * runs, and the local effect journal (its per-entry actions and archive).
  *
- * Side-effect registers `<jf-activity-surface>` for the chrome
- * dispatcher.
- *
- * Shows the latest operation-history snapshot from retained operations rows,
- * followed by live updates. Resource-declared operation keys merge replay overlap.
- * Unkeyed observations remain independent; filtering and export are not provided.
+ * Side-effect registers `<jf-activity-surface>` for the chrome dispatcher.
  *
  * Backend declaration: `CoreSurfaceCatalog.ACTIVITY_SURFACE_ID`
  * (`core.activity-surface`) → mountTag `jf-activity-surface`,
@@ -26,7 +18,6 @@
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
 import { surfaceLayoutStyles } from '../primitives/surfaceLayout.js';
-import '../components/ResourceView.js';
 // Tempdoc 550 thesis II: mount the unified action-ledger read-view (the Outcome face — one
 // chronological, originator-attributed, LIVE stream over operations + navigations + gates + FE
 // effects). Side-effect import registers <jf-action-ledger>.
@@ -34,14 +25,15 @@ import '../components/ActionLedgerView.js';
 import '../components/RunActivity.js';
 import type { RunActivity } from '../components/RunActivity.js';
 import '../components/EffectAuditLog.js';
-import { subscribeActivitySection, takeActivitySection } from '../state/activitySection.js';
+import { peekActivitySection, subscribeActivitySection, takeActivitySection } from '../state/activitySection.js';
 import '../components/Button.js';
 import '../components/EffectLine.js';
 import { listJournalByOriginator, previewUndoAllByOriginator, undoEntries, subscribeJournal,
   type JournalEntry } from '../substrates/effects/index.js';
 import { applyEffect } from '../substrates/actions/index.js';
 import { defineMacroFromEffects } from '../substrates/macros/index.js';
-import { getSeenCursor } from '../substrates/recall/recallCursor.js';
+import { isNewSinceSeen } from '../substrates/recall/recallCursor.js';
+import { reportUndoRun } from '../components/undoReport.js';
 import { listOpenReversals, subscribeReversals } from '../state/ownReversals.js';
 
 export class ActivitySurface extends JfElement {
@@ -70,19 +62,27 @@ export class ActivitySurface extends JfElement {
     this.arriveAtSection();
   }
 
-  /** A pointer from elsewhere (the status panel, Ctrl+K) lands on the section it named. */
+  /**
+   * A pointer from elsewhere (the status panel, Ctrl+K) lands on the section it named. The request
+   * is taken only by an Activity that is still on screen once rendered, so a second Activity (another
+   * pane) or one closing meanwhile cannot consume it without revealing it. The journal's own filters
+   * are cleared on arrival, so a filter left from earlier cannot hide what the pointer named.
+   */
   private arriveAtSection(): void {
-    if (!this.isConnected) return;
-    const section = takeActivitySection();
-    if (section === null) return;
+    if (!this.isConnected || peekActivitySection() === null) return;
     void this.updateComplete.then(async () => {
+      if (!this.isConnected) return;
+      const section = takeActivitySection();
+      if (section === null) return;
       if (section === 'background-runs') {
         const runs = this.renderRoot.querySelector<RunActivity>('jf-run-activity');
         await runs?.updateComplete;
         runs?.revealBackgroundRuns();
         return;
       }
-      const journal = this.renderRoot.querySelector<HTMLElement & { updateComplete?: Promise<unknown> }>('jf-effect-audit-log');
+      const journal = this.renderRoot.querySelector<HTMLElement & { updateComplete?: Promise<unknown>;
+        originator?: string; outcome?: string }>('jf-effect-audit-log');
+      if (journal) { journal.originator = 'all'; journal.outcome = 'all'; }
       await journal?.updateComplete;
       const panel = journal?.shadowRoot?.querySelector<HTMLElement>('[data-testid="effect-audit-journal"]');
       panel?.scrollIntoView?.({ block: 'start' });
@@ -101,10 +101,8 @@ export class ActivitySurface extends JfElement {
     const previewed = this.undoPreview;
     this.undoPreview = [];
     if (!previewed.length) return;
-    const { reversed, skipped } = undoEntries(previewed, applyEffect);
-    applyEffect({ kind: 'toast', severity: skipped.length ? 'warning' : 'info',
-      message: `${reversed ? `Undid ${reversed} AI action${reversed === 1 ? '' : 's'}` : 'Nothing was undone'}${skipped.length
-        ? `; ${skipped.length} could no longer be undone` : ''}` });
+    reportUndoRun(undoEntries(previewed, (effect) => applyEffect(effect)),
+      (reversed) => `Undid ${reversed} AI action${reversed === 1 ? '' : 's'}`);
   }
   /** DE6 — your own recent actions that can still be reversed in this window, with their reversal. */
   private renderOwnReversals(): TemplateResult | typeof nothing {
@@ -119,7 +117,7 @@ export class ActivitySurface extends JfElement {
 
   private async saveMacro(): Promise<void> {
     const effects = listJournalByOriginator('agent')
-      .filter(e => e.invokedAt > getSeenCursor() && e.pendingOutcome !== 'rejected').map(e => e.effect);
+      .filter(e => isNewSinceSeen(e.invokedAt) && e.pendingOutcome !== 'rejected').map(e => e.effect);
     if (effects.length) await defineMacroFromEffects(effects, {
       description: `Save what the assistant just did (${effects.length} action${effects.length === 1 ? '' : 's'}) as a reusable macro. It will surface in the command palette under "Macros".`,
     });
@@ -131,10 +129,6 @@ export class ActivitySurface extends JfElement {
   static styles = [
     surfaceLayoutStyles,
     css`
-    jf-resource-view {
-      display: block;
-      width: 100%;
-    }
     jf-action-ledger {
       display: block;
       width: 100%;
@@ -164,10 +158,9 @@ export class ActivitySurface extends JfElement {
              is embeddable as a host member (System) without emitting a second <h1>. -->
         <h2>Activity</h2>
         <div class="sub">
-          What the system did — a structured audit of operations (button
-          clicks, agent calls, scheduled runs) with outcomes and timing.
-          Recent activity and retained operation history, updated live.
-          For raw diagnostic output, see Logs.
+          What happened, who did it and how it ended — your actions, the
+          assistant's, indexing and the engine's own work, in one list
+          updated live. For raw diagnostic output, see Logs.
         </div>
       </div>
       <div class="body">
@@ -189,31 +182,16 @@ export class ActivitySurface extends JfElement {
           <jf-button size="sm" variant="danger" label="Undo all" data-testid="activity-undo-confirm-yes" .onActivate=${() => this.confirmUndo()}>Undo all</jf-button>
           <jf-button size="sm" label="Cancel" data-testid="activity-undo-confirm-cancel" .onActivate=${() => { this.undoPreview = []; }}>Cancel</jf-button>
         </section>` : nothing}
-        <!-- Tempdoc 550 thesis II (Outcome read-view): the unified, LIVE action-ledger —
-             one chronological, originator-attributed stream over operations + navigations +
-             trust-gate firings + FE-local effects. This is the 550 Outcome face. -->
         <jf-run-activity api-base=${this.apiBase} data-testid="activity-run-activity"></jf-run-activity>
-        <div class="section-label">Unified activity (live)</div>
+        <!-- The one feed: ledger, committed operation history and this window's journal, joined. -->
+        <div class="section-label">Activity</div>
         <jf-action-ledger
           api-base=${this.apiBase}
           data-testid="activity-surface-action-ledger"
         ></jf-action-ledger>
 
-        <!-- Tempdoc 511 Phase 6: <jf-resource> aggregate component
-             dispatches via the (Resource, list-item) canonical
-             strategy, which wraps <jf-resource-view> with audience
-             gating + wire-metadata data attributes. Retained as the
-             structured operations table (core.operation-history). -->
-        <div class="section-label">Operations (structured)</div>
-        <jf-resource
-          context="list-item"
-          resource-id="core.operation-history"
-          api-base=${this.apiBase}
-          data-testid="activity-surface-resource-view"
-        ></jf-resource>
-
-        <!-- §25.δ2 — this window's effects, with their undo. -->
-        <div class="section-label">Effects in this window</div>
+        <!-- §25.δ2 — the local effect journal with its per-entry actions, selection and archive. -->
+        <div class="section-label">Effects recorded in this browser</div>
         <jf-effect-audit-log data-testid="activity-effect-journal"></jf-effect-audit-log>
       </div>
     `;

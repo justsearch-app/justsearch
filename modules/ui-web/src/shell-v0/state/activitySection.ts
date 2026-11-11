@@ -13,6 +13,11 @@ export function requestActivitySection(section: ActivitySection): void {
   for (const listener of listeners) listener();
 }
 
+/** The pending section, left in place for the Activity that will reveal it. */
+export function peekActivitySection(): ActivitySection | null {
+  return requested;
+}
+
 /** The pending section, cleared by the read. */
 export function takeActivitySection(): ActivitySection | null {
   const section = requested;

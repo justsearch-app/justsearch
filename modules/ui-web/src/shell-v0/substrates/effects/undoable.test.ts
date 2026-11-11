@@ -7,7 +7,7 @@
 import { beforeEach, describe, it, expect } from 'vitest';
 import {
   recordEffect,
-  markUndoableOperation,
+  associateOperation,
   getUndoableOperation,
   __resetJournalForTest,
 } from './index.js';
@@ -25,7 +25,7 @@ describe('§32 U2 — undoable-operation side-map', () => {
       { originator: 'agent' },
     );
     expect(getUndoableOperation(entry.id)).toBeUndefined();
-    markUndoableOperation(entry.id, 'core.file-operations', 'exec-123');
+    associateOperation(entry.id, { executionId: 'exec-123' });
     expect(getUndoableOperation(entry.id)).toEqual({
       operationId: 'core.file-operations',
       executionId: 'exec-123',
@@ -34,7 +34,7 @@ describe('§32 U2 — undoable-operation side-map', () => {
 
   it('reset clears the side-map', () => {
     const entry = recordEffect({ kind: 'noop' }, CORE_PROVENANCE);
-    markUndoableOperation(entry.id, 'op', 'e');
+    associateOperation(entry.id, { executionId: 'e' });
     __resetJournalForTest();
     expect(getUndoableOperation(entry.id)).toBeUndefined();
   });

@@ -19,7 +19,7 @@ vi.mock('../api/authorizedFetch.js', () => ({ authorizedFetch: (url: string, ini
 vi.mock('../plugin-api/pumpHostAiStream.js', () => ({ streamViaHost: (options: Parameters<AgentSessionTransport['stream']>[0]) => routes.get(new URL(options.fallbackUrl).origin)!.stream(options) }));
 vi.mock('../../api/streams.js', async (original) => ({ ...await original<object>(), consumeShapeStream: (...args: Parameters<AgentSessionTransport['consume']>) => routes.get(new URL(String(args[0])).origin)!.consume(...args) }));
 vi.mock('./liveRuns.js', () => ({ discoverLiveAgentRunRow: (base: string, conversationId?: string | null) => routes.get(base)!.discover(base, conversationId) }));
-vi.mock('../substrates/effects/index.js', async (original) => ({ ...await original<object>(), recordEffect: vi.fn(() => ({ id: 1 })), markUndoableOperation: vi.fn() }));
+vi.mock('../substrates/effects/index.js', async (original) => ({ ...await original<object>(), recordEffect: vi.fn(() => ({ id: 1 })) }));
 
 const controllers: AgentSessionController[] = [];
 const tasks: Promise<unknown>[] = [];
