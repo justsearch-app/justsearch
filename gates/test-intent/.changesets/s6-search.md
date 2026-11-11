@@ -102,3 +102,23 @@ Sources below record the delegated choices for SR1–SR5. Independent acceptance
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "s6-verifier-taz2_vmu",
+  "verdict": "accept",
+  "digest": "sha256:a1769202798689006336a1fcab68cf43f333bfb2b704facac48ace662ca3c1ba"
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "s6-verifier-taz2_vmu",
+  "verdict": "accept",
+  "digest": "sha256:82ea920a61538e2f27d18b0aad664a41e5443fb59b5eb28ae884d07df984e15e"
+}
+```
