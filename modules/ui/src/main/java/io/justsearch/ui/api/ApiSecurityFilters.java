@@ -60,7 +60,8 @@ final class ApiSecurityFilters {
    * of stores and holders the Engine publishes), never the index, its client or serving views.
    * They stay ordinary work for limits, freeze, closing and release, but are admitted as not
    * retaining the index, so an open window does not refuse an index recovery close. Explicit
-   * routes only: work-carrying streams (POST streams, runs, chat) are not listed.
+   * routes only, compared with the matched route: work-carrying streams (POST streams, runs,
+   * chat) are not listed.
    */
   private static final Set<String> PUBLISHED_STATE_STREAM_PATHS = Set.of(
       "/api/shell-events/stream", "/api/indexing-jobs/stream", "/api/health/events/stream",
@@ -239,8 +240,10 @@ final class ApiSecurityFilters {
         boolean userActivity = RequestEngineContext.isUserActivity(ctx);
         // Status reads keep their bounded observation slot; every other request may carry the
         // presence report's input age (zero for anything but POST /api/ui/activity).
+        // The matched route, not the raw path: every spelling the router serves from one of these
+        // routes (a trailing slash) is the same stream, and nothing else is.
         boolean publishedStateStream = "GET".equals(ctx.method().name())
-            && PUBLISHED_STATE_STREAM_PATHS.contains(ctx.path());
+            && PUBLISHED_STATE_STREAM_PATHS.contains(ctx.matchedPath());
         var work = observation ? engineAdmission.admitObservationRequest(selected, userActivity)
             : publishedStateStream ? engineAdmission.admitPublishedStateRequest(selected, userActivity)
             : engineAdmission.admitRequest(selected, ctx.path().startsWith("/api/upgrade/"), userActivity,

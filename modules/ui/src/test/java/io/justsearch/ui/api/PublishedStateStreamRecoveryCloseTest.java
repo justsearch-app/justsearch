@@ -134,6 +134,130 @@ final class PublishedStateStreamRecoveryCloseTest {
     }
   }
 
+  /** Spellings the router serves from a marked route are the same published-state stream. */
+  @ParameterizedTest(name = "{arguments}")
+  @ValueSource(strings = {"/api/shell-events/stream/", "/api/shell-events/stream?since=",
+      "/api/indexing-jobs/stream/", "/infra/capabilities/stream/"})
+  void routerAcceptedSpellingOfAMarkedRouteIsClassifiedAsPublishedState(String route)
+      throws Exception {
+    try (var fixture = new Fixture(directory)) {
+      fixture.open(route);
+      assertEquals(1, fixture.root.admission().activeWorkCount(), route + " is admitted as work");
+      var server = fixture.installServer();
+      assertDoesNotThrow(fixture.root::closeForRecovery, route + " is published-state work");
+      verify(server).closeForRecovery();
+    }
+  }
+
+  /** Spellings the router does not serve are not admitted at all. */
+  @ParameterizedTest(name = "{arguments}")
+  @ValueSource(strings = {"/API/shell-events/stream", "//api/shell-events/stream",
+      "/api/shell-events/stream/extra", "/api/shell-events/streams"})
+  void unservedLookalikeIsNotAdmitted(String route) throws Exception {
+    try (var fixture = new Fixture(directory)) {
+      assertEquals(404, fixture.send("GET", route).statusCode(), route);
+      fixture.awaitActive(0);
+    }
+  }
+
+  /**
+   * A HEAD request, and GET routes whose paths extend, prefix or embed a marked route, stay
+   * ordinary work that refuses the recovery close while held.
+   */
+  @ParameterizedTest(name = "{0} {1}")
+  @org.junit.jupiter.params.provider.CsvSource({
+      "HEAD, /api/shell-events/stream",
+      "HEAD, /infra/capabilities/stream",
+      "GET, /api/shell-events/stream-held",
+      "GET, /api/shell-events/stream/held",
+      "GET, /api/shell-events",
+      "GET, /test/api/shell-events/stream"})
+  void lookalikeRouteIsClassifiedAsOrdinaryWork(String method, String route) throws Exception {
+    var entered = new java.util.concurrent.CountDownLatch(1);
+    var release = new java.util.concurrent.CountDownLatch(1);
+    io.javalin.http.Handler held = ctx -> {
+      entered.countDown();
+      assertTrue(release.await(10, TimeUnit.SECONDS), "held request was not released");
+      ctx.status(200);
+    };
+    try (var fixture = new Fixture(directory, app -> {
+      if ("HEAD".equals(method)) app.head(route, held, ActivityRole.OBSERVATION);
+      else app.get(route, held, ActivityRole.OBSERVATION);
+    })) {
+      var response = fixture.sendAsync(method, route);
+      try {
+        assertTrue(entered.await(10, TimeUnit.SECONDS), method + " " + route + " never reached its handler");
+        assertEquals(1, fixture.root.admission().activeWorkCount());
+        var server = fixture.installServer();
+        var refused = assertThrows(IllegalStateException.class, fixture.root::closeForRecovery,
+            method + " " + route + " is ordinary work");
+        assertEquals("Live Engine work retains the index owner", refused.getMessage());
+        verify(server, never()).closeForRecovery();
+      } finally {
+        release.countDown();
+      }
+      assertEquals(200, response.get(15, TimeUnit.SECONDS).statusCode());
+      fixture.awaitActive(0);
+    }
+  }
+
+  /**
+   * A marked stream that ends exceptionally releases its slot and mark exactly once: independent
+   * physical work is still counted (no undercount), and nothing is counted after it is released.
+   */
+  @ParameterizedTest(name = "{arguments}")
+  @ValueSource(strings = {"before-first-frame", "after-first-frame"})
+  void markedStreamEndingExceptionallyLeavesNoMarkBehind(String when) throws Exception {
+    try (var fixture = new Fixture(directory, app -> { })) {
+      // A separate server for the failing stream: the real route module owns the marked paths.
+      var failing = Javalin.create(config -> {
+        config.showJavalinBanner = false;
+        config.jsonMapper(new Jackson3JsonMapper());
+      });
+      var events = Executors.newSingleThreadExecutor();
+      try {
+        SseAttachmentOwner.install(failing);
+        new ApiSecurityFilters(false, null, new EventBuffer(), events, null, null,
+            fixture.root.admission()).install(failing);
+        failing.sse(SHELL, client -> {
+          if ("after-first-frame".equals(when)) client.sendEvent("frame", "first");
+          throw new IllegalStateException("stream attachment failed");
+        }, ActivityRole.OBSERVATION);
+        failing.start("127.0.0.1", 0);
+        var work = fixture.root.admission().admit(context(), false);
+        try (var http = HttpClient.newHttpClient()) {
+          for (int i = 0; i < 3; i++) {
+            var response = http.send(HttpRequest.newBuilder(
+                    URI.create("http://127.0.0.1:" + failing.port() + SHELL))
+                .timeout(Duration.ofSeconds(10)).GET().build(), HttpResponse.BodyHandlers.ofString());
+            assertTrue(response.statusCode() == 200 || response.statusCode() == 500,
+                "status " + response.statusCode());
+          }
+        }
+        fixture.awaitActive(1);
+        var server = fixture.installServer();
+        assertThrows(IllegalStateException.class, fixture.root::closeForRecovery,
+            "the independent work is still counted after the failed streams");
+        verify(server, never()).closeForRecovery();
+        work.close();
+        fixture.awaitActive(0);
+        assertDoesNotThrow(fixture.root::closeForRecovery, "no mark or slot leaked");
+        verify(server).closeForRecovery();
+        var later = fixture.root.admission().admit(context(), false);
+        try {
+          fixture.installServer();
+          assertThrows(IllegalStateException.class, fixture.root::closeForRecovery,
+              "later work is counted exactly");
+        } finally {
+          later.close();
+        }
+      } finally {
+        failing.stop();
+        events.shutdownNow();
+      }
+    }
+  }
+
   @Test
   void streamConnectedBeforeAFailedInitialStartDoesNotPreventItsCleanupOrRetry() throws Exception {
     var previous = io.justsearch.configuration.resolved.ConfigStore.globalOrNull();
@@ -200,6 +324,11 @@ final class PublishedStateStreamRecoveryCloseTest {
     private final String previousDataDir;
 
     Fixture(Path directory) throws Exception {
+      this(directory, app -> {});
+    }
+
+    /** {@code extraRoutes} registers test routes beside the real route module. */
+    Fixture(Path directory, java.util.function.Consumer<Javalin> extraRoutes) throws Exception {
       previousDataDir = System.getProperty("justsearch.data.dir");
       System.setProperty("justsearch.data.dir", directory.resolve("data").toString());
       root = new EngineRoot(mock(OperationStore.class), mock(OperationAttemptRunner.class), 1_000, 100);
@@ -221,6 +350,7 @@ final class PublishedStateStreamRecoveryCloseTest {
       new ApiSecurityFilters(false, null, new EventBuffer(), events, null, null, root.admission(),
           resources::admissionOperation).install(app);
       resources.register(app);
+      extraRoutes.accept(app);
       app.start("127.0.0.1", 0);
     }
 
@@ -250,6 +380,26 @@ final class PublishedStateStreamRecoveryCloseTest {
       var stream = new Stream(response.body(), end);
       streams.add(stream);
       return stream;
+    }
+
+    HttpResponse<String> send(String method, String route) throws Exception {
+      return client.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + app.port() + route))
+          .method(method, HttpRequest.BodyPublishers.noBody()).timeout(Duration.ofSeconds(10)).build(),
+          HttpResponse.BodyHandlers.ofString());
+    }
+
+    CompletableFuture<HttpResponse<String>> sendAsync(String method, String route) {
+      return client.sendAsync(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + app.port() + route))
+          .method(method, HttpRequest.BodyPublishers.noBody()).timeout(Duration.ofSeconds(15)).build(),
+          HttpResponse.BodyHandlers.ofString());
+    }
+
+    void awaitActive(int expected) throws InterruptedException {
+      long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+      while (root.admission().activeWorkCount() != expected && System.nanoTime() < deadline) {
+        Thread.sleep(5);
+      }
+      assertEquals(expected, root.admission().activeWorkCount());
     }
 
     KnowledgeServer installServer() throws Exception {

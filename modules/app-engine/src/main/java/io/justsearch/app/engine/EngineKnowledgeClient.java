@@ -1774,7 +1774,9 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
               if (outcomesOnly) {
                 // Terminal acceptance is lossless and independent of view overflow/resubscribe.
                 // Its consumer only appends to the bounded activity store; sockets stay async.
-                ingest.subscribeIndexingJobOutcomes(onFrame, ctx);
+                // Delivery still runs through the flow, so retirement completes the subscriber
+                // only after an outcome already being accepted has returned.
+                ingest.subscribeIndexingJobOutcomes(flow::deliverSynchronously, ctx);
               } else ingest.subscribeIndexingJobs(
                       SubscribeIndexingJobsRequest.newBuilder().build(),
                       frame -> {

@@ -479,6 +479,15 @@ final class BoundedHandoff<T> implements AutoCloseable {
     }
   }
 
+  /**
+   * Delivers one frame on the producer's own thread, without the queue, for a lossless producer
+   * whose consumer must accept before the producer moves on. It shares the delivery count with
+   * queued delivery, so {@link #complete} waits for it, and refuses once the flow is closed.
+   */
+  void deliverSynchronously(T frame) {
+    deliverFrame(frame);
+  }
+
   private boolean deliverFrame(T frame) {
     // A queued delivery can enter here after the outer drain passed its close check. The check
     // and the in-progress count share one lock, so complete() sees every call that can still run.
