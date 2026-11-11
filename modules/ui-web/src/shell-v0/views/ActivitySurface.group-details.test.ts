@@ -315,3 +315,47 @@ describe('14:10Z decision — a burst says how long it took and where it came fr
     expect(fact(el, 'activity-details-source')).toBe('Several: A schedule · The engine');
   });
 });
+
+// ---------------------------------------------------------------- file names at the Engine's address
+
+describe('amendment 14 — a record\'s file name is read from the Engine Activity is connected to', () => {
+  it('Activity with a separate Engine address resolves the file name there, not at the page\'s own origin', async () => {
+    const { __resetForTest: resetResolutions } = await import('../hooks/resolvePathLazy.js');
+    resetResolutions();
+    seedResourceCatalog({ schemaVersion: '1.0', catalogVersion: 1, namespace: 'core', primitive: 'Resource', entries: [
+      historyResource(),
+      { ...historyResource(), id: 'core.indexing-jobs', kind: 'indexing-jobs', primaryKey: 'pathHash',
+        privacy: { pathPolicy: 'HASHED_REQUIRES_RESOLVER', loopbackOnly: true, resolver: 'core.resolve-path-hash' } },
+    ] });
+    const asked: string[] = [];
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    fetchMock.mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (url.endsWith('/api/library/path-label')) {
+        asked.push(url);
+        // Only the Engine knows the file; the page's own origin has no such route.
+        return Promise.resolve(url.startsWith(`${API}/`)
+          ? json({ found: true, path: '/engine-local/reports/report.pdf' })
+          : new Response('not found', { status: 404 }));
+      }
+      return engineFetch(input);
+    });
+    try {
+      const el = document.createElement('jf-activity-surface') as ActivitySurface;
+      el.apiBase = API;
+      document.body.append(el);
+      await settle(el);
+      ledgerStream().snapshot([index(1, 'FAILED', { pathHash: 'split' })]);
+      historyStream().snapshot([]);
+      await settle(el);
+      await selectRecord(el);
+      await settle(el);
+      expect(asked.length, 'the file name was asked for').toBeGreaterThan(0);
+      expect(asked.every((u) => u.startsWith(`${API}/`)), `every file-name read went to the Engine: ${asked.join(', ')}`).toBe(true);
+      expect(fact(el, 'activity-details-file')).toContain('report.pdf');
+    } finally {
+      fetchMock.mockImplementation(engineFetch);
+      resetResolutions();
+    }
+  });
+});

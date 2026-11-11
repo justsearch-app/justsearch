@@ -646,7 +646,9 @@ export class ActionLedgerView extends JfElement {
     if (!pathHash || this.resolvingHashes.has(pathHash) || this.resolvedPaths[pathHash]) return;
     this.resolvingHashes.add(pathHash);
     const generation = this.mountGeneration;
-    const resolve = this.resolveHash ?? resolvePathLazy;
+    // Ask the Engine this view reads from, as Library and the failed-files list do (amendment 14).
+    const resolve = this.resolveHash
+      ?? ((resource: string, hash: string) => resolvePathLazy(resource, hash, { apiBase: this.apiBase || undefined }));
     void resolve(INDEXING_JOBS_RESOURCE, pathHash)
       .then((path) => {
         if (path && generation === this.mountGeneration) {

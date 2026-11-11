@@ -464,6 +464,28 @@ Repair after verification v1 (three defects): Escape with the keyboard on the pa
         "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts#an unknown transport reads Another source and its raw code appears nowhere in the pane",
         "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts#every backend transport and WORKER_INDEXER has source words in the rendered pane"
       ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Activity connected to an Engine at a separate address reads an indexing record's file name from that Engine (POST <apiBase>/api/library/path-label), never from the page's own origin, and the details pane shows the resolved name.",
+      "repaired": true,
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "Bring the aspects of the UI between the main windows up to date and remove bad practices and code implemented without an overarching design.",
+          "choice": "Settled Activity scenario amendment 14 (2026-11-11): related-file details work where the frontend and the Engine have different origins; file names resolve at the Engine Activity is connected to, as Library and the failed-files list already do.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-activity-details-resolver-origin.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts#Activity with a separate Engine address resolves the file name there, not at the page's own origin"
+      ]
     }
   ]
 }
