@@ -94,6 +94,27 @@ changes.
     },
     {
       "items": [
+        "modules/ui-web/src/shell-v0/views/HealthSurface.quiet.test.ts"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation",
+        "input re-encoding"
+      ],
+      "whatMoved": "The SH7 test's ledger() fixture handed the ledger reader's multiplex listener a hand-built reducer state, which was the bare array of retained ledger rows. The ledger reader's state is now the arbitrated stream state ({ rows, snapshotApplied, resets, unconfirmed }), so the bare array no longer reaches the controller (rows was undefined and the reader threw). The fixture now keeps the reducer the ledger reader registers with the multiplexer and folds each retained history through it as a snapshot frame ({ kind: 'snapshot', entries }) before calling the listener, which is what the shared multiplexed stream does (instrumentation). The same retained histories are delivered: the same keys, outcomes, operation id, originator and time, carried as snapshot entries instead of the old state array (input re-encoding). A snapshot is the Engine's current retention, so the empty history still drops the records it established, as the old array did. Every call to history(), every outcome the history reads return, the mark-read step and every assertion are unchanged.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "Keep one reading of the ledger: System Health's status controller and the Activity feed both read the ledger through the same arbitrated reducer. The Health test therefore delivers its histories through that reducer instead of building the reducer's internal state itself, and keeps every SH7 expectation."
+        }
+      ]
+    },
+    {
+      "items": [
         "modules/ui-web/src/shell-v0/substrates/effects/undoEntries.test.ts"
       ],
       "class": "Obsolete",

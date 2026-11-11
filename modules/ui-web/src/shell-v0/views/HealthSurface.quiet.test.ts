@@ -45,13 +45,25 @@ async function mount(ready = true): Promise<HealthSurface> {
   return el;
 }
 const row = (id: string) => el!.shadowRoot!.querySelector(`[data-health-row=${id}] dd`);
-/** The retained action-ledger history, as the shell's multiplexed stream delivers each snapshot. */
+/**
+ * The retained action-ledger history, as the shell's multiplexed stream delivers each snapshot: a
+ * snapshot frame folded through the reducer the ledger reader registered, then handed to its listener.
+ */
 function ledger(): (keys: readonly [string, 'SUCCESS' | 'FAILURE'][]) => Promise<void> {
-  let deliver: ((snapshot: { payload: unknown[] }) => void) | undefined;
-  controller!.setMultiplex({ subscribe: (_id: string, _config: unknown, listener: typeof deliver) => { deliver = listener; return () => undefined; } } as unknown as MultiplexedStream);
+  type Config = { initialState: unknown; reducer: (state: unknown, envelope: unknown) => unknown };
+  let deliver: ((snapshot: { payload: unknown; seq: number; resumeToken: null; isConnected: boolean }) => void) | undefined;
+  let config: Config | undefined;
+  let state: unknown;
+  let seq = 0;
+  controller!.setMultiplex({ subscribe: (_id: string, create: () => Config, listener: typeof deliver) => {
+    config = create(); state = config.initialState; deliver = listener; return () => undefined; } } as unknown as MultiplexedStream);
   return async keys => {
-    deliver!({ payload: keys.map(([key, result]) => ({ id: `operation:${key}`, kind: 'operation', occurredAt: '2026-11-11T11:58:00Z',
-      originator: 'USER', operationId: 'core.rebuild-index', outcome: result })) });
+    const entries = keys.map(([key, result]) => ({ id: `operation:${key}`, kind: 'operation', occurredAt: '2026-11-11T11:58:00Z',
+      originator: 'USER', operationId: 'core.rebuild-index', outcome: result }));
+    seq++;
+    state = config!.reducer(state, { streamId: 'surface:action-ledger', frameKind: 'LIFECYCLE', seq, ts: '2026-11-11T11:58:00Z',
+      resumeToken: null, payload: { kind: 'snapshot', entries } });
+    deliver!({ payload: state, seq, resumeToken: null, isConnected: true });
     for (let i = 0; i < 5; i++) await new Promise(resolve => setTimeout(resolve, 0));
     await el!.updateComplete;
   };
