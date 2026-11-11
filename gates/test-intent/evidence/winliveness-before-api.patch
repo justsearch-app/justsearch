@@ -1,0 +1,35 @@
+diff --git a/modules/shell/src-tauri/src/shell_actuator.rs b/modules/shell/src-tauri/src/shell_actuator.rs
+index 7a9e0a7a05..cc5161ea51 100644
+--- a/modules/shell/src-tauri/src/shell_actuator.rs
++++ b/modules/shell/src-tauri/src/shell_actuator.rs
+@@ -529,6 +529,30 @@ fn legacy_identity_check(pid: u32, birth: Option<&str>) -> &'static str {
+     }
+ }
+ 
++// Test-intent compatibility scaffolding for the before-state only: the candidate's pure exit step,
++// which the transplanted tests call. Nothing in this before-state's production code calls it.
++#[cfg(windows)]
++fn birth_verdict(seen: Option<&str>, birth: Option<&str>) -> &'static str {
++    match (seen, birth) {
++        (Some(a), Some(b)) if a == b => "ALIVE_MATCH",
++        (Some(_), Some(_)) => "GONE",
++        _ => "IDENTITY_UNKNOWN",
++    }
++}
++#[cfg(windows)]
++fn exit_verdict(
++    wait: windows_sys::Win32::Foundation::WAIT_EVENT,
++    seen: impl FnOnce() -> Option<String>,
++    birth: Option<&str>,
++) -> &'static str {
++    use windows_sys::Win32::Foundation::{WAIT_OBJECT_0, WAIT_TIMEOUT};
++    match wait {
++        WAIT_OBJECT_0 => "GONE",
++        WAIT_TIMEOUT => birth_verdict(seen().as_deref(), birth),
++        _ => "IDENTITY_UNKNOWN",
++    }
++}
++
+ #[cfg(target_os = "linux")]
+ fn linux_signal_name(signal: i32) -> String {
+     match signal {
