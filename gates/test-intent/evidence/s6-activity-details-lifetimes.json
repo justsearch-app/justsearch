@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
   },
-  "createdAt": "2026-11-11T20:34:27.100Z",
-  "revision": "d3a21166b77573a40a3b745893d5f255e5bf2cba",
-  "tree": "976f08cad56a73b04a173298bd7c3bd29006dc1d",
+  "createdAt": "2026-11-11T22:37:59.769Z",
+  "revision": "6c718b9b8d13fa334d1d94b9897a4667d3311a39",
+  "tree": "7ea44babec7dbede348f54ffdbd2e66713fc60f1",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.details.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/uj_psk9a/tmp/test-intent-vitest-15435-1794429263995.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.details.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-513963-1794436670186.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 3102
+      "durationMs": 3585
     }
   ],
   "checks": [
@@ -41,6 +41,27 @@
       ]
     }
   ],
-  "failBefore": null,
-  "digest": "sha256:5d8412ef32f71cfacf2567d8f281803e4ea23656ffec384c6005debb0c1d146d"
+  "failBefore": {
+    "ref": "95434de9c0",
+    "revision": "95434de9c04e63fbfda4880aa7288ba5a34b7805",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.details.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-513963-1794436676744.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 2698,
+        "output": "JSON report written to /tmp/test-intent-vitest-513963-1794436676744.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#a receipt read answered after Activity closed does not reach the reopened Activity or move focus",
+        "classification": "assertion",
+        "detail": "amendment 6 — leaving Activity during reads: obsolete answers change nothing a receipt read answered after Activity closed does not reach the reopened Activity or move focus:  AssertionError: a receipt read for 019a0000-0000-7000-8000-000000000001 is waiting: expected 0 to be greater than 0\n    at receipt (/tmp/test-intent-before-wtuhnt/modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts:128:63)\n    at /tmp/test-intent-before-wtuhnt/modules/ui-web/src/shell-"
+      }
+    ]
+  },
+  "digest": "sha256:b8aa2daef60a2ae0a72c15437da4aa5034f6077552ea1b7d53ace3cf0c5ef10e"
 }

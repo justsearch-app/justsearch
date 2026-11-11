@@ -93,7 +93,7 @@ Repair after verification v1 (three defects): Escape with the keyboard on the pa
         "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts"
       ],
       "class": "New",
-      "behaviour": "Amendment 6, preservation (passes before as well, where no details read existed): a receipt read answered after its Activity closed changes nothing in the reopened Activity and does not move focus.",
+      "behaviour": "Amendment 6, new: a receipt read that the details pane started and that is answered after its Activity closed changes nothing in the reopened Activity and does not move focus. The baseline has no details pane and starts no receipt read, so the check fails there at its precondition (no pending receipt read) before reaching the lifetime obligation.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -323,11 +323,8 @@ Repair after verification v1 (three defects): Escape with the keyboard on the pa
       "items": [
         "modules/ui-web/src/shell-v0/views/ActivitySurface.scroll-lockdown.test.ts"
       ],
-      "class": "Adaptation",
-      "moved": [
-        "instrumentation"
-      ],
-      "whatMoved": "A click on a record now also opens its details (a sheet at 600×400, which takes the keyboard). After the click the test presses Escape, which closes the details and returns the keyboard to that record, so the following Ctrl+End, Ctrl+Home, End and Home start from the record as before. Inputs, the click, the 'a click on a record focuses it' assertion and every later assertion are unchanged.",
+      "class": "Obsolete",
+      "behaviour": "Retired oracle: directly after a click on a feed record, the keyboard is on that record and Ctrl+End, Ctrl+Home, End and Home start from it.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -335,8 +332,31 @@ Repair after verification v1 (three defects): Escape with the keyboard on the pa
           "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
           "delegationScope": "the shell redesign's slices including Settings and secondary pages",
           "label": "agent choice",
-          "choice": "A17 (selecting a record opens its details; Escape returns to the opener) and the decided sheet presentation below 980 px."
+          "choice": "A17 with the decided sheet presentation below 980 px: selecting a record opens its details, and at 600×400 the details sheet takes the keyboard, so focus is no longer on the record right after the click."
         }
+      ],
+      "conflictSearch": "decision records searched for a conflict: none"
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.scroll-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "After a click on a feed record opens its details, Escape closes them and returns the keyboard to that record; from there Ctrl+End, Ctrl+Home, End and Home reach both ends of the feed, at 1280×720 and at 600×400 with 200% text. Wheel, touch and every other assertion of the test are unchanged.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "A17: selecting a record opens its details; Escape closes them and returns focus to the record; feed keys then work from the record (A16)."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-activity-details-scroll-escape.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.scroll-lockdown.test.ts#at 1280×720, one scroller holds the Activity feed, and the wheel, touch and keys reach both ends",
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.scroll-lockdown.test.ts#at 600×400 with 200% text, one scroller holds the Activity feed, and the wheel, touch and keys reach both ends"
       ]
     },
     {
