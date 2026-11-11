@@ -248,3 +248,14 @@ ContentLanguageWritePathsTest and ContentLanguageMaintenanceTest are exempt (iso
   "note": "Rebased onto 07769e24e2: the remaining entries hold against the new base. Before-state run on 07769e24e2 with the candidate's checks overlaid: every repaired check fails by assertion for the reason under test (locale tag en-US/de-DE instead of a content label or none; help marker stays v4, or a v4 marker triggers no re-ingest); retainsExistingScriptLabels and the passage-label check pass on both. Non-blocking wording: the prose says three new test files are exempt (two are; ContentLanguageTest is covered by entries), and the help entry says the released v4 marker names help under policy v9 (v0.3.2 shipped v4 with v7); neither changes an oracle."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "cb931fec-4aa3-4c83-8112-969f6334cf08:verifier-4",
+  "verdict": "accept",
+  "digest": "sha256:9450f908c89fee28557ca1c59ac13eb337cc4d9cc7b9a1f4d2ebb52c589e0961",
+  "note": "Rebased onto 8c726a279c (#1213): every entry holds against the new base. Before-state run on 8c726a279c with the candidate's checks overlaid: every repaired check fails by assertion for the reason under test (locale tag en-US instead of a content label or none; help marker stays v4, or a v4 marker triggers no re-ingest); retainsExistingScriptLabels and the passage-label check pass on both. The exempt ContentLanguageWritePathsTest now publishes first indexing through buildDeclaredChunks + replaceTextFamily as JobBatchWriter does and fails on the base by assertion (en-US). The labels evidence names 8c726a279c as its fail-before revision. The corrected wording holds: two exempt files; v0.3.2 shipped help marker v4 with extraction policy tika-default-v7."
+}
+```
