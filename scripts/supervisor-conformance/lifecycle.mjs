@@ -26,7 +26,7 @@ export async function runLifecycle({ name, testCase, policy, io }) {
     const faultGatePath=testCase.probe==='locked-renewed'?path.join(workDir,'running.json'):null;
     const run=runBinary({binary:binaryPath(io.repoRoot),workDir,dataDir,planPath,io,
       env:{...process.env,...io.harnessOverrides,...(faultGatePath?{JUSTSEARCH_FAKE_ENGINE_FAULT_GATE:faultGatePath}:{}),JUSTSEARCH_SUPERVISOR_START_DEADLINE_MS:String(testCase.startTimeoutMs??4000)},stopAfterIncarnation:0,
-      // The session probe must run before the binary's own run time ends it: 25 s setup wait + 60 s probe limit + margin.
+      // For the session case the binary's 90 s run time covers the 25 s setup wait and the probe's own 60 s limit, plus margin.
       ...(testCase.probe==='session'?{runMs:90000}:{})});
     Object.assign(run,{dataDir,faultGatePath,statePath:path.join(dataDir,'runtime/supervisor.v1.json'),seen:new Map()});runs.push(run);return run;
   }

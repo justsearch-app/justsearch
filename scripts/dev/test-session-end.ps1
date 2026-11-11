@@ -28,7 +28,7 @@ function Read-EngineRecords {
 $supervisor = Get-Process -Id $SupervisorPid -ErrorAction SilentlyContinue
 if (-not $supervisor) {
   $intents = @(Read-EngineRecords | Where-Object { $_.type -eq 'engine-intent' } | ForEach-Object { "$($_.reason)/$($_.detail)" }) -join ', '
-  throw "Supervisor $SupervisorPid already exited before the probe started; likely cause: the conformance binary stops itself after its --run-ms run time. Engine intents: [$intents]"
+  throw "The supervisor (pid $SupervisorPid) exited before the probe ran; one possible cause is the conformance binary's own --run-ms run time. Engine intents: [$intents]"
 }
 $window = [IntPtr]::Zero
 do {
