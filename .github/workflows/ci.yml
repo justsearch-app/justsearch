@@ -2014,7 +2014,7 @@ jobs:
           name: shell-supervisor-conformance-windows-attempt-${{ github.run_attempt }}
           path: tmp/supervisor-conformance/**
           if-no-files-found: ignore
-          retention-days: 14
+          retention-days: 30
 
   shell-rust-tests-linux:
     needs: changes

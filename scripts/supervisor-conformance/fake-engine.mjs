@@ -76,7 +76,10 @@ const dataDir = path.resolve(
 // A supervisor may discard this process's stderr (the Tauri driver does). Keep a copy beside
 // engine.log so a failed case's timing record can say why an incarnation ended. Written only
 // when something is written, and never in place of the real stream.
-const stderrCopy = path.join(dataDir, 'logs', `fake-engine-${process.pid}.stderr.log`);
+// Named per start: a PID can be reused by a later incarnation, its reference and entry time are not.
+const stderrRef = (env.JUSTSEARCH_ENGINE_INCARNATION ?? '').replace(/[^A-Za-z0-9._-]/g, '_');
+const stderrCopy = path.join(dataDir, 'logs',
+  `fake-engine-${process.pid}-${entryEpochMs}${stderrRef ? `-${stderrRef}` : ''}.stderr.log`);
 const keepStderr = (text) => {
   try {
     fs.mkdirSync(path.dirname(stderrCopy), { recursive: true });

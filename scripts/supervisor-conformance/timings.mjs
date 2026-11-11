@@ -10,16 +10,24 @@ function lines(file) {
 }
 const epoch = value => Number.isFinite(Date.parse(value)) ? Date.parse(value) : null;
 const STDERR_TAIL_CHARS = 2000;
+// The fake Engine's stderr copy is named by its incarnation reference, made filename-safe.
+export const stderrName = ref => ref.replace(/[^A-Za-z0-9._-]/g, '_');
 const EXIT_FIELDS = ['code', 'signal', 'signalName', 'codeName', 'exitClass', 'phase', 'forced', 'observedAt'];
 
 // How each Engine incarnation of one work folder ended, as the supervisor recorded it, and the end
 // of what that fake Engine wrote to stderr. An exit no supervisor recorded stays null.
 export function incarnationEnds(workDir, ledgerRows, events) {
   const ends = [];
+  const add = (incarnation, pid) => { const row = { incarnation, pid, workDir, exit: null, stderrTail: null }; ends.push(row); return row; };
+  // A reference names one incarnation; a PID may be reused by a later one (Windows does), so a PID
+  // alone joins only when exactly one row carries it, and never across two known references.
   const entry = (incarnation = null, pid = null) => {
-    let row = ends.find(candidate => (incarnation && candidate.incarnation === incarnation)
-      || (pid != null && candidate.pid === pid));
-    if (!row) ends.push(row = { incarnation, pid, workDir, exit: null, stderrTail: null });
+    let row = incarnation ? ends.find(candidate => candidate.incarnation === incarnation) : undefined;
+    if (!row && pid != null) {
+      const same = ends.filter(candidate => candidate.pid === pid && (!incarnation || !candidate.incarnation));
+      if (same.length === 1) row = same[0];
+    }
+    row ??= add(incarnation, pid);
     row.incarnation ??= incarnation;
     row.pid ??= pid;
     return row;
@@ -36,11 +44,17 @@ export function incarnationEnds(workDir, ledgerRows, events) {
       EXIT_FIELDS.filter(key => row[key] !== undefined).map(key => [key, row[key]]));
   }
   const logs = path.join(workDir, 'data', 'logs');
-  const files = fs.existsSync(logs) ? fs.readdirSync(logs) : [];
+  const files = fs.existsSync(logs) ? fs.readdirSync(logs).sort() : [];
   for (const name of files) {
-    const match = /^fake-engine-(\d+)\.stderr\.log$/.exec(name);
+    const match = /^fake-engine-(\d+)-\d+(?:-(.+))?\.stderr\.log$/.exec(name);
     if (!match) continue;
-    entry(null, Number(match[1])).stderrTail = fs.readFileSync(path.join(logs, name), 'utf8').slice(-STDERR_TAIL_CHARS);
+    const pid = Number(match[1]);
+    const named = match[2] ? ends.filter(row => row.incarnation && stderrName(row.incarnation) === match[2]) : [];
+    const row = named.length === 1 ? named[0]
+      : match[2] ? add(null, pid) : entry(null, pid);
+    row.pid ??= pid;
+    row.stderrFile = name;
+    row.stderrTail = fs.readFileSync(path.join(logs, name), 'utf8').slice(-STDERR_TAIL_CHARS);
   }
   return ends;
 }
@@ -64,7 +78,8 @@ export function caseTimings({ adapter, testCase, policy, root }) {
   const seen = new Set();
   const event = (phase, atMs, fields = {}) => {
     if (!Number.isFinite(atMs)) return;
-    const key = JSON.stringify([phase, fields.incarnation, fields.pid, fields.workDir, fields.launch]);
+    // entryEpochMs tells apart two unreferenced starts that reused one PID.
+    const key = JSON.stringify([phase, fields.incarnation, fields.pid, fields.entryEpochMs, fields.workDir, fields.launch]);
     if (seen.has(key)) return;
     seen.add(key);
     record.events.push({ phase, atMs, ...fields });
@@ -134,16 +149,19 @@ export function caseTimings({ adapter, testCase, policy, root }) {
           if (!match) continue;
           const entry = /entryEpochMs=(\d+) pid=(\d+)/.exec(match[2]);
           if (entry) {
-            const start = starts.find(row => row.pid === Number(entry[2]));
             const ref = /incarnationRef=(\S+)/.exec(match[2]);
-            current = { pid: Number(entry[2]), incarnation: ref?.[1]
+            // Without a reference, a PID names a start only if no other start reused it.
+            const same = ref ? [] : starts.filter(row => row.pid === Number(entry[2]));
+            const start = same.length === 1 ? same[0] : null;
+            current = { pid: Number(entry[2]), entryEpochMs: Number(entry[1]), incarnation: ref?.[1]
               ?? (start ? `${start.incarnation.session}/${start.incarnation.n}` : null) };
             event('engineEntry', Number(entry[1]), { ...current, workDir, source: 'fake Engine entry' });
           }
           const port = /JUSTSEARCH_API_PORT=(\d+)/.exec(match[2]);
           if (port) {
             // The preceding entry belongs to this log's current process, even when no ledger start survived.
-            event('portEmitted', epoch(match[1]), { incarnation: current?.incarnation, pid: current?.pid, workDir, source: 'fake Engine log' });
+            event('portEmitted', epoch(match[1]), { incarnation: current?.incarnation, pid: current?.pid,
+              entryEpochMs: current?.entryEpochMs, workDir, source: 'fake Engine log' });
           }
         }
         for (const row of rows) {
