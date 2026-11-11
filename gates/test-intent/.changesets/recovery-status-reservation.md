@@ -79,3 +79,14 @@ Agent choices under the quoted delegation, against the settled scenarios of the 
   "note": "Expectations match settled R1, R3 and P4-P6; evidence digests and assertion fail-before are valid. Test-intent acceptance does not certify unverified scenarios."
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "01a1c901-4465-7e10-9305-0f5779c1f093",
+  "verdict": "accept",
+  "digest": "sha256:650a592f0dda7ba077eea3901202bce79f7b814621249d5e908755de4cec8fbf",
+  "note": "Re-scoped R1 and delegated choices support the expectations; evidence and test-source digests match; repair runs fail by assertion for the intended refusal. Audit covers test intent, not Windows or physical index recovery."
+}
+```
