@@ -593,3 +593,13 @@ changes.
   "digest": "sha256:0037471e716183fe68f0d94ec35af657c8373528b1d4989ca2386980523ffd15"
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "01a1cbfb-5213-7713-8b36-ddc6402b5ea5",
+  "verdict": "accept",
+  "digest": "sha256:0037471e716183fe68f0d94ec35af657c8373528b1d4989ca2386980523ffd15"
+}
+```
