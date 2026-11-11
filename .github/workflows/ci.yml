@@ -2005,6 +2005,17 @@ jobs:
           node scripts/supervisor-conformance/run.mjs --adapter tauri --case fileless-clean-local-restart-is-not-counted --repeat 50
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      # Under CI, run.mjs keeps a failed case's work folder (ledger, logs, fake Engine stderr) and
+      # every timing record under tmp/supervisor-conformance; passing cases' folders are removed.
+      - name: Preserve supervisor conformance diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: shell-supervisor-conformance-windows-attempt-${{ github.run_attempt }}
+          path: tmp/supervisor-conformance/**
+          if-no-files-found: ignore
+          retention-days: 30
+
   shell-rust-tests-linux:
     needs: changes
     if: needs.changes.outputs.rust != 'false'
