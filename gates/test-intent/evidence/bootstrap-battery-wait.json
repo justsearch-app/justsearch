@@ -1,0 +1,50 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
+  },
+  "createdAt": "2026-11-11T18:08:56.370Z",
+  "revision": "c8fffe1d1f570f68be69f783f837621bc0b0a307",
+  "tree": "15d84cd5a93e89be83660157d880a0cfbe62de5b",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:ui:integrationTest --tests \"io.justsearch.app.engine.IndexingRulesBootstrapIntegrationTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 87972
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/integrationTest/java/io/justsearch/app/engine/IndexingRulesBootstrapIntegrationTest.java",
+      "file": "modules/ui/src/integrationTest/java/io/justsearch/app/engine/IndexingRulesBootstrapIntegrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:caa4a2819641639427f1c2caa7cdb01dca4b5eab0f07e6bb7a7ac29bfe298847",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "sameBootstrapCloseStartRearmsTheFreshReadingBarrier()",
+          "status": "passed"
+        },
+        {
+          "name": "fullMainHoldsFreshBatteryAndTimesOutUnknownWithDurablyQueuedWork()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:1faddab98a36745d5060685a24df40874b7404ae5cf05dc0322190e67fe6a326"
+}
