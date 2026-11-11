@@ -129,6 +129,15 @@ export class ActivitySurface extends JfElement {
   static styles = [
     surfaceLayoutStyles,
     css`
+    /* One scroller, the surface itself, holds the header and the feed: at 600×400 with 200% text a
+       fixed header would leave the feed a sliver of the window. */
+    :host {
+      overflow-y: auto;
+    }
+    .body {
+      flex: none;
+      overflow-y: visible;
+    }
     jf-action-ledger {
       display: block;
       width: 100%;

@@ -15,6 +15,11 @@ arbitration in both streams, the history source's unavailable state and the undo
 were repaired; those checks have their own fail-before evidence against ef84062e5e. After verification
 of 81b02ecadf, index-state classification in burst summaries and resolved labels and keyboard reach
 in the windowed feed were repaired; those checks have fail-before evidence against 81b02ecadf.
+After a check against a real Engine at 85d57d405e, three defects were repaired, each with fail-before
+evidence against 85d57d405e: Activity on a healthy, idle shared stream said its ledger showed
+last-known records until the next event; the System tab panel did not scroll at all (no element held
+the feed's overflow, and Health could not scroll either); and every command palette use added a No-op
+row under Your actions. The acceptance record below predates these changes.
 
 ```json
 {
@@ -406,6 +411,75 @@ in the windowed feed were repaired; those checks have fail-before evidence again
         "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts#A16 — at 600×400 with text at 200 percent, Home, End, Ctrl+Home, Ctrl+End, PageUp and PageDown reach the newest and oldest loaded rows, rendered and focused",
         "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts#A16 — at 1280×720, with focus on the page, not the feed, the scrolling keys move the feed to its newest and oldest loaded rows",
         "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts#A16 — at 600×400 with text at 200 percent, with focus on the page, not the feed, the scrolling keys move the feed to its newest and oldest loaded rows"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Repaired after a check against a real Engine (fail before at 85d57d405e). Live state: the Shell's ledger readers subscribe the action-ledger channel of the shared shell-events stream at boot, so the Engine's connected and snapshot frames for that channel reach them, not Activity; an idle channel sends nothing more, and the connection's heartbeat travels on its own system:shell-events-heartbeat channel. Activity opened on that healthy, idle stream (frames sent exactly as MultiplexedSseWriter and SseEnvelopeWriter send them) shows the ledger as live at once, on every opening, with no 'live updates are not connected' notice; when the connection really drops the ledger says it shows last-known records and keeps them. Before, it said last-known until the next ledger event. Your actions: a command palette action that does its own work journals a no-op as the user's, and its ledger copy arrives by the effect ingest; Your actions no longer lists it, while witnessed navigation is still revealed there and All with routine rows shown still lists the no-op once. Before, every palette use added a No-op row under Your actions (at 716017c61f the no-op showed only behind the routine toggle, which this change keeps).",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "Join a channel at its current state: the ledger source starts from what the shared channel has already established and whether the connection is up, so connection state comes from the stream's own connection signal and emptiness still only from a snapshot or a successful read (amendment 5). A no-op records that nothing was done, so it is not one of Your actions; All keeps showing it with routine rows as at 716017c61f."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-activity-feed-repair3.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts#Activity opened on a healthy, idle stream is live at once, every time; a real drop shows last-known",
+        "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts#a command palette use is not one of Your actions: its journaled no-op stays with the routine rows of All"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Preservation on the shared stream as a real Engine sends it (passes before as well): with the connection up and the ledger channel's connected frame and heartbeats received but no snapshot and no answered read, the feed says it is loading and never claims an empty ledger; the channel's snapshot then establishes the empty ledger and the source is live.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "Amendment 5 as settled: a heartbeat or connection alone never proves an empty source; the live-state repair must not weaken it."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-activity-feed-repair3.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts#connected and heartbeat frames alone never claim an empty ledger; the snapshot does"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.scroll-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Repaired after a check against a real Engine (fail before at 85d57d405e; the same at 716017c61f). In real Chromium with the real Shell opening System › Activity, whose 140 ledger records arrive over the shared stream as an Engine sends them, at 1280×720 and at 600×400 with 200 percent text: exactly one scroller holds the feed and it ends inside the window; the wheel and a touch drag over the feed move it; after clicking a record, Ctrl+End, Ctrl+Home, End and Home focus the oldest and the newest record, on screen; with focus on the page (a click on the Activity heading), the browser's Ctrl+End, Ctrl+Home, End and Home take that scroller to its end and its start. Before, no element scrolled: the tab panel clipped a member grown to its full content height. The Health and Logs tabs end inside the window and scroll in their own body; at 1280×720 the wheel moves Health's body. Before, Health had grown to its content height too and could not scroll. Named limit, not covered: at 600×400 with 200 percent text the Health and Logs windows' own fixed headers are taller than the tab, so their bodies start below the window.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "The member's own scroller owns the scroll, as the surface layout authority declares: the shared tab panel hands its height down as a flex column (the block wrapper added in #1096 broke that chain for every tab host). Activity scrolls as a whole, header and feed in one scroller, because a fixed header at 600×400 with 200 percent text leaves the feed about 24 pixels."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-activity-feed-repair3.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.scroll-lockdown.test.ts#at 1280×720, one scroller holds the Activity feed, and the wheel, touch and keys reach both ends",
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.scroll-lockdown.test.ts#at 600×400 with 200% text, one scroller holds the Activity feed, and the wheel, touch and keys reach both ends",
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.scroll-lockdown.test.ts#at 1280×720, the Health and Logs tabs keep their own scrolling",
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.scroll-lockdown.test.ts#at 600×400 with 200% text, the Health and Logs tabs keep their own scrolling"
       ],
       "repaired": true
     }

@@ -1,0 +1,200 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
+  },
+  "createdAt": "2026-11-11T16:33:28.821Z",
+  "revision": "85d57d405e1d415c4abe97a0a4c20e24fa656c08",
+  "tree": "1e5c567c768d92fca021f5e70cf6dc60ddb6f097",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/ActionLedgerView.feed.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/_zaln_4_/tmp/test-intent-vitest-26263-1794414746437.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1851
+    },
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.scroll-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/_zaln_4_/tmp/test-intent-vitest-26263-1794414748289.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 40792
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts#Activity opened on a healthy, idle stream is live at once, every time; a real drop shows last-known",
+      "file": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:146573302ed9ad6aaabf0bcc7089eecf937596d1556e4a11ac30cbf294a91d19",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the Shell's shared stream, as a real Engine sends it Activity opened on a healthy, idle stream is live at once, every time; a real drop shows last-known",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts#a command palette use is not one of Your actions: its journaled no-op stays with the routine rows of All",
+      "file": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:146573302ed9ad6aaabf0bcc7089eecf937596d1556e4a11ac30cbf294a91d19",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "classification and quick filters (A9, A10) a command palette use is not one of Your actions: its journaled no-op stays with the routine rows of All",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts#connected and heartbeat frames alone never claim an empty ledger; the snapshot does",
+      "file": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:146573302ed9ad6aaabf0bcc7089eecf937596d1556e4a11ac30cbf294a91d19",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the Shell's shared stream, as a real Engine sends it connected and heartbeat frames alone never claim an empty ledger; the snapshot does",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.scroll-lockdown.test.ts#at 1280×720, one scroller holds the Activity feed, and the wheel, touch and keys reach both ends",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.scroll-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:59e3683090e84220718854f74ee299cc43dd546f8da9a2b22b7df096d9a31c58",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "at 1280×720, one scroller holds the Activity feed, and the wheel, touch and keys reach both ends",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.scroll-lockdown.test.ts#at 600×400 with 200% text, one scroller holds the Activity feed, and the wheel, touch and keys reach both ends",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.scroll-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:59e3683090e84220718854f74ee299cc43dd546f8da9a2b22b7df096d9a31c58",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "at 600×400 with 200% text, one scroller holds the Activity feed, and the wheel, touch and keys reach both ends",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.scroll-lockdown.test.ts#at 1280×720, the Health and Logs tabs keep their own scrolling",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.scroll-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:59e3683090e84220718854f74ee299cc43dd546f8da9a2b22b7df096d9a31c58",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "at 1280×720, the Health and Logs tabs keep their own scrolling",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.scroll-lockdown.test.ts#at 600×400 with 200% text, the Health and Logs tabs keep their own scrolling",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.scroll-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:59e3683090e84220718854f74ee299cc43dd546f8da9a2b22b7df096d9a31c58",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "at 600×400 with 200% text, the Health and Logs tabs keep their own scrolling",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "85d57d405e",
+    "revision": "85d57d405e1d415c4abe97a0a4c20e24fa656c08",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/ActionLedgerView.feed.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/_zaln_4_/tmp/test-intent-vitest-26263-1794414792726.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1335,
+        "output": "JSON report written to /home/elias/.cache/am/_zaln_4_/tmp/test-intent-vitest-26263-1794414792726.json\n\n"
+      },
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.scroll-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/_zaln_4_/tmp/test-intent-vitest-26263-1794414794061.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 14278,
+        "output": "JSON report written to /home/elias/.cache/am/_zaln_4_/tmp/test-intent-vitest-26263-1794414794061.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts#Activity opened on a healthy, idle stream is live at once, every time; a real drop shows last-known",
+        "classification": "assertion",
+        "detail": "the Shell's shared stream, as a real Engine sends it Activity opened on a healthy, idle stream is live at once, every time; a real drop shows last-known:  AssertionError: no ledger source notice while the stream is live: expected 'last-known' to be null\n    at /home/elias/.cache/am/_zaln_4_/tmp/test-intent-before-0fxQE5/modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts:379:79\n    at file:///home/elias/.cache/am/_zaln_4_/tmp/test-int"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts#a command palette use is not one of Your actions: its journaled no-op stays with the routine rows of All",
+        "classification": "assertion",
+        "detail": "classification and quick filters (A9, A10) a command palette use is not one of Your actions: its journaled no-op stays with the routine rows of All:  AssertionError: Your actions lists no no-op: expected true to be false // Object.is equality\n    at /home/elias/.cache/am/_zaln_4_/tmp/test-intent-before-0fxQE5/modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts:585:84\n    at file:///home/elias/.cache/am/_zaln_4_/tmp/test-intent-be"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts#connected and heartbeat frames alone never claim an empty ledger; the snapshot does",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.scroll-lockdown.test.ts#at 1280×720, one scroller holds the Activity feed, and the wheel, touch and keys reach both ends",
+        "classification": "assertion",
+        "detail": "at 1280×720, one scroller holds the Activity feed, and the wheel, touch and keys reach both ends:  AssertionError: exactly one scroller holds jf-action-ledger (found {\"count\":0,\"names\":[]}): expected +0 to be 1 // Object.is equality\n    at theScroller (/home/elias/.cache/am/_zaln_4_/tmp/test-intent-before-0fxQE5/modules/ui-web/src/shell-v0/views/ActivitySurface.scroll-lockdown.test.ts:170:93)"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.scroll-lockdown.test.ts#at 600×400 with 200% text, one scroller holds the Activity feed, and the wheel, touch and keys reach both ends",
+        "classification": "assertion",
+        "detail": "at 600×400 with 200% text, one scroller holds the Activity feed, and the wheel, touch and keys reach both ends:  AssertionError: exactly one scroller holds jf-action-ledger (found {\"count\":0,\"names\":[]}): expected +0 to be 1 // Object.is equality\n    at theScroller (/home/elias/.cache/am/_zaln_4_/tmp/test-intent-before-0fxQE5/modules/ui-web/src/shell-v0/views/ActivitySurface.scroll-lockdown.test.ts:170:93)"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.scroll-lockdown.test.ts#at 1280×720, the Health and Logs tabs keep their own scrolling",
+        "classification": "assertion",
+        "detail": "at 1280×720, the Health and Logs tabs keep their own scrolling:  AssertionError: jf-health-surface ends inside the window: expected 1738.875 to be less than or equal to 720.5\n    at /home/elias/.cache/am/_zaln_4_/tmp/test-intent-before-0fxQE5/modules/ui-web/src/shell-v0/views/ActivitySurface.scroll-lockdown.test.ts:305:64\n    at file:///home/elias/.cache/am/_zaln"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.scroll-lockdown.test.ts#at 600×400 with 200% text, the Health and Logs tabs keep their own scrolling",
+        "classification": "assertion",
+        "detail": "at 600×400 with 200% text, the Health and Logs tabs keep their own scrolling:  AssertionError: jf-health-surface ends inside the window: expected 4901.328125 to be less than or equal to 400.5\n    at /home/elias/.cache/am/_zaln_4_/tmp/test-intent-before-0fxQE5/modules/ui-web/src/shell-v0/views/ActivitySurface.scroll-lockdown.test.ts:305:64\n    at file:///home/elias/.cache/am/_z"
+      }
+    ]
+  },
+  "digest": "sha256:6f58a16ee1e8aff6b05c3e1bb625ced827c9b959948cf63bd7ea3a21c35fd2f8"
+}

@@ -282,10 +282,18 @@ export function routineShown(filter: FeedFilter): boolean {
   return filter.quick === 'mine' || filter.quick === 'indexing' || filter.quick === 'problems';
 }
 
+/**
+ * A no-op records that nothing was done: palette and kernel actions that do their own work journal
+ * one. All shows it with routine rows, as before; it is never one of Your actions.
+ */
+function isNoop(row: FeedRow): boolean {
+  return row.journal?.effect.kind === 'noop' || (row.ledger?.kind === 'effect' && row.ledger.effectKind === 'noop');
+}
+
 function matchesQuick(row: FeedRow, quick: QuickFilter): boolean {
   switch (quick) {
     case 'agents': return row.entry.originator === 'agent';
-    case 'mine': return row.entry.originator === 'user';
+    case 'mine': return row.entry.originator === 'user' && !isNoop(row);
     case 'indexing': return row.indexing;
     case 'problems': return row.problem;
     default: return true;

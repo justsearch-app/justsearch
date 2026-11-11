@@ -11,7 +11,8 @@
  *
  * Two variants (the only two the surfaces actually use):
  *  - `surfaceLayoutStyles` (default): the body scrolls inside a fixed header
- *    (Search / Activity / Health / Browse / Library / Logs / Agent / TokenEditor).
+ *    (Search / Health / Browse / Library / Logs / Agent / TokenEditor). Activity keeps these
+ *    regions but scrolls as a whole, header included, so its feed keeps the window at 200% text.
  *  - `surfaceScrollLayoutStyles`: the whole host scrolls under a sticky header
  *    (Brain / Settings / Help).
  *

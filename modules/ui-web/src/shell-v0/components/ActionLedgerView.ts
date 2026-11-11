@@ -53,6 +53,7 @@ import { listJournal, subscribeJournal, type JournalEntry } from '../substrates/
 import { resolvePathLazy, friendlyPathName } from '../hooks/resolvePathLazy.js';
 import type { MultiplexedStream } from '../streaming/MultiplexedStream.js';
 import { getSharedShellEventsMultiplex } from '../streaming/shellEventsMultiplexInstance.js';
+import { SHELL_EVENT_STREAM_IDS } from '../streaming/shellEventStreamIds.js';
 import { EnvelopeStream, type EnvelopeReducer } from '../streaming/EnvelopeStream.js';
 import { FetchEventSource, type StreamSource } from '../streaming/FetchEventSource.js';
 import { applySnapshot, observe } from '../streaming/snapshotArbitration.js';
@@ -387,6 +388,14 @@ export class ActionLedgerView extends JfElement {
       this.ledger = state;
       this.ledgerConnected = isConnected;
     }));
+    // Joining a channel the Shell already reads: its connect frames went to the readers before this
+    // one, and an idle ledger channel sends nothing more (the connection's heartbeat has its own
+    // channel). Start from what the channel has established and whether the connection is up.
+    const current = multiplex?.getSnapshot<LedgerStreamState>(SHELL_EVENT_STREAM_IDS.ACTION_LEDGER);
+    if (current && current.seq > 0) {
+      this.ledger = current.payload;
+      this.ledgerConnected = current.isConnected;
+    }
     void this.seedFromLedgerSnapshot(generation);
     this.openHistory();
     this.journal = listJournal();

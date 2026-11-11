@@ -20,6 +20,8 @@ import {
   __seedForTest as seedResourceCatalog,
 } from '../../api/registry/ResourceCatalogClient.js';
 import type { Resource } from '../../api/types/registry.js';
+import { MultiplexedStream } from '../streaming/MultiplexedStream.js';
+import { openActionLedgerStream } from '../operations/ActionLedgerClient.js';
 
 class FakeEventSource {
   listeners: Record<string, Array<(e: unknown) => void>> = {};
@@ -308,6 +310,108 @@ describe('first load and reconnect arbitration (challenger 4)', () => {
   });
 });
 
+/**
+ * The Engine's `/api/shell-events/stream` as `MultiplexedSseWriter` and `SseEnvelopeWriter` send it:
+ * on every connect, each stateful channel gets `connected` (no checkpoint yet) and then `snapshot`
+ * carrying its rows and the boundary token; while idle the ledger channel sends nothing, and the
+ * connection's heartbeat travels on its own `system:shell-events-heartbeat` channel every 15 s.
+ */
+class EngineShellEvents extends EventTarget {
+  readyState = 0;
+  private readonly seqs = new Map<string, number>();
+  constructor(readonly url: string) { super(); }
+  close(): void { this.readyState = 2; }
+  private send(streamId: string, frameKind: 'LIFECYCLE' | 'UPDATE', payload: unknown, checkpoint: boolean): void {
+    const seq = (this.seqs.get(streamId) ?? 0) + 1;
+    this.seqs.set(streamId, seq);
+    const resumeToken = checkpoint ? btoa(`${streamId}:${seq}:incarnation-1`) : '';
+    const data = JSON.stringify({ streamId, frameKind, seq, ts: new Date().toISOString(), payload, resumeToken });
+    this.dispatchEvent(new MessageEvent('frame', { data }));
+  }
+  /** The connection opens: the ledger channel's `connected`, then (unless held back) its snapshot. */
+  open(entries: unknown[] | null): void {
+    this.readyState = 1;
+    this.dispatchEvent(new Event('open'));
+    this.send('surface:action-ledger', 'LIFECYCLE', { kind: 'connected' }, false);
+    if (entries) this.snapshot(entries);
+  }
+  snapshot(entries: unknown[]): void { this.send('surface:action-ledger', 'LIFECYCLE', { kind: 'snapshot', entries }, true); }
+  heartbeat(): void { this.send('system:shell-events-heartbeat', 'LIFECYCLE', { kind: 'heartbeat' }, false); }
+  /** The connection really drops (the transport fails: readyState CLOSED, then `error`). */
+  drop(): void { this.readyState = 2; this.dispatchEvent(new Event('error')); }
+}
+
+describe("the Shell's shared stream, as a real Engine sends it", () => {
+  let engine: EngineShellEvents;
+  let multiplex: MultiplexedStream;
+  let stopBoot: () => void;
+
+  /** The Shell at boot: the shared connection opened, with its own ledger readers already subscribed. */
+  function bootShell(): void {
+    multiplex = new MultiplexedStream({ url: '/api/shell-events/stream', watchdogStaleMs: 0,
+      reconnectBaseMs: 60_000, eventSourceFactory: (url) => (engine = new EngineShellEvents(url)) });
+    stopBoot = openActionLedgerStream({ multiplex, onActivity: () => {} });
+    multiplex.start();
+  }
+
+  function mountActivity(answer: () => Promise<unknown[]>): ActionLedgerView {
+    const el = mount(answer);
+    el.remove();
+    el.multiplex = multiplex;
+    document.body.appendChild(el);
+    historyStream().snapshot([]);
+    return el;
+  }
+
+  const ledgerState = (): string | null => q('[data-testid="feed-source-ledger"]')[0]?.getAttribute('data-state') ?? null;
+
+  afterEach(() => { stopBoot(); multiplex.stop(); });
+
+  it('Activity opened on a healthy, idle stream is live at once, every time; a real drop shows last-known', async () => {
+    bootShell();
+    engine.open([op('earlier')]);
+    engine.heartbeat();
+    mountActivity(async () => [op('earlier')]);
+    await settle();
+    engine.heartbeat();
+    await settle();
+    expect(keys()).toEqual(['operation:earlier']);
+    expect(ledgerState(), 'no ledger source notice while the stream is live').toBeNull();
+    expect(host.shadowRoot!.textContent).not.toContain('live updates are not connected');
+
+    // Leave Activity and open it again: still nothing new on the ledger channel, still live.
+    host.remove();
+    mountActivity(async () => [op('earlier')]);
+    await settle();
+    engine.heartbeat();
+    await settle();
+    expect(keys()).toEqual(['operation:earlier']);
+    expect(ledgerState()).toBeNull();
+
+    engine.drop();
+    await settle();
+    expect(ledgerState()).toBe('last-known');
+    expect(q('[data-testid="feed-source-ledger"]')[0]?.textContent).toContain('live updates are not connected');
+    expect(keys()).toEqual(['operation:earlier']);
+  });
+
+  it('connected and heartbeat frames alone never claim an empty ledger; the snapshot does', async () => {
+    bootShell();
+    engine.open(null);
+    engine.heartbeat();
+    mountActivity(() => new Promise(() => {}));
+    await settle();
+    engine.heartbeat();
+    await settle();
+    expect(q('[data-testid="ledger-empty"]')).toHaveLength(0);
+    expect(q('[data-testid="ledger-loading"]')).toHaveLength(1);
+    engine.snapshot([]);
+    await settle();
+    expect(q('[data-testid="ledger-empty"]')[0]?.textContent).toContain('No activity in loaded records');
+    expect(ledgerState()).toBeNull();
+  });
+});
+
 describe('per-source states (challenger 5)', () => {
   it('each source says loading, unavailable or last-known; rows from the others still show as partial activity', async () => {
     mount(async () => { throw new Error('refused'); });
@@ -464,6 +568,26 @@ describe('classification and quick filters (A9, A10)', () => {
     expect(label('index:2')).toContain('Index gave up · corpus/h2.pdf');
     expect(label('index:3')).toContain('Index state unknown (PAUSED) · corpus/h3.pdf');
     expect(label('index:4')).toContain('Indexed · corpus/h4.pdf');
+  });
+
+  it('a command palette use is not one of Your actions: its journaled no-op stays with the routine rows of All', async () => {
+    // A palette action that does its own work returns a no-op, which applyEffect journals as the
+    // user's, and the effect ingest gives the ledger its copy.
+    const noop = recordEffect({ kind: 'noop' }, CORE_PROVENANCE, { originator: 'user' });
+    recordEffect({ kind: 'navigate', to: 'justsearch://surface/core.library-surface' }, CORE_PROVENANCE, { originator: 'user' });
+    mount();
+    ledger.snapshot([op('mine'), { id: noop.ledgerId, kind: 'effect', occurredAt: noop.invokedAt, originator: 'user',
+      effectKind: 'noop', subject: '' }]);
+    await settle();
+    choose('mine');
+    await settle();
+    const labels = q('.item').map((r) => r.textContent ?? '');
+    expect(labels.some((t) => t.includes('No-op')), 'Your actions lists no no-op').toBe(false);
+    expect(keys()).toContain('operation:mine');
+    expect(labels.some((t) => /navigate|Navigate/.test(t)), 'witnessed navigation is still revealed').toBe(true);
+    host.filter = { ...host.filter, quick: 'all', routine: 'show' };
+    await settle();
+    expect(q('.item').filter((r) => (r.textContent ?? '').includes('No-op')), 'All with routine shown keeps the no-op').toHaveLength(1);
   });
 
   it('an explicit advanced routine choice overrides every quick filter, as its label states', async () => {
