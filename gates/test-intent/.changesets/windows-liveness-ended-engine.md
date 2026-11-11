@@ -69,3 +69,14 @@ transplanted tests call and leaves the before-state's liveness check unchanged.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-14dd1ouf",
+  "verdict": "accept",
+  "digest": "sha256:9da49ffa1e89d498716a0b28e47087efd9089377d13d6f3eddef2c88c23a68c6",
+  "note": "Six Windows checks match the delegated cases; four repair checks assertion-fail before. Coverage gaps remain in the verification report."
+}
+```
