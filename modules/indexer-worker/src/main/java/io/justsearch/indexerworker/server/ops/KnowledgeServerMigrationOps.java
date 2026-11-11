@@ -54,6 +54,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -92,6 +93,12 @@ public final class KnowledgeServerMigrationOps {
      * certify. Returns true when it did; its obligations stay for the refusal cleanup.
      */
     default boolean refuseUncertifiable() { return false; }
+
+    /** Whether a deferred model start holds its wiring leases now; promotion waits for it. */
+    default boolean modelWiringInFlight() { return false; }
+
+    /** How long the switch waits for one in-flight model start before it fails. */
+    default long modelWiringMaxDurationMs() { return Long.MAX_VALUE; }
   }
 
   public record CutoverContext(
@@ -278,6 +285,8 @@ public final class KnowledgeServerMigrationOps {
     if (context.indexGenerationManager() == null || context.jobQueue() == null) {
       return;
     }
+    // Its own bound, apart from queue and finalization deferrals and the watcher-debt exemption.
+    Long modelWiringSinceNanos = null;
     while (context.runningSupplier().getAsBoolean() && !Thread.currentThread().isInterrupted()) {
       try {
         Throwable enumerationFailure = context.migrationEnumeratorFailureSupplier().get();
@@ -293,6 +302,26 @@ public final class KnowledgeServerMigrationOps {
         if (ms == IndexGenerationManager.MigrationState.IDLE
             || ms == IndexGenerationManager.MigrationState.FAILED) {
           return;
+        }
+
+        if (context.liveCutover().modelWiringInFlight()) {
+          long now = System.nanoTime();
+          long boundMs = context.liveCutover().modelWiringMaxDurationMs();
+          if (modelWiringSinceNanos == null) {
+            modelWiringSinceNanos = now;
+          } else if (now - modelWiringSinceNanos > TimeUnit.MILLISECONDS.toNanos(boundMs)) {
+            context.log().warn(
+                "Migration cutover failed: the deferred model start is still wiring after {}ms"
+                    + " (model wiring timeout); keeping Blue active",
+                boundMs);
+            context
+                .indexGenerationManager()
+                .updateMigrationState(IndexGenerationManager.MigrationState.FAILED);
+            context.drainSwitchBufferAction().run();
+            return;
+          }
+        } else {
+          modelWiringSinceNanos = null;
         }
 
         if (state != null && Boolean.TRUE.equals(state.migration_paused())) {

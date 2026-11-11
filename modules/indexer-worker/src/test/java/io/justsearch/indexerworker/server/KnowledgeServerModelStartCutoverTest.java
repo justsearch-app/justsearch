@@ -108,15 +108,21 @@ final class KnowledgeServerModelStartCutoverTest {
   }
 
   @Test
-  void shutdownWhileTheSwitchWaitsForAHeldModelStartIsBounded() throws Exception {
+  void shutdownWhileTheSwitchWaitsForAHeldModelStartEndsOnceTheStartExits() throws Exception {
     try (var forced = new Forced(true)) {
       forced.releaseOnSwitchRetry = false;
       var server = forced.boot(plainServer(tempDir));
+      var closeEntered = new CountDownLatch(1);
+      doAnswer(invocation -> {
+        closeEntered.countDown();
+        return invocation.callRealMethod();
+      }).when(server).close();
       forced.migrateLive();
       forced.startModelsWhenSwitchReached();
       assertTrue(forced.startHeld.await(60, TimeUnit.SECONDS), "the start is held");
       var closed = closeInBackground(server);
-      assertFalse(closed.isDone(), "close joins the held initializer");
+      assertTrue(closeEntered.await(30, TimeUnit.SECONDS), "close() was entered");
+      // The held start exits only when released; close joins it (unbounded, as before).
       forced.releaseHeld.countDown();
       closed.get(60, TimeUnit.SECONDS);
       assertTrue(server.awaitClosed(0), "close completed");
@@ -188,22 +194,8 @@ final class KnowledgeServerModelStartCutoverTest {
       })) {
         var server = captured.get();
         forced.attached(server);
-        Path model = tempDir.resolve("m4-models").resolve("onnx").resolve("gte-multilingual-base");
-        var assembly = embeddingAssembly(sessions);
-        forced.initializer = () -> {
-          // Mockito static mocks belong to the thread that composes the models.
-          try (var assembler = mockStatic(OrtSessionAssembler.class);
-              var embeddingAssembly = mockStatic(OnnxEmbeddingEncoder.class)) {
-            assembler.when(() -> OrtSessionAssembler.buildManager(anyString(), any(), any(), any()))
-                .thenReturn(sessions);
-            embeddingAssembly.when(() -> OnnxEmbeddingEncoder.buildAssembly(
-                    same(sessions), eq(model), anyInt(), anyInt(), anyBoolean(), any()))
-                .thenReturn(assembly);
-            QueryPrewarmFixture.invokeDeferredModelInitialization(server);
-          } catch (Exception failure) {
-            throw new IllegalStateException(failure);
-          }
-        };
+        forced.initializer = embeddingInitializer(server, sessions,
+            tempDir.resolve("m4-models").resolve("onnx").resolve("gte-multilingual-base"));
         forced.migrateLive();
         forced.startModelsWhenSwitchReached();
         forced.awaitSwitchAndModels();
@@ -282,6 +274,179 @@ final class KnowledgeServerModelStartCutoverTest {
         prewarmLog.setLevel(prewarmLevel);
         appender.stop();
       }
+    }
+  }
+
+  /**
+   * M5: a deferred model start that begins and completes (or fails after wiring) while the switch
+   * prepares its successor. The recorded switch's settings preparation runs outside the runtime
+   * lock; the test lifecycle holds the first preparation until the start has exited.
+   */
+  @org.junit.jupiter.params.ParameterizedTest(name = "start fails after wiring: {0}")
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void aModelStartInsideSuccessorPreparationIsWhatTheSuccessorServes(boolean failAfterWiring)
+      throws Exception {
+    var previous = io.justsearch.configuration.resolved.ConfigStore.globalOrNull();
+    Path models = tempDir.resolve("m5-models");
+    Path reranker = models.resolve("onnx").resolve("reranker");
+    Files.createDirectories(reranker);
+    for (String file : List.of("model.onnx", "model_fp16.onnx", "tokenizer.json", "config.json")) {
+      Files.writeString(reranker.resolve(file), "stub");
+    }
+    var values = new java.util.HashMap<String, String>();
+    values.put(io.justsearch.configuration.EnvRegistry.DATA_DIR.configKey(),
+        tempDir.resolve("m5").toString());
+    values.put("justsearch.index.base_path", tempDir.resolve("m5-index").toString());
+    values.put(io.justsearch.configuration.EnvRegistry.MODELS_DIR.configKey(), models.toString());
+    values.put(io.justsearch.configuration.EnvRegistry.SPARSE_MODEL.configKey(), "splade");
+    for (var key : new io.justsearch.configuration.EnvRegistry[] {
+        io.justsearch.configuration.EnvRegistry.AI_EMBED_ENABLED,
+        io.justsearch.configuration.EnvRegistry.SPLADE_ENABLED,
+        io.justsearch.configuration.EnvRegistry.NER_ENABLED,
+        io.justsearch.configuration.EnvRegistry.CITATION_SCORER_ENABLED,
+        io.justsearch.configuration.EnvRegistry.BGE_M3_ENABLED}) {
+      values.put(key.configKey(), "false");
+    }
+    values.put(io.justsearch.configuration.EnvRegistry.RERANK_ENABLED.configKey(), "true");
+    values.put(io.justsearch.configuration.EnvRegistry.RERANK_MODEL_PATH.configKey(),
+        reranker.toString());
+    values.put(io.justsearch.configuration.EnvRegistry.RERANK_GPU_ENABLED.configKey(), "false");
+    var configuration = io.justsearch.configuration.resolved.TestResolvedConfigHelper
+        .fromEntries(values);
+    io.justsearch.configuration.resolved.ConfigStore.setGlobal(
+        new io.justsearch.configuration.resolved.ConfigStore(configuration));
+    var lifecycle = new PreparationWindowLifecycle();
+    try (var executors = new TestEngineExecutors(); var forced = new Forced(false)) {
+      var server = spy(new KnowledgeServer(executors,
+          io.justsearch.indexerworker.WorkerConfig.load(configuration), null,
+          io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), lifecycle, null, null,
+          configuration));
+      forced.install(server);
+      if (failAfterWiring) {
+        // Wiring runs in order; a disambiguation binding that cannot be wired fails the start
+        // after the earlier bindings were applied, and its cleanup rewires the services.
+        doAnswer(invocation -> {
+          invocation.<java.util.function.Consumer<Object>>getArgument(1).accept(null);
+          return null;
+        }).when(server).initializeDisambiguationService(any(), any());
+      }
+      server.start();
+      forced.attached(server);
+      forced.initializer = () -> composeWithReranker(server);
+      var fingerprint = KnowledgeServer.class.getDeclaredMethod("expectedIndexFingerprintOrNull");
+      fingerprint.setAccessible(true);
+      lifecycle.fingerprint = (String) fingerprint.invoke(server);
+      lifecycle.source = forced.oldGeneration;
+      forced.successorGeneration = forced.manager.startRecordedMigration(
+          PreparationWindowLifecycle.OPERATION, "recorded-test", lifecycle.fingerprint,
+          lifecycle.source, List.of()).building_generation();
+      lifecycle.authorized = true;
+      assertTrue(server.beginRecordedBuildingLiveAsync(PreparationWindowLifecycle.OPERATION,
+          forced.restarts::incrementAndGet).get(30, TimeUnit.SECONDS), "Green opens live");
+
+      assertTrue(lifecycle.preparing.await(60, TimeUnit.SECONDS),
+          "the switch is preparing its successor outside the runtime lock");
+      forced.startModels();
+      server.deferredModelInit.handle((ignored, failure) -> null).get(60, TimeUnit.SECONDS);
+      Map<String, Object> wired;
+      try (var serving = server.captureServingView()) {
+        assertEquals(forced.oldGenerationPath(), serving.activeGenerationPath(),
+            "the start ran entirely while the old generation served");
+        wired = queryBindings(serving.services());
+      }
+      if (!failAfterWiring) assertNotNull(wired.get("searchReranker"), "the start wired a reranker");
+      lifecycle.resume.countDown();
+
+      assertTrue(server.awaitMigrationCutoverExitForTests(60, TimeUnit.SECONDS), "the switch ends");
+      assertEquals(forced.successorGeneration,
+          forced.manager.readStateBestEffort().active_generation(), "the switch completed");
+      try (var serving = server.captureServingView()) {
+        assertEquals(forced.manager.resolveGenerationPathStrict(forced.successorGeneration),
+            serving.activeGenerationPath());
+        var published = queryBindings(serving.services());
+        assertAll(wired.keySet().stream().map(name -> () -> assertSame(wired.get(name),
+            published.get(name), name + " of the published successor is the one the start left")));
+        if (!failAfterWiring) {
+          var view = getDeclared(serving, "captured");
+          var query = (QueryRoleSet) getDeclared(view, "queryRoleSet");
+          assertNotNull(query, "the successor serves the start's query set");
+          assertSame(query.reranker(), published.get("searchReranker"));
+        }
+      }
+    } finally {
+      lifecycle.resume.countDown();
+      io.justsearch.configuration.resolved.TestResolvedConfigHelper.restoreGlobal(previous);
+    }
+  }
+
+  /**
+   * P10: a model start that never finishes, with watcher reconciliation debt pending and Green's
+   * embeddings pending, so the switch neither reaches promotion nor its deadline. Its own bound
+   * (shortened here) fails the switch on the existing failure path.
+   */
+  @Test
+  @Timeout(120)
+  void aModelStartThatNeverFinishesCannotHoldTheSwitch() throws Exception {
+    var sessions = new QueryPrewarmFixture.SlowGpuSessions(50L);
+    var captured = new AtomicReference<KnowledgeServer>();
+    // A resolvable embedding identity: Green earns no embedding stamp while the held start
+    // provides no embeddings, so the switch keeps deferring at its embedding finalization.
+    io.justsearch.indexerworker.embed.EmbeddingFingerprint.setForTesting("p10-embedding");
+    try (var forced = new Forced(true)) {
+      forced.releaseOnSwitchRetry = false;
+      try (var boot = new QueryPrewarmFixture.Boot(tempDir, "p10", sessions, 10_000L, server -> {
+        captured.set(server);
+        forced.install(server);
+        forced.projectionSource(server);
+        shortenModelWiringBound(server, 5_000L);
+      })) {
+        var server = captured.get();
+        forced.attached(server);
+        forced.initializer = embeddingInitializer(server, sessions,
+            tempDir.resolve("p10-models").resolve("onnx").resolve("gte-multilingual-base"));
+        forced.migrateLive();
+        var root = Files.createDirectories(tempDir.resolve("p10-watched"));
+        var debt = new io.justsearch.indexerworker.queue.WatcherRootReconciliation(root.toString(),
+            "p10-root-incarnation", "notes");
+        var queue = (io.justsearch.indexerworker.queue.SqliteJobQueue) getField(server, "jobQueue");
+        assertTrue(queue.putSwitchBuffer(debt.key(),
+            io.justsearch.indexerworker.queue.WatcherRootReconciliation.OPERATION, debt.encode()));
+        assertTrue(io.justsearch.indexerworker.server.ops.KnowledgeServerMigrationOps
+            .hasWatcherReconciliationDebt(queue), "watcher reconciliation debt is pending");
+        forced.startModelsWhenSwitchReached();
+        assertTrue(forced.startHeld.await(60, TimeUnit.SECONDS), "the start is held");
+        // Green has no embedding stamp the held start could earn: the switch defers at its
+        // embedding finalization on every iteration and never reaches promotion.
+        var finalization = KnowledgeServer.class.getDeclaredMethod(
+            "finalizeEmbeddingRebuildBeforeCutover");
+        finalization.setAccessible(true);
+        assertFalse((Boolean) finalization.invoke(server),
+            "the switch defers at its embedding finalization");
+
+        // Unbounded: before the change the switch waits for the start for ever.
+        assertTrue(server.awaitMigrationCutoverExitForTests(1, TimeUnit.DAYS), "the switch ends");
+        var state = forced.manager.readStateBestEffort();
+        assertEquals("FAILED", state.migration_state(), "the switch took its failure path");
+        assertEquals(forced.oldGeneration, state.active_generation(), "the source stays active");
+        assertEquals(forced.successorGeneration, state.building_generation(),
+            "the candidate identity is kept for recovery");
+        assertTrue(Files.isDirectory(forced.oldGenerationPath()), "the source index is intact");
+        assertTrue(queue.listSwitchBufferOpsStrict().stream().anyMatch(op ->
+            io.justsearch.indexerworker.queue.WatcherRootReconciliation.OPERATION.equals(op.op())),
+            "the journal keeps the reconciliation debt");
+        assertFalse(forced.matching("model wiring timeout").isEmpty(), "the warning names it");
+        assertTrue(boot.health().getServing(), "the source generation keeps serving");
+        assertEquals(0, forced.restarts.get());
+
+        forced.releaseHeld.countDown();
+        server.deferredModelInit.handle((ignored, failure) -> null).get(60, TimeUnit.SECONDS);
+        try (var serving = server.captureServingView()) {
+          assertEquals(forced.oldGenerationPath(), serving.activeGenerationPath());
+          serving.encoderSet().acquire().close();
+        }
+      }
+    } finally {
+      io.justsearch.indexerworker.embed.EmbeddingFingerprint.invalidate();
     }
   }
 
@@ -539,6 +704,122 @@ final class KnowledgeServerModelStartCutoverTest {
         prewarmLog.setLevel(prewarmLevel);
         appender.stop();
       }
+    }
+  }
+
+  /** The deferred start with the stub embedding encoder; static mocks belong to its thread. */
+  private static Runnable embeddingInitializer(KnowledgeServer server,
+      QueryPrewarmFixture.SlowGpuSessions sessions, Path model) {
+    var assembly = embeddingAssembly(sessions);
+    return () -> {
+      try (var assembler = mockStatic(OrtSessionAssembler.class);
+          var embeddingAssembly = mockStatic(OnnxEmbeddingEncoder.class)) {
+        assembler.when(() -> OrtSessionAssembler.buildManager(anyString(), any(), any(), any()))
+            .thenReturn(sessions);
+        embeddingAssembly.when(() -> OnnxEmbeddingEncoder.buildAssembly(
+                same(sessions), eq(model), anyInt(), anyInt(), anyBoolean(), any()))
+            .thenReturn(assembly);
+        QueryPrewarmFixture.invokeDeferredModelInitialization(server);
+      } catch (Exception failure) {
+        throw new IllegalStateException(failure);
+      }
+    };
+  }
+
+  /** The deferred start with a stand-in reranker; only the native boundaries are replaced. */
+  private static void composeWithReranker(KnowledgeServer server) {
+    var handle = mock(io.justsearch.ort.SessionHandle.class);
+    when(handle.retirementStatus()).thenReturn(io.justsearch.ort.SessionHandle.RetirementStatus.RETIRED);
+    try (var assembler = mockStatic(OrtSessionAssembler.class);
+        var rerankerAssembly = mockStatic(io.justsearch.reranker.CrossEncoderReranker.class);
+        var inference = org.mockito.Mockito.mockConstruction(
+            io.justsearch.reranker.CrossEncoderReranker.class)) {
+      assembler.when(() -> OrtSessionAssembler.buildManager(anyString(), any(), any(), any()))
+          .thenReturn(handle);
+      rerankerAssembly.when(() -> io.justsearch.reranker.CrossEncoderReranker.buildAssembly(
+              any(), any(), any(), anyInt()))
+          .thenAnswer(call -> new io.justsearch.reranker.RerankerAssembly(call.getArgument(0),
+              new io.justsearch.reranker.RerankerShape(512, false),
+              mock(io.justsearch.reranker.RerankerTokenizer.class)));
+      QueryPrewarmFixture.invokeDeferredModelInitialization(server);
+      if (inference.constructed().isEmpty()) {
+        throw new IllegalStateException("the start composed no reranker");
+      }
+    } catch (Exception failure) {
+      throw new IllegalStateException(failure);
+    }
+  }
+
+  /** The query services a successor copies from its incumbent when it is prepared. */
+  private static Map<String, Object> queryBindings(Object services) throws Exception {
+    var bindings = new java.util.LinkedHashMap<String, Object>();
+    for (String name : List.of("searchReranker", "citationScorer", "spladeIdfQueryEncoder",
+        "gpuDiagnostics", "stageAvailability")) {
+      var field = DefaultWorkerAppServices.class.getDeclaredField(name);
+      field.setAccessible(true);
+      bindings.put(name, field.get(services));
+    }
+    return bindings;
+  }
+
+  /** Test seam for the bound, where it exists; before the change there is no bound to shorten. */
+  private static void shortenModelWiringBound(KnowledgeServer server, long millis) {
+    try {
+      var bound = KnowledgeServer.class.getDeclaredMethod("modelWiringBoundMillis");
+      bound.setAccessible(true);
+      bound.invoke(org.mockito.Mockito.doReturn(millis).when(server));
+    } catch (NoSuchMethodException absent) {
+      // The unchanged Engine has no own bound for an in-flight model start.
+    } catch (ReflectiveOperationException failure) {
+      throw new IllegalStateException(failure);
+    }
+  }
+
+  /** A recorded bulk switch whose settings preparation is held once, outside the runtime lock. */
+  private static final class PreparationWindowLifecycle implements RecordedIngestionLifecycle {
+    static final String OPERATION = "01994180-0000-7000-8000-000000000301";
+    final CountDownLatch preparing = new CountDownLatch(1);
+    final CountDownLatch resume = new CountDownLatch(1);
+    final AtomicInteger preparations = new AtomicInteger();
+    volatile String source;
+    volatile String fingerprint;
+    volatile boolean authorized;
+    volatile boolean published;
+
+    @Override public IndexGenerationManager.BootOwnership bootOwnership(
+        io.justsearch.indexerworker.queue.JobQueue queue) {
+      return !authorized || published ? new IndexGenerationManager.BootOwnership.Native()
+          : new IndexGenerationManager.BootOwnership.Recorded(OPERATION, source, "recorded-test",
+              fingerprint, true, true, List.of());
+    }
+    @Override public boolean recordedCutoverReady(String key) { return authorized; }
+    @Override public io.justsearch.indexerworker.queue.JobQueue.RecordedClaimDecision
+        recordedClaimDecision(String key) {
+      return io.justsearch.indexerworker.queue.JobQueue.RecordedClaimDecision.ALLOW;
+    }
+    @Override public Attachment attach(io.justsearch.indexerworker.queue.JobQueue queue,
+        CheckedServingGeneration generation, java.util.function.BooleanSupplier online) {
+      return () -> {};
+    }
+    @Override public IndexGenerationManager.State promoteRecordedGeneration(String key,
+        io.justsearch.indexerworker.queue.JobQueue queue, CheckedPromotion promotion)
+        throws java.io.IOException {
+      var promoted = promotion.promote();
+      if (promoted != null) published = true;
+      return promoted;
+    }
+    @Override public PreparedCompositeProjection prepareRecordedGenerationProjection(String key,
+        io.justsearch.indexerworker.queue.JobQueue queue) throws java.io.IOException {
+      if (preparations.incrementAndGet() == 1) {
+        preparing.countDown();
+        try {
+          if (!resume.await(60, TimeUnit.SECONDS)) throw new java.io.IOException("not resumed");
+        } catch (InterruptedException interrupted) {
+          Thread.currentThread().interrupt();
+          throw new java.io.IOException(interrupted);
+        }
+      }
+      return RecordedIngestionLifecycle.super.prepareRecordedGenerationProjection(key, queue);
     }
   }
 

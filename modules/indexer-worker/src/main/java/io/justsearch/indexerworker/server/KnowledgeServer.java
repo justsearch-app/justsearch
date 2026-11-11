@@ -253,6 +253,12 @@ public final class KnowledgeServer implements Closeable {
    * has released them. Promotion is not attempted meanwhile. Guarded by servingViewMonitor.
    */
   private boolean modelWiringInFlight;
+  /**
+   * Advanced on every exit of the deferred model start, after its failure cleanup and lease
+   * release. A promotion that prepared its successor under another value prepares it again.
+   * Guarded by servingViewMonitor.
+   */
+  private long modelWiringGeneration;
 
   private static final class ServingView {
     private final WorkerAppServices services;
@@ -5299,7 +5305,10 @@ public final class KnowledgeServer implements Closeable {
       try {
         for (ServingLease lease : modelWiringLeases) lease.close();
       } finally {
-        synchronized (servingViewMonitor) { modelWiringInFlight = false; }
+        synchronized (servingViewMonitor) {
+          modelWiringInFlight = false;
+          modelWiringGeneration++;
+        }
       }
       if (recordedCandidate != null && gapWaitProducerPaused) {
         if (appServices instanceof DefaultWorkerAppServices producer) {
@@ -9208,6 +9217,11 @@ public final class KnowledgeServer implements Closeable {
     return KnowledgeServerMigrationOps.parseMigrationState(raw);
   }
 
+  /** How long a switch waits for an in-flight deferred model start: the switching deadline. */
+  long modelWiringBoundMillis() {
+    return MIGRATION_SWITCHING_MAX_DURATION_MS;
+  }
+
   private synchronized void startMigrationCutoverMonitorBestEffort() {
     if (migrationCutoverThread != null && migrationCutoverThread.isAlive()) {
       return;
@@ -9269,6 +9283,14 @@ public final class KnowledgeServer implements Closeable {
 
                            @Override public void transition(String point) throws IOException, InterruptedException {
                              migrationTransition(point);
+                           }
+
+                           @Override public boolean modelWiringInFlight() {
+                             synchronized (servingViewMonitor) { return modelWiringInFlight; }
+                           }
+
+                           @Override public long modelWiringMaxDurationMs() {
+                             return modelWiringBoundMillis();
                            }
 
                            @Override public boolean refuseUncertifiable() {
@@ -10304,8 +10326,10 @@ public final class KnowledgeServer implements Closeable {
       }
       // The in-flight model start attaches its sets to whatever view serves when it ends.
       // Not yet: retried under the switching deadline, as the conditions below.
+      final long wiringAtPreparation;
       synchronized (servingViewMonitor) {
         if (modelWiringInFlight) return null;
+        wiringAtPreparation = modelWiringGeneration;
       }
       incumbent = current;
       successor = prepareServingSuccessor(green);
@@ -10489,8 +10513,11 @@ public final class KnowledgeServer implements Closeable {
                           || old.searchRuntime != searchLifecycle || old.ingestRuntime != green) {
                         throw new IOException("Serving source changed before pointer commitment");
                       }
-                      // A model start may have captured A while preparation left the runtime lock.
-                      if (modelWiringInFlight) return null;
+                      // A model start may have run while preparation left the runtime lock: the
+                      // successor copied A's wiring before it. Not yet; the next attempt prepares again.
+                      if (modelWiringInFlight || modelWiringGeneration != wiringAtPreparation) {
+                        return null;
+                      }
                     }
                     ServingView next = new ServingView(preparedServices, green, green, successorPath);
                     EncoderSet successorEncoder = recordedCandidate == null ? old.encoderSet
