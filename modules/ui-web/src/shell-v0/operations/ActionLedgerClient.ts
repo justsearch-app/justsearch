@@ -28,6 +28,7 @@ import { EnvelopeStream, type EnvelopeStreamSnapshot } from '../streaming/Envelo
 import type { MultiplexedStream } from '../streaming/MultiplexedStream.js';
 import { SHELL_EVENT_STREAM_IDS } from '../streaming/shellEventStreamIds.js';
 import { isLifecycleEnvelope } from '../streaming/envelope-types.js';
+import { applySnapshot, observe } from '../streaming/snapshotArbitration.js';
 import { present } from '../display/present.js';
 // Tempdoc 613 §6/§10 + 612 §3 — the Activity-inclusion routing predicates: routine local-ack effects /
 // navigation, and the operation-significance grade over the declared OperationCatalog facets.
@@ -480,11 +481,15 @@ export interface LedgerStreamState {
   readonly rows: readonly BackendLedgerEntry[];
   readonly snapshotApplied: boolean;
   readonly resets: number;
-  /** UPDATE rows received on this connection before its snapshot (kept if the snapshot lacks them). */
-  readonly liveSinceSnapshot: readonly BackendLedgerEntry[];
+  /** UPDATE rows no snapshot has contained yet: a later snapshot that lacks them keeps them. */
+  readonly unconfirmed: readonly BackendLedgerEntry[];
 }
 
-const INITIAL_LEDGER_STATE: LedgerStreamState = { rows: [], snapshotApplied: false, resets: 0, liveSinceSnapshot: [] };
+const INITIAL_LEDGER_STATE: LedgerStreamState = { rows: [], snapshotApplied: false, resets: 0, unconfirmed: [] };
+
+/** The one log is id-keyed; a row without an explicit id has no identity to match. */
+const ledgerIdentity = (e: BackendLedgerEntry): string | undefined =>
+  typeof e.id === 'string' && e.id.length > 0 ? e.id : undefined;
 
 /** Keep the first row per explicit id (the one log is id-keyed); rows without an id stay independent. */
 function dedupById(rows: readonly BackendLedgerEntry[]): BackendLedgerEntry[] {
@@ -501,13 +506,12 @@ function dedupById(rows: readonly BackendLedgerEntry[]): BackendLedgerEntry[] {
 }
 
 /**
- * Reducer over the unified ledger SSE. A `snapshot` frame replaces the accumulated rows — it is the
- * Engine's current retention, so a smaller or empty snapshot after a reconnect drops what the
- * Engine no longer holds — except UPDATE rows that arrived on the same connection before it: a
- * snapshot cannot erase what was observed after it was taken. A `connected` frame starts a new
- * connection; a `reset` discards everything and waits for the next snapshot. Every UPDATE frame
- * appends one row, deduplicated by its explicit event id (snapshot and live rows project the same
- * event through the one ActionLedgerProjection).
+ * Reducer over the unified ledger SSE, arbitrated by {@link applySnapshot}: a `snapshot` frame is
+ * the Engine's current retention, so a smaller or empty snapshot after a reconnect drops what it
+ * established before, but never an UPDATE row no snapshot has contained yet, on this connection or
+ * an earlier one. Only a `reset` discards everything and waits for the next snapshot. Every UPDATE
+ * frame appends one row, deduplicated by its explicit event id (snapshot and live rows project the
+ * same event through the one ActionLedgerProjection).
  */
 function ledgerReducer(
   state: LedgerStreamState,
@@ -516,19 +520,18 @@ function ledgerReducer(
   if (isLifecycleEnvelope(envelope as never)) {
     const payload = envelope.payload as { kind?: string; entries?: BackendLedgerEntry[] };
     if (payload?.kind === 'snapshot' && Array.isArray(payload.entries)) {
-      return { ...state, rows: dedupById([...payload.entries, ...state.liveSinceSnapshot]),
-        snapshotApplied: true, liveSinceSnapshot: [] };
+      const next = applySnapshot(dedupById(payload.entries), state.unconfirmed, ledgerIdentity);
+      return { ...state, rows: next.rows, unconfirmed: next.unconfirmed, snapshotApplied: true };
     }
     if (payload?.kind === 'reset') {
-      return { rows: [], snapshotApplied: false, resets: state.resets + 1, liveSinceSnapshot: [] };
+      return { rows: [], snapshotApplied: false, resets: state.resets + 1, unconfirmed: [] };
     }
-    if (payload?.kind === 'connected') return { ...state, liveSinceSnapshot: [] };
-    return state; // heartbeat / closing — no row change.
+    return state; // connected / heartbeat / closing — no row change.
   }
   const row = envelope.payload as BackendLedgerEntry;
   if (!row || typeof row.kind !== 'string') return state;
   if (typeof row.id === 'string' && row.id.length > 0 && state.rows.some((r) => r.id === row.id)) return state;
-  return { ...state, rows: [...state.rows, row], liveSinceSnapshot: [...state.liveSinceSnapshot, row] };
+  return { ...state, rows: [...state.rows, row], unconfirmed: observe(state.unconfirmed, row, ledgerIdentity) };
 }
 
 /** The ledger stream as a source: its state after every frame, and whether the channel is up. */

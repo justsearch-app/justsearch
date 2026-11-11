@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
   },
-  "createdAt": "2026-11-11T13:01:13.207Z",
-  "revision": "716017c61f87ff6bfbae502b5fa5f06d777f5246",
-  "tree": "a273fbac0c31589269aff43123928412db93dedb",
+  "createdAt": "2026-11-11T13:45:59.395Z",
+  "revision": "ef84062e5e817dfba2c517b9aff4611941d7ee47",
+  "tree": "2a5bec75042a58a8dbb0c7be9a5b144f19429c0c",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,16 +18,16 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/substrates/recall/recallCursor.test.ts\" \"src/shell-v0/views/ActivitySurface.actions.test.ts\" \"src/shell-v0/substrates/effects/undoEntries.test.ts\" \"src/shell-v0/chrome/Shell.test.ts\" \"src/shell-v0/controllers/AgentSessionController.test.ts\" \"src/shell-v0/substrates/effects/associations.test.ts\" \"src/shell-v0/components/ActionLedgerView.feed.test.ts\" \"src/shell-v0/views/ActivitySurface.render.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/ydlugpjq/tmp/test-intent-vitest-24684-1794401977948.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/substrates/recall/recallCursor.test.ts\" \"src/shell-v0/views/ActivitySurface.actions.test.ts\" \"src/shell-v0/substrates/effects/undoEntries.test.ts\" \"src/shell-v0/chrome/Shell.test.ts\" \"src/shell-v0/controllers/AgentSessionController.test.ts\" \"src/shell-v0/substrates/effects/associations.test.ts\" \"src/shell-v0/components/ActionLedgerView.feed.test.ts\" \"src/shell-v0/views/ActivitySurface.render.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/61ey_0k2/tmp/test-intent-vitest-7341-1794404655199.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 6589
+      "durationMs": 12133
     },
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/ydlugpjq/tmp/test-intent-vitest-24684-1794401984538.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/61ey_0k2/tmp/test-intent-vitest-7341-1794404667335.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 3684
+      "durationMs": 5683
     }
   ],
   "checks": [
@@ -204,7 +204,7 @@
       "id": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts",
       "file": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:e6cb786fb804ff0374fa8a1498bc5915d664f63969975c6abfdd20dfd6b6ff6e",
+      "contentDigest": "sha256:0fd332931c266de82b41c0aed8ef8ad66cd698653db611811e1f039da7f2f20b",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -254,7 +254,23 @@
           "status": "passed"
         },
         {
+          "name": "first load and reconnect arbitration (challenger 4) a ledger UPDATE no snapshot has contained survives a reconnect snapshot that lacks it; only a reset voids it",
+          "status": "passed"
+        },
+        {
+          "name": "first load and reconnect arbitration (challenger 4) a history snapshot cannot erase a newer UPDATE it lacks; a reset voids it and later snapshots do not bring it back",
+          "status": "passed"
+        },
+        {
+          "name": "first load and reconnect arbitration (challenger 4) a history record a snapshot has contained leaves with a smaller snapshot",
+          "status": "passed"
+        },
+        {
           "name": "per-source states (challenger 5) each source says loading, unavailable or last-known; rows from the others still show as partial activity",
+          "status": "passed"
+        },
+        {
+          "name": "per-source states (challenger 5) the history stream failing before its first snapshot says it is unavailable, not loading, until a snapshot reads it",
           "status": "passed"
         },
         {
@@ -399,30 +415,30 @@
     "patches": [],
     "runs": [
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/substrates/recall/recallCursor.test.ts\" \"src/shell-v0/views/ActivitySurface.actions.test.ts\" \"src/shell-v0/substrates/effects/undoEntries.test.ts\" \"src/shell-v0/chrome/Shell.test.ts\" \"src/shell-v0/controllers/AgentSessionController.test.ts\" \"src/shell-v0/substrates/effects/associations.test.ts\" \"src/shell-v0/components/ActionLedgerView.feed.test.ts\" \"src/shell-v0/views/ActivitySurface.render.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/ydlugpjq/tmp/test-intent-vitest-24684-1794401990813.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/substrates/recall/recallCursor.test.ts\" \"src/shell-v0/views/ActivitySurface.actions.test.ts\" \"src/shell-v0/substrates/effects/undoEntries.test.ts\" \"src/shell-v0/chrome/Shell.test.ts\" \"src/shell-v0/controllers/AgentSessionController.test.ts\" \"src/shell-v0/substrates/effects/associations.test.ts\" \"src/shell-v0/components/ActionLedgerView.feed.test.ts\" \"src/shell-v0/views/ActivitySurface.render.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/61ey_0k2/tmp/test-intent-vitest-7341-1794404675683.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 8959,
-        "output": "JSON report written to /home/elias/.cache/am/ydlugpjq/tmp/test-intent-vitest-24684-1794401990813.json\n\n"
+        "durationMs": 9646,
+        "output": "JSON report written to /home/elias/.cache/am/61ey_0k2/tmp/test-intent-vitest-7341-1794404675683.json\n\n"
       },
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/ydlugpjq/tmp/test-intent-vitest-24684-1794401999773.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/61ey_0k2/tmp/test-intent-vitest-7341-1794404685330.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 73155,
-        "output": "JSON report written to /home/elias/.cache/am/ydlugpjq/tmp/test-intent-vitest-24684-1794401999773.json\n\n"
+        "durationMs": 73779,
+        "output": "JSON report written to /home/elias/.cache/am/61ey_0k2/tmp/test-intent-vitest-7341-1794404685330.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/substrates/recall/recallCursor.test.ts#orders whole-second, millisecond and finer timestamps by time, not by spelling",
         "classification": "assertion",
-        "detail": "recallCursor — the one seen authority orders whole-second, millisecond and finer timestamps by time, not by spelling:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/ydlugpjq/tmp/test-intent-before-x2FHjl/modules/ui-web/src/shell-v0/substrates/recall/recallCursor.test.ts:61:56\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-activity/modules/ui-web/node_modu"
+        "detail": "recallCursor — the one seen authority orders whole-second, millisecond and finer timestamps by time, not by spelling:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/61ey_0k2/tmp/test-intent-before-YtYVem/modules/ui-web/src/shell-v0/substrates/recall/recallCursor.test.ts:61:56\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-activity/modules/ui-web/node_modu"
       },
       {
         "id": "modules/ui-web/src/shell-v0/substrates/recall/recallCursor.test.ts#a whole-second mark after a later millisecond mark does not rewind the cursor",
         "classification": "assertion",
-        "detail": "recallCursor — the one seen authority a whole-second mark after a later millisecond mark does not rewind the cursor:  AssertionError: expected '2026-01-01T00:00:00Z' to be '2026-01-01T00:00:00.900Z' // Object.is equality\n    at /home/elias/.cache/am/ydlugpjq/tmp/test-intent-before-x2FHjl/modules/ui-web/src/shell-v0/substrates/recall/recallCursor.test.ts:74:29\n    at file:///home/elias/dev/justsearch/.claude/worktre"
+        "detail": "recallCursor — the one seen authority a whole-second mark after a later millisecond mark does not rewind the cursor:  AssertionError: expected '2026-01-01T00:00:00Z' to be '2026-01-01T00:00:00.900Z' // Object.is equality\n    at /home/elias/.cache/am/61ey_0k2/tmp/test-intent-before-YtYVem/modules/ui-web/src/shell-v0/substrates/recall/recallCursor.test.ts:74:29\n    at file:///home/elias/dev/justsearch/.claude/worktre"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.actions.test.ts#S6 — \"Save as macro\" takes the AI actions after the seen cursor by time, across timestamp spellings",
@@ -432,12 +448,12 @@
       {
         "id": "modules/ui-web/src/shell-v0/substrates/effects/undoEntries.test.ts#a reversal the Engine performs is returned as requested, never reversed, and settles with the Engine answer",
         "classification": "assertion",
-        "detail": "undoEntries (DE6) a reversal the Engine performs is returned as requested, never reversed, and settles with the Engine answer:  AssertionError: expected 2 to be 1 // Object.is equality\n    at /home/elias/.cache/am/ydlugpjq/tmp/test-intent-before-x2FHjl/modules/ui-web/src/shell-v0/substrates/effects/undoEntries.test.ts:57:30\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-activity/modules/ui-web/node_modules/@vi"
+        "detail": "undoEntries (DE6) a reversal the Engine performs is returned as requested, never reversed, and settles with the Engine answer:  AssertionError: expected 2 to be 1 // Object.is equality\n    at /home/elias/.cache/am/61ey_0k2/tmp/test-intent-before-YtYVem/modules/ui-web/src/shell-v0/substrates/effects/undoEntries.test.ts:57:30\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-activity/modules/ui-web/node_modules/@vi"
       },
       {
         "id": "modules/ui-web/src/shell-v0/substrates/effects/undoEntries.test.ts#reverses the previewed entries newest first and nothing recorded after the preview",
         "classification": "assertion",
-        "detail": "undoEntries (DE6) reverses the previewed entries newest first and nothing recorded after the preview:  AssertionError: expected { reversed: 2, skipped: [] } to deeply equal { reversed: 2, requested: [], …(1) }\n    at /home/elias/.cache/am/ydlugpjq/tmp/test-intent-before-x2FHjl/modules/ui-web/src/shell-v0/substrates/effects/undoEntries.test.ts:26:21\n    at file:///home/elias/dev/justsearch/.claude/wor"
+        "detail": "undoEntries (DE6) reverses the previewed entries newest first and nothing recorded after the preview:  AssertionError: expected { reversed: 2, skipped: [] } to deeply equal { reversed: 2, requested: [], …(1) }\n    at /home/elias/.cache/am/61ey_0k2/tmp/test-intent-before-YtYVem/modules/ui-web/src/shell-v0/substrates/effects/undoEntries.test.ts:26:21\n    at file:///home/elias/dev/justsearch/.claude/wor"
       },
       {
         "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#S6: undo-all says an Engine undo was asked for, then what the Engine answered (declined)",
@@ -452,12 +468,12 @@
       {
         "id": "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#S6: identical invocations answering in reverse order each keep their invocation, a keyed failure joins as a failure, both persist",
         "classification": "assertion",
-        "detail": "Shell — slice 492 substrate integration S6: identical invocations answering in reverse order each keep their invocation, a keyed failure joins as a failure, both persist:  AssertionError: expected [ undefined, undefined ] to deeply equal [ undefined, 'key-2' ]\n    at /home/elias/.cache/am/ydlugpjq/tmp/test-intent-before-x2FHjl/modules/ui-web/src/shell-v0/chrome/Shell.test.ts:337:77\n    at Timeout.checkCallback (file:///home/elias/dev/justsearch/.claude/worktrees/s6-ac"
+        "detail": "Shell — slice 492 substrate integration S6: identical invocations answering in reverse order each keep their invocation, a keyed failure joins as a failure, both persist:  AssertionError: expected [ undefined, undefined ] to deeply equal [ undefined, 'key-2' ]\n    at /home/elias/.cache/am/61ey_0k2/tmp/test-intent-before-YtYVem/modules/ui-web/src/shell-v0/chrome/Shell.test.ts:337:77\n    at Timeout.checkCallback (file:///home/elias/dev/justsearch/.claude/worktrees/s6-ac"
       },
       {
         "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#identical concurrent calls completing in reverse order each keep their own invocation; a keyed failure journals nothing",
         "classification": "assertion",
-        "detail": "AgentSessionController SSE handlers (G1 migration) identical concurrent calls completing in reverse order each keep their own invocation; a keyed failure journals nothing:  AssertionError: expected [ [ undefined, undefined ], …(1) ] to deeply equal [ [ 'key-2', 'exec-2' ], …(1) ]\n    at /home/elias/.cache/am/ydlugpjq/tmp/test-intent-before-x2FHjl/modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts:606:8\n    at file:///home/elias/dev/justsearch/.claud"
+        "detail": "AgentSessionController SSE handlers (G1 migration) identical concurrent calls completing in reverse order each keep their own invocation; a keyed failure journals nothing:  AssertionError: expected [ [ undefined, undefined ], …(1) ] to deeply equal [ [ 'key-2', 'exec-2' ], …(1) ]\n    at /home/elias/.cache/am/61ey_0k2/tmp/test-intent-before-YtYVem/modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts:606:8\n    at file:///home/elias/dev/justsearch/.claud"
       },
       {
         "id": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts#a replayed run journals no effect and no association",
@@ -467,17 +483,17 @@
       {
         "id": "modules/ui-web/src/shell-v0/substrates/effects/associations.test.ts",
         "classification": "assertion",
-        "detail": "journal invocation associations survive a reload a restored execution still offers its backend undo, and its invocation key is kept:  AssertionError: expected undefined to deeply equal { …(2) }\n    at /home/elias/.cache/am/ydlugpjq/tmp/test-intent-before-x2FHjl/modules/ui-web/src/shell-v0/substrates/effects/associations.test.ts:37:37\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-activity/modules/ui-web/node_modules | journal invocation associations survive a reload legacy entries"
+        "detail": "journal invocation associations survive a reload a restored execution still offers its backend undo, and its invocation key is kept:  AssertionError: expected undefined to deeply equal { …(2) }\n    at /home/elias/.cache/am/61ey_0k2/tmp/test-intent-before-YtYVem/modules/ui-web/src/shell-v0/substrates/effects/associations.test.ts:37:37\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-activity/modules/ui-web/node_modules | journal invocation associations survive a reload legacy entries"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts",
         "classification": "assertion",
-        "detail": "one feed: joins by exact identity (A1-A5) A1 — a keyed operation in the ledger, the history and the journal is one row carrying all three:  AssertionError: the feed opens the operation-history stream: expected undefined to be defined\n    at historyStream (/home/elias/.cache/am/ydlugpjq/tmp/test-intent-before-x2FHjl/modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts:88:66)\n    at /home/elias/.cache/am/ydlugpjq/tmp/test- | one feed: joins by exact identity (A1-A5) A2 — same name "
+        "detail": "one feed: joins by exact identity (A1-A5) A1 — a keyed operation in the ledger, the history and the journal is one row carrying all three:  AssertionError: the feed opens the operation-history stream: expected undefined to be defined\n    at historyStream (/home/elias/.cache/am/61ey_0k2/tmp/test-intent-before-YtYVem/modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts:88:66)\n    at /home/elias/.cache/am/61ey_0k2/tmp/test- | one feed: joins by exact identity (A1-A5) A2 — same name "
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts",
         "classification": "assertion",
-        "detail": "A16 — more than 500 ledger and 500 local records are all reachable, newest to oldest, through a windowed list:  Error: expected +0 to be 1 // Object.is equality\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/dev/justsearch/.claude/worktrees/s6-activity/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3748:47)\n    at open (/home/elias/.cache/am/ydlugpjq/tmp/test-intent-before-x2FHjl/modu | A16 — a live arrival keeps the reader where they were:  Error: expected +0 to be 1 //"
+        "detail": "A16 — more than 500 ledger and 500 local records are all reachable, newest to oldest, through a windowed list:  Error: expected +0 to be 1 // Object.is equality\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/dev/justsearch/.claude/worktrees/s6-activity/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3748:47)\n    at open (/home/elias/.cache/am/61ey_0k2/tmp/test-intent-before-YtYVem/modu | A16 — a live arrival keeps the reader where they were:  Error: expected +0 to be 1 //"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.render.test.ts#the one feed reads the ledger and the operation history from its own api-base",
@@ -487,14 +503,14 @@
       {
         "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.render.test.ts#an Activity closing before it renders leaves the request to another Activity, which reveals it",
         "classification": "assertion",
-        "detail": "Activity holds what the frame drawers held (DP3) an Activity closing before it renders leaves the request to another Activity, which reveals it:  AssertionError: expected null to be <section class=\"panel\" …(3)>…(4)</section> // Object.is equality\n    at /home/elias/.cache/am/ydlugpjq/tmp/test-intent-before-x2FHjl/modules/ui-web/src/shell-v0/views/ActivitySurface.render.test.ts:160:47\n    at runNextTicks (node:internal/process/task_queues:65:5"
+        "detail": "Activity holds what the frame drawers held (DP3) an Activity closing before it renders leaves the request to another Activity, which reveals it:  AssertionError: expected null to be <section class=\"panel\" …(3)>…(4)</section> // Object.is equality\n    at /home/elias/.cache/am/61ey_0k2/tmp/test-intent-before-YtYVem/modules/ui-web/src/shell-v0/views/ActivitySurface.render.test.ts:160:47\n    at runNextTicks (node:internal/process/task_queues:65:5"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.render.test.ts#arriving at the journal clears a journal filter that would hide what the pointer named",
         "classification": "assertion",
-        "detail": "Activity holds what the frame drawers held (DP3) arriving at the journal clears a journal filter that would hide what the pointer named:  AssertionError: expected [ 'system', 'rejected' ] to deeply equal [ 'all', 'all' ]\n    at /home/elias/.cache/am/ydlugpjq/tmp/test-intent-before-x2FHjl/modules/ui-web/src/shell-v0/views/ActivitySurface.render.test.ts:176:51\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTim"
+        "detail": "Activity holds what the frame drawers held (DP3) arriving at the journal clears a journal filter that would hide what the pointer named:  AssertionError: expected [ 'system', 'rejected' ] to deeply equal [ 'all', 'all' ]\n    at /home/elias/.cache/am/61ey_0k2/tmp/test-intent-before-YtYVem/modules/ui-web/src/shell-v0/views/ActivitySurface.render.test.ts:176:51\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTim"
       }
     ]
   },
-  "digest": "sha256:91d403f5e7c70b634decfec9e9df9756d9b49238da42857085e1f727a7a18018"
+  "digest": "sha256:16a27bb3958c19d6813485f17a637dcaf9e6390d8064719fd2330f0f34cfb717"
 }

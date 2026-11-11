@@ -10,7 +10,9 @@ author-session: s6-activity-feed-builder
 No acceptance is claimed; independent verification is pending. Two defects broken at 716017c61f are
 repaired: undo-all reported Engine undo success from dispatch alone, and the shared seen cursor
 compared timestamps as strings. The replayed-run and mark-all-read-scope checks are preservation
-checks and pass before as well.
+checks and pass before as well. After verification of candidate 1 (ef84062e5e), snapshot
+arbitration in both streams, the history source's unavailable state and the undoable reset fixture
+were repaired; those checks have their own fail-before evidence against ef84062e5e.
 
 ```json
 {
@@ -20,7 +22,6 @@ checks and pass before as well.
         "modules/ui-web/src/shell-v0/components/EffectAuditLog.test.ts",
         "modules/ui-web/src/shell-v0/operations/ActionLedgerClient.test.ts",
         "modules/ui-web/src/shell-v0/substrates/effects/effects.test.ts",
-        "modules/ui-web/src/shell-v0/substrates/effects/undoable.test.ts",
         "modules/ui-web/src/shell-v0/controllers/AgentSessionController.halt.test.ts"
       ],
       "class": "Adaptation",
@@ -36,6 +37,27 @@ checks and pass before as well.
           "delegationScope": "the shell redesign's slices including Settings and secondary pages",
           "label": "agent choice",
           "choice": "Retire the memory-only undo side-map so the execution association is persisted with its journal entry, as the settled saved-state decision requires, keeping each existing undo oracle intact."
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/substrates/effects/undoable.test.ts"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation",
+        "input re-encoding"
+      ],
+      "whatMoved": "The undo association moved from the retired in-memory side-map, which took the operation id as an argument for any entry (markUndoableOperation(id, operationId, executionId)), to the journal entry itself (associateOperation(id, { executionId })), where the operation id is the entry's own invoke-operation effect. The first test already journals an invoke-operation of core.file-operations, so only the call moved (instrumentation). The reset test journaled a noop entry and named operation 'op' in the side-map call; the candidate associates only invoke-operation entries, so that input is re-encoded as an invoke-operation entry of 'op' with execution 'e' (input re-encoding), the same association getUndoableOperation reported before reset at the baseline. A precondition assertion now shows that association ({ operationId: 'op', executionId: 'e' }) before the reset, which also holds at the baseline; the reset oracle (undefined after __resetJournalForTest) is unchanged.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "Retire the memory-only undo side-map so the execution association is persisted with its journal entry, as the settled saved-state decision requires, keeping the association and reset oracles intact and observable."
         }
       ]
     },
@@ -253,7 +275,7 @@ checks and pass before as well.
         "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts"
       ],
       "class": "New",
-      "behaviour": "The one feed: A1 a keyed operation in ledger, history and journal is one row with all three; A2 different keys stay apart and re-delivered ids stay one row; A3 unkeyed history joins only the exact legacy identity at raw precision, shared legacy identities are kept and disclosed, a legacy numeric journal id matching a backend effect keeps both rows labelled; A4 a local effect without a ledger copy reads Recorded locally and its later delivery joins without a second row; A5 a smaller reconnect snapshot drops ledger-only rows while history partners stay; A6 the bounded window is disclosed without an older-records control; arbitration (connected/heartbeat never claims empty, an empty snapshot does, an UPDATE before the snapshot survives, the GET seed gives way to the snapshot, a reset discards rows and a pre-reset GET cannot resurrect them); per-source loading, unavailable, partial and last-known states; A9 the Problems and Indexing tables including agent wire names, gates and grants, and outcome-unavailable; A10 failed per-file indexing reachable in Problems and Indexing despite routine, bursts counting failures and expanding to members; the explicit routine choice overriding quick filters; A11 proposal decisions filterable with the actor and never outcomes; the cursor with mixed precision and mark-all-read scope (passes before: preservation); two feeds with independent filters; resolver recovery; Today advancing at local midnight.",
+      "behaviour": "The one feed: A1 a keyed operation in ledger, history and journal is one row with all three; A2 different keys stay apart and re-delivered ids stay one row; A3 unkeyed history joins only the exact legacy identity at raw precision, shared legacy identities are kept and disclosed, a legacy numeric journal id matching a backend effect keeps both rows labelled; A4 a local effect without a ledger copy reads Recorded locally and its later delivery joins without a second row; A5 a smaller reconnect snapshot drops ledger-only rows while history partners stay; A6 the bounded window is disclosed without an older-records control; arbitration (connected/heartbeat never claims empty, an empty snapshot does, an UPDATE no snapshot has contained survives later snapshots in the ledger and the history until a reset, a record a snapshot contained leaves with a smaller one, the GET seed gives way to the snapshot, a reset discards rows and a pre-reset GET cannot resurrect them); per-source loading, unavailable (a history stream failing before its first snapshot, with Retry), partial and last-known states; A9 the Problems and Indexing tables including agent wire names, gates and grants, and outcome-unavailable; A10 failed per-file indexing reachable in Problems and Indexing despite routine, bursts counting failures and expanding to members; the explicit routine choice overriding quick filters; A11 proposal decisions filterable with the actor and never outcomes; the cursor with mixed precision and mark-all-read scope (passes before: preservation); two feeds with independent filters; resolver recovery; Today advancing at local midnight.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -312,6 +334,30 @@ checks and pass before as well.
         "modules/ui-web/src/shell-v0/views/ActivitySurface.render.test.ts#an Activity closing before it renders leaves the request to another Activity, which reveals it",
         "modules/ui-web/src/shell-v0/views/ActivitySurface.render.test.ts#arriving at the journal clears a journal filter that would hide what the pointer named"
       ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Arbitration and source states repaired after verification of candidate 1 (fail before at ef84062e5e): a ledger UPDATE no snapshot has contained survives a reconnect snapshot that lacks it, and only a reset voids it; a history UPDATE newer than a snapshot that lacks it is kept, on the same or a later connection, while a reset voids it and later snapshots do not bring it back; the history stream failing before its first snapshot says Operation history could not be read (unavailable, distinct from loading, with partial activity from the ledger), a connected or heartbeat frame does not change that, Retry reopens the stream (loading), and a snapshot then reads it. A record a snapshot has contained still leaves with a smaller snapshot (preservation, covered by the whole-file check).",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "Settled amendments 4 and 5 (adopted challenger points 4 and 5): a snapshot never erases an observation newer than the snapshot it replaces unless the source signals a reset, as the stream protocol defines (snapshot = current retention, reset = earlier state void); a source that fails before its first success says it is unavailable, with the stream's retry, never loading."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-activity-feed-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts#a ledger UPDATE no snapshot has contained survives a reconnect snapshot that lacks it; only a reset voids it",
+        "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts#a history snapshot cannot erase a newer UPDATE it lacks; a reset voids it and later snapshots do not bring it back",
+        "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts#the history stream failing before its first snapshot says it is unavailable, not loading, until a snapshot reads it"
+      ],
+      "repaired": true
     }
   ]
 }

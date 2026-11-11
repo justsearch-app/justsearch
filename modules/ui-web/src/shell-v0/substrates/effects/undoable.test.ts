@@ -33,8 +33,9 @@ describe('§32 U2 — undoable-operation side-map', () => {
   });
 
   it('reset clears the side-map', () => {
-    const entry = recordEffect({ kind: 'noop' }, CORE_PROVENANCE);
+    const entry = recordEffect({ kind: 'invoke-operation', operationId: 'op' }, CORE_PROVENANCE);
     associateOperation(entry.id, { executionId: 'e' });
+    expect(getUndoableOperation(entry.id)).toEqual({ operationId: 'op', executionId: 'e' });
     __resetJournalForTest();
     expect(getUndoableOperation(entry.id)).toBeUndefined();
   });

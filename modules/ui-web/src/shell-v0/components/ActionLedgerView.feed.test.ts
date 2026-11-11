@@ -261,6 +261,51 @@ describe('first load and reconnect arbitration (challenger 4)', () => {
     expect(keys()).toEqual([]);
     expect(q('[data-testid="ledger-loading"]')).toHaveLength(1);
   });
+  it('a ledger UPDATE no snapshot has contained survives a reconnect snapshot that lacks it; only a reset voids it', async () => {
+    mount();
+    ledger.snapshot([op('older')]);
+    ledger.update(op('newer', { occurredAt: '2026-11-01T10:05:00Z' }));
+    ledger.lifecycle('connected');
+    ledger.snapshot([op('older')]);
+    await settle();
+    expect(keys().sort()).toEqual(['operation:newer', 'operation:older']);
+    ledger.lifecycle('reset');
+    ledger.snapshot([op('older')]);
+    await settle();
+    expect(keys()).toEqual(['operation:older']);
+  });
+
+  it('a history snapshot cannot erase a newer UPDATE it lacks; a reset voids it and later snapshots do not bring it back', async () => {
+    mount();
+    const h = historyStream();
+    h.update(committed('k-new', { startTime: '2026-11-01T10:04:59Z', endTime: '2026-11-01T10:05:00Z' }));
+    h.snapshot([committed('k-old')]);
+    await settle();
+    expect(keys()).toEqual(['operation:k-new', 'operation:k-old']);
+    h.lifecycle('connected');
+    h.snapshot([committed('k-old')]);
+    await settle();
+    expect(keys()).toEqual(['operation:k-new', 'operation:k-old']);
+    h.lifecycle('reset');
+    h.snapshot([committed('k-old')]);
+    h.lifecycle('connected');
+    h.snapshot([committed('k-old')]);
+    await settle();
+    expect(keys()).toEqual(['operation:k-old']);
+  });
+
+  it('a history record a snapshot has contained leaves with a smaller snapshot', async () => {
+    mount();
+    const h = historyStream();
+    h.snapshot([committed('k-old')]);
+    h.update(committed('k-gone', { endTime: '2026-11-01T10:05:00Z' }));
+    h.lifecycle('connected');
+    h.snapshot([committed('k-old'), committed('k-gone', { endTime: '2026-11-01T10:05:00Z' })]);
+    h.lifecycle('connected');
+    h.snapshot([committed('k-old')]);
+    await settle();
+    expect(keys()).toEqual(['operation:k-old']);
+  });
 });
 
 describe('per-source states (challenger 5)', () => {
@@ -278,6 +323,28 @@ describe('per-source states (challenger 5)', () => {
     await settle();
     expect(q('[data-testid="feed-source-history"]')[0]?.getAttribute('data-state')).toBe('last-known');
     expect(keys()).toEqual(['operation:kh']);
+  });
+
+  it('the history stream failing before its first snapshot says it is unavailable, not loading, until a snapshot reads it', async () => {
+    mount();
+    ledger.snapshot([op('kl')]);
+    const first = historyStream();
+    first.fail();
+    first.lifecycle('connected');
+    first.lifecycle('heartbeat');
+    await settle();
+    const state = q('[data-testid="feed-source-history"]')[0];
+    expect(state?.getAttribute('data-state')).toBe('unavailable');
+    expect(state?.textContent).toMatch(/^Partial activity: Operation history could not be read\./);
+    expect(state?.textContent).not.toContain('loading');
+    (q('[data-testid="feed-source-history-retry"]')[0] as HTMLButtonElement).click();
+    await settle();
+    expect(history).not.toBe(first);
+    expect(q('[data-testid="feed-source-history"]')[0]?.getAttribute('data-state')).toBe('loading');
+    historyStream().snapshot([committed('kh')]);
+    await settle();
+    expect(q('[data-testid="feed-source-history"]')).toHaveLength(0);
+    expect(keys().sort()).toEqual(['operation:kh', 'operation:kl']);
   });
 });
 

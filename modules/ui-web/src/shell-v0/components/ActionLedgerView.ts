@@ -5,12 +5,14 @@
  * One chronological list over the three records of what happened, joined by exact identities in
  * {@link projectActivityFeed}: the backend action ledger (`GET /api/action-ledger` seed plus its
  * live stream), the committed operation history (`core.operation-history`) and this window's
- * Effect Journal. Each source's state is said separately — loading, unavailable, partial, or last
- * known while its live channel is down — so an empty list is only claimed about sources read.
+ * Effect Journal. Each source's state is said separately — loading, unavailable (it failed before
+ * a snapshot read it), partial, or last known while its live channel is down — so an empty list is
+ * only claimed about sources read.
  *
- * Arbitration between the ledger's two reads: the stream's snapshot is the Engine's current
- * retention and wins; the GET seed only stands in before the first snapshot, and an answer that
- * started before a reset, or arrives after a snapshot, is discarded. The view is bounded by what the
+ * Arbitration: in both streams a snapshot is the Engine's current retention, but it cannot erase an
+ * UPDATE no snapshot has contained yet; only a reset voids earlier observations (applySnapshot).
+ * Between the ledger's two reads the stream wins: the GET seed only stands in before the first
+ * snapshot, and an answer that started before a reset, or arrives after a snapshot, is discarded. The view is bounded by what the
  * sources retain (the ledger ring, the history window, the journal) and says so; nothing older is
  * fetched. A row whose source no longer holds it leaves when its last contributing source drops it.
  *
@@ -38,6 +40,7 @@ import {
   type FeedFilter,
   type FeedNote,
   type FeedRow,
+  historyLedgerId,
   type OperationHistoryRow,
   type QuickFilter,
   type RoutineChoice,
@@ -49,6 +52,8 @@ import { resolvePathLazy, friendlyPathName } from '../hooks/resolvePathLazy.js';
 import type { MultiplexedStream } from '../streaming/MultiplexedStream.js';
 import { getSharedShellEventsMultiplex } from '../streaming/shellEventsMultiplexInstance.js';
 import { EnvelopeStream, type EnvelopeReducer } from '../streaming/EnvelopeStream.js';
+import { FetchEventSource, type StreamSource } from '../streaming/FetchEventSource.js';
+import { applySnapshot, observe } from '../streaming/snapshotArbitration.js';
 import { collapseBursts } from '../projections/boundedProjection.js';
 import { compareInstants } from '../primitives/instant.js';
 import { getResource, onCatalogChange } from '../../api/registry/ResourceCatalogClient.js';
@@ -97,7 +102,16 @@ interface HistorySourceState {
   readonly inner: StrategyState<unknown>;
   /** A snapshot frame was read since the last reset: only then is an empty history a claim. */
   readonly snapshotSeen: boolean;
+  /** UPDATE rows no snapshot has contained since the last reset (see {@link applySnapshot}). */
+  readonly unconfirmed: readonly OperationHistoryRow[];
 }
+
+/** The history window the strategy keeps; unconfirmed observations beyond it are no longer shown. */
+const HISTORY_WINDOW = 200;
+
+/** A history row's identity: its invocation key, else the exact legacy identity of its raw fields. */
+const historyIdentity = (row: OperationHistoryRow): string | undefined =>
+  row && typeof row.operationId === 'string' && typeof row.endTime === 'string' ? historyLedgerId(row) : undefined;
 
 const QUICK_FILTERS: ReadonlyArray<readonly [QuickFilter, string]> = [
   ['all', 'All'], ['agents', 'Agents'], ['mine', 'Your actions'], ['indexing', 'Indexing'], ['problems', 'Problems'],
@@ -163,6 +177,10 @@ export class ActionLedgerView extends JfElement {
   /** Bumped on every disconnect, so an answer started by an earlier mount changes nothing. */
   private mountGeneration = 0;
   private midnightTimer: ReturnType<typeof setTimeout> | null = null;
+  /** The history stream failed since its last snapshot (or before its first): it is unavailable, not loading. */
+  private historyFailed = false;
+  /** Reopens the history stream now; set while the stream is open. */
+  private retryHistory: (() => void) | null = null;
   /** The first record on screen before new records arrive, when the reader has scrolled into the list. */
   private readingAnchor: { key: string; top: number } | null = null;
 
@@ -366,6 +384,8 @@ export class ActionLedgerView extends JfElement {
     this.ledgerReadFailed = false;
     this.history = null;
     this.historyState = 'loading';
+    this.historyFailed = false;
+    this.retryHistory = null;
   }
 
   /**
@@ -409,25 +429,61 @@ export class ActionLedgerView extends JfElement {
       this.historyState = 'unavailable';
       return;
     }
+    // Snapshot arbitration (amendment 4): a snapshot cannot erase or replace an observation no
+    // snapshot has contained yet; only a reset voids what was observed before it.
     const reducer: EnvelopeReducer<HistorySourceState> = (state, envelope) => {
-      const kind = envelope.frameKind === 'LIFECYCLE' ? (envelope.payload as { kind?: string } | null)?.kind : undefined;
-      return {
-        inner: strategy.reducer(state.inner, envelope),
-        snapshotSeen: kind === 'snapshot' ? true : kind === 'reset' ? false : state.snapshotSeen,
-      };
+      const payload = envelope.payload as { kind?: string; entries?: unknown } | null;
+      const kind = envelope.frameKind === 'LIFECYCLE' ? payload?.kind : undefined;
+      if (kind === 'snapshot' && Array.isArray(payload?.entries)) {
+        const next = applySnapshot(payload.entries as OperationHistoryRow[], state.unconfirmed, historyIdentity);
+        return {
+          inner: strategy.reducer(state.inner, { ...envelope, payload: { ...payload, entries: next.rows } }),
+          snapshotSeen: true,
+          unconfirmed: next.unconfirmed,
+        };
+      }
+      const inner = strategy.reducer(state.inner, envelope);
+      if (kind === 'reset') return { inner, snapshotSeen: false, unconfirmed: [] };
+      if (envelope.frameKind === 'UPDATE') {
+        const unconfirmed = observe(state.unconfirmed, envelope.payload as OperationHistoryRow, historyIdentity);
+        return { inner, snapshotSeen: state.snapshotSeen, unconfirmed: unconfirmed.slice(-HISTORY_WINDOW) };
+      }
+      return { ...state, inner, snapshotSeen: kind === 'snapshot' ? true : state.snapshotSeen };
+    };
+    // A failure is said only about a source that has not read a snapshot since: once read, a lost
+    // channel shows the last-known records instead. Connection or heartbeat frames prove nothing.
+    const open = this.historyEventSourceFactory ?? ((url: string) => new FetchEventSource(url));
+    const eventSourceFactory = (url: string): StreamSource => {
+      const source = open(url) as StreamSource;
+      source.addEventListener('error', () => {
+        if (generation !== this.mountGeneration || this.history?.snapshotSeen) return;
+        this.historyFailed = true;
+        this.historyState = 'unavailable';
+      });
+      return source;
     };
     const base = (this.apiBase ?? '').replace(/\/$/, '');
     const stream = new EnvelopeStream<HistorySourceState>({
       url: /^https?:\/\//i.test(resource.endpoint) ? resource.endpoint : `${base}${resource.endpoint}`,
-      initialState: { inner: strategy.initialState, snapshotSeen: false },
+      initialState: { inner: strategy.initialState, snapshotSeen: false, unconfirmed: [] },
       reducer,
-      ...(this.historyEventSourceFactory ? { eventSourceFactory: this.historyEventSourceFactory } : {}),
+      eventSourceFactory,
     });
     const unsubscribe = stream.subscribe((snap) => {
       this.history = snap.payload;
-      this.historyState = !snap.payload.snapshotSeen ? 'loading' : snap.isConnected ? 'live' : 'last-known';
+      if (snap.payload.snapshotSeen) this.historyFailed = false;
+      this.historyState = snap.payload.snapshotSeen ? (snap.isConnected ? 'live' : 'last-known')
+        : this.historyFailed ? 'unavailable' : 'loading';
     });
     stream.start();
+    // The stream reconnects itself with backoff; Retry reopens it now.
+    this.retryHistory = () => {
+      if (generation !== this.mountGeneration) return;
+      this.historyFailed = false;
+      if (!this.history?.snapshotSeen) this.historyState = 'loading';
+      stream.stop();
+      stream.start();
+    };
     this.stops.push(() => { unsubscribe(); stream.stop(); });
   }
 
@@ -634,7 +690,10 @@ export class ActionLedgerView extends JfElement {
     const words = (state: SourceState): string => state === 'loading' ? 'loading'
       : state === 'unavailable' ? 'could not be read' : 'showing last-known records; live updates are not connected';
     return html`${affected.map(([name, state]) => html`<p class="source-state" role="status"
-      data-testid=${`feed-source-${name}`} data-state=${state}>${anyRead && feed.length ? 'Partial activity: ' : ''}${SOURCE_NAMES[name]} ${words(state)}.</p>`)}`;
+      data-testid=${`feed-source-${name}`} data-state=${state}>${anyRead && feed.length ? 'Partial activity: ' : ''}${SOURCE_NAMES[name]} ${words(state)}.${
+        name === 'history' && state === 'unavailable' && this.retryHistory
+          ? html` <button type="button" class="retry" data-testid="feed-source-history-retry"
+              @click=${() => this.retryHistory?.()}>Retry</button>` : nothing}</p>`)}`;
   }
 
   private renderNotes(row: FeedRow): TemplateResult | typeof nothing {

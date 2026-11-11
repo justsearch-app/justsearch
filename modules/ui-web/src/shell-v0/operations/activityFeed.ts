@@ -95,7 +95,7 @@ function originatorOfTransport(transport: string | null | undefined): EffectOrig
 }
 
 /** The ledger identity the backend gives this history row's operation event (raw fields, raw precision). */
-function historyLedgerId(row: OperationHistoryRow): string {
+export function historyLedgerId(row: OperationHistoryRow): string {
   return row.operationKey ? `operation:${row.operationKey}`
     : `operation:${row.endTime}:${row.operationId}:${row.outcome}:${row.executionId ?? ''}`;
 }
