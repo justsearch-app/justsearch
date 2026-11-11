@@ -408,3 +408,13 @@ env -u DISPLAY -u WAYLAND_DISPLAY js-gradle-slot node scripts/governance/gates/t
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1c8b9-16f5-7a73-8f93-10e2414a1205",
+  "verdict": "accept",
+  "digest": "sha256:771cc679dab675c3367ae608fcb7b4d4e8bd0cb847bceaa8fbea9eeab4c71912"
+}
+```
