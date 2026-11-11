@@ -178,7 +178,7 @@ describe('SP1 one chord, one palette', () => {
   it('SP1 IME composition, key repeat, extra modifiers and AltGraph never toggle; Cmd K on macOS and Ctrl K elsewhere', async () => {
     const shell = await mount();
     const field = await composerField(shell); field.focus();
-    for (const extra of [{ isComposing: true }, { repeat: true }, { shiftKey: true }, { altKey: true }, { altGraph: true },
+    for (const extra of [{ isComposing: true }, { keyCode: 229 }, { repeat: true }, { shiftKey: true }, { altKey: true }, { altGraph: true },
       { ctrlKey: false, metaKey: true }, { metaKey: true }]) {
       chord(field, extra); await settle(shell);
       expect(openPalettes(shell), JSON.stringify(extra)).toBe(0);
@@ -189,5 +189,30 @@ describe('SP1 one chord, one palette', () => {
     chord(field, { ctrlKey: false, metaKey: true }); await settle(shell);
     expect(palette(shell).open, 'Cmd K on macOS').toBe(true);
     expect(openPalettes(shell)).toBe(1);
+  });
+
+  it('SP1 a keydown the IME is processing (keyCode 229, isComposing still false) runs no binding: neither Ctrl K nor Settings Ctrl comma', async () => {
+    const shell = await mount();
+    const invoked: string[] = [];
+    const stop = onCommandInvoked(id => invoked.push(id));
+    try {
+      const field = await composerField(shell); field.focus();
+      const settings = (): SettingsWindow => shell.shadowRoot!.querySelector<SettingsWindow>('jf-settings-window')!;
+      for (const key of ['k', ',']) {
+        const event = chord(field, { key, keyCode: 229, isComposing: false }); await settle(shell);
+        expect(event.defaultPrevented, key).toBe(false);
+      }
+      expect(invoked).toEqual([]);
+      expect(openPalettes(shell)).toBe(0);
+      expect(settings().open).toBe(false);
+      // The same chords without the IME code do run, so the guard is what held them.
+      chord(field, { key: ',' }); await settle(shell);
+      expect(settings().open).toBe(true);
+      settings().dismiss(); await settle(shell);
+      field.focus();
+      chord(field); await settle(shell);
+      expect(palette(shell).open).toBe(true);
+      expect(invoked).toEqual(['shell.go-to-settings', 'shell.toggle-palette']);
+    } finally { stop(); }
   });
 });

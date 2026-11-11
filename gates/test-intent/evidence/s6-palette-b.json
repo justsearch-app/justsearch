@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
   },
-  "createdAt": "2026-11-11T06:12:03.585Z",
-  "revision": "545232c4d8fbb5345d73b5f484c9839fa04b0905",
-  "tree": "3845604dc355f907833962f72ef26fd1cf064a33",
+  "createdAt": "2026-11-11T07:18:12.279Z",
+  "revision": "02a9eb6522645313af699a4b190e7163824ee05a",
+  "tree": "7166ece8bcc37c4fe29fbf5408fd90449479c9d7",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/commands/CommandPalette.overlay.test.ts\" \"src/shell-v0/chrome/Shell.palette.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.paletteActions.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.memory.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.pane.test.ts\" \"src/shell-v0/views/search-v3/Sv3Empty.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/v1spql95/tmp/test-intent-vitest-11189-1794377504685.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/commands/CommandPalette.overlay.test.ts\" \"src/shell-v0/chrome/Shell.palette.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.paletteActions.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.memory.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.pane.test.ts\" \"src/shell-v0/views/search-v3/Sv3Empty.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/0smce4lf/tmp/test-intent-vitest-3844-1794381479396.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 6886
+      "durationMs": 5635
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/commands/CommandPalette.overlay.test.ts",
       "file": "modules/ui-web/src/shell-v0/commands/CommandPalette.overlay.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:32d73a4336b1b691419d5d46dd336cc9aeb707dcae05d5a5de19bbb9b7b7ab2d",
+      "contentDigest": "sha256:ac05d37d83eddd44c0fae72e5f074c6aafecd6bb045ccec49f37ce3c1ccf5e5a",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -108,7 +108,7 @@
       "id": "modules/ui-web/src/shell-v0/chrome/Shell.palette.test.ts",
       "file": "modules/ui-web/src/shell-v0/chrome/Shell.palette.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:4510ac8e49e2c79dbe9d7860a47f67e22ac13aa6d6d9e018e845ffedb619fe75",
+      "contentDigest": "sha256:7717a7f0477eb428905d10674d06ed1e956ce0b134a5739aa1f4f8a37c789205",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -127,6 +127,10 @@
         },
         {
           "name": "SP1 one chord, one palette SP1 IME composition, key repeat, extra modifiers and AltGraph never toggle; Cmd K on macOS and Ctrl K elsewhere",
+          "status": "passed"
+        },
+        {
+          "name": "SP1 one chord, one palette SP1 a keydown the IME is processing (keyCode 229, isComposing still false) runs no binding: neither Ctrl K nor Settings Ctrl comma",
           "status": "passed"
         }
       ]
@@ -734,43 +738,43 @@
     "patches": [],
     "runs": [
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/commands/CommandPalette.overlay.test.ts\" \"src/shell-v0/chrome/Shell.palette.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.paletteActions.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.memory.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.pane.test.ts\" \"src/shell-v0/views/search-v3/Sv3Empty.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/v1spql95/tmp/test-intent-vitest-11189-1794377513438.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/commands/CommandPalette.overlay.test.ts\" \"src/shell-v0/chrome/Shell.palette.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.paletteActions.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.memory.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.pane.test.ts\" \"src/shell-v0/views/search-v3/Sv3Empty.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/0smce4lf/tmp/test-intent-vitest-3844-1794381486421.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 9723,
-        "output": "JSON report written to /home/elias/.cache/am/v1spql95/tmp/test-intent-vitest-11189-1794377513438.json\n\n"
+        "durationMs": 5605,
+        "output": "JSON report written to /home/elias/.cache/am/0smce4lf/tmp/test-intent-vitest-3844-1794381486421.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/commands/CommandPalette.overlay.test.ts",
         "classification": "assertion",
-        "detail": "SP5 Tab shows each result kind's actions, primary first; Escape returns to the results:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/v1spql95/tmp/test-intent-before-iMKhsv/modules/ui-web/src/shell-v0/commands/CommandPalette.overlay.test.ts:91:59\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///home | SP5 Escape or Shift Tab returns with query, selection and scroll kept, and a second Escape closes:  Assertio"
+        "detail": "SP5 Tab shows each result kind's actions, primary first; Escape returns to the results:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/0smce4lf/tmp/test-intent-before-PkNJxC/modules/ui-web/src/shell-v0/commands/CommandPalette.overlay.test.ts:91:59\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///home | SP5 Escape or Shift Tab returns with query, selection and scroll kept, and a second Escape closes:  Assertio"
       },
       {
         "id": "modules/ui-web/src/shell-v0/chrome/Shell.palette.test.ts",
         "classification": "assertion",
-        "detail": "SP1 one chord, one palette SP1 one chord press toggles exactly one palette from Search's composer, Library, AI Brain and a contributed window:  AssertionError: core.search-v3-surface: expected null to be <textarea rows=\"1\" …(7)></textarea> // Object.is equality\n    at /home/elias/.cache/am/v1spql95/tmp/test-intent-before-iMKhsv/modules/ui-web/src/shell-v0/chrome/Shell.palette.test.ts:128:146\n    at file:///home/elias/dev/justsearch/.claude/ | SP1 one chord, one palette SP1 the Search topbar butt"
+        "detail": "SP1 one chord, one palette SP1 one chord press toggles exactly one palette from Search's composer, Library, AI Brain and a contributed window:  AssertionError: core.search-v3-surface: expected null to be <textarea rows=\"1\" …(7)></textarea> // Object.is equality\n    at /home/elias/.cache/am/0smce4lf/tmp/test-intent-before-PkNJxC/modules/ui-web/src/shell-v0/chrome/Shell.palette.test.ts:128:146\n    at file:///home/elias/dev/justsearch/.claude/ | SP1 one chord, one palette SP1 the Search topbar butt"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.paletteActions.test.ts",
         "classification": "assertion",
-        "detail": "SP7 Search's working commands are app palette actions under their ids; the seven inert entries and the second palette are gone:  AssertionError: expected undefined to be 'Search everything' // Object.is equality\n    at /home/elias/.cache/am/v1spql95/tmp/test-intent-before-iMKhsv/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.paletteActions.test.ts:72:46\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-p | SP7 the topbar button asks the app's one toggle action, once per pre"
+        "detail": "SP7 Search's working commands are app palette actions under their ids; the seven inert entries and the second palette are gone:  AssertionError: expected undefined to be 'Search everything' // Object.is equality\n    at /home/elias/.cache/am/0smce4lf/tmp/test-intent-before-PkNJxC/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.paletteActions.test.ts:72:46\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-p | SP7 the topbar button asks the app's one toggle action, once per pre"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.memory.test.ts",
         "classification": "assertion",
-        "detail": "SP7 opens the existing Memory surface from the app palette’s \"Open AI Brain › Memory\" (S53.3, DM1):  AssertionError: expected '\\n                  AI Brain › Readin…' to contain 'Open AI Brain › Memory'\n    at /home/elias/.cache/am/v1spql95/tmp/test-intent-before-iMKhsv/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.memory.test.ts:39:40\n    at processTicksAndRejections (node:internal/proc"
+        "detail": "SP7 opens the existing Memory surface from the app palette’s \"Open AI Brain › Memory\" (S53.3, DM1):  AssertionError: expected '\\n                  AI Brain › Readin…' to contain 'Open AI Brain › Memory'\n    at /home/elias/.cache/am/0smce4lf/tmp/test-intent-before-PkNJxC/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.memory.test.ts:39:40\n    at processTicksAndRejections (node:internal/proc"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts",
         "classification": "assertion",
-        "detail": "SP7 HO12 the app palette's \"Search everything\" after a hand-off searches in Search mode and returns focus to the composer:  AssertionError: expected 'ask' to be 'search' // Object.is equality\n    at /home/elias/.cache/am/v1spql95/tmp/test-intent-before-iMKhsv/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:477:42\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-palette-b/modules/ui-"
+        "detail": "SP7 HO12 the app palette's \"Search everything\" after a hand-off searches in Search mode and returns focus to the composer:  AssertionError: expected 'ask' to be 'search' // Object.is equality\n    at /home/elias/.cache/am/0smce4lf/tmp/test-intent-before-PkNJxC/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.handoffs.test.ts:477:42\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-palette-b/modules/ui-"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.pane.test.ts",
         "classification": "assertion",
-        "detail": "Escape closes the pane FIRST SP9 one chord in the composer opens only the app palette, and its Escape closes the palette while the pane stays open:  AssertionError: expected <jf-sv3-palette …(1)></jf-sv3-palette> to be null\n    at /home/elias/.cache/am/v1spql95/tmp/test-intent-before-iMKhsv/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.pane.test.ts:565:100\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-palette-b/modules"
+        "detail": "Escape closes the pane FIRST SP9 one chord in the composer opens only the app palette, and its Escape closes the palette while the pane stays open:  AssertionError: expected <jf-sv3-palette …(1)></jf-sv3-palette> to be null\n    at /home/elias/.cache/am/0smce4lf/tmp/test-intent-before-PkNJxC/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.pane.test.ts:565:100\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-palette-b/modules"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Empty.test.ts",
@@ -779,5 +783,5 @@
       }
     ]
   },
-  "digest": "sha256:08da8a713ddd93d583b80138709dea9ba7309a1849db6b6f0ae77369b6b065b4"
+  "digest": "sha256:6c9e7c1f40805a639d821a9bd3e2ff671db59c4b936ba73c452f02582ca34c84"
 }

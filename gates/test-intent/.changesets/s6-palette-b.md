@@ -7,7 +7,7 @@ author-session: s6-palette-b-builder
 
 # Candidate B — one palette overlay, Tab actions, Search palette retirement, chord ownership, keyboard and accessibility
 
-No acceptance is claimed; independent verification is pending. Fail-before evidence ran on 545232c4d8 (candidate A).
+No acceptance is claimed; independent verification is pending. Fail-before evidence ran on 545232c4d8 (candidate A) in gates/test-intent/evidence/s6-palette-b.json; the verifier-round repairs (keyCode 229 as composition for every binding, the listbox as the palette's scroll region) ran their fail-before on 02a9eb6522 in gates/test-intent/evidence/s6-palette-b-repair.json. The palette harness steps' witness repair is a script self-test (scripts/jsharness/tests/test_ui_palette_witness.py), outside this gate's scope.
 
 ```json
 {
@@ -17,7 +17,7 @@ No acceptance is claimed; independent verification is pending. Fail-before evide
         "modules/ui-web/src/shell-v0/commands/CommandPalette.overlay.test.ts"
       ],
       "class": "New",
-      "behaviour": "SP5 Tab shows each result kind's actions in the decided inventory (Action: Run; Settings row: Open; Folder: Open in Library, Remove from Library; Recent conversation: Open; Area: Open); Escape or Shift Tab returns with query, selected identity and scroll kept and a second Escape closes; a folder's Remove hands off to Library's confirmation request and issues no deleting request; with no result Tab opens no actions and keeps focus in the dialog; keys during IME composition (isComposing or keyCode 229) invoke, move, show actions or dismiss nothing. SP4/SP9 in the actions view: a removed or same-id replacement registration runs nothing and is announced as no longer available. SP8: modal dialog, labelled combobox with aria-controls and aria-activedescendant, listbox with groups labelled by their headers, aria-posinset and aria-setsize over every match, the active option scrolled into view; count, empty, loading and folder-error states announced in a status region; every match reachable by arrow keys alone; forced-colours outline on the active option and the field, and a short-window rule that keeps field and list (style mechanism; the rendered check is the palette-forced-colors and palette-600x400-text-200 harness steps). SP9: dismissal by Escape or backdrop returns focus to the invoker, else to the main region; the palette's Escape reaches no listener beneath. SP10c: an Alt peek is dismissed once on Alt release, leaving the row, removal of the row, dismissal and disconnect, and leaves no keyup listener. Fail-before on 545232c4d8: every case fails with an assertion except the SP10c Alt release and leaving-the-row cases, which pass before (today's behaviour, kept).",
+      "behaviour": "SP5 Tab shows each result kind's actions in the decided inventory (Action: Run; Settings row: Open; Folder: Open in Library, Remove from Library; Recent conversation: Open; Area: Open); Escape or Shift Tab returns with query, selected identity and scroll kept and a second Escape closes; a folder's Remove hands off to Library's confirmation request and issues no deleting request; with no result Tab opens no actions and keeps focus in the dialog; keys during IME composition (isComposing or keyCode 229) invoke, move, show actions or dismiss nothing. SP4/SP9 in the actions view: a removed or same-id replacement registration runs nothing and is announced as no longer available. SP8: modal dialog, labelled combobox with aria-controls and aria-activedescendant, listbox with groups labelled by their headers, aria-posinset and aria-setsize over every match, the active option scrolled into view; count, empty, loading and folder-error states announced in a status region; every match reachable by arrow keys alone; the listbox the field controls is the scroll region, so the field's arrow keys scroll it and the scroll kept on return from actions is the listbox's; forced-colours outline on the active option and the field, and a short-window rule that keeps field and list (style mechanism; the rendered check is the palette-forced-colors and palette-600x400-text-200 harness steps). SP9: dismissal by Escape or backdrop returns focus to the invoker, else to the main region; the palette's Escape reaches no listener beneath. SP10c: an Alt peek is dismissed once on Alt release, leaving the row, removal of the row, dismissal and disconnect, and leaves no keyup listener. Fail-before on 545232c4d8: every case fails with an assertion except the SP10c Alt release and leaving-the-row cases, which pass before (today's behaviour, kept).",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -39,7 +39,7 @@ No acceptance is claimed; independent verification is pending. Fail-before evide
         "modules/ui-web/src/shell-v0/chrome/Shell.palette.test.ts"
       ],
       "class": "New",
-      "behaviour": "SP1 with the real Shell: one Ctrl K press from Search's composer, Library, AI Brain and a contributed window invokes shell.toggle-palette exactly once and opens exactly one palette; the next press closes it and focus returns to where the chord was pressed; Search's topbar button opens the same palette and Escape returns focus to the button; under Settings or a confirmation dialog the chord leaves the dialog in control, and the toggle action itself, run while a modal is open, does not open; IME composition, key repeat, Shift, Alt, AltGraph and Cmd on Linux do not toggle; on macOS Cmd K toggles and Ctrl K does not. Fail-before on 545232c4d8 (assertions): closing did not return focus to the invoker, the topbar opened Search's own palette, the toggle opened over Settings, and Search's own chord matcher opened its palette under composition, repeat and extra modifiers.",
+      "behaviour": "SP1 with the real Shell: one Ctrl K press from Search's composer, Library, AI Brain and a contributed window invokes shell.toggle-palette exactly once and opens exactly one palette; the next press closes it and focus returns to where the chord was pressed; Search's topbar button opens the same palette and Escape returns focus to the button; under Settings or a confirmation dialog the chord leaves the dialog in control, and the toggle action itself, run while a modal is open, does not open; IME composition (isComposing, or keyCode 229 with isComposing still false, for Ctrl K and Settings Ctrl comma alike), key repeat, Shift, Alt, AltGraph and Cmd on Linux do not toggle; on macOS Cmd K toggles and Ctrl K does not. Fail-before on 545232c4d8 (assertions): closing did not return focus to the invoker, the topbar opened Search's own palette, the toggle opened over Settings, and Search's own chord matcher opened its palette under composition, repeat and extra modifiers.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -75,6 +75,74 @@ No acceptance is claimed; independent verification is pending. Fail-before evide
       "evidence": "gates/test-intent/evidence/s6-palette-b.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.paletteActions.test.ts"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/utils/keyboardHandler.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "SP1 and the Settings Ctrl comma rule (never during IME composition): the app's one key-event guard treats a keydown the IME is processing (keyCode 229) as composition even while isComposing is still false, so every registered binding and every raw global key handler that shares the guard stands down for it; an ordinary Ctrl K keydown is not composition. Fail-before on 02a9eb6522: assertion (shouldIgnoreKeyEvent returned false for keyCode 229).",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "Fix the one shared definition in utils/keyboardHandler.ts (isImeComposition, used by shouldIgnoreKeyEvent) rather than the keybinding dispatcher alone, so the registry, Shell's global keys, Search's window keys, the status pill and panel and action buttons all agree; the palette's own composition check now uses the same definition instead of its copy."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-palette-b-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/utils/keyboardHandler.test.ts#ignores a keydown the IME is processing (keyCode 229) before isComposing is set"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.palette.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "SP1 with the real Shell: with Search's composer focused, a keydown {key k, ctrlKey, keyCode 229, isComposing false} and the same for Settings' Ctrl comma invoke no command, are not default-prevented, open no palette and no Settings; the same chords without the IME code open Settings and the palette, so the guard is what held them. The SP1 modifier case also covers keyCode 229. Fail-before on 02a9eb6522: assertion (Ctrl K with keyCode 229 opened the palette; the dispatcher ignored only isComposing and repeat).",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "Every binding, not only the palette chord, stands down for keyCode 229; Settings Ctrl comma is the second binding checked."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-palette-b-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.palette.test.ts#SP1 a keydown the IME is processing (keyCode 229, isComposing still false) runs no binding: neither Ctrl K nor Settings Ctrl comma",
+        "modules/ui-web/src/shell-v0/chrome/Shell.palette.test.ts#SP1 IME composition, key repeat, extra modifiers and AltGraph never toggle; Cmd K on macOS and Ctrl K elsewhere"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/commands/CommandPalette.overlay.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "SP8: the scroll region of the results is the listbox the combobox controls (its popup), which shrinks before the area around it, so keyboard users scroll it from the field through aria-activedescendant and axe's scrollable-region-focusable no longer reports the palette's results container (rendered check: the palette-forced-colors steps, light and dark, at 1280x720 with a scrolling list, axe clean); returning from a result's actions restores that listbox's scroll. Fail-before on 02a9eb6522: assertion (no listbox scroll rule; the listbox's scroll was not restored because the containing .results scrolled instead).",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "Make the combobox's listbox the scroll container, the listbox pattern's own shape, instead of adding a tab stop: focus stays in the field and the active-descendant model, announcements and visible active row are unchanged."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-palette-b-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/commands/CommandPalette.overlay.test.ts#SP8 forced colours keep the active option and the field's focus distinguishable, and a short window keeps field and list",
+        "modules/ui-web/src/shell-v0/commands/CommandPalette.overlay.test.ts#SP5 Escape or Shift Tab returns with query, selection and scroll kept, and a second Escape closes"
       ],
       "repaired": true
     },

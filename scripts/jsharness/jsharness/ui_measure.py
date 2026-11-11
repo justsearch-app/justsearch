@@ -315,25 +315,31 @@ _JS_DEEP = """
 """
 
 async def assert_search_state(page, name: str) -> None:
-    """A clean axe scan counts only after the promised Search state is visible.
+    """A clean axe scan counts only after the promised Search (or palette) state is visible.
 
     Run at measurement time too, so deleting content after setup cannot produce an empty pass.
-    Non-Search surfaces have their own setup predicates and do not claim Search coverage.
+    Non-Search surfaces have their own setup predicates and do not claim Search coverage. The app's
+    one palette is a sibling of Search in the shell, so palette steps are witnessed under the palette
+    element itself.
     """
-    from .ui_selectors import SEARCH_STATE_WITNESSES, CSS_SV3_WINDOW
-    selectors = SEARCH_STATE_WITNESSES.get(name.removesuffix("-light"))
+    from .ui_selectors import SEARCH_STATE_WITNESSES, PALETTE_STATE_WITNESSES, CSS_SV3_WINDOW, CSS_PALETTE
+    key = name.removesuffix("-light")
+    if key in PALETTE_STATE_WITNESSES:
+        selectors, root_css, what = PALETTE_STATE_WITNESSES[key], CSS_PALETTE, "palette"
+    else:
+        selectors, root_css, what = SEARCH_STATE_WITNESSES.get(key), CSS_SV3_WINDOW, "Search"
     if selectors is None:
         return
-    root = page.locator(CSS_SV3_WINDOW + ":visible")
+    root = page.locator(root_css + ":visible")
     if await root.count() != 1:
-        raise AssertionError(f"{name}: expected exactly one visible Search window")
+        raise AssertionError(f"{name}: expected exactly one visible {what} element")
     registered = await root.evaluate("el => !!customElements.get(el.localName) && !!el.shadowRoot")
     if not registered:
-        raise AssertionError(f"{name}: Search custom element is not registered/rendered")
+        raise AssertionError(f"{name}: {what} custom element is not registered/rendered")
     for selector in selectors:
         loc = root.locator(selector).first
         if await loc.count() == 0 or not await loc.is_visible():
-            raise AssertionError(f"{name}: missing visible Search state witness {selector}")
+            raise AssertionError(f"{name}: missing visible {what} state witness {selector}")
         valid = await loc.evaluate("""el => {
             const r = el.getBoundingClientRect();
             const text = node => {
@@ -345,7 +351,7 @@ async def assert_search_state(page, name: str) -> None:
                 && (el.matches('textarea,input') || text(el).trim().length > 0);
         }""")
         if not valid:
-            raise AssertionError(f"{name}: empty/hidden Search state witness {selector}")
+            raise AssertionError(f"{name}: empty/hidden {what} state witness {selector}")
 
 
     drafts = {"chat-mode": "What is this file about?", "chat-composer-small": "A longer draft remains reachable in a small window."}

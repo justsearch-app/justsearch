@@ -104,14 +104,15 @@ it('SP5 Escape or Shift Tab returns with query, selection and scroll kept, and a
   const palette = await open('>Tool');
   for (const back of [{ key: 'Escape' }, { key: 'Tab', shiftKey: true }]) {
     await select(palette, 'shell.tool-4');
-    const list = shadow(palette).querySelector<HTMLElement>('.results')!;
-    list.scrollTop = 48;
+    const list = shadow(palette).querySelector<HTMLElement>('#palette-listbox');
+    expect(list, 'the listbox the field controls, which is the scroll region').not.toBeNull();
+    list!.scrollTop = 48;
     key(palette, { key: 'Tab' }); await palette.updateComplete;
     expect(actionLabels(palette)).toEqual(['Run']);
     key(palette, back); await palette.updateComplete; await palette.updateComplete;
     expect(field(palette).value).toBe('>Tool');
     expect(palette.results[palette.selectedIndex]?.entry.id).toBe('shell.tool-4');
-    expect(shadow(palette).querySelector<HTMLElement>('.results')!.scrollTop).toBe(48);
+    expect(shadow(palette).querySelector<HTMLElement>('#palette-listbox')?.scrollTop).toBe(48);
     expect(palette.open).toBe(true);
   }
   key(palette, { key: 'Escape' }); await palette.updateComplete;
@@ -193,7 +194,7 @@ it('SP8 a modal dialog with a labelled combobox, a listbox of labelled groups, p
   const dialog = shadow(palette).querySelector('[role="dialog"]');
   expect(dialog, 'a dialog').not.toBeNull();
   expect(dialog!.getAttribute('aria-modal')).toBe('true');
-  expect(dialog.getAttribute('aria-label')).toBe('Command palette');
+  expect(dialog!.getAttribute('aria-label')).toBe('Command palette');
   const combobox = shadow(palette).querySelector('input[role="combobox"]');
   expect(combobox, 'a combobox').not.toBeNull();
   expect(combobox!.getAttribute('aria-label')).toBeTruthy();
@@ -252,6 +253,13 @@ it('SP8 forced colours keep the active option and the field\'s focus distinguish
   const results = styles.slice(styles.indexOf('.results {'), styles.indexOf('}', styles.indexOf('.results {')));
   expect(results).toContain('min-height: 0');
   expect(results).toContain('overflow-y: auto');
+  // The scroll region is the listbox the field controls (the combobox's popup), so keyboard users
+  // scroll it from the field; it shrinks before the area around it does.
+  const rule = '.results > [role="listbox"] {';
+  expect(styles).toContain(rule);
+  const listbox = styles.slice(styles.indexOf(rule), styles.indexOf('}', styles.indexOf(rule)));
+  expect(listbox).toContain('min-height: 0');
+  expect(listbox).toContain('overflow-y: auto');
   expect(styles).toContain('max-height: calc(100dvh - var(--palette-top) - 0.5rem)');
   expect(styles).toMatch(/@media \(max-height: 30rem\)\s*\{[^@]*\.footer \{ display: none; \}/);
 });

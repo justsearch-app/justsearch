@@ -1,0 +1,147 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
+  },
+  "createdAt": "2026-11-11T07:18:28.995Z",
+  "revision": "02a9eb6522645313af699a4b190e7163824ee05a",
+  "tree": "c28993c8c239c1f22fd8a1398dc716d3181e18aa",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/utils/keyboardHandler.test.ts\" \"src/shell-v0/chrome/Shell.palette.test.ts\" \"src/shell-v0/commands/CommandPalette.overlay.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/0smce4lf/tmp/test-intent-vitest-4142-1794381501033.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 3548
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/utils/keyboardHandler.test.ts#ignores a keydown the IME is processing (keyCode 229) before isComposing is set",
+      "file": "modules/ui-web/src/shell-v0/utils/keyboardHandler.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:47785601c13860b9373499b7fb14351c9bdebb37c7198536c44699938a4d3d94",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "shouldIgnoreKeyEvent (864 Layer 2(b)) ignores a keydown the IME is processing (keyCode 229) before isComposing is set",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.palette.test.ts#SP1 a keydown the IME is processing (keyCode 229, isComposing still false) runs no binding: neither Ctrl K nor Settings Ctrl comma",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.palette.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7717a7f0477eb428905d10674d06ed1e956ce0b134a5739aa1f4f8a37c789205",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SP1 one chord, one palette SP1 a keydown the IME is processing (keyCode 229, isComposing still false) runs no binding: neither Ctrl K nor Settings Ctrl comma",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.palette.test.ts#SP1 IME composition, key repeat, extra modifiers and AltGraph never toggle; Cmd K on macOS and Ctrl K elsewhere",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.palette.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7717a7f0477eb428905d10674d06ed1e956ce0b134a5739aa1f4f8a37c789205",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SP1 one chord, one palette SP1 IME composition, key repeat, extra modifiers and AltGraph never toggle; Cmd K on macOS and Ctrl K elsewhere",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/commands/CommandPalette.overlay.test.ts#SP8 forced colours keep the active option and the field's focus distinguishable, and a short window keeps field and list",
+      "file": "modules/ui-web/src/shell-v0/commands/CommandPalette.overlay.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ac05d37d83eddd44c0fae72e5f074c6aafecd6bb045ccec49f37ce3c1ccf5e5a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SP8 forced colours keep the active option and the field's focus distinguishable, and a short window keeps field and list",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/commands/CommandPalette.overlay.test.ts#SP5 Escape or Shift Tab returns with query, selection and scroll kept, and a second Escape closes",
+      "file": "modules/ui-web/src/shell-v0/commands/CommandPalette.overlay.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ac05d37d83eddd44c0fae72e5f074c6aafecd6bb045ccec49f37ce3c1ccf5e5a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SP5 Escape or Shift Tab returns with query, selection and scroll kept, and a second Escape closes",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "02a9eb6522",
+    "revision": "02a9eb6522645313af699a4b190e7163824ee05a",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/utils/keyboardHandler.test.ts\" \"src/shell-v0/chrome/Shell.palette.test.ts\" \"src/shell-v0/commands/CommandPalette.overlay.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/0smce4lf/tmp/test-intent-vitest-4142-1794381505844.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 2929,
+        "output": "JSON report written to /home/elias/.cache/am/0smce4lf/tmp/test-intent-vitest-4142-1794381505844.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/utils/keyboardHandler.test.ts#ignores a keydown the IME is processing (keyCode 229) before isComposing is set",
+        "classification": "assertion",
+        "detail": "shouldIgnoreKeyEvent (864 Layer 2(b)) ignores a keydown the IME is processing (keyCode 229) before isComposing is set:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/0smce4lf/tmp/test-intent-before-8TCIrh/modules/ui-web/src/shell-v0/utils/keyboardHandler.test.ts:108:101\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-palette-b/modules/ui-web/node_modules/@v"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.palette.test.ts#SP1 a keydown the IME is processing (keyCode 229, isComposing still false) runs no binding: neither Ctrl K nor Settings Ctrl comma",
+        "classification": "assertion",
+        "detail": "SP1 one chord, one palette SP1 a keydown the IME is processing (keyCode 229, isComposing still false) runs no binding: neither Ctrl K nor Settings Ctrl comma:  AssertionError: k: expected true to be false // Object.is equality\n    at /home/elias/.cache/am/0smce4lf/tmp/test-intent-before-8TCIrh/modules/ui-web/src/shell-v0/chrome/Shell.palette.test.ts:203:45\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-palette-b/modules/ui-web/node_modules/@"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.palette.test.ts#SP1 IME composition, key repeat, extra modifiers and AltGraph never toggle; Cmd K on macOS and Ctrl K elsewhere",
+        "classification": "assertion",
+        "detail": "SP1 one chord, one palette SP1 IME composition, key repeat, extra modifiers and AltGraph never toggle; Cmd K on macOS and Ctrl K elsewhere:  AssertionError: {\"keyCode\":229}: expected 1 to be +0 // Object.is equality\n    at /home/elias/.cache/am/0smce4lf/tmp/test-intent-before-8TCIrh/modules/ui-web/src/shell-v0/chrome/Shell.palette.test.ts:184:58\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-palette-b/modules/ui-web/node_m"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/commands/CommandPalette.overlay.test.ts#SP8 forced colours keep the active option and the field's focus distinguishable, and a short window keeps field and list",
+        "classification": "assertion",
+        "detail": "SP8 forced colours keep the active option and the field's focus distinguishable, and a short window keeps field and list:  AssertionError: expected '\\n    :host {\\n      /* 559 Authority…' to contain '.results > [role=\"listbox\"] {'\n    at /home/elias/.cache/am/0smce4lf/tmp/test-intent-before-8TCIrh/modules/ui-web/src/shell-v0/commands/CommandPalette.overlay.test.ts:259:18\n    at file:///home/elias/dev/justsearch/.claude"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/commands/CommandPalette.overlay.test.ts#SP5 Escape or Shift Tab returns with query, selection and scroll kept, and a second Escape closes",
+        "classification": "assertion",
+        "detail": "SP5 Escape or Shift Tab returns with query, selection and scroll kept, and a second Escape closes:  AssertionError: expected +0 to be 48 // Object.is equality\n    at /home/elias/.cache/am/0smce4lf/tmp/test-intent-before-8TCIrh/modules/ui-web/src/shell-v0/commands/CommandPalette.overlay.test.ts:115:87\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-palette-b/modules/ui-web/node_module"
+      }
+    ]
+  },
+  "digest": "sha256:6043e323456c5ec4d95a8f3c3b560ff3daaa61284c4b1e613d34a2bfb4608985"
+}

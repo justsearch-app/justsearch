@@ -15,7 +15,7 @@ import { html, css, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
 import { ModalityController } from '../primitives/modality.js';
 import { closeOthersInLayer } from '../state/transientLayerArbiter.js';
-import { deepActiveElement } from '../utils/keyboardHandler.js';
+import { deepActiveElement, isImeComposition } from '../utils/keyboardHandler.js';
 import { focusRegion } from '../chrome/frameRegions.js';
 import { repeat } from 'lit/directives/repeat.js';
 import {
@@ -50,9 +50,6 @@ function sameResult(entry: PaletteEntry, selected: PaletteEntry): boolean {
     && (selected.target.kind !== 'action' || (entry.target.kind === 'action' && entry.target.action === selected.target.action))
     && (selected.target.kind !== 'command' || (entry.target.kind === 'command' && entry.target.command === selected.target.command));
 }
-
-/** A key that ends or steers an IME composition belongs to the IME (229 is the legacy composing code). */
-const composing = (e: KeyboardEvent): boolean => e.isComposing || e.keyCode === 229;
 
 const FIRST_BOUND = 8;
 const LIST_ID = 'palette-listbox';
@@ -298,8 +295,17 @@ export class CommandPalette extends JfElement {
     .results {
       flex: 1 1 auto;
       min-height: 0;
+      display: flex;
+      flex-direction: column;
       overflow-y: auto;
       padding: 0.25rem 0.5rem 0.5rem;
+    }
+    /* The listbox the field controls is the scroll region (the combobox's popup), so the field's
+       arrow keys scroll it through aria-activedescendant; it shrinks first, before anything around it. */
+    .results > [role="listbox"] {
+      flex: 0 1 auto;
+      min-height: 0;
+      overflow-y: auto;
     }
     .category-header {
       font-size: var(--font-size-xs);
@@ -517,7 +523,7 @@ export class CommandPalette extends JfElement {
   }
 
   private handleKeydown(e: KeyboardEvent): void {
-    if (composing(e)) return;
+    if (isImeComposition(e)) return;
     // Tempdoc 508-followup §δ1 — wizard mode: Enter confirms,
     // Escape cancels; arrow keys are no-ops since there's no result list.
     if (this.wizardActive) {
@@ -567,7 +573,7 @@ export class CommandPalette extends JfElement {
    * moves among the dialog's own controls, never out to the page behind the backdrop.
    */
   private handlePanelKeydown(e: KeyboardEvent): void {
-    if (composing(e) || e.composedPath()[0] instanceof HTMLInputElement) return;
+    if (isImeComposition(e) || e.composedPath()[0] instanceof HTMLInputElement) return;
     if (e.key === 'Escape') {
       e.preventDefault();
       e.stopPropagation();
@@ -621,7 +627,7 @@ export class CommandPalette extends JfElement {
   }
 
   private showActions(entry: PaletteEntry): void {
-    this.resultsScroll = this.shadowRoot?.querySelector('.results')?.scrollTop ?? 0;
+    this.resultsScroll = this.shadowRoot?.getElementById(LIST_ID)?.scrollTop ?? 0;
     this.dismissPeek();
     this.actionsFor = entry;
     this.actionsGone = false;
@@ -639,7 +645,7 @@ export class CommandPalette extends JfElement {
     this.leaveActions();
     const scroll = this.resultsScroll;
     void this.updateComplete.then(() => {
-      const list = this.shadowRoot?.querySelector('.results');
+      const list = this.shadowRoot?.getElementById(LIST_ID);
       if (list) list.scrollTop = scroll;
       this.shadowRoot?.querySelector<HTMLElement>('[data-selected]')?.scrollIntoView?.({ block: 'nearest' });
     });

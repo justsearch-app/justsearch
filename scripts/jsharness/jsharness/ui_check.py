@@ -2485,9 +2485,9 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
     ]
 
     # Theme is a rendered state. Reuse the same interaction, not a separate camera recipe.
-    search_steps = set(S.SEARCH_STATE_WITNESSES) - {
+    search_steps = (set(S.SEARCH_STATE_WITNESSES) - {
         "home", "legacy-token-plugin", "sv3-citation-selected", "sv3-citation-dropped",
-    }
+    }) | {"palette-forced-colors"}
     return steps + [replace(step, name=step.name + "-light", color_scheme="light")
                     for step in steps if step.name in search_steps]
 

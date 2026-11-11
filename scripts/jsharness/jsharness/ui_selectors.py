@@ -128,10 +128,19 @@ SEARCH_STATE_WITNESSES = {
     "sv3-search-results": ['[data-testid="search-result-row"]'],
     "sv3-hero-forced-colors": ['[data-testid="sv3-composer-headline"]', 'jf-sv3-composer textarea'],
     "sv3-docked-forced-colors": ['[data-testid="sv3-turn-answer"]'],
-    "palette-forced-colors": ['jf-command-palette [role="dialog"] [role="option"][aria-selected="true"]'],
     "sv3-citation-selected": ['.cite-ref.cite-selected', 'jf-document-pane :is(.blocks, .source)'],
     "sv3-citation-dropped": ['[data-testid="sv3-turn-citations"] .inclusion', 'jf-document-pane :is(.blocks, .source)'],
     "legacy-token-plugin": ['jf-sv3-composer textarea'],
+}
+# The app's one palette is not inside Search: it lives in the shell's overlay host, a sibling of
+# every window, so its witnesses are read under CSS_PALETTE, never under CSS_SV3_WINDOW. Same rule as
+# above: they run immediately before the screenshot and the axe measurement, and a palette step whose
+# palette is not open fails there instead of measuring whatever is beneath.
+PALETTE_STATE_WITNESSES = {
+    "palette-forced-colors": ['[role="dialog"] input[role="combobox"]',
+                              '[role="dialog"] [role="option"][aria-selected="true"]'],
+    "palette-600x400-text-200": ['[role="dialog"] input[role="combobox"]',
+                                 '[role="dialog"] #palette-actions [role="option"][aria-selected="true"]'],
 }
 
 @dataclass(frozen=True)
