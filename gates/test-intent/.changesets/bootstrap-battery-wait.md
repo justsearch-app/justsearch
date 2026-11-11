@@ -45,3 +45,13 @@ the passing body.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1cbd0-656a-7ce3-8f22-34ca45eb043e",
+  "verdict": "accept",
+  "digest": "sha256:8995a871bf5b091faddd8cc40585c181e8df2e1917a2423713a168ee94db503b"
+}
+```
