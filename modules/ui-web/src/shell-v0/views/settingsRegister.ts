@@ -2,6 +2,8 @@
 /** The one Settings register: navigation, content, search and incoming coordinates. */
 import { getShowDeveloperTools } from '../state/developerToolsState.js';
 import { getViewerAudience } from '../state/viewerAudienceState.js';
+import { getOperation } from '../../api/registry/OperationCatalogClient.js';
+import { operationVisibleTo } from '../aggregate-substrate/queryPrimitives.js';
 import { localizeResourceKey } from '../../i18n/resourceCatalog.js';
 import { present } from '../display/present.js';
 
@@ -15,8 +17,52 @@ export interface SettingsSectionEntry {
   readonly labelKey: string;
   /** Catalog member rendered alongside native entries in this section. */
   readonly memberSurfaceId?: string;
-  /** Optional audience gate — mirrors the section renderer's own self-gate (see file header). */
-  readonly gate?: () => boolean;
+  /** Platform capability (`host_.platform.capabilities`) the row's controls need. Without it the row
+   *  is not part of Settings on this platform: never listed, rendered or explained. */
+  readonly requires?: string;
+  /** Who may see the row: the view tier, or the operation policy behind its only control. */
+  readonly audience?: (viewer: SettingsViewer) => boolean;
+  /** A developer tool: shown only while Show developer tools is on. */
+  readonly developerTool?: true;
+  /** The row's only control changes the backend's saved settings. While they are session-only the
+   *  row has nothing to offer, so it is not part of Settings, like a row this platform lacks. */
+  readonly savedSettings?: true;
+}
+
+/** What Settings knows about its viewer beyond the shared audience and developer-tools stores. */
+export interface SettingsViewer {
+  readonly capabilities: ReadonlySet<string>;
+  /** Settings recovery holds indexing until Reset to defaults is confirmed (the USER exception). */
+  readonly settingsRecovery: boolean;
+  /** The backend keeps settings for this session only (`settingsMode: in_memory`). */
+  readonly settingsReadOnly: boolean;
+}
+
+const NO_VIEWER: SettingsViewer = { capabilities: new Set(), settingsRecovery: false, settingsReadOnly: false };
+
+/** Shown, or why not: an audience or developer-tools restriction (explained to arrivals), or
+ *  absent on this platform or in this settings mode. Navigation, search, content and arrivals read only this. */
+export type SettingsEntryState = 'shown' | 'audience' | 'tools' | 'absent';
+
+export function entryState(entry: SettingsSectionEntry, viewer: SettingsViewer = NO_VIEWER): SettingsEntryState {
+  if (entry.requires && !viewer.capabilities.has(entry.requires)) return 'absent';
+  if (entry.savedSettings && viewer.settingsReadOnly) return 'absent';
+  if (entry.audience && !entry.audience(viewer)) return 'audience';
+  if (entry.developerTool && !getShowDeveloperTools()) return 'tools';
+  return 'shown';
+}
+
+/** A focused row that an audience or developer-tools change removes hands focus to Show developer
+ *  tools, which explains it. Reset to defaults disappears when settings recovery ends and keeps its
+ *  own rescue (the Settings heading). */
+export function rescuedBySwitch(entry: SettingsSectionEntry, viewer?: SettingsViewer): boolean {
+  const state = entryState(entry, viewer);
+  return (state === 'audience' || state === 'tools') && entry.key !== 'reset-settings';
+}
+
+/** The entries of a category this viewer sees, in register order. */
+export function shownEntries(category: SettingsCategory, viewer?: SettingsViewer): SettingsSectionEntry[] {
+  return (category.sections ?? []).filter(entry => entryState(entry, viewer) === 'shown');
 }
 
 export interface SettingsCategory {
@@ -42,15 +88,23 @@ export interface SettingsGroup {
 
 const operatorOrAbove = (): boolean => getViewerAudience() !== 'USER';
 const developerOnly = (): boolean => getViewerAudience() === 'DEVELOPER';
+/** Reset to defaults is offered by its operation's audience policy; settings recovery offers it as
+ *  OPERATOR (the USER exception), as its renderer does. */
+const resetSettingsOffered = (viewer: SettingsViewer): boolean => {
+  const reset = getOperation('core.reset-settings');
+  return !!reset && operationVisibleTo(reset, viewer.settingsRecovery ? 'OPERATOR' : getViewerAudience());
+};
+/** Desktop, update and updater rows need the native application. */
+const NATIVE = 'native-notifications';
 
 /** Seven pages, in navigation order. Entry keys remain compatible with old addresses. */
 export const SETTINGS_REGISTER: readonly SettingsGroup[] = [
   {
     id: 'general', labelKey: 'settings.category.general', categories: [{
       id: 'general', kind: 'native', labelKey: 'settings.category.general', sections: [
-        { key: 'desktop', labelKey: 'settings.section.desktop' },
+        { key: 'desktop', labelKey: 'settings.section.desktop', requires: NATIVE },
         { key: 'notifications', labelKey: 'settings.section.notifications' },
-        { key: 'app-updates', labelKey: 'settings.section.app-updates' },
+        { key: 'app-updates', labelKey: 'settings.section.app-updates', requires: NATIVE },
         { key: 'keyboard', labelKey: 'settings.section.keyboard' },
         { key: 'indexing', labelKey: 'settings.section.indexing' },
         { key: 'context-window', labelKey: 'settings.section.context-window' },
@@ -77,7 +131,7 @@ export const SETTINGS_REGISTER: readonly SettingsGroup[] = [
       id: 'security-privacy', kind: 'native', labelKey: 'settings.category.security-privacy', sections: [
         { key: 'core.security-surface', labelKey: 'registry-surface.core.security-surface.label', memberSurfaceId: 'core.security-surface' },
         { key: 'durable-grants', labelKey: 'settings.section.durable-grants' },
-        { key: 'plugin-permissions', labelKey: 'settings.section.plugin-permissions', gate: operatorOrAbove },
+        { key: 'plugin-permissions', labelKey: 'settings.section.plugin-permissions', audience: operatorOrAbove },
         { key: 'agent-autonomy', labelKey: 'settings.section.agent-autonomy' },
         { key: 'feedback-capture', labelKey: 'settings.section.feedback-capture' },
       ],
@@ -86,7 +140,7 @@ export const SETTINGS_REGISTER: readonly SettingsGroup[] = [
   {
     id: 'data-reset', labelKey: 'settings.category.data-reset', danger: true, categories: [{
       id: 'data-reset', kind: 'native', labelKey: 'settings.category.data-reset', sections: [
-        { key: 'reset-settings', labelKey: 'settings.section.reset-settings' },
+        { key: 'reset-settings', labelKey: 'settings.section.reset-settings', audience: resetSettingsOffered, savedSettings: true },
         { key: 'data', labelKey: 'settings.section.data' },
       ],
     }],
@@ -103,8 +157,8 @@ export const SETTINGS_REGISTER: readonly SettingsGroup[] = [
     id: 'advanced', labelKey: 'settings.category.advanced', categories: [{
       id: 'advanced', kind: 'native', labelKey: 'settings.category.advanced', sections: [
         { key: 'show-developer-tools', labelKey: 'settings.section.show-developer-tools' },
-        { key: 'view-tier', labelKey: 'settings.section.view-tier', gate: getShowDeveloperTools },
-        { key: 'workspace-profiles', labelKey: 'settings.section.workspace-profiles', gate: () => developerOnly() && getShowDeveloperTools() },
+        { key: 'view-tier', labelKey: 'settings.section.view-tier', developerTool: true },
+        { key: 'workspace-profiles', labelKey: 'settings.section.workspace-profiles', audience: developerOnly, developerTool: true },
       ],
     }],
   },
@@ -208,6 +262,7 @@ function includesCaseInsensitive(label: string, needle: string): boolean {
 export function searchRegister(
   query: string,
   register: readonly SettingsGroup[] = SETTINGS_REGISTER,
+  viewer?: SettingsViewer,
 ): SettingsSearchResult[] {
   const needle = query.trim().toLowerCase();
   if (!needle) return [];
@@ -225,8 +280,7 @@ export function searchRegister(
       if (groupHit || includesCaseInsensitive(categoryLabel(category), needle)) {
         push({ group, category });
       }
-      for (const section of category.sections ?? []) {
-        if (section.gate && !section.gate()) continue;
+      for (const section of shownEntries(category, viewer)) {
         if (includesCaseInsensitive(entryLabel(section), needle)) {
           push({ group, category, section });
         }

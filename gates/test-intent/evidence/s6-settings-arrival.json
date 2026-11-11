@@ -1,0 +1,107 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
+  },
+  "createdAt": "2026-11-11T01:02:05.446Z",
+  "revision": "5acd43a66fdae08e582845bd7f71bb7558ec7d71",
+  "tree": "162374619a0633261d545ddc9b76fab8cbe97bf6",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/fhuoi0gm/tmp/test-intent-vitest-5774-1794358519931.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 207316
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SG4 a cold section=agent arrival below the Security panel ends in view and focused after the Engine answers late, also on reload",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e019b00a8df34cef0edcdad6e2f5a7a2754905af078d35100e9da2fd566f643d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SG4 a cold section=agent arrival below the Security panel ends in view and focused after the Engine answers late, also on reload",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SG4 a cold section=plugins&anchor=durable-grants arrival below the Security panel ends in view and focused after the Engine answers late, also on reload",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e019b00a8df34cef0edcdad6e2f5a7a2754905af078d35100e9da2fd566f643d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SG4 a cold section=plugins&anchor=durable-grants arrival below the Security panel ends in view and focused after the Engine answers late, also on reload",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SG4 a cold section=desktop&anchor=feedback-capture arrival below the Security panel ends in view and focused after the Engine answers late, also on reload",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e019b00a8df34cef0edcdad6e2f5a7a2754905af078d35100e9da2fd566f643d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SG4 a cold section=desktop&anchor=feedback-capture arrival below the Security panel ends in view and focused after the Engine answers late, also on reload",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "5acd43a66f",
+    "revision": "5acd43a66fdae08e582845bd7f71bb7558ec7d71",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/fhuoi0gm/tmp/test-intent-vitest-5774-1794358729797.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 195404,
+        "output": "JSON report written to /home/elias/.cache/am/fhuoi0gm/tmp/test-intent-vitest-5774-1794358729797.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SG4 a cold section=agent arrival below the Security panel ends in view and focused after the Engine answers late, also on reload",
+        "classification": "assertion",
+        "detail": "SG4 a cold section=agent arrival below the Security panel ends in view and focused after the Engine answers late, also on reload:  AssertionError: launch: {\"inView\":false,\"focused\":true,\"top\":980}: expected { inView: false, focused: true, …(1) } to match object { inView: true, focused: true }\n(1 matching property omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/s6-devtools/modul"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SG4 a cold section=plugins&anchor=durable-grants arrival below the Security panel ends in view and focused after the Engine answers late, also on reload",
+        "classification": "assertion",
+        "detail": "SG4 a cold section=plugins&anchor=durable-grants arrival below the Security panel ends in view and focused after the Engine answers late, also on reload:  AssertionError: launch: {\"inView\":false,\"focused\":true,\"top\":811}: expected { inView: false, focused: true, …(1) } to match object { inView: true, focused: true }\n(1 matching property omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/s6-devtools/modul"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SG4 a cold section=desktop&anchor=feedback-capture arrival below the Security panel ends in view and focused after the Engine answers late, also on reload",
+        "classification": "assertion",
+        "detail": "SG4 a cold section=desktop&anchor=feedback-capture arrival below the Security panel ends in view and focused after the Engine answers late, also on reload:  AssertionError: launch: {\"inView\":false,\"focused\":true,\"top\":1134}: expected { inView: false, focused: true, …(1) } to match object { inView: true, focused: true }\n(1 matching property omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/s6-devtools/modu"
+      }
+    ]
+  },
+  "digest": "sha256:5fb6fa6cf46040b3813e3106ffe13ffdc108d3a947f2d11ae294610fd9895da9"
+}

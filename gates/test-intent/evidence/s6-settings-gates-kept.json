@@ -1,0 +1,76 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
+  },
+  "createdAt": "2026-11-11T01:51:11.376Z",
+  "revision": "5acd43a66fdae08e582845bd7f71bb7558ec7d71",
+  "tree": "01bbae52a2626f4cc7f7502d9291c836a969cfa3",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/SettingsSurface.sections.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/iub5jcly/tmp/test-intent-vitest-39607-1794361869024.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2351
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.sections.test.ts#SG5 SG6 Reset to defaults is listed, searched and rendered only where its operation policy offers it (OPERATOR)",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.sections.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e95095ec8e9c119a52f039d7f44f96636315fe7f01c7f5ed4c60db5fcb4cfbc1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SG5 SG6 Reset to defaults is listed, searched and rendered only where its operation policy offers it (OPERATOR)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.sections.test.ts#SG5 SG6 Reset to defaults is listed, searched and rendered only where its operation policy offers it (DEVELOPER)",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.sections.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e95095ec8e9c119a52f039d7f44f96636315fe7f01c7f5ed4c60db5fcb4cfbc1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SG5 SG6 Reset to defaults is listed, searched and rendered only where its operation policy offers it (DEVELOPER)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.sections.test.ts#SG6 SG7 in the desktop, rows this platform renders are the rows navigation, search and About offer",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.sections.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e95095ec8e9c119a52f039d7f44f96636315fe7f01c7f5ed4c60db5fcb4cfbc1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SG6 SG7 in the desktop, rows this platform renders are the rows navigation, search and About offer",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:0497da3f10a3dfad2fe9fac62729d34be1221a02e4ef1e271374b401449a2ec2"
+}

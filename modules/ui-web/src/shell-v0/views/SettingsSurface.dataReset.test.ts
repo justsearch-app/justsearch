@@ -10,6 +10,8 @@ import './SettingsSurface.js';
 import type { SettingsSurface } from './SettingsSurface.js';
 import { createMockHostApi } from '../plugin-api/testHostApi.js';
 import { __resetForTest, __seedForTest } from '../../api/registry/SurfaceCatalogClient.js';
+import { __resetForTest as resetOperations, __seedForTest as seedOperations } from '../../api/registry/OperationCatalogClient.js';
+import { getViewerAudience, setViewerAudience } from '../state/viewerAudienceState.js';
 
 type Button = HTMLElement & { onActivate: () => void; disabled: boolean };
 const settle = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
@@ -115,8 +117,21 @@ describe('WP5.1 Settings reset', () => {
   });
 
   it('RN2 settings-to-defaults remains the separate core.reset-settings operation', async () => {
-    const element = await mount();
-    expect(element.shadowRoot!.querySelector('jf-operation[operation-id="core.reset-settings"]')).not.toBeNull();
-    expect(invoke.mock.calls.filter(([name]) => /delete_data/.test(name))).toEqual([]);
+    // Reset to defaults is offered to OPERATOR by its operation policy.
+    seedOperations({ schemaVersion: '1', catalogVersion: 1, namespace: 'core', primitive: 'Operation', entries: [{
+      id: 'core.reset-settings', audience: 'OPERATOR',
+      presentation: { labelKey: 'ops.reset-settings.label', descriptionKey: 'ops.reset-settings.description' },
+      intf: { inputs: {}, result: {}, errors: [], uiHints: {} },
+      policy: { risk: 'MEDIUM', confirm: { kind: 'INLINE' }, audit: 'METADATA_ONLY', undoSupported: false },
+      availability: {}, lineage: { affects: [], supersedes: [] },
+      provenance: { tier: 'CORE', contributorId: 'core', version: '1.0' }, executors: ['UI'], consumers: [],
+    }] });
+    const audience = getViewerAudience();
+    setViewerAudience('OPERATOR');
+    try {
+      const element = await mount();
+      expect(element.shadowRoot!.querySelector('jf-operation[operation-id="core.reset-settings"]')).not.toBeNull();
+      expect(invoke.mock.calls.filter(([name]) => /delete_data/.test(name))).toEqual([]);
+    } finally { setViewerAudience(audience); resetOperations(); }
   });
 });

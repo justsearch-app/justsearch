@@ -1500,19 +1500,20 @@ export class Shell extends JfElement {
         this.keepAreaUnderSettings();
         // Shell slice 2 — `?section=<category>` opens that Settings section (reload, deep link,
         // Back/Forward). Unknown sections are ignored: the window keeps the section it shows, and an
-        // address without one is completed with it.
-        const coordinate = resolveSettingsCoordinate(
-          typeof state?.section === 'string' ? state.section : undefined,
-          typeof state?.anchor === 'string' ? state.anchor : undefined,
-        ) ?? { section: this.settingsSection ?? firstCategoryId() };
+        // address without one is completed with it. Settings recovery always arrives at Reset to
+        // defaults, so its address names that destination before Settings mounts.
+        const recovery = state?.focusSettingsRecovery === true || state?.focusSettingsRecovery === 'true';
+        const coordinate = (recovery ? resolveSettingsCoordinate(undefined, 'reset-settings') : undefined)
+          ?? resolveSettingsCoordinate(
+            typeof state?.section === 'string' ? state.section : undefined,
+            typeof state?.anchor === 'string' ? state.anchor : undefined,
+          ) ?? { section: this.settingsSection ?? firstCategoryId() };
         requestMemberTab(SETTINGS_SURFACE_ID, coordinate.section, coordinate.anchor);
         this.replaceAddressState(SETTINGS_SURFACE_ID, {
           section: coordinate.section, anchor: coordinate.anchor,
           tab: undefined, category: undefined, entry: undefined,
         });
-        if (state?.focusSettingsRecovery === true || state?.focusSettingsRecovery === 'true') {
-          win.focusSettingsRecovery();
-        }
+        if (recovery) win.focusSettingsRecovery();
         // The focus request belongs to this arrival only. Keep the destination in history,
         // but hand focus off to Settings' cancellable pending intent instead of replaying it.
         const current = parseUrl(window.location.hash.slice(1));

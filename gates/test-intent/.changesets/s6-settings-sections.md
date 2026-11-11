@@ -31,7 +31,7 @@ Candidate G follows the settled SG1–SG10 amendments. SD developer-tools change
       "moved": [
         "instrumentation"
       ],
-      "whatMoved": "Only setup coordinates move to the settled section (General, Appearance, Data & reset or Advanced), including selecting Appearance explicitly after the default becomes General. Every prior input, visibility, write, error, confirmation, cancellation, focus, timing, native-capability and audience assertion remains intact.",
+      "whatMoved": "Only setup coordinates move to the settled section (General, Appearance, Data & reset or Advanced), including selecting Appearance explicitly after the default becomes General. Every prior input, visibility, write, error, confirmation, cancellation, focus, timing, native-capability and audience assertion remains intact. SettingsSurface.dataReset.test.ts RN2 additionally seeds the Reset to defaults operation and views as OPERATOR, the tier its operation policy offers Reset to, because Data & reset no longer lists Reset where it renders nothing; its separate-operation assertion is unchanged.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -529,6 +529,183 @@ Candidate G follows the settled SG1–SG10 amendments. SD developer-tools change
         "modules/ui-web/src/shell-v0/components/SettingsNav.forced-colors-lockdown.test.ts"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "SG4 opening the app cold at a Security & privacy row below the Security panel (old section=agent, plugins with entry durable-grants, desktop with entry feedback-capture) and reloading its canonical address end with that row in view and focused once the Security panel has rendered the Engine's late status and chat-encryption replies, and the row does not move afterwards.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "SG4 opening the app cold at a Security & privacy row below the Security panel (old section=agent, plugins with entry durable-grants, desktop with entry feedback-capture) and reloading its canonical address end with that row in view and focused once the Security panel has rendered the Engine's late status and chat-encryption replies, and the row does not move afterwards."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-settings-arrival.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SG4 a cold section=agent arrival below the Security panel ends in view and focused after the Engine answers late, also on reload",
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SG4 a cold section=plugins&anchor=durable-grants arrival below the Security panel ends in view and focused after the Engine answers late, also on reload",
+        "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SG4 a cold section=desktop&anchor=feedback-capture arrival below the Security panel ends in view and focused after the Engine answers late, also on reload"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.sections.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "SG5 SG6 for a USER outside settings recovery Data & reset neither renders a Reset settings heading nor lists or searches Reset; during settings recovery a USER gets Reset in content, navigation and search, and when recovery ends it leaves all three. SG6 SG7 in the browser General neither renders, lists nor searches the Desktop and App updates rows, About offers no Open Updates link, and an old update link opens General without explaining or focusing a missing row.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "SG5 SG6 for a USER outside settings recovery Data & reset neither renders a Reset settings heading nor lists or searches Reset; during settings recovery a USER gets Reset in content, navigation and search, and when recovery ends it leaves all three. SG6 SG7 in the browser General neither renders, lists nor searches the Desktop and App updates rows, About offers no Open Updates link, and an old update link opens General without explaining or focusing a missing row."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-settings-gates.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.sections.test.ts#SG5 SG6 Reset to defaults is listed, searched and rendered only where its operation policy offers it (USER)",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.sections.test.ts#SG5 SG6 settings recovery offers Reset to a USER in content, navigation and search; ending it removes Reset everywhere",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.sections.test.ts#SG6 SG7 in the browser, rows this platform renders are the rows navigation, search and About offer"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.sections.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "SG5 SG6 OPERATOR and DEVELOPER keep Reset settings with the core.reset-settings operation in Data & reset content, navigation and search. SG6 SG7 on desktop General keeps Desktop and App updates in content, navigation and search, every listed row renders content, About's Open Updates opens General at Check for updates, and an old update link focuses App updates.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "SG5 SG6 OPERATOR and DEVELOPER keep Reset settings with the core.reset-settings operation in Data & reset content, navigation and search. SG6 SG7 on desktop General keeps Desktop and App updates in content, navigation and search, every listed row renders content, About's Open Updates opens General at Check for updates, and an old update link focuses App updates."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-settings-gates-kept.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.sections.test.ts#SG5 SG6 Reset to defaults is listed, searched and rendered only where its operation policy offers it (OPERATOR)",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.sections.test.ts#SG5 SG6 Reset to defaults is listed, searched and rendered only where its operation policy offers it (DEVELOPER)",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.sections.test.ts#SG6 SG7 in the desktop, rows this platform renders are the rows navigation, search and About offer"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/ContextWindow.home.test.ts"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "Settings links to AI Brain: only setup coordinates move. The former Agent page held both Agent autonomy and the Reading memory link; the check now selects Security & privacy before its Agent autonomy assertion and General before its no-second-control assertion and the link activation. Every assertion, including the navigation detail, is unchanged.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "SG9 the AI Brain reading-memory link still arrives; the former Agent page is split by the placement map, so the check reads Agent autonomy in Security & privacy and the link in General."
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.sections.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "SG5 SG6 in Session-only mode (backend settings in memory) Data & reset neither renders an empty Reset settings heading nor lists or searches Reset for OPERATOR, DEVELOPER or a USER in settings recovery; an old Reset link and recovery navigation open Data & reset without explaining or focusing the missing row.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "SG5 SG6 in Session-only mode (backend settings in memory) Data & reset neither renders an empty Reset settings heading nor lists or searches Reset for OPERATOR, DEVELOPER or a USER in settings recovery; an old Reset link and recovery navigation open Data & reset without explaining or focusing the missing row."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-settings-session-only.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.sections.test.ts#SG5 SG6 in Session-only mode Reset to defaults is neither rendered empty, listed, searched nor arrived at (OPERATOR)",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.sections.test.ts#SG5 SG6 in Session-only mode Reset to defaults is neither rendered empty, listed, searched nor arrived at (DEVELOPER)",
+        "modules/ui-web/src/shell-v0/views/SettingsSurface.sections.test.ts#SG5 SG6 in Session-only mode Reset to defaults is neither rendered empty, listed, searched nor arrived at (USER in settings recovery)"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.test.ts"
+      ],
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "SG4 SG5 Settings addresses name a section and row: a recovery arrival's address names Data & reset at Reset to defaults instead of the bare Settings address, and a Security member deep-link delivers Security & privacy with the member as its row instead of the member as a Settings page."
+        }
+      ],
+      "conflictSearch": "Decision records searched for Settings address, recovery navigation and member deep-link conflicts: none. Settled SG3/SG4/SG5 rows map old members to section rows and recovery to Data & reset > Reset to defaults."
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "SG5 a settings-recovery arrival (in-app boolean or URL string) consumes its focus flag before Back and Forward, and its address names Data & reset at Reset to defaults before Settings mounts; Back closes and Forward reopens without focusing again.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "SG5 a settings-recovery arrival (in-app boolean or URL string) consumes its focus flag before Back and Forward, and its address names Data & reset at Reset to defaults before Settings mounts; Back closes and Forward reopens without focusing again."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-settings-recovery-address.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#SG5 R2 consumes recovery focus ('in-app boolean') before Back and Forward; the address names Data & reset at Reset",
+        "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#SG5 R2 consumes recovery focus ('URL string') before Back and Forward; the address names Data & reset at Reset"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "SG4 a Security member deep-link opens the Settings window, closed or already open, and delivers the Security & privacy section with the Security member as its row, without stacking a history entry.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "SG4 a Security member deep-link opens the Settings window, closed or already open, and delivers the Security & privacy section with the Security member as its row, without stacking a history entry."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-settings-member-rows.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#SG4 a member deep-link opens the window AND delivers the member's section and row (window closed)",
+        "modules/ui-web/src/shell-v0/chrome/Shell.test.ts#SG4 a member deep-link delivers the member's section and row while the window is ALREADY open"
+      ]
     }
   ]
 }

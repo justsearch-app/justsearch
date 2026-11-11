@@ -32,8 +32,21 @@ const json = (body) => new Response(JSON.stringify(body), { status: 200, headers
 // ?registryDelay=<ms> holds the boot's window-catalog response, as a busy engine does: the app
 // keeps starting (Settings mounts ahead of its first opening) before the address is applied.
 const registryDelay = Number(new URLSearchParams(location.search).get('registryDelay') ?? 0);
+// ?engineDelay=<ms> answers the Security window's reads late with an Engine's real replies: the
+// captured /api/status body (Data protection card) and a chat encryption not yet set up.
+const engineDelay = Number(new URLSearchParams(location.search).get('engineDelay') ?? 0);
+const { default: liveStatus } = engineDelay ? await import('/src/api/__fixtures__/status-response-live.json') : {};
 window.fetch = async (input) => {
-  if (registryDelay && String(input).endsWith('/api/registry/surfaces')) await new Promise(r => setTimeout(r, registryDelay));
+  const path = new URL(String(input instanceof Request ? input.url : input), location.href).pathname;
+  if (registryDelay && path.endsWith('/api/registry/surfaces')) await new Promise(r => setTimeout(r, registryDelay));
+  if (engineDelay && path.endsWith('/api/status')) {
+    await new Promise(r => setTimeout(r, engineDelay));
+    return json({ ...liveStatus, conversationProtection: { state: 'not_configured' } });
+  }
+  if (engineDelay && path.endsWith('/api/conversations/encryption')) {
+    await new Promise(r => setTimeout(r, engineDelay));
+    return json({ state: 'not_configured' });
+  }
   return json({ entries: [], conversations: [], messages: [] });
 };
 window.loadSettingsModule = id => import(id);
@@ -793,6 +806,43 @@ it.each([
     expect(await page.locator(`div[data-settings-anchor="${member}"]`).evaluate(el => (el.getRootNode() as ShadowRoot).activeElement === el)).toBe(true);
   }
 }, 30_000);
+
+/** The row's top is inside the window, nothing covers it, and it holds keyboard focus. */
+async function rowInViewAndFocused(page: Page, anchor: string): Promise<{ inView: boolean; focused: boolean; top: number }> {
+  return page.locator(`div[data-settings-anchor="${anchor}"]`).evaluate(el => {
+    const rect = el.getBoundingClientRect();
+    const x = rect.left + 8;
+    const y = rect.top + 8;
+    let top: Element | null = document.elementFromPoint(x, y);
+    while (top?.shadowRoot?.elementFromPoint(x, y) && top.shadowRoot.elementFromPoint(x, y) !== top) top = top.shadowRoot.elementFromPoint(x, y);
+    let shown = false;
+    for (let node: Node | null = top; node; node = (node as Element).parentElement ?? ((node.getRootNode() as ShadowRoot).host ?? null)) {
+      if (node === el) { shown = true; break; }
+    }
+    return { inView: rect.top >= 0 && rect.top + 24 <= innerHeight && shown,
+      focused: (el.getRootNode() as ShadowRoot).activeElement === el, top: Math.round(rect.top) };
+  });
+}
+
+it.each([
+  ['section=agent', 'agent-autonomy'],
+  ['section=plugins&anchor=durable-grants', 'durable-grants'],
+  ['section=desktop&anchor=feedback-capture', 'feedback-capture'],
+])('SG4 a cold %s arrival below the Security panel ends in view and focused after the Engine answers late, also on reload', async (address, anchor) => {
+  const page = await open(1280, 720, '?engineDelay=1500', `#justsearch://surface/${SETTINGS}?${address}`);
+  for (const reloaded of [false, true]) {
+    if (reloaded) await reloadIntoSettings(page, 'security-privacy');
+    expect((await where(page)).address).toBe(`${SETTINGS}?anchor=${anchor}&section=security-privacy`);
+    // The Security panel has settled: both late Engine replies are rendered.
+    await page.locator('jf-security-surface .card.section').waitFor({ timeout: 10_000 });
+    await page.locator('jf-security-surface #enc-pass').waitFor({ timeout: 10_000 });
+    await settle(page, 300);
+    const settled = await rowInViewAndFocused(page, anchor);
+    expect(settled, `${reloaded ? 'reload' : 'launch'}: ${JSON.stringify(settled)}`).toMatchObject({ inView: true, focused: true });
+    await settle(page, 1500);
+    expect(await rowInViewAndFocused(page, anchor), 'no later jump').toEqual(settled);
+  }
+}, 60_000);
 
 /**
  * SG8 oracle, per section: every enabled control Tab reaches is in view once focused (its box meets

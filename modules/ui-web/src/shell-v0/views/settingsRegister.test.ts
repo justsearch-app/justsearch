@@ -55,7 +55,7 @@ const FIXTURE_REGISTER: readonly SettingsGroup[] = [
           {
             key: 'workspace-profiles',
             labelKey: 'settings.section.workspace-profiles',
-            gate: () => getViewerAudience() === 'DEVELOPER',
+            audience: () => getViewerAudience() === 'DEVELOPER',
           },
         ],
       },

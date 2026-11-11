@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
   },
-  "createdAt": "2026-11-11T00:13:40.451Z",
-  "revision": "22f682a2ca02e2d911aa3bf4e0b357babef7b9a1",
-  "tree": "466c80e32e50b7cf35270983809f05b2bc9dd994",
+  "createdAt": "2026-11-11T00:54:55.856Z",
+  "revision": "5acd43a66fdae08e582845bd7f71bb7558ec7d71",
+  "tree": "3399be10f7f3d6fdc7b16977f6b33e1366f3d11d",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.frame.test.ts\" \"src/shell-v0/chrome/Shell.navigation.test.ts\" \"src/shell-v0/components/SettingsNav.test.ts\" \"src/shell-v0/views/SettingsSurface.appUpdate.test.ts\" \"src/shell-v0/views/SettingsSurface.chatWidth.test.ts\" \"src/shell-v0/views/SettingsSurface.dataReset.test.ts\" \"src/shell-v0/views/SettingsSurface.highContrast.test.ts\" \"src/shell-v0/views/SettingsSurface.notifications.test.ts\" \"src/shell-v0/views/SettingsSurface.overlap.test.ts\" \"src/shell-v0/views/SettingsSurface.ownActions.test.ts\" \"src/shell-v0/views/SettingsSurface.search.test.ts\" \"src/shell-v0/views/SettingsSurface.searchShortcut.test.ts\" \"src/shell-v0/views/SettingsSurface.section-address.test.ts\" \"src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts\" \"src/shell-v0/views/SettingsSurface.ui-mode.test.ts\" \"src/shell-v0/views/SettingsSurface.v15.test.ts\" \"src/shell-v0/views/SettingsSurface.viewerAudience.test.ts\" \"src/shell-v0/views/conversationExportWarnings.test.ts\" \"src/shell-v0/views/settingsRegister.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/jzb7omdo/tmp/test-intent-vitest-5-1794356014199.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.frame.test.ts\" \"src/shell-v0/chrome/Shell.navigation.test.ts\" \"src/shell-v0/components/SettingsNav.test.ts\" \"src/shell-v0/views/SettingsSurface.appUpdate.test.ts\" \"src/shell-v0/views/SettingsSurface.chatWidth.test.ts\" \"src/shell-v0/views/SettingsSurface.dataReset.test.ts\" \"src/shell-v0/views/SettingsSurface.highContrast.test.ts\" \"src/shell-v0/views/SettingsSurface.notifications.test.ts\" \"src/shell-v0/views/SettingsSurface.overlap.test.ts\" \"src/shell-v0/views/SettingsSurface.ownActions.test.ts\" \"src/shell-v0/views/SettingsSurface.search.test.ts\" \"src/shell-v0/views/SettingsSurface.searchShortcut.test.ts\" \"src/shell-v0/views/SettingsSurface.section-address.test.ts\" \"src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts\" \"src/shell-v0/views/SettingsSurface.ui-mode.test.ts\" \"src/shell-v0/views/SettingsSurface.v15.test.ts\" \"src/shell-v0/views/SettingsSurface.viewerAudience.test.ts\" \"src/shell-v0/views/conversationExportWarnings.test.ts\" \"src/shell-v0/views/settingsRegister.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/fhuoi0gm/tmp/test-intent-vitest-5323-1794358488948.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 6249
+      "durationMs": 6904
     }
   ],
   "checks": [
@@ -380,7 +380,7 @@
       "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.dataReset.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.dataReset.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:330c166dbc58e43797c0c952853e9153cd90b31cdf9ca3d32341e1354a2b1867",
+      "contentDigest": "sha256:2dd94320d0b1548c8b586aea82942d64ef7d3453c06d50251b6719ffa91a970f",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -947,7 +947,7 @@
       "id": "modules/ui-web/src/shell-v0/views/settingsRegister.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/settingsRegister.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:bd2ebae6142373903e9cb9df4198373e6939166fb4bf93fdedce51e9fcd667eb",
+      "contentDigest": "sha256:b80d216f63bf9debaf66c279a620efa07d90dd0062d8c2d26d2da5f351eb1c6b",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -1000,5 +1000,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:027f5d80d8ca15ff32620a63daa596208589558f224769bb20424bfa179d00f7"
+  "digest": "sha256:0b683abd32aa9b9cee1ebc5910aa5221db59de3ce84c4fc455443b25da2c5964"
 }

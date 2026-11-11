@@ -38,7 +38,10 @@ import { localizeResourceKey, onCatalogUpdated } from '../../i18n/resourceCatalo
 import {
   categoryLabel,
   entryLabel,
+  rescuedBySwitch,
   searchRegister,
+  shownEntries,
+  type SettingsViewer,
   type SettingsGroup,
   type SettingsCategory,
   type SettingsSearchResult,
@@ -49,6 +52,7 @@ export class SettingsNav extends JfElement {
     register: { attribute: false },
     audience: { attribute: false },
     showDeveloperTools: { attribute: false },
+    viewer: { attribute: false },
     activeCategory: { type: String, attribute: 'active-category' },
     activeAnchor: { type: String, attribute: 'active-anchor' },
     footerVersion: { type: String, attribute: 'footer-version' },
@@ -57,6 +61,8 @@ export class SettingsNav extends JfElement {
 
   declare audience: string;
   declare showDeveloperTools: boolean;
+  /** The Settings window's platform and recovery facts the register's entry gates read. */
+  declare viewer: SettingsViewer | undefined;
   private focusedRow: HTMLElement | null = null;
   private focusedRowHidden = false;
 
@@ -64,7 +70,7 @@ export class SettingsNav extends JfElement {
     this.focusedRow = this.shadowRoot?.activeElement as HTMLElement | null;
     const key = this.focusedRow?.dataset.settingsAnchor;
     this.focusedRowHidden = !!key && this.register.some(group => group.categories.some(category =>
-      category.sections?.some(entry => entry.key === key && entry.gate && !entry.gate())));
+      category.sections?.some(entry => entry.key === key && rescuedBySwitch(entry, this.viewer))));
   }
 
   protected override updated(changed: Map<string, unknown>): void {
@@ -454,7 +460,7 @@ export class SettingsNav extends JfElement {
   }
 
   private renderSearchResults(): TemplateResult {
-    const results = searchRegister(this.query, this.register);
+    const results = searchRegister(this.query, this.register, this.viewer);
     if (results.length === 0) {
       return html`<div class="search-empty" role="status">
         ${localizeResourceKey('settings.search.no-results')}
@@ -479,7 +485,7 @@ export class SettingsNav extends JfElement {
 
   private renderCategory(category: SettingsCategory, danger: boolean): TemplateResult {
     const isActive = category.id === this.activeCategory;
-    const sections = (category.sections ?? []).filter((s) => !s.gate || s.gate());
+    const sections = shownEntries(category, this.viewer);
     return html`
       <li>
         <button

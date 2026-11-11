@@ -112,12 +112,17 @@ import '../components/SettingsNav.js';
 import {
   SETTINGS_REGISTER,
   allCategories,
+  entryState,
   findCategory,
   firstCategoryId,
+  rescuedBySwitch,
   resolveSettingsCoordinate,
+  shownEntries,
   type SettingsCategory,
   type SettingsSectionEntry,
+  type SettingsViewer,
 } from './settingsRegister.js';
+import { onCatalogChange as onOperationCatalogChange } from '../../api/registry/OperationCatalogClient.js';
 import { deriveFocus, type Landmark } from '../primitives/navigation.js';
 import { viewportWindow } from '../primitives/scrollViewport.js';
 import { takeMemberTabRequest, subscribeMemberTab } from '../router/memberTabIntent.js';
@@ -307,6 +312,9 @@ export class SettingsSurface extends JfElement {
   declare activeAnchor: string | null;
   declare private addressAnchor: string | null;
   private arrivalRevision = 0;
+  private operationCatalogUnsub: (() => void) | null = null;
+  /** Ends the current arrival's hold on its row (see `holdArrival`). */
+  private releaseArrival: (() => void) | null = null;
   declare plugins: InstalledPlugin[];
   // Tempdoc 560 §28 — pending operator-approval candidates (URL-loaded + UNTRUSTED), id → source url.
   declare untrustedLoads: Map<string, string>;
@@ -1001,6 +1009,8 @@ export class SettingsSurface extends JfElement {
       this.railSurfaces = SettingsSurface.railSurfacesForCustomization();
       this.plugins = getSessionPluginRegistry().list();
     });
+    // Operation policies decide which register entries are offered (Reset to defaults).
+    this.operationCatalogUnsub = onOperationCatalogChange(() => this.requestUpdate());
     // Tempdoc 543 §20.7 B6 — populate WorkspaceProfile list lazily.
     void import('../substrates/profiles/index.js').then(
       ({ listProfiles: listWorkspaceProfiles, subscribeProfiles }) => {
@@ -1134,17 +1144,19 @@ export class SettingsSurface extends JfElement {
     this.themeUnsub = null;
     this.userConfigUnsub = null;
     this.catalogUnsub = null;
+    this.operationCatalogUnsub?.();
+    this.operationCatalogUnsub = null;
     this.viewerAudienceUnsub = null;
     this.workspaceProfilesUnsub = null;
     this.consentUnsub = null;
     this.teardownAnchorObservers();
+    this.releaseArrival?.();
   }
 
   protected override willUpdate(): void {
     const focusedEntry = this.shadowRoot?.activeElement?.closest<HTMLElement>('[data-settings-anchor]')?.dataset.settingsAnchor;
-    if (focusedEntry && findCategory(this.activeCategory)?.sections?.some(s => s.key === focusedEntry && s.gate && !s.gate())) {
-      this.restoreHiddenEntryFocus = true;
-    }
+    const focused = findCategory(this.activeCategory)?.sections?.find(s => s.key === focusedEntry);
+    if (focused && rescuedBySwitch(focused, this.viewer())) this.restoreHiddenEntryFocus = true;
     // The recovery-only audience exception can disappear on the next status poll.
     // Move focus before the nested operation renderer removes its focused button.
     if (!this.settingsRecovery) {
@@ -2023,10 +2035,7 @@ export class SettingsSurface extends JfElement {
     );
   }
 
-  private renderDesktop(): TemplateResult | typeof nothing {
-    if (!this.host_.platform.capabilities.has('native-notifications')) {
-      return nothing;
-    }
+  private renderDesktop(): TemplateResult {
     return html`
       <div class="section">
         <h3>${icon({ name: 'power', size: 12 })} Desktop</h3>
@@ -2896,9 +2905,6 @@ export class SettingsSurface extends JfElement {
   }
 
   private renderAppUpdates(): TemplateResult {
-    if (!this.host_.platform.capabilities.has('native-notifications')) {
-      return html``;
-    }
     const status = this.updateStatus;
     const available = status?.state === 'available' && status.availableVersion;
     const repairRequired = status?.state === 'repair_required';
@@ -3033,28 +3039,26 @@ export class SettingsSurface extends JfElement {
     return all.filter((s) => s.placement === 'RAIL' && !memberIds.has(s.id));
   }
 
+  /** Offered only where the register shows it (operation policy, recovery, saved settings). */
   private renderResetSettings(): TemplateResult {
     return html`<section class="section"><h3>Reset settings</h3>
-      ${!this.readOnly
-              ? html`<span id="settings-reset" tabindex="-1" role="group" aria-label="Reset to defaults"
-                  @action-invoke=${() => {
-                    // Confirmation removes its focused Yes button before the status receipt arrives.
-                    const reset = this.shadowRoot?.getElementById('settings-reset');
-                    this.restoreRecoveryResetFocus = this.settingsRecovery
-                      && !!this.shadowRoot?.activeElement && !!reset?.contains(this.shadowRoot.activeElement);
-                  }}
-                  @op-success=${() => this.handleResetSuccess()}
-                  @op-error=${(e: CustomEvent<OpErrorEventDetail>) =>
-                    this.handleResetError(e)}
-                >
-                  <jf-operation
-                    operation-id="core.reset-settings"
-                    context="button"
-                    viewer-audience=${ifDefined(this.settingsRecovery ? 'OPERATOR' : undefined)}
-                    api-base=${this.apiBase}
-                  ></jf-operation>
-                </span>`
-              : nothing}
+      <span id="settings-reset" tabindex="-1" role="group" aria-label="Reset to defaults"
+        @action-invoke=${() => {
+          // Confirmation removes its focused Yes button before the status receipt arrives.
+          const reset = this.shadowRoot?.getElementById('settings-reset');
+          this.restoreRecoveryResetFocus = this.settingsRecovery
+            && !!this.shadowRoot?.activeElement && !!reset?.contains(this.shadowRoot.activeElement);
+        }}
+        @op-success=${() => this.handleResetSuccess()}
+        @op-error=${(e: CustomEvent<OpErrorEventDetail>) => this.handleResetError(e)}
+      >
+        <jf-operation
+          operation-id="core.reset-settings"
+          context="button"
+          viewer-audience=${ifDefined(this.settingsRecovery ? 'OPERATOR' : undefined)}
+          api-base=${this.apiBase}
+        ></jf-operation>
+      </span>
     </section>`;
   }
 
@@ -3071,6 +3075,7 @@ export class SettingsSurface extends JfElement {
 
   private renderUpdateInformation(): TemplateResult {
     const status = this.updateStatus;
+    const updates = findCategory('general')?.sections?.find(s => s.key === 'app-updates');
     return html`<section class="section" data-testid="settings-update-information"><h3>Update information</h3>
       <p>${!this.host_.platform.capabilities.has('native-notifications')
         ? 'Application updates are unavailable in the browser.'
@@ -3081,8 +3086,8 @@ export class SettingsSurface extends JfElement {
       ${status?.availableVersion ? html`<p>Available version: ${status.availableVersion}</p>` : nothing}
       ${status?.error ? html`<p>${status.error}</p>` : nothing}
       ${status?.state === 'repair_required' ? html`<p>Re-run the signed installer for ${status.availableVersion ?? 'the target release'}, then restart JustSearch.</p>` : nothing}
-      <jf-button variant="ghost" label="Open Updates"
-        .onActivate=${() => this.activateSearchHit('general', 'app-updates')}>Open Updates</jf-button>
+      ${updates && entryState(updates, this.viewer()) === 'shown' ? html`<jf-button variant="ghost" label="Open Updates"
+        .onActivate=${() => this.activateSearchHit('general', 'app-updates')}>Open Updates</jf-button>` : nothing}
     </section>`;
   }
 
@@ -3121,6 +3126,7 @@ export class SettingsSurface extends JfElement {
             .register=${SETTINGS_REGISTER}
             .audience=${this.viewerAudience}
             .showDeveloperTools=${this.showDeveloperTools}
+            .viewer=${this.viewer()}
             @hidden-row-focus=${() => this.focusDeveloperTools()}
             active-category=${this.activeCategory}
             .activeAnchor=${this.activeAnchor}
@@ -3142,12 +3148,12 @@ export class SettingsSurface extends JfElement {
    *  section subset (in the centered reading column); a member category mounts its catalog
    *  surface full-bleed (its own SurfaceLayout owns its width, like `SurfaceTabs.renderPanel`). */
   private renderCategoryContent(category: SettingsCategory): TemplateResult {
-    const sections = (category.sections ?? []).filter((s) => !s.gate || s.gate());
+    const viewer = this.viewer();
+    const sections = shownEntries(category, viewer);
     const hiddenEntry = allCategories().flatMap(c => c.sections ?? []).find(s => s.key === this.hiddenDestinationKey);
-    const hiddenReason = hiddenEntry?.gate && !hiddenEntry.gate()
-      ? ((hiddenEntry.key === 'workspace-profiles' && this.viewerAudience !== 'DEVELOPER') || hiddenEntry.key === 'plugin-permissions'
-        ? 'This destination is hidden by your view tier.'
-        : 'This row appears when developer tools are shown.')
+    const hidden = hiddenEntry ? entryState(hiddenEntry, viewer) : 'shown';
+    const hiddenReason = hidden === 'audience' ? 'This destination is hidden by your view tier.'
+      : hidden === 'tools' ? 'This row appears when developer tools are shown.'
       : null;
     return html`
       <div class="settings-content-pane">
@@ -3157,6 +3163,12 @@ export class SettingsSurface extends JfElement {
         </div>
       </div>
     `;
+  }
+
+  /** The register's view of this window: platform capabilities, the settings-recovery hold and
+   *  whether the backend's settings are session-only. */
+  private viewer(): SettingsViewer {
+    return { capabilities: this.host_.platform.capabilities, settingsRecovery: this.settingsRecovery, settingsReadOnly: this.readOnly };
   }
 
   /** One native sub-anchor: `data-settings-anchor` is both the scroll-spy landmark id and the
@@ -3255,6 +3267,7 @@ export class SettingsSurface extends JfElement {
   private selectCategory(id: string): void {
     if (id === this.activeCategory) return;
     this.arrivalRevision++;
+    this.releaseArrival?.();
     this.hiddenDestinationKey = null;
     this.activeCategory = id;
     this.addressAnchor = null;
@@ -3286,17 +3299,48 @@ export class SettingsSurface extends JfElement {
     const coordinate = resolveSettingsCoordinate(id, anchor);
     if (!coordinate) return;
     const entry = findCategory(coordinate.section)?.sections?.find(s => s.key === coordinate.anchor);
-    const hidden = entry?.gate && !entry.gate();
+    const state = entry ? entryState(entry, this.viewer()) : 'shown';
+    // Audience and developer-tools restrictions are explained at the switch; a row this platform
+    // lacks is not part of Settings here, so its section opens at the top.
+    const hidden = state === 'audience' || state === 'tools';
     this.selectCategory(hidden ? 'advanced' : coordinate.section);
-    this.hiddenDestinationKey = hidden ? entry.key : null;
-    const destination = hidden ? 'show-developer-tools' : coordinate.anchor;
+    this.hiddenDestinationKey = hidden && entry ? entry.key : null;
+    const destination = hidden ? 'show-developer-tools' : state === 'absent' ? undefined : coordinate.anchor;
     const revision = ++this.arrivalRevision;
+    this.releaseArrival?.();
     this.addressAnchor = destination ?? null;
     void this.updateComplete.then(() => {
       if (revision !== this.arrivalRevision || !destination) return;
       this.jumpToAnchor(destination, true);
       if (hidden) this.focusDeveloperTools();
+      else this.holdArrival(destination, revision);
     });
+  }
+
+  /** Rows above an arrival can still grow once their data arrives (the Security member reads the
+   *  Engine after mounting). Until the reader acts, keep the arrived row where the arrival put it,
+   *  re-applied in the same frame as each layout change; reading, scrolling, pointing or moving
+   *  focus away, another arrival, a section change or hiding Settings ends the hold. */
+  private holdArrival(key: string, revision: number): void {
+    const content = this.shadowRoot?.querySelector<HTMLElement>('.settings-content-inner');
+    const row = Array.from(content?.querySelectorAll<HTMLElement>('[data-settings-anchor]') ?? [])
+      .find(el => el.dataset.settingsAnchor === key);
+    if (!content || !row || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (revision !== this.arrivalRevision || !entry?.contentRect.height) release();
+      else row.scrollIntoView({ block: 'start', behavior: 'auto' });
+    });
+    const inputs = ['wheel', 'touchstart', 'pointerdown', 'keydown'] as const;
+    const release = (): void => {
+      observer.disconnect();
+      for (const type of inputs) this.removeEventListener(type, release, true);
+      row.removeEventListener('focusout', release);
+      if (this.releaseArrival === release) this.releaseArrival = null;
+    };
+    for (const type of inputs) this.addEventListener(type, release, { capture: true, passive: true });
+    row.addEventListener('focusout', release);
+    this.releaseArrival = release;
+    observer.observe(content);
   }
 
   private jumpToAnchor(key: string, focus = false): void {

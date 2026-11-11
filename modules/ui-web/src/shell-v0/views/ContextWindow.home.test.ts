@@ -165,7 +165,10 @@ afterEach(() => { document.body.replaceChildren(); takeMemberTabIntent('core.bra
 describe('Context window has one home', () => {
   it('Settings links to AI Brain and has no second context control', async () => {
     const el = await mount('jf-settings-surface');
+    // The former Agent page is split: Agent autonomy lives in Security & privacy, the link in General.
+    el.activeCategory = 'security-privacy'; await settle(el);
     expect(el.shadowRoot!.querySelector('[data-settings-anchor="agent-autonomy"]')).not.toBeNull();
+    el.activeCategory = 'general'; await settle(el);
     expect(el.shadowRoot!.querySelector('#context-window-override')).toBeNull();
     const navigations: unknown[] = [];
     const listener = (event: Event) => navigations.push((event as CustomEvent).detail);

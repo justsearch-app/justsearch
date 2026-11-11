@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
   },
-  "createdAt": "2026-11-10T21:56:38.486Z",
-  "revision": "50c26d710c5f2a9223623c46516285881970a4ff",
-  "tree": "23c3220bc6c1828bc712a89ec44d307243ee1c6d",
+  "createdAt": "2026-11-11T01:50:42.401Z",
+  "revision": "5acd43a66fdae08e582845bd7f71bb7558ec7d71",
+  "tree": "ce0fdd505644c7b7f56f511d82deb512dae09c08",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/UserStateDocument.developerTools.test.ts\" \"src/shell-v0/state/developerToolsState.test.ts\" \"src/shell-v0/views/SettingsSurface.developerTools.test.ts\" \"src/shell-v0/views/SettingsSurface.sections.test.ts\" \"src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts\" \"src/shell-v0/views/settingsRegister.test.ts\" \"src/shell-v0/chrome/Shell.frame.test.ts\" \"src/shell-v0/chrome/TopBar.test.ts\" \"src/boot/factoryReset.developerTools.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/5bb7bl3g/tmp/test-intent-vitest-3-1794347793945.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/UserStateDocument.developerTools.test.ts\" \"src/shell-v0/state/developerToolsState.test.ts\" \"src/shell-v0/views/SettingsSurface.developerTools.test.ts\" \"src/shell-v0/views/SettingsSurface.sections.test.ts\" \"src/shell-v0/views/SettingsSurface.settingsRecovery.test.ts\" \"src/shell-v0/views/settingsRegister.test.ts\" \"src/shell-v0/chrome/Shell.frame.test.ts\" \"src/shell-v0/chrome/TopBar.test.ts\" \"src/boot/factoryReset.developerTools.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/iub5jcly/tmp/test-intent-vitest-39003-1794361838116.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 4540
+      "durationMs": 4284
     }
   ],
   "checks": [
@@ -246,7 +246,7 @@
       "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.sections.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.sections.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:f0caf9285b790a66401bb16c94584614c239ab954bc145c60e0e97adf7664c49",
+      "contentDigest": "sha256:e95095ec8e9c119a52f039d7f44f96636315fe7f01c7f5ed4c60db5fcb4cfbc1",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -285,6 +285,42 @@
         },
         {
           "name": "SG5 recovery selects Data & reset and the existing Reset anchor without invoking reset",
+          "status": "passed"
+        },
+        {
+          "name": "SG5 SG6 Reset to defaults is listed, searched and rendered only where its operation policy offers it (USER)",
+          "status": "passed"
+        },
+        {
+          "name": "SG5 SG6 Reset to defaults is listed, searched and rendered only where its operation policy offers it (OPERATOR)",
+          "status": "passed"
+        },
+        {
+          "name": "SG5 SG6 Reset to defaults is listed, searched and rendered only where its operation policy offers it (DEVELOPER)",
+          "status": "passed"
+        },
+        {
+          "name": "SG5 SG6 settings recovery offers Reset to a USER in content, navigation and search; ending it removes Reset everywhere",
+          "status": "passed"
+        },
+        {
+          "name": "SG5 SG6 in Session-only mode Reset to defaults is neither rendered empty, listed, searched nor arrived at (OPERATOR)",
+          "status": "passed"
+        },
+        {
+          "name": "SG5 SG6 in Session-only mode Reset to defaults is neither rendered empty, listed, searched nor arrived at (DEVELOPER)",
+          "status": "passed"
+        },
+        {
+          "name": "SG5 SG6 in Session-only mode Reset to defaults is neither rendered empty, listed, searched nor arrived at (USER in settings recovery)",
+          "status": "passed"
+        },
+        {
+          "name": "SG6 SG7 in the browser, rows this platform renders are the rows navigation, search and About offer",
+          "status": "passed"
+        },
+        {
+          "name": "SG6 SG7 in the desktop, rows this platform renders are the rows navigation, search and About offer",
           "status": "passed"
         },
         {
@@ -436,7 +472,7 @@
       "id": "modules/ui-web/src/shell-v0/views/settingsRegister.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/settingsRegister.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:bd2ebae6142373903e9cb9df4198373e6939166fb4bf93fdedce51e9fcd667eb",
+      "contentDigest": "sha256:b80d216f63bf9debaf66c279a620efa07d90dd0062d8c2d26d2da5f351eb1c6b",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -642,5 +678,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:318beda5a5f80619bf30eb3be9cc50b37445f35addcc960cf73cf80104d80b9b"
+  "digest": "sha256:d7c445d971d4e86da59cd806a135499624051c7bd03e994cfdf8d0966bcedd50"
 }
