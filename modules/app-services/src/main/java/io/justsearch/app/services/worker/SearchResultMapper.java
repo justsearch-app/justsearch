@@ -137,7 +137,7 @@ final class SearchResultMapper {
           new KnowledgeSearchResponse.Hit(
               sr.getId(),
               finalScore,
-              sr.getFieldsMap(),
+              withoutWireOnlyFields(sr.getFieldsMap()),
               sr.getMatchedFieldsList(),
               matchSpans,
               excerptRegions,
@@ -145,6 +145,14 @@ final class SearchResultMapper {
                   sr, SearchTraceMapper.ceScoreFor(ceScoresByDocId, sr.getId()))));
     }
     return hits;
+  }
+
+  /** The hit's fields without the Worker's cross-encoder-only input (never shown to callers). */
+  static Map<String, String> withoutWireOnlyFields(Map<String, String> fields) {
+    if (!fields.containsKey(KnowledgeSearchEngine.PARENT_OPENING_FIELD)) return fields;
+    Map<String, String> out = new java.util.LinkedHashMap<>(fields);
+    out.remove(KnowledgeSearchEngine.PARENT_OPENING_FIELD);
+    return out;
   }
 
   /** Extracts match spans from a SearchResult proto (best-effort, handles older Workers). */
@@ -197,6 +205,14 @@ final class SearchResultMapper {
     if (matchPos < 0) {
       return contentPreview.substring(0, Math.min(contentPreview.length(), maxLength));
     }
+    return snippetAround(contentPreview, matchPos, maxLength);
+  }
+
+  /**
+   * A window of about {@code maxLength} chars centered on {@code matchPos}, snapped to word
+   * boundaries; {@code matchPos} 0 gives the text's opening.
+   */
+  static String snippetAround(String contentPreview, int matchPos, int maxLength) {
     int halfWindow = maxLength / 2;
     int start = Math.max(0, matchPos - halfWindow);
     int end = Math.min(contentPreview.length(), start + maxLength);

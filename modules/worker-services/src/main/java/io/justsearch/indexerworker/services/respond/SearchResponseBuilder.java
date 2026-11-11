@@ -82,6 +82,15 @@ public final class SearchResponseBuilder {
    */
   private static final int EVIDENCE_PREVIEW_CAP = 4096;
 
+  /**
+   * Wire-only field carrying the head of a chunk hit's parent {@code content_preview} (the
+   * document's opening) to the Head's cross-encoder input; never stored or indexed.
+   */
+  public static final String PARENT_OPENING_FIELD = "parent_opening";
+
+  /** Enough of the opening to fill one cross-encoder passage (the Head cuts 1,500 chars). */
+  private static final int PARENT_OPENING_CAP = 1600;
+
   private final IndexCountOps indexCountOps;
   private final DocumentFieldOps documentFieldOps;
   private final TextQueryOps textQueryOps;
@@ -505,7 +514,7 @@ public final class SearchResponseBuilder {
       // the visible page — capping enrichment at the pre-rerank top-10 left reranked-up hits
       // (e.g. rank 11-20 promoted into view) with a blank title/filename/excerpt.
       if (isChunkHit) {
-        resolveParentMetadata(parentDocId, resultBuilder);
+        resolveParentMetadata(parentDocId, resultBuilder, pipeline.getCrossEncoderEnabled());
         // Tempdoc 771 item (b): put the parent document's entity values on the wire so the delivery
         // layer can carry them. Written to the RESULT builder only — `hit.fields()` is untouched, so
         // the EvidenceSpan NER_MEMBERSHIP signal and every span/ranking computation below see
@@ -644,7 +653,8 @@ public final class SearchResponseBuilder {
     return responseBuilder;
   }
 
-  private void resolveParentMetadata(String parentDocId, SearchResult.Builder resultBuilder) {
+  private void resolveParentMetadata(
+      String parentDocId, SearchResult.Builder resultBuilder, boolean includeOpening) {
     // Tempdoc 915 Phase 2 PR-B: feedback is keyed by the stable parent UID. Chunk-only hits cannot
     // obtain it from the chunk stored-field allowlist, so carry it through the existing parent
     // metadata enrichment and generic fields map. This is not a new protobuf or frontend field;
@@ -668,6 +678,19 @@ public final class SearchResponseBuilder {
     String filename = documentFieldOps.getDocumentField(parentDocId, SchemaFields.FILENAME);
     if (filename != null && !filename.isEmpty()) {
       resultBuilder.putFields(SchemaFields.FILENAME, filename);
+    }
+    // The Head's cross-encoder also judges a chunk hit by its document's opening (title page,
+    // subject line), which the winning chunk's text does not carry. Only the opening's head is
+    // sent; the Head drops the field before the hit leaves the search API. LambdaMART and
+    // per-source interleaving can change the Head's leading three, so retain the opening on all
+    // chunk candidates when cross-encoding is requested. Other pipelines need no parent read.
+    if (includeOpening) {
+      String opening = documentFieldOps.getDocumentField(parentDocId, SchemaFields.CONTENT_PREVIEW);
+      if (opening != null && !opening.isBlank()) {
+        resultBuilder.putFields(
+            PARENT_OPENING_FIELD,
+            opening.length() > PARENT_OPENING_CAP ? opening.substring(0, PARENT_OPENING_CAP) : opening);
+      }
     }
   }
 
