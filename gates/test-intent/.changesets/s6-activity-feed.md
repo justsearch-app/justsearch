@@ -19,7 +19,11 @@ After a check against a real Engine at 85d57d405e, three defects were repaired, 
 evidence against 85d57d405e: Activity on a healthy, idle shared stream said its ledger showed
 last-known records until the next event; the System tab panel did not scroll at all (no element held
 the feed's overflow, and Health could not scroll either); and every command palette use added a No-op
-row under Your actions. The acceptance record below predates these changes.
+row under Your actions. After the test-intent tie-break, the browser checks of A16, A19 and A20 are
+separate entries; A19 asserts what a reader can tell apart in forced colours rather than exact
+system colours, and A19 and A20 fail before at c09de15a10 with patches that remove only the
+forced-colour indicators or only the controls' wrapping. The acceptance records below predate these
+changes.
 
 ```json
 {
@@ -303,7 +307,7 @@ row under Your actions. The acceptance record below predates these changes.
         "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts"
       ],
       "class": "New",
-      "behaviour": "In real Chromium: A16 1,040 loaded records (520 ledger, 520 local) are all in a windowed list reachable from newest to oldest, and a live arrival keeps the record being read in place; A19 on light and dark forced-colour palettes the selected quick filter has a heavier Highlight border, keyboard focus a solid Highlight outline, the unread dot stays visible in CanvasText with its label, and outcomes carry a glyph and word; A20 at 600x400 and 1280x800 with 200 percent text the quick filters, advanced controls and mark-read stay within the width without sideways scrolling, light and dark.",
+      "behaviour": "In real Chromium, A16: 1,040 loaded records (520 ledger, 520 local) are all in a windowed list reachable from newest to oldest, and a live arrival keeps the record being read in place. Fail before at 716017c61f, which had no windowed one feed (the feed's quick-filter control the checks open on is absent).",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -311,12 +315,60 @@ row under Your actions. The acceptance record below predates these changes.
           "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
           "delegationScope": "the shell redesign's slices including Settings and secondary pages",
           "label": "agent choice",
-          "choice": "Check the feed's windowing, forced colours and narrow large-text layout in the browser, as scenarios A16, A19 and A20 require."
+          "choice": "Check the feed's windowing in the browser, as scenario A16 requires (draft s6-9 section 7: 'Long live session exceeds 500 ledger and 500 local entries; virtualized navigation reaches oldest/newest loaded rows. Live arrivals preserve scroll position and selected details.')."
         }
       ],
-      "evidence": "gates/test-intent/evidence/s6-activity-feed.json",
+      "evidence": "gates/test-intent/evidence/s6-activity-feed-a16.json",
       "newChecks": [
+        "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts#A16 — more than 500 ledger and 500 local records are all reachable, newest to oldest, through a windowed list",
+        "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts#A16 — a live arrival keeps the reader where they were"
+      ]
+    },
+    {
+      "items": [
         "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "In real Chromium on light and dark forced-colour palettes (A19), checked by what a reader can tell apart, not by which system colours are used: the quick filters are a radio group named Show activity whose radios have names; with focus elsewhere the selected filter differs from an unselected one in a property other than colour (border width, font weight, text decoration or outline); keyboard focus on a filter draws an outline it does not draw without focus; an unread record's mark keeps its image role and its label 'new since you looked', has a size, and is painted opaque in a colour other than the forced background; a failed outcome reads as a glyph and the word FAILURE. Fail before at c09de15a10 with gates/test-intent/evidence/s6-activity-feed-a19-before.patch, which removes only the forced-colour indicators (the selected filter's heavier border and weight, and the forced-colours rules: the Highlight border and outline and the unread mark's own paint): the selection checks fail because the selected and unselected filter look the same without colour (1px, weight 400 each), the unread checks because the mark is painted in the background colour. The focus outline and the outcome glyph are not what fails before: the patch keeps the focus outline (a forced palette recolours it but keeps it) and the outcome glyph predates this change.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "Scenario A19 (draft s6-9 section 7: 'Forced colours distinguish selection, focus, unread and outcome without colour alone; controls retain accessible names and valid roles'), with these specific design choices: the selected quick filter is marked by a heavier border and bolder text as well as colour; keyboard focus is shown by an outline; unread is the existing dot with its label, which stays painted (in the system text colour) under forced colours; an outcome is the existing glyph and word. The check asserts the distinctions, not the exact border widths or system colours."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-activity-feed-a19.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts#A19 — on a light forced-colours palette, the selected quick filter and keyboard focus are marked by more than colour",
+        "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts#A19 — on a dark forced-colours palette, the selected quick filter and keyboard focus are marked by more than colour",
+        "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts#A19 — on a light forced-colours palette, the unread mark stays visible with its label, and an outcome reads as a glyph and a word",
+        "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts#A19 — on a dark forced-colours palette, the unread mark stays visible with its label, and an outcome reads as a glyph and a word"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "In real Chromium with text at 200 percent (A20), light and dark at 600x400 and light at 1280x800: with Activity's advanced filters open, the quick filters, the advanced filters' summary, the routine choice, Today only and mark-read all end within the scroller's width and there is no page-level sideways overflow. Fail before at c09de15a10 with gates/test-intent/evidence/s6-activity-feed-a20-before.patch, which removes only the wrapping of the controls row, the quick filters and the advanced filter groups: each case fails because the content is 1,325 pixels wide.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "Scenario A20 (draft s6-9 section 7: 'At 600×400 with 200% text, filters and details actions remain reachable, sheet content scrolls, and there is no page-level sideways overflow. Repeat wide/light/dark states.'): the controls wrap onto further lines rather than widening the page."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-activity-feed-a20.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts#A20 — light at 600×400 with text at 200 percent: filters and advanced controls are reachable without sideways scrolling",
+        "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts#A20 — dark at 600×400 with text at 200 percent: filters and advanced controls are reachable without sideways scrolling",
+        "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts#A20 — light at 1280×800 with text at 200 percent: filters and advanced controls are reachable without sideways scrolling"
       ]
     },
     {

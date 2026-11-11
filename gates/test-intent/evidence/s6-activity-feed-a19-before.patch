@@ -1,0 +1,55 @@
+diff --git a/modules/ui-web/src/shell-v0/components/ActionLedgerView.ts b/modules/ui-web/src/shell-v0/components/ActionLedgerView.ts
+index c6f2169807..f9b90f953f 100644
+--- a/modules/ui-web/src/shell-v0/components/ActionLedgerView.ts
++++ b/modules/ui-web/src/shell-v0/components/ActionLedgerView.ts
+@@ -265,11 +265,9 @@ export class ActionLedgerView extends JfElement {
+         font-size: var(--font-size-xs);
+         cursor: pointer;
+       }
+-      /* Selected reads by weight and a heavier border as well as tint, so it survives forced colours. */
+       .quick button[aria-checked='true'] {
+-        border: 2px solid var(--accent);
++        border-color: var(--accent);
+         color: var(--text-primary);
+-        font-weight: 600;
+       }
+       .quick button:focus-visible,
+       .link:focus-visible,
+@@ -280,19 +278,6 @@ export class ActionLedgerView extends JfElement {
+         outline: 2px solid var(--focus-ring-color);
+         outline-offset: 1px;
+       }
+-      @media (forced-colors: active) {
+-        .quick button[aria-checked='true'] {
+-          border-color: Highlight;
+-        }
+-        .quick button:focus-visible,
+-        .link:focus-visible,
+-        .expand:focus-visible,
+-        .entry:focus-visible,
+-        summary:focus-visible,
+-        select:focus-visible {
+-          outline-color: Highlight;
+-        }
+-      }
+       .new-count {
+         font-size: var(--font-size-xs);
+         color: var(--text-tint);
+diff --git a/modules/ui-web/src/shell-v0/components/eventRow.ts b/modules/ui-web/src/shell-v0/components/eventRow.ts
+index be055ec872..7ed35d1509 100644
+--- a/modules/ui-web/src/shell-v0/components/eventRow.ts
++++ b/modules/ui-web/src/shell-v0/components/eventRow.ts
+@@ -110,13 +110,6 @@ export const eventRowStyles: CSSResult = css`
+     background: var(--accent-tint);
+     align-self: center;
+   }
+-  /* Forced colours replace backgrounds: keep the unread dot visible in the system text colour. */
+-  @media (forced-colors: active) {
+-    .new-dot {
+-      forced-color-adjust: none;
+-      background: CanvasText;
+-    }
+-  }
+   .who {
+     flex: 0 0 auto;
+     font-family: ui-monospace, monospace;

@@ -361,42 +361,89 @@ it('A16 — a live arrival keeps the reader where they were', async () => {
   }
 }, 60_000);
 
-it.each(['light', 'dark'] as const)('A19 — on a %s forced-colours palette, selection, focus, unread and outcome do not rely on colour', async (colorScheme) => {
+/** Open the feed on a forced-colours palette with eight ledger records, k7 a failure, all unread. */
+async function forcedColoursFeed(context: BrowserContext): Promise<Page> {
+  const page = await open(context);
+  await page.evaluate(() => (window as unknown as { __seed(a: number, b: number): void }).__seed(8, 0));
+  await expect.poll(() => renderedKeys(page)).toContain('operation:k7');
+  expect(await page.evaluate(() => matchMedia('(forced-colors: active)').matches), 'forced colours are active').toBe(true);
+  return page;
+}
+
+/** Visual properties of each quick filter other than colour. */
+function quickFilters(page: Page) {
+  return page.evaluate(() => {
+    const root = document.querySelector('jf-action-ledger')!.shadowRoot!;
+    return Array.from(root.querySelectorAll<HTMLElement>('[data-quick]')).map((b) => {
+      const c = getComputedStyle(b);
+      return { name: b.textContent!.trim(), role: b.getAttribute('role'), checked: b.getAttribute('aria-checked'),
+        focused: b.matches(':focus-visible'),
+        marks: { border: c.borderTopWidth, weight: c.fontWeight, decoration: c.textDecorationLine,
+          outline: c.outlineStyle === 'none' ? 'none' : `${c.outlineStyle} ${c.outlineWidth}` } };
+    });
+  });
+}
+
+it.each(['light', 'dark'] as const)('A19 — on a %s forced-colours palette, the selected quick filter and keyboard focus are marked by more than colour', async (colorScheme) => {
   const context = await browser.newContext({ forcedColors: 'active', colorScheme, viewport: { width: 1280, height: 800 } });
   try {
-    const page = await open(context);
-    await page.evaluate(() => (window as unknown as { __seed(a: number, b: number): void }).__seed(8, 0));
-    await expect.poll(() => renderedKeys(page)).toContain('operation:k7');
-    const system = await page.evaluate(() => {
-      const probe = document.createElement('div');
-      probe.style.cssText = 'forced-color-adjust: none; background: CanvasText; color: Highlight';
-      document.body.append(probe);
-      const c = getComputedStyle(probe);
-      const result = { canvasText: c.backgroundColor, highlight: c.color };
-      probe.remove();
-      return result;
+    const page = await forcedColoursFeed(context);
+    const group = await page.evaluate(() => {
+      const g = document.querySelector('jf-action-ledger')!.shadowRoot!.querySelector('[data-testid="feed-quick"]')!;
+      return { role: g.getAttribute('role'), name: g.getAttribute('aria-label') };
     });
-    const look = () => page.evaluate(() => {
-      const root = document.querySelector('jf-action-ledger')!.shadowRoot!;
-      const quick = Array.from(root.querySelectorAll<HTMLElement>('[data-quick]')).map((b) => {
-        const c = getComputedStyle(b);
-        return { checked: b.getAttribute('aria-checked'), border: c.borderTopWidth, borderColor: c.borderTopColor,
-          focused: b.matches(':focus-visible'), outlineStyle: c.outlineStyle, outlineColor: c.outlineColor };
-      });
-      const dot = root.querySelector('[data-testid="ledger-new-dot"]')!;
-      const failed = root.querySelector('.item[data-key="operation:k7"] [data-testid="ledger-outcome"]')!;
-      return { quick, dot: getComputedStyle(dot).backgroundColor, dotLabel: dot.getAttribute('aria-label'),
-        outcome: failed.textContent!.replace(/\s+/g, ' ').trim() };
-    });
+    expect(group).toEqual({ role: 'radiogroup', name: 'Show activity' });
     await page.keyboard.press('Tab');
     await page.keyboard.press('ArrowRight');
-    const state = await look();
-    const [all, agents] = state.quick;
-    expect(agents).toMatchObject({ checked: 'true', border: '2px', borderColor: system.highlight, focused: true,
-      outlineStyle: 'solid', outlineColor: system.highlight });
-    expect(all).toMatchObject({ checked: 'false', border: '1px', focused: false });
-    expect(state.dot).toBe(system.canvasText);
-    expect(state.dotLabel).toBe('new since you looked');
+    const focused = await quickFilters(page);
+    await page.evaluate(() => (document.querySelector('jf-action-ledger')!.shadowRoot!.activeElement as HTMLElement).blur());
+    const resting = await quickFilters(page);
+    for (const filter of resting) {
+      expect(filter.role, filter.name).toBe('radio');
+      expect(filter.name).not.toBe('');
+    }
+    const all = resting[0]!;
+    const agents = resting[1]!;
+    expect(agents).toMatchObject({ name: 'Agents', checked: 'true', focused: false });
+    expect(all).toMatchObject({ checked: 'false', focused: false });
+    // Selection: with focus elsewhere, the selected filter differs from an unselected one in a
+    // property other than colour (border width, weight, decoration or outline).
+    expect(agents.marks, 'the selected filter looks different from an unselected one without colour').not.toEqual(all.marks);
+    // Focus: the focused filter draws an outline it does not draw without focus.
+    expect(focused[1]).toMatchObject({ name: 'Agents', checked: 'true', focused: true });
+    expect(focused[1]!.marks.outline, 'keyboard focus draws an outline').not.toBe('none');
+    expect(agents.marks.outline, 'no outline without focus').toBe('none');
+    expect(focused[1]!.marks.outline).not.toMatch(/ 0px$/);
+  } finally {
+    await context.close();
+  }
+}, 60_000);
+
+it.each(['light', 'dark'] as const)('A19 — on a %s forced-colours palette, the unread mark stays visible with its label, and an outcome reads as a glyph and a word', async (colorScheme) => {
+  const context = await browser.newContext({ forcedColors: 'active', colorScheme, viewport: { width: 1280, height: 800 } });
+  try {
+    const page = await forcedColoursFeed(context);
+    const state = await page.evaluate(() => {
+      const probe = document.createElement('div');
+      probe.style.cssText = 'forced-color-adjust: none; background: Canvas';
+      document.body.append(probe);
+      const canvas = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      const root = document.querySelector('jf-action-ledger')!.shadowRoot!;
+      const dot = root.querySelector<HTMLElement>('.item[data-key="operation:k7"] [data-testid="ledger-new-dot"]');
+      const box = dot?.getBoundingClientRect();
+      const failed = root.querySelector('.item[data-key="operation:k7"] [data-testid="ledger-outcome"]')!;
+      return { canvas, dot: dot && { role: dot.getAttribute('role'), label: dot.getAttribute('aria-label'),
+        width: box!.width, height: box!.height, fill: getComputedStyle(dot).backgroundColor },
+      outcome: failed.textContent!.replace(/\s+/g, ' ').trim() };
+    });
+    expect(state.dot, 'an unread record carries the unread mark').not.toBeNull();
+    expect(state.dot).toMatchObject({ role: 'img', label: 'new since you looked' });
+    expect(state.dot!.width).toBeGreaterThan(0);
+    expect(state.dot!.height).toBeGreaterThan(0);
+    // Visible: an opaque fill that is not the page's own background colour.
+    expect(state.dot!.fill, 'the unread mark is painted opaque').toMatch(/^rgb\(/);
+    expect(state.dot!.fill, 'the unread mark is not painted in the background colour').not.toBe(state.canvas);
     expect(state.outcome).toMatch(/^\S+ FAILURE$/);
   } finally {
     await context.close();

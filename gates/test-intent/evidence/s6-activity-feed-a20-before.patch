@@ -1,0 +1,33 @@
+diff --git a/modules/ui-web/src/shell-v0/components/ActionLedgerView.ts b/modules/ui-web/src/shell-v0/components/ActionLedgerView.ts
+index c6f2169807..8c4eb26512 100644
+--- a/modules/ui-web/src/shell-v0/components/ActionLedgerView.ts
++++ b/modules/ui-web/src/shell-v0/components/ActionLedgerView.ts
+@@ -245,14 +245,12 @@ export class ActionLedgerView extends JfElement {
+       }
+       .controls {
+         display: flex;
+-        flex-wrap: wrap;
+         align-items: center;
+         gap: 0.5rem 0.75rem;
+         padding: 0 0 0.5rem 0;
+       }
+       .quick {
+         display: flex;
+-        flex-wrap: wrap;
+         gap: 0.25rem;
+       }
+       .quick button {
+@@ -308,13 +306,11 @@ export class ActionLedgerView extends JfElement {
+       }
+       .filters {
+         display: flex;
+-        flex-wrap: wrap;
+         gap: 0.75rem;
+         padding: 0.25rem 0 0.5rem 0;
+       }
+       .filters .group {
+         display: flex;
+-        flex-wrap: wrap;
+         align-items: center;
+         gap: 0.35rem;
+       }
