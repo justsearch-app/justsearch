@@ -3,57 +3,59 @@ package io.justsearch.indexerworker.extract;
 
 import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
+import java.io.BufferedInputStream;
+import java.io.DataInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import javax.imageio.ImageIO;
-import javax.imageio.metadata.IIOMetadataNode;
-import javax.imageio.stream.FileImageInputStream;
-import org.w3c.dom.Node;
 
 /** JPEG preparation owned by the OCR document; the original file is only ever read. */
 final class ExifImageOrientation {
   private ExifImageOrientation() {}
 
-  static Path prepare(Path source, Path tempDirectory) throws IOException {
-    int orientation = orientation(source);
-    if (orientation < 2 || orientation > 8) return source;
-    BufferedImage decoded = ImageIO.read(source.toFile());
-    if (decoded == null) throw new IOException("Cannot decode EXIF-oriented image");
-    Path prepared = tempDirectory.resolve("oriented.png");
-    ImageIO.write(transform(decoded, orientation), "png", prepared.toFile());
-    return prepared;
+  static Path prepare(Path source, Path tempDirectory) {
+    try {
+      int orientation = orientation(source);
+      if (orientation < 2 || orientation > 8) return source;
+      BufferedImage decoded = ImageIO.read(source.toFile());
+      if (decoded == null) return source;
+      Path prepared = tempDirectory.resolve("oriented.png");
+      return ImageIO.write(transform(decoded, orientation), "png", prepared.toFile())
+          ? prepared : source;
+    } catch (IOException | RuntimeException unsupportedImage) {
+      // Preparation is optional: tesseract can read JPEG variants that ImageIO cannot.
+      return source;
+    }
   }
 
+  /** Read JPEG markers without asking a pixel decoder to interpret the image. */
   static int orientation(Path source) throws IOException {
-    try (var input = new FileImageInputStream(source.toFile())) {
-      var readers = ImageIO.getImageReaders(input);
-      if (!readers.hasNext()) return 1;
-      var reader = readers.next();
-      try {
-        if (!"JPEG".equalsIgnoreCase(reader.getFormatName())) return 1;
-        reader.setInput(input, true, false);
-        Node tree = reader.getImageMetadata(0).getAsTree("javax_imageio_jpeg_image_1.0");
-        return orientation(tree);
-      } finally {
-        reader.dispose();
+    try (var input = new DataInputStream(new BufferedInputStream(Files.newInputStream(source)))) {
+      if (input.readUnsignedShort() != 0xffd8) return 1;
+      while (input.readUnsignedByte() == 0xff) {
+        int marker;
+        do {
+          marker = input.readUnsignedByte();
+        } while (marker == 0xff);
+        // Metadata ends at the start of compressed pixels (SOS), or end of image (EOI).
+        if (marker == 0xda || marker == 0xd9) return 1;
+        if (marker == 0x01 || (marker >= 0xd0 && marker <= 0xd7)) continue;
+        int length = input.readUnsignedShort() - 2;
+        if (length < 0) return 1;
+        if (marker == 0xe1) {
+          byte[] payload = new byte[length];
+          input.readFully(payload);
+          int value = exifOrientation(payload);
+          if (value != 1) return value;
+        } else {
+          input.skipNBytes(length);
+        }
       }
+      return 1;
     }
-  }
-
-  private static int orientation(Node node) {
-    if (node instanceof IIOMetadataNode metadata && "unknown".equals(node.getNodeName())
-        && "225".equals(metadata.getAttribute("MarkerTag"))
-        && metadata.getUserObject() instanceof byte[] bytes) {
-      int value = exifOrientation(bytes);
-      if (value != 1) return value;
-    }
-    for (Node child = node.getFirstChild(); child != null; child = child.getNextSibling()) {
-      int value = orientation(child);
-      if (value != 1) return value;
-    }
-    return 1;
   }
 
   /** Only the bounded APP1 payload is inspected. Ignore malformed/unsupported TIFF metadata. */

@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import javax.imageio.ImageIO;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.io.TempDir;
@@ -69,12 +70,76 @@ class ExifImageOrientationTest {
     assertEquals(beforeTime, Files.getLastModifiedTime(source));
   }
 
+  @ParameterizedTest
+  @ValueSource(ints = {0, 1, 6})
+  void exifBeforeJfifDoesNotPreventOcr(int orientation) throws Exception {
+    byte[] jpeg = jpeg();
+    // Move APP1 ahead of the JFIF APP0 segment, as cameras in the public set do.
+    byte[] tagged = withExif(jpeg, orientation, true);
+    int app0End = 4 + ((jpeg[4] & 0xff) << 8 | (jpeg[5] & 0xff));
+    var out = new ByteArrayOutputStream();
+    out.write(jpeg, 0, 2);
+    out.write(tagged, app0End, 36);
+    out.write(jpeg, 2, jpeg.length - 2);
+    assertOcrReads(out.toByteArray(), orientation == 6);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"arithmetic", "cmyk"})
+  void unsupportedJpegDecodeWithOrientationFallsBackToOriginal(String kind) throws Exception {
+    byte[] jpeg = jpeg();
+    for (int i = 2; i < jpeg.length - 1; i++) {
+      if ((jpeg[i] & 0xff) == 0xff && (jpeg[i + 1] & 0xff) == 0xc0) {
+        if (kind.equals("arithmetic")) jpeg[i + 1] = (byte) 0xc9;
+        else jpeg[i + 9] = 4; // A four-component frame inconsistent with the JFIF header.
+        break;
+      }
+    }
+    byte[] tagged = withExif(jpeg, 6, true);
+    Path source = tempDir.resolve("unsupported.jpg");
+    Files.write(source, tagged);
+    assertThrows(java.io.IOException.class, () -> ImageIO.read(source.toFile()));
+    assertOcrReads(tagged, false);
+  }
+
+  @Test
+  void unreadableExifFallsBackToOriginal() throws Exception {
+    byte[] truncated = {(byte) 0xff, (byte) 0xd8, (byte) 0xff, (byte) 0xe1, 0, 34, 'E'};
+    assertOcrReads(truncated, false);
+  }
+
+  private static byte[] jpeg() throws Exception {
+    var encoded = new ByteArrayOutputStream();
+    ImageIO.write(new BufferedImage(16, 16, BufferedImage.TYPE_INT_RGB), "jpeg", encoded);
+    return encoded.toByteArray();
+  }
+
+  private void assertOcrReads(byte[] jpeg, boolean derived) throws Exception {
+    Path source = tempDir.resolve("original.jpg");
+    Files.write(source, jpeg);
+    Files.setLastModifiedTime(source, FileTime.fromMillis(1_600_000_000_000L));
+    FileTime timestamp = Files.getLastModifiedTime(source);
+    Process process = mock(Process.class);
+    when(process.waitFor(anyLong(), any(TimeUnit.class))).thenReturn(true);
+    var config = new OcrRoutingConfig(true, List.of("eng"), 5_000, 1, 4096, 40_000_000, 72, 1);
+    try (var engine = new PdfOcrEngine(Executors::newFixedThreadPool, config, command -> {
+      assertEquals(!derived, source.equals(Path.of(command.get(1))),
+          "Only decodable images with orientation 2-8 need a derived file");
+      Files.writeString(Path.of(command.get(2) + ".txt"), "Original JPEG recognised");
+      return process;
+    }, "stub", 72, 1, null)) {
+      assertEquals("Original JPEG recognised", engine.ocrImage(source, 1000).text());
+    }
+    assertArrayEquals(jpeg, Files.readAllBytes(source));
+    assertEquals(timestamp, Files.getLastModifiedTime(source));
+  }
+
   static byte[] withExif(byte[] jpeg, int orientation, boolean littleEndian) throws Exception {
     var payload = ByteBuffer.allocate(32).order(littleEndian ? ByteOrder.LITTLE_ENDIAN : ByteOrder.BIG_ENDIAN);
     payload.put(new byte[] {'E', 'x', 'i', 'f', 0, 0});
     payload.putShort((short) (littleEndian ? 0x4949 : 0x4d4d));
     payload.putShort((short) 42).putInt(8).putShort((short) 1);
-    payload.putShort((short) 0x0112).putShort((short) 3).putInt(1).putShort((short) orientation).putShort((short) 0).putInt(0);
+    payload.putShort((short) (orientation == 0 ? 0x0100 : 0x0112)).putShort((short) 3).putInt(1).putShort((short) orientation).putShort((short) 0).putInt(0);
     var out = new ByteArrayOutputStream();
     // ImageIO writes a JFIF APP0 segment, which must remain immediately after SOI.
     int exifAt = 4 + ((jpeg[4] & 0xff) << 8 | (jpeg[5] & 0xff));

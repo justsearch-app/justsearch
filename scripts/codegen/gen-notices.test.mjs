@@ -63,6 +63,11 @@ run('THIRD_PARTY_NOTICES surfaces the separate-cuDNN-SLA note', () => {
   assert.match(tpn, /SEPARATE|separate/);
 });
 
+run('Tesseract notice attributes German, English and orientation data from tessdata_fast', () => {
+  const tpn = renderThirdParty([], [], [], loadNative());
+  assert.match(tpn, /German, English and orientation \(OSD\) tessdata_fast — Apache-2\.0/);
+});
+
 run('Rust/Cargo deps are sorted and rendered into THIRD_PARTY_NOTICES', () => {
   const cargo = loadCargo([
     { name: 'tauri', version: '2.0.0', license: 'Apache-2.0 OR MIT' },
