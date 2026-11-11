@@ -15,48 +15,47 @@ export const stderrName = ref => ref.replace(/[^A-Za-z0-9._-]/g, '_');
 const EXIT_FIELDS = ['code', 'signal', 'signalName', 'codeName', 'exitClass', 'phase', 'forced', 'observedAt'];
 
 // How each Engine incarnation of one work folder ended, as the supervisor recorded it, and the end
-// of what that fake Engine wrote to stderr. An exit no supervisor recorded stays null.
+// of what that fake Engine wrote to stderr. Evidence joins only by incarnation reference: a PID can
+// be reused by a later start (Windows does), so an unreferenced start is its own row, identified by
+// PID and entry time, and an exit no supervisor recorded for it stays null.
 export function incarnationEnds(workDir, ledgerRows, events) {
-  const ends = [];
-  const add = (incarnation, pid) => { const row = { incarnation, pid, workDir, exit: null, stderrTail: null }; ends.push(row); return row; };
-  // A reference names one incarnation; a PID may be reused by a later one (Windows does), so a PID
-  // alone joins only when exactly one row carries it, and never across two known references.
-  const entry = (incarnation = null, pid = null) => {
-    let row = incarnation ? ends.find(candidate => candidate.incarnation === incarnation) : undefined;
-    if (!row && pid != null) {
-      const same = ends.filter(candidate => candidate.pid === pid && (!incarnation || !candidate.incarnation));
-      if (same.length === 1) row = same[0];
-    }
-    row ??= add(incarnation, pid);
-    row.incarnation ??= incarnation;
-    row.pid ??= pid;
-    return row;
+  const ends = new Map();
+  const row = (incarnation, pid = null, entryEpochMs = null) => {
+    const key = incarnation ?? `pid ${pid} at ${entryEpochMs}`;
+    if (!ends.has(key)) ends.set(key, { incarnation, pid, entryEpochMs, workDir, exit: null, stderrTail: null });
+    const found = ends.get(key);
+    found.pid ??= pid;
+    found.entryEpochMs ??= entryEpochMs;
+    return found;
   };
-  for (const row of ledgerRows) {
-    if (row.type === 'engine-start' && row.incarnation) entry(`${row.incarnation.session}/${row.incarnation.n}`, row.pid ?? null);
+  const ref = incarnation => `${incarnation.session}/${incarnation.n}`;
+  for (const line of ledgerRows) {
+    if (line.type === 'engine-start' && line.incarnation) row(ref(line.incarnation), line.pid ?? null);
   }
-  for (const row of events) {
-    if (row.phase === 'engineEntry' && row.workDir === workDir) entry(row.incarnation || null, row.pid);
+  for (const line of events) {
+    if (line.phase === 'engineEntry' && line.workDir === workDir) row(line.incarnation || null, line.pid, line.atMs);
   }
-  for (const row of ledgerRows) {
-    if (row.type !== 'engine-exit' || !row.incarnation) continue;
-    entry(`${row.incarnation.session}/${row.incarnation.n}`).exit = Object.fromEntries(
-      EXIT_FIELDS.filter(key => row[key] !== undefined).map(key => [key, row[key]]));
+  for (const line of ledgerRows) {
+    if (line.type !== 'engine-exit' || !line.incarnation) continue;
+    row(ref(line.incarnation)).exit = Object.fromEntries(
+      EXIT_FIELDS.filter(key => line[key] !== undefined).map(key => [key, line[key]]));
   }
   const logs = path.join(workDir, 'data', 'logs');
   const files = fs.existsSync(logs) ? fs.readdirSync(logs).sort() : [];
   for (const name of files) {
-    const match = /^fake-engine-(\d+)-\d+(?:-(.+))?\.stderr\.log$/.exec(name);
+    const match = /^fake-engine-(\d+)-(\d+)(?:-(.+))?\.stderr\.log$/.exec(name);
     if (!match) continue;
-    const pid = Number(match[1]);
-    const named = match[2] ? ends.filter(row => row.incarnation && stderrName(row.incarnation) === match[2]) : [];
-    const row = named.length === 1 ? named[0]
-      : match[2] ? add(null, pid) : entry(null, pid);
-    row.pid ??= pid;
-    row.stderrFile = name;
-    row.stderrTail = fs.readFileSync(path.join(logs, name), 'utf8').slice(-STDERR_TAIL_CHARS);
+    const [pid, entryEpochMs] = [Number(match[1]), Number(match[2])];
+    const named = match[3] ? [...ends.values()].filter(end => end.incarnation && stderrName(end.incarnation) === match[3]) : [];
+    // A reference that names no single known incarnation stays unattributed, still shown.
+    let end = named.length === 1 ? named[0] : match[3] ? null : row(null, pid, entryEpochMs);
+    if (!end) ends.set(name, end = { incarnation: null, pid, entryEpochMs, workDir, exit: null, stderrTail: null });
+    end.pid ??= pid;
+    end.entryEpochMs ??= entryEpochMs;
+    end.stderrFile = name;
+    end.stderrTail = fs.readFileSync(path.join(logs, name), 'utf8').slice(-STDERR_TAIL_CHARS);
   }
-  return ends;
+  return [...ends.values()];
 }
 
 // Observations only. Missing phases remain absent: an unobserved event is never a zero duration.
@@ -134,8 +133,7 @@ export function caseTimings({ adapter, testCase, policy, root }) {
         }
         const dataDir = path.join(workDir, 'data');
         const rows = ledger.readLedger(ledger.ledgerDirectory(dataDir), 'engine').records.map(row => row.line);
-        const starts = rows.filter(row => row.type === 'engine-start');
-        const logLines = lines(path.join(dataDir, 'logs', 'engine.log'));
+            const logLines = lines(path.join(dataDir, 'logs', 'engine.log'));
         // The first stdout line survives even if fixture initialization fails before its file log.
         for (const run of runs.filter(run => run.workDir === workDir && run.stateRoot)) {
           const runRoot = path.join(run.stateRoot, 'runs');
@@ -150,11 +148,8 @@ export function caseTimings({ adapter, testCase, policy, root }) {
           const entry = /entryEpochMs=(\d+) pid=(\d+)/.exec(match[2]);
           if (entry) {
             const ref = /incarnationRef=(\S+)/.exec(match[2]);
-            // Without a reference, a PID names a start only if no other start reused it.
-            const same = ref ? [] : starts.filter(row => row.pid === Number(entry[2]));
-            const start = same.length === 1 ? same[0] : null;
-            current = { pid: Number(entry[2]), entryEpochMs: Number(entry[1]), incarnation: ref?.[1]
-              ?? (start ? `${start.incarnation.session}/${start.incarnation.n}` : null) };
+            // Only the reference names the incarnation: a PID may belong to a reused start.
+            current = { pid: Number(entry[2]), entryEpochMs: Number(entry[1]), incarnation: ref?.[1] ?? null };
             event('engineEntry', Number(entry[1]), { ...current, workDir, source: 'fake Engine entry' });
           }
           const port = /JUSTSEARCH_API_PORT=(\d+)/.exec(match[2]);

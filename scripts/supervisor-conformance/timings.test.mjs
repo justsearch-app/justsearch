@@ -173,7 +173,7 @@ test('record names how each incarnation ended and the bounded tail of its own st
     const record = timing.finish(['failed']);
     assert.deepEqual(JSON.parse(fs.readFileSync(timing.file, 'utf8')).incarnations, record.incarnations);
     const [one, two, orphan] = record.incarnations;
-    assert.deepEqual({ ...one, stderrTail: undefined }, { incarnation: 'run/1', pid: 123, workDir: root, stderrTail: undefined, stderrFile: `fake-engine-123-${now + 1}-run_1.stderr.log`,
+    assert.deepEqual({ ...one, stderrTail: undefined }, { incarnation: 'run/1', pid: 123, entryEpochMs: now + 1, workDir: root, stderrTail: undefined, stderrFile: `fake-engine-123-${now + 1}-run_1.stderr.log`,
       exit: { code: 1, codeName: 'FATAL_OR_UNCAUGHT', exitClass: 'UNEXPECTED', phase: 'STARTING', forced: false,
         observedAt: new Date(now + 90).toISOString() } });
     assert.equal(one.stderrTail.length, 2000);
@@ -181,7 +181,7 @@ test('record names how each incarnation ended and the bounded tail of its own st
     assert.deepEqual(two.exit, { code: null, signal: 9, signalName: 'SIGKILL', forced: true,
       observedAt: new Date(now + 900).toISOString() });
     assert.equal(two.stderrTail, null, 'no stderr written means none reported');
-    assert.deepEqual(orphan, { incarnation: null, pid: 125, workDir: root, exit: null,
+    assert.deepEqual(orphan, { incarnation: null, pid: 125, entryEpochMs: now + 2, workDir: root, exit: null,
       stderrFile: `fake-engine-125-${now + 2}.stderr.log`, stderrTail: 'orphan line\n' },
       'an exit no supervisor recorded is never invented');
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
@@ -218,37 +218,56 @@ test('the fake Engine keeps a copy of its stderr, including a fatal error, and o
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
-test('a PID reused by a later incarnation never merges two incarnations or their stderr', async () => {
+// Evidence is never attached to the wrong incarnation: only a reference joins; a reused PID does not.
+test('a reused PID never moves exit or stderr evidence between Engine starts', async (t) => {
   const { createLedgerWriter, ledgerDirectory } = await import('../dev/lib/exit-ledger.cjs');
-  for (const secondExit of [true, false]) {
-    const root = fs.mkdtempSync(path.join(tmp, 'timing-reused-pid-test-'));
+  const one = { session: 'run', n: 1 }; const two = { session: 'run', n: 2 };
+  const cases = {
+    A1: { entries: [[123, 1000, 'run/1'], [123, 2000, 'run/2']], ledger: [['start', one, 123], ['exit', one, 1], ['start', two, 123], ['exit', two, 7]],
+      stderr: [[123, 1000, 'run_1', 'first'], [123, 2000, 'run_2', 'second']],
+      want: [['run/1', 123, 1000, 1, 'first'], ['run/2', 123, 2000, 7, 'second']] },
+    A2: { entries: [[123, 1000], [123, 2000]], ledger: [], stderr: [[123, 1000, null, 'first'], [123, 2000, null, 'second']],
+      want: [[null, 123, 1000, null, 'first'], [null, 123, 2000, null, 'second']] },
+    A3: { entries: [[123, 1000], [123, 2000]], ledger: [['start', one, 123], ['exit', one, 1]],
+      stderr: [[123, 1000, null, 'first'], [123, 2000, null, 'second']],
+      want: [['run/1', 123, null, 1, null], [null, 123, 1000, null, 'first'], [null, 123, 2000, null, 'second']] },
+    A4: { entries: [[123, 1000], [123, 2000]], ledger: [['start', one, 123], ['exit', one, 1], ['start', two, 123], ['exit', two, 7]],
+      stderr: [[123, 1000, null, 'first'], [123, 2000, null, 'second']],
+      want: [['run/1', 123, null, 1, null], ['run/2', 123, null, 7, null], [null, 123, 1000, null, 'first'], [null, 123, 2000, null, 'second']] },
+    // Unreferenced starts are not joined even with unique PIDs: both supervisors always set the reference.
+    A5: { entries: [[123, 1000], [124, 2000]], ledger: [['start', one, 123], ['exit', one, 1]], stderr: [[123, 1000, null, 'first']],
+      want: [['run/1', 123, null, 1, null], [null, 123, 1000, null, 'first'], [null, 124, 2000, null, null]] },
+    A6: { entries: [[123, 1000, 'run/1']], ledger: [['start', one, 123], ['exit', one, 1]], stderr: [[123, 1000, 'other_9', 'stray']],
+      want: [['run/1', 123, 1000, 1, null], [null, 123, 1000, null, 'stray']] },
+    A7: { entries: [[123, 1000], [123, 2000, 'run/2']], ledger: [['start', two, 123], ['exit', two, 7]],
+      stderr: [[123, 1000, null, 'first'], [123, 2000, 'run_2', 'second']],
+      want: [['run/2', 123, 2000, 7, 'second'], [null, 123, 1000, null, 'first']] },
+  };
+  for (const [id, { entries, ledger, stderr, want }] of Object.entries(cases)) await t.test(id, () => {
+    const root = fs.mkdtempSync(path.join(tmp, `timing-reused-pid-${id}-`));
     try {
       const now = Date.now();
-      const timing = caseTimings({ adapter: 'tauri', testCase: { id: 'reused' }, policy: {}, root });
+      const timing = caseTimings({ adapter: 'tauri', testCase: { id }, policy: {}, root });
       const writer = createLedgerWriter({ ledgerDir: ledgerDirectory(path.join(root, 'data')), family: 'engine',
         writer: { role: 'dev-runner', pid: process.pid, startedAt: now }, clock: () => now });
-      const first = { session: 'run', n: 1 }; const second = { session: 'run', n: 2 };
-      writer.append('engine-start', { incarnation: first, pid: 123 });
-      writer.append('engine-exit', { incarnation: first, code: 1, observedAt: new Date(now + 90).toISOString() });
-      writer.append('engine-start', { incarnation: second, pid: 123 });
-      if (secondExit) writer.append('engine-exit', { incarnation: second, code: 7, observedAt: new Date(now + 300).toISOString() });
+      for (const [type, incarnation, value] of ledger) {
+        writer.append(`engine-${type}`, type === 'start' ? { incarnation, pid: value }
+          : { incarnation, code: value, observedAt: new Date(now).toISOString() });
+      }
       const logs = path.join(root, 'data/logs'); fs.mkdirSync(logs, { recursive: true });
-      fs.writeFileSync(path.join(logs, 'engine.log'),
-        `[fake-engine] x entryEpochMs=${now + 1} pid=123 incarnationRef=run/1\n`
-        + `[fake-engine] x entryEpochMs=${now + 200} pid=123 incarnationRef=run/2\n`);
-      fs.writeFileSync(path.join(logs, `fake-engine-123-${now + 1}-run_1.stderr.log`), 'first death\n');
-      fs.writeFileSync(path.join(logs, `fake-engine-123-${now + 200}-run_2.stderr.log`), 'second death\n');
+      fs.writeFileSync(path.join(logs, 'engine.log'), entries.map(([pid, at, ref]) =>
+        `[fake-engine] x entryEpochMs=${at} pid=${pid} incarnationRef=${ref ?? ''}\n`).join(''));
+      for (const [pid, at, ref, text] of stderr) {
+        fs.writeFileSync(path.join(logs, `fake-engine-${pid}-${at}${ref ? `-${ref}` : ''}.stderr.log`), text);
+      }
       timing.addWorkDir(root);
       const ends = timing.finish(['failed']).incarnations;
-      assert.deepEqual(ends.map(row => [row.incarnation, row.pid, row.exit?.code ?? null, row.stderrTail]), [
-        ['run/1', 123, 1, 'first death\n'],
-        ['run/2', 123, secondExit ? 7 : null, 'second death\n'],
-      ], `second exit row ${secondExit ? 'present' : 'absent'}`);
+      assert.deepEqual(ends.map(row => [row.incarnation, row.pid, row.entryEpochMs, row.exit?.code ?? null, row.stderrTail]), want, id);
     } finally { fs.rmSync(root, { recursive: true, force: true }); }
-  }
+  });
 });
 
-test('an unreferenced Engine entry joins a ledger start by PID only when no other start reused that PID', async () => {
+test('an Engine entry line names its incarnation only by its reference, never by a ledger PID', async () => {
   const { createLedgerWriter, ledgerDirectory } = await import('../dev/lib/exit-ledger.cjs');
   const root = fs.mkdtempSync(path.join(tmp, 'timing-unreferenced-entry-test-'));
   try {
@@ -258,22 +277,21 @@ test('an unreferenced Engine entry joins a ledger start by PID only when no othe
     const writer = createLedgerWriter({ ledgerDir: ledgerDirectory(path.join(root, 'data')), family: 'engine',
       writer: { role: 'dev-runner', pid: process.pid, startedAt: now }, clock: () => now });
     writer.append('engine-start', { incarnation: { session: 'run', n: 1 }, pid: 123 });
-    writer.append('engine-start', { incarnation: { session: 'run', n: 2 }, pid: 123 });
-    writer.append('engine-start', { incarnation: { session: 'run', n: 3 }, pid: 124 });
+    writer.append('engine-start', { incarnation: { session: 'run', n: 2 }, pid: 124 });
     const logs = path.join(root, 'data/logs'); fs.mkdirSync(logs, { recursive: true });
     fs.writeFileSync(path.join(logs, 'engine.log'), [
       `[fake-engine] ${iso(1)} entryEpochMs=${now + 1} pid=123 incarnationRef=`,
       `[fake-engine] ${iso(5)} JUSTSEARCH_API_PORT=1`,
       `[fake-engine] ${iso(200)} entryEpochMs=${now + 200} pid=123 incarnationRef=`,
       `[fake-engine] ${iso(205)} JUSTSEARCH_API_PORT=2`,
-      `[fake-engine] ${iso(400)} entryEpochMs=${now + 400} pid=124 incarnationRef=`,
+      `[fake-engine] ${iso(400)} entryEpochMs=${now + 400} pid=124 incarnationRef=run/2`,
     ].join('\n') + '\n');
     timing.addWorkDir(root);
     const events = timing.finish([]).events.filter(row => ['engineEntry', 'portEmitted'].includes(row.phase));
     assert.deepEqual(events.map(row => [row.phase, row.atMs - now, row.pid, row.incarnation]), [
       ['engineEntry', 1, 123, null], ['portEmitted', 5, 123, null],
       ['engineEntry', 200, 123, null], ['portEmitted', 205, 123, null],
-      ['engineEntry', 400, 124, 'run/3'],
+      ['engineEntry', 400, 124, 'run/2'],
     ]);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
