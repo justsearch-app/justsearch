@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
   },
-  "createdAt": "2026-11-11T02:18:10.890Z",
-  "revision": "e0c83179b6f3a64a93a40e290919adc5984b9d43",
-  "tree": "6f714a839747d47b5aaa1853a22f8a6b66ac0175",
+  "createdAt": "2026-11-11T03:48:31.975Z",
+  "revision": "55782be2255604e5c6e6fe56d15b31c54c94be7b",
+  "tree": "1d4ed30a67171813af7bff3493b3c728c0db4210",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -21,19 +21,25 @@
       "command": "./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineRootIndexRecoveryTest.workThatUsesTheIndexStillRefusesRecoveryCloseAndIsCounted\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 6525
+      "durationMs": 3042
     },
     {
       "command": "./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineAdmissionControllerTest.shutdownDrainWaitsForAHeldStatusReservationThatTheIndexCloseDoesNotCount\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3544
+      "durationMs": 1915
     },
     {
       "command": "./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineAdmissionControllerTest.concurrentStatusChurnNeverMasksOrUnderflowsTheIndexRetainingCount\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2829
+      "durationMs": 1792
+    },
+    {
+      "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.PolledObservationRecoveryCloseTest.heldOrdinaryRequestStillRefusesTheRecoveryClose\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4696
     }
   ],
   "checks": [
@@ -93,8 +99,23 @@
           "status": "passed"
         }
       ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/PolledObservationRecoveryCloseTest.java#heldOrdinaryRequestStillRefusesTheRecoveryClose",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/PolledObservationRecoveryCloseTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:48e26fdec4d1163f3a41dea1ea65ee0f7de93a2aed2a3553903be02c2be8fd08",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "/api/test-index-work",
+          "status": "passed"
+        }
+      ]
     }
   ],
   "failBefore": null,
-  "digest": "sha256:81eb7e9fe0967df06a394f94936e92a99586a720076514839c003288d743112d"
+  "digest": "sha256:c1ecc17df748fa4205e688c88baa019b87f8204657017aa6d3123fa918b0a43e"
 }
