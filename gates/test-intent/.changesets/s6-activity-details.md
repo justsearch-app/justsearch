@@ -512,3 +512,13 @@ Repair after verification v1 (three defects): Escape with the keyboard on the pa
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "2_rxznnp",
+  "verdict": "accept",
+  "digest": "sha256:0f17040da6f33bebfb313ab0abfb8a7f6f19494f53fbf6c98197203fefa8994f"
+}
+```
