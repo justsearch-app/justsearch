@@ -509,3 +509,14 @@ row under Your actions. The acceptance record below predates these changes.
   "note": "Test expectations and cited intent accepted. This is not product acceptance: independent Chromium verification fails amendment 13 when a hidden connected Activity consumes the section request before a visible consumer."
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "01a1cbc5-c82a-7d73-a1fd-1b5e7c4b7472",
+  "verdict": "reject",
+  "digest": "sha256:4038c6eee90e75e461546c59f8a8b26b486c2710b2c64fa84895f68f5c4247e4",
+  "note": "Entries 13 and 14 lack independently checkable sources for all their new expectations. Entry 13 cites the settled design classification table and indexing set without recording their contents; the supplied s6-9-scenarios.md delegates A1-A20 to draft section 7 in results/s6-9/investigator-1, which is not provided. Entry 14 cites A16/A19/A20 without their contents and describes a testing strategy rather than the specific forced-colour and layout choices its assertions pin. Supply the referenced scenario/design text or explicit specific delegated choices covering those expectations. The other 19 entries pass this test-intent audit; no Adaptation hides a changed existing oracle. This is a source-warrant rejection, not a product defect verdict."
+}
+```
