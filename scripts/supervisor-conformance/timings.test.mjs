@@ -147,3 +147,66 @@ test('spawn timing write failure warns while preserving the child exit status', 
     assert.match(result.stderr, /timing warning.*ENOENT/);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
+
+test('record names how each incarnation ended and the bounded tail of its own stderr', async () => {
+  const { createLedgerWriter, ledgerDirectory } = await import('../dev/lib/exit-ledger.cjs');
+  const root = fs.mkdtempSync(path.join(tmp, 'timing-ends-test-'));
+  try {
+    const now = Date.now();
+    const timing = caseTimings({ adapter: 'tauri', testCase: { id: 'ends' }, policy: {}, root });
+    const writer = createLedgerWriter({ ledgerDir: ledgerDirectory(path.join(root, 'data')), family: 'engine',
+      writer: { role: 'dev-runner', pid: process.pid, startedAt: now }, clock: () => now });
+    const first = { session: 'run', n: 1 }; const second = { session: 'run', n: 2 };
+    assert.equal(writer.append('engine-start', { incarnation: first, pid: 123 }), true);
+    assert.equal(writer.append('engine-exit', { incarnation: first, code: 1, codeName: 'FATAL_OR_UNCAUGHT',
+      exitClass: 'UNEXPECTED', phase: 'STARTING', forced: false, observedAt: new Date(now + 90).toISOString() }), true);
+    assert.equal(writer.append('engine-start', { incarnation: second, pid: 124 }), true);
+    assert.equal(writer.append('engine-exit', { incarnation: second, code: null, signal: 9, signalName: 'SIGKILL',
+      forced: true, observedAt: new Date(now + 900).toISOString() }), true);
+    const logs = path.join(root, 'data/logs'); fs.mkdirSync(logs, { recursive: true });
+    fs.writeFileSync(path.join(logs, 'engine.log'),
+      `[fake-engine] x entryEpochMs=${now + 1} pid=123 incarnationRef=run/1\n`
+      + `[fake-engine] x entryEpochMs=${now + 2} pid=125 incarnationRef=\n`);
+    fs.writeFileSync(path.join(logs, 'fake-engine-123.stderr.log'), `${'x'.repeat(5000)}[fake-engine] listen failed: EADDRINUSE\n`);
+    fs.writeFileSync(path.join(logs, 'fake-engine-125.stderr.log'), 'orphan line\n');
+    timing.addWorkDir(root);
+    const record = timing.finish(['failed']);
+    assert.deepEqual(JSON.parse(fs.readFileSync(timing.file, 'utf8')).incarnations, record.incarnations);
+    const [one, two, orphan] = record.incarnations;
+    assert.deepEqual({ ...one, stderrTail: undefined }, { incarnation: 'run/1', pid: 123, workDir: root, stderrTail: undefined,
+      exit: { code: 1, codeName: 'FATAL_OR_UNCAUGHT', exitClass: 'UNEXPECTED', phase: 'STARTING', forced: false,
+        observedAt: new Date(now + 90).toISOString() } });
+    assert.equal(one.stderrTail.length, 2000);
+    assert.match(one.stderrTail, /listen failed: EADDRINUSE\n$/);
+    assert.deepEqual(two.exit, { code: null, signal: 9, signalName: 'SIGKILL', forced: true,
+      observedAt: new Date(now + 900).toISOString() });
+    assert.equal(two.stderrTail, null, 'no stderr written means none reported');
+    assert.deepEqual(orphan, { incarnation: null, pid: 125, workDir: root, exit: null, stderrTail: 'orphan line\n' },
+      'an exit no supervisor recorded is never invented');
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('the fake Engine keeps a copy of its stderr, including a fatal error, and only when it writes one', () => {
+  const root = fs.mkdtempSync(path.join(tmp, 'timing-fake-stderr-test-'));
+  try {
+    const fake = path.join(import.meta.dirname, 'fake-engine.mjs');
+    const run = (name, env) => {
+      const dataDir = path.join(root, name);
+      const result = spawnSync(process.execPath, [fake], { encoding: 'utf8',
+        env: { ...process.env, JUSTSEARCH_FAKE_ENGINE_PLAN: '', JUSTSEARCH_DATA_DIR: dataDir, ...env } });
+      const copy = path.join(dataDir, 'logs', `fake-engine-${result.pid}.stderr.log`);
+      return { result, copy: fs.existsSync(copy) ? fs.readFileSync(copy, 'utf8') : null };
+    };
+    const bootFail = run('boot-fail', { JUSTSEARCH_FAKE_ENGINE_MODE: 'boot-fail', JUSTSEARCH_FAKE_ENGINE_EXIT_AFTER_MS: '1' });
+    assert.equal(bootFail.result.status, 2);
+    assert.equal(bootFail.copy, bootFail.result.stderr);
+    assert.match(bootFail.copy, /boot failed \(simulated\)/);
+    const plan = path.join(root, 'broken.plan.json'); fs.writeFileSync(plan, '{not json');
+    const fatal = run('fatal', { JUSTSEARCH_FAKE_ENGINE_PLAN: plan });
+    assert.equal(fatal.result.status, 1);
+    assert.match(fatal.copy, /^\[(uncaughtException|unhandledRejection)\] SyntaxError/);
+    const quiet = run('quiet', { JUSTSEARCH_FAKE_ENGINE_MODE: 'die-before-manifest', JUSTSEARCH_FAKE_ENGINE_EXIT_AFTER_MS: '1' });
+    assert.equal(quiet.result.status, 1);
+    assert.equal(quiet.copy, null);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});

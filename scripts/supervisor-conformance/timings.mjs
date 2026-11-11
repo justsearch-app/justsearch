@@ -9,6 +9,41 @@ function lines(file) {
   return fs.readFileSync(file, 'utf8').split('\n').filter(Boolean);
 }
 const epoch = value => Number.isFinite(Date.parse(value)) ? Date.parse(value) : null;
+const STDERR_TAIL_CHARS = 2000;
+const EXIT_FIELDS = ['code', 'signal', 'signalName', 'codeName', 'exitClass', 'phase', 'forced', 'observedAt'];
+
+// How each Engine incarnation of one work folder ended, as the supervisor recorded it, and the end
+// of what that fake Engine wrote to stderr. An exit no supervisor recorded stays null.
+export function incarnationEnds(workDir, ledgerRows, events) {
+  const ends = [];
+  const entry = (incarnation = null, pid = null) => {
+    let row = ends.find(candidate => (incarnation && candidate.incarnation === incarnation)
+      || (pid != null && candidate.pid === pid));
+    if (!row) ends.push(row = { incarnation, pid, workDir, exit: null, stderrTail: null });
+    row.incarnation ??= incarnation;
+    row.pid ??= pid;
+    return row;
+  };
+  for (const row of ledgerRows) {
+    if (row.type === 'engine-start' && row.incarnation) entry(`${row.incarnation.session}/${row.incarnation.n}`, row.pid ?? null);
+  }
+  for (const row of events) {
+    if (row.phase === 'engineEntry' && row.workDir === workDir) entry(row.incarnation || null, row.pid);
+  }
+  for (const row of ledgerRows) {
+    if (row.type !== 'engine-exit' || !row.incarnation) continue;
+    entry(`${row.incarnation.session}/${row.incarnation.n}`).exit = Object.fromEntries(
+      EXIT_FIELDS.filter(key => row[key] !== undefined).map(key => [key, row[key]]));
+  }
+  const logs = path.join(workDir, 'data', 'logs');
+  const files = fs.existsSync(logs) ? fs.readdirSync(logs) : [];
+  for (const name of files) {
+    const match = /^fake-engine-(\d+)\.stderr\.log$/.exec(name);
+    if (!match) continue;
+    entry(null, Number(match[1])).stderrTail = fs.readFileSync(path.join(logs, name), 'utf8').slice(-STDERR_TAIL_CHARS);
+  }
+  return ends;
+}
 
 // Observations only. Missing phases remain absent: an unobserved event is never a zero duration.
 export function caseTimings({ adapter, testCase, policy, root }) {
@@ -22,7 +57,7 @@ export function caseTimings({ adapter, testCase, policy, root }) {
       quit: policy.quitDeadlineMs, quitForceAt: policy.quitDeadlineMs - policy.quitForceMarginMs,
       quitForceTolerance: 250,
       quitAssertion: policy.quitDeadlineMs + (testCase.probe === 'stream' ? policy.quitForceMarginMs : 2000),
-    }, events: [], waits: [], measurements: [] };
+    }, events: [], waits: [], measurements: [], incarnations: [] };
   const runs = [];
   const samplers = [];
   let launches = 0;
@@ -120,6 +155,7 @@ export function caseTimings({ adapter, testCase, policy, root }) {
             event('exitObserved', epoch(row.observedAt), fields);
           }
         }
+        record.incarnations.push(...incarnationEnds(workDir, rows, record.events));
       }
       record.finishedAtMs = Date.now();
       record.problems = problems;
