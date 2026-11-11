@@ -19,12 +19,12 @@ rank slightly lower since #1209. The specific expectations below are delegated a
 not verbatim owner requirements. Both gated files use `New`: the existing files gain
 expectations and inputs, so their edits do not preserve the whole oracle as `Adaptation` requires.
 The GPL assertion protects an existing export projection rather than claiming a repaired export
-defect. The fallback check pins the ranking repair and its output boundary; the passage-building and score-folding unit checks are in the new isolated KnowledgeSearchEngineOpeningPassageTest.
+defect. The fallback check pins passage construction, duplicate-pair avoidance, the ranking repair,
+retained passage scores and the output boundary through public search entry points.
 
 The gate exempts these isolated new test sources; their expectations and execution remain for
 the independent verifier:
 
-- `KnowledgeSearchEngineOpeningPassageTest.java`
 - `KnowledgeFolderFilesWireFieldsTest.java`
 - `WorkerSearchOutputProjectionTest.java`
 - `KnowledgeSearchParentOpeningExitTest.java`
@@ -59,7 +59,7 @@ the independent verifier:
         "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineOpeningFallbackTest.java"
       ],
       "class": "New",
-      "behaviour": "With four chunk candidates, submit their four match passages plus only the first three title/opening passages, and let candidate 2's stronger opening move it ahead of candidates 0, 1 and 3. Check ordinary and authorized search, ordinary and authorized search sessions, and the agent search tool. Incomplete original/opening score vectors (2, 4 or 6 of 7 scores) retain the complete pre-rerank order with no cross-encoder trace. Null, skipped, unavailable and deadline-exceeded rerank results also preserve that order. Every response removes parent_opening; the agent tool output also omits the opening value. Restore the previous global ConfigStore after each case.",
+      "behaviour": "Through public search, a chunk hit with parent_opening submits its title plus parent opening as a second reranker pair. A chunk without parent_opening and a short whole-document hit whose opening equals its match passage submit only their original title/match pair (preservation). With four chunk candidates, submit their four match passages plus only the first three title/opening passages, and let candidate 2's stronger opening move it ahead of candidates 0, 1 and 3. Assert each retained cross-encoder score is the better passage score (9, 4, 3 and 1 in result order). Check ordinary and authorized search, ordinary and authorized search sessions, and the agent search tool. Incomplete original/opening score vectors (2, 4 or 6 of 7 scores) retain the complete pre-rerank order with no cross-encoder trace. Null, skipped, unavailable and deadline-exceeded rerank results also preserve that order. Every response removes parent_opening; the agent tool output also omits the opening value. Restore the previous global ConfigStore after each case.",
       "sources": [
         {
           "kind": "delegated-choice",

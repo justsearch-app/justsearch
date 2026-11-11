@@ -22,9 +22,11 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 
 final class KnowledgeSearchEngineOpeningFallbackTest {
   @TempDir Path tempDir;
@@ -47,6 +49,53 @@ final class KnowledgeSearchEngineOpeningFallbackTest {
   @AfterEach
   void restoreConfig() {
     TestResolvedConfigHelper.restoreGlobal(previousConfig);
+  }
+
+  @Test
+  void chunkHitOpeningPassageUsesTitleAndParentOpening() {
+    var client = client();
+    when(client.search(any(SearchRequest.class), any())).thenReturn(SearchResponse.newBuilder()
+        .addResults(SearchResult.newBuilder().setId("doc-2").setScore(1f)
+            .putFields("title", "Kleine Anfrage").putFields("chunk_index", "3")
+            .putFields("content_preview", "deep chunk text about camps")
+            .putFields("parent_opening", "Zur Situation im Lager Machmur"))
+        .build());
+    when(client.rerankSearch(anyString(), anyList(), anyLong(), any())).thenReturn(
+        RerankResponse.newBuilder().addAllScores(List.of(1f, 2f))
+            .addAllSortedIndices(List.of(1, 0)).build());
+
+    engineOver(client).search(request(), TestEngineContexts.internal());
+
+    ArgumentCaptor<List<String>> passages = ArgumentCaptor.captor();
+    verify(client).rerankSearch(anyString(), passages.capture(), anyLong(), any());
+    assertEquals(List.of("Kleine Anfrage deep chunk text about camps",
+        "Kleine Anfrage Zur Situation im Lager Machmur"), passages.getValue());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"chunk-without-opening", "short-whole-document"})
+  void unknownOrIdenticalOpeningDoesNotSubmitASecondPair(String candidate) {
+    var client = client();
+    var hit = SearchResult.newBuilder().setId("doc").setScore(1f).putFields("title", "T");
+    String matchPassage;
+    if (candidate.equals("chunk-without-opening")) {
+      hit.putFields("chunk_index", "2").putFields("content_preview", "chunk");
+      matchPassage = "T chunk";
+    } else {
+      hit.putFields("content_preview", "short whole document");
+      matchPassage = "T short whole document";
+    }
+    when(client.search(any(SearchRequest.class), any())).thenReturn(
+        SearchResponse.newBuilder().addResults(hit).build());
+    when(client.rerankSearch(anyString(), anyList(), anyLong(), any())).thenReturn(
+        RerankResponse.newBuilder().addScores(1f).addSortedIndices(0).build());
+
+    var response = engineOver(client).search(request(), TestEngineContexts.internal());
+
+    ArgumentCaptor<List<String>> passages = ArgumentCaptor.captor();
+    verify(client).rerankSearch(anyString(), passages.capture(), anyLong(), any());
+    assertEquals(List.of(matchPassage), passages.getValue());
+    assertEquals(List.of("doc"), ids(response));
   }
 
   @ParameterizedTest
@@ -145,6 +194,11 @@ final class KnowledgeSearchEngineOpeningFallbackTest {
 
     verify(client).rerankSearch(anyString(), anyList(), anyLong(), any());
     assertEquals(List.of("doc2", "doc0", "doc1", "doc3"), ids(response));
+    assertEquals(List.of(9f, 4f, 3f, 1f), response.results().stream()
+        .map(hit -> hit.trace().stream()
+            .filter(stage -> stage.id().wireId().equals("cross-encoder"))
+            .findFirst().orElseThrow().score())
+        .toList());
     assertTrue(response.results().stream().noneMatch(hit -> hit.fields().containsKey("parent_opening")));
     System.out.println("Head search seam with Worker/reranker doubles (" + exit + "): "
         + response.tookMs() + " ms");
