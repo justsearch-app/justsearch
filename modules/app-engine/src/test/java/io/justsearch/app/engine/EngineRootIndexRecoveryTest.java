@@ -91,6 +91,86 @@ final class EngineRootIndexRecoveryTest {
   }
 
   @Test
+  void heldStatusReservationDoesNotRefuseRecoveryCloseAndOpenFailureIsTheRecordedCause()
+      throws Exception {
+    var root = root();
+    try (var _ = root.processResources(); root) {
+      var harness = new Harness(root);
+      var openAttempted = new AtomicBoolean();
+      // A GET /api/status response holds this reservation through serialization.
+      try (var _ = root.admission().reserveStatusAdmission(statusContext())) {
+        harness.body = (mayOpen) -> {
+          root.closeForRecovery();
+          if (!mayOpen.getAsBoolean()) return false;
+          openAttempted.set(true);
+          throw new IOException("Lock held by another program: /index/write.lock");
+        };
+
+        var result = root.recoverIndex(harness.request, harness.recoveryBody());
+
+        assertEquals(1, root.admission().activeWorkCount(), "the status read is still held");
+        assertEquals(ComponentRecoveryAction.Outcome.FAILED, result.outcome());
+        String evidence = result.observation().evidence();
+        assertFalse(evidence.contains("Live Engine work retains the index owner"), evidence);
+        assertTrue(evidence.contains("/index/write.lock"), evidence);
+        assertTrue(openAttempted.get(), "the attempt must go on to open the index");
+        assertEquals(1, result.observation().recoveryAttempts());
+        verify(harness.incumbent).closeForRecovery();
+      }
+    }
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(strings = {
+      "admitted", "retained", "internal-attach", "admitted-with-status"})
+  void workThatUsesTheIndexStillRefusesRecoveryCloseAndIsCounted(String kind) throws Exception {
+    var root = root();
+    try (var _ = root.processResources(); root) {
+      var harness = new Harness(root);
+      var admission = root.admission();
+      var held = new java.util.ArrayList<AutoCloseable>();
+      try {
+        switch (kind) {
+          case "admitted" -> held.add(admission.admit(mcpContext(), false));
+          case "retained" -> {
+            var work = admission.admit(mcpContext(), false);
+            held.add(work.retain());
+            work.close();
+          }
+          // EngineKnowledgeClient's call slot for a status-started physical observation.
+          case "internal-attach" -> held.add(admission.attach(
+              io.justsearch.app.services.intent.EngineProvenance.internal("status-sampler",
+                  io.justsearch.core.context.EngineContext.Survival.INTERACTIVE,
+                  io.justsearch.core.context.EngineContext.Urgency.BACKGROUND)));
+          case "admitted-with-status" -> {
+            held.add(admission.reserveStatusAdmission(statusContext()));
+            held.add(admission.admit(mcpContext(), false));
+            held.add(admission.reserveStatusAdmission(statusContext()));
+          }
+          default -> throw new AssertionError(kind);
+        }
+        var openAttempted = new AtomicBoolean();
+        harness.body = (mayOpen) -> {
+          root.closeForRecovery();
+          openAttempted.set(true);
+          return true;
+        };
+
+        var result = root.recoverIndex(harness.request, harness.recoveryBody());
+
+        assertEquals(ComponentRecoveryAction.Outcome.FAILED, result.outcome());
+        assertEquals("Physical recovery failed: Live Engine work retains the index owner",
+            result.observation().evidence());
+        assertEquals(1, result.observation().recoveryAttempts());
+        assertFalse(openAttempted.get());
+        verify(harness.incumbent, never()).closeForRecovery();
+      } finally {
+        for (var owner : held) owner.close();
+      }
+    }
+  }
+
+  @Test
   void timeoutAloneDoesNotPreventSameAttemptLateReady() throws Exception {
     var root = root();
     try (var _ = root.processResources(); root) {
@@ -689,6 +769,20 @@ final class EngineRootIndexRecoveryTest {
         (gauge, executors, ingestion, indexComponent, encoderComponent) -> {
           throw new AssertionError("test installs its physical owner directly");
         }, 1_000, 100, ignored -> {}, () -> {}, OperationAuthority.inMemory());
+  }
+
+  private static io.justsearch.core.context.EngineContext statusContext() {
+    return new io.justsearch.core.context.EngineContext(
+        io.justsearch.core.context.EngineContext.ClientKind.WEBVIEW, "status-ui", Optional.empty(),
+        Optional.empty(), "LOCAL_UI", "HTTP", io.justsearch.core.context.EngineContext.Survival.INTERACTIVE,
+        io.justsearch.core.context.EngineContext.Urgency.FOREGROUND);
+  }
+
+  private static io.justsearch.core.context.EngineContext mcpContext() {
+    return new io.justsearch.core.context.EngineContext(
+        io.justsearch.core.context.EngineContext.ClientKind.MCP_CLIENT, "agent", Optional.of("session"),
+        Optional.empty(), "UNTRUSTED", "MCP", io.justsearch.core.context.EngineContext.Survival.INTERACTIVE,
+        io.justsearch.core.context.EngineContext.Urgency.FOREGROUND);
   }
 
   private static void set(Object owner, String name, Object value) throws Exception {
