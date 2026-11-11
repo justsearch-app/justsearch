@@ -37,3 +37,14 @@ Balancing the two longest hosted unit-test jobs: pure moves of test work between
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-1-ci-lane-balance-20261111",
+  "verdict": "accept",
+  "digest": "sha256:edfa5d4517a62d9696f8a6223652bb6c5ae4f6930262248c88120e3ea9a5ef4e",
+  "note": "Class Structural rule kept holds: on 718e761989 vs 579e52b2e5 the parsed ci.yml has the same 29 jobs, names, needs, if, runs-on and env; 6 npm test lines and 61 Gradle test-task occurrences on both sides; only timeout change is unit-tests-search-worker-2 25 to 35 min (declared, named in the brief, not in the owner's quoted words). Gradle dry run: indexer-worker ciUnitTest1+ciUnitTest2 are disjoint and equal test (371 classes, 2009 tests) on both sides; SyncRootPromotionCrashRecoveryTest moved shard 1 to 2 and its 8 tests executed and passed in ciUnitTest2. Policy verifier passes and rejects old policy with new workflow. Delegation quote checked against the brief only, not the task record. Not confirmed: the 28.1-minute sibling figure in whySurvives."
+}
+```
