@@ -306,7 +306,7 @@ describe('A7 / amendment 3 — a selected running operation converges without re
     expect(entries(el)).toHaveLength(1);
     expect(keyOf(entries(el)[0]!)).toBe(`operation:${K1}`);
     expect(entries(el)[0]!.getAttribute('aria-selected')).toBe('true');
-    expect(text(testid(details(el), 'activity-details-outcome'))).toBe('SUCCESS');
+    expect(text(testid(details(el), 'activity-details-outcome'))).toBe('Succeeded');
     expect(text(testid(details(el), 'activity-details-records'))).toBe("Activity ledger · Operation history · This window's journal");
     expect(feedRoot(el).activeElement?.getAttribute('data-entry-key'), 'focus stays on the record').toBe(`operation:${K1}`);
   });
@@ -319,7 +319,7 @@ describe('A7 / amendment 3 — a selected running operation converges without re
     await select(el, `operation:${K1}`);
     receipt(K1).resolve({ state: 'running', historySince: 0 });
     await settle(el);
-    expect(text(testid(details(el), 'activity-details-outcome'))).toBe('SUCCESS');
+    expect(text(testid(details(el), 'activity-details-outcome'))).toBe('Succeeded');
     expect(testid(details(el), 'activity-details-receipt')?.dataset.state).toBe('behind');
   });
 
@@ -371,7 +371,7 @@ describe('A8 — a missing or unreadable receipt is never a failed execution', (
     await settle(el);
     expect(testid(details(el), 'activity-details-receipt')?.dataset.state).toBe('unreadable');
     expect(text(testid(details(el), 'activity-details-receipt'))).toContain('says nothing about how the operation ended');
-    expect(text(testid(details(el), 'activity-details-outcome'))).toBe('SUCCESS');
+    expect(text(testid(details(el), 'activity-details-outcome'))).toBe('Succeeded');
     await activate(testid(details(el), 'activity-details-receipt-retry'));
     receipt(K1).resolve({ state: 'failed', historySince: 0, message: 'Index locked', result: { code: 'LOCKED' } });
     await settle(el);

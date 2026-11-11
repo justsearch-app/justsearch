@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
   },
-  "createdAt": "2026-11-11T20:27:14.988Z",
-  "revision": "d3a21166b77573a40a3b745893d5f255e5bf2cba",
-  "tree": "6f3b5fc563e7981b12f0f520372cac95d0b7a7fd",
+  "createdAt": "2026-11-11T23:28:36.372Z",
+  "revision": "d5d95eb7d62c72aa211688b02c4d5fcc56a89c2c",
+  "tree": "639c93d58bee47b343f75a44db478b44cbc317c8",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.details.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/uj_psk9a/tmp/test-intent-vitest-11921-1794428826865.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.details.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/4isn2edh/tmp/test-intent-vitest-12434-1794439708734.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 3336
+      "durationMs": 2995
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#the receipt completes before the history arrives: the selection and focus follow the join into one row",
       "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:5acfb1b388ab67e444c3e21cecb351a4a39a454387b54b73a0f9b7ae6de6143f",
+      "contentDigest": "sha256:317b63cc5528a68b297c8a1052e56d2352a8916cdf76c52dbcfa02e9393c4ebb",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#A18 — an older running read answering after a newer completed one, for an earlier selection, shows nothing stale",
       "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:5acfb1b388ab67e444c3e21cecb351a4a39a454387b54b73a0f9b7ae6de6143f",
+      "contentDigest": "sha256:317b63cc5528a68b297c8a1052e56d2352a8916cdf76c52dbcfa02e9393c4ebb",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -59,7 +59,7 @@
       "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#the run read's records outside the general window show in the run scope; a previous run's late answer is not taken",
       "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:5acfb1b388ab67e444c3e21cecb351a4a39a454387b54b73a0f9b7ae6de6143f",
+      "contentDigest": "sha256:317b63cc5528a68b297c8a1052e56d2352a8916cdf76c52dbcfa02e9393c4ebb",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -74,7 +74,7 @@
       "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#closes them without confirming anything, keeps every record, and relabels none",
       "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:5acfb1b388ab67e444c3e21cecb351a4a39a454387b54b73a0f9b7ae6de6143f",
+      "contentDigest": "sha256:317b63cc5528a68b297c8a1052e56d2352a8916cdf76c52dbcfa02e9393c4ebb",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -98,35 +98,35 @@
     ],
     "runs": [
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.details.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/uj_psk9a/tmp/test-intent-vitest-11921-1794428831630.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.details.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/4isn2edh/tmp/test-intent-vitest-12434-1794439713012.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 3117,
-        "output": "JSON report written to /home/elias/.cache/am/uj_psk9a/tmp/test-intent-vitest-11921-1794428831630.json\n\n"
+        "durationMs": 3118,
+        "output": "JSON report written to /home/elias/.cache/am/4isn2edh/tmp/test-intent-vitest-12434-1794439713012.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#the receipt completes before the history arrives: the selection and focus follow the join into one row",
         "classification": "assertion",
-        "detail": "A7 / amendment 3 — a selected running operation converges without regressing the receipt completes before the history arrives: the selection and focus follow the join into one row:  AssertionError: expected 'false' to be 'true' // Object.is equality\n    at /home/elias/.cache/am/uj_psk9a/tmp/test-intent-before-9qHoLm/modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts:308:59\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-activity-details/modules/ui-w"
+        "detail": "A7 / amendment 3 — a selected running operation converges without regressing the receipt completes before the history arrives: the selection and focus follow the join into one row:  AssertionError: expected 'false' to be 'true' // Object.is equality\n    at /home/elias/.cache/am/4isn2edh/tmp/test-intent-before-uLmOWa/modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts:308:59\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-activity-details/modules/ui-w"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#A18 — an older running read answering after a newer completed one, for an earlier selection, shows nothing stale",
         "classification": "assertion",
-        "detail": "A7 / amendment 3 — a selected running operation converges without regressing A18 — an older running read answering after a newer completed one, for an earlier selection, shows nothing stale:  AssertionError: expected 'failed' to be 'complete' // Object.is equality\n    at /home/elias/.cache/am/uj_psk9a/tmp/test-intent-before-9qHoLm/modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts:341:76\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-activity-details/modules"
+        "detail": "A7 / amendment 3 — a selected running operation converges without regressing A18 — an older running read answering after a newer completed one, for an earlier selection, shows nothing stale:  AssertionError: expected 'failed' to be 'complete' // Object.is equality\n    at /home/elias/.cache/am/4isn2edh/tmp/test-intent-before-uLmOWa/modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts:341:76\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-activity-details/modules"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#the run read's records outside the general window show in the run scope; a previous run's late answer is not taken",
         "classification": "assertion",
-        "detail": "A15 / amendment 7 — the current run is a scope of the feed, reachable when the stream is down the run read's records outside the general window show in the run scope; a previous run's late answer is not taken:  AssertionError: expected [] to deeply equal [ Array(1) ]\n    at /home/elias/.cache/am/uj_psk9a/tmp/test-intent-before-9qHoLm/modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts:655:36\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-activity-details/modules/ui-w"
+        "detail": "A15 / amendment 7 — the current run is a scope of the feed, reachable when the stream is down the run read's records outside the general window show in the run scope; a previous run's late answer is not taken:  AssertionError: expected [] to deeply equal [ Array(1) ]\n    at /home/elias/.cache/am/4isn2edh/tmp/test-intent-before-uLmOWa/modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts:655:36\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-activity-details/modules/ui-w"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#closes them without confirming anything, keeps every record, and relabels none",
         "classification": "assertion",
-        "detail": "amendment 9 — a profile switch with details, a receipt read and an undo preview open closes them without confirming anything, keeps every record, and relabels none:  AssertionError: the details close: expected <jf-details-pane …(4)>…(1)</jf-details-pane> to be null\n    at /home/elias/.cache/am/uj_psk9a/tmp/test-intent-before-9qHoLm/modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts:728:82\n    at file:///home/elias/dev/justsearch/.claude/worktrees/"
+        "detail": "amendment 9 — a profile switch with details, a receipt read and an undo preview open closes them without confirming anything, keeps every record, and relabels none:  AssertionError: the details close: expected <jf-details-pane …(4)>…(1)</jf-details-pane> to be null\n    at /home/elias/.cache/am/4isn2edh/tmp/test-intent-before-uLmOWa/modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts:728:82\n    at file:///home/elias/dev/justsearch/.claude/worktrees/"
       }
     ]
   },
-  "digest": "sha256:fd79fc9c5ee23982f50d309eddf2130e52711868dd07eccdbf47e901af926b65"
+  "digest": "sha256:7a905af08ccaf72fab4fe658d2eb0a57c3b525d1aa491819702fbbfb21fb634d"
 }

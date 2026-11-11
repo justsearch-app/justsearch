@@ -1,0 +1,167 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-11T23:31:43.198Z",
+  "revision": "d5d95eb7d62c72aa211688b02c4d5fcc56a89c2c",
+  "tree": "02483bb004c1096de56418758dceb04ed5a31030",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.details-honesty.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/4isn2edh/tmp/test-intent-vitest-14601-1794439898255.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1685
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-honesty.test.ts#an operation's recorded outcome is a word: SUCCESS, FAILURE and UNDONE never show as they were recorded",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-honesty.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:66ab00cd690eca7aaf2aeffb90c4fe09c0b9b3cc32b30d074ddff185e33b3637",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "decision 2026-11-11 — the details say recorded codes in words an operation's recorded outcome is a word: SUCCESS, FAILURE and UNDONE never show as they were recorded",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-honesty.test.ts#an outcome with no words is labelled as a code",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-honesty.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:66ab00cd690eca7aaf2aeffb90c4fe09c0b9b3cc32b30d074ddff185e33b3637",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "decision 2026-11-11 — the details say recorded codes in words an outcome with no words is labelled as a code",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-honesty.test.ts#how an approval was asked for is said in words",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-honesty.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:66ab00cd690eca7aaf2aeffb90c4fe09c0b9b3cc32b30d074ddff185e33b3637",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "decision 2026-11-11 — the details say recorded codes in words how an approval was asked for is said in words",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-honesty.test.ts#a failed receipt's error code is labelled as a code for support, beside what happened",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-honesty.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:66ab00cd690eca7aaf2aeffb90c4fe09c0b9b3cc32b30d074ddff185e33b3637",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "decision 2026-11-11 — the details say recorded codes in words a failed receipt's error code is labelled as a code for support, beside what happened",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-honesty.test.ts#a record this window journaled is titled by what it did, and says who recorded it in words",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-honesty.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:66ab00cd690eca7aaf2aeffb90c4fe09c0b9b3cc32b30d074ddff185e33b3637",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "decision 2026-11-11 — the details say recorded codes in words a record this window journaled is titled by what it did, and says who recorded it in words",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-honesty.test.ts#a plugin that recorded an entry is named with how far it is trusted, not by its raw tier",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-honesty.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:66ab00cd690eca7aaf2aeffb90c4fe09c0b9b3cc32b30d074ddff185e33b3637",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "decision 2026-11-11 — the details say recorded codes in words a plugin that recorded an entry is named with how far it is trusted, not by its raw tier",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "d5d95eb7d6",
+    "revision": "d5d95eb7d62c72aa211688b02c4d5fcc56a89c2c",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.details-honesty.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/4isn2edh/tmp/test-intent-vitest-14601-1794439901245.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1678,
+        "output": "JSON report written to /home/elias/.cache/am/4isn2edh/tmp/test-intent-vitest-14601-1794439901245.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-honesty.test.ts#an operation's recorded outcome is a word: SUCCESS, FAILURE and UNDONE never show as they were recorded",
+        "classification": "assertion",
+        "detail": "decision 2026-11-11 — the details say recorded codes in words an operation's recorded outcome is a word: SUCCESS, FAILURE and UNDONE never show as they were recorded:  AssertionError: expected [ 'SUCCESS', 'FAILURE', 'UNDONE' ] to deeply equal [ 'Succeeded', 'Failed', 'Undone' ]\n    at /home/elias/.cache/am/4isn2edh/tmp/test-intent-before-le0XZU/modules/ui-web/src/shell-v0/views/ActivitySurface.details-honesty.test.ts:233:18\n    at file:///home/elias/dev/justsearc"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-honesty.test.ts#an outcome with no words is labelled as a code",
+        "classification": "assertion",
+        "detail": "decision 2026-11-11 — the details say recorded codes in words an outcome with no words is labelled as a code:  AssertionError: expected 'HALTED_BY_POLICY' to be 'Not described (code HALTED_BY_POLICY)' // Object.is equality\n    at /home/elias/.cache/am/4isn2edh/tmp/test-intent-before-le0XZU/modules/ui-web/src/shell-v0/views/ActivitySurface.details-honesty.test.ts:239:50\n    at file:///home/elias/dev/justsearc"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-honesty.test.ts#how an approval was asked for is said in words",
+        "classification": "assertion",
+        "detail": "decision 2026-11-11 — the details say recorded codes in words how an approval was asked for is said in words:  AssertionError: expected '' to be 'A typed confirmation' // Object.is equality\n    at /home/elias/.cache/am/4isn2edh/tmp/test-intent-before-le0XZU/modules/ui-web/src/shell-v0/views/ActivitySurface.details-honesty.test.ts:247:48\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-activity-d"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-honesty.test.ts#a failed receipt's error code is labelled as a code for support, beside what happened",
+        "classification": "assertion",
+        "detail": "decision 2026-11-11 — the details say recorded codes in words a failed receipt's error code is labelled as a code for support, beside what happened:  AssertionError: expected [ 'Receipt', 'Message', 'Code' ] to include 'Error code'\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/s6-activity-details/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1319:15)\n    at Proxy.<anonymous> (file:///home/elias/dev/justs"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-honesty.test.ts#a record this window journaled is titled by what it did, and says who recorded it in words",
+        "classification": "assertion",
+        "detail": "decision 2026-11-11 — the details say recorded codes in words a record this window journaled is titled by what it did, and says who recorded it in words:  AssertionError: expected 'invoke-operation: Rebuild Index' to be 'Rebuild Index' // Object.is equality\n    at /home/elias/.cache/am/4isn2edh/tmp/test-intent-before-le0XZU/modules/ui-web/src/shell-v0/views/ActivitySurface.details-honesty.test.ts:272:19\n    at file:///home/elias/dev/justsearch/.claude"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-honesty.test.ts#a plugin that recorded an entry is named with how far it is trusted, not by its raw tier",
+        "classification": "assertion",
+        "detail": "decision 2026-11-11 — the details say recorded codes in words a plugin that recorded an entry is named with how far it is trusted, not by its raw tier:  AssertionError: expected '' to be 'A plugin without trusted status (acme…' // Object.is equality\n    at /home/elias/.cache/am/4isn2edh/tmp/test-intent-before-le0XZU/modules/ui-web/src/shell-v0/views/ActivitySurface.details-honesty.test.ts:283:51\n    at file:///home/elias/dev/justsearch/.claude/workt"
+      }
+    ]
+  },
+  "digest": "sha256:b7e393ab6e4e3c09603c56c871ec3cdeb119985669aca0ff996365303ebdfcae"
+}

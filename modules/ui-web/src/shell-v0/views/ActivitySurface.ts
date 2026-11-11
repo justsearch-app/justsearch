@@ -10,7 +10,8 @@
  *
  * Per-record actions live in the details: the receipt, Ask the engine to undo, the causation trace,
  * Restore to this point, Undo this AI turn, related files and the run link, and choosing journal
- * records for a macro or an export (saved or exported from the details' footer in journal order).
+ * records for a macro or an export (saved or exported, in journal order, from the controls at the
+ * end of the details, where they scroll with them rather than taking their room).
  * What is not about one record stays a utility of Activity: your own reversals, the AI-wide undo and
  * its preview, saving recent AI actions as a macro, importing a journal archive, and background
  * runs with their launcher. What one run did, and what this window recorded, are scopes of the feed.
@@ -51,7 +52,7 @@ import '../components/Button.js';
 import '../components/EffectLine.js';
 import { exportJournalArchive, importJournalArchive, listJournal, listJournalByOriginator, peekLastUndoableByOriginator,
   previewUndoAllByOriginator, undoEntries, subscribeJournal, type JournalEntry } from '../substrates/effects/index.js';
-import { applyEffect } from '../substrates/actions/index.js';
+import { applyClipboardEffect, applyEffect } from '../substrates/actions/index.js';
 import { defineMacro, defineMacroFromEffects } from '../substrates/macros/index.js';
 import { elicit } from '../substrates/elicit/index.js';
 import { isNewSinceSeen } from '../substrates/recall/recallCursor.js';
@@ -79,6 +80,7 @@ export class ActivitySurface extends JfElement {
     overlay: { type: Boolean, reflect: true },
     widthPx: { state: true },
     chosen: { state: true },
+    exportFailed: { state: true },
   } as const;
 
   declare apiBase: string;
@@ -94,6 +96,8 @@ export class ActivitySurface extends JfElement {
   declare widthPx: number;
   /** Journal entry ids chosen in details for a macro or an export. */
   declare chosen: ReadonlySet<number>;
+  /** The last export of the chosen records could not be written to the clipboard. */
+  declare exportFailed: boolean;
 
   private stops: Array<() => void> = [];
   private observer: ResizeObserver | null = null;
@@ -110,6 +114,7 @@ export class ActivitySurface extends JfElement {
     this.overlay = false;
     this.widthPx = clampDetailsPaneWidth(readDetailsPaneWidth() ?? DETAILS_PANE_DEFAULT_PX);
     this.chosen = new Set();
+    this.exportFailed = false;
   }
 
   override connectedCallback(): void {
@@ -223,6 +228,17 @@ export class ActivitySurface extends JfElement {
   }
 
   /**
+   * The details' control that had the keyboard is gone: it goes to the selected record, or, while the
+   * details are a sheet over the window (the feed behind it is inert), to the sheet's own tab.
+   */
+  private async focusSelectedRecord(): Promise<void> {
+    const key = this.selectedKey;
+    if (key === null) return;
+    if (this.overlay) { this.renderRoot.querySelector<DetailsPane>('jf-details-pane')?.focusActiveTab(); return; }
+    await this.feed()?.focusRecord(key);
+  }
+
+  /**
    * Close the details and put the keyboard back on the record they were for: the feed brings it
    * back into its windowed list if it scrolled away; if it is no longer shown, the list itself.
    * The Shell calls this for Escape with the keyboard on the page (through the System host).
@@ -268,7 +284,7 @@ export class ActivitySurface extends JfElement {
   private settleOpenWork(): void {
     this.renderRoot.querySelector<ActivityDetails>('jf-activity-details')?.settle();
     this.undoPreview = [];
-    this.chosen = new Set();
+    this.clearChosen();
     this.selectedKey = null;
     this.record = null;
     this.evicted = false;
@@ -314,6 +330,7 @@ export class ActivitySurface extends JfElement {
     const next = new Set(this.chosen);
     if (chosen) next.add(id); else next.delete(id);
     this.chosen = next;
+    this.exportFailed = false;
   }
 
   /** The chosen entries in journal order, whatever order they were chosen in. */
@@ -325,17 +342,28 @@ export class ActivitySurface extends JfElement {
     const entries = this.chosenEntries();
     if (!entries.length) return;
     const macro = await defineMacroFromEffects(entries.map((entry) => entry.effect));
-    if (macro) this.chosen = new Set();
+    if (macro) this.clearChosen();
   }
 
-  /** Tempdoc 613 §6 — the export confirmation is a receipt flashed in its button, not a window toast. */
+  /**
+   * Tempdoc 613 §6 — the export confirmation is a receipt flashed in its button, not a window toast.
+   * It is flashed only once the clipboard took the archive; a refused write says so and stays.
+   */
   private readonly exportReceipt = new ReceiptController(this);
 
-  private exportChosen(): void {
+  private async exportChosen(): Promise<void> {
     const entries = this.chosenEntries();
     if (!entries.length) return;
-    applyEffect({ kind: 'copy-to-clipboard', text: exportJournalArchive(entries) });
-    this.exportReceipt.flash(`Exported ${entries.length} entr${entries.length === 1 ? 'y' : 'ies'}`);
+    this.exportFailed = false;
+    const copied = await applyClipboardEffect(exportJournalArchive(entries));
+    if (!this.isConnected) return;
+    if (copied) this.exportReceipt.flash(`Exported ${entries.length} entr${entries.length === 1 ? 'y' : 'ies'}`);
+    else this.exportFailed = true;
+  }
+
+  private clearChosen(): void {
+    this.chosen = new Set();
+    this.exportFailed = false;
   }
 
   // ---------------------------------------------------------------- Activity utilities
@@ -505,7 +533,14 @@ export class ActivitySurface extends JfElement {
     }
     .grip:focus-visible { outline: var(--frame-focus-width) solid var(--focus-ring-color); }
     jf-activity-details { flex: 1 1 auto; min-block-size: 0; overflow-y: auto; }
-    .chosen { display: flex; flex-wrap: wrap; gap: var(--jf-space-2); }
+    /* The choice's controls end the details' content and scroll with it, at every window size. */
+    .chosen {
+      margin: var(--jf-space-4) calc(-1 * var(--jf-space-4)) 0;
+      padding: var(--jf-space-3) var(--jf-space-4) 0;
+      border-block-start: var(--frame-hairline) solid var(--border-subtle);
+    }
+    .chosen .actions { display: flex; flex-wrap: wrap; gap: var(--jf-space-2); }
+    .chosen p { margin: var(--jf-space-2) 0 0; }
     .details { display: contents; }
   `,
   ];
@@ -526,16 +561,21 @@ export class ActivitySurface extends JfElement {
         @details-close=${() => this.closeDetails()}>
         <jf-activity-details .record=${record} ?evicted=${this.evicted} api-base=${this.apiBase} .journalSelection=${this.chosen}
           @journal-choose=${(event: CustomEvent<{ id: number; chosen: boolean }>) => this.choose(event.detail.id, event.detail.chosen)}
-          @activity-run-scope=${() => this.scopeToRun()}></jf-activity-details>
-        ${chosen ? html`<div slot="actions" class="chosen" data-testid="activity-details-chosen">
-          <jf-button size="sm" data-testid="activity-save-chosen" label=${`Save chosen (${chosen}) as macro`}
-            .onActivate=${() => void this.saveChosen()}>Save chosen (${chosen}) as macro</jf-button>
-          <jf-button size="sm" data-testid="activity-export-chosen"
-            .label=${this.exportReceipt.active ? `✓ ${this.exportReceipt.active.message}` : `Export chosen (${chosen})`}
-            .onActivate=${() => this.exportChosen()}>${this.exportReceipt.active ? `✓ ${this.exportReceipt.active.message}` : `Export chosen (${chosen})`}</jf-button>
-          <jf-button size="sm" variant="ghost" data-testid="activity-clear-chosen" label="Clear choice"
-            .onActivate=${() => { this.chosen = new Set(); }}>Clear choice</jf-button>
-        </div>` : nothing}
+          @activity-details-focus-record=${() => void this.focusSelectedRecord()}
+          @activity-run-scope=${() => this.scopeToRun()}>${chosen ? html`<div slot="chosen" class="chosen" role="group"
+            aria-label="Chosen records" data-testid="activity-details-chosen">
+          <div class="actions">
+            <jf-button size="sm" data-testid="activity-save-chosen" label=${`Save chosen (${chosen}) as macro`}
+              .onActivate=${() => void this.saveChosen()}>Save chosen (${chosen}) as macro</jf-button>
+            <jf-button size="sm" data-testid="activity-export-chosen"
+              .label=${this.exportReceipt.active ? `✓ ${this.exportReceipt.active.message}` : `Export chosen (${chosen})`}
+              .onActivate=${() => void this.exportChosen()}>${this.exportReceipt.active ? `✓ ${this.exportReceipt.active.message}` : `Export chosen (${chosen})`}</jf-button>
+            <jf-button size="sm" variant="ghost" data-testid="activity-clear-chosen" label="Clear choice"
+              .onActivate=${() => this.clearChosen()}>Clear choice</jf-button>
+          </div>
+          ${this.exportFailed ? html`<p role="alert" data-testid="activity-export-failed">Not exported: the clipboard refused
+            the copy, so nothing was copied. Allow this app to use the clipboard, then try again.</p>` : nothing}
+        </div>` : nothing}</jf-activity-details>
       </jf-details-pane>`;
     return this.overlay ? pane : html`<div class="side">
       <button type="button" class="grip" data-testid="details-pane-grip"

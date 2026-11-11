@@ -17,6 +17,8 @@ check and has no fail-before.
 
 Repair after verification v1 (three defects): Escape with the keyboard on the page now closes Activity's details (Shell → System host → active member), a burst's details say its duration and source, and the rendered member oracle of the retired in-row expansion is restored at its new home, the details pane (ActivitySurface.group-details.test.ts). Entries 11 and 12 are reclassified Obsolete for the retired in-row assertions; the details-pane checks are New. Checks of what this repair fixes fail before at fedc486273 (the candidate before it); checks of the new home fail before at d3a21166b7; the page-Escape protections fail before against s6-activity-details-p3-before.patch (this repair's production code with only those protections removed, applied to fedc486273).
 
+
+Repair after the real-Engine check of 2026-11-12 (five defects; design choices delegated by the user, 2026-11-03: "proceed accordingly. tell me when you need me to juge, try to ask me sparely"): the records chosen for a macro or an export are acted on from controls at the end of the details' scrolling content, not a footer that covered the sheet at 600×400 with 200% text; Export chosen confirms only a copy the clipboard took; Cancel on a preview returns the keyboard to the control that opened it; feed rows keep their element by record identity, so a dialog returning the keyboard returns it to the same record; the details say outcomes, approval kinds and recorders in words and label codes as codes. Its checks fail before at d5d95eb7d6, except the 1280×720 layout check, a preservation check of the same design. Three expected values in ActivitySurface.details.test.ts changed from SUCCESS to Succeeded under the same decision; their evidence was regenerated with its original before-states.
 ```json
 {
   "entries": [
@@ -25,7 +27,7 @@ Repair after verification v1 (three defects): Escape with the keyboard on the pa
         "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts"
       ],
       "class": "New",
-      "behaviour": "The selected record's details and where per-record capabilities live (fail before at d3a21166b7, where Activity had no selection or details). The feed is a list box of option records with no control inside any row; a click, Enter or Space selects a record and opens its details in the shared jf-details-pane (marked for F6), and Escape closes them with the keyboard back on that record. Every record's details say when it happened, its duration (committed start to end) and its source (the recorded transport, in words), and which records it joins. A8: a receipt that is unknown or expired, or a read the Engine refuses, keeps the record and says what it means, never a failed execution; Try again reads it again. A7: a committed outcome stands over a receipt still reading running, which is shown as behind. A12/A14: Ask the engine to undo is a request until the Engine answers, a refusal is said as one and a second click asks nothing; Restore to this point and Undo this AI turn preview a fixed set, name what will remain, Cancel changes nothing, confirming runs once; the causation trace is in the record's details; records chosen in details are saved as a macro and exported in journal order, with the export confirmed in its control rather than a toast; an execution association recorded after the details opened brings Undo at once; Import journal archive and Undo last AI action stay Activity utilities. Amendment 10: a backend copy of another window's effect has no proposal, undo, restore or choice and says so; two Activities keep their own selections. Amendment 14: a resolved file is named; Open file and Show in folder appear only in the desktop app, and an unresolved file offers neither until it resolves. A10: a burst's details list every member and how many failed. A15/amendment 13: the journal arrival resets the feed's filters to this window's records and puts the keyboard there, also when one of two Activities closes before it renders. A selected record no source holds any more stays readable with its last-known content, says so and offers no actions.",
+      "behaviour": "The selected record's details and where per-record capabilities live (fail before at d3a21166b7, where Activity had no selection or details). The feed is a list box of option records with no control inside any row; a click, Enter or Space selects a record and opens its details in the shared jf-details-pane (marked for F6), and Escape closes them with the keyboard back on that record. Every record's details say when it happened, its duration (committed start to end) and its source (the recorded transport, in words), and which records it joins. A8: a receipt that is unknown or expired, or a read the Engine refuses, keeps the record and says what it means, never a failed execution; Try again reads it again. A7: a committed outcome stands over a receipt still reading running, which is shown as behind. A12/A14: Ask the engine to undo is a request until the Engine answers, a refusal is said as one and a second click asks nothing; Restore to this point and Undo this AI turn preview a fixed set, name what will remain, Cancel changes nothing, confirming runs once; the causation trace is in the record's details; records chosen in details are saved as a macro and exported in journal order, with the export confirmed in its control rather than a toast; an execution association recorded after the details opened brings Undo at once; Import journal archive and Undo last AI action stay Activity utilities. Amendment 10: a backend copy of another window's effect has no proposal, undo, restore or choice and says so; two Activities keep their own selections. Amendment 14: a resolved file is named; Open file and Show in folder appear only in the desktop app, and an unresolved file offers neither until it resolves. A10: a burst's details list every member and how many failed. A15/amendment 13: the journal arrival resets the feed's filters to this window's records and puts the keyboard there, also when one of two Activities closes before it renders. A selected record no source holds any more stays readable with its last-known content, says so and offers no actions. The committed outcome is said in words (Succeeded, not SUCCESS), per the orchestrator decision of 2026-11-11 that the details pane never shows a raw backend code as if it were a word.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -68,7 +70,7 @@ Repair after verification v1 (three defects): Escape with the keyboard on the pa
         "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts"
       ],
       "class": "New",
-      "behaviour": "The protections of the details, each failing before on its own assertion with gates/test-intent/evidence/s6-activity-details-p1-before.patch (the candidate's production code with only these protections removed, applied to d3a21166b7). A7/amendment 3: a locally keyed invocation selected before its history and ledger copies arrive converges into one row that stays selected and focused, through the identity it had, with the committed outcome. A18: a receipt answer for an earlier selection, or an older running read answering after a newer completed one, never shows. Amendment 7: the current run's session-filtered records that the general ledger read does not return show in the run scope while the ledger read fails, and a read for the previous run answering after the run switched is not taken. Amendment 9: a profile switch with details, a receipt read and a restore preview open closes them without confirming anything; the late receipt changes nothing, and the records stay as they were, none selected or relabelled.",
+      "behaviour": "The protections of the details, each failing before on its own assertion with gates/test-intent/evidence/s6-activity-details-p1-before.patch (the candidate's production code with only these protections removed, applied to d3a21166b7). A7/amendment 3: a locally keyed invocation selected before its history and ledger copies arrive converges into one row that stays selected and focused, through the identity it had, with the committed outcome. A18: a receipt answer for an earlier selection, or an older running read answering after a newer completed one, never shows. Amendment 7: the current run's session-filtered records that the general ledger read does not return show in the run scope while the ledger read fails, and a read for the previous run answering after the run switched is not taken. Amendment 9: a profile switch with details, a receipt read and a restore preview open closes them without confirming anything; the late receipt changes nothing, and the records stay as they were, none selected or relabelled. The committed outcome is said in words (Succeeded, not SUCCESS), per the orchestrator decision of 2026-11-11 that the details pane never shows a raw backend code as if it were a word.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -506,6 +508,122 @@ Repair after verification v1 (three defects): Escape with the keyboard on the pa
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts#Activity with a separate Engine address resolves the file name there, not at the page's own origin"
       ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.details-reach-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Real-Engine defect of 2026-11-12 (live check p7): at 600×400 with 200% text, with a record chosen for a macro or an export, the details title, Restore to this point and the choose box, and Save chosen, Export chosen and Clear choice, are each where a click aimed at them lands once brought into view, the details keep at least a third of the pane, and nothing overflows sideways (fail before at d5d95eb7d6, where the choice's footer covered the details: a click aimed at the title landed on Save chosen).",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "Bring the aspects of the UI between the main windows up to date and remove bad practices and code implemented without an overarching design.",
+          "label": "agent choice",
+          "choice": "A20 (600×400 at 200% text) and A12-A14 for the records chosen across records: the choice's controls (Save chosen as macro, Export chosen, Clear choice) end the details' own scrolling content, under a hairline, instead of a footer fixed under it. One design for both sizes: a fixed footer that wraps at 200% text took the sheet's room and covered its content; inside the content it scrolls with the details and never overlaps them."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-activity-details-choice-layout.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.details-reach-lockdown.test.ts#at 600×400 with 200% text, with a record chosen, every details control and the choice's controls are reached where a click lands"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.details-reach-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Preservation for the same design at 1280×720: with a record chosen, every details control and the choice's controls are where a click lands, the details keep at least a third of the pane, and nothing overflows sideways. It passes at d5d95eb7d6 too (the inline pane had room for the footer), so it has no fail-before.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "Bring the aspects of the UI between the main windows up to date and remove bad practices and code implemented without an overarching design.",
+          "label": "agent choice",
+          "choice": "A20 (600×400 at 200% text) and A12-A14 for the records chosen across records: the choice's controls (Save chosen as macro, Export chosen, Clear choice) end the details' own scrolling content, under a hairline, instead of a footer fixed under it. One design for both sizes: a fixed footer that wraps at 200% text took the sheet's room and covered its content; inside the content it scrolls with the details and never overlaps them."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-activity-details-choice-layout-wide.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.details-reach-lockdown.test.ts#at 1280×720, with a record chosen, every details control and the choice's controls are reached where a click lands"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.details-reach-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "A17 in real Chromium with the real Shell (live check of 2026-11-12, p4 and p6): Cancel on a Restore preview puts the keyboard back on Restore to this point, the control that opened it, rather than the page; with the keyboard on a record, Ctrl+comma then Escape returns it to the same record although newer records arrived meanwhile (the feed's rows below its windowing threshold were drawn unkeyed, so the focused row element came to show another record). Both fail before at d5d95eb7d6.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "Bring the aspects of the UI between the main windows up to date and remove bad practices and code implemented without an overarching design.",
+          "label": "agent choice",
+          "choice": "A17 (the keyboard returns to the logical opener): a closed preview returns it to the control that opened it, or, when that control is gone, to the record (to the sheet's tab while the details are a sheet over an inert window); a row element belongs to one record by identity, also when the record gains a key by a join, so a dialog returning the keyboard to it returns it to that record."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-activity-details-focus-return.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.details-reach-lockdown.test.ts#Cancel on a Restore preview puts the keyboard back on Restore to this point",
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.details-reach-lockdown.test.ts#Settings opened and closed with the keyboard returns it to the same record, after new records arrived meanwhile"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.details-honesty.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Amendment 14 for Export chosen (live check of 2026-11-12, p4): a clipboard write that is refused never reads Exported; an alert says nothing was copied and how to allow it. A write the clipboard takes is confirmed in the control only once it is written, and is journaled as every copy-to-clipboard effect is. Both fail before at d5d95eb7d6, which flashed Exported as soon as the effect was dispatched.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "Bring the aspects of the UI between the main windows up to date and remove bad practices and code implemented without an overarching design.",
+          "label": "agent choice",
+          "choice": "Settled amendment 14 (never claim success from a helper returning). The copy-to-clipboard effect's dispatch discards the clipboard's answer, so Activity applies the effect through applyClipboardEffect in the actions substrate: journaled as applyEffect journals it, written by the one clipboard authority (utils/clipboardCopy), resolving whether the write succeeded. No fallback for getting the text is added: the effect layer offers none."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-activity-details-export-honesty.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.details-honesty.test.ts#a refused clipboard write says nothing was exported, and never says Exported",
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.details-honesty.test.ts#a copy the clipboard took is confirmed once written, with nothing said to have failed"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.details-honesty.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "The details pane says recorded codes in words (live check of 2026-11-12, p1): an operation's outcome reads Succeeded, Failed or Undone; an outcome with no words reads 'Not described (code X)'; how an approval was asked for reads A typed confirmation or A confirmation; a failed receipt's code is labelled Error code and marked for support beside the receipt's state and message; a record this window journaled is titled by its operation without the 'invoke-operation:' prefix the UI added; who recorded a journal entry reads JustSearch itself, or a plugin by trust and id, never a raw tier. Each fails before at d5d95eb7d6.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "Bring the aspects of the UI between the main windows up to date and remove bad practices and code implemented without an overarching design.",
+          "label": "agent choice",
+          "choice": "Orchestrator decision 2026-11-11: the details pane never shows raw backend codes as if they were words. Error codes may remain only labelled as a code for support next to words that say what happened; the 'invoke-operation:' prefix is the UI's own (ActionLedgerClient.projectEffect) and is removed; record titles the backend gives, feed rows and Library are out of scope. Words follow GateBehavior's own documentation (AUTO, INLINE_CONFIRM, TYPED_CONFIRM, DENY) and the provenance tiers (CORE, TRUSTED_PLUGIN, UNTRUSTED_PLUGIN)."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-activity-details-words.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.details-honesty.test.ts#an operation's recorded outcome is a word: SUCCESS, FAILURE and UNDONE never show as they were recorded",
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.details-honesty.test.ts#an outcome with no words is labelled as a code",
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.details-honesty.test.ts#how an approval was asked for is said in words",
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.details-honesty.test.ts#a failed receipt's error code is labelled as a code for support, beside what happened",
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.details-honesty.test.ts#a record this window journaled is titled by what it did, and says who recorded it in words",
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.details-honesty.test.ts#a plugin that recorded an entry is named with how far it is trusted, not by its raw tier"
+      ],
+      "repaired": true
     }
   ]
 }

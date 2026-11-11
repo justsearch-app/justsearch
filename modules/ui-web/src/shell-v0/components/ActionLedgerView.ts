@@ -30,6 +30,7 @@
  */
 
 import { html, css, nothing, type PropertyValues, type TemplateResult } from 'lit';
+import { repeat } from 'lit/directives/repeat.js';
 import '@lit-labs/virtualizer';
 import { JfElement } from '../primitives/JfElement.js';
 import {
@@ -675,6 +676,28 @@ export class ActionLedgerView extends JfElement {
 
   /** The projection the last render drew: every loaded row, and the visible items in order. */
   private drawn: { feed: readonly FeedRow[]; items: ReadonlyArray<FeedRow | IndexBurstSummary> } = { feed: [], items: [] };
+  /**
+   * The row element each drawn record keeps, by every key it answers to: a record that gains a key
+   * (a local invocation joined by its ledger and history copies) keeps the element it was drawn in,
+   * and a record never takes over another's element when newer ones arrive above it — so the
+   * keyboard, or a dialog giving it back, stays on that record.
+   */
+  private rowIdentity = new Map<string, string>();
+
+  private identify(items: ReadonlyArray<FeedRow | IndexBurstSummary>): (item: FeedRow | IndexBurstSummary) => string {
+    const previous = this.rowIdentity;
+    const next = new Map<string, string>();
+    const used = new Set<string>();
+    for (const item of items) {
+      const keys = isBurst(item) ? [item.key] : [item.key, ...item.aliases];
+      const kept = keys.map((key) => previous.get(key)).find((id) => id !== undefined && !used.has(id));
+      const id = kept ?? item.key;
+      used.add(id);
+      for (const key of keys) next.set(key, id);
+    }
+    this.rowIdentity = next;
+    return (item) => next.get(item.key) ?? item.key;
+  }
 
   /** What `key` stands for now, or null when no loaded record answers to it. */
   private recordFor(key: string): SelectedRecord | null {
@@ -1149,15 +1172,16 @@ export class ActionLedgerView extends JfElement {
     });
     this.drawn = { feed, items: projected };
     const count = projected.length;
+    const rowOf = this.identify(projected);
     return html`${header}<div class="list" data-testid="feed-list" role="listbox" aria-label="Activity"
       @keydown=${(e: KeyboardEvent) => this.onListKey(e, count)}
       @focusin=${(e: FocusEvent) => {
         const entry = (e.target as Element).closest<HTMLElement>('.entry');
         if (entry) this.moveTabStop(entry);
       }}>${count <= VIRTUALIZE_ABOVE
-      ? projected.map((item, index) => this.renderEntry(item, index, count, feed))
+      ? repeat(projected, rowOf, (item, index) => this.renderEntry(item, index, count, feed))
       : html`<lit-virtualizer .items=${projected}
-          .keyFunction=${(item: FeedRow | IndexBurstSummary) => item.key}
+          .keyFunction=${rowOf}
           .renderItem=${(item: FeedRow | IndexBurstSummary, index: number) => this.renderEntry(item, index, count, feed)}></lit-virtualizer>`}</div>`;
   }
 }

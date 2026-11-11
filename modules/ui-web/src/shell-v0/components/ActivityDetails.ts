@@ -21,6 +21,10 @@
  *     in folder only where the runtime can do it (the desktop app);
  *   - a record from an agent run links to it: Replay in Search for a finished background run, the
  *     run scope for the current run, and nothing invented for an outside caller.
+ *
+ * What Activity does with the records chosen across records (save, export, clear) is slotted at the
+ * end of the content (`slot="chosen"`): it scrolls with the details and never takes their room.
+ * Recorded codes are said in words; a code with no words is shown as a code, labelled as one.
  */
 import { html, css, nothing, type PropertyValues, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
@@ -103,9 +107,30 @@ const GRANT_WORDS: Record<string, string> = {
   ISSUED: 'Permission granted', CONSUMED: 'Permission used', REVOKED: 'Permission withdrawn',
 };
 
+/** A recorded outcome, in words. */
+const OUTCOME_WORDS: Record<string, string> = {
+  SUCCESS: 'Succeeded', FAILURE: 'Failed', UNDONE: 'Undone', PARTIAL: 'Partly done',
+};
+
+/** How an approval was asked for, in words. */
+const ASKED_WORDS: Record<string, string> = {
+  AUTO: 'Not asked: allowed to run directly', INLINE_CONFIRM: 'A confirmation',
+  TYPED_CONFIRM: 'A typed confirmation', DENY: 'Not asked: refused outright',
+};
+
+/** Who recorded a journal entry, by its provenance tier: the app itself, or a plugin and how far it is trusted. */
+const RECORDER_WORDS: Record<string, string> = {
+  CORE: 'JustSearch itself', TRUSTED_PLUGIN: 'A plugin', UNTRUSTED_PLUGIN: 'A plugin without trusted status',
+};
+
 const RECEIPT_WORDS: Record<string, string> = {
   accepted: 'Accepted; waiting to run', running: 'Running', complete: 'Completed', failed: 'Failed',
 };
+
+/** A code with no words of its own is said as a code, never as if it were a word. */
+function words(map: Record<string, string>, code: string): string {
+  return map[code] ?? `Not described (code ${code})`;
+}
 
 function count(n: number, noun: string): string {
   return `${n} ${noun}${n === 1 ? '' : 's'}`;
@@ -126,6 +151,14 @@ function groupSourceWords(members: readonly FeedRow[]): string {
 
 function durationWords(ms: number | undefined): string {
   return ms !== undefined ? (formatScanDuration(ms) || 'Under a second') : 'Not recorded';
+}
+
+/** The app itself in words; a plugin by its tier's words and its id, which is how it is known. */
+function recorderWords(entry: JournalEntry): string {
+  const by = entry.invokedBy;
+  if (!by?.tier) return 'Not recorded';
+  if (by.tier === 'CORE') return RECORDER_WORDS.CORE!;
+  return `${words(RECORDER_WORDS, by.tier)}${by.contributorId ? ` (${by.contributorId})` : ''}`;
 }
 
 function when(iso: string): string {
@@ -263,6 +296,7 @@ export class ActivityDetails extends JfElement {
       ${record.row?.journal && !this.evicted ? this.renderJournal(record.row.journal) : nothing}
       ${record.row && !record.row.journal && record.row.ledger?.kind === 'effect' ? html`<p class="note" data-testid="activity-details-elsewhere">
         Recorded by another window or app. Its local details, proposal status and undo are only available there.</p>` : nothing}
+      <slot name="chosen"></slot>
     </div>`;
   }
 
@@ -299,7 +333,7 @@ export class ActivityDetails extends JfElement {
    */
   private outcomeWords(row: FeedRow): string {
     const committed = row.history[0]?.outcome ?? (row.ledger?.kind === 'operation' ? row.ledger.outcome : undefined);
-    if (committed) return committed;
+    if (committed) return words(OUTCOME_WORDS, committed);
     const outcome = this.receipt?.outcome;
     if (outcome && (isTerminalReceipt(outcome.state) || isPending(outcome)) && RECEIPT_WORDS[outcome.state]) return RECEIPT_WORDS[outcome.state]!;
     if (row.journal?.pendingOutcome === 'rejected') return 'Not carried out (the proposal was rejected)';
@@ -313,7 +347,7 @@ export class ActivityDetails extends JfElement {
       return html`<h4>Approval</h4><dl data-testid="activity-details-gate">
         <dt>Decision</dt><dd>${GATE_WORDS[ledger.disposition ?? ''] ?? ledger.disposition ?? 'Not recorded'}</dd>
         <dt>Operation</dt><dd>${present({ kind: 'operation', id: ledger.operationId ?? '' }).label}</dd>
-        ${ledger.gateBehavior ? html`<dt>Asked as</dt><dd>${ledger.gateBehavior}</dd>` : nothing}
+        ${ledger.gateBehavior ? html`<dt>Asked as</dt><dd data-testid="activity-details-asked">${words(ASKED_WORDS, ledger.gateBehavior)}</dd>` : nothing}
         ${ledger.pendingId ? html`<dt>Request</dt><dd>${ledger.pendingId}</dd>` : nothing}
       </dl>`;
     }
@@ -380,7 +414,8 @@ export class ActivityDetails extends JfElement {
         [outcome.unitsCompleted !== undefined ? `${outcome.unitsCompleted} done` : '',
           outcome.unitsFailed ? `${outcome.unitsFailed} failed` : ''].filter(Boolean).join(' · ')}</dd>` : nothing}
       ${outcome.message ? html`<dt>Message</dt><dd class=${outcome.state === 'failed' ? 'alert' : ''}>${outcome.message}</dd>` : nothing}
-      ${code ? html`<dt>Code</dt><dd>${code}</dd>` : nothing}
+      ${code ? html`<dt>${outcome.state === 'failed' ? 'Error code' : 'Result code'}</dt><dd data-testid="activity-details-code">${code}
+        <span class="note">(for support)</span></dd>` : nothing}
       ${outcome.result?.gaps?.length ? html`<dt>Gaps</dt><dd>${count(outcome.result.gaps.length, 'item')} could not be completed</dd>` : nothing}
     </dl>
     ${receipt?.readFailed ? html`<p role="status" data-testid="activity-details-receipt-stale">The latest read failed; this is
@@ -425,7 +460,7 @@ export class ActivityDetails extends JfElement {
     return html`<h4>Same request</h4><ul data-testid="activity-details-related">${related.map((r) => html`<li>${r.entry.label}${
       r.entry.gate ? ` · ${GATE_WORDS[r.entry.gate.disposition] ?? r.entry.gate.disposition}` : ''}${
       r.entry.grant ? ` · ${GRANT_WORDS[r.entry.grant.action] ?? r.entry.grant.action}` : ''}${
-      r.entry.outcome ? ` · ${r.entry.outcome}` : ''} · ${when(r.entry.occurredAt)}</li>`)}</ul>`;
+      r.entry.outcome ? ` · ${words(OUTCOME_WORDS, r.entry.outcome)}` : ''} · ${when(r.entry.occurredAt)}</li>`)}</ul>`;
   }
 
   /** The agent run a record names, linked only where Activity knows that run. */
@@ -455,8 +490,7 @@ export class ActivityDetails extends JfElement {
     return html`<h4>Recorded in this window</h4>
       <jf-effect-line .effect=${entry.effect} .timestamp=${entry.invokedAt} showDetail></jf-effect-line>
       <dl data-testid="activity-details-journal">
-        <dt>Recorded by</dt><dd>${entry.invokedBy?.contributorId
-          ? `${entry.invokedBy.contributorId} (${entry.invokedBy.tier})` : 'Not recorded'}</dd>
+        <dt>Recorded by</dt><dd data-testid="activity-details-recorder">${recorderWords(entry)}</dd>
         ${entry.pendingOutcome ? html`<dt>Proposal</dt><dd data-testid="activity-details-proposal">${rejected
           ? 'Rejected. It was never carried out, so there is nothing to undo.'
           : 'Accepted. This records the decision; carrying it out is recorded on its own.'}</dd>` : nothing}
@@ -545,15 +579,32 @@ export class ActivityDetails extends JfElement {
         <jf-button size="sm" variant="danger" data-testid="activity-details-preview-confirm" label=${restore ? 'Restore' : 'Undo turn'}
           .onActivate=${() => this.confirm()}>${restore ? 'Restore' : 'Undo turn'}</jf-button>
         <jf-button size="sm" data-testid="activity-details-preview-cancel" label="Cancel"
-          .onActivate=${() => { this.preview = null; }}>Cancel</jf-button>
+          .onActivate=${() => this.closePreview()}>Cancel</jf-button>
       </div>
     </section>`;
   }
 
-  /** DE6 — exactly the previewed entries, once; a second activation finds the preview gone. */
-  private confirm(): void {
+  /**
+   * Close the preview and give the keyboard back to the control that opened it, which the preview's
+   * own buttons took it from; when that control is gone, Activity puts it on the record.
+   */
+  private closePreview(): JournalPreview | null {
     const preview = this.preview;
     this.preview = null;
+    if (!preview) return null;
+    const opener = preview.kind === 'restore' ? 'activity-details-restore' : 'activity-details-undo-turn';
+    void this.updateComplete.then(() => {
+      if (!this.isConnected) return;
+      const control = this.renderRoot.querySelector<HTMLElement>(`[data-testid="${opener}"]`);
+      if (control) control.focus();
+      else this.dispatchEvent(new CustomEvent('activity-details-focus-record', { bubbles: true, composed: true }));
+    });
+    return preview;
+  }
+
+  /** DE6 — exactly the previewed entries, once; a second activation finds the preview gone. */
+  private confirm(): void {
+    const preview = this.closePreview();
     if (!preview) return;
     const scope = preview.kind === 'turn' ? ' in this turn' : '';
     reportUndoRun(undoEntries(preview.entries, (effect) => applyEffect(effect)),

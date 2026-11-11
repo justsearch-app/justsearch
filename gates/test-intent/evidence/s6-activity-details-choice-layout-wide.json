@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-11T23:30:26.999Z",
+  "revision": "d5d95eb7d62c72aa211688b02c4d5fcc56a89c2c",
+  "tree": "0ff7c8bb1a5bf3d1f7559f74669743f2d0ae956b",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.details-reach-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/4isn2edh/tmp/test-intent-vitest-13469-1794439802937.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 24058
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-reach-lockdown.test.ts#at 1280×720, with a record chosen, every details control and the choice's controls are reached where a click lands",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-reach-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e4119f176b5e261dabcc4c0bc76727cee09a22cc42580fee938349e64533a1b6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "at 1280×720, with a record chosen, every details control and the choice's controls are reached where a click lands",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:705662c0d94b2cd5e999ff3df3fc9af8d8f553d3bbaf857152ca0bc4a636fc0b"
+}

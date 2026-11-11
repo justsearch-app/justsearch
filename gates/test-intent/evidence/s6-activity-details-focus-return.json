@@ -1,0 +1,87 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-11T23:31:28.792Z",
+  "revision": "d5d95eb7d62c72aa211688b02c4d5fcc56a89c2c",
+  "tree": "4aa39d9368d6ba12a4204caa77ae7ad40c6d6c77",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.details-reach-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/4isn2edh/tmp/test-intent-vitest-13783-1794439829342.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 24061
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-reach-lockdown.test.ts#Cancel on a Restore preview puts the keyboard back on Restore to this point",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-reach-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e4119f176b5e261dabcc4c0bc76727cee09a22cc42580fee938349e64533a1b6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Cancel on a Restore preview puts the keyboard back on Restore to this point",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-reach-lockdown.test.ts#Settings opened and closed with the keyboard returns it to the same record, after new records arrived meanwhile",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-reach-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e4119f176b5e261dabcc4c0bc76727cee09a22cc42580fee938349e64533a1b6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Settings opened and closed with the keyboard returns it to the same record, after new records arrived meanwhile",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "d5d95eb7d6",
+    "revision": "d5d95eb7d62c72aa211688b02c4d5fcc56a89c2c",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.details-reach-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/4isn2edh/tmp/test-intent-vitest-13783-1794439854770.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 33769,
+        "output": "JSON report written to /home/elias/.cache/am/4isn2edh/tmp/test-intent-vitest-13783-1794439854770.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-reach-lockdown.test.ts#Cancel on a Restore preview puts the keyboard back on Restore to this point",
+        "classification": "assertion",
+        "detail": "Cancel on a Restore preview puts the keyboard back on Restore to this point:  Error: the keyboard is on the control that opened the preview: expected [] to include 'activity-details-restore'\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/dev/justsearch/.claude/worktrees/s6-activity-details/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3748:47)\n    at"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-reach-lockdown.test.ts#Settings opened and closed with the keyboard returns it to the same record, after new records arrived meanwhile",
+        "classification": "assertion",
+        "detail": "Settings opened and closed with the keyboard returns it to the same record, after new records arrived meanwhile:  Error: the keyboard is back on the same record: expected 'operation:019a0000-0000-7000-8000-000…' to be 'operation:019a0000-0000-7000-8000-000…' // Object.is equality\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/dev/justsearch/.claude/worktrees/s6-activity-details/modules/ui-web/node_modul"
+      }
+    ]
+  },
+  "digest": "sha256:9bfa4592641865dfa150231bcc28d83d5e5ab22b81084ad379571025d679ebe6"
+}
