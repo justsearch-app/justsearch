@@ -536,3 +536,25 @@ Candidate G follows the settled SG1–SG10 amendments. SD developer-tools change
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "f3xlx3bo-verifier",
+  "verdict": "reject",
+  "digest": "sha256:bc32468e35ec2fb5e283202d74b4ce422dd00f53324c96c644578c373377f710",
+  "note": "Current candidate fails the test-intent evidence contract: s6-settings-adapted, s6-settings-sections, s6-settings-browser, s6-settings-repairs and s6-settings-guards cite test file digests changed by this branch (23 evidence-invalid errors). Refresh evidence for final files and reconcile the superseded View tier legacy-address check before renewed acceptance. The reload wait change preserves the assertion but does not refresh these evidence files."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "f3xlx3bo-verifier",
+  "verdict": "reject",
+  "digest": "sha256:f65082f37a41b14cec666ff5ebf6a468f111c0fffade99231e59dc372dd4202c",
+  "note": "Against the specified whole-branch baseline c46bf1a6cc, current evidence has 23 evidence-invalid failures: final test files differ from s6-settings-adapted/sections/browser/repairs/guards runs. Refresh the final-file evidence and superseded legacy Developer View tier check. Runtime rechecks do not repair these committed evidence digests."
+}
+```
