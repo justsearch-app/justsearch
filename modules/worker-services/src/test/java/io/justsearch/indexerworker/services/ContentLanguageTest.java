@@ -3,9 +3,15 @@ package io.justsearch.indexerworker.services;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import io.justsearch.indexerworker.extract.ContentExtractor.ExtractionResult;
+import io.justsearch.indexerworker.loop.ops.IndexingDocumentOps;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import java.util.stream.Stream;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -58,6 +64,50 @@ class ContentLanguageTest {
       "אחד שניים שלושה ארבעה חמישה שישה שבעה שמונה תשעה עשרה"})
   void insufficientOrNonProseEvidenceHasNoLabel(String text) {
     assertNull(LanguageUtils.resolveLanguage(text));
+  }
+
+  /** Verifier probes: code and data files that an n-gram model labelled as confident prose. */
+  static Stream<Arguments> codeAndData() {
+    return Stream.of(
+        Arguments.of("script.py", "text/x-python"),
+        Arguments.of("script.sh", "application/x-sh"),
+        Arguments.of("query.sql", "text/x-sql"),
+        Arguments.of("main.go", "text/x-go"),
+        Arguments.of("people.csv", "text/csv"),
+        Arguments.of("config.yaml", "application/x-yaml"),
+        Arguments.of("config.json", "application/json"),
+        Arguments.of("test-summary.json", "application/json"));
+  }
+
+  static String probe(String name) throws IOException {
+    try (InputStream in = ContentLanguageTest.class.getResourceAsStream("/language-probes/" + name)) {
+      return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+    }
+  }
+
+  private static String indexedLanguage(String fileName, String mime, String content) {
+    return IndexingDocumentOps.deriveParentMetadata(
+        Path.of(fileName), new ExtractionResult(content, null, mime), null, null).language();
+  }
+
+  @ParameterizedTest
+  @MethodSource("codeAndData")
+  void codeAndStructuredDataKindsHaveNoLabel(String name, String mime) throws Exception {
+    assertNull(indexedLanguage(name, mime, probe(name)));
+  }
+
+  @ParameterizedTest
+  @MethodSource("codeAndData")
+  void dataLikeTextInAProseKindHasNoLabel(String name, String ignoredMime) throws Exception {
+    assertEquals("text", IndexingDocumentOps.classifyFileKind(Path.of("notes.txt"), "text/plain"));
+    assertNull(indexedLanguage("notes.txt", "text/plain", probe(name)));
+  }
+
+  @Test
+  void proseKeepsItsLabelBesideAFewDataLines() {
+    String english = (String) prose().findFirst().orElseThrow().get()[1];
+    String text = english + "\n\nhost: localhost\nport: 8080\nretries: 3\n\n" + english;
+    assertEquals("en", indexedLanguage("notes.txt", "text/plain", text));
   }
 
   static Stream<Arguments> scripts() {

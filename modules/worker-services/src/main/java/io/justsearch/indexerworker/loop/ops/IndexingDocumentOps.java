@@ -533,7 +533,8 @@ public final class IndexingDocumentOps {
     String mimeBase = normalizeMimeBase(mime);
     String fileKind = classifyFileKind(filePath, mimeBase);
     boolean isMarkdown = "markdown".equals(fileKind);
-    String language = LanguageUtils.resolveLanguage(contentPreview(extraction.content(), isMarkdown));
+    String language = LanguageUtils.resolveLanguage(
+        contentPreview(extraction.content(), isMarkdown), fileKind, mimeBase);
 
     Long parentTokenCount = null;
     if (tokenCounter != null) {

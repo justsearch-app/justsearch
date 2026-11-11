@@ -74,8 +74,9 @@ public final class VduResultWriter {
       }
     }
     if (replaceContent) {
-      boolean isMarkdown = "markdown".equals(
-          runtime.documentFieldOps().getDocumentFieldOrThrow(docId, SchemaFields.FILE_KIND));
+      String fileKind = runtime.documentFieldOps().getDocumentFieldOrThrow(docId, SchemaFields.FILE_KIND);
+      String mimeBase = runtime.documentFieldOps().getDocumentFieldOrThrow(docId, SchemaFields.MIME_BASE);
+      boolean isMarkdown = "markdown".equals(fileKind);
       String preview = LanguageUtils.contentPreview(
           content, ChunkDocumentWriter.CONTENT_PREVIEW_MAX_CHARS, isMarkdown);
       updates.put(SchemaFields.CONTENT, content);
@@ -87,7 +88,7 @@ public final class VduResultWriter {
       updates.put(SchemaFields.EXTRACTION_QUALITY_SCORE, TextQualityAnalyzer.computeQualityScore(content));
       updates.put(SchemaFields.CONTENT_SHA256, ChunkParentRevision.sha256Hex(content));
       updates.put(SchemaFields.CONTENT_PREVIEW, preview);
-      updates.put(SchemaFields.LANGUAGE, LanguageUtils.resolveLanguage(preview));
+      updates.put(SchemaFields.LANGUAGE, LanguageUtils.resolveLanguage(preview, fileKind, mimeBase));
       updates.put(SchemaFields.EXTRACTION_METHOD, SchemaFields.EXTRACTION_METHOD_VDU);
       updates.put(SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING);
     }

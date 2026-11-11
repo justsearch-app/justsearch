@@ -193,6 +193,11 @@ tasks.withType<Test>().matching { it.name == "test" || it.name.startsWith("ciUni
   // (each fork is its own JVM, isolated), no shared file paths
   // (@TempDir per test), no port bindings.
   maxParallelForks = 2
+  // Content language detection keeps Tika's bundled language models (about 96 MiB, all profiles)
+  // for the life of the JVM once any test indexes Latin text; the convention's 384m fork then ran
+  // out of memory in the full suite. At 512m a fork still kept up to 426 MiB after a full GC late
+  // in the suite, so 640m leaves about 200 MiB of headroom.
+  maxHeapSize = "640m"
 
   // Lane F stage A item A18. DevReloadManagerTriggerTest reads the dev MCP server's
   // SOURCE to check that the tool WRITING the hot-reload trigger and the Java constant

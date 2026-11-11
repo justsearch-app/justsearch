@@ -23,6 +23,10 @@ public final class LanguageUtils {
 
   private static final int MIN_LATIN_LETTERS = 50;
   private static final char BOM = '\uFEFF';
+  private static final Set<String> STRUCTURED_DATA_MIMES = Set.of(
+      "text/csv", "text/tab-separated-values", "application/json", "application/x-ndjson",
+      "application/yaml", "application/x-yaml", "text/yaml", "text/x-yaml", "application/toml",
+      "application/sql", "application/x-sql", "text/x-sql");
   private static final List<String> DESCRIPTION_KEYS =
       List.of("description", "summary", "excerpt", "abstract");
 
@@ -43,6 +47,27 @@ public final class LanguageUtils {
    */
   public static String resolveLanguage(String preview) {
     return detectLanguage(preview);
+  }
+
+  /**
+   * Resolves the language of a document of the given kind. Source code and structured data, as
+   * the app classifies them by file kind and MIME type, have no natural language and get no label.
+   *
+   * @param preview the content preview (first ~4K chars)
+   * @param fileKind the stored file kind ({@code code}, {@code text}, {@code markdown}, ...)
+   * @param mimeBase the stored MIME type without parameters
+   * @return an ISO language code, or null for code, data or insufficient evidence
+   */
+  public static String resolveLanguage(String preview, String fileKind, String mimeBase) {
+    return isCodeOrData(fileKind, mimeBase) ? null : detectLanguage(preview);
+  }
+
+  private static boolean isCodeOrData(String fileKind, String mimeBase) {
+    if ("code".equals(fileKind)) {
+      return true;
+    }
+    return mimeBase != null
+        && (STRUCTURED_DATA_MIMES.contains(mimeBase) || mimeBase.endsWith("+json"));
   }
 
   /**

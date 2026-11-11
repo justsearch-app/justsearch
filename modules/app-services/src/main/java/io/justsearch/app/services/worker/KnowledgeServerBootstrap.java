@@ -1191,8 +1191,13 @@ public final class KnowledgeServerBootstrap implements Closeable {
         }
     }
 
-    /** Version stamp for built-in help files. Bump when help content changes. */
-    private static final String HELP_FILES_VERSION = "v4";
+    /**
+     * Version stamp for built-in help files. Bump when help content changes, or when the worker's
+     * extraction policy changes what is stored for them: the help folder is no watched root, so
+     * the maintenance scan that re-reads files stored under an older policy never reaches it.
+     * v5: content-derived language labels (extraction policy v10).
+     */
+    private static final String HELP_FILES_VERSION = "v5";
 
     /**
      * Auto-ingests built-in help files if not already done for this version.

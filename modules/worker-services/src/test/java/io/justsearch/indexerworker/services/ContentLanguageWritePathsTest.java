@@ -19,6 +19,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 class ContentLanguageWritePathsTest extends LuceneExecutorTestBase {
@@ -39,8 +40,13 @@ class ContentLanguageWritePathsTest extends LuceneExecutorTestBase {
   }
 
   private String index(RunningRuntime runtime, String content, boolean markdown) {
-    Path source = directory.resolve(markdown ? "document.md" : "document.txt");
-    var extraction = new ExtractionResult(content, null, markdown ? "text/markdown" : "text/plain");
+    return index(runtime, markdown ? "document.md" : "document.txt",
+        markdown ? "text/markdown" : "text/plain", content);
+  }
+
+  private String index(RunningRuntime runtime, String name, String mime, String content) {
+    Path source = directory.resolve(name);
+    var extraction = new ExtractionResult(content, null, mime);
     var metadata = IndexingDocumentOps.deriveParentMetadata(source, extraction, null, null);
     var plan = IndexingDocumentOps.chunkPlan(source, extraction, metadata);
     var document = TestDocumentBuilder.buildDocument(source, extraction, "documents", null, metadata);
@@ -126,6 +132,22 @@ class ContentLanguageWritePathsTest extends LuceneExecutorTestBase {
         replace(runtime, id, prefix + GERMAN.repeat(100), false);
       }
       assertTrue(family(runtime, id, "de") > 1);
+    }
+  }
+
+  @ParameterizedTest
+  @CsvSource({"people.csv,text/csv", "script.py,text/x-python"})
+  void codeAndDataHaveNoLabelOnEveryWritePath(String name, String mime) throws Exception {
+    String content = ContentLanguageTest.probe(name).repeat(30);
+    try (var runtime = open()) {
+      String id = index(runtime, name, mime, content);
+      assertTrue(family(runtime, id, null) > 1);
+      ChunkDocumentWriter.regenerateChunksFromExistingParent(runtime.documentFieldOps(),
+          runtime.indexingCoordinator(), id, content, false);
+      refresh(runtime);
+      assertTrue(family(runtime, id, null) > 1);
+      replace(runtime, id, content, false);
+      assertTrue(family(runtime, id, null) > 1);
     }
   }
 

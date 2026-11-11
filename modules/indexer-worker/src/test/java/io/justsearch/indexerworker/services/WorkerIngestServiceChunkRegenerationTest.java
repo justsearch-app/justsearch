@@ -126,6 +126,8 @@ final class WorkerIngestServiceChunkRegenerationTest extends io.justsearch.adapt
 
     List<LuceneRuntimeTypes.SearchHit> hits = findChunks(docId);
     assertEquals(expectedChunks, hits.size());
+    // Passages carry the label of the replacement text stored on the parent ("no language" too).
+    String parentLanguage = lifecycle.documentFieldOps().getDocumentField(docId, SchemaFields.LANGUAGE);
     hits.sort(Comparator.comparingInt(h -> Integer.parseInt(h.fields().get(SchemaFields.CHUNK_INDEX))));
 
     // ChunkSplitter now returns offsets relative to the original content,
@@ -150,7 +152,7 @@ final class WorkerIngestServiceChunkRegenerationTest extends io.justsearch.adapt
       assertEquals(mime, fields.get(SchemaFields.MIME));
       assertEquals(mimeBase, fields.get(SchemaFields.MIME_BASE));
       assertEquals(fileKind, fields.get(SchemaFields.FILE_KIND));
-      assertNotNull(fields.get(SchemaFields.LANGUAGE));
+      assertEquals(parentLanguage, fields.get(SchemaFields.LANGUAGE));
     }
 
     String normalizedId = IngestResponses.normalizeDocIdForMutation(docId);
