@@ -229,3 +229,13 @@ existing address path selects it with its own draft departure checks once connec
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-14rpihz5",
+  "verdict": "accept",
+  "digest": "sha256:616f2025d5d0072a35a1b84be6967ec5d4d5988bda411f0dac8fd3bf18bcdfa3"
+}
+```
