@@ -54,6 +54,9 @@ import type { StateSnapshot } from '../router/types.js';
 import type { TransportTag } from '../router/transports.js';
 import { __seedForTest as seedErrorCatalog, __resetForTest as resetErrorCatalog } from '../../i18n/errorCatalog.js';
 import { EPHEMERAL_TOAST_EVENT, type EphemeralToastSpec } from '../components/advisory/ephemeralToast.js';
+import { listJournal, __resetJournalForTest as resetEffectJournal } from '../substrates/effects/index.js';
+import { applyEffect } from '../substrates/actions/index.js';
+import '../views/ActivitySurface.js';
 
 function makeRailSurface(id: string, mountTag: string): Surface {
   return {
@@ -311,6 +314,87 @@ describe('Shell — slice 492 substrate integration', () => {
     expect(shown.message).not.toMatch(/failed|Health|private-operation-id/);
     expect(invocations).toBe(1);
     expect(approvals).toBe(state === 'gone' ? 1 : 0);
+  });
+
+  // S6 Activity — each dispatched invocation keeps the Engine invocation it became, by its own
+  // journal entry, also when identical requests answer out of order and when one fails with a key.
+  it('S6: identical invocations answering in reverse order each keep their invocation, a keyed failure joins as a failure, both persist', async () => {
+    resetEffectJournal();
+    const answers: Array<(response: Response) => void> = [];
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).includes('/api/operations/core.file-operations/invoke')) {
+        return await new Promise<Response>((resolve) => answers.push(resolve));
+      }
+      return new Response(JSON.stringify({ entries: [] }), { status: 200 });
+    }));
+    await renderShell();
+    const invocations = () => listJournal().filter((e) => e.effect.kind === 'invoke-operation');
+    applyEffect({ kind: 'invoke-operation', operationId: 'core.file-operations', args: { op: 'move' } });
+    applyEffect({ kind: 'invoke-operation', operationId: 'core.file-operations', args: { op: 'move' } });
+    await vi.waitFor(() => expect(answers).toHaveLength(2));
+    answers[1]!(new Response(JSON.stringify({ success: true, message: 'ok', executionId: 'exec-2',
+      structuredData: { operationKey: 'key-2' } }), { status: 200 }));
+    await vi.waitFor(() => expect(invocations().map((e) => e.operationKey)).toEqual([undefined, 'key-2']));
+    answers[0]!(new Response(JSON.stringify({ success: false, message: 'refused', errorClass: 'HANDLER_FAILURE',
+      structuredData: { operationKey: 'key-1' } }), { status: 500 }));
+    await vi.waitFor(() => expect(invocations().map((e) => e.operationKey)).toEqual(['key-1', 'key-2']));
+    expect(invocations().map((e) => e.executionId)).toEqual([undefined, 'exec-2']);
+    const stored = JSON.parse(localStorage.getItem('justsearch.effect-journal.v1') ?? '{}') as
+      { entries?: Array<{ effect: { kind: string }; operationKey?: string; executionId?: string }> };
+    expect(stored.entries?.filter((e) => e.effect.kind === 'invoke-operation').map((e) => [e.operationKey, e.executionId]))
+      .toEqual([['key-1', undefined], ['key-2', 'exec-2']]);
+  });
+
+  // S6 Activity (broken before): "Undo all AI actions" counted an Engine undo as done when it was
+  // only dispatched; consent, refusal and failure arrive later.
+  it.each([
+    ['declined', 'The engine did not undo 1 action'],
+    ['confirmed', 'The engine confirmed 1 undo'],
+  ] as const)('S6: undo-all says an Engine undo was asked for, then what the Engine answered (%s)', async (answer, finalMessage) => {
+    resetEffectJournal();
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/api/operations/core_file_operations/invoke')) {
+        return new Response(JSON.stringify({ success: true, message: 'ok', executionId: 'exec-9' }), { status: 200 });
+      }
+      if (url.includes('/api/undo/')) {
+        return answer === 'confirmed'
+          ? new Response(JSON.stringify({ success: true, message: 'undone' }), { status: 200 })
+          : new Response(JSON.stringify({ errorClass: 'CONFIRMATION_REQUIRED', message: 'Confirmation required',
+            pendingId: 'pa-undo', gateBehavior: 'TYPED_CONFIRM' }), { status: 428 });
+      }
+      if (url.includes('/api/authorizations/pending/')) return new Response('{}', { status: 200 });
+      if (url.endsWith('/api/authorizations/reject')) return new Response(JSON.stringify({ rejected: true }), { status: 200 });
+      return new Response(JSON.stringify({ entries: [] }), { status: 200 });
+    }));
+    await renderShell();
+    setAuthorizationPresenter(async () => ({ approved: false, allowAlways: false }));
+    applyEffect({ kind: 'invoke-operation', operationId: 'core_file_operations' }, undefined, 'agent');
+    const toasts: string[] = [];
+    const onToast = (e: Event): void => { toasts.push((e as CustomEvent<EphemeralToastSpec>).detail.message); };
+    document.addEventListener(EPHEMERAL_TOAST_EVENT, onToast);
+    const activity = document.createElement('jf-activity-surface') as HTMLElement & { updateComplete: Promise<unknown> };
+    document.body.append(activity);
+    try {
+      const press = async (testId: string): Promise<void> => {
+        await vi.waitFor(() => expect(activity.shadowRoot!.querySelector(`[data-testid="${testId}"]`)).not.toBeNull());
+        const button = activity.shadowRoot!.querySelector(`[data-testid="${testId}"]`) as HTMLElement & { updateComplete: Promise<unknown> };
+        await button.updateComplete;
+        const control = button.shadowRoot!.querySelector('jf-control') as HTMLElement & { updateComplete: Promise<unknown> };
+        await control.updateComplete;
+        (control.shadowRoot!.querySelector('button') as HTMLButtonElement).click();
+        await activity.updateComplete;
+      };
+      await press('activity-undo-all');
+      await press('activity-undo-confirm-yes');
+      await vi.waitFor(() => expect(toasts).toContain(finalMessage));
+      expect(toasts).toContain('Asked the engine to undo 1 action');
+      expect(toasts.filter((message) => /^Undid /.test(message)), 'a dispatch alone is never reported as done').toEqual([]);
+    } finally {
+      document.removeEventListener(EPHEMERAL_TOAST_EVENT, onToast);
+      activity.remove();
+      setAuthorizationPresenter(null);
+    }
   });
 
   it('906: an uncertain mutation response asks users to check its effect, without retrying', async () => {

@@ -1,0 +1,112 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
+  },
+  "createdAt": "2026-11-11T18:42:28.599Z",
+  "revision": "c09de15a106e9b3f436ad61bf54184e4c96ae442",
+  "tree": "5a8e1fe4289a41a977eff4dd69e89f148a410d1f",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/ycyj6u4l/tmp/test-intent-vitest-8184-1794422443417.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 52212
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts#A20 — light at 600×400 with text at 200 percent: filters and advanced controls are reachable without sideways scrolling",
+      "file": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:75fcbec0280535b354565376f8cff1af4d8dd86f1c03ee932fbe41478dee7be0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "A20 — light at 600×400 with text at 200 percent: filters and advanced controls are reachable without sideways scrolling",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts#A20 — dark at 600×400 with text at 200 percent: filters and advanced controls are reachable without sideways scrolling",
+      "file": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:75fcbec0280535b354565376f8cff1af4d8dd86f1c03ee932fbe41478dee7be0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "A20 — dark at 600×400 with text at 200 percent: filters and advanced controls are reachable without sideways scrolling",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts#A20 — light at 1280×800 with text at 200 percent: filters and advanced controls are reachable without sideways scrolling",
+      "file": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:75fcbec0280535b354565376f8cff1af4d8dd86f1c03ee932fbe41478dee7be0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "A20 — light at 1280×800 with text at 200 percent: filters and advanced controls are reachable without sideways scrolling",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "c09de15a10",
+    "revision": "c09de15a106e9b3f436ad61bf54184e4c96ae442",
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/s6-activity-feed-a20-before.patch",
+        "contentDigest": "sha256:a1a1f78cea8ac43fc0da027d6d170a297e43b75eea0f2efe05930883fb358bba"
+      }
+    ],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/ycyj6u4l/tmp/test-intent-vitest-8184-1794422497021.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 51281,
+        "output": "JSON report written to /home/elias/.cache/am/ycyj6u4l/tmp/test-intent-vitest-8184-1794422497021.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts#A20 — light at 600×400 with text at 200 percent: filters and advanced controls are reachable without sideways scrolling",
+        "classification": "assertion",
+        "detail": "A20 — light at 600×400 with text at 200 percent: filters and advanced controls are reachable without sideways scrolling:  AssertionError: no page-level sideways overflow: expected 1325 to be less than or equal to 600\n    at /home/elias/.cache/am/ycyj6u4l/tmp/test-intent-before-595p1b/modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts:471:60\n    at file:///home/elias/dev/justsearch/.claude/wor"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts#A20 — dark at 600×400 with text at 200 percent: filters and advanced controls are reachable without sideways scrolling",
+        "classification": "assertion",
+        "detail": "A20 — dark at 600×400 with text at 200 percent: filters and advanced controls are reachable without sideways scrolling:  AssertionError: no page-level sideways overflow: expected 1325 to be less than or equal to 600\n    at /home/elias/.cache/am/ycyj6u4l/tmp/test-intent-before-595p1b/modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts:471:60\n    at file:///home/elias/dev/justsearch/.claude/wor"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts#A20 — light at 1280×800 with text at 200 percent: filters and advanced controls are reachable without sideways scrolling",
+        "classification": "assertion",
+        "detail": "A20 — light at 1280×800 with text at 200 percent: filters and advanced controls are reachable without sideways scrolling:  AssertionError: no page-level sideways overflow: expected 1325 to be less than or equal to 1280\n    at /home/elias/.cache/am/ycyj6u4l/tmp/test-intent-before-595p1b/modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts:471:60\n    at file:///home/elias/dev/justsearch/.claude/wo"
+      }
+    ]
+  },
+  "digest": "sha256:c6b4644785990724bcec9f03cf9e5802bed86060466918b1a517fa0a3c035a04"
+}

@@ -21,7 +21,6 @@ import { ReceiptController } from '../primitives/receiptController.js';
 import {
   listJournal,
   subscribeJournal,
-  undoLastEffectByOriginator,
   undoEntries,
   listJournalByOriginator,
   peekLastUndoableByOriginator,
@@ -45,6 +44,7 @@ import { groupJournalForDisplay, type DisplayTurn } from '../substrates/effects/
 import './EffectLine.js';
 // §28.W4 — dispatch inverse effects through the kernel.
 import { applyEffect } from '../substrates/actions/index.js';
+import { reportUndoRun } from './undoReport.js';
 // 543-fwd #19 — import archive → define a replayable macro (interactive prompt).
 import { elicit } from '../substrates/elicit/index.js';
 import { defineMacro } from '../substrates/macros/index.js';
@@ -137,18 +137,12 @@ export class EffectAuditLog extends JfElement {
     this.groupPreview = [];
     if (!previewed.length) return;
     // DE6 — exactly the previewed turn members, nothing that joined the turn since.
-    const { reversed, skipped } = undoEntries(previewed, (effect) => applyEffect(effect));
-    this.reportUndone(reversed, skipped.length, ' in this turn');
+    this.reportUndone(undoEntries(previewed, (effect) => applyEffect(effect)), ' in this turn');
   }
 
   /** The outcome of a confirmed undo preview, including what could no longer be undone. */
-  private reportUndone(reversed: number, skipped: number, scope = ''): void {
-    applyEffect({
-      kind: 'toast',
-      message: `${reversed === 0 ? 'Nothing was undone' : `Reverted ${reversed} action${reversed === 1 ? '' : 's'}${scope}`}${skipped
-        ? `; ${skipped} could no longer be undone` : ''}`,
-      severity: skipped ? 'warning' : 'info',
-    });
+  private reportUndone(run: ReturnType<typeof undoEntries>, scope = ''): void {
+    reportUndoRun(run, (reversed) => `Reverted ${reversed} action${reversed === 1 ? '' : 's'}${scope}`);
   }
 
   /** DE6 — the entries in a preview's scope that will NOT be reversed, said before the person commits. */
@@ -185,8 +179,7 @@ export class EffectAuditLog extends JfElement {
     this.restorePreview = [];
     if (!previewed.length) return;
     // DE6 — exactly the previewed entries, nothing recorded after the preview was drawn.
-    const { reversed, skipped } = undoEntries(previewed, (effect) => applyEffect(effect));
-    this.reportUndone(reversed, skipped.length);
+    this.reportUndone(undoEntries(previewed, (effect) => applyEffect(effect)));
   }
 
   // §28.W4 — undo the last reversible effect from a given originator.
@@ -194,17 +187,14 @@ export class EffectAuditLog extends JfElement {
   // 543-fwd #4 — peek first so the confirmation toast can NAME what was undone.
   private handleUndoLastByOriginator(originator: EffectOriginator): void {
     const target = peekLastUndoableByOriginator(originator);
-    const inverse = undoLastEffectByOriginator(originator, (effect) => {
-      applyEffect(effect);
-    });
-    if (inverse && target) {
-      applyEffect({
-        kind: 'toast',
-        message: `Undid: ${present({ kind: 'effect', effect: target.effect }).label}`,
-      });
-    } else {
+    if (!target) {
       applyEffect({ kind: 'toast', message: 'Nothing to undo', severity: 'info' });
+      return;
     }
+    // The same walk as undoLastEffectByOriginator, through the one run that tells an Engine request
+    // (said as asked, then answered) from a reversal applied here.
+    reportUndoRun(undoEntries([target], (effect) => applyEffect(effect)),
+      () => `Undid: ${present({ kind: 'effect', effect: target.effect }).label}`);
   }
 
   // §28.W4 — undo ALL reversible effects from a given originator.
@@ -228,13 +218,8 @@ export class EffectAuditLog extends JfElement {
     this.undoAllPreview = [];
     if (!previewed.length) return;
     // DE6 — exactly the previewed AI actions; a repeated click finds the preview gone and does nothing.
-    const { reversed, skipped } = undoEntries(previewed, (effect) => applyEffect(effect));
-    applyEffect({
-      kind: 'toast',
-      message: `${reversed === 0 ? 'Nothing was undone' : `Undid ${reversed} AI action${reversed === 1 ? '' : 's'}`}${skipped.length
-        ? `; ${skipped.length} could no longer be undone` : ''}`,
-      severity: skipped.length ? 'warning' : 'info',
-    });
+    reportUndoRun(undoEntries(previewed, (effect) => applyEffect(effect)),
+      (reversed) => `Undid ${reversed} AI action${reversed === 1 ? '' : 's'}`);
   }
 
   // §28.W5 — toggle one entry's membership in the selection set.

@@ -1,0 +1,107 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
+  },
+  "createdAt": "2026-11-11T16:33:49.896Z",
+  "revision": "85d57d405e1d415c4abe97a0a4c20e24fa656c08",
+  "tree": "322f406d201ca066117b6a19350faa3c253f6ed0",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/ActionLedgerView.feed.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/_zaln_4_/tmp/test-intent-vitest-27058-1794414824697.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1430
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts#a ledger UPDATE no snapshot has contained survives a reconnect snapshot that lacks it; only a reset voids it",
+      "file": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:146573302ed9ad6aaabf0bcc7089eecf937596d1556e4a11ac30cbf294a91d19",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "first load and reconnect arbitration (challenger 4) a ledger UPDATE no snapshot has contained survives a reconnect snapshot that lacks it; only a reset voids it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts#a history snapshot cannot erase a newer UPDATE it lacks; a reset voids it and later snapshots do not bring it back",
+      "file": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:146573302ed9ad6aaabf0bcc7089eecf937596d1556e4a11ac30cbf294a91d19",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "first load and reconnect arbitration (challenger 4) a history snapshot cannot erase a newer UPDATE it lacks; a reset voids it and later snapshots do not bring it back",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts#the history stream failing before its first snapshot says it is unavailable, not loading, until a snapshot reads it",
+      "file": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:146573302ed9ad6aaabf0bcc7089eecf937596d1556e4a11ac30cbf294a91d19",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "per-source states (challenger 5) the history stream failing before its first snapshot says it is unavailable, not loading, until a snapshot reads it",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "ef84062e5e",
+    "revision": "ef84062e5e817dfba2c517b9aff4611941d7ee47",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/ActionLedgerView.feed.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/_zaln_4_/tmp/test-intent-vitest-27058-1794414828143.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1290,
+        "output": "JSON report written to /home/elias/.cache/am/_zaln_4_/tmp/test-intent-vitest-27058-1794414828143.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts#a ledger UPDATE no snapshot has contained survives a reconnect snapshot that lacks it; only a reset voids it",
+        "classification": "assertion",
+        "detail": "first load and reconnect arbitration (challenger 4) a ledger UPDATE no snapshot has contained survives a reconnect snapshot that lacks it; only a reset voids it:  AssertionError: expected [ 'operation:older' ] to deeply equal [ Array(2) ]\n    at /home/elias/.cache/am/_zaln_4_/tmp/test-intent-before-yXxh9U/modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts:273:27\n    at file:///home/elias/.cache/am/_zaln_4_/tmp/test-intent-before-yXxh9U/modul"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts#a history snapshot cannot erase a newer UPDATE it lacks; a reset voids it and later snapshots do not bring it back",
+        "classification": "assertion",
+        "detail": "first load and reconnect arbitration (challenger 4) a history snapshot cannot erase a newer UPDATE it lacks; a reset voids it and later snapshots do not bring it back:  AssertionError: expected [ 'operation:k-old' ] to deeply equal [ Array(2) ]\n    at /home/elias/.cache/am/_zaln_4_/tmp/test-intent-before-yXxh9U/modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts:286:20\n    at file:///home/elias/.cache/am/_zaln_4_/tmp/test-intent-before-yXxh9U/modul"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts#the history stream failing before its first snapshot says it is unavailable, not loading, until a snapshot reads it",
+        "classification": "assertion",
+        "detail": "per-source states (challenger 5) the history stream failing before its first snapshot says it is unavailable, not loading, until a snapshot reads it:  AssertionError: expected 'loading' to be 'unavailable' // Object.is equality\n    at /home/elias/.cache/am/_zaln_4_/tmp/test-intent-before-yXxh9U/modules/ui-web/src/shell-v0/components/ActionLedgerView.feed.test.ts:441:47\n    at file:///home/elias/.cache/am/_zaln_4_/tmp/test-intent-before-yXxh9U/modu"
+      }
+    ]
+  },
+  "digest": "sha256:ce7086e8938978a8162092d778b67bc899f101f55d9bb90a2553b41dfc31ebf7"
+}

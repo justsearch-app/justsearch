@@ -59,7 +59,7 @@ import { requestAuthorization, cancelAuthorizationsForRun } from '../operations/
 // "what the AI did" digest / undo-AI reflect REAL agent activity (not just the
 // demo + producer-less vop_ path). recordEffect journals WITHOUT dispatching —
 // the op already ran server-side, so we must not re-invoke it via applyEffect.
-import { recordEffect, markUndoableOperation } from '../substrates/effects/index.js';
+import { recordEffect } from '../substrates/effects/index.js';
 import { CORE_PROVENANCE } from '../primitives/provenance.js';
 import type { Effect } from '../substrates/effect.js';
 import { StopAttempt, STOP_RESPONSE_WAIT_MS, type RunTerminalOutcome } from '../state/stopAttempt.js';
@@ -1292,9 +1292,9 @@ export class AgentSessionController implements CoreAgentRunHandlers {
    * `applyEffect` — the op already executed server-side; re-dispatching would
    * re-run it (a destructive `core_file_operations` would fire twice). When the
    * backend returned an `executionId` (undoSupported ops), wire "undo the AI"
-   * through the existing executionId → POST /api/undo/{id} path via
-   * `markUndoableOperation` (the audit log's per-entry Undo button reads that
-   * side-map). vop_ tools are skipped — they already self-journal via
+   * through the existing executionId → POST /api/undo/{id} path by recording
+   * it on the entry (the audit log's per-entry Undo button reads it, after a
+   * reload too). vop_ tools are skipped — they already self-journal via
    * `onToolCallVirtual` → `invokeAndApply('agent')` → `applyEffect`.
    */
   private journalAgentToolCall(call: ToolCall): void {
@@ -1310,14 +1310,17 @@ export class AgentSessionController implements CoreAgentRunHandlers {
     // 543-fwd #6 — chain this tool-call to the previous one in the same turn so
     // the journal records a real per-turn causation chain (the "why did this
     // happen" trace). The first call of a turn has no parent (chain root).
+    // The completed call names its own invocation (operationKey) and, when undo-supported, its
+    // execution: recorded on the entry itself, so Activity joins it to the ledger/history records
+    // of THIS call (not another with the same name) and a reload still offers its undo.
+    const operationKey = call.structuredData?.operationKey;
     const entry = recordEffect(effect, CORE_PROVENANCE, {
       originator: 'agent',
       ...(this.lastAgentCausationId !== null ? { causation: this.lastAgentCausationId } : {}),
+      ...(typeof operationKey === 'string' ? { operationKey } : {}),
+      ...(call.executionId ? { executionId: call.executionId } : {}),
     });
     this.lastAgentCausationId = entry.id;
-    if (call.executionId) {
-      markUndoableOperation(entry.id, call.toolName, call.executionId);
-    }
   }
 
   onToolCallRejected(payload: CoreAgentRunToolCallRejectedPayload): void {

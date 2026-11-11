@@ -94,7 +94,9 @@ export class SurfaceTabs extends JfElement {
     }
     .tab-bar { display: flex; flex-wrap: wrap; align-items: center; border-bottom: 1px solid var(--border-subtle); }
     .tab-actions { margin-inline-start: auto; padding: .25rem 1rem; min-width: 0; max-width: 100%; }
-    #surface-tabs-panel { flex: 1; min-height: 0; overflow: hidden; }
+    /* The panel passes the host's height down to the member, so a member's own scroller (its
+       surface body) holds its content; the panel itself never scrolls. */
+    #surface-tabs-panel { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
     .tabs {
       flex-shrink: 0;
       display: flex;

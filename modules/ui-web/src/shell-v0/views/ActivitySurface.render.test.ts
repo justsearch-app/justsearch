@@ -3,20 +3,22 @@
 /**
  * ActivitySurface render test — 727 F-4.
  *
- * Pre-fix, the "Operations (structured)" panel's `<jf-resource>` element was mounted with
- * no `api-base` attribute at all, so it (and the `resourceListItemStrategy` it dispatches
- * through) fell back to relative URLs for the `core.operation-history` SSE stream — wrong
- * whenever the FE and backend are served from different origins. The sibling
- * `<jf-action-ledger>` panel was never affected because it always set `api-base` explicitly.
- * This test pins that `<jf-resource>` now receives the same `api-base` ActivitySurface itself
- * was given, mirroring `<jf-action-ledger>`.
+ * Pre-fix, the operation-history panel was mounted with no `api-base`, so its
+ * `core.operation-history` stream fell back to relative URLs — wrong whenever the FE and backend
+ * are served from different origins. The one feed now reads that history itself; these tests pin
+ * that it reads it, and the ledger, from the `api-base` ActivitySurface was given.
  */
 
 import { describe, expect, it, afterEach, beforeAll, vi } from 'vitest';
 import { requestActivitySection, takeActivitySection } from '../state/activitySection.js';
+import {
+  __resetForTest as resetResourceCatalog,
+  __seedForTest as seedResourceCatalog,
+} from '../../api/registry/ResourceCatalogClient.js';
+import type { Resource } from '../../api/types/registry.js';
 
-// Stub EventSource before ActivitySurface's transitive imports (ActionLedgerView,
-// jf-resource-view) try to open real streams against a non-existent backend.
+// Stub EventSource before ActivitySurface's transitive imports (ActionLedgerView) try to open real
+// streams against a non-existent backend.
 class NoopEventSource extends EventTarget {
   readyState = 0;
   url: string;
@@ -36,6 +38,8 @@ class NoopEventSource extends EventTarget {
   }
 }
 
+const requested: string[] = [];
+
 beforeAll(() => {
   vi.stubGlobal(
     'EventSource',
@@ -43,17 +47,42 @@ beforeAll(() => {
       return new NoopEventSource(url) as unknown as EventSource;
     },
   );
-  // Tempdoc 804 §B9 (F9): <jf-action-ledger> also READS `GET /api/action-ledger` (so an undelivered
-  // stream frame can no longer render as a false "No activity yet"). Stub it — this test is about
-  // api-base forwarding, not the ledger, and an unstubbed read would hit a non-existent backend.
+  // Tempdoc 804 §B9 (F9): <jf-action-ledger> also READS `GET /api/action-ledger`. Stub every read;
+  // this test is about which origin the reads go to, not their content.
   vi.stubGlobal(
     'fetch',
-    async () => ({ ok: true, status: 200, json: async () => ({ entries: [] }) }) as unknown as Response,
+    async (input: RequestInfo | URL) => {
+      requested.push(String(input));
+      return { ok: true, status: 200, json: async () => ({ entries: [] }), body: null } as unknown as Response;
+    },
   );
 });
 
 import './ActivitySurface.js';
 import type { ActivitySurface } from './ActivitySurface.js';
+
+function operationHistoryResource(): Resource {
+  return {
+    id: 'core.operation-history',
+    presentation: { labelKey: 'registry-resource.operation-history.label',
+      descriptionKey: 'registry-resource.operation-history.description', iconHint: null, category: null },
+    schema: 'https://ssot.justsearch/v1/schemas/operation-history-entry.v1.json',
+    category: 'EVENT_STREAM',
+    subscriptionMode: 'SSE_STREAM',
+    endpoint: '/api/operation-history/stream',
+    kind: 'operation-history',
+    history: null,
+    recovery: null,
+    provenance: { tier: 'CORE', contributorId: 'core', version: '1.0' },
+    privacy: { pathPolicy: 'NO_PATHS', loopbackOnly: false, resolver: null },
+    itemOperations: [],
+    collectionOperations: [],
+    primaryKey: 'operationKey',
+    audience: 'USER',
+    consumers: [],
+    role: 'PRODUCT',
+  };
+}
 
 async function mount(apiBase: string): Promise<ActivitySurface> {
   const el = document.createElement('jf-activity-surface') as ActivitySurface;
@@ -66,24 +95,21 @@ async function mount(apiBase: string): Promise<ActivitySurface> {
 describe('ActivitySurface (jf-activity-surface) — api-base forwarding (727 F-4)', () => {
   afterEach(() => {
     document.body.innerHTML = '';
+    resetResourceCatalog();
+    requested.length = 0;
   });
 
-  it('passes its own api-base down to both the action-ledger and resource panels', async () => {
+  it('the one feed reads the ledger and the operation history from its own api-base', async () => {
+    seedResourceCatalog({ schemaVersion: '1.0', catalogVersion: 1, namespace: 'core', primitive: 'Resource',
+      entries: [operationHistoryResource()] });
     const el = await mount('http://127.0.0.1:33221');
-
     const ledger = el.shadowRoot?.querySelector('jf-action-ledger');
-    const resource = el.shadowRoot?.querySelector('jf-resource');
-
     expect(ledger?.getAttribute('api-base')).toBe('http://127.0.0.1:33221');
-    // Pre-fix: this attribute was absent entirely (getAttribute returned null),
-    // leaving <jf-resource-view> to resolve its stream URL against the wrong origin.
-    expect(resource?.getAttribute('api-base')).toBe('http://127.0.0.1:33221');
-  });
-
-  it('still declares resource-id="core.operation-history" on the structured-operations panel', async () => {
-    const el = await mount('http://127.0.0.1:33221');
-    const resource = el.shadowRoot?.querySelector('jf-resource');
-    expect(resource?.getAttribute('resource-id')).toBe('core.operation-history');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(requested).toContain('http://127.0.0.1:33221/api/action-ledger');
+    expect(requested).toContain('http://127.0.0.1:33221/api/operation-history/stream');
+    // One list: the separate operations table is gone, its records are in the feed.
+    expect(el.shadowRoot?.querySelector('jf-resource')).toBeNull();
   });
 });
 
@@ -117,6 +143,37 @@ describe('Activity holds what the frame drawers held (DP3)', () => {
     requestActivitySection(section);
     await new Promise(resolve => setTimeout(resolve, 0));
     expect(child.shadowRoot!.activeElement).toBe(child.shadowRoot!.querySelector(selector));
+    el.remove();
+  });
+
+  it('an Activity closing before it renders leaves the request to another Activity, which reveals it', async () => {
+    const leaving = document.createElement('jf-activity-surface') as ActivitySurface;
+    const staying = document.createElement('jf-activity-surface') as ActivitySurface;
+    document.body.append(leaving, staying);
+    await leaving.updateComplete;
+    await staying.updateComplete;
+    requestActivitySection('effect-journal');
+    leaving.remove();
+    const journal = staying.shadowRoot!.querySelector('jf-effect-audit-log') as HTMLElement & { updateComplete: Promise<unknown> };
+    await journal.updateComplete;
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(journal.shadowRoot!.activeElement).toBe(journal.shadowRoot!.querySelector('[data-testid="effect-audit-journal"]'));
+    expect(takeActivitySection()).toBeNull();
+    staying.remove();
+  });
+
+  it('arriving at the journal clears a journal filter that would hide what the pointer named', async () => {
+    const el = document.createElement('jf-activity-surface') as ActivitySurface;
+    document.body.append(el);
+    await el.updateComplete;
+    const journal = el.shadowRoot!.querySelector('jf-effect-audit-log') as HTMLElement & { updateComplete: Promise<unknown>;
+      originator: string; outcome: string };
+    journal.originator = 'system';
+    journal.outcome = 'rejected';
+    requestActivitySection('effect-journal');
+    await new Promise(resolve => setTimeout(resolve, 0));
+    await journal.updateComplete;
+    expect([journal.originator, journal.outcome]).toEqual(['all', 'all']);
     el.remove();
   });
 });

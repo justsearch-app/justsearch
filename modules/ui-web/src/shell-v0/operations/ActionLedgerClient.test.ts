@@ -22,7 +22,7 @@ import {
   recordEffect,
   listJournal,
   journalEventId,
-  markUndoableOperation,
+  associateOperation,
   __resetJournalForTest,
   type JournalEntry,
 } from '../substrates/effects/index';
@@ -100,14 +100,14 @@ describe('unifiedActivity (pure projection)', () => {
 
   it('collapses an FE invoke-operation effect and its backend operation row into ONE record (G6)', () => {
     // The FE dispatched an invoke-operation effect; the backend ran it and returned exec-42,
-    // which the Shell associated with the journal entry via markUndoableOperation. The backend
+    // which the Shell associated with the journal entry via associateOperation. The backend
     // ledger row for that op carries the same executionId. unifiedActivity must show ONE row.
     const entry = recordEffect(
       { kind: 'invoke-operation', operationId: 'core.reindex', args: {} },
       CORE_PROVENANCE,
       { originator: 'agent' },
     );
-    markUndoableOperation(entry.id, 'core.reindex', 'exec-42');
+    associateOperation(entry.id, { executionId: 'exec-42' });
 
     const backend: BackendLedgerEntry[] = [
       backendEntry({
@@ -167,7 +167,7 @@ describe('unifiedActivity (pure projection)', () => {
       CORE_PROVENANCE,
       { originator: 'agent' },
     );
-    markUndoableOperation(entry.id, 'core.reindex', 'exec-99');
+    associateOperation(entry.id, { executionId: 'exec-99' });
     // Backend row for a DIFFERENT execution — no collapse.
     const backend: BackendLedgerEntry[] = [
       backendEntry({ kind: 'operation', operationId: 'core.reindex', executionId: 'exec-other' }),

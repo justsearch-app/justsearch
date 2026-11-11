@@ -110,7 +110,7 @@ describe('<jf-action-ledger> (tempdoc 550 C1 / thesis II — live read-view)', (
     // Tempdoc 613 §6/§10 — the FE-local example here is a navigate effect, which the default feed now
     // de-floods (routine direct-user navigation). This test is about the ONE log containing BOTH
     // records, so reveal the full view; the de-flood default itself is covered by its own test below.
-    host.showRoutine = true;
+    host.filter = { ...host.filter, routine: 'show' };
 
     src.emitFrame(
       snapshotFrame([
@@ -318,7 +318,7 @@ describe('<jf-action-ledger> (tempdoc 550 C1 / thesis II — live read-view)', (
       occurredAt: `2026-05-28T00:00:0${i}.000Z`,
     }));
     src.emitFrame(snapshotFrame(indexRows));
-    host.showRoutine = true;
+    host.filter = { ...host.filter, routine: 'show' };
     await host.updateComplete;
 
     const bursts = host.shadowRoot!.querySelectorAll('[data-testid="ledger-burst"]');
@@ -450,7 +450,7 @@ describe('<jf-action-ledger> (tempdoc 550 C1 / thesis II — live read-view)', (
     it('marks foreground rows newer than the cursor as new, with a header count (cursor = never looked)', async () => {
       const src = mount(); // beforeEach reset the cursor to '' → everything is new
       src.emitFrame(snapshotFrame(foregroundRows));
-      host.showRoutine = true; // reveal the routine row too, to prove it is NOT marked
+      host.filter = { ...host.filter, routine: 'show' }; // reveal the routine row too, to prove it is NOT marked
       await host.updateComplete;
 
       const newDots = host.shadowRoot!.querySelectorAll('[data-testid="ledger-new-dot"]');
@@ -762,7 +762,7 @@ describe('<jf-action-ledger> (tempdoc 550 C1 / thesis II — live read-view)', (
           })),
         ),
       );
-      host.showRoutine = true;
+      host.filter = { ...host.filter, routine: 'show' };
       await host.updateComplete;
 
       const bursts = host.shadowRoot!.querySelectorAll('[data-testid="ledger-burst"]');

@@ -18,7 +18,7 @@ import {
 import {
   __resetJournalForTest,
   recordEffect,
-  markUndoableOperation,
+  associateOperation,
   exportJournalArchive,
 } from '../substrates/effects/index.js';
 import { applyEffect } from '../substrates/actions/index.js';
@@ -240,7 +240,7 @@ describe('<jf-effect-audit-log> causation chip (§32 R-E3)', () => {
       CORE_PROVENANCE,
       { originator: 'agent' },
     );
-    markUndoableOperation(entry.id, 'core.file-operations', 'exec-77');
+    associateOperation(entry.id, { executionId: 'exec-77' });
     await flush();
     const undoBtn = host.shadowRoot?.querySelector(
       `[data-testid="undo-op-${entry.id}"]`,
@@ -359,7 +359,7 @@ describe('<jf-effect-audit-log> causation chip (§32 R-E3)', () => {
   });
 
   it('§32 U2 — marking an entry undoable AFTER the log is open re-renders the Undo button', async () => {
-    // Proves the side-map's listener re-fire path (markUndoableOperation →
+    // Proves the side-map's listener re-fire path (associateOperation →
     // journal listeners → audit-log re-render) and the capture→render
     // integration the Shell jf-invoke-operation .then() callback drives.
     const entry = recordEffect(
@@ -370,7 +370,7 @@ describe('<jf-effect-audit-log> causation chip (§32 R-E3)', () => {
     await flush();
     const sel = `[data-testid="undo-op-${entry.id}"]`;
     expect(host.shadowRoot?.querySelector(sel)).toBeNull(); // not yet undoable
-    markUndoableOperation(entry.id, 'core.file-operations', 'exec-after');
+    associateOperation(entry.id, { executionId: 'exec-after' });
     await flush();
     expect(host.shadowRoot?.querySelector(sel)).not.toBeNull(); // re-rendered
   });

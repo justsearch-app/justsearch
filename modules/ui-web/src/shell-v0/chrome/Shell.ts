@@ -41,7 +41,7 @@ import {
   onSurfaceCatalogChange,
 } from '../../api/registry/SurfaceCatalogClient.js';
 import type { Surface } from '../../api/types/surface.js';
-import { OperationClient, isStaleAuthorization } from '../operations/OperationClient.js';
+import { OperationClient, OperationError, isStaleAuthorization } from '../operations/OperationClient.js';
 import { operationFailureMessage } from '../operations/operationFailureMessage.js';
 import { originatorToTransport } from '../operations/originatorTransport.js';
 import { startDragDetect, type DragKind } from '../utils/dragDetect.js';
@@ -139,7 +139,8 @@ import { bumpScopeVersion } from '../substrates/evaluationContext/index.js';
 // at boot so prior-session navigations / effects are queryable.
 import {
   restoreJournalFromStorage,
-  markUndoableOperation,
+  associateOperation,
+  settleOperationRequest,
   markRemovedFolderOperation,
   undoLastEffect,
   peekLastEffectUndo,
@@ -1081,20 +1082,25 @@ export class Shell extends JfElement {
             if (typeof key === 'string') bindTaskOperation(taskId, key);
             else completeTask(taskId, 'succeeded');
           }
-          // §32 U2 — undoSupported ops return an executionId; associate it
-          // with the journal entry so the audit log can offer "Undo"
-          // (→ POST /api/undo/{operationId}).
-          if (operationId === 'core.remove-watched-root' && detail.journalEntryId !== undefined) {
-            markRemovedFolderOperation(detail.journalEntryId, result.structuredData?.removedFolder);
-          } else if (result.executionId && detail.journalEntryId !== undefined) {
-            markUndoableOperation(
-              detail.journalEntryId,
-              operationId,
-              result.executionId,
-            );
+          // The dispatching journal entry records which invocation it was (operationKey), and
+          // §32 U2 — for undoSupported ops the returned executionId, so Activity joins it to its
+          // history/ledger records and offers "Undo" (→ POST /api/undo/{operationId}), also after a reload.
+          if (detail.journalEntryId !== undefined) {
+            const removal = operationId === 'core.remove-watched-root';
+            if (removal) markRemovedFolderOperation(detail.journalEntryId, result.structuredData?.removedFolder);
+            associateOperation(detail.journalEntryId, {
+              operationKey: result.structuredData?.operationKey,
+              ...(removal ? {} : { executionId: result.executionId }),
+            });
+            settleOperationRequest(detail.journalEntryId, 'confirmed');
           }
         })
         .catch((err) => {
+          if (detail.journalEntryId !== undefined) {
+            // A keyed failure is still that invocation: join it, never as a success.
+            if (err instanceof OperationError) associateOperation(detail.journalEntryId, { operationKey: err.operationKey });
+            settleOperationRequest(detail.journalEntryId, 'not-done');
+          }
           if (taskId) completeTask(taskId, 'failed');
           emitEphemeralToast({
             message: operationFailureMessage(err),
@@ -1118,7 +1124,7 @@ export class Shell extends JfElement {
     // 428 on every real undo and surface as an unexplained failure.
     this.undoOperationListener = (e: Event) => {
       const detail = (
-        e as CustomEvent<{ operationId?: string; executionId?: string }>
+        e as CustomEvent<{ operationId?: string; executionId?: string; journalEntryId?: number }>
       ).detail;
       const operationId = detail?.operationId;
       const executionId = detail?.executionId;
@@ -1130,7 +1136,12 @@ export class Shell extends JfElement {
           requestConsent: prompt => requestAuthorization(prompt,
             async () => await client.peekPending(prompt.pendingId) !== null),
         })
+        .then(() => {
+          if (detail.journalEntryId !== undefined) settleOperationRequest(detail.journalEntryId, 'confirmed');
+        })
         .catch((err) => {
+          // A declined approval, an expired execution or a failure: the reversal did not happen.
+          if (detail.journalEntryId !== undefined) settleOperationRequest(detail.journalEntryId, 'not-done');
           emitEphemeralToast({
             message: operationFailureMessage(err, true),
             severity: isStaleAuthorization(err) ? 'info' : 'error',

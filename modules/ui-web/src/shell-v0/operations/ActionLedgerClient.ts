@@ -28,6 +28,7 @@ import { EnvelopeStream, type EnvelopeStreamSnapshot } from '../streaming/Envelo
 import type { MultiplexedStream } from '../streaming/MultiplexedStream.js';
 import { SHELL_EVENT_STREAM_IDS } from '../streaming/shellEventStreamIds.js';
 import { isLifecycleEnvelope } from '../streaming/envelope-types.js';
+import { applySnapshot, observe } from '../streaming/snapshotArbitration.js';
 import { present } from '../display/present.js';
 // Tempdoc 613 §6/§10 + 612 §3 — the Activity-inclusion routing predicates: routine local-ack effects /
 // navigation, and the operation-significance grade over the declared OperationCatalog facets.
@@ -45,6 +46,28 @@ function removedFolderOf(e: BackendLedgerEntry): { removedFolder?: { path: strin
       || !folder || typeof folder.path !== 'string' || !folder.path) return {};
   return { removedFolder: { path: folder.path,
     ...(typeof folder.collection === 'string' && folder.collection ? { collection: folder.collection } : {}) } };
+}
+
+/**
+ * What an index row's state establishes, and nothing more: DONE is indexed, FAILED and
+ * RETRY_EXHAUSTED are failures, and any other or missing state is unknown — never a success.
+ */
+export type IndexResult = 'indexed' | 'failed' | 'unknown';
+
+export function indexResultOf(state: string | undefined): IndexResult {
+  if (state === 'DONE') return 'indexed';
+  if (state === 'FAILED' || state === JOB_STATE_RETRY_EXHAUSTED) return 'failed';
+  return 'unknown';
+}
+
+/** An index row's label for its state at `where` (a collection, or a resolved file name). */
+export function indexLabel(state: string | undefined, where: string): string {
+  // Tempdoc 885 item 21b: RETRY_EXHAUSTED is the other terminal failure — retried for a week
+  // and never readable. Named distinctly because "Index failed" would suggest a bad file.
+  if (state === 'FAILED') return `Index failed · ${where}`;
+  if (state === JOB_STATE_RETRY_EXHAUSTED) return `Index gave up · ${where}`;
+  if (state === 'DONE') return `Indexed · ${where}`;
+  return `Index state unknown${state ? ` (${state})` : ''} · ${where}`;
 }
 
 /** A backend action-ledger entry (operation or navigation). Mirrors ActionLedgerController. */
@@ -169,6 +192,8 @@ export interface UnifiedActionEntry {
   readonly pathHash?: string;
   /** Present on `index` rows — the job's collection, so a collapsed burst can name it. */
   readonly collection?: string;
+  /** Present on `index` rows that carry one — the backend's job state, read via `indexResultOf`. */
+  readonly indexState?: string;
   /** Tempdoc 812 D4 — true on a scan-rollup row (an `operation` row summarizing a whole scan). */
   readonly isScanRollup?: boolean;
 }
@@ -297,15 +322,7 @@ export function projectBackend(e: BackendLedgerEntry): UnifiedActionEntry {
     // System/indexing terminal outcome: "Indexed · <collection>" / "Index failed · <collection>".
     // pathHash is a SHA-256 hex (not a raw path); a short prefix disambiguates without leaking.
     const where = `${e.collection ?? 'default'}${e.pathHash ? ' (' + e.pathHash.slice(0, 6) + ')' : ''}`;
-    // Tempdoc 885 item 21b: RETRY_EXHAUSTED is the other terminal failure — retried for a week
-    // and never readable. Named distinctly because "Index failed" would suggest a bad file.
-    if (e.state === 'FAILED') {
-      label = `Index failed · ${where}`;
-    } else if (e.state === JOB_STATE_RETRY_EXHAUSTED) {
-      label = `Index gave up · ${where}`;
-    } else {
-      label = `Indexed · ${where}`;
-    }
+    label = indexLabel(e.state, where);
   } else if (isScanRollupRow(e)) {
     // tempdoc 812 D2 — the scan rollup: ONE row for a whole directory scan, stating what it DID
     // (counts are the backend's observed terminal job states). This is the audit record the
@@ -372,12 +389,13 @@ export function projectBackend(e: BackendLedgerEntry): UnifiedActionEntry {
         collection: e.collection ?? 'default',
         ...(e.scanId ? { scanId: e.scanId } : {}),
         ...(e.pathHash ? { pathHash: e.pathHash } : {}),
+        ...(e.state ? { indexState: e.state } : {}),
       }
     : base;
 }
 
 /** Map a FE Effect Journal entry to a unified row. */
-function projectEffect(j: JournalEntry): UnifiedActionEntry {
+export function projectEffect(j: JournalEntry): UnifiedActionEntry {
   const e = j.effect;
   // §2.A: route the operation id / navigation target through the display projector (Q7).
   const detail =
@@ -386,7 +404,9 @@ function projectEffect(j: JournalEntry): UnifiedActionEntry {
       : e.kind === 'navigate'
         ? `: ${present({ kind: 'route', target: e.to }).label}`
         : '';
-  const vetoed = j.pendingOutcome === 'rejected' ? ' (rejected)' : '';
+  // A proposal marker records a DECISION, not a dispatch: a rejected one never ran.
+  const decision = j.pendingOutcome === 'rejected' ? 'Proposal rejected · '
+    : j.pendingOutcome === 'accepted' ? 'Proposal accepted · ' : '';
   return {
     // FE-local effects key off the journal entry id (the FE half of the one schema).
     id: journalEventId(j),
@@ -394,7 +414,7 @@ function projectEffect(j: JournalEntry): UnifiedActionEntry {
     kind: e.kind,
     occurredAt: j.invokedAt,
     originator: j.originator,
-    label: `${e.kind}${detail}${vetoed}`,
+    label: `${decision}${e.kind}${detail}`,
     // Tempdoc 613 §6/§10 — a raw FE `navigate` journal row is routine direct-user navigation.
     ...(isRoutineActivity(e.kind, j.originator) ? { isRoutine: true } : {}),
   };
@@ -471,62 +491,108 @@ export function gateFirings(entries: ReadonlyArray<UnifiedActionEntry>): Unified
 // ============================================================
 
 /**
- * Reducer over the unified ledger SSE: a `snapshot` lifecycle frame replaces the accumulated
- * backend rows; every UPDATE frame appends one new row (operation / navigation / gate). The
- * payload of each frame is already a {@link BackendLedgerEntry} in the same projection the GET
- * snapshot uses (the backend guarantees this via the shared ActionLedgerProjection), so the FE
- * renders snapshot and live rows through one path.
+ * What the live ledger stream has established. `snapshotApplied` says a snapshot frame (possibly
+ * legitimately empty) was read, so an empty `rows` is a claim about the ledger only then: a
+ * connected or heartbeat frame proves nothing about it. `resets` counts reset frames, so a reader
+ * that started before one can tell its answer describes discarded state.
+ */
+export interface LedgerStreamState {
+  readonly rows: readonly BackendLedgerEntry[];
+  readonly snapshotApplied: boolean;
+  readonly resets: number;
+  /** UPDATE rows no snapshot has contained yet: a later snapshot that lacks them keeps them. */
+  readonly unconfirmed: readonly BackendLedgerEntry[];
+}
+
+const INITIAL_LEDGER_STATE: LedgerStreamState = { rows: [], snapshotApplied: false, resets: 0, unconfirmed: [] };
+
+/** The one log is id-keyed; a row without an explicit id has no identity to match. */
+const ledgerIdentity = (e: BackendLedgerEntry): string | undefined =>
+  typeof e.id === 'string' && e.id.length > 0 ? e.id : undefined;
+
+/** Keep the first row per explicit id (the one log is id-keyed); rows without an id stay independent. */
+function dedupById(rows: readonly BackendLedgerEntry[]): BackendLedgerEntry[] {
+  const seen = new Set<string>();
+  const out: BackendLedgerEntry[] = [];
+  for (const e of rows) {
+    if (typeof e.id === 'string' && e.id.length > 0) {
+      if (seen.has(e.id)) continue;
+      seen.add(e.id);
+    }
+    out.push(e);
+  }
+  return out;
+}
+
+/**
+ * Reducer over the unified ledger SSE, arbitrated by {@link applySnapshot}: a `snapshot` frame is
+ * the Engine's current retention, so a smaller or empty snapshot after a reconnect drops what it
+ * established before, but never an UPDATE row no snapshot has contained yet, on this connection or
+ * an earlier one. Only a `reset` discards everything and waits for the next snapshot. Every UPDATE
+ * frame appends one row, deduplicated by its explicit event id (snapshot and live rows project the
+ * same event through the one ActionLedgerProjection).
  */
 function ledgerReducer(
-  state: ReadonlyArray<BackendLedgerEntry>,
+  state: LedgerStreamState,
   envelope: { frameKind: string; payload: unknown },
-): BackendLedgerEntry[] {
+): LedgerStreamState {
   if (isLifecycleEnvelope(envelope as never)) {
     const payload = envelope.payload as { kind?: string; entries?: BackendLedgerEntry[] };
     if (payload?.kind === 'snapshot' && Array.isArray(payload.entries)) {
-      // Tempdoc 550 thesis I (F1): dedup the snapshot by id, mirroring the UPDATE branch — the one
-      // log is id-keyed/idempotent, so a re-delivered row must appear once.
-      const seen = new Set<string>();
-      const out: BackendLedgerEntry[] = [];
-      for (const e of payload.entries) {
-        if (typeof e.id === 'string' && e.id.length > 0) {
-          if (seen.has(e.id)) continue;
-          seen.add(e.id);
-        }
-        out.push(e);
-      }
-      return out;
+      const next = applySnapshot(dedupById(payload.entries), state.unconfirmed, ledgerIdentity);
+      return { ...state, rows: next.rows, unconfirmed: next.unconfirmed, snapshotApplied: true };
     }
-    return [...state]; // connected / heartbeat / reset / closing — no row change.
+    if (payload?.kind === 'reset') {
+      return { rows: [], snapshotApplied: false, resets: state.resets + 1, unconfirmed: [] };
+    }
+    return state; // connected / heartbeat / closing — no row change.
   }
-  // UPDATE: the payload IS the new row. Tempdoc 550 thesis I — dedup by the explicit event id so a
-  // row carried in both the initial snapshot and a later UPDATE appears once (the snapshot frame
-  // and the live broadcast project the same event through the one ActionLedgerProjection).
   const row = envelope.payload as BackendLedgerEntry;
-  if (!row || typeof row.kind !== 'string') {
-    return [...state];
+  if (!row || typeof row.kind !== 'string') return state;
+  if (typeof row.id === 'string' && row.id.length > 0 && state.rows.some((r) => r.id === row.id)) return state;
+  return { ...state, rows: [...state.rows, row], unconfirmed: observe(state.unconfirmed, row, ledgerIdentity) };
+}
+
+/** The ledger stream as a source: its state after every frame, and whether the channel is up. */
+export function openLedgerSource(
+  config: {
+    apiBase?: string;
+    eventSourceFactory?: (url: string) => EventSource;
+    multiplex?: MultiplexedStream;
+  },
+  onState: (state: LedgerStreamState, isConnected: boolean) => void,
+): () => void {
+  if (config.multiplex) {
+    return config.multiplex.subscribe<LedgerStreamState>(
+      SHELL_EVENT_STREAM_IDS.ACTION_LEDGER,
+      () => ({ initialState: INITIAL_LEDGER_STATE, reducer: ledgerReducer as never }),
+      (snap: EnvelopeStreamSnapshot<LedgerStreamState>) => onState(snap.payload, snap.isConnected),
+    );
   }
-  if (typeof row.id === 'string' && row.id.length > 0 && state.some((r) => r.id === row.id)) {
-    return [...state];
-  }
-  return [...state, row];
+  const base = (config.apiBase ?? '').replace(/\/$/, '');
+  const stream = new EnvelopeStream<LedgerStreamState>({
+    url: `${base}/api/action-ledger/stream`,
+    initialState: INITIAL_LEDGER_STATE,
+    reducer: ledgerReducer as never,
+    ...(config.eventSourceFactory ? { eventSourceFactory: config.eventSourceFactory } : {}),
+  });
+  const unsubscribe = stream.subscribe((snap) => onState(snap.payload, snap.isConnected));
+  stream.start();
+  return () => {
+    unsubscribe();
+    stream.stop();
+  };
 }
 
 /**
  * Open the live action-ledger stream. Tempdoc 550 thesis I (process-spanning ONE log): `onActivity`
  * is called after every frame with the projected backend rows — which now INCLUDE FE-local effects,
- * because the FE ingests them into the one authoritative log (see {@link startEffectIngest}). There
- * is no longer a read-time client-side merge of the backend ledger and the FE journal (the
- * eliminated `unifiedActivity` fold); the view renders one log. Returns a stop function.
+ * because the FE ingests them into the one authoritative log (see {@link startEffectIngest}).
  *
  * Tempdoc 662: when `config.multiplex` is supplied, subscribes the `surface:action-ledger`
- * streamId on the shared `MultiplexedStream` instead of opening a dedicated EventSource — this
- * is also where the pre-662 duplicate-socket defect (both `AiActivityDigest` and
- * `ActionLedgerView` independently called this function, each opening its OWN
- * `/api/action-ledger/stream` connection) collapses for free: both callers subscribe the SAME
- * streamId on the SAME shared multiplexer, so there is exactly one socket regardless of how
- * many consumers call this function. Omitting `multiplex` keeps the pre-662 direct-connection
- * fallback (apiBase/eventSourceFactory), unchanged.
+ * streamId on the shared `MultiplexedStream` instead of opening a dedicated EventSource, so every
+ * caller shares one socket. Omitting `multiplex` keeps the direct-connection fallback
+ * (apiBase/eventSourceFactory).
  */
 export function openActionLedgerStream(
   config: {
@@ -536,30 +602,8 @@ export function openActionLedgerStream(
     onActivity: (rows: UnifiedActionEntry[]) => void;
   },
 ): () => void {
-  if (config.multiplex) {
-    return config.multiplex.subscribe<BackendLedgerEntry[]>(
-      SHELL_EVENT_STREAM_IDS.ACTION_LEDGER,
-      () => ({ initialState: [], reducer: ledgerReducer as never }),
-      (snap: EnvelopeStreamSnapshot<BackendLedgerEntry[]>) => {
-        config.onActivity(snap.payload.map(projectBackend));
-      },
-    );
-  }
-  const base = (config.apiBase ?? '').replace(/\/$/, '');
-  const stream = new EnvelopeStream<BackendLedgerEntry[]>({
-    url: `${base}/api/action-ledger/stream`,
-    initialState: [],
-    reducer: ledgerReducer as never,
-    ...(config.eventSourceFactory ? { eventSourceFactory: config.eventSourceFactory } : {}),
-  });
-  const unsubscribe = stream.subscribe((snap: EnvelopeStreamSnapshot<BackendLedgerEntry[]>) => {
-    config.onActivity(snap.payload.map(projectBackend));
-  });
-  stream.start();
-  return () => {
-    unsubscribe();
-    stream.stop();
-  };
+  const { onActivity, ...source } = config;
+  return openLedgerSource(source, (state) => onActivity(state.rows.map(projectBackend)));
 }
 
 /**

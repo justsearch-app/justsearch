@@ -7,7 +7,7 @@ import { CORE_PROVENANCE } from '../primitives/provenance.js';
 import { __resetElicitForTest, listPendingElicits, resolveElicit } from '../substrates/elicit/index.js';
 import { __resetMacrosForTest, listMacros } from '../substrates/macros/index.js';
 import { __resetActionsForTest } from '../substrates/actions/index.js';
-import { __resetRecallCursor } from '../substrates/recall/recallCursor.js';
+import { __resetRecallCursor, markSeen } from '../substrates/recall/recallCursor.js';
 let host: ActivitySurface;
 function mount() { host = new ActivitySurface(); document.body.append(host); }
 beforeEach(() => {
@@ -68,6 +68,27 @@ describe('Activity owns the retired digest actions', () => {
     expect(macros).toHaveLength(1);
     expect(macros[0]!.label).toBe('What the AI did');
     expect(macros[0]!.effects.map((e) => e.kind)).toEqual(['invoke-operation', 'navigate']);
+  });
+  it('S6 — "Save as macro" takes the AI actions after the seen cursor by time, across timestamp spellings', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(Date.UTC(2026, 10, 1, 9, 59, 59, 900));
+      recordEffect({ kind: 'navigate', to: '#before' }, CORE_PROVENANCE, { originator: 'agent' });
+      vi.setSystemTime(Date.UTC(2026, 10, 1, 10, 0, 0, 100));
+      recordEffect({ kind: 'navigate', to: '#after' }, CORE_PROVENANCE, { originator: 'agent' });
+    } finally {
+      vi.useRealTimers();
+    }
+    markSeen('2026-11-01T10:00:00Z');
+    mount();
+    await flush();
+    await activateJfButton(host.shadowRoot?.querySelector('[data-testid="activity-save-macro"]'));
+    await flush();
+    const reqs = listPendingElicits();
+    expect(reqs).toHaveLength(1);
+    resolveElicit(reqs[0]!.id, { label: 'Recent' });
+    await flush();
+    expect(listMacros()[0]?.effects).toEqual([{ kind: 'navigate', to: '#after' }]);
   });
   it('577 #16 — the undo-confirm names the irreversible remainder (honest partial undo)', async () => {
     // open-pane is reversible (inverse derivable); toast is irreversible (no inverse). The confirm

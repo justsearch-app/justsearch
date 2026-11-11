@@ -1,196 +1,237 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * `<jf-action-ledger>` — the Outcome face's unified activity read-view (tempdoc 550 C1, FE).
+ * `<jf-action-ledger>` — Activity's one feed (tempdoc 550 C1, S6 Activity).
  *
- * Renders one chronological, originator-attributed stream over BOTH the backend action
- * ledger (`GET /api/action-ledger` — authoritative Operation + Navigation records) and the
- * FE-local Effect Journal, via {@link ActionLedgerClient.unifiedActivity}. This is the
- * "show me everything that happened this session (and who did it)" view — the receipt /
- * timeline / trust-audit read 550's Outcome face describes, as read-views over one ledger
- * rather than separate stores.
+ * One chronological list over the three records of what happened, joined by exact identities in
+ * {@link projectActivityFeed}: the backend action ledger (`GET /api/action-ledger` seed plus its
+ * live stream), the committed operation history (`core.operation-history`) and this window's
+ * Effect Journal. Each source's state is said separately — loading, unavailable (it failed before
+ * a snapshot read it), partial, or last known while its live channel is down — so an empty list is
+ * only claimed about sources read.
  *
- * Refreshes on connect and whenever a new FE Effect is journaled (so freshly-applied
- * local effects appear immediately without re-fetching the backend on every keystroke).
+ * Arbitration: in both streams a snapshot is the Engine's current retention, but it cannot erase an
+ * UPDATE no snapshot has contained yet; only a reset voids earlier observations (applySnapshot).
+ * Between the ledger's two reads the stream wins: the GET seed only stands in before the first
+ * snapshot, and an answer that started before a reset, or arrives after a snapshot, is discarded. The view is bounded by what the
+ * sources retain (the ledger ring, the history window, the journal) and says so; nothing older is
+ * fetched. A row whose source no longer holds it leaves when its last contributing source drops it.
+ *
+ * Filters: one quick choice (All / Agents / Your actions / Indexing / Problems) and advanced
+ * originator, outcome, proposal-decision, routine and date constraints (values OR within a
+ * dimension, dimensions AND together).
  */
 
-import { html, css, type TemplateResult } from 'lit';
+import { html, css, nothing, type PropertyValues, type TemplateResult } from 'lit';
+import '@lit-labs/virtualizer';
 import { JfElement } from '../primitives/JfElement.js';
 import {
   ActionLedgerClient,
-  openActionLedgerStream,
-  projectBackend,
+  indexLabel,
+  indexResultOf,
+  openLedgerSource,
+  type BackendLedgerEntry,
+  type LedgerStreamState,
   type UnifiedActionEntry,
 } from '../operations/ActionLedgerClient.js';
+import {
+  DEFAULT_FEED_FILTER,
+  matchesFilter,
+  projectActivityFeed,
+  routineShown,
+  startOfLocalDay,
+  type FeedFilter,
+  type FeedNote,
+  type FeedRow,
+  historyLedgerId,
+  type OperationHistoryRow,
+  type QuickFilter,
+  type RoutineChoice,
+} from '../operations/activityFeed.js';
+import { listJournal, subscribeJournal, type JournalEntry } from '../substrates/effects/index.js';
 // tempdoc 812 D4 — the SAME hash→path resolver the Tasks bridge uses (`core.indexing-jobs`'
 // privacy resolver), so a per-document row reads "corpus/report.pdf", not "default (f7e852)".
 import { resolvePathLazy, friendlyPathName } from '../hooks/resolvePathLazy.js';
 import type { MultiplexedStream } from '../streaming/MultiplexedStream.js';
 import { getSharedShellEventsMultiplex } from '../streaming/shellEventsMultiplexInstance.js';
+import { SHELL_EVENT_STREAM_IDS } from '../streaming/shellEventStreamIds.js';
+import { EnvelopeStream, type EnvelopeReducer } from '../streaming/EnvelopeStream.js';
+import { FetchEventSource, type StreamSource } from '../streaming/FetchEventSource.js';
+import { applySnapshot, observe } from '../streaming/snapshotArbitration.js';
 import { collapseBursts } from '../projections/boundedProjection.js';
-import { newestFirst } from '../primitives/eventStreamProjection.js';
+import { compareInstants } from '../primitives/instant.js';
+import { getResource, onCatalogChange } from '../../api/registry/ResourceCatalogClient.js';
+import { strategyFor, type StrategyState } from '../strategies/subscriptionStrategy.js';
 // tempdoc 558 §S1 — the ONE shared ledger-row projection (also used by the retrospective History tab).
 import { renderEventRow, renderEventWhen, eventRowStyles } from './eventRow.js';
-// tempdoc 558 §E1 — reuse the FilterChip atom (the same facet primitive the advisory drawer composes).
 import './FilterChip.js';
-// tempdoc 612 §UX/§CI R1 — the ONE shared "seen" authority (577 §2.14). Activity is "any 'new since you
-// looked' marker" the cursor was built to serve; it READS the one cursor (a 2nd cursor would re-create the
-// two-authorities bug 577 removed) and offers a "mark all read" affordance that advances that one boundary.
-import {
-  getSeenCursor,
-  markSeen,
-  subscribeSeenCursor,
-} from '../substrates/recall/recallCursor.js';
+// tempdoc 612 §UX/§CI R1 — the ONE shared "seen" authority (577 §2.14), read here and advanced by
+// "mark all read"; a second cursor would re-create the two-authorities bug 577 removed.
+import { getSeenCursor, markSeen, subscribeSeenCursor } from '../substrates/recall/recallCursor.js';
+import { deepActiveElement, isImeComposition, isTypingTarget } from '../utils/keyboardHandler.js';
+import { modalOwnsFocus } from '../primitives/modality.js';
 
-/** A collapsed indexing burst — N adjacent same-collection index rows summarized (tempdoc 550 III(b)). */
+/** A collapsed indexing burst — adjacent same-group index rows summarized, members kept. */
 interface IndexBurstSummary {
   readonly summary: true;
-  readonly groupKey: string;
-  readonly count: number;
-  // tempdoc 558 Deepening 3 — the burst is still a projection of records that happened at a time; carry
-  // the most-recent occurredAt of the collapsed group so the summary row is not the one row with no time.
+  readonly key: string;
+  readonly collection: string;
+  readonly members: readonly FeedRow[];
+  /** Members per what their state establishes (`indexResultOf`); unknown is never counted as indexed. */
+  readonly indexed: number;
+  readonly failed: number;
+  readonly unknown: number;
   readonly occurredAt: string;
 }
 
-function isBurst(row: UnifiedActionEntry | IndexBurstSummary): row is IndexBurstSummary {
+function isBurst(row: FeedRow | IndexBurstSummary): row is IndexBurstSummary {
   return (row as IndexBurstSummary).summary === true;
+}
+
+/** The nearest scrolling ancestor across shadow boundaries, else the document's scroller. */
+function scrollerOf(start: Element): Element {
+  let node: Node | null = start;
+  while (node) {
+    node = node instanceof ShadowRoot ? node.host : (node as Element).assignedSlot ?? node.parentNode;
+    if (node instanceof Element && /(auto|scroll)/.test(getComputedStyle(node).overflowY)
+        && node.scrollHeight > node.clientHeight) return node;
+  }
+  return document.scrollingElement ?? document.documentElement;
+}
+
+/** The part of the window a scroller shows, in viewport coordinates. */
+function viewOf(scroller: Element): { top: number; bottom: number } {
+  return scroller === document.scrollingElement || scroller === document.documentElement
+    ? { top: 0, bottom: window.innerHeight } : scroller.getBoundingClientRect();
 }
 
 /** The Resource whose `privacy.resolver` (core.resolve-path-hash) resolves an index row's hash. */
 const INDEXING_JOBS_RESOURCE = 'core.indexing-jobs';
+const HISTORY_RESOURCE = 'core.operation-history';
+/** Above this many rows the list is windowed (the Table's threshold); below it renders directly. */
+const VIRTUALIZE_ABOVE = 100;
+
+type SourceState = 'loading' | 'live' | 'last-known' | 'unavailable';
+
+interface HistorySourceState {
+  readonly inner: StrategyState<unknown>;
+  /** A snapshot frame was read since the last reset: only then is an empty history a claim. */
+  readonly snapshotSeen: boolean;
+  /** UPDATE rows no snapshot has contained since the last reset (see {@link applySnapshot}). */
+  readonly unconfirmed: readonly OperationHistoryRow[];
+}
+
+/** The history window the strategy keeps; unconfirmed observations beyond it are no longer shown. */
+const HISTORY_WINDOW = 200;
+
+/** A history row's identity: its invocation key, else the exact legacy identity of its raw fields. */
+const historyIdentity = (row: OperationHistoryRow): string | undefined =>
+  row && typeof row.operationId === 'string' && typeof row.endTime === 'string' ? historyLedgerId(row) : undefined;
+
+const QUICK_FILTERS: ReadonlyArray<readonly [QuickFilter, string]> = [
+  ['all', 'All'], ['agents', 'Agents'], ['mine', 'Your actions'], ['indexing', 'Indexing'], ['problems', 'Problems'],
+];
+
+const NOTE_TEXT: Record<FeedNote, string> = {
+  'recorded-locally': 'Recorded locally',
+  'ambiguous-legacy': 'Older local record: it may be the same event as another row, which cannot be proven',
+  'ambiguous-history': 'Several history records share this identity',
+  'outcome-unavailable': 'Outcome unavailable',
+};
+
+const SOURCE_NAMES = { ledger: 'Activity ledger', history: 'Operation history' } as const;
 
 export class ActionLedgerView extends JfElement {
   static properties = {
     apiBase: { type: String, attribute: 'api-base' },
-    // Tempdoc 662: the shared MultiplexedStream (mirrors AdvisoryToastHost's `store` property
-    // shape — an object, not an attribute-able primitive).
+    // Tempdoc 662: the shared MultiplexedStream (an object, not an attribute-able primitive).
     multiplex: { attribute: false },
-    entries: { attribute: false },
-    // tempdoc 558 §E1 — client-side facets over the streamed entries (empty = all).
-    filterOriginators: { state: true },
-    filterOutcomes: { state: true },
-    // tempdoc 613 §6/§10 — the default Activity feed is a CURATED projection: routine direct-user
-    // navigation (the user already witnessed it) is excluded unless this toggle reveals it.
-    showRoutine: { state: true },
-    // tempdoc 612 §UX — the seen-cursor snapshot, mirrored into reactive state so the feed re-renders its
-    // "new since you looked" marks when any recall surface (incl. the AI digest) advances the one cursor.
+    filter: { attribute: false },
+    ledger: { state: true },
+    ledgerConnected: { state: true },
+    seed: { state: true },
+    ledgerReadFailed: { state: true },
+    history: { state: true },
+    historyState: { state: true },
+    journal: { state: true },
+    // tempdoc 612 §UX — the seen-cursor snapshot, mirrored so "new" marks re-fold when it advances.
     seenCursor: { state: true },
-    // tempdoc 804 §B9 (F9) — did the ledger READ fail? "No activity yet" is a claim about the
-    // ledger, so it may only be made when the ledger was actually read.
-    ledgerUnreadable: { state: true },
-    // tempdoc 812 D4 — which scan rollups the user expanded to their per-document rows.
-    expandedScans: { state: true },
+    expanded: { state: true },
     // tempdoc 812 D4 — pathHash → friendly name, filled lazily by core.resolve-path-hash.
     resolvedNames: { state: true },
   } as const;
 
   declare apiBase: string;
   declare multiplex?: MultiplexedStream;
-  declare entries: UnifiedActionEntry[];
-  declare filterOriginators: string[];
-  declare filterOutcomes: string[];
-  declare showRoutine: boolean;
+  /** The active filters; ephemeral (never persisted). */
+  declare filter: FeedFilter;
+  declare ledger: LedgerStreamState | null;
+  declare ledgerConnected: boolean;
+  declare seed: readonly BackendLedgerEntry[] | null;
+  declare ledgerReadFailed: boolean;
+  declare history: HistorySourceState | null;
+  declare historyState: SourceState;
+  declare journal: readonly JournalEntry[];
   declare seenCursor: string;
-  declare ledgerUnreadable: boolean;
-  declare expandedScans: string[];
+  /** Scan rollups and bursts the person expanded, by key. */
+  declare expanded: readonly string[];
   declare resolvedNames: Record<string, string>;
 
-  /** Hashes already asked for (in-flight or resolved) — one resolve per hash per session. */
+  /** Hashes asked for and not yet answered or answered with a name; a failed answer is retried later. */
   private readonly resolvingHashes = new Set<string>();
   /** Injected only by tests; production uses the real `core.resolve-path-hash` resolver. */
   resolveHash?: (resourceId: string, pathHash: string) => Promise<string | null>;
-
-  /** Injected only by tests; production uses the real EventSource via openActionLedgerStream. */
+  /** Injected only by tests; production uses the real EventSource via openLedgerSource. */
   eventSourceFactory?: (url: string) => EventSource;
+  /** Injected only by tests; production opens the operation-history stream with a real EventSource. */
+  historyEventSourceFactory?: (url: string) => EventSource;
   /** Injected only by tests; production uses `authorizedFetch` via {@link ActionLedgerClient}. */
   ledgerFetch?: typeof fetch;
 
-  private stopStream: (() => void) | null = null;
-  private stopSeenSub: (() => void) | null = null;
-  /** tempdoc 804 §B9 (F9) — true once the live stream has delivered rows (the seed then stands down). */
-  private streamDeliveredRows = false;
+  private stops: Array<() => void> = [];
+  /** Bumped on every disconnect, so an answer started by an earlier mount changes nothing. */
+  private mountGeneration = 0;
+  private midnightTimer: ReturnType<typeof setTimeout> | null = null;
+  /** The history stream failed since its last snapshot (or before its first): it is unavailable, not loading. */
+  private historyFailed = false;
+  /** Reopens the history stream now; set while the stream is open. */
+  private retryHistory: (() => void) | null = null;
+  /** The first record on screen before new records arrive, when the reader has scrolled into the list. */
+  private readingAnchor: { key: string; top: number } | null = null;
+  /** The feed entry Tab lands on: the one last focused, else the newest. */
+  private tabStop = 0;
+  /** Bumped by each scrolling key and by the reader's own wheel or pointer: the latest one wins. */
+  private keyScroll = 0;
 
   constructor() {
     super();
     this.apiBase = '';
-    this.entries = [];
-    this.filterOriginators = [];
-    this.filterOutcomes = [];
-    this.showRoutine = false;
+    this.filter = DEFAULT_FEED_FILTER;
+    this.ledger = null;
+    this.ledgerConnected = false;
+    this.seed = null;
+    this.ledgerReadFailed = false;
+    this.history = null;
+    this.historyState = 'loading';
+    this.journal = [];
     this.seenCursor = getSeenCursor();
-    this.ledgerUnreadable = false;
-    this.expandedScans = [];
+    this.expanded = [];
     this.resolvedNames = {};
   }
 
-  /**
-   * tempdoc 812 D4 — resolve an index row's pathHash to a friendly name ONCE, then re-render so the
-   * row relabels in place. Until it resolves (or if it can't), the short-hash label stands: an
-   * unresolvable hash degrades to what the row said before, never to a blank or a wrong name.
-   */
-  private ensureResolvedName(pathHash: string): void {
-    if (!pathHash || this.resolvingHashes.has(pathHash) || this.resolvedNames[pathHash]) return;
-    this.resolvingHashes.add(pathHash);
-    const resolve = this.resolveHash ?? resolvePathLazy;
-    void resolve(INDEXING_JOBS_RESOURCE, pathHash)
-      .then((path) => {
-        if (path) {
-          this.resolvedNames = { ...this.resolvedNames, [pathHash]: friendlyPathName(path) };
-        }
-      })
-      .catch(() => {
-        /* keep the short-hash fallback */
-      });
-  }
-
-  /**
-   * tempdoc 812 D4 — the per-document rows of one scan, matched by the capture-side scanId (D2).
-   * Only the rows still in the bounded ring survive; the rollup's own counts remain the audit
-   * truth, so an expansion showing fewer rows than the rollup counted is expected, not a conflict.
-   */
-  private rowsOfScan(scanId: string): UnifiedActionEntry[] {
-    return this.entries.filter((e) => e.kind === 'index' && e.scanId === scanId);
-  }
-
-  /** Relabel an index row with its resolved name when one is known (else leave it untouched). */
-  private withResolvedLabel(row: UnifiedActionEntry): UnifiedActionEntry {
-    if (row.kind !== 'index' || !row.pathHash) return row;
-    this.ensureResolvedName(row.pathHash);
-    const name = this.resolvedNames[row.pathHash];
-    if (!name) return row;
-    const failed = row.outcome === 'FAILED';
-    return { ...row, label: `${failed ? 'Index failed' : 'Indexed'} · ${name}` };
-  }
-
-  private toggleScan(scanId: string): void {
-    this.expandedScans = this.expandedScans.includes(scanId)
-      ? this.expandedScans.filter((s) => s !== scanId)
-      : [...this.expandedScans, scanId];
-  }
-
-  /** A foreground row the user has not yet seen (newer than the one shared seen-cursor). Routine rows
-   *  are never marked — they are hidden noise, not "what happened that you should know about". */
-  private isNewRow(e: UnifiedActionEntry): boolean {
-    // Reads the reactive `seenCursor` state (kept in sync with the one shared cursor) so render is a pure
-    // function of state. ISO-8601 `Z` timestamps compare lexically === chronologically (per recallCursor).
-    return !e.isRoutine && e.occurredAt > this.seenCursor;
-  }
-
-  // tempdoc 558 §S1 — the row styles are single-sourced in eventRow.ts (shared with the History tab);
-  // this surface adds only its host + empty-state styles + the burst-summary chrome.
+  // tempdoc 558 §S1 — the row styles are single-sourced in eventRow.ts (shared with the History tab).
   static styles = [
     eventRowStyles,
     css`
       :host {
         display: block;
         font-size: var(--font-size-sm);
+        min-width: 0;
       }
       .empty {
         opacity: 0.6;
         padding: 0.5rem 0;
       }
-      /* tempdoc 612 §L.2 #4 — inline reveal affordance on the all-routine curated-empty state. */
-      .reveal-routine {
-        margin-left: 0.4rem;
+      .link {
         padding: 0;
         border: 0;
         background: none;
@@ -199,28 +240,77 @@ export class ActionLedgerView extends JfElement {
         text-decoration: underline;
         cursor: pointer;
       }
-      /* tempdoc 612 §UX — the "N new since you looked" affordance + its "mark all read" link. */
+      .reveal-routine {
+        margin-left: 0.4rem;
+      }
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem 0.75rem;
+        padding: 0 0 0.5rem 0;
+      }
+      .quick {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.25rem;
+      }
+      .quick button {
+        padding: 0.125rem 0.6rem;
+        border-radius: 9999px;
+        border: 1px solid var(--border-subtle);
+        background: transparent;
+        color: var(--text-secondary);
+        font: inherit;
+        font-size: var(--font-size-xs);
+        cursor: pointer;
+      }
+      /* Selected reads by weight and a heavier border as well as tint, so it survives forced colours. */
+      .quick button[aria-checked='true'] {
+        border: 2px solid var(--accent);
+        color: var(--text-primary);
+        font-weight: 600;
+      }
+      .quick button:focus-visible,
+      .link:focus-visible,
+      .expand:focus-visible,
+      .entry:focus-visible,
+      summary:focus-visible,
+      select:focus-visible {
+        outline: 2px solid var(--focus-ring-color);
+        outline-offset: 1px;
+      }
+      @media (forced-colors: active) {
+        .quick button[aria-checked='true'] {
+          border-color: Highlight;
+        }
+        .quick button:focus-visible,
+        .link:focus-visible,
+        .expand:focus-visible,
+        .entry:focus-visible,
+        summary:focus-visible,
+        select:focus-visible {
+          outline-color: Highlight;
+        }
+      }
       .new-count {
         font-size: var(--font-size-xs);
         color: var(--text-tint);
         font-weight: 600;
       }
       .mark-read {
-        padding: 0;
-        border: 0;
-        background: none;
-        color: var(--accent);
-        font: inherit;
         font-size: var(--font-size-xs);
-        text-decoration: underline;
-        cursor: pointer;
       }
-      /* tempdoc 558 §E1 — the facet bar (who / outcome), composed from the FilterChip atom. */
+      details.advanced > summary {
+        cursor: pointer;
+        font-size: var(--font-size-xs);
+        color: var(--text-secondary);
+      }
       .filters {
         display: flex;
         flex-wrap: wrap;
         gap: 0.75rem;
-        padding: 0 0 0.5rem 0;
+        padding: 0.25rem 0 0.5rem 0;
       }
       .filters .group {
         display: flex;
@@ -228,14 +318,29 @@ export class ActionLedgerView extends JfElement {
         align-items: center;
         gap: 0.35rem;
       }
-      .filters .group-label {
+      .group-label {
         font-size: var(--font-size-xs);
         color: var(--text-secondary);
       }
-      /* tempdoc 812 D4 — the scan rollup's expand affordance reads as the row's label, not a
-         separate control: same type, same colour, only the disclosure caret is added. */
-      .scan-expand {
+      .notice,
+      .source-state {
+        margin: 0 0 0.35rem 0;
+        font-size: var(--font-size-xs);
+        color: var(--text-secondary);
+      }
+      .notes {
+        padding: 0 0 0.25rem 0;
+        font-size: var(--font-size-xs);
+        color: var(--text-secondary);
+      }
+      .notes span + span::before {
+        content: ' · ';
+      }
+      /* tempdoc 812 D4 — the rollup/burst expand control reads as the row's label: same type and
+         colour, only the disclosure caret is added. */
+      .expand {
         flex: 1;
+        min-width: 0;
         padding: 0;
         border: 0;
         background: none;
@@ -244,337 +349,701 @@ export class ActionLedgerView extends JfElement {
         text-align: left;
         cursor: pointer;
       }
-      /* Indented per-document detail under an expanded scan rollup. */
-      .scan-child {
+      .child {
         padding-left: 1.25rem;
       }
-      .scan-child.empty {
-        opacity: 0.6;
+      .child.empty {
         padding: 0.25rem 0 0.25rem 1.25rem;
+      }
+      .row,
+      .label {
+        min-width: 0;
+        overflow-wrap: anywhere;
+      }
+      .row {
+        flex-wrap: wrap;
+      }
+      lit-virtualizer {
+        width: 100%;
+      }
+      /* An entry spans the row, so a click anywhere on it focuses it for the feed's keys. */
+      .entry {
+        box-sizing: border-box;
+        width: 100%;
       }
     `,
   ];
 
   override connectedCallback(): void {
     super.connectedCallback();
-    // One live read path: openActionLedgerStream delivers the initial snapshot frame AND every
-    // subsequent backend row, and re-folds the FE Effect Journal on each change — so there is no
-    // separate snapshot fetch to drift from the live stream. (tempdoc 550 thesis I: snapshot and
-    // live are two reads of one projection, not two code paths.)
-    // Tempdoc 662: `ActivitySurface` mounts this element via the generic SurfaceCatalog
-    // dispatcher (attribute-only — no object property binding path from Shell's boot site),
-    // so an un-bound `multiplex` property falls back to the shared singleton Shell sets at
-    // boot. Tests keep injecting `multiplex` directly and never touch the singleton.
+    const generation = this.mountGeneration;
+    // Tempdoc 662: an un-bound `multiplex` property falls back to the shared singleton Shell sets at
+    // boot; tests inject `multiplex` or an EventSource factory directly.
     const multiplex = this.multiplex ?? getSharedShellEventsMultiplex() ?? undefined;
-    this.stopStream = openActionLedgerStream({
+    this.stops.push(openLedgerSource({
       apiBase: this.apiBase,
       ...(multiplex ? { multiplex } : {}),
       ...(this.eventSourceFactory ? { eventSourceFactory: this.eventSourceFactory } : {}),
-      onActivity: (rows) => {
-        // tempdoc 804 §B9 (F9) — a lifecycle frame that carries no rows (connected / heartbeat,
-        // and every frame before the snapshot arrives) must not erase what the snapshot read
-        // already established. The ledger is an append-only ring: it never shrinks to empty.
-        if (rows.length === 0 && this.entries.length > 0) return;
-        this.streamDeliveredRows = this.streamDeliveredRows || rows.length > 0;
-        this.entries = rows;
-        this.requestUpdate();
-      },
-    });
-    void this.seedFromLedgerSnapshot();
-    // tempdoc 612 §UX — mirror the one shared seen-cursor into reactive state, so the "new" marks
-    // re-fold whenever the cursor advances (here, or from the AI digest's "mark as seen" — one boundary).
+    }, (state, isConnected) => {
+      this.ledger = state;
+      this.ledgerConnected = isConnected;
+    }));
+    // Joining a channel the Shell already reads: its connect frames went to the readers before this
+    // one, and an idle ledger channel sends nothing more (the connection's heartbeat has its own
+    // channel). Start from what the channel has established and whether the connection is up.
+    const current = multiplex?.getSnapshot<LedgerStreamState>(SHELL_EVENT_STREAM_IDS.ACTION_LEDGER);
+    if (current && current.seq > 0) {
+      this.ledger = current.payload;
+      this.ledgerConnected = current.isConnected;
+    }
+    void this.seedFromLedgerSnapshot(generation);
+    this.openHistory();
+    this.journal = listJournal();
+    this.stops.push(subscribeJournal(() => { this.journal = listJournal(); }));
     this.seenCursor = getSeenCursor();
-    this.stopSeenSub = subscribeSeenCursor(() => {
-      this.seenCursor = getSeenCursor();
-    });
+    this.stops.push(subscribeSeenCursor(() => { this.seenCursor = getSeenCursor(); }));
+    this.armMidnight();
+    window.addEventListener('keydown', this.onPageKey);
+    this.stops.push(() => window.removeEventListener('keydown', this.onPageKey));
   }
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
-    this.stopStream?.();
-    this.stopStream = null;
-    this.stopSeenSub?.();
-    this.stopSeenSub = null;
-    this.streamDeliveredRows = false;
+    this.mountGeneration += 1;
+    for (const stop of this.stops.splice(0)) stop();
+    if (this.midnightTimer !== null) clearTimeout(this.midnightTimer);
+    this.midnightTimer = null;
+    this.ledger = null;
+    this.ledgerConnected = false;
+    this.seed = null;
+    this.ledgerReadFailed = false;
+    this.history = null;
+    this.historyState = 'loading';
+    this.historyFailed = false;
+    this.retryHistory = null;
   }
 
   /**
-   * Tempdoc 804 §B9 (round-10 F9) — read the ledger the surface claims to audit.
-   *
-   * The round found this view rendering "No activity yet." while `GET /api/action-ledger` held 405
-   * entries: the live stream was the ONLY source, so any frame the socket did not deliver rendered
-   * as a confident, false "nothing happened". The snapshot GET is the SAME projection as the
-   * stream's snapshot frame (`ActionLedgerController` serializes both through
-   * `ActionLedgerProjection`), so this is a second READ of one record, not a second authority —
-   * and it only fills the gap: live rows always win, and the seed never overwrites them.
+   * Tempdoc 804 §B9 (F9) — read the ledger the surface claims to audit, so an undelivered stream
+   * frame never renders as a confident "nothing happened". The GET is the same projection as the
+   * stream's snapshot; it only stands in until the stream's first snapshot. An answer is dropped if
+   * this element was disconnected since, a reset arrived since, or the stream already answered.
    */
-  private async seedFromLedgerSnapshot(): Promise<void> {
+  private async seedFromLedgerSnapshot(generation: number): Promise<void> {
+    const resetsAtStart = this.ledger?.resets ?? 0;
     const client = new ActionLedgerClient({
       apiBase: this.apiBase,
       ...(this.ledgerFetch ? { fetchImpl: this.ledgerFetch } : {}),
     });
     try {
       const backend = await client.fetchBackendLedger();
-      this.ledgerUnreadable = false;
-      if (this.streamDeliveredRows || this.entries.length > 0 || backend.length === 0) return;
-      this.entries = backend.map(projectBackend);
-      this.requestUpdate();
+      if (generation !== this.mountGeneration || (this.ledger?.resets ?? 0) !== resetsAtStart) return;
+      this.ledgerReadFailed = false;
+      if (!this.ledger?.snapshotApplied) this.seed = backend;
     } catch {
-      // The ledger could not be read at all — say that, rather than claiming it is empty.
-      this.ledgerUnreadable = this.entries.length === 0 && !this.streamDeliveredRows;
+      if (generation !== this.mountGeneration) return;
+      this.ledgerReadFailed = true;
     }
   }
 
-  /** tempdoc 612 §UX — advance the one shared seen-cursor to the newest foreground row (the standard
-   *  "mark all read"). Monotonic in {@link markSeen}; clears the marks here AND any other recall surface. */
-  private markAllRead(): void {
+  /** Open `core.operation-history` from its catalog declaration (waiting for the catalog if needed). */
+  private openHistory(): void {
+    const generation = this.mountGeneration;
+    const resource = getResource(HISTORY_RESOURCE);
+    if (!resource) {
+      const stopWaiting = onCatalogChange(() => {
+        if (generation !== this.mountGeneration || !getResource(HISTORY_RESOURCE)) return;
+        stopWaiting();
+        this.openHistory();
+      });
+      this.stops.push(stopWaiting);
+      return;
+    }
+    const strategy = strategyFor(resource);
+    if (!strategy) {
+      this.historyState = 'unavailable';
+      return;
+    }
+    // Snapshot arbitration (amendment 4): a snapshot cannot erase or replace an observation no
+    // snapshot has contained yet; only a reset voids what was observed before it.
+    const reducer: EnvelopeReducer<HistorySourceState> = (state, envelope) => {
+      const payload = envelope.payload as { kind?: string; entries?: unknown } | null;
+      const kind = envelope.frameKind === 'LIFECYCLE' ? payload?.kind : undefined;
+      if (kind === 'snapshot' && Array.isArray(payload?.entries)) {
+        const next = applySnapshot(payload.entries as OperationHistoryRow[], state.unconfirmed, historyIdentity);
+        return {
+          inner: strategy.reducer(state.inner, { ...envelope, payload: { ...payload, entries: next.rows } }),
+          snapshotSeen: true,
+          unconfirmed: next.unconfirmed,
+        };
+      }
+      const inner = strategy.reducer(state.inner, envelope);
+      if (kind === 'reset') return { inner, snapshotSeen: false, unconfirmed: [] };
+      if (envelope.frameKind === 'UPDATE') {
+        const unconfirmed = observe(state.unconfirmed, envelope.payload as OperationHistoryRow, historyIdentity);
+        return { inner, snapshotSeen: state.snapshotSeen, unconfirmed: unconfirmed.slice(-HISTORY_WINDOW) };
+      }
+      return { ...state, inner, snapshotSeen: kind === 'snapshot' ? true : state.snapshotSeen };
+    };
+    // A failure is said only about a source that has not read a snapshot since: once read, a lost
+    // channel shows the last-known records instead. Connection or heartbeat frames prove nothing.
+    const open = this.historyEventSourceFactory ?? ((url: string) => new FetchEventSource(url));
+    const eventSourceFactory = (url: string): StreamSource => {
+      const source = open(url) as StreamSource;
+      source.addEventListener('error', () => {
+        if (generation !== this.mountGeneration || this.history?.snapshotSeen) return;
+        this.historyFailed = true;
+        this.historyState = 'unavailable';
+      });
+      return source;
+    };
+    const base = (this.apiBase ?? '').replace(/\/$/, '');
+    const stream = new EnvelopeStream<HistorySourceState>({
+      url: /^https?:\/\//i.test(resource.endpoint) ? resource.endpoint : `${base}${resource.endpoint}`,
+      initialState: { inner: strategy.initialState, snapshotSeen: false, unconfirmed: [] },
+      reducer,
+      eventSourceFactory,
+    });
+    const unsubscribe = stream.subscribe((snap) => {
+      this.history = snap.payload;
+      if (snap.payload.snapshotSeen) this.historyFailed = false;
+      this.historyState = snap.payload.snapshotSeen ? (snap.isConnected ? 'live' : 'last-known')
+        : this.historyFailed ? 'unavailable' : 'loading';
+    });
+    stream.start();
+    // The stream reconnects itself with backoff; Retry reopens it now.
+    this.retryHistory = () => {
+      if (generation !== this.mountGeneration) return;
+      this.historyFailed = false;
+      if (!this.history?.snapshotSeen) this.historyState = 'loading';
+      stream.stop();
+      stream.start();
+    };
+    this.stops.push(() => { unsubscribe(); stream.stop(); });
+  }
+
+  /**
+   * Live arrivals keep the reader's place: newest-first rows land above whatever is being read, so
+   * once the list's start is scrolled away, the first record on screen is noted before the update
+   * and the scroller is moved by however far that record was pushed once the list has laid out.
+   */
+  protected override willUpdate(changed: PropertyValues<this>): void {
+    this.readingAnchor = null;
+    const arrivals = changed.has('ledger') || changed.has('history') || changed.has('journal') || changed.has('seed');
+    if (!arrivals || changed.has('filter') || changed.has('expanded') || this.getBoundingClientRect().top >= 0) return;
+    let best: { key: string; top: number } | null = null;
+    for (const row of this.renderRoot.querySelectorAll<HTMLElement>('[data-key]')) {
+      const top = row.getBoundingClientRect().top;
+      if (top >= 0 && (!best || top < best.top)) best = { key: row.dataset.key ?? '', top };
+    }
+    this.readingAnchor = best;
+  }
+
+  protected override updated(): void {
+    const anchor = this.readingAnchor;
+    if (!anchor) return;
+    this.readingAnchor = null;
+    // The windowed list lays out over the next frames: follow the record for a few of them, and
+    // stop as soon as the reader scrolls themselves.
+    const scroller = scrollerOf(this);
+    let expected = scroller.scrollTop;
+    let frames = 6;
+    const follow = (): void => {
+      if (!this.isConnected || scroller.scrollTop !== expected) return;
+      const row = this.renderRoot.querySelector<HTMLElement>(`[data-key="${CSS.escape(anchor.key)}"]`);
+      const moved = row ? row.getBoundingClientRect().top - anchor.top : 0;
+      if (Math.abs(moved) >= 1) scroller.scrollTop += moved;
+      expected = scroller.scrollTop;
+      if (--frames > 0) requestAnimationFrame(follow);
+    };
+    requestAnimationFrame(follow);
+  }
+
+  /** Re-render at local midnight so Today's boundary advances; an early wake just re-arms. */
+  private armMidnight(): void {
+    const now = new Date();
+    const next = startOfLocalDay(now);
+    next.setDate(next.getDate() + 1);
+    this.midnightTimer = setTimeout(() => {
+      this.midnightTimer = null;
+      if (!this.isConnected) return;
+      this.requestUpdate();
+      this.armMidnight();
+    }, Math.max(1000, next.getTime() - now.getTime()));
+  }
+
+  /** The ledger rows this view holds: the stream's after its first snapshot, else the seed plus live rows. */
+  private ledgerRows(): readonly BackendLedgerEntry[] {
+    const live = this.ledger?.rows ?? [];
+    if (this.ledger?.snapshotApplied || !this.seed) return live;
+    const ids = new Set(live.map((e) => e.id).filter(Boolean));
+    return [...this.seed.filter((e) => !e.id || !ids.has(e.id)), ...live];
+  }
+
+  private historyRows(): readonly OperationHistoryRow[] {
+    const data = this.history?.inner.data as { events?: unknown[]; entries?: unknown[] } | undefined;
+    return ((data?.events ?? data?.entries ?? []) as OperationHistoryRow[])
+      .filter((row) => row && typeof row.operationId === 'string' && typeof row.endTime === 'string');
+  }
+
+  private ledgerState(): SourceState {
+    const read = !!this.ledger?.snapshotApplied || this.seed !== null || (this.ledger?.rows.length ?? 0) > 0;
+    if (!read) return this.ledgerReadFailed ? 'unavailable' : 'loading';
+    return this.ledgerConnected ? 'live' : 'last-known';
+  }
+
+  /**
+   * tempdoc 812 D4 — resolve an index row's pathHash to a friendly name, then re-render so the row
+   * relabels in place. Until it resolves the short-hash label stands; an unanswered resolve is
+   * forgotten so a later render can ask again once the resolver recovers.
+   */
+  private ensureResolvedName(pathHash: string): void {
+    if (!pathHash || this.resolvingHashes.has(pathHash) || this.resolvedNames[pathHash]) return;
+    this.resolvingHashes.add(pathHash);
+    const generation = this.mountGeneration;
+    const resolve = this.resolveHash ?? resolvePathLazy;
+    void resolve(INDEXING_JOBS_RESOURCE, pathHash)
+      .then((path) => {
+        if (path && generation === this.mountGeneration) {
+          this.resolvedNames = { ...this.resolvedNames, [pathHash]: friendlyPathName(path) };
+        } else this.resolvingHashes.delete(pathHash);
+      })
+      .catch(() => { this.resolvingHashes.delete(pathHash); });
+  }
+
+  /** Relabel an index row with its resolved name when one is known (else leave it untouched). */
+  private withResolvedLabel(row: UnifiedActionEntry): UnifiedActionEntry {
+    if (row.kind !== 'index' || !row.pathHash) return row;
+    this.ensureResolvedName(row.pathHash);
+    const name = this.resolvedNames[row.pathHash];
+    if (!name) return row;
+    return { ...row, label: indexLabel(row.indexState, name) };
+  }
+
+  private toggleExpanded(key: string): void {
+    this.expanded = this.expanded.includes(key) ? this.expanded.filter((k) => k !== key) : [...this.expanded, key];
+  }
+
+  private setFilter(change: Partial<FeedFilter>): void {
+    this.filter = { ...this.filter, ...change };
+  }
+
+  /** A foreground row newer than the one shared seen-cursor (parsed instants). Routine rows are never marked. */
+  private isNew(occurredAt: string, routine = false): boolean {
+    return !routine && (this.seenCursor === '' ? !!occurredAt : compareInstants(occurredAt, this.seenCursor) > 0);
+  }
+
+  /**
+   * "Mark all read" moves the shared cursor to the newest loaded foreground record, whatever the
+   * filters show — the cursor's scope is every loaded record, not the visible ones.
+   */
+  private markAllRead(feed: readonly FeedRow[]): void {
     let newest = '';
-    for (const e of this.entries) {
-      if (!e.isRoutine && e.occurredAt > newest) newest = e.occurredAt;
+    for (const row of feed) {
+      if (!row.entry.isRoutine && (newest === '' || compareInstants(row.entry.occurredAt, newest) > 0)) newest = row.entry.occurredAt;
     }
     if (newest) markSeen(newest);
   }
 
-  /** tempdoc 558 §E1 — toggle a facet value in/out of the active filter for its dimension. */
-  private toggleFilter(dim: 'originator' | 'outcome', value: string): void {
-    const cur = dim === 'originator' ? this.filterOriginators : this.filterOutcomes;
-    const next = cur.includes(value) ? cur.filter((v) => v !== value) : [...cur, value];
-    if (dim === 'originator') this.filterOriginators = next;
-    else this.filterOutcomes = next;
+  private onQuickKey(event: KeyboardEvent): void {
+    const order = QUICK_FILTERS.map(([value]) => value);
+    const step = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1
+      : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 0;
+    if (!step) return;
+    event.preventDefault();
+    const next = order[(order.indexOf(this.filter.quick) + step + order.length) % order.length]!;
+    this.setFilter({ quick: next });
+    void this.updateComplete.then(() => {
+      this.renderRoot.querySelector<HTMLElement>(`[data-quick="${next}"]`)?.focus();
+    });
   }
 
-  /** An entry passes when it matches every ACTIVE facet (empty facet = no constraint). */
-  private matchesFilter(e: UnifiedActionEntry): boolean {
-    if (this.filterOriginators.length > 0 && !this.filterOriginators.includes(e.originator)) return false;
-    if (this.filterOutcomes.length > 0 && !(e.outcome && this.filterOutcomes.includes(e.outcome)))
-      return false;
-    return true;
+  private renderQuick(): TemplateResult {
+    return html`<div class="quick" role="radiogroup" aria-label="Show activity" data-testid="feed-quick"
+      @keydown=${(e: KeyboardEvent) => this.onQuickKey(e)}>
+      ${QUICK_FILTERS.map(([value, label]) => html`<button type="button" role="radio"
+        data-quick=${value} aria-checked=${this.filter.quick === value ? 'true' : 'false'}
+        tabindex=${this.filter.quick === value ? '0' : '-1'}
+        @click=${() => this.setFilter({ quick: value })}>${label}</button>`)}
+    </div>`;
   }
 
-  /** Distinct facet values + counts over the UNFILTERED entries (stable chip set showing totals). */
-  private facet(
-    pick: (e: UnifiedActionEntry) => string | undefined,
-  ): Array<{ value: string; count: number }> {
+  /** Distinct values + counts over all loaded rows (a stable chip set). */
+  private facet(feed: readonly FeedRow[], pick: (row: FeedRow) => string | undefined): Array<{ value: string; count: number }> {
     const counts = new Map<string, number>();
-    for (const e of this.entries) {
-      const v = pick(e);
+    for (const row of feed) {
+      const v = pick(row);
       if (v) counts.set(v, (counts.get(v) ?? 0) + 1);
     }
     return [...counts.entries()].map(([value, count]) => ({ value, count }));
   }
 
-  private renderFilters(): TemplateResult {
-    const originators = this.facet((e) => e.originator);
-    const outcomes = this.facet((e) => e.outcome);
-    // Only show a facet that actually discriminates (>1 value) — no chrome for a trivial single value.
-    const showWho = originators.length > 1;
-    const showOutcome = outcomes.length > 1;
-    // tempdoc 613 §6/§10 + 612 §3/§L — how many routine direct-user rows (navigation + witnessed
-    // local-ack/preference effects + insignificant operations) are excluded from the curated default.
-    const routineCount = this.entries.filter((e) => e.isRoutine).length;
-    // tempdoc 612 §UX — foreground rows newer than the one shared seen-cursor: "what happened that you
-    // should know about, since you last looked". A "mark all read" advances the shared boundary.
-    const newCount = this.entries.filter((e) => this.isNewRow(e)).length;
-    if (!showWho && !showOutcome && routineCount === 0 && newCount === 0) return html`${''}`;
-    const chip = (
-      dim: 'originator' | 'outcome',
-      selected: string[],
-      f: { value: string; count: number },
-    ): TemplateResult =>
-      html`<jf-filter-chip
-        ?active=${selected.includes(f.value)}
-        @click=${() => this.toggleFilter(dim, f.value)}
-      >
-        ${f.value}
-        <span class="chip-count">(${f.count})</span>
-      </jf-filter-chip>`;
-    return html`<div class="filters" data-testid="ledger-filters">
-      ${newCount > 0
-        ? html`<div class="group">
-            <span class="group-label">new</span>
-            <span class="new-count" data-testid="ledger-new-count"
-              >${newCount} since you looked</span
-            >
-            <button
-              type="button"
-              class="mark-read"
-              data-testid="ledger-mark-read"
-              @click=${() => this.markAllRead()}
-            >
-              mark all read
-            </button>
-          </div>`
-        : ''}
-      ${showWho
-        ? html`<div class="group">
-            <span class="group-label">who</span>
-            ${originators.map((f) => chip('originator', this.filterOriginators, f))}
-          </div>`
-        : ''}
-      ${showOutcome
-        ? html`<div class="group">
-            <span class="group-label">outcome</span>
-            ${outcomes.map((f) => chip('outcome', this.filterOutcomes, f))}
-          </div>`
-        : ''}
-      ${routineCount > 0
-        ? html`<div class="group">
-            <span class="group-label">hidden</span>
-            <jf-filter-chip
-              ?active=${this.showRoutine}
-              data-testid="ledger-routine-toggle"
-              @click=${() => {
-                this.showRoutine = !this.showRoutine;
-              }}
-            >
-              routine
-              <span class="chip-count">(${routineCount})</span>
-            </jf-filter-chip>
-          </div>`
-        : ''}
-    </div>`;
+  private renderAdvanced(feed: readonly FeedRow[]): TemplateResult {
+    const originators = this.facet(feed, (r) => r.entry.originator);
+    const outcomes = this.facet(feed, (r) => r.entry.outcome);
+    const proposals = this.facet(feed, (r) => r.proposal);
+    const toggle = <K extends 'originators' | 'outcomes' | 'proposals'>(dim: K, value: string): void => {
+      const cur = this.filter[dim] as readonly string[];
+      this.setFilter({ [dim]: cur.includes(value) ? cur.filter((v) => v !== value) : [...cur, value] } as Partial<FeedFilter>);
+    };
+    const chips = (dim: 'originators' | 'outcomes' | 'proposals', label: string, values: Array<{ value: string; count: number }>) =>
+      html`<div class="group" data-testid=${`feed-facet-${dim}`}>
+        <span class="group-label">${label}</span>
+        ${values.map((f) => html`<jf-filter-chip ?active=${(this.filter[dim] as readonly string[]).includes(f.value)}
+          @click=${() => toggle(dim, f.value)}>${f.value} <span class="chip-count">(${f.count})</span></jf-filter-chip>`)}
+      </div>`;
+    const active = this.filter.originators.length + this.filter.outcomes.length + this.filter.proposals.length
+      + (this.filter.routine !== 'auto' ? 1 : 0) + (this.filter.date !== 'all' ? 1 : 0);
+    return html`<details class="advanced" data-testid="feed-advanced">
+      <summary>Filter${active ? ` (${active} active)` : ''}</summary>
+      <div class="filters" data-testid="ledger-filters">
+        ${originators.length > 1 ? chips('originators', 'who', originators) : nothing}
+        ${outcomes.length > 1 ? chips('outcomes', 'outcome', outcomes) : nothing}
+        ${proposals.some((p) => p.value !== 'normal') ? chips('proposals', 'proposal', proposals) : nothing}
+        <div class="group">
+          <label class="group-label" for="routine-choice">routine activity</label>
+          <select id="routine-choice" data-testid="feed-routine-choice"
+            @change=${(e: Event) => this.setFilter({ routine: (e.target as HTMLSelectElement).value as RoutineChoice })}>
+            <option value="auto" ?selected=${this.filter.routine === 'auto'}>Automatic: hidden in All and Agents</option>
+            <option value="show" ?selected=${this.filter.routine === 'show'}>Always show, in every view</option>
+            <option value="hide" ?selected=${this.filter.routine === 'hide'}>Always hide, in every view</option>
+          </select>
+        </div>
+        <div class="group">
+          <span class="group-label">date</span>
+          <jf-filter-chip ?active=${this.filter.date === 'today'} data-testid="feed-date-today"
+            @click=${() => this.setFilter({ date: this.filter.date === 'today' ? 'all' : 'today' })}>Today only</jf-filter-chip>
+        </div>
+      </div>
+    </details>`;
+  }
+
+  private renderSourceStates(feed: readonly FeedRow[]): TemplateResult {
+    const states: Array<[keyof typeof SOURCE_NAMES, SourceState]> = [['ledger', this.ledgerState()], ['history', this.historyState]];
+    const affected = states.filter(([, state]) => state !== 'live');
+    const anyRead = states.some(([, s]) => s === 'live' || s === 'last-known') || this.journal.length > 0;
+    const words = (state: SourceState): string => state === 'loading' ? 'loading'
+      : state === 'unavailable' ? 'could not be read' : 'showing last-known records; live updates are not connected';
+    return html`${affected.map(([name, state]) => html`<p class="source-state" role="status"
+      data-testid=${`feed-source-${name}`} data-state=${state}>${anyRead && feed.length ? 'Partial activity: ' : ''}${SOURCE_NAMES[name]} ${words(state)}.${
+        name === 'history' && state === 'unavailable' && this.retryHistory
+          ? html` <button type="button" class="retry" data-testid="feed-source-history-retry"
+              @click=${() => this.retryHistory?.()}>Retry</button>` : nothing}</p>`)}`;
+  }
+
+  private renderNotes(row: FeedRow): TemplateResult | typeof nothing {
+    if (!row.notes.length) return nothing;
+    return html`<div class="notes" data-testid="feed-notes">${row.notes.map((note) =>
+      html`<span data-testid="feed-note" data-note=${note}>${NOTE_TEXT[note]}</span>`)}</div>`;
+  }
+
+  private newDot(isNew: boolean): TemplateResult | typeof nothing {
+    return isNew ? html`<span class="new-dot" data-testid="ledger-new-dot" role="img" aria-label="new since you looked"></span>` : nothing;
   }
 
   /**
-   * tempdoc 812 D4 — one scan = one collapsible row. "Indexed 5,184 documents · scifact · 6m 12s",
-   * expandable to whatever per-document rows for that scan are still in the ring (resolved to
-   * friendly names). The rollup is the durable record; the children are surviving detail.
+   * tempdoc 812 D4 — one scan = one collapsible row, expandable to the per-document rows of that
+   * scan still retained. The rollup is the durable record; the children are surviving detail.
    */
-  private renderScanRollup(row: UnifiedActionEntry): TemplateResult {
-    const scanId = row.scanId ?? '';
-    const expanded = this.expandedScans.includes(scanId);
-    const children = expanded ? this.rowsOfScan(scanId) : [];
-    return html`<div
-        class="row"
-        data-testid="ledger-scan-rollup"
-        data-kind="scan"
-        data-scan-id=${scanId}
-        ?data-new=${this.isNewRow(row)}
-      >
-        ${this.isNewRow(row)
-          ? html`<span class="new-dot" data-testid="ledger-new-dot" role="img" aria-label="new since you looked"></span>`
-          : ''}
-        <span class="who" data-originator=${row.originator}>${row.originator}</span>
-        <button
-          type="button"
-          class="scan-expand"
-          data-testid="ledger-scan-expand"
-          aria-expanded=${expanded ? 'true' : 'false'}
-          @click=${() => this.toggleScan(scanId)}
-        >
-          ${expanded ? '▾' : '▸'} ${row.label}
-        </button>
+  private renderScanRollup(row: FeedRow, feed: readonly FeedRow[]): TemplateResult {
+    const scanId = row.entry.scanId ?? '';
+    const key = `scan:${scanId}`;
+    const expanded = this.expanded.includes(key);
+    const children = expanded ? feed.filter((r) => r.entry.kind === 'index' && r.entry.scanId === scanId) : [];
+    const isNew = this.isNew(row.entry.occurredAt);
+    return html`<div class="row" data-testid="ledger-scan-rollup" data-kind="scan" data-scan-id=${scanId} data-key=${row.key}
+        ?data-new=${isNew} ?data-problem=${row.problem}>
+        ${this.newDot(isNew)}
+        <span class="who" data-originator=${row.entry.originator}>${row.entry.originator}</span>
+        <button type="button" class="expand" data-testid="ledger-scan-expand" aria-expanded=${expanded ? 'true' : 'false'}
+          @click=${() => this.toggleExpanded(key)}>${expanded ? '▾' : '▸'} ${row.entry.label}</button>
         <span class="src">backend</span>
-        ${renderEventWhen(row.occurredAt)}
+        ${renderEventWhen(row.entry.occurredAt)}
       </div>
       ${expanded && children.length === 0
-        ? html`<div class="scan-child empty" data-testid="ledger-scan-empty">
-            No per-document rows retained for this scan.
-          </div>`
-        : ''}
-      ${children.map(
-        (child) =>
-          html`<div class="scan-child" data-testid="ledger-scan-child">
-            ${renderEventRow(this.withResolvedLabel(child), { apiBase: this.apiBase })}
-          </div>`,
-      )}`;
+        ? html`<div class="child empty" data-testid="ledger-scan-empty">No per-document rows retained for this scan.</div>` : nothing}
+      ${children.map((child) => html`<div class="child" data-testid="ledger-scan-child">
+        ${renderEventRow(this.withResolvedLabel(child.entry), { apiBase: this.apiBase })}</div>`)}`;
+  }
+
+  /** A burst summary that says how many failed, expandable to every member it stands for. */
+  private renderBurst(burst: IndexBurstSummary): TemplateResult {
+    const key = `burst:${burst.key}`;
+    const expanded = this.expanded.includes(key);
+    const isNew = this.isNew(burst.occurredAt);
+    const label = [`Indexed ${burst.indexed}`, burst.failed ? `${burst.failed} failed` : '',
+      burst.unknown ? `${burst.unknown} with unknown state` : '', burst.collection].filter(Boolean).join(' · ');
+    return html`<div class="row" data-testid="ledger-burst" data-kind="index" ?data-new=${isNew} ?data-problem=${burst.failed > 0}>
+        ${this.newDot(isNew)}
+        <span class="who" data-originator="system">system</span>
+        <button type="button" class="expand" data-testid="ledger-burst-expand" aria-expanded=${expanded ? 'true' : 'false'}
+          @click=${() => this.toggleExpanded(key)}>${expanded ? '▾' : '▸'} <span class="label">${label}</span></button>
+        <span class="src">backend</span>
+        ${renderEventWhen(burst.occurredAt)}
+      </div>
+      ${expanded ? burst.members.map((member) => html`<div class="child" data-testid="ledger-burst-member">
+        ${renderEventRow(this.withResolvedLabel(member.entry), { apiBase: this.apiBase })}</div>`) : nothing}`;
+  }
+
+  private renderItem(item: FeedRow | IndexBurstSummary, feed: readonly FeedRow[]): TemplateResult {
+    if (isBurst(item)) return this.renderBurst(item);
+    if (item.entry.isScanRollup) return this.renderScanRollup(item, feed);
+    // tempdoc 612 §UX — the "new" mark is an additive opt-in; History/Timeline render the row without it.
+    const sources = [item.ledger ? 'ledger' : '', item.history.length ? 'history' : '', item.journal ? 'journal' : '']
+      .filter(Boolean).join(' ');
+    return html`<div class="item" data-key=${item.key} data-sources=${sources} ?data-problem=${item.problem}>${renderEventRow(this.withResolvedLabel(item.entry),
+      { isNew: this.isNew(item.entry.occurredAt, item.entry.isRoutine), apiBase: this.apiBase })}${this.renderNotes(item)}</div>`;
+  }
+
+  /**
+   * The feed's own keys: Home and End (with or without Ctrl) go to the newest and oldest loaded
+   * entry, PageUp and PageDown by a screenful, and the entry reached is focused. The browser's own
+   * scrolling for these keys cannot be relied on over the windowed list: its smooth scroll is cut
+   * short whenever newly measured rows correct the position.
+   */
+  private onListKey(e: KeyboardEvent, count: number): void {
+    if (e.altKey || e.shiftKey || e.metaKey) return;
+    const target = e.target as Element;
+    if (target.closest('input, select, textarea, [contenteditable]')) return;
+    const current = Number(target.closest<HTMLElement>('.entry')?.dataset.index ?? this.tabStop);
+    let next: number;
+    switch (e.key) {
+      case 'Home': next = 0; break;
+      case 'End': next = count - 1; break;
+      case 'PageUp': next = current - this.pageSize(); break;
+      case 'PageDown': next = current + this.pageSize(); break;
+      default: return;
+    }
+    e.preventDefault();
+    void this.focusEntry(Math.max(0, Math.min(count - 1, next)), count, next <= current ? 'start' : 'end');
+  }
+
+  /**
+   * The browser's own Home, End (with or without Ctrl), PageUp and PageDown when focus is not in the
+   * feed's entries: on the page, or on a control beside the feed. Which scroller they move is the
+   * browser's choice, so nothing is done unless it starts moving the feed's scroller. Over the
+   * windowed list the browser's smooth scroll stops short: the list's correction for the rows it has
+   * just measured is a scroll of its own, which ends the smooth one partway. So once that scroll has
+   * ended, the feed's scroller is taken the rest of the way to the key's destination, instantly. Keys
+   * already handled (the feed's entries, other areas' own keys), a text field or an open modal are
+   * left alone, and the reader's own wheel, touch or click cancels the rest.
+   */
+  private readonly onPageKey = (e: KeyboardEvent): void => {
+    if (e.defaultPrevented || e.altKey || e.shiftKey || e.metaKey || isImeComposition(e) || modalOwnsFocus()) return;
+    if (!['Home', 'End', 'PageUp', 'PageDown'].includes(e.key) || (e.ctrlKey && e.key.startsWith('Page'))) return;
+    if (isTypingTarget(deepActiveElement()) || !this.renderRoot.querySelector('lit-virtualizer')) return;
+    const scroller = scrollerOf(this);
+    const events: EventTarget = scroller === document.scrollingElement || scroller === document.documentElement
+      ? document : scroller;
+    const from = { top: scroller.scrollTop, entry: this.rowOnScreen(scroller, e.key === 'PageDown' ? 'last' : 'first') };
+    const token = ++this.keyScroll;
+    const cancel = (): void => { this.keyScroll += 1; };
+    const reader = ['wheel', 'pointerdown', 'touchstart'] as const;
+    for (const type of reader) window.addEventListener(type, cancel, { capture: true, passive: true });
+    const stop = (): void => {
+      events.removeEventListener('scroll', started);
+      events.removeEventListener('scrollend', ended);
+      for (const type of reader) window.removeEventListener(type, cancel, { capture: true });
+      clearTimeout(timer);
+    };
+    // No scroll on the feed's scroller soon after the key: the browser moved something else, or nothing.
+    let timer = setTimeout(stop, 500);
+    const started = (): void => {
+      events.removeEventListener('scroll', started);
+      clearTimeout(timer);
+      timer = setTimeout(ended, 2_000);
+    };
+    const ended = (): void => {
+      stop();
+      if (token === this.keyScroll && this.isConnected) void this.finishKeyScroll(scroller, e.key, from, token);
+    };
+    events.addEventListener('scroll', started);
+    events.addEventListener('scrollend', ended);
+  };
+
+  /** The first or last entry at least partly on screen, and where its top is within the view. */
+  private rowOnScreen(scroller: Element, which: 'first' | 'last'): { index: string; top: number } | null {
+    const view = viewOf(scroller);
+    let found: { index: string; top: number } | null = null;
+    for (const entry of this.renderRoot.querySelectorAll<HTMLElement>('.entry')) {
+      const box = entry.getBoundingClientRect();
+      if (box.bottom <= view.top || box.top >= view.bottom) continue;
+      if (!found || (which === 'first' ? box.top < found.top : box.top > found.top)) {
+        found = { index: entry.dataset.index ?? '', top: box.top - view.top };
+      }
+    }
+    return found;
+  }
+
+  /**
+   * Take the scroller to where `key` goes, instantly, and hold it there while the windowed list
+   * measures the rows it brings in and corrects for them, until the reader scrolls themselves. Home
+   * and End go to the start and the end. PageUp and PageDown move what was on screen by the browser's
+   * own page, seven eighths of the view, measured on an entry that was on screen (`from.entry`), so a
+   * correction cannot carry the scroll past a row the reader has not seen; with no entry on screen,
+   * from where the scroller was (`from.top`).
+   */
+  private async finishKeyScroll(scroller: Element, key: string,
+    from: { top: number; entry: { index: string; top: number } | null }, token: number): Promise<void> {
+    const max = (): number => scroller.scrollHeight - scroller.clientHeight;
+    const step = Math.max(1, scroller.clientHeight * 0.875) * (key === 'PageUp' ? -1 : 1);
+    const page = key === 'PageUp' || key === 'PageDown';
+    /** How far the scroller still has to move: by the reference entry for a page, else to the end. */
+    const remaining = (): number => {
+      const top = scroller.scrollTop;
+      if (!page) return (key === 'Home' ? 0 : max()) - top;
+      const entry = from.entry && this.renderRoot.querySelector<HTMLElement>(`.entry[data-index="${from.entry.index}"]`);
+      const by = from.entry && entry
+        ? entry.getBoundingClientRect().top - viewOf(scroller).top - (from.entry.top - step)
+        : from.top + step - top;
+      return Math.max(-top, Math.min(max() - top, by));
+    };
+    const cancel = (): void => { this.keyScroll += 1; };
+    const reader = ['wheel', 'pointerdown', 'touchstart', 'keydown'] as const;
+    for (const type of reader) window.addEventListener(type, cancel, { capture: true, passive: true });
+    try {
+      await this.listSettled();
+      for (let round = 0, still = 0; round < 60 && still < 2 && token === this.keyScroll && this.isConnected; round += 1) {
+        const by = remaining();
+        if (Math.abs(by) < 1) still += 1;
+        else {
+          still = 0;
+          scroller.scrollTo({ top: scroller.scrollTop + by, behavior: 'instant' });
+        }
+        await this.listSettled();
+      }
+    } finally {
+      for (const type of reader) window.removeEventListener(type, cancel, { capture: true });
+    }
+  }
+
+  /** The windowed list has measured the rows it shows (or a moment has passed). */
+  private listSettled(): Promise<unknown> {
+    const list = this.renderRoot.querySelector('lit-virtualizer') as { layoutComplete?: Promise<void> } | null;
+    return Promise.race([list?.layoutComplete?.catch(() => undefined),
+      new Promise((resolve) => setTimeout(resolve, 250))]);
+  }
+
+  /** How many entries fit on screen, less one kept for context; at least one. */
+  private pageSize(): number {
+    const view = viewOf(scrollerOf(this));
+    let shown = 0;
+    for (const entry of this.renderRoot.querySelectorAll<HTMLElement>('.entry')) {
+      const box = entry.getBoundingClientRect();
+      if (box.top >= view.top && box.bottom <= view.bottom) shown += 1;
+    }
+    return Math.max(1, shown - 1);
+  }
+
+  /**
+   * Focus entry `index`. The windowed list renders only entries near the screen, so until it is
+   * rendered the scroller is moved to where the entry is estimated to be, and again once the rows
+   * there are measured. (The virtualizer's own scroll-to-index is not used: inside an outer
+   * scroller that has moved it counts the list's offset twice and renders nothing.)
+   */
+  private async focusEntry(index: number, count: number, block: ScrollLogicalPosition): Promise<void> {
+    this.tabStop = index;
+    const find = (): HTMLElement | null => this.renderRoot.querySelector<HTMLElement>(`.entry[data-index="${index}"]`);
+    for (let attempt = 0; attempt < 10 && !find(); attempt += 1) {
+      const list = this.renderRoot.querySelector('lit-virtualizer');
+      if (!list || !this.isConnected || this.tabStop !== index) return;
+      const scroller = scrollerOf(this);
+      const view = viewOf(scroller);
+      const box = list.getBoundingClientRect();
+      const estimate = box.top + (box.height * (index + 0.5)) / count;
+      scroller.scrollTo({ top: scroller.scrollTop + estimate - (view.top + view.bottom) / 2, behavior: 'instant' });
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    }
+    const entry = find();
+    if (!entry || this.tabStop !== index) return;
+    this.moveTabStop(entry);
+    entry.focus({ preventScroll: true });
+    entry.scrollIntoView({ block, behavior: 'instant' });
+  }
+
+  /** One entry is in the Tab order; it follows focus without a re-render. */
+  private moveTabStop(entry: HTMLElement): void {
+    this.tabStop = Number(entry.dataset.index);
+    for (const other of this.renderRoot.querySelectorAll<HTMLElement>('.entry[tabindex="0"]')) other.tabIndex = -1;
+    entry.tabIndex = 0;
+  }
+
+  private renderEntry(item: FeedRow | IndexBurstSummary, index: number, count: number, feed: readonly FeedRow[]): TemplateResult {
+    return html`<div class="entry" role="listitem" data-index=${index} aria-posinset=${index + 1} aria-setsize=${count}
+      tabindex=${index === Math.min(this.tabStop, count - 1) ? '0' : '-1'}>${this.renderItem(item, feed)}</div>`;
   }
 
   override render(): TemplateResult {
-    if (this.entries.length === 0) {
-      // tempdoc 804 §B9 (F9) — "No activity yet" is a claim ABOUT the ledger, so it is only made
-      // when the ledger was read. An unreadable ledger is an unknown, not an empty one.
-      return this.ledgerUnreadable
-        ? html`<div class="empty" data-testid="ledger-unreadable">
-            Activity unavailable — the action ledger could not be read.
-          </div>`
-        : html`<div class="empty" data-testid="ledger-empty">No activity yet.</div>`;
+    const feed = projectActivityFeed(this.ledgerRows(), this.historyRows(), this.journal);
+    const now = new Date();
+    const showRoutine = routineShown(this.filter);
+    const matching = feed.filter((row) => matchesFilter(row, this.filter, now));
+    const routineCount = matching.filter((row) => row.entry.isRoutine).length;
+    // tempdoc 812 D4 — a scan's STARTED row is a placeholder; once its completion exists, the
+    // completion IS the record.
+    const finishedScans = new Set(feed.filter((r) => r.entry.isScanRollup && r.entry.outcome !== 'STARTED' && r.entry.scanId)
+      .map((r) => r.entry.scanId as string));
+    const visible = matching.filter((row) => (showRoutine || !row.entry.isRoutine)
+      && !(row.entry.isScanRollup && row.entry.outcome === 'STARTED' && row.entry.scanId && finishedScans.has(row.entry.scanId)));
+    const newCount = feed.filter((row) => this.isNew(row.entry.occurredAt, row.entry.isRoutine)).length;
+    const header = html`
+      <div class="controls">
+        ${this.renderQuick()}
+        ${routineCount > 0 ? html`<jf-filter-chip ?active=${showRoutine} data-testid="ledger-routine-toggle"
+          @click=${() => this.setFilter({ routine: showRoutine ? 'hide' : 'show' })}>routine
+          <span class="chip-count">(${routineCount})</span></jf-filter-chip>` : nothing}
+        ${newCount > 0 ? html`<span class="new-count" data-testid="ledger-new-count">${newCount} new since you looked</span>
+          <button type="button" class="link mark-read" data-testid="ledger-mark-read"
+            title="Marks every loaded record read, including ones the filters hide"
+            @click=${() => this.markAllRead(feed)}>mark all read</button>` : nothing}
+      </div>
+      ${this.renderAdvanced(feed)}
+      <p class="notice" data-testid="feed-window-notice">Recent activity is shown. Older records may not be loaded.</p>
+      ${this.renderSourceStates(feed)}`;
+    if (feed.length === 0) {
+      // tempdoc 804 §B9 (F9) — "no activity" is a claim about the sources, made only once one was read.
+      const ledger = this.ledgerState();
+      return html`${header}${ledger === 'unavailable'
+        ? html`<div class="empty" data-testid="ledger-unreadable">Activity unavailable — the action ledger could not be read.</div>`
+        : ledger === 'loading'
+          ? html`<div class="empty" data-testid="ledger-loading">Loading activity…</div>`
+          : html`<div class="empty" data-testid="ledger-empty">No activity in loaded records.</div>`}`;
     }
-    const filters = this.renderFilters();
-    // tempdoc 558 §E1 — facet the stream client-side before the existing ordering + burst projection.
-    // tempdoc 613 §6/§10 — and exclude routine direct-user navigation by default (the de-flood): the
-    // curated feed foregrounds what the user did NOT already witness; the toggle reveals the rest.
-    // tempdoc 812 D4 — a scan's STARTED row is a placeholder for a scan still in flight; once its
-    // completion row exists, the completion IS the record and the placeholder would double-count
-    // the same scan in the feed.
-    const finishedScans = new Set(
-      this.entries
-        .filter((e) => e.isScanRollup && e.outcome !== 'STARTED' && e.scanId)
-        .map((e) => e.scanId as string),
-    );
-    const filtered = this.entries.filter(
-      (e) =>
-        this.matchesFilter(e) &&
-        (this.showRoutine || !e.isRoutine) &&
-        !(e.isScanRollup && e.outcome === 'STARTED' && e.scanId && finishedScans.has(e.scanId)),
-    );
-    if (filtered.length === 0) {
-      // tempdoc 612 §L.2 #4 — distinguish a genuinely-empty curated feed (the session was ALL routine,
-      // nothing hidden by who/outcome facets) from a real filter mismatch, so de-flooding never reads as
-      // breakage. The reveal toggle is already rendered in `filters` above (routineCount > 0).
-      const onlyRoutineHidden =
-        !this.showRoutine &&
-        this.filterOriginators.length === 0 &&
-        this.filterOutcomes.length === 0 &&
-        this.entries.some((e) => e.isRoutine);
-      return html`${filters}<div class="empty" data-testid="ledger-empty">
-          ${onlyRoutineHidden
-            ? html`Only routine activity this session.
-                <button
-                  type="button"
-                  class="reveal-routine"
-                  data-testid="ledger-reveal-routine"
-                  @click=${() => {
-                    this.showRoutine = true;
-                  }}
-                >
-                  Show routine
-                </button>`
-            : html`No activity matches the filter.`}
-        </div>`;
+    if (visible.length === 0) {
+      const onlyRoutineHidden = !showRoutine && routineCount > 0 && matching.every((row) => row.entry.isRoutine);
+      return html`${header}<div class="empty" data-testid="ledger-empty">
+        ${onlyRoutineHidden
+          ? html`Only routine activity this session.
+            <button type="button" class="link reveal-routine" data-testid="ledger-reveal-routine"
+              @click=${() => this.setFilter({ routine: 'show' })}>Show routine</button>`
+          : html`No activity matches the filter.`}</div>`;
     }
-    // Most-recent first for display (the projection is oldest-first). Tempdoc 571 — the shared
-    // newest-first ordering primitive (the one bit genuinely duplicated with the Logs surface; the
-    // SSE substrate EnvelopeStream + the bounded collapseBursts are already shared).
-    const rows = newestFirst(filtered);
-    // Bounded projection (tempdoc 550 thesis III(b)): collapse a burst of adjacent same-collection
-    // indexing terminal outcomes into one summary row, so a large indexing run shows
-    // "Indexed N · <collection>" rather than N individual rows flooding the timeline.
-    const projected = collapseBursts<UnifiedActionEntry, IndexBurstSummary>(rows, {
-      keyOf: (e) => (e.kind === 'index' ? (e.groupKey ?? 'default') : null),
-      // rows are newest-first, so items[0] is the most recent terminal outcome in the burst.
+    // Bounded projection (tempdoc 550 III(b)): adjacent same-group index rows collapse into one
+    // summary that keeps its members and counts its failures.
+    const projected = collapseBursts<FeedRow, IndexBurstSummary>(visible, {
+      keyOf: (row) => (row.entry.kind === 'index' ? (row.entry.groupKey ?? 'default') : null),
       summarize: (groupKey, items) => ({
         summary: true,
-        // tempdoc 812 D2 — the group key may now be a scanId (exact grouping); the LABEL still
-        // names the collection, which is what a reader can act on.
-        groupKey: items[0]?.collection ?? groupKey,
-        count: items.length,
-        occurredAt: items[0]?.occurredAt ?? '',
+        key: `${groupKey}:${items[0]?.key ?? ''}`,
+        collection: items[0]?.entry.collection ?? groupKey,
+        members: items,
+        indexed: items.filter((item) => indexResultOf(item.entry.indexState) === 'indexed').length,
+        failed: items.filter((item) => indexResultOf(item.entry.indexState) === 'failed').length,
+        unknown: items.filter((item) => indexResultOf(item.entry.indexState) === 'unknown').length,
+        occurredAt: items[0]?.entry.occurredAt ?? '',
       }),
     });
-    return html`${filters}${projected.map((row) =>
-      isBurst(row)
-        ? html`<div
-            class="row"
-            data-testid="ledger-burst"
-            data-kind="index"
-            ?data-new=${row.occurredAt > this.seenCursor}
-          >
-            ${row.occurredAt > this.seenCursor
-              ? html`<span class="new-dot" data-testid="ledger-new-dot" role="img" aria-label="new since you looked"></span>`
-              : ''}
-            <span class="who" data-originator="system">system</span>
-            <span class="label">Indexed ${row.count} · ${row.groupKey}</span>
-            <span class="src">backend</span>
-            ${renderEventWhen(row.occurredAt)}
-          </div>`
-        : row.isScanRollup
-          ? // tempdoc 812 D4 — one collapsible row per scan, expandable to its surviving per-doc rows.
-            this.renderScanRollup(row)
-          : // tempdoc 612 §UX — pass the "new since you looked" mark as an ADDITIVE opt-in to the shared row;
-            // History/Timeline render the same row WITHOUT it (they pass no opts), so the marker never leaks.
-            renderEventRow(this.withResolvedLabel(row), { isNew: this.isNewRow(row), apiBase: this.apiBase }),
-    )}`;
+    const count = projected.length;
+    return html`${header}<div class="list" data-testid="feed-list" role="list" aria-label="Activity"
+      @keydown=${(e: KeyboardEvent) => this.onListKey(e, count)}
+      @focusin=${(e: FocusEvent) => {
+        const entry = (e.target as Element).closest<HTMLElement>('.entry');
+        if (entry) this.moveTabStop(entry);
+      }}>${count <= VIRTUALIZE_ABOVE
+      ? projected.map((item, index) => this.renderEntry(item, index, count, feed))
+      : html`<lit-virtualizer .items=${projected}
+          .keyFunction=${(item: FeedRow | IndexBurstSummary) => (isBurst(item) ? `burst:${item.key}` : item.key)}
+          .renderItem=${(item: FeedRow | IndexBurstSummary, index: number) => this.renderEntry(item, index, count, feed)}></lit-virtualizer>`}</div>`;
   }
 }
 

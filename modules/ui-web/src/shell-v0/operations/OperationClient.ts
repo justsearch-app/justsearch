@@ -117,6 +117,11 @@ export class OperationError extends Error {
    * (one-click vs type-the-op-id).
    */
   readonly gateBehavior?: string;
+  /**
+   * The recorded invocation a handler failure belongs to (`structuredData.operationKey` on the
+   * failed reply), so the dispatching journal entry can still be joined to its history record.
+   */
+  readonly operationKey?: string;
 
   constructor(
     message: string,
@@ -127,6 +132,7 @@ export class OperationError extends Error {
     retryable?: boolean,
     pendingId?: string,
     gateBehavior?: string,
+    operationKey?: string,
   ) {
     super(message);
     this.name = 'OperationError';
@@ -137,6 +143,7 @@ export class OperationError extends Error {
     this.retryable = retryable;
     this.pendingId = pendingId;
     this.gateBehavior = gateBehavior;
+    this.operationKey = operationKey;
   }
 }
 
@@ -280,6 +287,7 @@ export class OperationClient {
               preparationNonce: parsed.preparationNonce,
             }
           : parsed.errorDetails;
+      const recordedKey = parsed.structuredData?.operationKey;
       throw new OperationError(
         parsed.errorCode === 'CAPABILITY_UNAVAILABLE' ? capabilityWords(parsed.errorDetails?.capability)
           : parsed.message ?? `Operation ${operationId} failed`,
@@ -290,6 +298,7 @@ export class OperationClient {
         parsed.retryable,
         parsed.pendingId,
         parsed.gateBehavior,
+        typeof recordedKey === 'string' && recordedKey ? recordedKey : undefined,
       );
     }
 

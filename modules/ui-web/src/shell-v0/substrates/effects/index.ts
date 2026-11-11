@@ -79,6 +79,17 @@ export interface JournalEntry {
    * Absent when the entry didn't originate from a Pending.
    */
   readonly pendingOutcome?: 'accepted' | 'rejected';
+  /**
+   * The backend invocation this entry dispatched or mirrors (`OperationHistoryEntry.operationKey`),
+   * recorded when the Engine's reply carried it. Joins the entry to that invocation's history and
+   * ledger records. Absent on older entries and on invocations whose reply never arrived.
+   */
+  readonly operationKey?: string;
+  /**
+   * The backend execution a successful undo-supported invocation returned. Its presence means a
+   * backend undo can be REQUESTED; the Engine still decides whether it is available.
+   */
+  readonly executionId?: string;
 }
 
 const _entries: JournalEntry[] = [];
@@ -197,12 +208,12 @@ export function restoreJournalFromStorage(): void {
     if (!Array.isArray(parsed.entries)) return;
     // Older removals persisted an argument-less add operation as their inverse. It cannot
     // restore a folder; retain only a re-add carrying the path captured on success.
-    _entries.push(...parsed.entries.map(entry => entry.effect.kind === 'invoke-operation'
+    _entries.push(...parsed.entries.map(entry => withoutMalformedAssociations(entry.effect.kind === 'invoke-operation'
       && entry.effect.operationId === 'core.remove-watched-root'
       && !(entry.inverse?.kind === 'invoke-operation'
         && entry.inverse.operationId === 'core.add-watched-root'
         && typeof entry.inverse.args?.path === 'string' && entry.inverse.args.path.trim())
-      ? { ...entry, inverse: null } : entry));
+      ? { ...entry, inverse: null } : entry)));
     if (typeof parsed.nextId === 'number') {
       _nextId = Math.max(_nextId, parsed.nextId);
     }
@@ -210,6 +221,19 @@ export function restoreJournalFromStorage(): void {
   } catch {
     /* swallow corrupt storage */
   }
+}
+
+/** A stored association that is not a non-empty string links nothing; the entry stays as it was. */
+function isAssociation(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function withoutMalformedAssociations(entry: JournalEntry): JournalEntry {
+  if ((entry.operationKey === undefined || isAssociation(entry.operationKey))
+      && (entry.executionId === undefined || isAssociation(entry.executionId))) return entry;
+  const { operationKey, executionId, ...rest } = entry;
+  return { ...rest, ...(isAssociation(operationKey) ? { operationKey } : {}),
+    ...(isAssociation(executionId) ? { executionId } : {}) };
 }
 
 /** Test-only: clear localStorage persistence. */
@@ -426,6 +450,10 @@ export interface RecordEffectOptions {
   readonly causation?: number;
   readonly originator?: EffectOriginator;
   readonly pendingOutcome?: 'accepted' | 'rejected';
+  /** The backend invocation an already-completed effect mirrors (see {@link JournalEntry.operationKey}). */
+  readonly operationKey?: string;
+  /** The execution an already-completed undo-supported invocation returned. */
+  readonly executionId?: string;
 }
 
 export function recordEffect(
@@ -446,6 +474,8 @@ export function recordEffect(
     originator: opts.originator ?? 'user',
     ...(opts.causation !== undefined ? { causation: opts.causation } : {}),
     ...(opts.pendingOutcome !== undefined ? { pendingOutcome: opts.pendingOutcome } : {}),
+    ...(isAssociation(opts.operationKey) ? { operationKey: opts.operationKey } : {}),
+    ...(isAssociation(opts.executionId) ? { executionId: opts.executionId } : {}),
   };
   _entries.push(entry);
   // 543-fwd #1 (live fix) — truncate-on-new-append applies to REAL effects only.
@@ -673,42 +703,75 @@ export function getCausationChain(id: number): readonly JournalEntry[] {
 }
 
 // ============================================================
-// §32 U2 — undoable-operation side-map
+// §32 U2 — the backend invocation an entry dispatched
 // ============================================================
 //
-// An invoke-operation effect is journaled at dispatch time, BEFORE the
-// backend runs and returns an executionId. When the Shell jf-invoke-operation
-// listener gets a successful result carrying an executionId (undoSupported
-// ops), it associates that executionId with the journal entry here. The audit
-// log then offers "Undo" for entries with an association; clicking dispatches
-// an undo-operation Effect → POST /api/undo/{operationId}. Kept as a side-map
-// so JournalEntry stays append-only / immutable.
+// An invoke-operation effect is journaled at dispatch time, BEFORE the backend runs. When the Shell
+// jf-invoke-operation listener gets the Engine's reply it records the invocation's operationKey (on
+// success or a keyed failure) and, for undo-supported ops, the returned executionId on THAT entry —
+// the dispatch carries the entry id, so concurrent identical invocations each keep their own. The
+// association is persisted with the entry, so a reload still joins it to its history and ledger
+// records and still offers its backend undo. The first association of each kind wins: a later
+// reply cannot move an entry to another invocation.
 
 export interface UndoableOperation {
   readonly operationId: string;
   readonly executionId: string;
 }
 
-const _undoable = new Map<number, UndoableOperation>();
-
-/** Associate a journal entry with a backend-undoable operation execution. */
-export function markUndoableOperation(
+/** Record the backend invocation a journal entry dispatched. Malformed values link nothing. */
+export function associateOperation(
   journalEntryId: number,
-  operationId: string,
-  executionId: string,
+  association: { readonly operationKey?: unknown; readonly executionId?: unknown },
 ): void {
-  _undoable.set(journalEntryId, { operationId, executionId });
-  // Re-fire journal listeners so the audit log re-renders the Undo
-  // affordance for this entry (the entry itself is unchanged).
-  const entry = getJournalEntry(journalEntryId);
-  if (entry) notifyAllWith(_listeners, entry);
+  const index = _entries.findIndex((e) => e.id === journalEntryId);
+  const entry = _entries[index];
+  if (!entry) return;
+  const operationKey = entry.operationKey === undefined && isAssociation(association.operationKey)
+    ? association.operationKey : undefined;
+  const executionId = entry.executionId === undefined && isAssociation(association.executionId)
+    ? association.executionId : undefined;
+  if (operationKey === undefined && executionId === undefined) return;
+  const associated: JournalEntry = { ...entry, ...(operationKey !== undefined ? { operationKey } : {}),
+    ...(executionId !== undefined ? { executionId } : {}) };
+  _entries[index] = associated;
+  writePersisted();
+  // Re-fire journal listeners so views re-render this entry's joined record and Undo affordance.
+  notifyAllWith(_listeners, associated);
 }
 
 /** The backend-undoable operation associated with an entry, if any. */
 export function getUndoableOperation(
   journalEntryId: number,
 ): UndoableOperation | undefined {
-  return _undoable.get(journalEntryId);
+  const entry = getJournalEntry(journalEntryId);
+  return entry?.effect.kind === 'invoke-operation' && entry.executionId !== undefined
+    ? { operationId: entry.effect.operationId, executionId: entry.executionId } : undefined;
+}
+
+// ============================================================
+// Requests the Engine has not answered yet
+// ============================================================
+//
+// Dispatching an invoke-operation or undo-operation effect only SENDS a request: consent, the
+// Engine's refusal (an expired execution, a declined approval) or a network failure arrive later.
+// The Shell listeners report each dispatched request's settlement here by its own journal entry id,
+// so a caller that dispatched one can say what the Engine confirmed rather than what was sent.
+
+export type OperationRequestOutcome = 'confirmed' | 'not-done';
+
+const _requestWaiters = new Map<number, (outcome: OperationRequestOutcome) => void>();
+
+/** Called by the dispatcher's owner when the Engine answered the request journaled as `journalEntryId`. */
+export function settleOperationRequest(journalEntryId: number, outcome: OperationRequestOutcome): void {
+  const resolve = _requestWaiters.get(journalEntryId);
+  if (!resolve) return;
+  _requestWaiters.delete(journalEntryId);
+  resolve(outcome);
+}
+
+function awaitOperationRequest(journalEntryId: number): Promise<OperationRequestOutcome> {
+  return new Promise((resolve) => { _requestWaiters.set(journalEntryId, resolve); });
 }
 
 /**
@@ -727,7 +790,7 @@ export function getUndoableOperation(
  */
 function undoEffectFor(entry: JournalEntry): Effect | null {
   if (entry.inverse !== null) return entry.inverse;
-  const compensable = _undoable.get(entry.id);
+  const compensable = getUndoableOperation(entry.id);
   if (compensable) {
     return {
       kind: 'undo-operation' as const,
@@ -937,32 +1000,59 @@ export function undoAllByOriginator(
   return count;
 }
 
+/** A reversal sent to the Engine: `settled` resolves when the Engine answers, if it can be followed. */
+interface RequestedReversal {
+  readonly entry: JournalEntry;
+  /** Absent when the dispatcher journaled nothing to follow (the answer cannot be observed). */
+  readonly settled?: Promise<OperationRequestOutcome>;
+}
+
+export interface UndoRun {
+  /** Reversals applied in this window (UI inverses), which take effect as they are dispatched. */
+  readonly reversed: number;
+  /** Reversals that are requests to the Engine; dispatching one does not mean it happened. */
+  readonly requested: readonly RequestedReversal[];
+  readonly skipped: readonly JournalEntry[];
+}
+
+/** Reversals the Engine performs: an undo of an execution, or an inverse that is another operation. */
+function isEngineRequest(effect: Effect): boolean {
+  return effect.kind === 'undo-operation' || effect.kind === 'invoke-operation';
+}
+
 /**
  * DE6 — reverse EXACTLY a confirmed preview: the entries the person saw, in the order shown
  * (newest-first), and nothing that arrived after the preview was drawn. An entry that is no longer
  * reversible by the time of the confirmation (vetoed, gone) is skipped and returned, so the caller
  * can say what was not undone. A failing reversal stops the run; it and the rest are returned too.
+ * A reversal the Engine performs is returned as requested, never counted as reversed: its answer
+ * (consent, refusal, failure) arrives later, through {@link RequestedReversal.settled}.
  */
 export function undoEntries(
   previewed: readonly JournalEntry[],
   applyFn: (effect: Effect) => void,
-): { readonly reversed: number; readonly skipped: readonly JournalEntry[] } {
+): UndoRun {
   let reversed = 0;
+  const requested: RequestedReversal[] = [];
   const skipped: JournalEntry[] = [];
   for (let i = 0; i < previewed.length; i++) {
     const shown = previewed[i]!;
     const entry = getJournalEntry(shown.id);
     const undo = entry && entry.pendingOutcome !== 'rejected' ? undoEffectFor(entry) : null;
     if (undo === null) { skipped.push(shown); continue; }
+    const firstNewId = _nextId;
     try {
       applyFn(undo);
-      reversed++;
     } catch {
       skipped.push(...previewed.slice(i));
       break;
     }
+    if (!isEngineRequest(undo)) { reversed++; continue; }
+    // The dispatcher journals the reversal as its own entry; its settlement is reported by that id.
+    const dispatched = _entries.find((e) => e.id >= firstNewId && e.effect === undo);
+    requested.push(dispatched ? { entry: shown, settled: awaitOperationRequest(dispatched.id) } : { entry: shown });
   }
-  return { reversed, skipped };
+  return { reversed, requested, skipped };
 }
 
 /**
@@ -1107,6 +1197,6 @@ export function __resetJournalForTest(): void {
   _undoCursor = 0;
   _previousNavTarget = null;
   _replayNavTarget = null;
-  _undoable.clear();
+  _requestWaiters.clear();
   __clearJournalPersistenceForTest();
 }
