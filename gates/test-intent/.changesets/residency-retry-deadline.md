@@ -117,3 +117,15 @@ Independent acceptance is intentionally pending.
   no skips or failures, in 238.152 seconds. Ordinary Retry took 56.642 ms.
   This run likewise used two private CPU load workers on CPUs 0-3, now stopped
   and waited for. All four validation load groups have completed cleanup.
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "iqbehwu5-residency-verifier",
+  "verdict": "accept",
+  "digest": "sha256:1b69472e81ab7c78dcad11cc9a4397660b793b4d9b4b67fd9df552e194d38efa"
+}
+```
