@@ -121,6 +121,7 @@ final class PersistentByteIoSourceTest extends LuceneExecutorTestBase {
       var extractor=new TimeboxedContentExtractor(PipelineTestFixture.registration(executors,"own-javaio",1),parser,Duration.ofSeconds(5),null)) {
    assertTrue(parser.extractArtifact(submitted).result().content().contains("ownjavaioverifier"));
    h.writer=mock(IndexingCoordinator.class,call->{
+      if (call.getMethod().getName().equals("replaceTextFamily")) return PipelineTestFixture.publicationAnswer(call);
     try{return call.getMethod().invoke(runtime.indexingCoordinator(),call.getArguments());}
     catch(java.lang.reflect.InvocationTargetException e){if(call.getMethod().getName().equals("indexSingle"))actualWrites.add(e.getCause());throw e.getCause();}
    });h.commitOps=runtime.commitOps();

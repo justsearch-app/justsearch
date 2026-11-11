@@ -231,35 +231,27 @@ public final class ChunkDocumentWriter {
   private static int writeChunks(
       IndexingCoordinator indexingCoordinator, String parentDocId, ChunkPlan plan, String content,
       ParentChunkMetadata meta, boolean chunkSpladeEnabled, boolean declareParent) {
+    List<IndexDocument> documents = buildDeclaredChunks(parentDocId, content, meta, plan, chunkSpladeEnabled);
+    indexingCoordinator.deleteChunksForParentDocId(parentDocId);
+    if (declareParent) declareChunkSet(indexingCoordinator, parentDocId, plan.total(), plan.revision());
+    for (IndexDocument document : documents) indexingCoordinator.indexSingle(document);
+    return documents.size();
+  }
+
+  /** Builds canonical fresh child rows without reading or mutating the old family. */
+  public static List<IndexDocument> buildDeclaredChunks(
+      String parentDocId, String content, ParentChunkMetadata meta, ChunkPlan plan,
+      boolean chunkSpladeEnabled) {
     validatePlan(plan, content);
-    if (plan.total() == 0) {
-      indexingCoordinator.deleteChunksForParentDocId(parentDocId);
-      if (declareParent) declareChunkSet(indexingCoordinator, parentDocId, 0, plan.revision());
-      return 0;
-    }
-    List<ChunkSplitter.Chunk> chunks = plan.chunks();
+    if (plan.total() == 0) return List.of();
     if (meta == null || meta.parentDocUid == null || meta.parentDocUid.isBlank()) {
       throw new IllegalStateException(
           "A persisted parent document identity is required before chunk indexing");
     }
-
-    // Validate every prerequisite for replacement before deleting the currently searchable
-    // chunks. A transient parent-identity read failure must fail closed without data loss.
-    indexingCoordinator.deleteChunksForParentDocId(parentDocId);
-
-    // ChunkSplitter offsets are now relative to the original content (including leading whitespace).
-    // Tempdoc 931 §C.1: every chunk carries the identity of the parent revision it was cut from, so
-    // an RMW that re-slices chunk_content out of a LATER parent revision is detectable instead of
-    // silently producing wrong text. Hashed once per parent, not once per chunk.
+    List<ChunkSplitter.Chunk> chunks = plan.chunks();
     String parentContentRevision = plan.revision();
     var metadata = new ChunkOffsetMath.MetadataIndex(content);
-    // Publish the intended total before the first child can reach an unrelated commit.
-    // A partial replacement then fails the count/ordinal check, even after a process crash.
-    // A parent written with its declaration (replaceDeclaredChunks) already did so.
-    if (declareParent) {
-      declareChunkSet(indexingCoordinator, parentDocId, chunks.size(), parentContentRevision);
-    }
-    int indexed = 0;
+    List<IndexDocument> documents = new java.util.ArrayList<>(chunks.size());
     for (ChunkSplitter.Chunk chunk : chunks) {
       String chunkContent = chunk.content();
       Map<String, Object> fields = new HashMap<>();
@@ -339,11 +331,10 @@ public final class ChunkDocumentWriter {
         fields.put(SchemaFields.SPLADE_STATUS, SchemaFields.SPLADE_STATUS_PENDING);
       }
 
-      indexingCoordinator.indexSingle(new IndexDocument(fields));
-      indexed++;
+      documents.add(new IndexDocument(fields));
     }
 
-    return indexed;
+    return List.copyOf(documents);
   }
 
   private static void declareChunkSet(

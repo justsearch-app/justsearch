@@ -63,7 +63,7 @@ final class WriterDocumentIoTest extends LuceneExecutorTestBase {
     s.extractedText="verifierpoison body";
     var failures=new CopyOnWriteArrayList<RuntimeException>();
     try(var runtime=schema.atPath(temp.resolve("index")).withExecutorRegistrations(testLuceneExecutors()).open()) {
-      s.writer=mock(IndexingCoordinator.class, org.mockito.AdditionalAnswers.delegatesTo(runtime.indexingCoordinator()));
+      s.writer=PipelineTestFixture.coordinatorDelegate(runtime.indexingCoordinator());
       doAnswer(c -> {
         try { runtime.indexingCoordinator().indexSingle(c.getArgument(0)); }
         catch(RuntimeException failure) { failures.add(failure); throw failure; }

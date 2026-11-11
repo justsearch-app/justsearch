@@ -52,6 +52,7 @@ final class InvalidTokenPositionOutageTest extends LuceneExecutorTestBase {
       var provider=new PolicyDrivenTikaExtractor(java.util.concurrent.Executors::newFixedThreadPool);
       var timebox=new TimeboxedContentExtractor(PipelineTestFixture.registration(owners,"token-position",1),provider,Duration.ofSeconds(8),null)) {
    h.writer=mock(IndexingCoordinator.class,call->{
+      if (call.getMethod().getName().equals("replaceTextFamily")) return PipelineTestFixture.publicationAnswer(call);
     try {
      Object result=call.getMethod().invoke(runtime.indexingCoordinator(),call.getArguments());
      if(call.getMethod().getName().equals("probeIngestion")) probes.incrementAndGet();

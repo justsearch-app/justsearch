@@ -233,7 +233,7 @@ final class ExtractionInfrastructureTest {
       var identities = mock(DocumentIdentityStore.class);
       when(identities.resolve(anyString(), anyLong())).thenAnswer(call -> new DocumentIdentityStore.Identity(
           call.getArgument(0), "uid-" + call.getArgument(0), call.getArgument(1), call.getArgument(1)));
-      var writer = mock(IndexingCoordinator.class);
+      var writer = PipelineTestFixture.coordinator();
       doAnswer(call -> { writes.incrementAndGet(); return null; }).when(writer).indexSingle(any());
       doAnswer(call -> {
         List<JobQueue.IndexJob> claims = actualQueue.pollPending(call.getArgument(0));

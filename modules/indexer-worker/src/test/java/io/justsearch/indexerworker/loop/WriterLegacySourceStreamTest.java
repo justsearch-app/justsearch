@@ -59,7 +59,8 @@ final class WriterLegacySourceStreamTest extends LuceneExecutorTestBase {
       var owners=new TestEngineExecutors();var parser=new PolicyDrivenTikaExtractor(java.util.concurrent.Executors::newFixedThreadPool);
       var box=new TimeboxedContentExtractor(PipelineTestFixture.registration(owners,"writer-source-alias",1),parser,Duration.ofSeconds(5),null)) {
    assertTrue(parser.extractArtifact(alias).result().content().contains("aliasdisappearsverifier"));
-   h.writer=mock(IndexingCoordinator.class,call->{try{return call.getMethod().invoke(runtime.indexingCoordinator(),call.getArguments());}
+   h.writer=mock(IndexingCoordinator.class,call->{
+      if (call.getMethod().getName().equals("replaceTextFamily")) return PipelineTestFixture.publicationAnswer(call);try{return call.getMethod().invoke(runtime.indexingCoordinator(),call.getArguments());}
     catch(java.lang.reflect.InvocationTargetException wrapped){if(call.getMethod().getName().equals("indexSingle"))actualFailures.add(wrapped.getCause());throw wrapped.getCause();}});
    h.commitOps=runtime.commitOps();
    h.queue.enqueueEntries(List.of(JobQueue.EnqueueEntry.stat(alias).withinRoot(temp),JobQueue.EnqueueEntry.stat(healthy).withinRoot(temp)));

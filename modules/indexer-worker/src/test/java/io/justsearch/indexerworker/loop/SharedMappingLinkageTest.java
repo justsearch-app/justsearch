@@ -40,7 +40,8 @@ final class SharedMappingLinkageTest extends LuceneExecutorTestBase {
     @Override public Set<Entry<Object,Object>> entrySet(){available();return original.entrySet();}
    };
    mappingField.set(mapper,unavailable);
-   h.writer=mock(IndexingCoordinator.class,call->{try{return call.getMethod().invoke(runtime.indexingCoordinator(),call.getArguments());}
+   h.writer=mock(IndexingCoordinator.class,call->{
+      if (call.getMethod().getName().equals("replaceTextFamily")) return PipelineTestFixture.publicationAnswer(call);try{return call.getMethod().invoke(runtime.indexingCoordinator(),call.getArguments());}
     catch(java.lang.reflect.InvocationTargetException e){if(call.getMethod().getName().equals("indexSingle"))writeFailures.add(e.getCause());throw e.getCause();}});
    h.commitOps=runtime.commitOps();h.loop=PipelineTestFixture.withExtractor(h,box);
    h.enqueue("warmup.txt");h.loop.start();h.awaitAllState("DONE",12);

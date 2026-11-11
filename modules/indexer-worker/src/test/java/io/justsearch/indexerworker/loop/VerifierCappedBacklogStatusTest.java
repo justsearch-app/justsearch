@@ -148,7 +148,7 @@ final class VerifierCappedBacklogStatusTest {
     }
 
     IndexingLoop newLoop() throws Exception {
-      var writer = mock(IndexingCoordinator.class);
+      var writer = PipelineTestFixture.coordinator();
       doAnswer(call -> { firstWriteAt.compareAndSet(0, System.currentTimeMillis()); written.incrementAndGet(); return null; })
           .when(writer).indexSingle(any());
       var identities = mock(DocumentIdentityStore.class);

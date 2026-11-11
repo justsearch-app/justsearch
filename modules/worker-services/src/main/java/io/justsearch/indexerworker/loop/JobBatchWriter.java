@@ -161,6 +161,21 @@ public final class JobBatchWriter {
   }
 
   /** Publishes an admitted source, or only its envelope when content is unchanged. */
+  public boolean canReuseDocumentEmbedding(ExtractedJob ex) {
+    if (ex.forceReindex() || ex.artifact() == null) return false;
+    var metadata = IndexingDocumentOps.deriveParentMetadata(ex.filePath(), ex.artifact().result(), null, log);
+    var plan = IndexingDocumentOps.chunkPlan(ex.filePath(), ex.artifact().result(), metadata);
+    var parent = IndexingDocumentOps.withChunkDeclaration(IndexingDocumentOps.buildDocument(
+        ex.filePath(), ex.artifact(), ex.collection(), signalBus, null, false, null,
+        metadata, stageRecorder, log, null,
+        new IndexingDocumentOps.SourceFileMetadata(ex.envelope().sizeBytes(), ex.envelope().modifiedAtMs(), ex.sourceSha256()),
+        ex.docUid()), plan);
+    var children = IndexingDocumentOps.buildDeclaredChunks(ex.filePath(), ex.artifact().result(),
+        metadata, ex.collection(), ex.docUid(), chunkSpladeEnabledSupplier.getAsBoolean(), plan, java.util.Map.of());
+    return indexingCoordinator.canReuseDocumentEmbedding(parent, children);
+  }
+
+  /** Publishes an admitted source, or only its envelope when content is unchanged. */
   public void write(ExtractedJob ex, float[] precomputedEmbedding) {
     Span writeSpan = maybeSpan("indexing.write");
     writeSpan.setAttribute("doc.path", ex.filePath().toString());
@@ -250,6 +265,8 @@ public final class JobBatchWriter {
       var fields = new java.util.HashMap<>(doc.fields());
       fields.putAll(envelope);
       doc = new IndexDocument(fields);
+      var chunks = IndexingDocumentOps.buildDeclaredChunks(ex.filePath(), ex.artifact().result(),
+          parentMetadata, ex.collection(), ex.docUid(), chunkSpladeEnabledSupplier.getAsBoolean(), chunkPlan, envelope);
 
       long writeStart = System.currentTimeMillis();
       publishedPath = String.valueOf(doc.fields().get(SchemaFields.PATH));
@@ -272,33 +289,24 @@ public final class JobBatchWriter {
         var lexicalFields = new java.util.HashMap<>(lexicalDocument.fields());
         lexicalFields.putAll(envelope);
         lexicalDocument = new IndexDocument(lexicalFields);
-        lexicalSource.indexingCoordinator().indexSingle(lexicalDocument);
-        IndexingDocumentOps.indexDeclaredChunks(ex.filePath(), ex.artifact().result(),
-            lexicalSource.indexingCoordinator(), lexicalMetadata, ex.collection(), ex.docUid(),
-            false, chunkPlan, envelope);
+        var lexicalChunks = IndexingDocumentOps.buildDeclaredChunks(ex.filePath(), ex.artifact().result(),
+            lexicalMetadata, ex.collection(), ex.docUid(), false, chunkPlan, envelope);
+        lexicalSource.indexingCoordinator().replaceTextFamily(lexicalDocument, lexicalChunks, !ex.forceReindex());
       } else if (lexicalSource != null) {
         lexicalSource.indexingCoordinator().updateDocument(ex.envelope().normalizedPath(), sourceEnvelope.patch());
       }
-      boolean acceptedEmbedding = indexingCoordinator.indexSingle(doc);
       // Tempdoc 819 / 821 §O.1 (+ #470 D2): when the document carries a completed embedding (the
       // migration/blue-green inline-embed path), that IS the success evidence the attestation must
       // be earned from — feed it to the ECC. (The empty-index stamp permit this call once revoked
       // was deleted outright: a document-less commit could spend it first, granting a permanent
       // unearned attestation.)
-      notifyEmbeddingCompatibility(acceptedEmbedding);
-      indexedDelta.accept(1L);
-      batchStats.recordIndexed(1);
+      indexingCoordinator.replaceTextFamily(doc, chunks, !ex.forceReindex(), acceptedEmbedding -> {
+        notifyEmbeddingCompatibility(acceptedEmbedding);
+        indexedDelta.accept(1L);
+        batchStats.recordIndexed(1);
+      });
 
-      int chunksIndexed =
-          IndexingDocumentOps.indexDeclaredChunks(
-              ex.filePath(),
-              ex.artifact().result(),
-              indexingCoordinator,
-              parentMetadata,
-              ex.collection(),
-              ex.docUid(),
-              chunkSpladeEnabledSupplier.getAsBoolean(),
-              chunkPlan, envelope);
+      int chunksIndexed = chunks.size();
       if (chunksIndexed > 0) {
         indexedDelta.accept(chunksIndexed);
         log.debug("Indexed {} chunks for: {}", chunksIndexed, ex.filePath().getFileName());

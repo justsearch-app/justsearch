@@ -48,6 +48,7 @@ final class CanaryWritePathCoverageTest extends LuceneExecutorTestBase {
         var extractor = new TimeboxedContentExtractor(PipelineTestFixture.registration(owners,
             "analyzer-warmup", 1), provider, Duration.ofSeconds(8), null)) {
       h.writer = mock(IndexingCoordinator.class, call -> {
+      if (call.getMethod().getName().equals("replaceTextFamily")) return PipelineTestFixture.publicationAnswer(call);
         try {
           return call.getMethod().invoke(runtime.indexingCoordinator(), call.getArguments());
         } catch (InvocationTargetException wrapped) {
@@ -117,6 +118,7 @@ final class CanaryWritePathCoverageTest extends LuceneExecutorTestBase {
       assertTrue(parser.extractArtifact(source).result().content().contains("healthy"));
       current.set(unavailable); unavailable.close();
       h.writer = mock(IndexingCoordinator.class, call -> {
+      if (call.getMethod().getName().equals("replaceTextFamily")) return PipelineTestFixture.publicationAnswer(call);
         try { return call.getMethod().invoke(current.get().indexingCoordinator(), call.getArguments()); }
         catch (InvocationTargetException failure) { throw failure.getCause(); }
       });

@@ -570,6 +570,53 @@ public final class IndexingCoordinator {
     }
   }
 
+  /** Advisory classification before migration's batch inference; publication always reads again. */
+  public boolean canReuseDocumentEmbedding(IndexDocument parent, List<IndexDocument> children) {
+    acquireReadLockTimed();
+    try {
+      dispatchLock.lock();
+      try {
+        var reusable = TextArtifactReuse.attach(session, writeOps.get(), parent, children, true).getFirst();
+        return reusable.fields().get(SchemaFields.VECTOR) instanceof float[];
+      } catch (IOException failure) {
+        throw IndexRuntimeIOException.fromIndexOperation(failure, "Cannot assess replacement text artifacts");
+      } finally { dispatchLock.unlock(); }
+    } finally { releaseWriteBarrierAndReport(); }
+  }
+
+  /**
+   * Publishes canonical fresh rows, attaching only compatible text artifacts before removing the
+   * old family. An advisory pre-batch decision never supplies artifacts or publication authority.
+   */
+  public boolean replaceTextFamily(IndexDocument parent, List<IndexDocument> children, boolean allowReuse) {
+    return replaceTextFamily(parent, children, allowReuse, accepted -> {});
+  }
+
+  /** The producer observes its parent write before child deletion, including a later child failure. */
+  public boolean replaceTextFamily(IndexDocument parent, List<IndexDocument> children, boolean allowReuse,
+      java.util.function.Consumer<Boolean> parentPublished) {
+    acquireReadLockTimed();
+    try {
+      dispatchLock.lock();
+      try {
+        List<IndexDocument> replacement;
+        if (allowReuse) replacement = TextArtifactReuse.attach(session, writeOps.get(), parent, children, false);
+        else {
+          replacement = new ArrayList<>(children.size() + 1);
+          replacement.add(parent); replacement.addAll(children);
+        }
+        for (var row : replacement) validate(row);
+        boolean accepted = indexSingle(replacement.getFirst());
+        parentPublished.accept(accepted);
+        deleteChunksForParentDocId((String) parent.fields().get(SchemaFields.DOC_ID));
+        for (int i = 1; i < replacement.size(); i++) indexSingle(replacement.get(i));
+        return accepted;
+      } catch (IOException failure) {
+        throw IndexRuntimeIOException.fromIndexOperation(failure, "Cannot read replacement text artifacts");
+      } finally { dispatchLock.unlock(); }
+    } finally { releaseWriteBarrierAndReport(); }
+  }
+
   /** Indexes a document, returning whether the write accepted a completed dense embedding. */
   public boolean indexSingle(IndexDocument document) {
     acquireReadLockTimed();

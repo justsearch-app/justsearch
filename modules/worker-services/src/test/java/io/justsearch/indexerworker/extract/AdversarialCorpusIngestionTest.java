@@ -63,7 +63,14 @@ final class AdversarialCorpusIngestionTest {
   @BeforeEach
   void setUp() {
     queue = new RecordingQueue();
-    queue.indexingCoordinator = mock(IndexingCoordinator.class);
+    queue.indexingCoordinator = mock(IndexingCoordinator.class, call -> {
+      if (call.getMethod().getName().equals("replaceTextFamily")) {
+        return io.justsearch.adapters.lucene.runtime.CoordinatorPublicationFixture.publish(
+            (IndexingCoordinator) call.getMock(), call.getArgument(0), call.getArgument(1),
+            call.getArguments().length == 4 ? call.getArgument(3) : null);
+      }
+      return org.mockito.Answers.RETURNS_DEFAULTS.answer(call);
+    });
     loop =
         new IndexingLoop(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocr(), io.justsearch.indexerworker.TestWorkerExecutorRegistrations.timebox(),
             queue,
