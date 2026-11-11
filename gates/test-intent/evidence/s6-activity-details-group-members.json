@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
   },
-  "createdAt": "2026-11-11T21:37:37.163Z",
-  "revision": "324e423d5becbb045471af8362d3fb07d0cb2524",
-  "tree": "61f73745fa7b58ae7694eb27746723b169b43583",
+  "createdAt": "2026-11-11T22:27:17.066Z",
+  "revision": "809fa5e595546066e2d60331223fc17ae3b8270b",
+  "tree": "f3c0862fb0a56f0549498af6e4296ce22705183f",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.group-details.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/6jyb3g6d/tmp/test-intent-vitest-4-1794433045567.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.group-details.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-473669-1794436029851.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 4042
+      "durationMs": 2464
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts#a burst of a known and an unknown state lists both: the unknown state named, never as indexed",
       "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:c2a8772f3859518d045bc09c464afa795e0b145514d86e35da278e4b7e0fad4e",
+      "contentDigest": "sha256:0c24311b17eb37a0eae61ecee2b752a71f5789d25038b807ec93bde4554e0cb9",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts#a member whose file resolved reads as its name; one that did not keeps the short-hash label",
       "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:c2a8772f3859518d045bc09c464afa795e0b145514d86e35da278e4b7e0fad4e",
+      "contentDigest": "sha256:0c24311b17eb37a0eae61ecee2b752a71f5789d25038b807ec93bde4554e0cb9",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -59,7 +59,7 @@
       "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts#lists that scan's documents (matched by scanId, not another scan's): a resolved one by name, the rest by short hash",
       "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:c2a8772f3859518d045bc09c464afa795e0b145514d86e35da278e4b7e0fad4e",
+      "contentDigest": "sha256:0c24311b17eb37a0eae61ecee2b752a71f5789d25038b807ec93bde4554e0cb9",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -74,7 +74,7 @@
       "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts#says how long the scan took and where it came from, from its own rollup record",
       "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:c2a8772f3859518d045bc09c464afa795e0b145514d86e35da278e4b7e0fad4e",
+      "contentDigest": "sha256:0c24311b17eb37a0eae61ecee2b752a71f5789d25038b807ec93bde4554e0cb9",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -93,35 +93,35 @@
     "patches": [],
     "runs": [
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.group-details.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/6jyb3g6d/tmp/test-intent-vitest-4-1794433052818.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.group-details.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-473669-1794436034069.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 3743,
-        "output": "JSON report written to /home/elias/.cache/am/6jyb3g6d/tmp/test-intent-vitest-4-1794433052818.json\n\n"
+        "durationMs": 2682,
+        "output": "JSON report written to /tmp/test-intent-vitest-473669-1794436034069.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts#a burst of a known and an unknown state lists both: the unknown state named, never as indexed",
         "classification": "assertion",
-        "detail": "A9 / A10 — a burst's members are listed in its details by the labels the feed gives them a burst of a known and an unknown state lists both: the unknown state named, never as indexed:  AssertionError: expected [] to have a length of 2 but got +0\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/6jyb3g6d/tmp/test-intent-before-TOXIbb/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/6jyb3g6d/tmp/test-intent"
+        "detail": "A9 / A10 — a burst's members are listed in its details by the labels the feed gives them a burst of a known and an unknown state lists both: the unknown state named, never as indexed:  AssertionError: expected [] to have a length of 2 but got +0\n    at Proxy.<anonymous> (file:///tmp/test-intent-before-odoWcS/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///tmp/test-intent-before-odoWcS/modules/ui-web/node_modules/@vitest/expect/di"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts#a member whose file resolved reads as its name; one that did not keeps the short-hash label",
         "classification": "assertion",
-        "detail": "A9 / A10 — a burst's members are listed in its details by the labels the feed gives them a member whose file resolved reads as its name; one that did not keeps the short-hash label:  AssertionError: expected [] to have a length of 3 but got +0\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/6jyb3g6d/tmp/test-intent-before-TOXIbb/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/6jyb3g6d/tmp/test-intent"
+        "detail": "A9 / A10 — a burst's members are listed in its details by the labels the feed gives them a member whose file resolved reads as its name; one that did not keeps the short-hash label:  AssertionError: expected [] to have a length of 3 but got +0\n    at Proxy.<anonymous> (file:///tmp/test-intent-before-odoWcS/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///tmp/test-intent-before-odoWcS/modules/ui-web/node_modules/@vitest/expect/di"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts#lists that scan's documents (matched by scanId, not another scan's): a resolved one by name, the rest by short hash",
         "classification": "assertion",
-        "detail": "D4 — a scan rollup's details list the per-document records of that scan lists that scan's documents (matched by scanId, not another scan's): a resolved one by name, the rest by short hash:  AssertionError: scan-a's three documents, not scan-b's two: expected [] to have a length of 3 but got +0\n    at Proxy.<anonymous> (file:///home/elias/.cache/am/6jyb3g6d/tmp/test-intent-before-TOXIbb/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///h"
+        "detail": "D4 — a scan rollup's details list the per-document records of that scan lists that scan's documents (matched by scanId, not another scan's): a resolved one by name, the rest by short hash:  AssertionError: scan-a's three documents, not scan-b's two: expected [] to have a length of 3 but got +0\n    at Proxy.<anonymous> (file:///tmp/test-intent-before-odoWcS/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///tmp/test-intent-before-odoWcS/m"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts#says how long the scan took and where it came from, from its own rollup record",
         "classification": "assertion",
-        "detail": "D4 — a scan rollup's details list the per-document records of that scan says how long the scan took and where it came from, from its own rollup record:  AssertionError: expected '' to be '6m 12s' // Object.is equality\n    at /home/elias/.cache/am/6jyb3g6d/tmp/test-intent-before-TOXIbb/modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts:233:51\n    at file:///home/elias/.cache/am/6jyb3g6d/tmp/test-intent-before-TOXIbb/modules/ui-we"
+        "detail": "D4 — a scan rollup's details list the per-document records of that scan says how long the scan took and where it came from, from its own rollup record:  AssertionError: expected '' to be '6m 12s' // Object.is equality\n    at /tmp/test-intent-before-odoWcS/modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts:233:51\n    at file:///tmp/test-intent-before-odoWcS/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
       }
     ]
   },
-  "digest": "sha256:edc84fe5a179c089f5b996397e3cf01b0f6624f22e9ebe36eb6c5904d0186bbd"
+  "digest": "sha256:d057b5673e18597fca20690c2171799d656c44659b7bf74360bd9602c425d287"
 }
