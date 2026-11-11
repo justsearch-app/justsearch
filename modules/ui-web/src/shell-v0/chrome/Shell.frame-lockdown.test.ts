@@ -929,3 +929,57 @@ it.each([[600, 400, 200], [1280, 720, 100]])('SG8 at %ix%i and %i percent text e
     if (height === 400) expect(layout.scrollers, `${section}: Settings content scroll containers`).toHaveLength(1);
   }
 }, 90_000);
+
+
+it.each(['light', 'dark'] as const)('SR2 SR5 control-word search arrives visibly and clears on interaction at 600x400, 200 percent text, reduced motion and %s forced colours', async (colorScheme) => {
+  const page = await open(600, 400);
+  await page.emulateMedia({ reducedMotion: 'reduce', forcedColors: 'active', colorScheme });
+  await page.evaluate(() => { document.documentElement.style.fontSize = '200%'; });
+  await openSettings(page);
+  const input = page.locator('jf-settings-nav input');
+  await input.fill('reduce motion');
+  const result = page.locator('jf-settings-nav button.search-result-row[data-settings-anchor="accessibility"]');
+  expect(await result.count()).toBe(1);
+  await result.focus(); await page.keyboard.press('Enter');
+  await settle(page);
+  expect(await settingsSection(page)).toBe('appearance');
+  expect(await rowInViewAndFocused(page, 'accessibility')).toMatchObject({ inView: true, focused: true });
+  const row = page.locator('div[data-settings-anchor="accessibility"]');
+  const mark = await row.evaluate(el => {
+    const style = getComputedStyle(el);
+    const probe = document.createElement('div');
+    probe.style.cssText = 'forced-color-adjust: none; color: Highlight';
+    document.body.append(probe);
+    const highlight = getComputedStyle(probe).color; probe.remove();
+    return { marked: el.classList.contains('arrival-highlight'), outline: style.outlineColor,
+      width: style.outlineWidth, animation: style.animationName, scroll: style.scrollBehavior, highlight };
+  });
+  expect(mark).toMatchObject({ marked: true, outline: mark.highlight, width: '2px', animation: 'none', scroll: 'auto' });
+  await page.keyboard.press('Tab');
+  expect(await row.evaluate(el => el.classList.contains('arrival-highlight'))).toBe(false);
+  await input.fill('reduce motion'); await input.focus();
+  await page.keyboard.press('Escape');
+  expect(await input.inputValue()).toBe('');
+  expect((await where(page)).settings).toBe(true);
+  await page.keyboard.press('Escape');
+  expect((await where(page)).settings).toBe(false);
+}, 30_000);
+
+it('SR2 search opens containing folds before focusing the row, and pointer interaction removes the mark', async () => {
+  const page = await open(); await openSettings(page);
+  await page.locator('jf-settings-nav [data-settings-category="appearance"]').click();
+  const row = page.locator('div[data-settings-anchor="theme"]');
+  await row.evaluate(el => {
+    const outer = document.createElement('details'); const inner = document.createElement('details');
+    outer.innerHTML = '<summary>Outer fold</summary>'; inner.innerHTML = '<summary>Inner fold</summary>';
+    el.replaceWith(outer); outer.append(inner); inner.append(el);
+  });
+  await page.locator('jf-settings-nav input').fill('theme');
+  const result = page.locator('jf-settings-nav button.search-result-row[data-settings-anchor="theme"]');
+  await result.click(); await settle(page);
+  expect(await row.evaluate(el => [el.parentElement, el.parentElement?.parentElement].every(fold => (fold as HTMLDetailsElement).open))).toBe(true);
+  expect(await rowInViewAndFocused(page, 'theme')).toMatchObject({ inView: true, focused: true });
+  expect(await row.evaluate(el => el.classList.contains('arrival-highlight'))).toBe(true);
+  await page.locator('jf-settings-nav input').click();
+  expect(await row.evaluate(el => el.classList.contains('arrival-highlight'))).toBe(false);
+}, 30_000);

@@ -406,7 +406,7 @@ describe('jf-settings-nav', () => {
     it('ArrowDown roves focus between search-result rows (reuses the nav row-navigation handler)', async () => {
       const el = await mountNav('appearance');
       const input = searchInput(el);
-      input.value = 'a';
+      input.value = 'data';
       input.dispatchEvent(new Event('input', { bubbles: true }));
       await el.updateComplete;
       const rows = Array.from(

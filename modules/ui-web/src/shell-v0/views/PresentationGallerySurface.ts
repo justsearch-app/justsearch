@@ -8,6 +8,7 @@
  * inert JSON "skin"; Import certifies + saves a pasted skin. A skin is inert data over a closed
  * vocabulary — safe like a terminal theme, expressive like a full theme, gate-certified on import.
  */
+import { SETTINGS_CONTROL_LABELS } from './settingsControlLabels.js';
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
 import { surfaceScrollLayoutStyles } from '../primitives/surfaceLayout.js';
@@ -233,10 +234,10 @@ export class PresentationGallerySurface extends JfElement {
             data-testid="gallery-revert"
             ?disabled=${!this.canRevert}
             .onActivate=${() => this.revert()}
-            >Revert</jf-control
+            >${SETTINGS_CONTROL_LABELS['core.presentation-gallery-surface'].revert}</jf-control
           >
           <jf-control data-testid="gallery-export" .onActivate=${() => this.exportActive()}
-            >Export active</jf-control
+            >${SETTINGS_CONTROL_LABELS['core.presentation-gallery-surface'].export}</jf-control
           >
         </div>
         <div class="grid" data-testid="gallery-grid">
@@ -256,14 +257,14 @@ export class PresentationGallerySurface extends JfElement {
                 <jf-control
                   data-testid="gallery-apply"
                   .onActivate=${() => this.apply(decl)}
-                  >${decl.id === this.activeId ? 'Applied ✓' : 'Apply'}</jf-control
+                  >${decl.id === this.activeId ? SETTINGS_CONTROL_LABELS['core.presentation-gallery-surface'].applied : SETTINGS_CONTROL_LABELS['core.presentation-gallery-surface'].apply}</jf-control
                 >
               </div>
             `,
           )}
         </div>
         <div class="import">
-          <label for="skin-import">Import a skin (paste inert JSON)</label>
+          <label for="skin-import">${SETTINGS_CONTROL_LABELS['core.presentation-gallery-surface'].paste}</label>
           <textarea
             id="skin-import"
             .value=${this.importText}
@@ -276,7 +277,7 @@ export class PresentationGallerySurface extends JfElement {
             data-testid="gallery-import"
             ?disabled=${this.importText.trim() === ''}
             .onActivate=${() => this.importSkin()}
-            >Import + certify</jf-control
+            >${SETTINGS_CONTROL_LABELS['core.presentation-gallery-surface'].import}</jf-control
           >
         </div>
         <div class="msg" aria-live="polite">${this.message || nothing}</div>

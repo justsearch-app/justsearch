@@ -9,6 +9,7 @@
  * (§32.9), and this dial only tunes the FE's proactive oversight.
  */
 
+import { SETTINGS_CONTROL_LABELS } from '../views/settingsControlLabels.js';
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
 import {
@@ -25,9 +26,9 @@ import {
 import { confirmAsync } from './ConfirmDialog.js';
 
 const LABELS: Record<AutonomyLevel, string> = {
-  watch: 'Watch',
-  assist: 'Assist',
-  auto: 'Auto',
+  watch: SETTINGS_CONTROL_LABELS['agent-autonomy'].watch,
+  assist: SETTINGS_CONTROL_LABELS['agent-autonomy'].assist,
+  auto: SETTINGS_CONTROL_LABELS['agent-autonomy'].auto,
 };
 
 // Honest copy: the three levels are genuinely distinct (keyed on whether the
