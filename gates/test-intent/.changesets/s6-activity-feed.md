@@ -624,3 +624,13 @@ changes.
   "digest": "sha256:0037471e716183fe68f0d94ec35af657c8373528b1d4989ca2386980523ffd15"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "acceptor-50547733-ecf2-44d9-8904-25b6121dd7d8",
+  "verdict": "accept",
+  "digest": "sha256:a5d368d82614b94e611f82cc206cf97100b5347ab4423fee4fbdb2b45fc4125b"
+}
+```
