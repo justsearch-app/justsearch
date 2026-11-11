@@ -92,7 +92,7 @@
       "requiredCheck": "Unit tests (search-worker)",
       "owner": "search and worker hosted unit evidence",
       "hardTimeoutSeconds": 2100,
-      "notes": "Class-balanced from hosted per-class attribution on 2026-10-21. Main CI run 43094849517 informed moving adapters-lucene:test and indexer-worker's SyncRootPromotionCrashRecoveryTest to search-worker-2, leaving about 1900s of summed test-class time here. Confirm total wall time after rollout.",
+      "notes": "Class-balanced from hosted per-class attribution on 2026-10-21. Main CI run 43094849517 informed moving indexer-worker's SyncRootPromotionCrashRecoveryTest to search-worker-2. Confirm total wall time after rollout.",
       "advisoryBudgets": {
         "maxWallSeconds": 660
       }
@@ -102,7 +102,7 @@
       "requiredCheck": "Unit tests (search-worker)",
       "owner": "search and worker hosted unit evidence",
       "hardTimeoutSeconds": 2100,
-      "notes": "Class-balanced from hosted per-class attribution on 2026-10-21. Main CI run 43094849517 informed moving adapters-lucene:test and indexer-worker's SyncRootPromotionCrashRecoveryTest here from search-worker-1, yielding about 1900s of summed test-class time here. Confirm total wall time after rollout.",
+      "notes": "Class-balanced from hosted per-class attribution on 2026-10-21. Main CI run 43094849517 informed moving indexer-worker's SyncRootPromotionCrashRecoveryTest here from search-worker-1; this job runs more small modules, so it carries less summed test-class time than its sibling for a similar wall time. Confirm total wall time after rollout.",
       "advisoryBudgets": {
         "maxWallSeconds": 660
       }

@@ -145,9 +145,10 @@
       ],
       "gradleTasks": [
         ":modules:indexer-worker:ciUnitTest1",
-        ":modules:worker-services:ciUnitTest1"
+        ":modules:worker-services:ciUnitTest1",
+        ":modules:adapters-lucene:test"
       ],
-      "localCommand": "node scripts/lib/tool-invoker.cjs gradle :modules:indexer-worker:ciUnitTest1 :modules:worker-services:ciUnitTest1 -PskipWebBuild=true --console=plain",
+      "localCommand": "node scripts/lib/tool-invoker.cjs gradle :modules:indexer-worker:ciUnitTest1 :modules:worker-services:ciUnitTest1 :modules:adapters-lucene:test -PskipWebBuild=true --console=plain",
       "advisoryBudgets": {
         "maxSummedSuiteSeconds": 300,
         "slowSuiteWarnSeconds": 60,
@@ -170,7 +171,6 @@
       "gradleTasks": [
         ":modules:indexer-worker:ciUnitTest2",
         ":modules:worker-services:ciUnitTest2",
-        ":modules:adapters-lucene:test",
         ":modules:worker-core:test",
         ":modules:configuration:test",
         ":modules:core:test",
@@ -178,7 +178,7 @@
         ":modules:core-contracts:test",
         ":modules:ipc-common:test"
       ],
-      "localCommand": "node scripts/lib/tool-invoker.cjs gradle :modules:indexer-worker:ciUnitTest2 :modules:worker-services:ciUnitTest2 :modules:adapters-lucene:test :modules:worker-core:test :modules:configuration:test :modules:core:test :modules:indexing:test :modules:core-contracts:test :modules:ipc-common:test -PskipWebBuild=true --console=plain",
+      "localCommand": "node scripts/lib/tool-invoker.cjs gradle :modules:indexer-worker:ciUnitTest2 :modules:worker-services:ciUnitTest2 :modules:worker-core:test :modules:configuration:test :modules:core:test :modules:indexing:test :modules:core-contracts:test :modules:ipc-common:test -PskipWebBuild=true --console=plain",
       "advisoryBudgets": {
         "maxSummedSuiteSeconds": 300,
         "slowSuiteWarnSeconds": 60,
