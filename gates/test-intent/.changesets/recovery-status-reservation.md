@@ -68,3 +68,14 @@ Agent choices under the quoted delegation, against the settled scenarios of the 
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "kpy2yxwx-verifier",
+  "verdict": "accept",
+  "digest": "sha256:650a592f0dda7ba077eea3901202bce79f7b814621249d5e908755de4cec8fbf",
+  "note": "Expectations match settled R1, R3 and P4-P6; evidence digests and assertion fail-before are valid. Test-intent acceptance does not certify unverified scenarios."
+}
+```
