@@ -79,6 +79,7 @@ test('both installed Engine tiers always collect and upload child logs, kept lon
     assert.equal(upload.with['if-no-files-found'], 'error', id);
     // Retention reads the job status when the step runs, so every other upload that can fail runs first.
     assert.equal(uploads.at(-1), upload, `${id}: child logs upload comes after the job's other uploads`);
+    assert.equal(steps.at(-1), upload, `${id}: child logs upload is the job's final step, so no later step can fail after retention is chosen`);
     const collect = steps.findIndex((step) => step.run === 'node scripts/ci/collect-e2e-child-logs.mjs');
     assert.ok(collect >= 0 && steps.indexOf(upload) > collect, `${id}: upload follows collection`);
     for (const [status, days] of [['failure', 30], ['success', 3], ['cancelled', 3]]) {
