@@ -1,0 +1,343 @@
+{
+  "method": {
+    "baseline": "cc74c7a58a7dfc8da4397bc3f1722739e53cbc8f",
+    "command": "npm run test:unit:lockdown -- src/boot/boot-frame-lockdown.test.ts --reporter=json --outputFile=<run>.json (from modules/ui-web)",
+    "beforeState": "Shared clone of the baseline inside TMPDIR with its own copy of modules/ui-web/node_modules; no stash or revert.",
+    "runnerS": "Vitest JSON startTime to the last file endTime, including the build in beforeAll.",
+    "alone": "No load created by this session; other sessions on the 20-CPU machine kept a load average of about 3-7 throughout, so alone runs are not idle-machine runs.",
+    "load": "Suite pinned with taskset to CPUs 0-3; two python busy loops pinned to CPUs 0 and 1, started and killed by PID by the same script; identical for before and after.",
+    "resources": "Owned headless Chromium, loopback vite preview servers on port 0 and two CPU-load processes on this machine. No shared dev stack, owner app or CI."
+  },
+  "runs": {
+    "before-alone": {
+      "passed": 135,
+      "failed": 0,
+      "runnerS": 220.7,
+      "slowestCaseS": 13.19,
+      "slowestCase": "SW5 X1 window controls are legible over every surface with core.night-registry dark, and in forced colours",
+      "legibilityCases": 12,
+      "legibilitySumS": 151.2,
+      "legibilityMaxS": 13.19,
+      "otherCasesSumS": 67.7,
+      "slowest5": [
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.night-registry dark, and in forced colours",
+          "s": 13.19
+        },
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.cyanotype light, and in forced colours",
+          "s": 12.85
+        },
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.nord dark, and in forced colours",
+          "s": 12.71
+        },
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.night-registry light, and in forced colours",
+          "s": 12.6
+        },
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.sepia-focus dark, and in forced colours",
+          "s": 12.58
+        }
+      ]
+    },
+    "before-loaded": {
+      "passed": 135,
+      "failed": 0,
+      "runnerS": 286.4,
+      "slowestCaseS": 15.53,
+      "slowestCase": "SW5 X1 window controls are legible over every surface with core.sepia-focus light, and in forced colours",
+      "legibilityCases": 12,
+      "legibilitySumS": 181.3,
+      "legibilityMaxS": 15.53,
+      "otherCasesSumS": 101.3,
+      "slowest5": [
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.sepia-focus light, and in forced colours",
+          "s": 15.53
+        },
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.night-registry dark, and in forced colours",
+          "s": 15.5
+        },
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.sepia-focus dark, and in forced colours",
+          "s": 15.46
+        },
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.night-registry light, and in forced colours",
+          "s": 15.42
+        },
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.registrars-ledger light, and in forced colours",
+          "s": 15.38
+        }
+      ]
+    },
+    "after-alone-first": {
+      "passed": 135,
+      "failed": 0,
+      "runnerS": 101.9,
+      "slowestCaseS": 3.7,
+      "slowestCase": "SW5 X1 window controls are legible over every surface with core.nord dark, and in forced colours",
+      "legibilityCases": 12,
+      "legibilitySumS": 33.5,
+      "legibilityMaxS": 3.7,
+      "otherCasesSumS": 66.5,
+      "slowest5": [
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.nord dark, and in forced colours",
+          "s": 3.7
+        },
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.nord light, and in forced colours",
+          "s": 3.55
+        },
+        {
+          "name": "SA5 a second window saves its look without an incidental stale overwrite",
+          "s": 2.85
+        },
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.sepia-focus dark, and in forced colours",
+          "s": 2.7
+        },
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.night-registry dark, and in forced colours",
+          "s": 2.68
+        }
+      ]
+    },
+    "after-loaded": {
+      "passed": 135,
+      "failed": 0,
+      "runnerS": 155.5,
+      "slowestCaseS": 6.72,
+      "slowestCase": "SW5 X1 window controls are legible over every surface with core.nord light, and in forced colours",
+      "legibilityCases": 12,
+      "legibilitySumS": 50.8,
+      "legibilityMaxS": 6.72,
+      "otherCasesSumS": 101.4,
+      "slowest5": [
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.nord light, and in forced colours",
+          "s": 6.72
+        },
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.nord dark, and in forced colours",
+          "s": 5.57
+        },
+        {
+          "name": "SA5 a second window saves its look without an incidental stale overwrite",
+          "s": 5.45
+        },
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.sepia-focus dark, and in forced colours",
+          "s": 4.28
+        },
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.high-vis light, and in forced colours",
+          "s": 4.06
+        }
+      ]
+    },
+    "after-alone-consecutive-1": {
+      "passed": 135,
+      "failed": 0,
+      "runnerS": 106.7,
+      "slowestCaseS": 4.16,
+      "slowestCase": "SW5 X1 window controls are legible over every surface with core.nord dark, and in forced colours",
+      "legibilityCases": 12,
+      "legibilitySumS": 34.0,
+      "legibilityMaxS": 4.16,
+      "otherCasesSumS": 70.7,
+      "slowest5": [
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.nord dark, and in forced colours",
+          "s": 4.16
+        },
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.nord light, and in forced colours",
+          "s": 3.9
+        },
+        {
+          "name": "SA5 a second window saves its look without an incidental stale overwrite",
+          "s": 3.01
+        },
+        {
+          "name": "SA5 profile switch and palette changes cache the resulting live colours",
+          "s": 2.81
+        },
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.cyanotype light, and in forced colours",
+          "s": 2.69
+        }
+      ]
+    },
+    "after-alone-consecutive-2": {
+      "passed": 135,
+      "failed": 0,
+      "runnerS": 106.1,
+      "slowestCaseS": 3.94,
+      "slowestCase": "SW5 X1 window controls are legible over every surface with core.nord dark, and in forced colours",
+      "legibilityCases": 12,
+      "legibilitySumS": 36.3,
+      "legibilityMaxS": 3.94,
+      "otherCasesSumS": 67.7,
+      "slowest5": [
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.nord dark, and in forced colours",
+          "s": 3.94
+        },
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.nord light, and in forced colours",
+          "s": 3.93
+        },
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.night-registry light, and in forced colours",
+          "s": 3.31
+        },
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.high-vis light, and in forced colours",
+          "s": 3.16
+        },
+        {
+          "name": "SA5 a second window saves its look without an incidental stale overwrite",
+          "s": 3.02
+        }
+      ]
+    },
+    "after-alone-consecutive-3": {
+      "passed": 135,
+      "failed": 0,
+      "runnerS": 101.6,
+      "slowestCaseS": 3.81,
+      "slowestCase": "SW5 X1 window controls are legible over every surface with core.nord dark, and in forced colours",
+      "legibilityCases": 12,
+      "legibilitySumS": 33.9,
+      "legibilityMaxS": 3.81,
+      "otherCasesSumS": 65.6,
+      "slowest5": [
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.nord dark, and in forced colours",
+          "s": 3.81
+        },
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.nord light, and in forced colours",
+          "s": 3.8
+        },
+        {
+          "name": "SA5 a second window saves its look without an incidental stale overwrite",
+          "s": 3.79
+        },
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.registrars-ledger dark, and in forced colours",
+          "s": 2.71
+        },
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.night-registry dark, and in forced colours",
+          "s": 2.67
+        }
+      ]
+    },
+    "after-alone-consecutive-4": {
+      "passed": 135,
+      "failed": 0,
+      "runnerS": 109.2,
+      "slowestCaseS": 4.21,
+      "slowestCase": "SW5 X1 window controls are legible over every surface with core.nord dark, and in forced colours",
+      "legibilityCases": 12,
+      "legibilitySumS": 38.3,
+      "legibilityMaxS": 4.21,
+      "otherCasesSumS": 69.0,
+      "slowest5": [
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.nord dark, and in forced colours",
+          "s": 4.21
+        },
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.high-vis light, and in forced colours",
+          "s": 4.08
+        },
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.nord light, and in forced colours",
+          "s": 3.92
+        },
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.cyanotype light, and in forced colours",
+          "s": 3.43
+        },
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.registrars-ledger dark, and in forced colours",
+          "s": 2.99
+        }
+      ]
+    },
+    "after-alone-consecutive-5": {
+      "passed": 135,
+      "failed": 0,
+      "runnerS": 144.0,
+      "slowestCaseS": 7.21,
+      "slowestCase": "SW5 X1 window controls are legible over every surface with core.nord dark, and in forced colours",
+      "legibilityCases": 12,
+      "legibilitySumS": 62.6,
+      "legibilityMaxS": 7.21,
+      "otherCasesSumS": 79.2,
+      "slowest5": [
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.nord dark, and in forced colours",
+          "s": 7.21
+        },
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.nord light, and in forced colours",
+          "s": 7.09
+        },
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.night-registry light, and in forced colours",
+          "s": 5.41
+        },
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.high-vis light, and in forced colours",
+          "s": 5.36
+        },
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.registrars-ledger light, and in forced colours",
+          "s": 4.98
+        }
+      ]
+    }
+  },
+  "equivalence": {
+    "what": "Every measured value of the legibility cases dumped (temporary instrumentation in the clones only) at the baseline (real keyboard and pointer input, fresh pages per palette) and at the candidate (protocol-forced states, shared pages where used), keyed by case and surface/forced/control/state.",
+    "baselineValues": 5184,
+    "candidateValues": 5184,
+    "sameKeys": true,
+    "differingValues": 0,
+    "note": "A first candidate that also shared connecting and factory reset across palettes and applied each palette to them differed on exactly those two surfaces (432 values): they paint before the saved palette is restored. They now boot per palette with that palette storage, as before, and all 5184 values match."
+  },
+  "plantedDefects": {
+    "how": "BOOT_FRAME_TREE pointed at a shared clone of the baseline with one rule added to index.html; candidate test file; the 12 legibility cases run.",
+    "A-normal": {
+      "rule": "#window-controls button:active { color: var(--window-control-fill); } (after the hover/active rule, outside forced colours)",
+      "failedCases": 12,
+      "failuresPerCase": 72,
+      "printedEntries": 864,
+      "byState": {
+        "normal pressed: icon": 432,
+        "normal focus ring + pressed: icon": 432
+      }
+    },
+    "B-forced": {
+      "rule": "#window-controls button:focus-visible { outline-color: Canvas; } (inside @media (forced-colors: active))",
+      "failedCases": 12,
+      "failuresPerCase": 108,
+      "printedEntries": 216,
+      "byState": {
+        "forced focus ring: ring": 72,
+        "forced focus ring + hover: ring": 72,
+        "forced focus ring + pressed: ring": 72
+      },
+      "note": "Vitest printed one error per group of identical failures: the six dark cases share one (108 entries) and the six light cases another (108 entries)."
+    }
+  }
+}

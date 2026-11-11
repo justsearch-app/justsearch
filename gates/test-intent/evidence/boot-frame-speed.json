@@ -1,0 +1,582 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
+  },
+  "createdAt": "2026-11-11T09:03:22.561Z",
+  "revision": "cc74c7a58a7dfc8da4397bc3f1722739e53cbc8f",
+  "tree": "fbc4a7c73a0026a971aed5d0d010daa0ff23cf8c",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/boot/boot-frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/jt6z5pal/tmp/test-intent-vitest-60149-1794387594229.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 208330
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
+      "file": "modules/ui-web/src/boot/boot-frame-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:efede978e90c10405fc4b8cfc6e3c2bccd5fcfe704458e12bc599ee72bb3045d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SA1 SA6 first paint precedes entry and is inert",
+          "status": "passed"
+        },
+        {
+          "name": "SA6 rendered shell rejects input until frame hand-off",
+          "status": "passed"
+        },
+        {
+          "name": "SA6 never-rendering shell stays unreachable and deadline Reload takes focus",
+          "status": "passed"
+        },
+        {
+          "name": "SA6 every input path is stopped at window capture under the frame and released after paint",
+          "status": "passed"
+        },
+        {
+          "name": "SA6 shell shortcuts neither run nor queue beneath the frame, then normal shortcuts work",
+          "status": "passed"
+        },
+        {
+          "name": "SA6 pointer hover wheel context menu and mouse Back/Forward cannot reach the covered shell",
+          "status": "passed"
+        },
+        {
+          "name": "SA6 SA17 deadline discards rendered controls; failure page alone handles input and keyboard actions",
+          "status": "passed"
+        },
+        {
+          "name": "SA6 browser reload keys retain their native default at frame",
+          "status": "passed"
+        },
+        {
+          "name": "SA6 browser reload keys retain their native default at failure",
+          "status": "passed"
+        },
+        {
+          "name": "SA6 browser reload keys retain their native default at painted",
+          "status": "passed"
+        },
+        {
+          "name": "SA2 SA3 SA4 saved light over OS dark",
+          "status": "passed"
+        },
+        {
+          "name": "SA2 SA3 SA4 saved dark over OS light",
+          "status": "passed"
+        },
+        {
+          "name": "SA2 SA3 SA4 no copy follows OS light",
+          "status": "passed"
+        },
+        {
+          "name": "SA2 SA3 SA4 hostile copy follows OS dark",
+          "status": "passed"
+        },
+        {
+          "name": "SA3 query theme wins",
+          "status": "passed"
+        },
+        {
+          "name": "SA4 denied storage still paints",
+          "status": "passed"
+        },
+        {
+          "name": "SA8 SA12 entry failure report",
+          "status": "passed"
+        },
+        {
+          "name": "SA8 SA12 parse failure report",
+          "status": "passed"
+        },
+        {
+          "name": "SA8 SA12 dependency failure report",
+          "status": "passed"
+        },
+        {
+          "name": "SA8 SA12 evaluation failure report",
+          "status": "passed"
+        },
+        {
+          "name": "SA8 SA12 bootstrap failure report",
+          "status": "passed"
+        },
+        {
+          "name": "SA8 SA12 no-engine-address failure report",
+          "status": "passed"
+        },
+        {
+          "name": "SA10 SA17 60-second deadline discards an attached shell even when rendering later completes",
+          "status": "passed"
+        },
+        {
+          "name": "SA7 SA17 no blank interval through recovery removal and delayed render",
+          "status": "passed"
+        },
+        {
+          "name": "SA14 terminal event during hand-off beats first render and deadline",
+          "status": "passed"
+        },
+        {
+          "name": "SA14 reset incomplete takes over",
+          "status": "passed"
+        },
+        {
+          "name": "SA14 reset awaiting_storage takes over",
+          "status": "passed"
+        },
+        {
+          "name": "SA5 failed restore preserves previous paint cache",
+          "status": "passed"
+        },
+        {
+          "name": "SA16 SA18 newer-schema bytes survive complete boot and repeated reloads",
+          "status": "passed"
+        },
+        {
+          "name": "SA11 X1 X2 dark 1280 forced=false enlarged text",
+          "status": "passed"
+        },
+        {
+          "name": "SA11 X1 X2 dark 1280 forced=true enlarged text",
+          "status": "passed"
+        },
+        {
+          "name": "SA11 X1 X2 dark 900 forced=false enlarged text",
+          "status": "passed"
+        },
+        {
+          "name": "SA11 X1 X2 dark 900 forced=true enlarged text",
+          "status": "passed"
+        },
+        {
+          "name": "SA11 X1 X2 dark 600 forced=false enlarged text",
+          "status": "passed"
+        },
+        {
+          "name": "SA11 X1 X2 dark 600 forced=true enlarged text",
+          "status": "passed"
+        },
+        {
+          "name": "SA11 X1 X2 light 1280 forced=false enlarged text",
+          "status": "passed"
+        },
+        {
+          "name": "SA11 X1 X2 light 1280 forced=true enlarged text",
+          "status": "passed"
+        },
+        {
+          "name": "SA11 X1 X2 light 900 forced=false enlarged text",
+          "status": "passed"
+        },
+        {
+          "name": "SA11 X1 X2 light 900 forced=true enlarged text",
+          "status": "passed"
+        },
+        {
+          "name": "SA11 X1 X2 light 600 forced=false enlarged text",
+          "status": "passed"
+        },
+        {
+          "name": "SA11 X1 X2 light 600 forced=true enlarged text",
+          "status": "passed"
+        },
+        {
+          "name": "SA5 live mode contrast and presentation changes survive reload mid-boot",
+          "status": "passed"
+        },
+        {
+          "name": "SA5 a second window saves its look without an incidental stale overwrite",
+          "status": "passed"
+        },
+        {
+          "name": "SA10 stalled catalog discovery raises failure and late mount replaces it before rendering",
+          "status": "passed"
+        },
+        {
+          "name": "SA9 optional theme and lazy chunk failures stay optional",
+          "status": "passed"
+        },
+        {
+          "name": "SA4 denied storage does not block complete boot",
+          "status": "passed"
+        },
+        {
+          "name": "SA4 malformed copy null is ignored",
+          "status": "passed"
+        },
+        {
+          "name": "SA4 malformed copy {\"mode\":\"light\",\"background\":\"rgb(248, 249, 252)\",\"raised\":\"rgb(241, 242, 248)\",\"text\":\"rgb(20, 24, 32)\",\"muted\":\"rgb(50, 55, 65)\",\"border\":\"rgb(110, 115, 125)\",\"accent\":123} is ignored",
+          "status": "passed"
+        },
+        {
+          "name": "SA4 malformed copy {\"mode\":\"light\",\"background\":\"rgb(248, 249, 252)\",\"raised\":\"rgb(241, 242, 248)\",\"text\":\"rgb(20, 24, 32)\",\"muted\":\"rgb(50, 55, 65)\",\"border\":\"rgb(110, 115, 125)\",\"accent\":\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"} is ignored",
+          "status": "passed"
+        },
+        {
+          "name": "SA4 malformed copy {\"mode\":\"light\",\"background\":\"rgb(248, 249, 252)\",\"raised\":\"rgb(241, 242, 248)\",\"text\":\"rgb(20, 24, 32)\",\"muted\":\"rgb(50, 55, 65)\",\"border\":\"rgb(110, 115, 125)\",\"accent\":\"notacolor\"} is ignored",
+          "status": "passed"
+        },
+        {
+          "name": "SA4 malformed copy {\"mode\":\"system\",\"background\":\"rgb(248, 249, 252)\",\"raised\":\"rgb(241, 242, 248)\",\"text\":\"rgb(20, 24, 32)\",\"muted\":\"rgb(50, 55, 65)\",\"border\":\"rgb(110, 115, 125)\",\"accent\":\"rgb(0, 110, 100)\"} is ignored",
+          "status": "passed"
+        },
+        {
+          "name": "SA15 catalog cache absent still boots",
+          "status": "passed"
+        },
+        {
+          "name": "SA15 catalog cache valid still boots",
+          "status": "passed"
+        },
+        {
+          "name": "SA15 catalog cache stale still boots",
+          "status": "passed"
+        },
+        {
+          "name": "SA15 catalog cache malformed still boots",
+          "status": "passed"
+        },
+        {
+          "name": "SA13 SA15 built HTML resolves placeholders and boots with hashed inline CSP",
+          "status": "passed"
+        },
+        {
+          "name": "SA5 profile switch and palette changes cache the resulting live colours",
+          "status": "passed"
+        },
+        {
+          "name": "SA5 partly failed palette restore leaves the previous cache byte-identical",
+          "status": "passed"
+        },
+        {
+          "name": "SA14 factory reset taking over during hand-off beats the pending first render",
+          "status": "passed"
+        },
+        {
+          "name": "SA6 SA14 recovery replaces frame and its keyboard action works",
+          "status": "passed"
+        },
+        {
+          "name": "SA6 SA14 reset replaces frame and its keyboard action works",
+          "status": "passed"
+        },
+        {
+          "name": "SA6 SA14 recovery replaces failure and its keyboard action works",
+          "status": "passed"
+        },
+        {
+          "name": "SA6 SA14 reset replaces failure and its keyboard action works",
+          "status": "passed"
+        },
+        {
+          "name": "SA12 refused clipboard reveals only the fixed report ready to select",
+          "status": "passed"
+        },
+        {
+          "name": "X1 X2 light frame colours and bounds with no application stylesheet",
+          "status": "passed"
+        },
+        {
+          "name": "X1 X2 dark frame colours and bounds with no application stylesheet",
+          "status": "passed"
+        },
+        {
+          "name": "SA7 SA10 deadline survives a long connecting interval before the frame returns",
+          "status": "passed"
+        },
+        {
+          "name": "SW1 SW2 SW3 SW7 window controls send their command on start-up frame, by pointer and keyboard",
+          "status": "passed"
+        },
+        {
+          "name": "SW1 SW2 SW3 SW7 window controls send their command on entry failure, by pointer and keyboard",
+          "status": "passed"
+        },
+        {
+          "name": "SW1 SW2 SW3 SW7 window controls send their command on evaluation failure, by pointer and keyboard",
+          "status": "passed"
+        },
+        {
+          "name": "SW1 SW2 SW3 SW7 window controls send their command on stalled failure, by pointer and keyboard",
+          "status": "passed"
+        },
+        {
+          "name": "SW1 SW2 SW3 SW7 window controls send their command on connecting, by pointer and keyboard",
+          "status": "passed"
+        },
+        {
+          "name": "SW1 SW2 SW3 SW7 window controls send their command on engine terminal, by pointer and keyboard",
+          "status": "passed"
+        },
+        {
+          "name": "SW1 SW2 SW3 SW7 window controls send their command on engine not ready, by pointer and keyboard",
+          "status": "passed"
+        },
+        {
+          "name": "SW1 SW2 SW3 SW7 window controls send their command on Linux update hold, by pointer and keyboard",
+          "status": "passed"
+        },
+        {
+          "name": "SW1 SW2 SW3 SW7 window controls send their command on reset busy, by pointer and keyboard",
+          "status": "passed"
+        },
+        {
+          "name": "SW1 SW2 SW3 SW7 window controls send their command on reset error, by pointer and keyboard",
+          "status": "passed"
+        },
+        {
+          "name": "SW1 SW2 SW3 SW7 window controls send their command on reset complete, by pointer and keyboard",
+          "status": "passed"
+        },
+        {
+          "name": "SW1 SW2 SW3 SW7 window controls send their command on running app, by pointer and keyboard",
+          "status": "passed"
+        },
+        {
+          "name": "SW1 SW2 SW3 SW7 window controls send their command on held hand-off, by pointer and keyboard",
+          "status": "passed"
+        },
+        {
+          "name": "SW1 SW2 top area of start-up frame moves the window; interactive controls never start a drag",
+          "status": "passed"
+        },
+        {
+          "name": "SW1 SW2 top area of entry failure moves the window; interactive controls never start a drag",
+          "status": "passed"
+        },
+        {
+          "name": "SW1 SW2 top area of evaluation failure moves the window; interactive controls never start a drag",
+          "status": "passed"
+        },
+        {
+          "name": "SW1 SW2 top area of stalled failure moves the window; interactive controls never start a drag",
+          "status": "passed"
+        },
+        {
+          "name": "SW1 SW2 top area of connecting moves the window; interactive controls never start a drag",
+          "status": "passed"
+        },
+        {
+          "name": "SW1 SW2 top area of engine terminal moves the window; interactive controls never start a drag",
+          "status": "passed"
+        },
+        {
+          "name": "SW1 SW2 top area of engine not ready moves the window; interactive controls never start a drag",
+          "status": "passed"
+        },
+        {
+          "name": "SW1 SW2 top area of Linux update hold moves the window; interactive controls never start a drag",
+          "status": "passed"
+        },
+        {
+          "name": "SW1 SW2 top area of reset busy moves the window; interactive controls never start a drag",
+          "status": "passed"
+        },
+        {
+          "name": "SW1 SW2 top area of reset error moves the window; interactive controls never start a drag",
+          "status": "passed"
+        },
+        {
+          "name": "SW1 SW2 top area of reset complete moves the window; interactive controls never start a drag",
+          "status": "passed"
+        },
+        {
+          "name": "SW1 SW2 top area of running app moves the window; interactive controls never start a drag",
+          "status": "passed"
+        },
+        {
+          "name": "SW1 SW2 top area of held hand-off moves the window; interactive controls never start a drag",
+          "status": "passed"
+        },
+        {
+          "name": "SW2 the vendored Tauri drag script is the tauri version Cargo.lock pins, unchanged",
+          "status": "passed"
+        },
+        {
+          "name": "SW2 controls and moving keep working after the hand-off releases the app",
+          "status": "passed"
+        },
+        {
+          "name": "SW4 maximize control follows the real window state on running app",
+          "status": "passed"
+        },
+        {
+          "name": "SW4 maximize control follows the real window state on entry failure",
+          "status": "passed"
+        },
+        {
+          "name": "SW4 maximize control follows the real window state on start-up frame",
+          "status": "passed"
+        },
+        {
+          "name": "SW9 refused window operations on start-up frame do nothing harmful and raise no error",
+          "status": "passed"
+        },
+        {
+          "name": "SW9 refused window operations on entry failure do nothing harmful and raise no error",
+          "status": "passed"
+        },
+        {
+          "name": "SW9 refused window operations on running app do nothing harmful and raise no error",
+          "status": "passed"
+        },
+        {
+          "name": "SW6 browser runtime has no window layer, drag regions or native commands on any surface",
+          "status": "passed"
+        },
+        {
+          "name": "SW5 every control is reachable by keyboard in order, with a visible focus ring, after the app and on the failure page",
+          "status": "passed"
+        },
+        {
+          "name": "SW5 X1 X2 entry failure dark forced=false: controls fit at every size and enlarged text, axe clean",
+          "status": "passed"
+        },
+        {
+          "name": "SW5 X1 X2 engine terminal dark forced=false: controls fit at every size and enlarged text, axe clean",
+          "status": "passed"
+        },
+        {
+          "name": "SW5 X1 X2 reset complete dark forced=false: controls fit at every size and enlarged text, axe clean",
+          "status": "passed"
+        },
+        {
+          "name": "SW5 X1 X2 running app dark forced=false: controls fit at every size and enlarged text, axe clean",
+          "status": "passed"
+        },
+        {
+          "name": "SW5 X1 X2 start-up frame dark forced=false: controls fit at every size and enlarged text, axe clean",
+          "status": "passed"
+        },
+        {
+          "name": "SW5 X1 X2 entry failure dark forced=true: controls fit at every size and enlarged text, axe clean",
+          "status": "passed"
+        },
+        {
+          "name": "SW5 X1 X2 engine terminal dark forced=true: controls fit at every size and enlarged text, axe clean",
+          "status": "passed"
+        },
+        {
+          "name": "SW5 X1 X2 reset complete dark forced=true: controls fit at every size and enlarged text, axe clean",
+          "status": "passed"
+        },
+        {
+          "name": "SW5 X1 X2 running app dark forced=true: controls fit at every size and enlarged text, axe clean",
+          "status": "passed"
+        },
+        {
+          "name": "SW5 X1 X2 start-up frame dark forced=true: controls fit at every size and enlarged text, axe clean",
+          "status": "passed"
+        },
+        {
+          "name": "SW5 X1 X2 entry failure light forced=false: controls fit at every size and enlarged text, axe clean",
+          "status": "passed"
+        },
+        {
+          "name": "SW5 X1 X2 engine terminal light forced=false: controls fit at every size and enlarged text, axe clean",
+          "status": "passed"
+        },
+        {
+          "name": "SW5 X1 X2 reset complete light forced=false: controls fit at every size and enlarged text, axe clean",
+          "status": "passed"
+        },
+        {
+          "name": "SW5 X1 X2 running app light forced=false: controls fit at every size and enlarged text, axe clean",
+          "status": "passed"
+        },
+        {
+          "name": "SW5 X1 X2 start-up frame light forced=false: controls fit at every size and enlarged text, axe clean",
+          "status": "passed"
+        },
+        {
+          "name": "SW5 X1 X2 entry failure light forced=true: controls fit at every size and enlarged text, axe clean",
+          "status": "passed"
+        },
+        {
+          "name": "SW5 X1 X2 engine terminal light forced=true: controls fit at every size and enlarged text, axe clean",
+          "status": "passed"
+        },
+        {
+          "name": "SW5 X1 X2 reset complete light forced=true: controls fit at every size and enlarged text, axe clean",
+          "status": "passed"
+        },
+        {
+          "name": "SW5 X1 X2 running app light forced=true: controls fit at every size and enlarged text, axe clean",
+          "status": "passed"
+        },
+        {
+          "name": "SW5 X1 X2 start-up frame light forced=true: controls fit at every size and enlarged text, axe clean",
+          "status": "passed"
+        },
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.nord dark, and in forced colours",
+          "status": "passed"
+        },
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.nord light, and in forced colours",
+          "status": "passed"
+        },
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.sepia-focus dark, and in forced colours",
+          "status": "passed"
+        },
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.sepia-focus light, and in forced colours",
+          "status": "passed"
+        },
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.high-vis dark, and in forced colours",
+          "status": "passed"
+        },
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.high-vis light, and in forced colours",
+          "status": "passed"
+        },
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.registrars-ledger dark, and in forced colours",
+          "status": "passed"
+        },
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.registrars-ledger light, and in forced colours",
+          "status": "passed"
+        },
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.night-registry dark, and in forced colours",
+          "status": "passed"
+        },
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.night-registry light, and in forced colours",
+          "status": "passed"
+        },
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.cyanotype dark, and in forced colours",
+          "status": "passed"
+        },
+        {
+          "name": "SW5 X1 window controls are legible over every surface with core.cyanotype light, and in forced colours",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:2df67eda72cc5ad06c4610b5c37c89074a08b068fba27b748dcf343031415c72"
+}

@@ -1099,93 +1099,188 @@ for (const os of ['dark', 'light'] as const) for (const forced of [false, true])
 
 // X1 SW5: the layer takes its colours from the surface beneath it, for every shipped palette and state.
 const shippedPalettes = (JSON.parse(readFileSync(path.resolve('public/themes/manifest.json'), 'utf8')) as { themes: { id: string }[] }).themes.map(theme => theme.id);
+type ControlState = { state: string; measure: { icon: boolean; ring: boolean }; pseudo: string[] };
+/**
+ * The six states, with the pseudo-classes keyboard and pointer input give a control in each:
+ * keyboard focus shows the ring, the pointer over it hovers, a primary button held on it presses
+ * it, and keyboard focus is kept while the pointer hovers or presses.
+ */
+const controlStates: ControlState[] = [
+  { state: 'icon', measure: { icon: true, ring: false }, pseudo: [] },
+  { state: 'focus ring', measure: { icon: false, ring: true }, pseudo: ['focus', 'focus-visible'] },
+  { state: 'hover', measure: { icon: true, ring: false }, pseudo: ['hover'] },
+  { state: 'pressed', measure: { icon: true, ring: false }, pseudo: ['hover', 'active'] },
+  { state: 'focus ring + hover', measure: { icon: true, ring: true }, pseudo: ['focus', 'focus-visible', 'hover'] },
+  { state: 'focus ring + pressed', measure: { icon: true, ring: true }, pseudo: ['focus', 'focus-visible', 'hover', 'active'] },
+];
+const controlNames = ['Minimize', 'Maximize', 'Close'];
+/** Each control's colours as painted, in document order (Minimize, Maximize or Restore, Close). */
+function measureControls(ring: boolean) {
+  return [...document.querySelectorAll<HTMLElement>('#window-controls button')].map(el => {
+    const ctx = document.createElement('canvas').getContext('2d', { willReadFrequently: true })!;
+    const rgba = (value: string) => { ctx.clearRect(0, 0, 1, 1); ctx.fillStyle = value; ctx.fillRect(0, 0, 1, 1); return [...ctx.getImageData(0, 0, 1, 1).data].map((v, i) => i < 3 ? v : v / 255); };
+    const over = (top: number[], bottom: number[]) => [...top.slice(0, 3).map((v, i) => v * top[3]! + bottom[i]! * (1 - top[3]!)), 1];
+    const lum = (v: number[]) => { const l = v.slice(0, 3).map(c => { c /= 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; }); return l[0]! * .2126 + l[1]! * .7152 + l[2]! * .0722; };
+    const ratio = (x: number[], y: number[]) => { const a = lum(x), b = lum(y); return (Math.max(a, b) + .05) / (Math.min(a, b) + .05); };
+    const css = (v: number[]) => `rgb(${v.slice(0, 3).map(Math.round).join(', ')})`;
+    const own = getComputedStyle(el);
+    const fill = rgba(own.backgroundColor);
+    const visible = !ring || (el.matches(':focus-visible') && own.outlineStyle !== 'none' && parseFloat(own.outlineWidth) > 0);
+    // What the surfaces beneath the layer paint at the control's centre, over the page canvas.
+    const layer = el.closest<HTMLElement>('#window-controls')!;
+    const r = el.getBoundingClientRect();
+    layer.style.visibility = 'hidden';
+    let under = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    while (under?.shadowRoot) { const inner = under.shadowRoot.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); if (!inner || inner === under) break; under = inner; }
+    layer.style.visibility = '';
+    const chain: number[][] = [];
+    for (let node: Element | null = under; node; node = node.parentElement ?? ((node.getRootNode() as ShadowRoot).host ?? null)) chain.push(rgba(getComputedStyle(node).backgroundColor));
+    const probe = document.createElement('span'); probe.style.color = 'Canvas'; document.documentElement.append(probe);
+    let beside = rgba(getComputedStyle(probe).color); probe.remove();
+    for (const paint of chain.reverse()) beside = over(paint, beside);
+    const filled = over(fill, beside);
+    const icon = over(rgba(own.color), filled);
+    // The ring as painted: over the fill when inset, over the surface when drawn outside the control.
+    const outline = over(rgba(own.outlineColor), parseFloat(own.outlineOffset) < 0 ? filled : beside);
+    return { visible, icon: ratio(icon, filled), ringFill: ratio(outline, filled), ringSurface: ratio(outline, beside),
+      ink: own.color, ring: own.outlineColor, fill: css(filled), beside: css(beside) };
+  });
+}
+type Measured = ReturnType<typeof measureControls>[number];
+type StateMeasures = { forced: boolean; state: string; measured: Measured[] }[];
+/**
+ * All three controls in each of the six states, in normal and forced colours. Chromium's DevTools
+ * protocol sets each state's pseudo-classes on the three controls at once (their rules depend on
+ * no other element's state), so one evaluation per state measures them. realInputMeasures shows
+ * keyboard and pointer input paint the same.
+ */
+async function forcedStateMeasures(page: Page): Promise<StateMeasures> {
+  const out: StateMeasures = [];
+  // As before each real-input pass: the pointer is away from the controls.
+  await page.mouse.move(1, page.viewportSize()!.height - 1);
+  const cdp = await page.context().newCDPSession(page);
+  try {
+    await cdp.send('DOM.enable'); await cdp.send('CSS.enable');
+    const { root } = await cdp.send('DOM.getDocument', { depth: 0 });
+    const { nodeIds } = await cdp.send('DOM.querySelectorAll', { nodeId: root.nodeId, selector: '#window-controls button' });
+    expect(nodeIds).toHaveLength(3);
+    const force = (pseudo: string[]) => Promise.all(nodeIds.map(nodeId => cdp.send('CSS.forcePseudoState', { nodeId, forcedPseudoClasses: pseudo })));
+    try {
+      for (const forced of [false, true]) {
+        await page.emulateMedia({ forcedColors: forced ? 'active' : 'none' });
+        for (const { state, measure, pseudo } of controlStates) {
+          await force(pseudo);
+          out.push({ forced, state, measured: await page.evaluate(measureControls, measure.ring) });
+        }
+      }
+    } finally { await force([]); }
+  } finally { await cdp.detach(); await page.emulateMedia({ forcedColors: 'none' }); }
+  return out;
+}
 /**
  * Each control's icon, hover, pressed and focus ring against what is painted behind it, in normal
  * and forced colours, alone and with keyboard focus kept while the pointer hovers or presses: the
  * icon at least 4.5:1 against its fill; the ring at least 4.5:1 alone and, over a fill, at least
  * 3:1 against both the fill and the surface beside it.
  */
-async function controlContrasts(page: Page, surface: string) {
+function controlContrasts(measures: StateMeasures, surface: string) {
   const failures: string[] = [];
-  const away = { x: 1, y: page.viewportSize()!.height - 1 };
-  for (const forced of [false, true]) {
-    await page.emulateMedia({ forcedColors: forced ? 'active' : 'none' });
-    for (const name of ['Minimize', 'Maximize', 'Close']) {
-      const button = control(page, name);
-      const box = (await button.boundingBox())!;
-      const centre = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
-      // A key press first, so programmatic focus shows the keyboard focus ring.
-      const focus = async () => { await page.keyboard.press('Shift'); await button.focus(); };
-      const blur = async () => { await button.evaluate(el => (el as HTMLElement).blur()); };
-      // Pressed states are released away from the control, so no window command runs.
-      const release = async () => { await page.mouse.move(away.x, away.y); await page.mouse.up(); };
-      const states: [string, { icon: boolean; ring: boolean }, () => Promise<void>, () => Promise<void>][] = [
-        ['icon', { icon: true, ring: false }, async () => { await page.mouse.move(away.x, away.y); await blur(); }, async () => {}],
-        ['focus ring', { icon: false, ring: true }, focus, blur],
-        ['hover', { icon: true, ring: false }, async () => { await page.mouse.move(centre.x, centre.y); }, async () => {}],
-        ['pressed', { icon: true, ring: false }, async () => { await page.mouse.move(centre.x, centre.y); await page.mouse.down(); }, release],
-        ['focus ring + hover', { icon: true, ring: true }, async () => { await focus(); await page.mouse.move(centre.x, centre.y); }, async () => { await page.mouse.move(away.x, away.y); await blur(); }],
-        ['focus ring + pressed', { icon: true, ring: true }, async () => { await focus(); await page.mouse.move(centre.x, centre.y); await page.mouse.down(); }, async () => { await release(); await blur(); }],
-      ];
-      for (const [state, measure, enter, leave] of states) {
-        await enter();
-        const measured = await button.evaluate((el, ring) => {
-          const ctx = document.createElement('canvas').getContext('2d', { willReadFrequently: true })!;
-          const rgba = (value: string) => { ctx.clearRect(0, 0, 1, 1); ctx.fillStyle = value; ctx.fillRect(0, 0, 1, 1); return [...ctx.getImageData(0, 0, 1, 1).data].map((v, i) => i < 3 ? v : v / 255); };
-          const over = (top: number[], bottom: number[]) => [...top.slice(0, 3).map((v, i) => v * top[3]! + bottom[i]! * (1 - top[3]!)), 1];
-          const lum = (v: number[]) => { const l = v.slice(0, 3).map(c => { c /= 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; }); return l[0]! * .2126 + l[1]! * .7152 + l[2]! * .0722; };
-          const ratio = (x: number[], y: number[]) => { const a = lum(x), b = lum(y); return (Math.max(a, b) + .05) / (Math.min(a, b) + .05); };
-          const css = (v: number[]) => `rgb(${v.slice(0, 3).map(Math.round).join(', ')})`;
-          const own = getComputedStyle(el);
-          const fill = rgba(own.backgroundColor);
-          const visible = !ring || (el.matches(':focus-visible') && own.outlineStyle !== 'none' && parseFloat(own.outlineWidth) > 0);
-          // What the surfaces beneath the layer paint at the control's centre, over the page canvas.
-          const layer = el.closest<HTMLElement>('#window-controls')!;
-          const r = el.getBoundingClientRect();
-          layer.style.visibility = 'hidden';
-          let under = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-          while (under?.shadowRoot) { const inner = under.shadowRoot.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); if (!inner || inner === under) break; under = inner; }
-          layer.style.visibility = '';
-          const chain: number[][] = [];
-          for (let node: Element | null = under; node; node = node.parentElement ?? ((node.getRootNode() as ShadowRoot).host ?? null)) chain.push(rgba(getComputedStyle(node).backgroundColor));
-          const probe = document.createElement('span'); probe.style.color = 'Canvas'; document.documentElement.append(probe);
-          let beside = rgba(getComputedStyle(probe).color); probe.remove();
-          for (const paint of chain.reverse()) beside = over(paint, beside);
-          const filled = over(fill, beside);
-          const icon = over(rgba(own.color), filled);
-          // The ring as painted: over the fill when inset, over the surface when drawn outside the control.
-          const outline = over(rgba(own.outlineColor), parseFloat(own.outlineOffset) < 0 ? filled : beside);
-          return { visible, icon: ratio(icon, filled), ringFill: ratio(outline, filled), ringSurface: ratio(outline, beside),
-            ink: own.color, ring: own.outlineColor, fill: css(filled), beside: css(beside) };
-        }, measure.ring);
-        await leave();
-        const where = `${surface}${forced ? ' forced' : ''} ${name} ${state}`;
-        if (!measured.visible) { failures.push(`${where}: no ring`); continue; }
-        if (measure.icon && measured.icon < 4.5) failures.push(`${where}: icon ${measured.icon.toFixed(2)} (${measured.ink} on ${measured.fill})`);
-        // Alone, the ring is beside the surface only; over a fill the table's 3:1 applies to both.
-        const least = measure.icon ? 3 : 4.5;
-        if (measure.ring && (measured.ringFill < least || measured.ringSurface < least)) failures.push(`${where}: ring ${measured.ringFill.toFixed(2)} against the fill ${measured.fill}, ${measured.ringSurface.toFixed(2)} against the surface ${measured.beside} (${measured.ring})`);
-      }
-    }
+  for (const { forced, state, measured } of measures) {
+    const { measure } = controlStates.find(one => one.state === state)!;
+    measured.forEach((one, i) => {
+      const where = `${surface}${forced ? ' forced' : ''} ${controlNames[i]} ${state}`;
+      if (!one.visible) { failures.push(`${where}: no ring`); return; }
+      if (measure.icon && one.icon < 4.5) failures.push(`${where}: icon ${one.icon.toFixed(2)} (${one.ink} on ${one.fill})`);
+      // Alone, the ring is beside the surface only; over a fill the table's 3:1 applies to both.
+      const least = measure.icon ? 3 : 4.5;
+      if (measure.ring && (one.ringFill < least || one.ringSurface < least)) failures.push(`${where}: ring ${one.ringFill.toFixed(2)} against the fill ${one.fill}, ${one.ringSurface.toFixed(2)} against the surface ${one.beside} (${one.ring})`);
+    });
   }
-  await page.emulateMedia({ forcedColors: 'none' });
   return failures;
 }
-for (const palette of shippedPalettes) for (const mode of ['dark', 'light'] as const) it(`SW5 X1 window controls are legible over every surface with ${palette} ${mode}, and in forced colours`, async () => {
-  const failures: string[] = [];
-  let storage: Record<string, string> = {};
-  // The running app after the theme applied; it writes the saved frame copy the next start paints.
-  const app = await create({ os: mode, theme: mode });
+/** The same six states by real keyboard and pointer input on one control, measured the same way. */
+async function realInputMeasures(page: Page, name: string) {
+  const out: { forced: boolean; state: string; measured: Measured }[] = [];
+  const index = controlNames.indexOf(name);
+  const away = { x: 1, y: page.viewportSize()!.height - 1 };
+  const button = control(page, name);
+  const box = (await button.boundingBox())!;
+  const centre = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  // A key press first, so programmatic focus shows the keyboard focus ring.
+  const focus = async () => { await page.keyboard.press('Shift'); await button.focus(); };
+  const blur = async () => { await button.evaluate(el => (el as HTMLElement).blur()); };
+  // Pressed states are released away from the control, so no window command runs.
+  const release = async () => { await page.mouse.move(away.x, away.y); await page.mouse.up(); };
+  const input: Record<string, [() => Promise<void>, () => Promise<void>]> = {
+    'icon': [async () => { await page.mouse.move(away.x, away.y); await blur(); }, async () => {}],
+    'focus ring': [focus, blur],
+    'hover': [async () => { await page.mouse.move(centre.x, centre.y); }, async () => {}],
+    'pressed': [async () => { await page.mouse.move(centre.x, centre.y); await page.mouse.down(); }, release],
+    'focus ring + hover': [async () => { await focus(); await page.mouse.move(centre.x, centre.y); }, async () => { await page.mouse.move(away.x, away.y); await blur(); }],
+    'focus ring + pressed': [async () => { await focus(); await page.mouse.move(centre.x, centre.y); await page.mouse.down(); }, async () => { await release(); await blur(); }],
+  };
   try {
-    await app.goto(url); await app.waitForSelector('jf-top-bar .more-trigger'); await expect.poll(() => app.locator('#boot-frame').count()).toBe(0);
-    expect(await controlLabels(app)).toEqual(['Minimize', 'Maximize', 'Close']);
-    await app.addScriptTag({ type: 'module', url: new URL(probe, url).href });
-    await app.waitForFunction(() => 'frameProbe' in window);
-    await app.evaluate(({ palette, mode }) => window.frameProbe.applyAppearance({ paletteId: palette, theme: mode }), { palette, mode });
-    await expect.poll(() => app.evaluate(key => JSON.parse(localStorage.getItem(key) ?? 'null')?.text === getComputedStyle(document.documentElement).getPropertyValue('--text-primary').trim(), key)).toBe(true);
-    failures.push(...await controlContrasts(app, 'running app'));
-    storage = await app.evaluate(() => Object.fromEntries(Object.entries(localStorage)));
-  } finally { await app.close(); }
+    for (const forced of [false, true]) {
+      await page.emulateMedia({ forcedColors: forced ? 'active' : 'none' });
+      for (const { state, measure } of controlStates) {
+        const [enter, leave] = input[state]!;
+        await enter();
+        out.push({ forced, state, measured: (await page.evaluate(measureControls, measure.ring))[index]! });
+        await leave();
+      }
+    }
+  } finally { await page.emulateMedia({ forcedColors: 'none' }); }
+  return out;
+}
+/**
+ * Booted once per mode, outside any one case's contexts (closing the browser after all cases closes
+ * them): these surfaces take their colours from the app's tokens, which a palette changes at
+ * runtime, so each case applies its palette to them through the app's own appearance writer. The
+ * other surfaces boot per palette: the start-up frame, failure page and hand-off paint the saved
+ * copy the early HTML script reads once at boot, and connecting and factory reset paint before the
+ * saved palette is restored.
+ */
+const livePages = new Map<'dark' | 'light', Promise<[string, Page][]>>();
+function livePagesFor(mode: 'dark' | 'light') {
+  if (!livePages.has(mode)) livePages.set(mode, (async () => {
+    const open = async (surface: string, options: Options, ready: string) => {
+      const page = await create({ os: mode, theme: mode, ...options });
+      contexts.delete(page.context());
+      await page.goto(url); await page.waitForSelector(ready, { state: 'attached' });
+      await page.addScriptTag({ type: 'module', url: new URL(probe, url).href });
+      await page.waitForFunction(() => 'frameProbe' in window);
+      return [surface, page] as [string, Page];
+    };
+    // The running app writes the saved frame copy the next start paints.
+    return [await open('running app', {}, 'jf-top-bar .more-trigger'),
+      await open('hand-off without a saved copy', { renderHold: true }, 'jf-top-bar .more-trigger'),
+      await open('engine recovery', { supervisor: exhausted }, '#root > jf-engine-recovery')];
+  })());
+  return livePages.get(mode)!;
+}
+const legibilityCases = shippedPalettes.flatMap(palette => (['dark', 'light'] as const).map(mode => ({ palette, mode })));
+legibilityCases.forEach(({ palette, mode }, caseIndex) => it(`SW5 X1 window controls are legible over every surface with ${palette} ${mode}, and in forced colours`, async () => {
+  const failures: string[] = [];
+  const live = new Map(await livePagesFor(mode));
+  // Every surface is also measured under real keyboard and pointer input once across these cases.
+  let surfaceIndex = 0;
+  const measureSurface = async (page: Page, surface: string) => {
+    const measures = await forcedStateMeasures(page);
+    failures.push(...controlContrasts(measures, surface));
+    if (surfaceIndex++ % legibilityCases.length === caseIndex) {
+      const name = controlNames[caseIndex % controlNames.length]!, index = controlNames.indexOf(name);
+      expect({ surface, name, real: await realInputMeasures(page, name) })
+        .toEqual({ surface, name, real: measures.map(({ forced, state, measured }) => ({ forced, state, measured: measured[index] })) });
+    }
+  };
+  const apply = (page: Page) => page.evaluate(({ palette, mode }) => window.frameProbe.applyAppearance({ paletteId: palette, theme: mode }), { palette, mode });
+  const app = live.get('running app')!;
+  await expect.poll(() => app.locator('#boot-frame').count()).toBe(0);
+  expect(await controlLabels(app)).toEqual(['Minimize', 'Maximize', 'Close']);
+  await apply(app);
+  await expect.poll(() => app.evaluate(key => JSON.parse(localStorage.getItem(key) ?? 'null')?.text === getComputedStyle(document.documentElement).getPropertyValue('--text-primary').trim(), key)).toBe(true);
+  await measureSurface(app, 'running app');
+  const storage: Record<string, string> = await app.evaluate(() => Object.fromEntries(Object.entries(localStorage)));
   const noCopy = Object.fromEntries(Object.entries(storage).filter(([name]) => name !== key));
   const start = async (options: Options, styles: boolean, entryFails: boolean) => {
     const page = await create({ os: mode, theme: mode, ...options });
@@ -1199,8 +1294,6 @@ for (const palette of shippedPalettes) for (const mode of ['dark', 'light'] as c
   const handOff = async (options: Options) => {
     const page = await create({ os: mode, theme: mode, renderHold: true, ...options });
     await page.goto(url); await page.waitForSelector('jf-top-bar .more-trigger');
-    await page.waitForFunction(palette => document.querySelector(`style[data-theme-id="${palette}"]`) !== null, palette);
-    expect(await page.locator('#boot-frame').count()).toBe(1);
     return page;
   };
   const opened = async (options: Options, selector: string) => { const page = await create({ os: mode, theme: mode, ...options }); await page.goto(url); return loaded(selector)(page); };
@@ -1212,17 +1305,22 @@ for (const palette of shippedPalettes) for (const mode of ['dark', 'light'] as c
     ['failure page', () => start({ storage }, true, true)],
     ['failure page without a saved copy', () => start({ storage: noCopy }, true, true)],
     ['hand-off', () => handOff({ storage })],
-    ['hand-off without a saved copy', () => handOff({ storage: noCopy })],
+    ['hand-off without a saved copy', async () => { const page = live.get('hand-off without a saved copy')!; await apply(page); return page; }],
+    // Both paint before the saved palette is restored, so each boots with this palette's storage as a start would.
     ['connecting', () => opened({ storage, discoveryHold: true }, '#root > jf-engine-recovery')],
-    ['engine recovery', () => opened({ storage, supervisor: exhausted }, '#root > jf-engine-recovery')],
+    ['engine recovery', async () => { const page = live.get('engine recovery')!; await apply(page); return page; }],
     ['factory reset', () => opened({ storage, phase: 'complete' }, '#root > jf-factory-reset-recovery')],
   ];
   for (const [surface, open] of states) {
     const page = await open();
     try {
+      if (surface.startsWith('hand-off')) {
+        await page.waitForFunction(palette => document.querySelector(`style[data-theme-id="${palette}"]`) !== null, palette);
+        expect({ surface, frame: await page.locator('#boot-frame').count() }).toEqual({ surface, frame: 1 });
+      }
       expect({ surface, labels: await controlLabels(page) }).toEqual({ surface, labels: ['Minimize', 'Maximize', 'Close'] });
-      failures.push(...await controlContrasts(page, surface));
-    } finally { await page.close(); }
+      await measureSurface(page, surface);
+    } finally { if (!live.has(surface)) await page.close(); }
   }
   expect(failures).toEqual([]);
-}, 90_000);
+}, 90_000));
