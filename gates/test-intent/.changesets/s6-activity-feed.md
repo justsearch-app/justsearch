@@ -520,3 +520,14 @@ row under Your actions. The acceptance record below predates these changes.
   "note": "Entries 13 and 14 lack independently checkable sources for all their new expectations. Entry 13 cites the settled design classification table and indexing set without recording their contents; the supplied s6-9-scenarios.md delegates A1-A20 to draft section 7 in results/s6-9/investigator-1, which is not provided. Entry 14 cites A16/A19/A20 without their contents and describes a testing strategy rather than the specific forced-colour and layout choices its assertions pin. Supply the referenced scenario/design text or explicit specific delegated choices covering those expectations. The other 19 entries pass this test-intent audit; no Adaptation hides a changed existing oracle. This is a source-warrant rejection, not a product defect verdict."
 }
 ```
+
+```json
+{
+  "kind": "tie-break",
+  "role": "verifier",
+  "session": "01a1cbd0-3470-7db2-a1bc-d56a39e068ef",
+  "verdict": "reject",
+  "digest": "sha256:4038c6eee90e75e461546c59f8a8b26b486c2710b2c64fa84895f68f5c4247e4",
+  "note": "Entry 13 is warranted by the supplied draft section 3 classification table/indexing set, section 7 scenarios and settled amendments. Entry 14 remains rejected: draft A19 requires distinguishable selection, focus, unread and outcome without colour alone, but does not choose the asserted 2px selected/1px unselected borders, Highlight border and solid Highlight focus outline, or CanvasText unread fill. Its delegated-choice says to check these features in a browser, not to adopt these exact visual choices. The broad delegation permits making such choices; record the specific choices as an independently checkable source or test the sourced behavioural requirement. A16/A20 are otherwise supported. The remaining 20 entries pass this intent review; no Adaptation hides a changed existing oracle. This is a source-warrant rejection, not a product defect verdict."
+}
+```
