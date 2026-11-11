@@ -19,6 +19,7 @@
  */
 import { journalEventId, type JournalEntry, type EffectOriginator } from '../substrates/effects/index.js';
 import { compareInstants } from '../primitives/instant.js';
+import { OPERATION_KEY_PATTERN } from './operationReceipt.js';
 import {
   indexResultOf,
   projectBackend,
@@ -254,6 +255,11 @@ function finish(d: Draft): FeedRow {
 // ============================================================
 
 export type QuickFilter = 'all' | 'agents' | 'mine' | 'indexing' | 'problems';
+/**
+ * Which records the feed is scoped to: everything loaded, the records this window's journal holds
+ * (where the retired journal list's arrivals now land), or one agent run's records by its session id.
+ */
+export type FeedScope = 'all' | 'local' | 'run';
 /** `auto` follows the quick filter; an explicit choice overrides it in every quick filter. */
 export type RoutineChoice = 'auto' | 'show' | 'hide';
 type DateScope = 'all' | 'today';
@@ -266,11 +272,27 @@ export interface FeedFilter {
   readonly proposals: readonly ProposalDecision[];
   readonly routine: RoutineChoice;
   readonly date: DateScope;
+  readonly scope: FeedScope;
+  /** The run a `run` scope shows, by its session id. */
+  readonly runId?: string;
 }
 
 export const DEFAULT_FEED_FILTER: FeedFilter = {
-  quick: 'all', originators: [], outcomes: [], proposals: [], routine: 'auto', date: 'all',
+  quick: 'all', originators: [], outcomes: [], proposals: [], routine: 'auto', date: 'all', scope: 'all',
 };
+
+/** The agent run (session id) a row's backend records name, if any. */
+export function runOf(row: FeedRow): string | undefined {
+  return row.ledger?.correlationId ?? row.history.find((h) => h.provenance?.correlationId)?.provenance?.correlationId ?? undefined;
+}
+
+function matchesScope(row: FeedRow, filter: FeedFilter): boolean {
+  switch (filter.scope) {
+    case 'local': return !!row.journal;
+    case 'run': return !!filter.runId && runOf(row) === filter.runId;
+    default: return true;
+  }
+}
 
 /**
  * Whether routine rows show. In `auto`, All and Agents keep the curated default (routine hidden);
@@ -307,6 +329,7 @@ export function startOfLocalDay(now: Date): Date {
 
 /** Every constraint except routine; the caller counts what routine alone hides. */
 export function matchesFilter(row: FeedRow, filter: FeedFilter, now: Date): boolean {
+  if (!matchesScope(row, filter)) return false;
   if (!matchesQuick(row, filter.quick)) return false;
   if (filter.originators.length && !filter.originators.includes(row.entry.originator)) return false;
   if (filter.outcomes.length && !(row.entry.outcome && filter.outcomes.includes(row.entry.outcome))) return false;
@@ -314,4 +337,58 @@ export function matchesFilter(row: FeedRow, filter: FeedFilter, now: Date): bool
   if (filter.date === 'today'
       && compareInstants(row.entry.occurredAt, startOfLocalDay(now).toISOString()) < 0) return false;
   return true;
+}
+
+// ============================================================
+// What a selected record's details say
+// ============================================================
+
+/** The invocation key a row answers to (history, ledger identity or the journal's association). */
+export function operationKeyOf(row: FeedRow): string | undefined {
+  const keyed = row.history.find((h) => h.operationKey)?.operationKey;
+  if (keyed) return keyed;
+  if (row.ledger?.kind === 'operation' && row.ledger.id.startsWith('operation:')) {
+    const key = row.ledger.id.slice('operation:'.length);
+    if (OPERATION_KEY_PATTERN.test(key)) return key;
+  }
+  return row.journal?.operationKey;
+}
+
+/** How long the recorded work took: the committed start and end, else a recorded duration. */
+export function durationOf(row: FeedRow): number | undefined {
+  const committed = row.history.find((h) => h.startTime && h.endTime);
+  if (committed) {
+    const ms = Date.parse(committed.endTime) - Date.parse(committed.startTime!);
+    if (Number.isFinite(ms) && ms >= 0) return ms;
+  }
+  const recorded = row.ledger?.durationMs;
+  return typeof recorded === 'number' && Number.isFinite(recorded) && recorded >= 0 ? recorded : undefined;
+}
+
+/** The transport a record names as its source, if any (history provenance, else the ledger's). */
+export function transportOf(row: FeedRow): string | undefined {
+  return row.history.find((h) => h.provenance?.transport)?.provenance?.transport ?? row.ledger?.transport ?? undefined;
+}
+
+/** The records a row's contributions came from, in the order the details name them. */
+export function contributionsOf(row: FeedRow): Array<'ledger' | 'history' | 'journal'> {
+  return [...(row.ledger ? ['ledger' as const] : []), ...(row.history.length ? ['history' as const] : []),
+    ...(row.journal ? ['journal' as const] : [])];
+}
+
+/** What a selected key stands for: one record, a collapsed indexing burst, or a legacy scan rollup. */
+export interface SelectedRecord {
+  readonly key: string;
+  readonly kind: 'record' | 'burst' | 'scan';
+  /** The record itself (absent for a burst, which is a summary of its members). */
+  readonly row?: FeedRow;
+  /** As the feed words it, with resolved file names. */
+  readonly label: string;
+  readonly occurredAt: string;
+  /** A burst's members, or the per-document records a scan still has retained. */
+  readonly members: readonly FeedRow[];
+  /** Other records of the same approval request (gate decisions, grants, the execution). */
+  readonly related: readonly FeedRow[];
+  /** Index paths resolved so far, by path hash. */
+  readonly paths: Readonly<Record<string, string>>;
 }

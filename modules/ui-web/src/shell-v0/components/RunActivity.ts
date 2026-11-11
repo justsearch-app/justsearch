@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * <jf-run-activity> — what agent runs did and are doing, in Activity (design system §1: "History →
- * System › Activity"). Background runs: the cross-conversation list (`/api/presence`) and the
- * run-in-background launcher. This run: what the agent did in the run open right now
- * (`/api/action-ledger` by correlation id). Both read the ONE shared `AgentSessionController`, so this
- * is a consumer, not a second authority. Machine-wide history is the ledger beside it in Activity.
+ * <jf-run-activity> — Activity's background-runs utility (design system §1: "History → System ›
+ * Activity"): the cross-conversation list (`/api/presence`) and the run-in-background launcher. It
+ * reads the ONE shared `AgentSessionController`, so it is a consumer, not a second authority. What a
+ * run did is Activity's feed, scoped to that run.
  *
  * A failed read keeps the rows it had and says so; empty only ever means the backend said empty.
  */
@@ -16,7 +15,6 @@ import { getAgentSessionController, subscribeAgentSession } from '../state/agent
 import { runListNotice, type RunListLoad } from '../controllers/runListLoad.js';
 import { requestSurfaceNavigation } from '../controllers/navigateRequest.js';
 import { activateOnKey } from '../utils/keyboardHandler.js';
-import { renderEventRow, eventRowStyles } from './eventRow.js';
 import type { PresenceRun } from '../controllers/AgentSessionController.js';
 import type { PluginHostApi } from '../plugin-api/plugin-types.js';
 
@@ -68,7 +66,6 @@ export class RunActivity extends JfElement {
     super.connectedCallback();
     this.unsubscribe = subscribeAgentSession(() => this.requestUpdate());
     void this.ctrl().loadPresence();
-    void this.ctrl().loadHistory();
   }
 
   override disconnectedCallback(): void {
@@ -154,25 +151,11 @@ export class RunActivity extends JfElement {
     </section>`;
   }
 
-  private thisRun(): TemplateResult {
-    const ctrl = this.ctrl();
-    const history = ctrl.history;
-    return html`<section aria-label="This run" data-testid="activity-this-run">
-      <div class="section-label">This run</div>
-      <p class="scope-note">What the agent did in the run open right now.</p>
-      ${this.notice(ctrl.historyLoad, 'this run', () => void ctrl.loadHistory())}
-      ${history.length === 0 && !ctrl.historyLoad.failed
-        ? html`<p class="empty">Each tool the agent uses in the current run is listed here — the run has used none yet.</p>`
-        : history.map(entry => renderEventRow(entry, { apiBase: this.apiBase }))}
-    </section>`;
-  }
-
   override render(): TemplateResult {
-    return html`${this.backgroundRuns()}${this.thisRun()}`;
+    return this.backgroundRuns();
   }
 
   static styles = [
-    eventRowStyles,
     css`
       :host { display: block; }
       section:focus { outline: none; }

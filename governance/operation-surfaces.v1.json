@@ -290,6 +290,15 @@
       "note": "S6 Activity one feed: a pure read-time join of the action-ledger rows (through ActionLedgerClient's BackendLedgerEntry and projectBackend), the committed core.operation-history rows and the FE Effect Journal, by exact identities only (operation:<operationKey>, the legacy projection identity rebuilt from raw history fields, the journal's ledgerId, operationKey or executionId). It keeps no lifecycle state of its own: every row is a projection of records those sources hold, and the committed history stays the authority for an operation's outcome."
     },
     {
+      "id": "fe-activity-details",
+      "kind": "consumer",
+      "lang": "ts",
+      "path": "modules/ui-web/src/shell-v0/components/ActivityDetails.ts",
+      "guard": "test:ActivitySurface.details.test.ts",
+      "consumesProjection": "fe-activity-feed-projection",
+      "note": "S6 Activity details: renders the selected feed row (activityFeed's FeedRow, through ActionLedgerClient's index vocabulary) and reads that invocation's receipt (/api/operation-history/{operationKey}) for display only. It keeps no record of its own; the journal actions it offers dispatch through the Effect Journal's existing undo, restore and turn paths."
+    },
+    {
       "id": "fe-agent-history-timeline",
       "kind": "projection",
       "lang": "ts",
@@ -486,15 +495,6 @@
       "guard": "gate:operation-surface",
       "consumesProjection": "fe-action-ledger-client",
       "note": "Tempdoc 558 \u00a7S1 \u2014 the ONE ledger-row projection over a UnifiedActionEntry (renderEventRow), single-sourced so the Activity surface and the workspace retrospective render identical rows (they previously forked)."
-    },
-    {
-      "id": "fe-run-activity",
-      "kind": "consumer",
-      "lang": "ts",
-      "path": "modules/ui-web/src/shell-v0/components/RunActivity.ts",
-      "guard": "test:RunActivity.test.ts",
-      "consumesProjection": "fe-event-row-projection",
-      "note": "Tempdoc 558 \u00a7S1 \u2014 composes renderEventRow (the shared row projection) to render workspace activity + history; consumes UnifiedActionEntry via that projection only, no independent model."
     },
     {
       "id": "operation-record-type",

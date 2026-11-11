@@ -11,6 +11,7 @@
 export type ComponentTag =
   | 'jf-action-button'
   | 'jf-action-ledger'
+  | 'jf-activity-details'
   | 'jf-activity-surface'
   | 'jf-advisory-inbox-drawer'
   | 'jf-advisory-rail-badge'
@@ -52,7 +53,6 @@ export type ComponentTag =
   | 'jf-dispatch-source'
   | 'jf-document-pane'
   | 'jf-drag-overlay'
-  | 'jf-effect-audit-log'
   | 'jf-effect-line'
   | 'jf-elicit-host'
   | 'jf-engine-loss'
@@ -175,6 +175,7 @@ export type ComponentTag =
 export const COMPONENT_TAGS: readonly ComponentTag[] = [
   'jf-action-button',
   'jf-action-ledger',
+  'jf-activity-details',
   'jf-activity-surface',
   'jf-advisory-inbox-drawer',
   'jf-advisory-rail-badge',
@@ -216,7 +217,6 @@ export const COMPONENT_TAGS: readonly ComponentTag[] = [
   'jf-dispatch-source',
   'jf-document-pane',
   'jf-drag-overlay',
-  'jf-effect-audit-log',
   'jf-effect-line',
   'jf-elicit-host',
   'jf-engine-loss',

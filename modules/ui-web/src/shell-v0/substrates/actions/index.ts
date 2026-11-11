@@ -552,7 +552,7 @@ export function dispatchEffectToChrome(
       // 574 B2 — route the clipboard effect through the one clipboard authority.
       // Tempdoc 613 §6 — a copy confirmation is a RECEIPT (locality: at-control), flashed in the
       // control via ReceiptController by the caller — NOT a window toast. The effect no longer carries
-      // a `successMessage` window toast (the lone caller, EffectAuditLog, now flashes a receipt).
+      // a `successMessage` window toast (the lone caller, Activity's export of chosen records, flashes a receipt).
       void copyToClipboard(effect.text);
       return true;
     }

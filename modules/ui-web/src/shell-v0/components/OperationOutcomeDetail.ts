@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 import { html, css, type PropertyValues, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
-import { authorizedFetch } from '../api/authorizedFetch.js';
-import { operationOutcomeViewSchema, type OperationOutcomeView } from '../../api/generated/schema-types/index.js';
-import { parseWireContract } from '../../api/schemas.js';
+import type { OperationOutcomeView } from '../../api/generated/schema-types/index.js';
+import { OPERATION_KEY_PATTERN, readOperationReceipt } from '../operations/operationReceipt.js';
 
 /** Follows a recorded operation through acceptance to its retained outcome details. */
 export class OperationOutcomeDetail extends JfElement {
@@ -49,17 +48,15 @@ export class OperationOutcomeDetail extends JfElement {
   private async load(): Promise<void> {
     const serial = ++this.requestSerial;
     clearTimeout(this.pollTimer);
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(this.operationKey)) return;
+    if (!OPERATION_KEY_PATTERN.test(this.operationKey)) return;
     let pending = true;
     try {
-      const response = await authorizedFetch(`${this.apiBase.replace(/\/$/, '')}/api/operation-history/${encodeURIComponent(this.operationKey)}`);
-      if (!response.ok) return;
-      const outcome = parseWireContract(operationOutcomeViewSchema, await response.json(), 'operation outcome');
+      const outcome = await readOperationReceipt(this.apiBase, this.operationKey);
       if (serial !== this.requestSerial) return;
       pending = ['accepted', 'running'].includes(outcome.state);
       this.outcome = outcome.state === 'failed' ? outcome : null;
     } catch {
-      // A restart can briefly interrupt outcome reads while the recorded operation continues.
+      // A refused or failed read, or a restart briefly interrupting reads: the operation may continue.
     } finally {
       if (pending && serial === this.requestSerial && this.isConnected) {
         this.pollTimer = setTimeout(() => void this.load(), 4_000);

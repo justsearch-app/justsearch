@@ -199,7 +199,7 @@ export interface UnifiedActionEntry {
 }
 
 /** "6m 12s" / "45s" / "1h 03m" — a scan's duration at human altitude (millis are not). */
-function formatScanDuration(ms: number | undefined): string {
+export function formatScanDuration(ms: number | undefined): string {
   if (typeof ms !== 'number' || !Number.isFinite(ms) || ms < 0) return '';
   const totalSec = Math.round(ms / 1000);
   if (totalSec < 60) return `${totalSec}s`;

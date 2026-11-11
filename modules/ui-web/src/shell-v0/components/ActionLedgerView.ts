@@ -18,7 +18,15 @@
  *
  * Filters: one quick choice (All / Agents / Your actions / Indexing / Problems) and advanced
  * originator, outcome, proposal-decision, routine and date constraints (values OR within a
- * dimension, dimensions AND together).
+ * dimension, dimensions AND together), within a scope: everything loaded, the records this window's
+ * journal holds, or the current agent run (whose session-filtered read joins the feed too).
+ *
+ * Selection: the feed is a list box whose records are its options; a click, Enter or Space selects
+ * one (`feed-select`). The owner holds the selection (`selectedKey`) and shows its details; after
+ * every change the feed says what the selected key now stands for (`feed-record`): the joined row
+ * found through any of its identities, a burst's or a scan's member records, the records of the
+ * same approval request, or null once no loaded record answers to it. Rows hold no controls of
+ * their own.
  */
 
 import { html, css, nothing, type PropertyValues, type TemplateResult } from 'lit';
@@ -42,6 +50,8 @@ import {
   type FeedFilter,
   type FeedNote,
   type FeedRow,
+  type FeedScope,
+  type SelectedRecord,
   historyLedgerId,
   type OperationHistoryRow,
   type QuickFilter,
@@ -85,6 +95,12 @@ interface IndexBurstSummary {
 
 function isBurst(row: FeedRow | IndexBurstSummary): row is IndexBurstSummary {
   return (row as IndexBurstSummary).summary === true;
+}
+
+/** What a burst summary says: how many were indexed, failed or are of unknown state, and where. */
+function burstLabel(burst: IndexBurstSummary): string {
+  return [`Indexed ${burst.indexed}`, burst.failed ? `${burst.failed} failed` : '',
+    burst.unknown ? `${burst.unknown} with unknown state` : '', burst.collection].filter(Boolean).join(' · ');
 }
 
 /** The nearest scrolling ancestor across shadow boundaries, else the document's scroller. */
@@ -138,6 +154,11 @@ const NOTE_TEXT: Record<FeedNote, string> = {
   'outcome-unavailable': 'Outcome unavailable',
 };
 
+const SCOPE_WORDS: Record<Exclude<FeedScope, 'all'>, string> = {
+  local: 'Showing what was recorded in this window.',
+  run: 'Showing the current agent run.',
+};
+
 const SOURCE_NAMES = { ledger: 'Activity ledger', history: 'Operation history' } as const;
 
 export class ActionLedgerView extends JfElement {
@@ -155,9 +176,11 @@ export class ActionLedgerView extends JfElement {
     journal: { state: true },
     // tempdoc 612 §UX — the seen-cursor snapshot, mirrored so "new" marks re-fold when it advances.
     seenCursor: { state: true },
-    expanded: { state: true },
-    // tempdoc 812 D4 — pathHash → friendly name, filled lazily by core.resolve-path-hash.
-    resolvedNames: { state: true },
+    selectedKey: { attribute: false },
+    runRecords: { attribute: false },
+    currentRun: { attribute: false },
+    // tempdoc 812 D4 — pathHash → resolved path, filled lazily by core.resolve-path-hash.
+    resolvedPaths: { state: true },
   } as const;
 
   declare apiBase: string;
@@ -172,9 +195,13 @@ export class ActionLedgerView extends JfElement {
   declare historyState: SourceState;
   declare journal: readonly JournalEntry[];
   declare seenCursor: string;
-  /** Scan rollups and bursts the person expanded, by key. */
-  declare expanded: readonly string[];
-  declare resolvedNames: Record<string, string>;
+  /** The selected record's key, held by the owner; null when none is selected. */
+  declare selectedKey: string | null;
+  /** The current run's records from its session-filtered read, joined into the feed. */
+  declare runRecords: readonly BackendLedgerEntry[];
+  /** The current agent run's session id, when there is one: the run scope offers it. */
+  declare currentRun: string | null;
+  declare resolvedPaths: Record<string, string>;
 
   /** Hashes asked for and not yet answered or answered with a name; a failed answer is retried later. */
   private readonly resolvingHashes = new Set<string>();
@@ -214,8 +241,10 @@ export class ActionLedgerView extends JfElement {
     this.historyState = 'loading';
     this.journal = [];
     this.seenCursor = getSeenCursor();
-    this.expanded = [];
-    this.resolvedNames = {};
+    this.selectedKey = null;
+    this.runRecords = [];
+    this.currentRun = null;
+    this.resolvedPaths = {};
   }
 
   // tempdoc 558 §S1 — the row styles are single-sourced in eventRow.ts (shared with the History tab).
@@ -273,7 +302,6 @@ export class ActionLedgerView extends JfElement {
       }
       .quick button:focus-visible,
       .link:focus-visible,
-      .expand:focus-visible,
       .entry:focus-visible,
       summary:focus-visible,
       select:focus-visible {
@@ -286,7 +314,6 @@ export class ActionLedgerView extends JfElement {
         }
         .quick button:focus-visible,
         .link:focus-visible,
-        .expand:focus-visible,
         .entry:focus-visible,
         summary:focus-visible,
         select:focus-visible {
@@ -336,24 +363,10 @@ export class ActionLedgerView extends JfElement {
       .notes span + span::before {
         content: ' · ';
       }
-      /* tempdoc 812 D4 — the rollup/burst expand control reads as the row's label: same type and
-         colour, only the disclosure caret is added. */
-      .expand {
-        flex: 1;
-        min-width: 0;
-        padding: 0;
-        border: 0;
-        background: none;
-        color: inherit;
-        font: inherit;
-        text-align: left;
-        cursor: pointer;
-      }
-      .child {
-        padding-left: 1.25rem;
-      }
-      .child.empty {
-        padding: 0.25rem 0 0.25rem 1.25rem;
+      .members {
+        flex: none;
+        color: var(--text-secondary);
+        font-size: var(--font-size-xs);
       }
       .row,
       .label {
@@ -366,10 +379,32 @@ export class ActionLedgerView extends JfElement {
       lit-virtualizer {
         width: 100%;
       }
-      /* An entry spans the row, so a click anywhere on it focuses it for the feed's keys. */
+      /* An entry spans the row, so a click anywhere on it focuses and selects it. */
       .entry {
         box-sizing: border-box;
         width: 100%;
+        padding-inline-start: calc(var(--jf-space-2) + 2 * var(--frame-focus-width));
+        cursor: pointer;
+      }
+      /* Selected reads by a bar at the start as well as by tint: only the selected record has a border
+         there, so forced colours, which paint every border, still tell it apart. */
+      .entry[aria-selected='true'] {
+        padding-inline-start: var(--jf-space-2);
+        border-inline-start: calc(2 * var(--frame-focus-width)) solid var(--accent);
+        background: var(--accent-tint-16);
+      }
+      .scope {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--jf-space-1);
+        font-size: var(--font-size-xs);
+        color: var(--text-primary);
+        font-weight: 600;
+      }
+      @media (forced-colors: active) {
+        .entry[aria-selected='true'] {
+          border-inline-start-color: Highlight;
+        }
       }
     `,
   ];
@@ -529,8 +564,9 @@ export class ActionLedgerView extends JfElement {
    */
   protected override willUpdate(changed: PropertyValues<this>): void {
     this.readingAnchor = null;
-    const arrivals = changed.has('ledger') || changed.has('history') || changed.has('journal') || changed.has('seed');
-    if (!arrivals || changed.has('filter') || changed.has('expanded') || this.getBoundingClientRect().top >= 0) return;
+    const arrivals = changed.has('ledger') || changed.has('history') || changed.has('journal') || changed.has('seed')
+      || changed.has('runRecords');
+    if (!arrivals || changed.has('filter') || this.getBoundingClientRect().top >= 0) return;
     let best: { key: string; top: number } | null = null;
     for (const row of this.renderRoot.querySelectorAll<HTMLElement>('[data-key]')) {
       const top = row.getBoundingClientRect().top;
@@ -539,7 +575,12 @@ export class ActionLedgerView extends JfElement {
     this.readingAnchor = best;
   }
 
-  protected override updated(): void {
+  protected override updated(changed: PropertyValues<this>): void {
+    if (this.selectedKey !== null && ['selectedKey', 'ledger', 'history', 'journal', 'seed', 'runRecords', 'resolvedPaths', 'filter']
+      .some((name) => changed.has(name as keyof ActionLedgerView))) {
+      this.dispatchEvent(new CustomEvent<{ key: string; record: SelectedRecord | null }>('feed-record',
+        { detail: { key: this.selectedKey, record: this.recordFor(this.selectedKey) } }));
+    }
     const anchor = this.readingAnchor;
     if (!anchor) return;
     this.readingAnchor = null;
@@ -575,9 +616,13 @@ export class ActionLedgerView extends JfElement {
   /** The ledger rows this view holds: the stream's after its first snapshot, else the seed plus live rows. */
   private ledgerRows(): readonly BackendLedgerEntry[] {
     const live = this.ledger?.rows ?? [];
-    if (this.ledger?.snapshotApplied || !this.seed) return live;
-    const ids = new Set(live.map((e) => e.id).filter(Boolean));
-    return [...this.seed.filter((e) => !e.id || !ids.has(e.id)), ...live];
+    const streamed = this.ledger?.snapshotApplied || !this.seed ? live : (() => {
+      const ids = new Set(live.map((e) => e.id).filter(Boolean));
+      return [...this.seed!.filter((e) => !e.id || !ids.has(e.id)), ...live];
+    })();
+    // The run's own read can hold records the general window no longer does; the feed joins by id,
+    // so a record in both is one row (the stream's copy first).
+    return this.runRecords.length ? [...streamed, ...this.runRecords] : streamed;
   }
 
   private historyRows(): readonly OperationHistoryRow[] {
@@ -598,14 +643,14 @@ export class ActionLedgerView extends JfElement {
    * forgotten so a later render can ask again once the resolver recovers.
    */
   private ensureResolvedName(pathHash: string): void {
-    if (!pathHash || this.resolvingHashes.has(pathHash) || this.resolvedNames[pathHash]) return;
+    if (!pathHash || this.resolvingHashes.has(pathHash) || this.resolvedPaths[pathHash]) return;
     this.resolvingHashes.add(pathHash);
     const generation = this.mountGeneration;
     const resolve = this.resolveHash ?? resolvePathLazy;
     void resolve(INDEXING_JOBS_RESOURCE, pathHash)
       .then((path) => {
         if (path && generation === this.mountGeneration) {
-          this.resolvedNames = { ...this.resolvedNames, [pathHash]: friendlyPathName(path) };
+          this.resolvedPaths = { ...this.resolvedPaths, [pathHash]: path };
         } else this.resolvingHashes.delete(pathHash);
       })
       .catch(() => { this.resolvingHashes.delete(pathHash); });
@@ -615,13 +660,56 @@ export class ActionLedgerView extends JfElement {
   private withResolvedLabel(row: UnifiedActionEntry): UnifiedActionEntry {
     if (row.kind !== 'index' || !row.pathHash) return row;
     this.ensureResolvedName(row.pathHash);
-    const name = this.resolvedNames[row.pathHash];
-    if (!name) return row;
-    return { ...row, label: indexLabel(row.indexState, name) };
+    const path = this.resolvedPaths[row.pathHash];
+    if (!path) return row;
+    return { ...row, label: indexLabel(row.indexState, friendlyPathName(path)) };
   }
 
-  private toggleExpanded(key: string): void {
-    this.expanded = this.expanded.includes(key) ? this.expanded.filter((k) => k !== key) : [...this.expanded, key];
+  /** A feed row as the list and the details show it: its file named once resolved. */
+  private shown(row: FeedRow): FeedRow {
+    const entry = this.withResolvedLabel(row.entry);
+    return entry === row.entry ? row : { ...row, entry };
+  }
+
+  /** The projection the last render drew: every loaded row, and the visible items in order. */
+  private drawn: { feed: readonly FeedRow[]; items: ReadonlyArray<FeedRow | IndexBurstSummary> } = { feed: [], items: [] };
+
+  /** What `key` stands for now, or null when no loaded record answers to it. */
+  private recordFor(key: string): SelectedRecord | null {
+    const { feed, items } = this.drawn;
+    const paths = this.resolvedPaths;
+    const burst = items.find((item): item is IndexBurstSummary => isBurst(item) && item.key === key);
+    if (burst) {
+      return { key, kind: 'burst', label: burstLabel(burst), occurredAt: burst.occurredAt,
+        members: burst.members.map((m) => this.shown(m)), related: [], paths };
+    }
+    const found = feed.find((r) => r.key === key) ?? feed.find((r) => r.aliases.includes(key));
+    if (!found) return null;
+    const row = this.shown(found);
+    if (row.entry.isScanRollup) {
+      const members = feed.filter((r) => r.entry.kind === 'index' && !!row.entry.scanId && r.entry.scanId === row.entry.scanId);
+      return { key: row.key, kind: 'scan', row, label: row.entry.label, occurredAt: row.entry.occurredAt,
+        members: members.map((m) => this.shown(m)), related: [], paths };
+    }
+    const request = row.ledger?.pendingId;
+    const related = request ? feed.filter((r) => r !== found && r.ledger?.pendingId === request) : [];
+    return { key: row.key, kind: 'record', row, label: row.entry.label, occurredAt: row.entry.occurredAt,
+      members: [], related, paths };
+  }
+
+  /** Put the keyboard on the record `key` (bringing it into the windowed list); false when not shown. */
+  async focusRecord(key: string): Promise<boolean> {
+    await this.updateComplete;
+    const items = this.drawn.items;
+    let index = items.findIndex((item) => item.key === key);
+    if (index < 0) index = items.findIndex((item) => !isBurst(item) && item.aliases.includes(key));
+    if (index < 0) return false;
+    await this.focusEntry(index, items.length, 'nearest');
+    return (this.renderRoot as ShadowRoot).activeElement?.classList.contains('entry') ?? false;
+  }
+
+  private select(key: string): void {
+    this.dispatchEvent(new CustomEvent<{ key: string }>('feed-select', { detail: { key } }));
   }
 
   private setFilter(change: Partial<FeedFilter>): void {
@@ -693,7 +781,7 @@ export class ActionLedgerView extends JfElement {
           @click=${() => toggle(dim, f.value)}>${f.value} <span class="chip-count">(${f.count})</span></jf-filter-chip>`)}
       </div>`;
     const active = this.filter.originators.length + this.filter.outcomes.length + this.filter.proposals.length
-      + (this.filter.routine !== 'auto' ? 1 : 0) + (this.filter.date !== 'all' ? 1 : 0);
+      + (this.filter.routine !== 'auto' ? 1 : 0) + (this.filter.date !== 'all' ? 1 : 0) + (this.filter.scope !== 'all' ? 1 : 0);
     return html`<details class="advanced" data-testid="feed-advanced">
       <summary>Filter${active ? ` (${active} active)` : ''}</summary>
       <div class="filters" data-testid="ledger-filters">
@@ -709,6 +797,13 @@ export class ActionLedgerView extends JfElement {
             <option value="hide" ?selected=${this.filter.routine === 'hide'}>Always hide, in every view</option>
           </select>
         </div>
+        <div class="group" data-testid="feed-scope-choices">
+          <span class="group-label">records</span>
+          <jf-filter-chip ?active=${this.filter.scope === 'local'} data-testid="feed-scope-local"
+            @click=${() => this.setScope(this.filter.scope === 'local' ? 'all' : 'local')}>Recorded in this window</jf-filter-chip>
+          ${this.currentRun ? html`<jf-filter-chip ?active=${this.filter.scope === 'run'} data-testid="feed-scope-run"
+            @click=${() => this.setScope(this.filter.scope === 'run' ? 'all' : 'run')}>This run</jf-filter-chip>` : nothing}
+        </div>
         <div class="group">
           <span class="group-label">date</span>
           <jf-filter-chip ?active=${this.filter.date === 'today'} data-testid="feed-date-today"
@@ -716,6 +811,18 @@ export class ActionLedgerView extends JfElement {
         </div>
       </div>
     </details>`;
+  }
+
+  /** The scope's words, and the way back to everything loaded. */
+  private renderScope(): TemplateResult | typeof nothing {
+    const scope = this.filter.scope;
+    if (scope === 'all') return nothing;
+    return html`<span class="scope" data-testid="feed-scope" data-scope=${scope}>${SCOPE_WORDS[scope]}
+      <button type="button" class="link" data-testid="feed-scope-clear" @click=${() => this.setScope('all')}>Show all activity</button></span>`;
+  }
+
+  private setScope(scope: FeedScope): void {
+    this.setFilter(scope === 'run' && this.currentRun ? { scope, runId: this.currentRun } : { scope });
   }
 
   private renderSourceStates(feed: readonly FeedRow[]): TemplateResult {
@@ -742,47 +849,34 @@ export class ActionLedgerView extends JfElement {
   }
 
   /**
-   * tempdoc 812 D4 — one scan = one collapsible row, expandable to the per-document rows of that
-   * scan still retained. The rollup is the durable record; the children are surviving detail.
+   * tempdoc 812 D4 — one scan = one row; the per-document rows of that scan still retained are its
+   * members, listed in its details. The rollup is the durable record; the members are surviving detail.
    */
   private renderScanRollup(row: FeedRow, feed: readonly FeedRow[]): TemplateResult {
     const scanId = row.entry.scanId ?? '';
-    const key = `scan:${scanId}`;
-    const expanded = this.expanded.includes(key);
-    const children = expanded ? feed.filter((r) => r.entry.kind === 'index' && r.entry.scanId === scanId) : [];
+    const members = feed.filter((r) => r.entry.kind === 'index' && r.entry.scanId === scanId).length;
     const isNew = this.isNew(row.entry.occurredAt);
     return html`<div class="row" data-testid="ledger-scan-rollup" data-kind="scan" data-scan-id=${scanId} data-key=${row.key}
         ?data-new=${isNew} ?data-problem=${row.problem}>
         ${this.newDot(isNew)}
         <span class="who" data-originator=${row.entry.originator}>${row.entry.originator}</span>
-        <button type="button" class="expand" data-testid="ledger-scan-expand" aria-expanded=${expanded ? 'true' : 'false'}
-          @click=${() => this.toggleExpanded(key)}>${expanded ? '▾' : '▸'} ${row.entry.label}</button>
+        <span class="label">${row.entry.label}</span>
+        <span class="members" data-testid="ledger-scan-members">${members ? `${members} document${members === 1 ? '' : 's'} retained` : 'no documents retained'}</span>
         <span class="src">backend</span>
         ${renderEventWhen(row.entry.occurredAt)}
-      </div>
-      ${expanded && children.length === 0
-        ? html`<div class="child empty" data-testid="ledger-scan-empty">No per-document rows retained for this scan.</div>` : nothing}
-      ${children.map((child) => html`<div class="child" data-testid="ledger-scan-child">
-        ${renderEventRow(this.withResolvedLabel(child.entry), { apiBase: this.apiBase })}</div>`)}`;
+      </div>`;
   }
 
-  /** A burst summary that says how many failed, expandable to every member it stands for. */
+  /** A burst summary that says how many failed; its members are listed in its details. */
   private renderBurst(burst: IndexBurstSummary): TemplateResult {
-    const key = `burst:${burst.key}`;
-    const expanded = this.expanded.includes(key);
     const isNew = this.isNew(burst.occurredAt);
-    const label = [`Indexed ${burst.indexed}`, burst.failed ? `${burst.failed} failed` : '',
-      burst.unknown ? `${burst.unknown} with unknown state` : '', burst.collection].filter(Boolean).join(' · ');
-    return html`<div class="row" data-testid="ledger-burst" data-kind="index" ?data-new=${isNew} ?data-problem=${burst.failed > 0}>
+    return html`<div class="row" data-testid="ledger-burst" data-kind="index" data-key=${burst.key} ?data-new=${isNew} ?data-problem=${burst.failed > 0}>
         ${this.newDot(isNew)}
         <span class="who" data-originator="system">system</span>
-        <button type="button" class="expand" data-testid="ledger-burst-expand" aria-expanded=${expanded ? 'true' : 'false'}
-          @click=${() => this.toggleExpanded(key)}>${expanded ? '▾' : '▸'} <span class="label">${label}</span></button>
+        <span class="label">${burstLabel(burst)}</span>
         <span class="src">backend</span>
         ${renderEventWhen(burst.occurredAt)}
-      </div>
-      ${expanded ? burst.members.map((member) => html`<div class="child" data-testid="ledger-burst-member">
-        ${renderEventRow(this.withResolvedLabel(member.entry), { apiBase: this.apiBase })}</div>`) : nothing}`;
+      </div>`;
   }
 
   private renderItem(item: FeedRow | IndexBurstSummary, feed: readonly FeedRow[]): TemplateResult {
@@ -791,7 +885,9 @@ export class ActionLedgerView extends JfElement {
     // tempdoc 612 §UX — the "new" mark is an additive opt-in; History/Timeline render the row without it.
     const sources = [item.ledger ? 'ledger' : '', item.history.length ? 'history' : '', item.journal ? 'journal' : '']
       .filter(Boolean).join(' ');
-    return html`<div class="item" data-key=${item.key} data-sources=${sources} ?data-problem=${item.problem}>${renderEventRow(this.withResolvedLabel(item.entry),
+    // The receipt is read in the record's details, not on every row.
+    const { operationOutcomeKey: _receipt, ...entry } = this.withResolvedLabel(item.entry);
+    return html`<div class="item" data-key=${item.key} data-sources=${sources} ?data-problem=${item.problem}>${renderEventRow(entry,
       { isNew: this.isNew(item.entry.occurredAt, item.entry.isRoutine), apiBase: this.apiBase })}${this.renderNotes(item)}</div>`;
   }
 
@@ -805,6 +901,11 @@ export class ActionLedgerView extends JfElement {
     if (e.altKey || e.shiftKey || e.metaKey) return;
     const target = e.target as Element;
     if (target.closest('input, select, textarea, [contenteditable]')) return;
+    if ((e.key === 'Enter' || e.key === ' ') && !e.ctrlKey && !isImeComposition(e)) {
+      const key = target.closest<HTMLElement>('.entry')?.dataset.entryKey;
+      if (key) { e.preventDefault(); this.select(key); }
+      return;
+    }
     const current = Number(target.closest<HTMLElement>('.entry')?.dataset.index ?? this.tabStop);
     let next: number;
     switch (e.key) {
@@ -969,12 +1070,17 @@ export class ActionLedgerView extends JfElement {
   }
 
   private renderEntry(item: FeedRow | IndexBurstSummary, index: number, count: number, feed: readonly FeedRow[]): TemplateResult {
-    return html`<div class="entry" role="listitem" data-index=${index} aria-posinset=${index + 1} aria-setsize=${count}
-      tabindex=${index === Math.min(this.tabStop, count - 1) ? '0' : '-1'}>${this.renderItem(item, feed)}</div>`;
+    const selected = this.selectedKey !== null && (item.key === this.selectedKey
+      || (!isBurst(item) && item.aliases.includes(this.selectedKey)));
+    return html`<div class="entry" role="option" data-index=${index} data-entry-key=${item.key}
+      aria-selected=${selected ? 'true' : 'false'} aria-posinset=${index + 1} aria-setsize=${count}
+      tabindex=${index === Math.min(this.tabStop, count - 1) ? '0' : '-1'}
+      @click=${() => this.select(item.key)}>${this.renderItem(item, feed)}</div>`;
   }
 
   override render(): TemplateResult {
     const feed = projectActivityFeed(this.ledgerRows(), this.historyRows(), this.journal);
+    this.drawn = { feed, items: [] };
     const now = new Date();
     const showRoutine = routineShown(this.filter);
     const matching = feed.filter((row) => matchesFilter(row, this.filter, now));
@@ -989,6 +1095,7 @@ export class ActionLedgerView extends JfElement {
     const header = html`
       <div class="controls">
         ${this.renderQuick()}
+        ${this.renderScope()}
         ${routineCount > 0 ? html`<jf-filter-chip ?active=${showRoutine} data-testid="ledger-routine-toggle"
           @click=${() => this.setFilter({ routine: showRoutine ? 'hide' : 'show' })}>routine
           <span class="chip-count">(${routineCount})</span></jf-filter-chip>` : nothing}
@@ -1009,6 +1116,10 @@ export class ActionLedgerView extends JfElement {
           ? html`<div class="empty" data-testid="ledger-loading">Loading activity…</div>`
           : html`<div class="empty" data-testid="ledger-empty">No activity in loaded records.</div>`}`;
     }
+    if (visible.length === 0 && this.filter.scope === 'local' && !feed.some((row) => row.journal)) {
+      return html`${header}<div class="empty" data-testid="ledger-empty">Nothing recorded in this window yet. What you or
+        the assistant does here is listed as it happens.</div>`;
+    }
     if (visible.length === 0) {
       const onlyRoutineHidden = !showRoutine && routineCount > 0 && matching.every((row) => row.entry.isRoutine);
       return html`${header}<div class="empty" data-testid="ledger-empty">
@@ -1022,9 +1133,10 @@ export class ActionLedgerView extends JfElement {
     // summary that keeps its members and counts its failures.
     const projected = collapseBursts<FeedRow, IndexBurstSummary>(visible, {
       keyOf: (row) => (row.entry.kind === 'index' ? (row.entry.groupKey ?? 'default') : null),
+      // Keyed by its oldest member, which newer arrivals above it do not change.
       summarize: (groupKey, items) => ({
         summary: true,
-        key: `${groupKey}:${items[0]?.key ?? ''}`,
+        key: `burst:${groupKey}:${items[items.length - 1]?.key ?? ''}`,
         collection: items[0]?.entry.collection ?? groupKey,
         members: items,
         indexed: items.filter((item) => indexResultOf(item.entry.indexState) === 'indexed').length,
@@ -1033,8 +1145,9 @@ export class ActionLedgerView extends JfElement {
         occurredAt: items[0]?.entry.occurredAt ?? '',
       }),
     });
+    this.drawn = { feed, items: projected };
     const count = projected.length;
-    return html`${header}<div class="list" data-testid="feed-list" role="list" aria-label="Activity"
+    return html`${header}<div class="list" data-testid="feed-list" role="listbox" aria-label="Activity"
       @keydown=${(e: KeyboardEvent) => this.onListKey(e, count)}
       @focusin=${(e: FocusEvent) => {
         const entry = (e.target as Element).closest<HTMLElement>('.entry');
@@ -1042,7 +1155,7 @@ export class ActionLedgerView extends JfElement {
       }}>${count <= VIRTUALIZE_ABOVE
       ? projected.map((item, index) => this.renderEntry(item, index, count, feed))
       : html`<lit-virtualizer .items=${projected}
-          .keyFunction=${(item: FeedRow | IndexBurstSummary) => (isBurst(item) ? `burst:${item.key}` : item.key)}
+          .keyFunction=${(item: FeedRow | IndexBurstSummary) => item.key}
           .renderItem=${(item: FeedRow | IndexBurstSummary, index: number) => this.renderEntry(item, index, count, feed)}></lit-virtualizer>`}</div>`;
   }
 }

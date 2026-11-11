@@ -1032,13 +1032,36 @@ export function undoEntries(
   previewed: readonly JournalEntry[],
   applyFn: (effect: Effect) => void,
 ): UndoRun {
+  return reverseEntries(previewed, undoEffectFor, applyFn);
+}
+
+/**
+ * Ask the Engine to undo the execution an entry's invocation returned — the per-record backend
+ * Undo, also for an association restored after a reload. Only a request: the Engine decides
+ * (consent, an expired execution), and its answer arrives through {@link RequestedReversal.settled}.
+ * A rejected proposal never ran, so it is never undone; an entry without an execution is skipped.
+ */
+export function requestOperationUndo(entryId: number, applyFn: (effect: Effect) => void): UndoRun {
+  const entry = getJournalEntry(entryId);
+  if (!entry) return { reversed: 0, requested: [], skipped: [] };
+  return reverseEntries([entry], (current) => {
+    const operation = current.pendingOutcome === 'rejected' ? undefined : getUndoableOperation(current.id);
+    return operation ? { kind: 'undo-operation', operationId: operation.operationId, executionId: operation.executionId } : null;
+  }, applyFn);
+}
+
+function reverseEntries(
+  previewed: readonly JournalEntry[],
+  undoFor: (entry: JournalEntry) => Effect | null,
+  applyFn: (effect: Effect) => void,
+): UndoRun {
   let reversed = 0;
   const requested: RequestedReversal[] = [];
   const skipped: JournalEntry[] = [];
   for (let i = 0; i < previewed.length; i++) {
     const shown = previewed[i]!;
     const entry = getJournalEntry(shown.id);
-    const undo = entry && entry.pendingOutcome !== 'rejected' ? undoEffectFor(entry) : null;
+    const undo = entry && entry.pendingOutcome !== 'rejected' ? undoFor(entry) : null;
     if (undo === null) { skipped.push(shown); continue; }
     const firstNewId = _nextId;
     try {

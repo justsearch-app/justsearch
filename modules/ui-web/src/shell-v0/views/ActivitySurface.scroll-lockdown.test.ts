@@ -250,6 +250,9 @@ for (const [width, height, text] of [[1280, 720, ''], [600, 400, '200%']] as con
     expect(record, 'reading on reaches the records').not.toBeNull();
     await page.mouse.click(record!.x, record!.y);
     await settle(page, 200);
+    // The click also opens the record's details (a sheet at 600×400); Escape closes them and puts
+    // the keyboard back on the record.
+    await press(page, 'Escape');
     expect(await focusedEntry(page), 'a click on a record focuses it').not.toBeNull();
     for (const [key, pos] of [['Control+End', 'last'], ['Control+Home', 1], ['End', 'last'], ['Home', 1]] as const) {
       await press(page, key);

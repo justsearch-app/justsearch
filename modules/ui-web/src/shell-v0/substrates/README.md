@@ -56,8 +56,8 @@ inverse, and (§21.E) `originator: 'user' | 'agent' | 'system'`.
 Per-Pending entries carry `pendingOutcome: 'accepted' | 'rejected'`
 when they originated from a `proposeEffect` lifecycle event.
 
-Consumers: undo cursor (`undoLastEffect`), audit log
-(`<jf-effect-audit-log>` chrome surface), per-originator filter
+Consumers: undo cursor (`undoLastEffect`), Activity (its feed and the
+selected record's details), per-originator filter
 (`listJournalByOriginator`), macros (replay via `runMacro`).
 
 Cross-session persistence via localStorage (500-entry LRU cap).
@@ -164,8 +164,8 @@ management list using `listAllConsents` + `revokeConsent`.
 `defineMacro({id, label, effects})` registers a macro + auto-registers
 as a palette Action under `core.action.macro.<id>`. `runMacro(id)`
 dispatches each effect in sequence via `applyEffect`. Persists to
-localStorage. `<jf-effect-audit-log>` (§28.W5) provides the
-multi-select + save UI.
+localStorage. Activity's details (§28.W5) let journal records be chosen
+and saved or exported in journal order.
 
 ## Layer placement (per §19 KCS direction)
 
