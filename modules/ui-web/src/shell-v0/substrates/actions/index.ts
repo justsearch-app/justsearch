@@ -109,7 +109,7 @@ import { recordEffect } from '../effects/index.js';
  * — e.g. `'corpus-picker'` mounts `<jf-corpus-picker>` instead of the
  * default text input.
  */
-export interface ParameterSchema {
+interface ParameterSchema {
   readonly type?:
     | 'object'
     | 'string'

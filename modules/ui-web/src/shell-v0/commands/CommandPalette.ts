@@ -15,16 +15,19 @@ import { ModalityController } from '../primitives/modality.js';
 import { closeOthersInLayer } from '../state/transientLayerArbiter.js';
 import { repeat } from 'lit/directives/repeat.js';
 import {
-  invokeCommand,
   parsePaletteQuery,
 } from './CommandRegistry.js';
 // §21.C — palette consumes the unified projection over Action.listActions
 // + legacy Commands. ScoredPaletteEntry retires in favor of ScoredPaletteEntry.
 import {
   searchPaletteEntries,
+  invokePaletteEntry,
+  paletteNotes,
+  watchPaletteEntries,
   type ScoredPaletteEntry,
   type PaletteEntry,
 } from './CommandPaletteProjection.js';
+import type { SettingsViewer } from '../views/settingsRegister.js';
 import { listEmptyStates } from './EmptyStateRegistry.js';
 import {
   setSlotPromptProvider,
@@ -65,6 +68,8 @@ export class CommandPalette extends JfElement {
 
   /** Tempdoc 508-followup §δ1 — pending wizard step (the slot we're prompting for). */
   private wizardStep: WizardStep | null = null;
+  private wizardCancelled = false;
+  private wizardInvocationActive = false;
 
   constructor() {
     super();
@@ -95,11 +100,21 @@ export class CommandPalette extends JfElement {
     // Tempdoc 508-followup §δ1 — register as the slot prompt provider
     // so template invocations resolve through the inline wizard
     // instead of window.prompt.
-    setSlotPromptProvider((slot, templateId) => this.promptForSlot(slot, templateId));
+    setSlotPromptProvider((slot, templateId) => this.promptForSlot(slot, templateId), phase => {
+      if (phase === 'start') {
+        this.hide();
+        this.wizardCancelled = false;
+        this.wizardInvocationActive = true;
+      } else {
+        this.wizardInvocationActive = false;
+        this.hide();
+      }
+    });
   }
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
+    this.hide();
     setSlotPromptProvider(null);
     // If a wizard was active, resolve with null (cancel) so any
     // in-flight template expansion unblocks.
@@ -118,6 +133,7 @@ export class CommandPalette extends JfElement {
    * order; completed slots accumulate in wizardCompletedLabels.
    */
   private promptForSlot(slot: NamedArgumentSlot, templateId: string): Promise<string | null> {
+    if (this.wizardCancelled) return Promise.resolve(null);
     return new Promise<string | null>((resolve) => {
       this.wizardStep = { slot, templateId, resolver: resolve };
       this.wizardActive = true;
@@ -296,11 +312,50 @@ export class CommandPalette extends JfElement {
     .empty-fallback:hover { background: var(--surface-active); }
   `;
 
+  private stopWatching?: () => void;
+  private sourceResults: ScoredPaletteEntry[] = [];
+  private groupLimits = new Map<string, number>();
+
+  private setResults(results: ScoredPaletteEntry[]): void {
+    this.sourceResults = results;
+    const counts = new Map<string, number>();
+    this.results = results.filter(row => {
+      const group = row.entry.category;
+      const count = (counts.get(group) ?? 0) + 1;
+      counts.set(group, count);
+      return count <= (this.groupLimits.get(group) ?? 8);
+    });
+  }
+
+  private showMore(group: string): void {
+    this.groupLimits.set(group, (this.groupLimits.get(group) ?? 8) + 24);
+    this.setResults(this.sourceResults);
+  }
+
+  protected override updated(): void {
+    this.shadowRoot?.querySelector<HTMLElement>('[data-selected]')?.scrollIntoView?.({ block: 'nearest' });
+  }
+  private settingsViewer?: SettingsViewer;
+
+  private refreshResults = (viewer: SettingsViewer): void => {
+    this.settingsViewer = viewer;
+    if (!this.open || this.wizardActive) return;
+    const selected = this.results[this.selectedIndex]?.entry;
+    this.setResults(searchPaletteEntries(this.query, viewer));
+    if (!selected) return;
+    this.selectedIndex = this.results.findIndex(row => row.entry.id === selected.id
+      && (selected.target.kind !== 'action' || (row.entry.target.kind === 'action' && row.entry.target.action === selected.target.action))
+      && (selected.target.kind !== 'command' || (row.entry.target.kind === 'command' && row.entry.target.command === selected.target.command)));
+  };
+
   show(): void {
     this.enterOverlay();
     this.open = true;
     this.query = '';
-    this.results = searchPaletteEntries('');
+    this.groupLimits.clear();
+    this.setResults(searchPaletteEntries(''));
+    this.stopWatching?.();
+    this.stopWatching = watchPaletteEntries(this.refreshResults);
     this.selectedIndex = 0;
     this.updateComplete.then(() => {
       const input = this.shadowRoot?.querySelector('input');
@@ -309,10 +364,21 @@ export class CommandPalette extends JfElement {
   }
 
   hide(): void {
+    if (this.wizardInvocationActive) this.wizardCancelled = true;
+    this.stopWatching?.();
+    this.stopWatching = undefined;
+    if (this.wizardStep) {
+      const step = this.wizardStep;
+      this.wizardStep = null;
+      this.wizardActive = false;
+      this.wizardInput = '';
+      step.resolver(null);
+    }
     this.open = false;
     this.modality.exit({ skipFocusRestore: true });
     this.query = '';
     this.results = [];
+    this.sourceResults = [];
     this.selectedIndex = 0;
     this.wizardCompletedLabels = [];
   }
@@ -324,7 +390,8 @@ export class CommandPalette extends JfElement {
       return;
     }
     this.query = value;
-    this.results = searchPaletteEntries(this.query);
+    this.groupLimits.clear();
+    this.setResults(searchPaletteEntries(this.query, this.settingsViewer));
     this.selectedIndex = 0;
   }
 
@@ -367,41 +434,10 @@ export class CommandPalette extends JfElement {
    * palette's modality. The query is read before closing clears it.
    */
   private runEntry(entry: PaletteEntry): void {
-    const query = this.query;
     this.hide();
-    this.invokeEntry(entry, query);
-  }
-
-  /**
-   * Tempdoc 548 §8 (intent surface, v0) — dispatch a palette entry. The
-   * synthetic search entry (origin 'intent') routes its free-text THROUGH the
-   * intent pipeline (navigate-with-state → IntentRouter → searchState restore),
-   * not via a direct `setSearchQuery` side-channel; everything else goes through
-   * the normal command/action invoke path unchanged.
-   */
-  private invokeEntry(entry: PaletteEntry, query: string): void {
-    if (entry.origin === 'intent' && entry.id === 'intent.search') {
-      const text = entry.intentText ?? parsePaletteQuery(query).text;
-      // Tempdoc 548 §4.5 (S4-B) — authority collapse: the query travels through
-      // the navigation INTENT, giving "the user asked to search" a single
-      // authority instead of a setSearchQuery side-channel + a separate navigate.
-      // Mirrors the shipped `core.palette.search-from-here` empty state
-      // (Shell.activateSurface('core.search-v3-surface', { query }, …)), so URL
-      // projection / telemetry / observability all see the navigation. Fired as a
-      // composed event so it crosses the shadow boundary up to Shell's
-      // `navigate-with-context` listener.
-      // Search Thread S5b — the standalone Search rail surface is retired; the retrieve tier
-      // folded into the one window (core.search-v3-surface).
-      this.dispatchEvent(
-        new CustomEvent('navigate-with-context', {
-          detail: { target: 'core.search-v3-surface', state: { query: text } },
-          bubbles: true,
-          composed: true,
-        }),
-      );
-      return;
-    }
-    invokeCommand(entry.id);
+    void invokePaletteEntry(entry, entry.target, this.settingsViewer).finally(() => {
+      if (this.open && !this.wizardStep) this.hide();
+    });
   }
 
   /**
@@ -551,11 +587,14 @@ export class CommandPalette extends JfElement {
                   ${item.entry.shortcut
                     ? html`<span class="result-shortcut">${item.entry.shortcut}</span>`
                     : nothing}
-                  <span class="result-source">${item.entry.origin}</span>
+                  <span class="result-source">${item.entry.description}</span>
                 </div>
               `;
             })}
+            ${this.sourceResults.filter(row => row.entry.category === category).length > items.length
+              ? html`<button type="button" @click=${() => this.showMore(category)}>Show more ${category.toLowerCase()}</button>` : nothing}
           `)}
+          ${paletteNotes(this.query).map(note => html`<p class="category-header" role="note" data-testid="palette-note">${note}</p>`)}
         </div>
       </div>
     `;

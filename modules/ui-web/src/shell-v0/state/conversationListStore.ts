@@ -11,6 +11,7 @@ import { subscribeProfiles, getActiveProfileId as getWorkspaceProfileId } from '
 import { authorizedFetch } from '../api/authorizedFetch.js';
 import { startUserActivity } from '../utils/userActivity.js';
 import { subscribeStatus } from '../utils/statusPoll.js';
+import { subscribeAiState } from './aiStateStore.js';
 
 /** Tempdoc 838 — who named a conversation. `null` when it has no name. */
 export type ConversationTitleSource = 'user' | 'auto';
@@ -374,12 +375,38 @@ export async function loadForkConversations(
   } catch { return null; }
 }
 
+let contentEpoch = 0;
+let historyLocked = false;
+let stopHistoryStatus: (() => void) | null = null;
+
+/**
+ * A lock observation revokes all previously read content, including late list answers. Unlocking
+ * revokes nothing: content returns only through the fresh read it starts (or any other new read).
+ */
+function observeHistoryLock(locked: boolean): void {
+  if (historyLocked === locked) return;
+  historyLocked = locked;
+  if (!locked) { void loadConversations(); return; }
+  contentEpoch++;
+  state = { ...state, conversations: state.conversations.map(conversation => ({ ...conversation, title: null, firstUserMessage: '' })) };
+  emit();
+}
+
 let listProfileEpoch = 0;
 let stopListProfileWatch: (() => void) | null = null;
 
 export async function loadConversations(): Promise<boolean> {
+  stopHistoryStatus ??= subscribeAiState(snapshot => {
+    const protection = snapshot.status?.conversationProtection?.state;
+    if (protection === 'locked' || protection === 'unlocked') observeHistoryLock(protection === 'locked');
+  });
   if (!stopListProfileWatch) {
-    const invalidate = (): void => { listProfileEpoch += 1; };
+    const invalidate = (): void => {
+      listProfileEpoch += 1;
+      contentEpoch++;
+      state = { ...state, conversations: [], loading: false };
+      emit();
+    };
     const stopUserProfile = subscribeProfileSwitch(invalidate);
     let workspaceProfile = getWorkspaceProfileId();
     const stopWorkspaceProfile = subscribeProfiles(() => {
@@ -393,14 +420,15 @@ export async function loadConversations(): Promise<boolean> {
   watchOtherWindowsLegacyTitles();
   const request = ++listRequests;
   const profileEpoch = listProfileEpoch;
+  const contentRead = contentEpoch;
   state = { ...state, loading: true };
   emit();
   try {
     const res = await authorizedFetch(`${apiBase}/api/chat/conversations?limit=20`);
-    if (profileEpoch !== listProfileEpoch) return false;
+    if (profileEpoch !== listProfileEpoch || contentRead !== contentEpoch) return false;
     if (!res.ok) { state = { ...state, loading: false }; emit(); return false; }
     const data = await res.json();
-    if (profileEpoch !== listProfileEpoch) return false;
+    if (profileEpoch !== listProfileEpoch || contentRead !== contentEpoch) return false;
     // A newer answer is already on screen; this one was built from older server state.
     if (request < listShown) return false;
     listShown = request;
@@ -409,7 +437,11 @@ export async function loadConversations(): Promise<boolean> {
     // is shown next, and the legacy browser map only for rows that have neither; each legacy entry is
     // written through when a person acts and erased once a list answer confirms the write.
     const legacy = loadTitles();
-    const conversations = rows.map((row) => toConversation(row, request, legacy));
+    if (data.locked === true) observeHistoryLock(true);
+    const conversations = rows.map((row) => {
+      const conversation = toConversation(row, request, legacy);
+      return historyLocked ? { ...conversation, title: null, firstUserMessage: '' } : conversation;
+    });
     const listed = new Set(conversations.map(c => c.id));
     const markers: string[] = Array.isArray(data.deletedIds)
       ? data.deletedIds.filter((id: unknown): id is string => typeof id === 'string')
@@ -460,7 +492,7 @@ export async function loadConversations(): Promise<boolean> {
     }));
     return true;
   } catch {
-    if (profileEpoch !== listProfileEpoch) return false;
+    if (profileEpoch !== listProfileEpoch || contentRead !== contentEpoch) return false;
     state = { ...state, loading: false };
     emit();
     return false;
@@ -1589,6 +1621,11 @@ export async function deleteConversationWithCascade(
 }
 
 export function __resetConversationListForTest(): void {
+  stopHistoryStatus?.();
+  stopHistoryStatus = null;
+  historyLocked = false;
+  contentEpoch++;
+
   stopListProfileWatch?.();
   stopListProfileWatch = null;
   listProfileEpoch += 1;
