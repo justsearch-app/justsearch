@@ -1550,8 +1550,9 @@ public final class EngineRoot implements WorkerHost {
 
   private void closeIndex(boolean publishIndexStopped) {
     // Ordered shutdown closes admission and drains physical users before this index owner.
-    // A direct close with live work cannot safely destroy its client/queue dependencies.
-    if (admission.activeWorkCount() != 0
+    // A direct close with live work cannot safely destroy its client/queue dependencies. A plain
+    // status reservation reads only published observations; its physical reads own their slot.
+    if (admission.indexRetainingWorkCount() != 0
         || (attempts.isClosing() && !attempts.awaitDrained(java.time.Duration.ZERO))) {
       throw new IllegalStateException("Live Engine work retains the index owner");
     }

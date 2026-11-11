@@ -1,0 +1,121 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
+  },
+  "createdAt": "2026-11-11T03:48:31.975Z",
+  "revision": "55782be2255604e5c6e6fe56d15b31c54c94be7b",
+  "tree": "1d4ed30a67171813af7bff3493b3c728c0db4210",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineRootIndexRecoveryTest.workThatUsesTheIndexStillRefusesRecoveryCloseAndIsCounted\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3042
+    },
+    {
+      "command": "./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineAdmissionControllerTest.shutdownDrainWaitsForAHeldStatusReservationThatTheIndexCloseDoesNotCount\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1915
+    },
+    {
+      "command": "./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineAdmissionControllerTest.concurrentStatusChurnNeverMasksOrUnderflowsTheIndexRetainingCount\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1792
+    },
+    {
+      "command": "./gradlew :modules:ui:test --tests \"io.justsearch.ui.api.PolledObservationRecoveryCloseTest.heldOrdinaryRequestStillRefusesTheRecoveryClose\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4696
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootIndexRecoveryTest.java#workThatUsesTheIndexStillRefusesRecoveryCloseAndIsCounted",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootIndexRecoveryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:cbb165215167c8795747392413f8d89ac6e411984aa7960eb972414c2aad176a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] admitted",
+          "status": "passed"
+        },
+        {
+          "name": "[2] retained",
+          "status": "passed"
+        },
+        {
+          "name": "[3] internal-attach",
+          "status": "passed"
+        },
+        {
+          "name": "[4] admitted-with-status",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineAdmissionControllerTest.java#shutdownDrainWaitsForAHeldStatusReservationThatTheIndexCloseDoesNotCount",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineAdmissionControllerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f8732189a1a2f382d3dfbfb580fd4106809023bb18716c9c07bb52aa40a37969",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "shutdownDrainWaitsForAHeldStatusReservationThatTheIndexCloseDoesNotCount()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineAdmissionControllerTest.java#concurrentStatusChurnNeverMasksOrUnderflowsTheIndexRetainingCount",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineAdmissionControllerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f8732189a1a2f382d3dfbfb580fd4106809023bb18716c9c07bb52aa40a37969",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "concurrentStatusChurnNeverMasksOrUnderflowsTheIndexRetainingCount()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/PolledObservationRecoveryCloseTest.java#heldOrdinaryRequestStillRefusesTheRecoveryClose",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/PolledObservationRecoveryCloseTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:48e26fdec4d1163f3a41dea1ea65ee0f7de93a2aed2a3553903be02c2be8fd08",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "/api/test-index-work",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:c1ecc17df748fa4205e688c88baa019b87f8204657017aa6d3123fa918b0a43e"
+}
