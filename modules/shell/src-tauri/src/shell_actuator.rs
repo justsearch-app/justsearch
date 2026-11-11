@@ -930,7 +930,7 @@ mod windows_identity_tests {
         for code in [0u32, 7, 259] {
             let mut child = held_child(code);
             let record = process_record(child.id());
-            assert!(record["creationFileTime"].is_string(), "{record}");
+            assert_eq!(record["creationFileTime"].is_string(), true, "{record}");
             let alive = identity_check(&record);
             let exited = end(&mut child);
             let verdict = identity_check(&record);
@@ -984,8 +984,9 @@ mod windows_identity_tests {
         assert_eq!(records[0]["osCheck"], "GONE", "{}", records[0]);
         assert_eq!(records[0]["exitClass"], "OWNER_DIED");
         assert_eq!(records[0]["basis"], "OPEN_START");
-        assert!(
-            !successor.lock_holder_gone(),
+        assert_eq!(
+            successor.lock_holder_gone(),
+            false,
             "no live holder was recovered"
         );
     }
@@ -1003,8 +1004,11 @@ mod windows_identity_tests {
         drop(child);
         assert_eq!(records[0]["osCheck"], "ALIVE_MATCH", "{}", records[0]);
         assert_eq!(records[0]["exitClass"], "UNKNOWN");
-        assert!(!while_alive, "a live holder still holds the data folder");
-        assert!(after_end, "an ended holder releases the early retry");
+        assert_eq!(
+            while_alive, false,
+            "a live holder still holds the data folder"
+        );
+        assert_eq!(after_end, true, "an ended holder releases the early retry");
     }
 
     #[test]
@@ -1024,6 +1028,6 @@ mod windows_identity_tests {
         owner.record_exit(code, "running", &decision);
         let gone = owner.lock_holder_gone();
         drop(child);
-        assert!(gone, "the holder saved by record_exit has ended");
+        assert_eq!(gone, true, "the holder saved by record_exit has ended");
     }
 }
