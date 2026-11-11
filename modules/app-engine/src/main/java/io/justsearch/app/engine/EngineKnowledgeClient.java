@@ -114,9 +114,10 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
   private final ExecutorService backgroundCallThreads;
   private final ExecutorService foregroundStreamThreads;
   private final ExecutorService backgroundStreamThreads;
-  // Admission bounds these live subscriptions; this index lets transport close find idle flows.
-  private final java.util.Set<BoundedHandoff<?>> indexingSubscriptions =
-      java.util.concurrent.ConcurrentHashMap.newKeySet();
+  // Admission bounds these live subscriptions; this index lets transport close find idle flows
+  // and tell each subscriber, once, that this client ended its stream.
+  private final Map<BoundedHandoff<?>, Runnable> indexingSubscriptions =
+      new java.util.concurrent.ConcurrentHashMap<>();
   private final AtomicBoolean transportClosing = new AtomicBoolean();
   private final java.util.function.Supplier<io.justsearch.indexerworker.server.KnowledgeServer.ServingLease>
       servingLeaseSupplier;
@@ -1664,7 +1665,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
   public IndexingJobsStream subscribeIndexingJobs(
       Consumer<IndexingJobsFrame> onFrame, Consumer<Throwable> onError, Runnable onCompleted, EngineContext engineContext) {
     try (var work = admission.attach(engineContext)) {
-      return subscribeIndexingWork(onFrame, onError, work, false);
+      return subscribeIndexingWork(onFrame, onError, onCompleted, work, false);
     }
   }
 
@@ -1672,12 +1673,13 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
   public IndexingJobsStream subscribeIndexingJobOutcomes(
       Consumer<IndexingJobsFrame> onFrame, Consumer<Throwable> onError, Runnable onCompleted, EngineContext engineContext) {
     try (var work = admission.attach(engineContext)) {
-      return subscribeIndexingWork(onFrame, onError, work, true);
+      return subscribeIndexingWork(onFrame, onError, onCompleted, work, true);
     }
   }
 
   private IndexingJobsStream subscribeIndexingWork(Consumer<IndexingJobsFrame> onFrame,
-      Consumer<Throwable> onError, io.justsearch.app.api.EngineWorkHandle work, boolean outcomesOnly) {
+      Consumer<Throwable> onError, Runnable onCompleted, io.justsearch.app.api.EngineWorkHandle work,
+      boolean outcomesOnly) {
     // Legacy supplier-only clients may block during service selection. Do that on the producer
     // thread, after cancellation is registered. Production serving leases are captured here.
     CallView view = servingLeaseSupplier == null
@@ -1743,7 +1745,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
           }
         }
       });
-      indexingSubscriptions.add(flow);
+      indexingSubscriptions.put(flow, onCompleted);
       if (cancel.isCancelled()) indexingSubscriptions.remove(flow);
       if (transportClosing.get()) {
         flow.close();
@@ -1852,9 +1854,12 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
   protected void closeTransport() {
     transportClosing.set(true);
     Throwable failure = null;
-    for (var flow : indexingSubscriptions) {
+    // Retirement ends each subscription normally: it releases the flow's ownership now and tells
+    // the subscriber once, after any delivery in progress returns, so a bridge can subscribe
+    // again to the replacement client instead of keeping a stream nothing feeds.
+    for (var subscription : indexingSubscriptions.entrySet()) {
       try {
-        flow.close();
+        subscription.getKey().complete(subscription.getValue());
       } catch (RuntimeException | Error cleanupFailure) {
         if (failure == null) failure = cleanupFailure;
         else if (failure != cleanupFailure) failure.addSuppressed(cleanupFailure);
