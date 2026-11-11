@@ -99,3 +99,14 @@ env -u DISPLAY -u WAYLAND_DISPLAY -u TESSDATA_PREFIX js-gradle-slot node scripts
 GPL is a preservation check: it passes before and after, and its entry claims no repair.
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1cc72-eab4-72f1-a657-769f6a777510",
+  "verdict": "accept",
+  "digest": "sha256:a5da8e00edab9486849a3319125a1939a56fcce1c98546c34be2bbf148b8bf04",
+  "note": "Transcribed by the orchestrator from the acceptor's answer (its sandbox could not spawn git)."
+}
+```
