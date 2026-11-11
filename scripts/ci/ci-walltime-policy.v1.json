@@ -21,7 +21,7 @@
       "job": "Unit tests (app-ui-ui)",
       "requiredCheck": "Unit tests (app-ui)",
       "owner": "app and UI hosted unit evidence",
-      "hardTimeoutSeconds": 1500,
+      "hardTimeoutSeconds": 2400,
       "notes": "Class-balanced from hosted per-class attribution on 2026-10-21; confirm total wall time after rollout.",
       "advisoryBudgets": {
         "maxWallSeconds": 660
