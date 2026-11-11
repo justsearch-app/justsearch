@@ -74,24 +74,27 @@ afterAll(async () => {
   if (output) await rm(output, { recursive: true, force: true });
 });
 
+/** The palette's dialog: the native <dialog> (before it was one, the panel carried role dialog). */
+const PANEL = ':is(dialog, [role="dialog"])';
+
 async function openPalette(): Promise<Page> {
   context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
   const page = await context.newPage();
   await page.goto(url);
   await page.locator('body[data-ready="true"]').waitFor({ timeout: 30_000 });
-  await page.locator('#shell jf-command-palette [role="dialog"]').waitFor();
+  await page.locator(`#shell jf-command-palette ${PANEL}`).waitFor();
   return page;
 }
 
 /** The panel's box, and what the palette's own rules ask of it at this size and text size. */
-const measure = (page: Page) => page.evaluate(() => {
+const measure = (page: Page) => page.evaluate((selector) => {
   const palette = document.querySelector('#shell')!.shadowRoot!.querySelector('jf-command-palette')!;
-  const panel = palette.shadowRoot!.querySelector('[role="dialog"]')!.getBoundingClientRect();
+  const panel = palette.shadowRoot!.querySelector(selector)!.getBoundingClientRect();
   const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
   const top = matchMedia('(max-height: 30rem)').matches ? 0.5 * rem : Math.min(0.15 * innerHeight, 8 * rem);
   return { left: panel.left, right: panel.right, top: panel.top, bottom: panel.bottom, width: panel.width,
     viewport: { width: innerWidth, height: innerHeight }, expected: { width: Math.min(40 * rem, innerWidth - rem), top } };
-});
+}, PANEL);
 
 it('SP8 the palette is horizontally centred inside the viewport at every size, text size and theme, its width and top unchanged', async () => {
   const page = await openPalette();

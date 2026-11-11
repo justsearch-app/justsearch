@@ -13,7 +13,8 @@ from pathlib import Path
 
 import pytest
 
-# The app's shape in miniature: <jf-shell> holds the Search window and, as its sibling, the palette.
+# The app's shape in miniature: <jf-shell> holds the Search window and, as its sibling, the palette
+# (a host with no box of its own around a native modal dialog).
 _SHELL = """
 <script>
   const define = (tag, html) => customElements.define(tag, class extends HTMLElement {
@@ -21,14 +22,14 @@ _SHELL = """
   });
   define('jf-sv3-window', '<textarea data-testid="sv3-composer-input">draft</textarea>');
   define('jf-command-palette', `
-    <style>:host { display: none } :host([open]) { display: block }</style>
-    <div role="dialog" aria-modal="true" aria-label="Command palette">
+    <style>:host { display: contents }</style>
+    <dialog aria-label="Command palette">
       <input role="combobox" aria-label="Search" aria-controls="palette-listbox" value="">
       <div role="listbox" id="palette-listbox">
         <div role="option" id="palette-opt-0" aria-selected="false">Toggle Command Palette</div>
         <div role="option" id="palette-opt-1" aria-selected="true">Change indexing rules</div>
       </div>
-    </div>`);
+    </dialog>`);
   define('jf-shell', '<jf-sv3-window></jf-sv3-window><jf-command-palette></jf-command-palette>');
 </script>
 <jf-shell></jf-shell>
@@ -49,8 +50,11 @@ def _witness(open_palette: bool, step: str) -> str | None:
                 page = await browser.new_page()
                 await page.set_content(_SHELL)
                 if open_palette:
-                    await page.evaluate("""() => document.querySelector('jf-shell').shadowRoot
-                        .querySelector('jf-command-palette').setAttribute('open', '')""")
+                    await page.evaluate("""() => {
+                        const palette = document.querySelector('jf-shell').shadowRoot.querySelector('jf-command-palette');
+                        palette.setAttribute('open', '');
+                        palette.shadowRoot.querySelector('dialog').showModal();
+                    }""")
                 try:
                     await assert_search_state(page, step)
                 except AssertionError as error:

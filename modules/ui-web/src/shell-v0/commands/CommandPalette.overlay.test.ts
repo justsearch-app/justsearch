@@ -74,6 +74,12 @@ async function select(palette: CommandPalette, id: string): Promise<void> {
 }
 const actionLabels = (palette: CommandPalette): string[] =>
   [...shadow(palette).querySelectorAll('#palette-actions [role="option"]')].map(row => row.textContent?.trim() ?? '');
+/** A click on the native dialog's box itself, not its content, is a click on its backdrop. */
+function clickBackdrop(palette: CommandPalette): void {
+  const dialog = shadow(palette).querySelector('dialog');
+  expect(dialog, 'the palette dialog').not.toBeNull();
+  dialog!.click();
+}
 const status = (palette: CommandPalette): string => shadow(palette).querySelector('[role="status"]')?.textContent ?? '';
 
 it('SP5 Tab shows each result kind\'s actions, primary first; Escape returns to the results', async () => {
@@ -231,11 +237,14 @@ it('SP4c a lock observed by the status poll takes the conversation\'s text out o
 
 it('SP8 a modal dialog with a labelled combobox, a listbox of labelled groups, positions and count, and the active option scrolled into view', async () => {
   const scrolled = vi.spyOn(HTMLElement.prototype, 'scrollIntoView').mockImplementation(() => {});
+  // A native dialog opened as a modal (showModal) is a modal dialog; happy-dom has no :modal.
+  const modal = vi.spyOn(HTMLDialogElement.prototype, 'showModal');
   for (let index = 0; index < 3; index++) registerAction(action(`core.action.shell.tool-${index}`, `Tool ${index}`));
   const palette = await open();
-  const dialog = shadow(palette).querySelector('[role="dialog"]');
+  const dialog = shadow(palette).querySelector('dialog');
   expect(dialog, 'a dialog').not.toBeNull();
-  expect(dialog!.getAttribute('aria-modal')).toBe('true');
+  expect(dialog!.open).toBe(true);
+  expect(modal.mock.contexts).toEqual([dialog]);
   expect(dialog!.getAttribute('aria-label')).toBe('Command palette');
   const combobox = shadow(palette).querySelector('input[role="combobox"]');
   expect(combobox, 'a combobox').not.toBeNull();
@@ -314,7 +323,7 @@ it('SP9 dismissal returns focus to the invoker, or to the main region when the i
     invoker.focus();
     const palette = await open();
     expect(document.activeElement).toBe(palette);
-    if (dismiss === 'Escape') key(palette, { key: 'Escape' }); else shadow(palette).querySelector<HTMLElement>('.backdrop')!.click();
+    if (dismiss === 'Escape') key(palette, { key: 'Escape' }); else clickBackdrop(palette);
     expect(document.activeElement, dismiss).toBe(invoker);
     palette.remove();
   }

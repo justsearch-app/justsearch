@@ -9,11 +9,15 @@
  * Keyboard: the field keeps focus; arrows move the active option (`aria-activedescendant`), Enter
  * runs it, Tab shows its actions, Escape or Shift Tab returns from them with query, selection and
  * scroll kept, and Escape on the results closes. Keys that end an IME composition are the IME's.
+ *
+ * The palette is a native modal `<dialog>` (`showModal()`, through `ModalController`, as Settings
+ * is): the top layer paints it above all chrome whatever its z-index, and the platform makes the page
+ * behind it inert, so nothing beneath can take a click or a Tab meant for the field.
  */
 
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
-import { ModalityController } from '../primitives/modality.js';
+import { ModalController } from '../primitives/modalController.js';
 import { closeOthersInLayer } from '../state/transientLayerArbiter.js';
 import { deepActiveElement, isImeComposition } from '../utils/keyboardHandler.js';
 import { focusRegion } from '../chrome/frameRegions.js';
@@ -116,16 +120,25 @@ export class CommandPalette extends JfElement {
   }
 
   /**
-   * The palette owns the keyboard while open (backdrop + focus in its field), so it enters the app's
-   * one modality authority: global shortcuts — the status panel's among them — stand down under it,
-   * and the toggle action leaves another dialog in control. Closing gives focus back to the invoker.
+   * The palette owns the keyboard while open, so it enters the app's one modality authority: global
+   * shortcuts — the status panel's among them — stand down under it, and the toggle action leaves
+   * another dialog in control. Closing gives focus back to the invoker.
    */
-  private readonly modality = new ModalityController(this);
+  private readonly modal = new ModalController(this, {
+    dialog: () => this.shadowRoot?.querySelector('dialog'),
+  });
 
-  /** One overlay at a time: opening the palette closes any open popover (the status panel included). */
+  /** An IME composition in the field: its Escape is the IME's, never the dialog's. */
+  private composing = false;
+
+  /**
+   * One overlay at a time: opening the palette closes any open popover (the status panel included).
+   * The modality is entered now, before the render that opens the dialog, so it holds from the
+   * moment the palette is asked to open and the saved focus is the invoker, not the field.
+   */
   private enterOverlay(): void {
     closeOthersInLayer('transient', 'command-palette');
-    this.modality.enter();
+    this.modal.captureFocus();
   }
 
   /**
@@ -133,7 +146,7 @@ export class CommandPalette extends JfElement {
    * fallback is the main content region (never a hidden field or the page).
    */
   private exitOverlay(): void {
-    this.modality.exit();
+    this.modal.close();
     const active = deepActiveElement();
     if (active !== null && active !== document.body && !this.shadowRoot?.contains(active)) return;
     const main = (this.getRootNode() as ParentNode).querySelector?.<HTMLElement>('[role="main"]') ?? null;
@@ -228,39 +241,31 @@ export class CommandPalette extends JfElement {
 
   static styles = css`
     :host {
-      /* 559 Authority I: placement owned by the OverlayHost center slot (fixed; inset: 0). The host
-         fills that slot, as the drag overlay does, so the panel is centred in the viewport; as a
-         content-sized item of the slot's row it sat at its left edge. */
-      position: absolute;
-      inset: 0;
-      display: none;
-      align-items: flex-start;
-      justify-content: center;
+      display: contents;
+    }
+    /* Native <dialog> (showModal): the top layer and the platform's inert background, so no backdrop
+       div and no z-index. Centred horizontally, at a fixed distance from the top. */
+    dialog {
       --palette-top: min(15vh, 8rem);
-      padding-top: var(--palette-top);
-    }
-    :host([open]) {
-      display: flex;
-    }
-    .backdrop {
-      /* 559 Authority I: absolute within the OverlayHost center slot (fixed;inset:0). */
-      position: absolute;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.5);
-    }
-    .panel {
-      position: relative;
-      z-index: 1;
       box-sizing: border-box;
       width: min(40rem, calc(100vw - 1rem));
+      max-width: none;
       max-height: calc(100dvh - var(--palette-top) - 0.5rem);
+      margin: var(--palette-top) auto auto;
+      padding: 0;
       background: var(--surface-1);
+      color: var(--text-primary);
       border: 1px solid var(--border-subtle);
       border-radius: 0.875rem;
       box-shadow: 0 24px 64px -24px rgb(0 0 0 / 0.65);
-      display: flex;
       flex-direction: column;
       overflow: hidden;
+    }
+    dialog[open] {
+      display: flex;
+    }
+    dialog::backdrop {
+      background: rgba(0, 0, 0, 0.5);
     }
     .search-row {
       display: flex;
@@ -396,7 +401,7 @@ export class CommandPalette extends JfElement {
     .footer .end { margin-inline-start: auto; }
     /* A short window keeps the field, the list and the active row; the key hints go first. */
     @media (max-height: 30rem) {
-      :host { --palette-top: 0.5rem; }
+      dialog { --palette-top: 0.5rem; }
       .footer { display: none; }
     }
     .empty {
@@ -427,7 +432,7 @@ export class CommandPalette extends JfElement {
     /* Forced colours drop fills and shadows: the active option keeps a system-colour outline, the
        field its focus outline, so selection and focus stay distinct in light and dark themes. */
     @media (forced-colors: active) {
-      .panel { border-color: CanvasText; }
+      dialog { border-color: CanvasText; }
       .result-row[data-selected] { outline: 2px solid Highlight; outline-offset: -2px; }
       .search-row input:focus-visible { outline-color: Highlight; }
       kbd { border-color: CanvasText; }
@@ -469,6 +474,8 @@ export class CommandPalette extends JfElement {
   }
 
   protected override updated(): void {
+    // The dialog is always rendered, so it exists here; opening is idempotent.
+    if (this.open) this.modal.open();
     this.shadowRoot?.querySelector<HTMLElement>('[data-selected]')?.scrollIntoView?.({ block: 'nearest' });
   }
   private settingsViewer?: SettingsViewer;
@@ -508,10 +515,11 @@ export class CommandPalette extends JfElement {
       this.wizardInput = '';
       step.resolver(null);
     }
+    this.composing = false;
     const wasOpen = this.open;
     this.open = false;
     if (wasOpen) this.exitOverlay();
-    else this.modality.exit();
+    else this.modal.close();
     this.query = '';
     this.results = [];
     this.sourceResults = [];
@@ -759,9 +767,46 @@ export class CommandPalette extends JfElement {
     return parts.filter(Boolean).join(' ');
   }
 
-  override render(): TemplateResult {
-    if (!this.open) return html``;
+  /**
+   * The dialog's own close request (Escape where no key handler took it, or the platform's): the same
+   * order as the keys — a template's slot cancels, a result's actions go back to the results, the
+   * results close. Never during an IME composition.
+   */
+  private onCancel(e: Event): void {
+    e.preventDefault();
+    if (this.composing) return;
+    if (this.wizardActive) this.cancelWizard();
+    else if (this.actionsOf) this.returnToResults();
+    else this.hide();
+  }
 
+  /** The platform closed the dialog without asking (a close request it would not let be refused). */
+  private onClose(e: Event): void {
+    if (this.open && !(e.currentTarget as HTMLDialogElement).open) this.hide();
+  }
+
+  /** A click on the dialog box itself, not its content, is a click on the backdrop. */
+  private onBackdrop(e: Event): void {
+    if (e.target !== e.currentTarget) return;
+    if (this.wizardActive) this.cancelWizard();
+    else this.hide();
+  }
+
+  override render(): TemplateResult {
+    return html`
+      <dialog
+        aria-label="Command palette"
+        @cancel=${this.onCancel}
+        @close=${this.onClose}
+        @click=${this.onBackdrop}
+        @keydown=${this.handlePanelKeydown}
+        @compositionstart=${() => { this.composing = true; }}
+        @compositionend=${() => { this.composing = false; }}
+      >${this.open ? this.renderContent() : nothing}</dialog>
+    `;
+  }
+
+  private renderContent(): TemplateResult {
     // Tempdoc 508-followup §δ1 — wizard render path. Replaces the
     // result list with a single-slot prompt UI while a template's
     // expandTemplate is awaiting input. Esc cancels (resolves null);
@@ -769,31 +814,28 @@ export class CommandPalette extends JfElement {
     if (this.wizardActive && this.wizardStep) {
       const slot = this.wizardStep.slot;
       return html`
-        <div class="backdrop" @click=${() => this.cancelWizard()}></div>
-        <div class="panel" role="dialog" aria-modal="true" aria-label="Command palette">
-          <div class="search-row">
-            <span class="mode-chip">${this.wizardStep.templateId}</span>
-            <input
-              type="text"
-              aria-label=${slot.name}
-              placeholder=${slot.name}
-              .value=${this.wizardInput}
-              @input=${this.handleInput}
-              @keydown=${this.handleKeydown}
-            />
-            <span class="result-keys"><kbd>Enter</kbd> continue <kbd>Esc</kbd> cancel</span>
+        <div class="search-row">
+          <span class="mode-chip">${this.wizardStep.templateId}</span>
+          <input
+            type="text"
+            aria-label=${slot.name}
+            placeholder=${slot.name}
+            .value=${this.wizardInput}
+            @input=${this.handleInput}
+            @keydown=${this.handleKeydown}
+          />
+          <span class="result-keys"><kbd>Enter</kbd> continue <kbd>Esc</kbd> cancel</span>
+        </div>
+        <div class="results">
+          <div class="category-header" data-wizard-slot-name=${slot.name}>
+            ${slot.name}${slot.default !== undefined ? html` <span class="result-source">default: ${slot.default}</span>` : nothing}
           </div>
-          <div class="results">
-            <div class="category-header" data-wizard-slot-name=${slot.name}>
-              ${slot.name}${slot.default !== undefined ? html` <span class="result-source">default: ${slot.default}</span>` : nothing}
-            </div>
-            ${this.wizardCompletedLabels.length > 0
-              ? html`<div class="category-header">Completed</div>
-                ${this.wizardCompletedLabels.map(
-                  (c) => html`<div class="result-row"><span class="result-label">${c.name}</span><span class="result-source">${c.value}</span></div>`,
-                )}`
-              : nothing}
-          </div>
+          ${this.wizardCompletedLabels.length > 0
+            ? html`<div class="category-header">Completed</div>
+              ${this.wizardCompletedLabels.map(
+                (c) => html`<div class="result-row"><span class="result-label">${c.name}</span><span class="result-source">${c.value}</span></div>`,
+              )}`
+            : nothing}
         </div>
       `;
     }
@@ -806,38 +848,35 @@ export class CommandPalette extends JfElement {
       : (this.results[this.selectedIndex] ? `palette-opt-${this.selectedIndex}` : '');
 
     return html`
-      <div class="backdrop" @click=${() => this.hide()}></div>
-      <div class="panel" role="dialog" aria-modal="true" aria-label="Command palette" @keydown=${this.handlePanelKeydown}>
-        <div class="search-row">
-          <svg class="search-glyph" aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3"/></svg>
-          ${modeLabel ? html`<span class="mode-chip">${modeLabel}</span>` : nothing}
-          <input
-            type="text"
-            role="combobox"
-            aria-label="Search actions, settings, folders, conversations and areas"
-            aria-expanded="true"
-            aria-autocomplete="list"
-            aria-controls=${actions ? ACTIONS_ID : LIST_ID}
-            aria-activedescendant=${activeId || nothing}
-            autocomplete="off"
-            spellcheck="false"
-            placeholder=${modeLabel ? `Filter ${modeLabel.toLowerCase()}…` : 'Search, or type > for actions only'}
-            .value=${this.query}
-            @input=${this.handleInput}
-            @keydown=${this.handleKeydown}
-          />
-          <kbd aria-hidden="true">Esc</kbd>
-        </div>
-        <div class="results">
-          ${actions ? this.renderActions(this.actionsFor) : this.renderResults()}
-        </div>
-        <div class="visually-hidden" role="status" aria-live="polite" data-testid="palette-status">${this.announcement()}</div>
-        <div class="footer" aria-hidden="true">
-          ${actions
-            ? html`<span><kbd>↑</kbd> <kbd>↓</kbd> move</span><span><kbd>Enter</kbd> run</span><span><kbd>Esc</kbd> back</span>`
-            : html`<span><kbd>↑</kbd> <kbd>↓</kbd> move</span><span><kbd>Enter</kbd> open</span><span><kbd>Tab</kbd> actions</span>
-              <span class="end">Type <kbd>&gt;</kbd> for actions only</span>`}
-        </div>
+      <div class="search-row">
+        <svg class="search-glyph" aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3"/></svg>
+        ${modeLabel ? html`<span class="mode-chip">${modeLabel}</span>` : nothing}
+        <input
+          type="text"
+          role="combobox"
+          aria-label="Search actions, settings, folders, conversations and areas"
+          aria-expanded="true"
+          aria-autocomplete="list"
+          aria-controls=${actions ? ACTIONS_ID : LIST_ID}
+          aria-activedescendant=${activeId || nothing}
+          autocomplete="off"
+          spellcheck="false"
+          placeholder=${modeLabel ? `Filter ${modeLabel.toLowerCase()}…` : 'Search, or type > for actions only'}
+          .value=${this.query}
+          @input=${this.handleInput}
+          @keydown=${this.handleKeydown}
+        />
+        <kbd aria-hidden="true">Esc</kbd>
+      </div>
+      <div class="results">
+        ${actions ? this.renderActions(this.actionsFor) : this.renderResults()}
+      </div>
+      <div class="visually-hidden" role="status" aria-live="polite" data-testid="palette-status">${this.announcement()}</div>
+      <div class="footer" aria-hidden="true">
+        ${actions
+          ? html`<span><kbd>↑</kbd> <kbd>↓</kbd> move</span><span><kbd>Enter</kbd> run</span><span><kbd>Esc</kbd> back</span>`
+          : html`<span><kbd>↑</kbd> <kbd>↓</kbd> move</span><span><kbd>Enter</kbd> open</span><span><kbd>Tab</kbd> actions</span>
+            <span class="end">Type <kbd>&gt;</kbd> for actions only</span>`}
       </div>
     `;
   }

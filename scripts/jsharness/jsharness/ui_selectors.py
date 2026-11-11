@@ -68,7 +68,7 @@ CSS_SETTINGS_WINDOW_SECURITY_CONTENT = 'jf-settings-window jf-settings-surface j
 CSS_SV3_WINDOW = 'jf-sv3-window'
 CSS_SV3_DEGRADATION_COMPACT = 'jf-sv3-window [data-testid="sv3-degradation"][data-open="false"]'
 CSS_SV3_COMPOSER_TEXTAREA = 'jf-sv3-window textarea[data-testid="sv3-composer-input"]'
-# The app's one palette (shell S6): a dialog in the shell's overlay host, opened from any area.
+# The app's one palette (shell S6): a native modal dialog in the shell's overlay host, opened from any area.
 CSS_PALETTE = 'jf-command-palette'
 # Search v3's Search mode renders its results on the shared `<jf-results-card>`, inside its own
 # results region, so the row is the card's `search-result-row` scoped to that region.
@@ -137,10 +137,10 @@ SEARCH_STATE_WITNESSES = {
 # above: they run immediately before the screenshot and the axe measurement, and a palette step whose
 # palette is not open fails there instead of measuring whatever is beneath.
 PALETTE_STATE_WITNESSES = {
-    "palette-forced-colors": ['[role="dialog"] input[role="combobox"]',
-                              '[role="dialog"] [role="option"][aria-selected="true"]'],
-    "palette-600x400-text-200": ['[role="dialog"] input[role="combobox"]',
-                                 '[role="dialog"] #palette-actions [role="option"][aria-selected="true"]'],
+    "palette-forced-colors": ['dialog:modal input[role="combobox"]',
+                              'dialog:modal [role="option"][aria-selected="true"]'],
+    "palette-600x400-text-200": ['dialog:modal input[role="combobox"]',
+                                 'dialog:modal #palette-actions [role="option"][aria-selected="true"]'],
 }
 
 @dataclass(frozen=True)

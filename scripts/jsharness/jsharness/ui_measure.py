@@ -325,12 +325,14 @@ async def assert_search_state(page, name: str) -> None:
     from .ui_selectors import SEARCH_STATE_WITNESSES, PALETTE_STATE_WITNESSES, CSS_SV3_WINDOW, CSS_PALETTE
     key = name.removesuffix("-light")
     if key in PALETTE_STATE_WITNESSES:
-        selectors, root_css, what = PALETTE_STATE_WITNESSES[key], CSS_PALETTE, "palette"
+        # The palette's host has no box of its own (its native dialog paints in the top layer), so
+        # the open host is the root and its witnesses, each required visible, carry the visibility.
+        selectors, root_css, what = PALETTE_STATE_WITNESSES[key], CSS_PALETTE + "[open]", "palette"
     else:
-        selectors, root_css, what = SEARCH_STATE_WITNESSES.get(key), CSS_SV3_WINDOW, "Search"
+        selectors, root_css, what = SEARCH_STATE_WITNESSES.get(key), CSS_SV3_WINDOW + ":visible", "Search"
     if selectors is None:
         return
-    root = page.locator(root_css + ":visible")
+    root = page.locator(root_css)
     if await root.count() != 1:
         raise AssertionError(f"{name}: expected exactly one visible {what} element")
     registered = await root.evaluate("el => !!customElements.get(el.localName) && !!el.shadowRoot")

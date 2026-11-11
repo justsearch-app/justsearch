@@ -1,0 +1,106 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
+  },
+  "createdAt": "2026-11-11T09:03:10.920Z",
+  "revision": "dfaee4315bb2b208f5c313faf08cfdcb6283f51c",
+  "tree": "f77c727cc1e5a553af57b5cb007fad3ec51c5023",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/commands/CommandPalette.modal-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/360jwr8w/tmp/test-intent-vitest-13898-1794387774792.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 16126
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/commands/CommandPalette.modal-lockdown.test.ts#SP8 the palette paints above all chrome and keeps the page behind out of reach (light, 1280x720, text 100%)",
+      "file": "modules/ui-web/src/shell-v0/commands/CommandPalette.modal-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a8939a1549aa8523fbca05095552759612338e3c3ab3967de0383a65f9ba266a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SP8 the palette paints above all chrome and keeps the page behind out of reach (light, 1280x720, text 100%)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/commands/CommandPalette.modal-lockdown.test.ts#SP8 the palette paints above all chrome and keeps the page behind out of reach (dark, 1280x720, text 100%)",
+      "file": "modules/ui-web/src/shell-v0/commands/CommandPalette.modal-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a8939a1549aa8523fbca05095552759612338e3c3ab3967de0383a65f9ba266a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SP8 the palette paints above all chrome and keeps the page behind out of reach (dark, 1280x720, text 100%)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/commands/CommandPalette.modal-lockdown.test.ts#SP8 the palette paints above all chrome and keeps the page behind out of reach (forced-colors, 1280x720, text 100%)",
+      "file": "modules/ui-web/src/shell-v0/commands/CommandPalette.modal-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a8939a1549aa8523fbca05095552759612338e3c3ab3967de0383a65f9ba266a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SP8 the palette paints above all chrome and keeps the page behind out of reach (forced-colors, 1280x720, text 100%)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/commands/CommandPalette.modal-lockdown.test.ts#SP9 the second Escape closes the palette and gives focus back to its invoker; nothing beneath hears either",
+      "file": "modules/ui-web/src/shell-v0/commands/CommandPalette.modal-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a8939a1549aa8523fbca05095552759612338e3c3ab3967de0383a65f9ba266a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SP9 the second Escape closes the palette and gives focus back to its invoker; nothing beneath hears either",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/commands/CommandPalette.modal-lockdown.test.ts#SP10c the Alt peek paints above the open palette where they overlap, and ends with Alt release",
+      "file": "modules/ui-web/src/shell-v0/commands/CommandPalette.modal-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a8939a1549aa8523fbca05095552759612338e3c3ab3967de0383a65f9ba266a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SP10c the Alt peek paints above the open palette where they overlap, and ends with Alt release",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:bbbeccc9821592bae558f7b0cf9ee471e768957069bedad0edb27fc292eac0d7"
+}

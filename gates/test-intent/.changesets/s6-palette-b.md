@@ -7,7 +7,7 @@ author-session: s6-palette-b-builder
 
 # Candidate B — one palette overlay, Tab actions, Search palette retirement, chord ownership, keyboard and accessibility
 
-No acceptance is claimed; independent verification is pending. Fail-before evidence ran on 545232c4d8 (candidate A) in gates/test-intent/evidence/s6-palette-b.json; the verifier-round repairs (keyCode 229 as composition for every binding, the listbox as the palette's scroll region) ran their fail-before on 02a9eb6522 in gates/test-intent/evidence/s6-palette-b-repair.json; the second verifier round's repairs (a locked conversation's text leaving an open actions view, the palette centred in its slot) ran their fail-before on d36b2c30f7 in gates/test-intent/evidence/s6-palette-b-repair2.json. The palette harness steps' witness repair is a script self-test (scripts/jsharness/tests/test_ui_palette_witness.py), outside this gate's scope.
+No acceptance is claimed; independent verification is pending. Fail-before evidence ran on 545232c4d8 (candidate A) in gates/test-intent/evidence/s6-palette-b.json; the verifier-round repairs (keyCode 229 as composition for every binding, the listbox as the palette's scroll region) ran their fail-before on 02a9eb6522 in gates/test-intent/evidence/s6-palette-b-repair.json; the second verifier round's repairs (a locked conversation's text leaving an open actions view, the palette centred in its slot) ran their fail-before on d36b2c30f7 in gates/test-intent/evidence/s6-palette-b-repair2.json. The palette harness steps' witness repair is a script self-test (scripts/jsharness/tests/test_ui_palette_witness.py), outside this gate's scope. The third verifier round's repair (the palette as a native modal dialog, so chrome such as the status trigger no longer paints over its field) ran its fail-before on dfaee4315b in gates/test-intent/evidence/s6-palette-b-modal.json; the kept behaviour it re-pins is in gates/test-intent/evidence/s6-palette-b-modal-kept.json; the evidence files whose checked files moved to the native dialog were re-run with their original before refs.
 
 ```json
 {
@@ -174,7 +174,7 @@ No acceptance is claimed; independent verification is pending. Fail-before evide
         "modules/ui-web/src/shell-v0/commands/CommandPalette.layout-lockdown.test.ts"
       ],
       "class": "New",
-      "behaviour": "SP8 layout in real Chromium: the app's composition (the palette inside a shadow root, an occupant of the overlay host's center slot) renders the palette's panel horizontally centred and inside the viewport at 1280x720, 900x700 and 600x400, at 100% and 200% text, in light, dark and forced colours; its width (min(40rem, viewport less 1rem)) and its top (min(15vh, 8rem), 0.5rem in a short window) are unchanged. Fail-before on d36b2c30f7: assertion (the panel sat at x=0: left 0, right 640 at 1280x720).",
+      "behaviour": "SP8 layout in real Chromium: the app's composition (the palette inside a shadow root, an occupant of the overlay host's center slot) renders the palette's dialog horizontally centred and inside the viewport at 1280x720, 900x700 and 600x400, at 100% and 200% text, in light, dark and forced colours; its width (min(40rem, viewport less 1rem)) and its top (min(15vh, 8rem), 0.5rem in a short window) are unchanged. Fail-before on d36b2c30f7: assertion (the panel sat at x=0: left 0, right 640 at 1280x720).",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -182,7 +182,7 @@ No acceptance is claimed; independent verification is pending. Fail-before evide
           "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
           "delegationScope": "the shell redesign's slices including Settings and secondary pages",
           "label": "agent choice",
-          "choice": "The palette's host fills the overlay host's center slot (position absolute, inset 0, as the drag overlay's own layer does), so its existing centring applies; as a content-sized item of the slot's row it sat at the slot's left edge. Nothing else about the layout changes."
+          "choice": "The palette is a native modal dialog (top layer), centred by its own margins: its top at min(15vh, 8rem) (0.5rem in a short window) and auto inline margins; its width min(40rem, viewport less 1rem) overrides the dialog's default maximum. Nothing else about the layout changes. (At d36b2c30f7 the repair was the host filling the overlay host's center slot; the native dialog replaced that host layout.)"
         }
       ],
       "evidence": "gates/test-intent/evidence/s6-palette-b-repair2.json",
@@ -559,6 +559,115 @@ No acceptance is claimed; independent verification is pending. Fail-before evide
         }
       ],
       "conflictSearch": "Searched docs/decisions with rg -n -i \"palette|ctrl\\+k|ctrl k|focus trap|peek\": only an unrelated manual-CI four-palette contrast sweep matched (0026-manual-ci-triggering.md). decision records searched for a conflict: none"
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/commands/CommandPalette.modal-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "SP8 in real Chromium over the real Shell (top bar, status pill, overlay host, palette, peek; probe areas with a text box and a button): at 600x400 with 200% text, in light, dark and forced colours, where the status pill's trigger shares the palette field's area, a click there focuses the field and typed text arrives in it, and the deepest element painted at that point is the field; Tab and Shift Tab keep focus inside the palette, Tab on a result shows its actions and the first Escape returns to the results with the typed query kept; a click on a background control outside the palette reaches nothing. Fail-before on dfaee4315b: assertion in all three cases (the click focused the status trigger, button.trigger, and the typing was lost).",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "The palette is rendered as a native modal <dialog> opened with showModal() through ModalController, Settings' pattern, so the top layer paints it above all chrome whatever its z-index and the platform makes the page behind it inert; z-index numbers are not raised. The 600x400 at 200% text size is SP8's own reachability size; the status trigger is the chrome observed painting over the field there."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-palette-b-modal.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/commands/CommandPalette.modal-lockdown.test.ts#SP8 the palette paints above all chrome and keeps the page behind out of reach (light, 600x400, text 200%)",
+        "modules/ui-web/src/shell-v0/commands/CommandPalette.modal-lockdown.test.ts#SP8 the palette paints above all chrome and keeps the page behind out of reach (dark, 600x400, text 200%)",
+        "modules/ui-web/src/shell-v0/commands/CommandPalette.modal-lockdown.test.ts#SP8 the palette paints above all chrome and keeps the page behind out of reach (forced-colors, 600x400, text 200%)"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/commands/CommandPalette.modal-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Kept behaviour, same file: the same SP8 assertions at 1280x720 and 100% text in light, dark and forced colours (no chrome under the field there); SP9: from a result's actions the first Escape returns to the results and the second closes the palette, nothing beneath hears either Escape, and focus returns to the invoking control; SP10c: the Alt peek, shown while the palette is open, paints above the palette where they overlap (900x500: a pixel of the previewed area over the palette's box is the preview's, not the palette's or its backdrop's) and Alt release dismisses it with the palette still open. These pass on dfaee4315b as well; they pin that the native dialog keeps them.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "The peek stays outside the palette's dialog: it is a popover shown after the dialog, so it is later in the top layer and paints above the palette and its backdrop; being outside the modal dialog it is inert, which changes nothing because moving the pointer off the row already dismisses it. The Escape order and focus return are SP5 and SP9's."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-palette-b-modal-kept.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/commands/CommandPalette.modal-lockdown.test.ts#SP8 the palette paints above all chrome and keeps the page behind out of reach (light, 1280x720, text 100%)",
+        "modules/ui-web/src/shell-v0/commands/CommandPalette.modal-lockdown.test.ts#SP8 the palette paints above all chrome and keeps the page behind out of reach (dark, 1280x720, text 100%)",
+        "modules/ui-web/src/shell-v0/commands/CommandPalette.modal-lockdown.test.ts#SP8 the palette paints above all chrome and keeps the page behind out of reach (forced-colors, 1280x720, text 100%)",
+        "modules/ui-web/src/shell-v0/commands/CommandPalette.modal-lockdown.test.ts#SP9 the second Escape closes the palette and gives focus back to its invoker; nothing beneath hears either",
+        "modules/ui-web/src/shell-v0/commands/CommandPalette.modal-lockdown.test.ts#SP10c the Alt peek paints above the open palette where they overlap, and ends with Alt release"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/commands/CommandPalette.overlay.test.ts"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "Relative to dfaee4315b. 'SP8 a modal dialog with a labelled combobox…': the dialog is found as the native <dialog> (open) and its modality is read from the showModal call on it (happy-dom has no :modal) instead of role=dialog with aria-modal=true; the aria-label assertion and everything after are unchanged. 'SP9 dismissal returns focus…': the backdrop click is a click on the dialog's own box (asserted present first), as a native modal dialog's backdrop click is, instead of a click on the retired backdrop div. Same oracle: a labelled modal dialog; focus returns to the invoker or the main region.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "The palette is a native modal <dialog>; the checks locate it as that element instead of a div with role dialog and a separate backdrop div."
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/commands/CommandPalette.providers.test.ts"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "Relative to dfaee4315b. 'SP10b %s cancels template slots…' (backdrop case): the backdrop click is a click on the dialog's own box (asserted present first) instead of on the retired backdrop div. Same oracle: no execution, wizard inactive, no stale slot on reopening.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "The palette is a native modal <dialog>; the checks locate it as that element instead of a div with role dialog and a separate backdrop div."
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/commands/CommandPalette.layout-lockdown.test.ts"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "Relative to dfaee4315b. The panel is read as the palette's dialog, :is(dialog, [role=\"dialog\"]) (the native <dialog> now, the div with role dialog before), instead of [role=\"dialog\"] alone, both for the wait and for the measured box. Same oracle: centred, inside the viewport, width and top unchanged, at every size, text size and theme.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "The palette is a native modal <dialog>; the checks locate it as that element instead of a div with role dialog and a separate backdrop div."
+        }
+      ]
     }
   ]
 }

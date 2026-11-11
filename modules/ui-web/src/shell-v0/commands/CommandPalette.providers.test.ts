@@ -242,7 +242,12 @@ it.each(['Escape', 'toggle', 'backdrop', 'disconnect'])('SP10b %s cancels templa
   const palette = new CommandPalette(); document.body.append(palette);
   const running = invokeCommandWithResult('template.cancel'); await flush(); await palette.updateComplete;
   if (method === 'Escape') palette.shadowRoot!.querySelector('input')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
-  else if (method === 'backdrop') palette.shadowRoot!.querySelector<HTMLElement>('.backdrop')!.click();
+  else if (method === 'backdrop') {
+    // A click on the native dialog's box itself, not its content, is a click on its backdrop.
+    const dialog = palette.shadowRoot!.querySelector('dialog');
+    expect(dialog, 'the palette dialog').not.toBeNull();
+    dialog!.click();
+  }
   else if (method === 'disconnect') palette.remove();
   else palette.hide();
   await flush();
