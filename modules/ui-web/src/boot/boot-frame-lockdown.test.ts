@@ -1237,7 +1237,7 @@ async function realInputMeasures(page: Page, name: string) {
  * them): these surfaces take their colours from the app's tokens, which a palette changes at
  * runtime, so each case applies its palette to them through the app's own appearance writer. The
  * other surfaces boot per palette: the start-up frame, failure page and hand-off paint the saved
- * copy the early HTML script reads once at boot, and connecting and factory reset paint before the
+ * copy the early HTML script reads once at boot, and connecting, engine recovery and factory reset paint before the
  * saved palette is restored.
  */
 const livePages = new Map<'dark' | 'light', Promise<[string, Page][]>>();
@@ -1253,8 +1253,7 @@ function livePagesFor(mode: 'dark' | 'light') {
     };
     // The running app writes the saved frame copy the next start paints.
     return [await open('running app', {}, 'jf-top-bar .more-trigger'),
-      await open('hand-off without a saved copy', { renderHold: true }, 'jf-top-bar .more-trigger'),
-      await open('engine recovery', { supervisor: exhausted }, '#root > jf-engine-recovery')];
+      await open('hand-off without a saved copy', { renderHold: true }, 'jf-top-bar .more-trigger')];
   })());
   return livePages.get(mode)!;
 }
@@ -1306,9 +1305,9 @@ legibilityCases.forEach(({ palette, mode }, caseIndex) => it(`SW5 X1 window cont
     ['failure page without a saved copy', () => start({ storage: noCopy }, true, true)],
     ['hand-off', () => handOff({ storage })],
     ['hand-off without a saved copy', async () => { const page = live.get('hand-off without a saved copy')!; await apply(page); return page; }],
-    // Both paint before the saved palette is restored, so each boots with this palette's storage as a start would.
+    // These paint before the saved palette is restored, so each boots with this palette's storage as a start would.
     ['connecting', () => opened({ storage, discoveryHold: true }, '#root > jf-engine-recovery')],
-    ['engine recovery', async () => { const page = live.get('engine recovery')!; await apply(page); return page; }],
+    ['engine recovery', () => opened({ storage, supervisor: exhausted }, '#root > jf-engine-recovery')],
     ['factory reset', () => opened({ storage, phase: 'complete' }, '#root > jf-factory-reset-recovery')],
   ];
   for (const [surface, open] of states) {
