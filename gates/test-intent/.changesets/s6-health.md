@@ -499,3 +499,13 @@ What each Obsolete entry removes:
   "digest": "sha256:eb00c515502693e2f1dc1732531829dfc91db6b3421571eb4a28f79798d105af"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-64wfoc9e-f7ada5e1",
+  "verdict": "accept",
+  "digest": "sha256:6b322ef1f002a0df883c9569057588a675b83fb65d21a64172a5a6f0d5825776"
+}
+```
