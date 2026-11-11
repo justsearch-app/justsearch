@@ -469,10 +469,9 @@ fn filetime_ms(birth: &str) -> Option<u64> {
 #[cfg(windows)]
 fn process_identity(pid: u32) -> (Option<String>, Option<String>) {
     use windows_sys::Win32::{
-        Foundation::{CloseHandle, FILETIME},
+        Foundation::CloseHandle,
         System::Threading::{
-            GetProcessTimes, OpenProcess, QueryFullProcessImageNameW,
-            PROCESS_QUERY_LIMITED_INFORMATION,
+            OpenProcess, QueryFullProcessImageNameW, PROCESS_QUERY_LIMITED_INFORMATION,
         },
     };
     unsafe {
@@ -480,18 +479,7 @@ fn process_identity(pid: u32) -> (Option<String>, Option<String>) {
         if handle.is_null() {
             return (None, None);
         }
-        let mut times = [std::mem::zeroed::<FILETIME>(); 4];
-        let ok = GetProcessTimes(
-            handle,
-            &mut times[0],
-            &mut times[1],
-            &mut times[2],
-            &mut times[3],
-        );
-        let birth = (ok != 0).then(|| {
-            ((u64::from(times[0].dwHighDateTime) << 32) | u64::from(times[0].dwLowDateTime))
-                .to_string()
-        });
+        let birth = creation_filetime(handle);
         let mut buffer = [0u16; 2048];
         let mut len = buffer.len() as u32;
         let executable = (QueryFullProcessImageNameW(handle, 0, buffer.as_mut_ptr(), &mut len)
@@ -505,28 +493,81 @@ fn process_identity(pid: u32) -> (Option<String>, Option<String>) {
 fn process_identity(_pid: u32) -> (Option<String>, Option<String>) {
     (None, None)
 }
+/// The creation FILETIME as recorded in `creationFileTime`, read from an open process handle.
+#[cfg(windows)]
+unsafe fn creation_filetime(handle: windows_sys::Win32::Foundation::HANDLE) -> Option<String> {
+    use windows_sys::Win32::{Foundation::FILETIME, System::Threading::GetProcessTimes};
+    let mut times = [std::mem::zeroed::<FILETIME>(); 4];
+    let ok = GetProcessTimes(
+        handle,
+        &mut times[0],
+        &mut times[1],
+        &mut times[2],
+        &mut times[3],
+    );
+    (ok != 0).then(|| {
+        ((u64::from(times[0].dwHighDateTime) << 32) | u64::from(times[0].dwLowDateTime)).to_string()
+    })
+}
 #[cfg(not(target_os = "linux"))]
-fn legacy_identity_check(pid: u32, birth: Option<&str>) -> &'static str {
-    #[cfg(windows)]
-    unsafe {
-        use windows_sys::Win32::{
-            Foundation::{CloseHandle, GetLastError, ERROR_INVALID_PARAMETER},
-            System::Threading::{OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION},
-        };
-        let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
-        if handle.is_null() && GetLastError() == ERROR_INVALID_PARAMETER {
-            return "GONE";
-        }
-        if !handle.is_null() {
-            CloseHandle(handle);
-        }
-    }
-    let (seen, _) = process_identity(pid);
-    match (seen.as_deref(), birth) {
+fn birth_verdict(seen: Option<&str>, birth: Option<&str>) -> &'static str {
+    match (seen, birth) {
         (Some(a), Some(b)) if a == b => "ALIVE_MATCH",
         (Some(_), Some(_)) => "GONE",
         _ => "IDENTITY_UNKNOWN",
     }
+}
+/// A zero-timeout wait on the opened process answers "exited" for every exit code, 259
+/// (STILL_ACTIVE) included, even while another process still holds a handle to it. Only a
+/// process that has not exited is compared by birth, read from that same handle.
+#[cfg(windows)]
+fn exit_verdict(
+    wait: windows_sys::Win32::Foundation::WAIT_EVENT,
+    seen: impl FnOnce() -> Option<String>,
+    birth: Option<&str>,
+) -> &'static str {
+    use windows_sys::Win32::Foundation::{WAIT_OBJECT_0, WAIT_TIMEOUT};
+    match wait {
+        WAIT_OBJECT_0 => "GONE",
+        WAIT_TIMEOUT => birth_verdict(seen().as_deref(), birth),
+        _ => "IDENTITY_UNKNOWN",
+    }
+}
+#[cfg(windows)]
+fn legacy_identity_check(pid: u32, birth: Option<&str>) -> &'static str {
+    use windows_sys::Win32::{
+        Foundation::{CloseHandle, GetLastError, ERROR_INVALID_PARAMETER},
+        System::Threading::{
+            OpenProcess, WaitForSingleObject, PROCESS_QUERY_LIMITED_INFORMATION,
+            PROCESS_SYNCHRONIZE,
+        },
+    };
+    unsafe {
+        let handle = OpenProcess(
+            PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SYNCHRONIZE,
+            0,
+            pid,
+        );
+        if handle.is_null() {
+            return if GetLastError() == ERROR_INVALID_PARAMETER {
+                "GONE"
+            } else {
+                "IDENTITY_UNKNOWN"
+            };
+        }
+        let verdict = exit_verdict(
+            WaitForSingleObject(handle, 0),
+            || creation_filetime(handle),
+            birth,
+        );
+        CloseHandle(handle);
+        verdict
+    }
+}
+#[cfg(not(any(windows, target_os = "linux")))]
+fn legacy_identity_check(pid: u32, birth: Option<&str>) -> &'static str {
+    let (seen, _) = process_identity(pid);
+    birth_verdict(seen.as_deref(), birth)
 }
 
 #[cfg(target_os = "linux")]
@@ -855,6 +896,33 @@ mod windows_identity_tests {
         .into_iter()
         .filter(|r| r["type"] == "engine-owner-died")
         .collect()
+    }
+
+    #[test]
+    fn exit_is_decided_before_identity_and_a_failed_query_is_unknown() {
+        use windows_sys::Win32::Foundation::{WAIT_FAILED, WAIT_OBJECT_0, WAIT_TIMEOUT};
+        let unread = || -> Option<String> { panic!("identity read after the exit answer") };
+        assert_eq!(exit_verdict(WAIT_OBJECT_0, unread, Some("1")), "GONE");
+        assert_eq!(
+            exit_verdict(WAIT_FAILED, unread, Some("1")),
+            "IDENTITY_UNKNOWN"
+        );
+        assert_eq!(
+            exit_verdict(WAIT_TIMEOUT, || Some("1".into()), Some("1")),
+            "ALIVE_MATCH"
+        );
+        assert_eq!(
+            exit_verdict(WAIT_TIMEOUT, || Some("2".into()), Some("1")),
+            "GONE"
+        );
+        assert_eq!(
+            exit_verdict(WAIT_TIMEOUT, || None, Some("1")),
+            "IDENTITY_UNKNOWN"
+        );
+        assert_eq!(
+            exit_verdict(WAIT_TIMEOUT, || Some("1".into()), None),
+            "IDENTITY_UNKNOWN"
+        );
     }
 
     #[test]
