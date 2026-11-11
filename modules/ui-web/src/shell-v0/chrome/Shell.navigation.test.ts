@@ -10,6 +10,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LitElement, html } from 'lit';
 import './Shell.js';
+import '../views/search-v3/SearchV3View.js';
+import * as paletteProjection from '../commands/CommandPaletteProjection.js';
+import type { SearchV3View } from '../views/search-v3/SearchV3View.js';
+import { loadConversations, getConversationListState } from '../state/conversationListStore.js';
+import { readLastViewedConversation } from '../controllers/lastViewedConversation.js';
 import '../components/SurfaceTabs.js';
 import type { Shell } from './Shell.js';
 import type { SettingsWindow } from './SettingsWindow.js';
@@ -502,3 +507,70 @@ it.each(['section=layout&entry=keyboard', 'category=layout&entry=keyboard', 'tab
     } finally { stop(); }
   },
 );
+
+describe('SP4b palette conversation arrivals are one navigation through Search address selection', () => {
+  async function setup(start: 'active' | 'cold' | 'retained'): Promise<Shell> {
+    resetCatalog();
+    seedCatalog({ schemaVersion: '1.0.0', catalogVersion: 1, namespace: 'core', primitive: 'Surface', entries: [
+      surface(SEARCH, 'jf-sv3-window'), surface(LIBRARY, 'jf-nav-host-probe'), surface(BRAIN, 'jf-nav-brain-probe'),
+      surface(SETTINGS, 'jf-nav-settings-probe', { placement: 'MODAL' }),
+    ] });
+    vi.stubGlobal('fetch', vi.fn(async input => {
+      const url = String(input);
+      if (url.includes('/api/chat/conversations?')) return Response.json({ sessions: [
+        { sessionId: 'conv-a', title: 'Conversation A', firstUserMessage: 'Question A', createdAtMs: 1, lastActiveAtMs: 2 },
+        { sessionId: 'conv-b', title: 'Conversation B', firstUserMessage: 'Question B', createdAtMs: 1, lastActiveAtMs: 3 },
+      ] });
+      if (url.includes('/api/chat/runs/live')) return Response.json({ runs: [] });
+      if (url.includes('/api/thread/')) return Response.json({ conversationId: url.split('/').at(-1), events: [] });
+      return Response.json({ entries: [] });
+    }));
+    if (start === 'cold') window.history.replaceState(null, '', `#justsearch://surface/${LIBRARY}`);
+    const shell = await mount();
+    if (start === 'retained') await go(shell, LIBRARY);
+    await loadConversations(); await settle(shell);
+    return shell;
+  }
+  async function open(shell: Shell, id: string): Promise<void> {
+    const entry = paletteProjection.searchPaletteEntries('').find(row => row.entry.id === `conversation:${id}`)?.entry;
+    expect(entry).toBeDefined();
+    if (entry) await paletteProjection.invokePaletteEntry?.(entry);
+    await settle(shell);
+    // The conversation projector settles on its own debounce; no fixed delay.
+    const { __flushPendingWriteForTest } = await import('../router/URLProjector.js'); __flushPendingWriteForTest(); await settle(shell);
+  }
+  function search(shell: Shell): SearchV3View | null {
+    return shell.shadowRoot!.querySelector('jf-stage')!.shadowRoot!.querySelector('jf-sv3-window') as SearchV3View | null;
+  }
+  for (const start of ['active', 'cold', 'retained'] as const) {
+    it(`SP4b ${start} Search opens exactly the selected conversation with one history transition and keeps Back Forward and reload correct`, async () => {
+      const shell = await setup(start);
+      const before = window.location.hash, journalBefore = getJournalState();
+      const pushes = vi.spyOn(window.history, 'pushState');
+      await open(shell, 'conv-b');
+      // The journal gains one entry, for B, and it marks the history entry the app is on; Back and
+      // Forward move its cursor without adding entries.
+      const journal = getJournalState(), shown = (): string | undefined => getJournalState().entries[getJournalState().cursor]?.url;
+      expect([journal.entries.length, journal.cursor]).toEqual([journalBefore.entries.length + 1, journalBefore.entries.length]);
+      expect(shown()).toBe(`justsearch://surface/${SEARCH}?conversationId=conv-b`);
+      expect(window.history.state?.navigationJournalId).toBe(journal.entries[journal.cursor]!.id);
+      expect(search(shell)?.isConnected).toBe(true);
+      expect(search(shell)!.sessions.activeId).toBe('conv-b');
+      expect(getConversationListState().activeId).toBe('conv-b');
+      expect(readLastViewedConversation()).toBe('conv-b');
+      expect(address()).toBe(`${SEARCH}?conversationId=conv-b`);
+      expect(pushes).toHaveBeenCalledTimes(1);
+      await browserBack(shell); expect(window.location.hash).toBe(before);
+      expect([getJournalState().entries.length, getJournalState().cursor]).toEqual([journal.entries.length, journal.cursor - 1]);
+      expect(shown()).toBe(journalBefore.entries[journalBefore.cursor]!.url);
+      await browserForward(shell); expect(address()).toBe(`${SEARCH}?conversationId=conv-b`);
+      expect([getJournalState().entries.length, getJournalState().cursor]).toEqual([journal.entries.length, journal.cursor]);
+      expect(shown()).toBe(`justsearch://surface/${SEARCH}?conversationId=conv-b`);
+      expect(search(shell)!.sessions.activeId).toBe('conv-b');
+      shell.remove(); __resetBootstrapForTest(); deactivateProjection(); const reloaded = await mount();
+      expect(getConversationListState().activeId).toBe('conv-b'); expect(address()).toBe(`${SEARCH}?conversationId=conv-b`);
+      expect(search(reloaded)!.sessions.activeId).toBe('conv-b');
+    });
+  }
+  // A refused opening from active and retained Search: Shell.paletteConversationRefusal.test.ts.
+});

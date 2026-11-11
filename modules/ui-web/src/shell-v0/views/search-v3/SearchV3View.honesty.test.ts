@@ -15,7 +15,9 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import './SearchV3View.js';
+import '../../commands/CommandPalette.js';
 import type { SearchV3View } from './SearchV3View.js';
+import type { CommandPalette } from '../../commands/CommandPalette.js';
 import { resetSearchState } from '../../state/searchState.js';
 import {
   __feedContactForTest,
@@ -881,8 +883,13 @@ describe('an answer can be copied and a conversation exported, through the share
     const row = sidebar.shadowRoot!.querySelector('jf-sv3-session-row')!;
     await row.updateComplete;
     expect(row.shadowRoot!.querySelector('[data-testid="sv3-session-row-export"]')).not.toBeNull();
-    const palette = await region(el, 'jf-sv3-palette');
+    // The app's one palette, every result shown, carries no Markdown-only conversation action.
+    const palette = document.createElement('jf-command-palette') as CommandPalette;
+    document.body.append(palette);
+    palette.show();
+    await palette.updateComplete;
     expect(palette.shadowRoot!.textContent).not.toContain('Copy this conversation as Markdown');
+    palette.remove();
     expect(clipboard).not.toHaveBeenCalled();
   });
 

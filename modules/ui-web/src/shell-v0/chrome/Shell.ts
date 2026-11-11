@@ -61,7 +61,7 @@ import '../components/RetiredStatusElements.js';
 import './RetiredFrameElements.js';
 import './TopBar.js';
 import type { TopBar, TopBarDestination, TopBarSelection } from './TopBar.js';
-import { FRAME_AREAS, FRAME_FIXED_WINDOWS } from '../layout/frameAreas.js';
+import { FRAME_AREAS, FRAME_FIXED_WINDOWS, frameWindows } from '../layout/frameAreas.js';
 import { undoStatusNotice, type StatusPill } from '../components/StatusPill.js';
 import { latestReversalAt, undoLatestReversal } from '../state/ownReversals.js';
 // §21.E — register the PendingEffect chrome surface. Renders nothing
@@ -244,7 +244,7 @@ import { copyToClipboard } from '../utils/clipboardCopy.js';
 // supplants slice 489's reverted dual-path Shell.ts integration; the
 // router substrate (parser, surfaceSchemas, storeRegistry, projector)
 // remains as shipped on origin/main.
-import { createNavigationHandler } from '../router/navigationHandler.js';
+import { createNavigationHandler, opensConversation } from '../router/navigationHandler.js';
 import { createInvocationHandler } from '../router/invocationHandler.js';
 import { createIntentRouter, type IntentRouter } from '../router/intentRouter.js';
 import { resolveSurface as catalogResolveSurface, resolveOperation as catalogResolveOperation, refreshPromotedAliases } from '../router/catalogResolver.js';
@@ -339,33 +339,6 @@ function canonicalSplitSurfaceId(surfaceId: string): string {
 function isSplitPaneCandidate(surface: SurfaceCatalogEntry, primaryId: string): boolean {
   return canonicalSplitSurfaceId(surface.id) !== canonicalSplitSurfaceId(primaryId)
     && !LEGACY_INTERACTION_MODE_SURFACE_IDS.has(surface.id);
-}
-
-// Tempdoc 571 §4b — altitude-band rank for the cross-altitude move-ban. PRODUCT + TRUST share the
-// product region; DIAGNOSTIC
-// sinks to the diagnostics region; TOOL (headless) last. A user reorder is clamped to keep each
-// surface in its own band, so a saved surfaceOrder cannot drag a DIAGNOSTIC surface into the product
-// region (or vice versa) — altitude, not user drag, owns which band a surface lives in.
-function altitudeBandRank(altitude: string | undefined): number {
-  switch (altitude) {
-    case 'DIAGNOSTIC':
-      return 1;
-    case 'TOOL':
-      return 2;
-    default:
-      return 0; // PRODUCT + TRUST
-  }
-}
-
-/**
- * Clamp a user-reordered surface list to within-altitude bands (tempdoc 571 §4b). A STABLE sort by
- * {@link altitudeBandRank} preserves the user's within-band order but re-groups surfaces by band, so a
- * reorder can only permute within an altitude — never move a surface across one.
- */
-export function clampReorderToAltitudeBands(
-  surfaces: SurfaceCatalogEntry[],
-): SurfaceCatalogEntry[] {
-  return [...surfaces].sort((a, b) => altitudeBandRank(a.altitude) - altitudeBandRank(b.altitude));
 }
 
 // `deriveTitleFromSurfaceId` is imported from '../utils/deriveRichLabel.js'
@@ -766,12 +739,13 @@ export class Shell extends JfElement {
       toggleInspector: () => {
         setInspectorOpen(!getInspectorStateInternal().isOpen);
       },
+      // The one palette's one toggle: the chord's binding and Search's topbar button both arrive
+      // here. Modality is read when the (deferred) action runs, so a dialog that opened in between
+      // — Settings, a confirmation, the security dialog — keeps the keyboard.
       togglePalette: () => {
         const palette = this.shadowRoot?.querySelector('jf-command-palette') as CommandPalette | null;
-        if (palette) {
-          if (palette.open) palette.hide();
-          else palette.show();
-        }
+        if (palette?.open) palette.hide();
+        else if (palette && !modalOwnsFocus()) palette.show();
       },
     });
     // §25.δ2 — register the toggle-audit-log Action. Idempotent (the
@@ -1422,7 +1396,20 @@ export class Shell extends JfElement {
       delete state.focusSettingsRecovery;
       return { ...address, state };
     };
+    const journal = (address: ShellAddressNavigation, transport: string): void => {
+      const url = canonicalize(persistentAddress(address));
+      recordNavigation(address.target, url,
+        deriveRichLabel(address.target, url, present({ kind: 'surface', id: address.target }).label), transport);
+    };
+    // An in-app conversation opening is journalled by the handler, with what Search accepted, just
+    // before its address is pushed; this is the transport of the opening now being realized.
+    let openingTransport: string | null = null;
     const navigationHandler = createNavigationHandler({
+      journalOpening: (address) => {
+        const transport = openingTransport;
+        openingTransport = null;
+        if (transport !== null) journal(address, transport);
+      },
       setActiveSurface: (id) => {
         // Slice 496 P1+P6 — track previous surface for navigation toast.
         const prev = this.activeId;
@@ -1618,13 +1605,12 @@ export class Shell extends JfElement {
         // Settle a claimed conversation before recording the surface that follows it.
         // A browser traversal has already moved its address and must never push here.
         if (intent.transport !== 'URL_BAR') flushPendingNavigationWrite();
-        const url = canonicalize(persistentAddress(intent.address));
-        const label = deriveRichLabel(
-          intent.address.target,
-          url,
-          present({ kind: 'surface', id: intent.address.target }).label,
-        );
-        recordNavigation(intent.address.target, url, label, intent.transport);
+        // Search may refuse an in-app conversation opening; the handler journals what it accepted.
+        // A browser arrival (URL_BAR) is journalled here, where its history marker is matched.
+        const target = outcome.status === 'auto-corrected' ? outcome.canonicalId : intent.address.target;
+        openingTransport = intent.transport !== 'URL_BAR' && opensConversation({ ...intent.address, target })
+          ? intent.transport : null;
+        if (openingTransport === null) journal(intent.address, intent.transport);
         // The window tab is part of the address: an address naming a tab opens it, and an address
         // without one is completed with the tab the window shows (after the handler wrote it).
         const tab = intent.address.state?.tab;
@@ -2242,76 +2228,7 @@ export class Shell extends JfElement {
 
   private refreshSurfaces(): void {
     const all = listSurfaces();
-    // Tempdoc 571 §11 / 578 — host/member composition: a surface declared as a member of a host has
-    // its home INSIDE that host (rendered as a tab by <jf-surface-tabs>), so it is excluded from the
-    // rail. Membership is the single home-authority — derived from the wire's `members`, never a
-    // separately hand-set Placement (so "off-rail" and "routable" stop being two signals to sync).
-    const memberIds = new Set(all.flatMap((s) => s.members ?? []));
-    // Tempdoc 855 §11 S1 — Settings is NEVER a rail/stage surface, whatever the catalog says. The
-    // wire declares MODAL, but a session running against a stale cached catalog (or a plugin catalog
-    // that re-declares it RAIL) would otherwise render a SECOND settings button next to the pinned
-    // affordance below AND let the Stage mount `jf-settings-surface` a second time, competing with
-    // the window's persistent mount (§11.2). The one MODAL surface is excluded unconditionally.
-    let railSurfaces = all.filter(
-      (s) => s.placement === 'RAIL' && !memberIds.has(s.id) && s.id !== SETTINGS_SURFACE_ID,
-    );
-
-    // Tempdoc 507 §6 Phase 5 — layout zone composition: if the active
-    // layout specifies which surfaces appear in the rail zone, filter to
-    // only those surfaces.
-    const layoutId = this.userConfig?.activeLayoutId;
-    if (layoutId) {
-      const layout = getLayout(layoutId);
-      const zoneSurfaces = layout?.zones?.rail?.surfaces;
-      if (zoneSurfaces && zoneSurfaces.length > 0) {
-        const allowed = new Set(zoneSurfaces);
-        railSurfaces = railSurfaces.filter((s) => allowed.has(s.id));
-      }
-    }
-
-    // Slice 472 — apply userConfig surfaceVisibility filter.
-    // Absent entries default to visible; explicit `false` hides.
-    const visibility = this.userConfig?.surfaceVisibility;
-    if (visibility) {
-      railSurfaces = railSurfaces.filter((s) => visibility[s.id] !== false);
-    }
-
-    // Tempdoc 586 F-2's Simple-mode trim of System retired with the rail (shell slice 2): System is
-    // a fixed row of the More menu in every detail level, never a switcher area.
-
-    // Slice 472 — apply userConfig surfaceOrder. Surfaces in the
-    // order list keep that order; surfaces not in the list keep
-    // catalog order after them. Surfaces in the order list that
-    // aren't in the (post-visibility) set are silently skipped
-    // (graceful degradation per `archive/source-tempdocs/421-extensibility.md`
-    // §"Failure modes" + Eclipse perspective lesson per 470 §B.A.6:
-    // user mutations win on restore; missing pane ids drop quietly).
-    const order = this.userConfig?.surfaceOrder;
-    if (order && order.length > 0) {
-      const present = new Set(railSurfaces.map((s) => s.id));
-      const ordered: SurfaceCatalogEntry[] = [];
-      const seen = new Set<string>();
-      for (const id of order) {
-        if (present.has(id) && !seen.has(id)) {
-          const surface = railSurfaces.find((s) => s.id === id);
-          if (surface) {
-            ordered.push(surface);
-            seen.add(id);
-          }
-        }
-      }
-      // Append surfaces not in the order list, in catalog order.
-      for (const surface of railSurfaces) {
-        if (!seen.has(surface.id)) {
-          ordered.push(surface);
-        }
-      }
-      // Tempdoc 571 §4b — the cross-altitude move-ban: honor the user reorder only WITHIN each altitude
-      // band. A saved surfaceOrder that interleaves bands cannot smuggle a DIAGNOSTIC surface into the
-      // product region; altitude (not user drag) owns band membership. This keeps `this.surfaces`
-      // band-consistent for every consumer (activeId default, secondary surface, the More menu).
-      railSurfaces = clampReorderToAltitudeBands(ordered);
-    }
+    const railSurfaces = frameWindows(all, this.userConfig ?? getUserConfig());
 
     this.surfaces = railSurfaces;
     if (this.surfaces.length > 0 && !this.activeId) {
@@ -2941,6 +2858,11 @@ export class Stage extends JfElement {
         (el as unknown as { host_?: PluginHostApi }).host_ = this.hostApi_ ?? undefined;
         if (surface.id === INTERACTION_SURFACE_ID) {
           (el as HTMLElement & { initialNavigationPending: boolean }).initialNavigationPending = this.initialNavigationPending;
+        }
+        // Only the Search window mounted for Search's address follows and may refuse an opening of
+        // it; another window that mounts the Search element keeps its own conversation.
+        if (el.localName === 'jf-sv3-window') {
+          (el as HTMLElement & { ownsAddress: boolean }).ownsAddress = surface.id === INTERACTION_SURFACE_ID;
         }
         const isAiSurface = surface.consumes?.conversationShapes && surface.consumes.conversationShapes.length > 0;
         if (isAiSurface) {

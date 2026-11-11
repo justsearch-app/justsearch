@@ -28,7 +28,7 @@
 import { getSurface } from '../../api/registry/SurfaceCatalogClient.js';
 import { canonicalize, parseUrl } from './parser.js';
 import { getStore } from './storeRegistry.js';
-import { getJournalState, recordNavigation } from '../state/NavigationJournal.js';
+import { describeEntry, getJournalState, recordNavigation } from '../state/NavigationJournal.js';
 import { present } from '../display/present.js';
 import { peekSearchV3Handoff } from '../utils/compose.js';
 import type { ShellAddressNavigation, StateSnapshot } from './types.js';
@@ -386,9 +386,13 @@ function writeUrl(surfaceId: string, schema: ResolvedSchema, push = false): void
     const journal = conversationView ? getJournalState() : null;
     const entry = journal?.entries[journal.cursor];
     // Replace keeps the entry's app state (position and journal marker) for every window: the
-    // address changed, not the place in history.
+    // address changed, not the place in history. The journal entry this history entry is marked
+    // with is written with it, so both name the address Search shows.
+    const marked = entry !== undefined && entry.surfaceId === surfaceId
+      && (entry.url === address || (window.history.state as { navigationJournalId?: unknown } | null)?.navigationJournalId === entry.id);
+    if (marked) describeEntry(entry.id, address);
     window.history.replaceState({ ...window.history.state, surfaceId, jsNavIndex: historyIndex(),
-      ...(entry?.url === address ? { navigationJournalId: entry.id } : {}) }, '', url);
+      ...(marked ? { navigationJournalId: entry.id } : {}) }, '', url);
   } catch {
     // history API failure non-fatal.
   }
@@ -402,6 +406,12 @@ function writeUrl(surfaceId: string, schema: ResolvedSchema, push = false): void
 function isCurrentUrl(relative: string): boolean {
   if (typeof window === 'undefined') return false;
   return window.location.hash === relative;
+}
+
+/** The state a surface's stores hold now, as its address would carry it (null without a schema). */
+export function projectedState(surfaceId: string): StateSnapshot | null {
+  const schema = getSurfaceStateSchema(surfaceId);
+  return schema ? collectState(resolveSurfaceStateSchema(schema)) : null;
 }
 
 function collectState(schema: ResolvedSchema): StateSnapshot {

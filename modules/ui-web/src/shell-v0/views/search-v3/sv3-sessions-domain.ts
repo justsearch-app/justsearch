@@ -34,6 +34,8 @@ interface SessionsHost {
   renamingId(): string | null;
   setRenamingId(id: string | null): void;
   connected(): boolean;
+  /** Is this the Search window the address names (not a split layout's second Search window)? */
+  ownsAddress(): boolean;
   historyLocked(): boolean;
   apiBase(): string;
   runGate(): Sv3RunGate;
@@ -92,10 +94,12 @@ export class Sv3SessionsDomain {
       this.forgetDeletedConversations(state.deletedIds);
       this.sessions = mergeStoreConversations(this.sessions, state.conversations);
       this.conversations = state.conversations;
-      // Only restoration follows another caller. A shared claim belongs to its own window.
-      if (change === 'restore') {
+      // Only restoration follows another caller. A shared claim belongs to its own window, and an
+      // opening to the window the address names: another Search window (a split layout's second
+      // one) neither follows it nor refuses it, so neither can move the other's conversation.
+      if (change === 'restore' || (change === 'open' && this.host.ownsAddress())) {
         if (state.activeId !== null) this.draftDomain.mountHasIncoming = true;
-        this.followStoreConversation(state.activeId);
+        this.followStoreConversation(state.activeId, change === 'open');
       }
     });
   }
@@ -153,7 +157,7 @@ export class Sv3SessionsDomain {
     void this.contextDomain.refreshHistory(id);
   }
 
-  private followStoreConversation(storeActiveId: string | null): void {
+  private followStoreConversation(storeActiveId: string | null, opening = false): void {
     if (storeActiveId === this.sessions.activeId) {
       if (!this.transport.hasFreshHandoff()) this.draftDomain.retireRefusedHandoff();
       this.draftDomain.departureBlocked = false; return;
@@ -161,7 +165,7 @@ export class Sv3SessionsDomain {
     this.removalConfirmation?.abort();
     if (storeActiveId === null && this.draftDomain.draftReview && this.composer.read().trim()) {
       const leaving = this.draftDomain.humanPlace();
-      if (!this.draftDomain.persistDraft({ place: null, text: this.draftDomain.recoveryText(this.composer.read()), preparation: this.draftDomain.currentPreparation() }, true)) { this.blockDeparture(); return; }
+      if (!this.draftDomain.persistDraft({ place: null, text: this.draftDomain.recoveryText(this.composer.read()), preparation: this.draftDomain.currentPreparation() }, true)) { this.blockDeparture(opening); return; }
       if (leaving !== null) this.draftDomain.rememberPlace(leaving, this.composer.read());
       this.draftDomain.revokeHumanTask(true);
       this.search.hide();
@@ -174,7 +178,7 @@ export class Sv3SessionsDomain {
     if (storeActiveId === null && this.search.hasPlace) {
       // WP1.1 S1.13 — the bare address is the result list when this window has one: Back/Forward
       // between results and a conversation returns to the list, its query and its chosen files.
-      if (!this.draftDomain.returnToResults()) { this.blockDeparture(); return; }
+      if (!this.draftDomain.returnToResults()) { this.blockDeparture(opening); return; }
       this.draftDomain.departureBlocked = false;
       this.transport.clearLastViewed();
       return;
@@ -184,7 +188,7 @@ export class Sv3SessionsDomain {
       // New session does — minus the focus move, which belongs to the affordance, and minus the
       // CLAIM, which would push a history entry for a move the browser already made and truncate
       // the forward tail with it. See {@link resetToHero}.
-      if (!this.draftDomain.resetToHero(true, true)) { this.blockDeparture(); return; }
+      if (!this.draftDomain.resetToHero(true, true)) { this.blockDeparture(opening); return; }
       this.draftDomain.departureBlocked = false;
       // The pointer still follows: the tab is on the hero now, so a reload must not resurrect the
       // conversation the reader just left. This one is a browser-local write with no emission, so
@@ -195,7 +199,7 @@ export class Sv3SessionsDomain {
     // An edit in another row is DROPPED rather than committed, the same rule every other move
     // between conversations applies.
     this.renamingId = null;
-    if (!this.draftDomain.swapPlace(storeActiveId)) { this.blockDeparture(); return; }
+    if (!this.draftDomain.swapPlace(storeActiveId)) { this.blockDeparture(opening); return; }
     this.draftDomain.departureBlocked = false;
     const now = Date.now();
     if (sessionById(this.sessions, storeActiveId) === null) {
@@ -214,8 +218,14 @@ export class Sv3SessionsDomain {
     void this.contextDomain.refreshHistory(storeActiveId);
   }
 
-  private blockDeparture(): void {
-    this.draftDomain.departureBlocked = true;
+  private blockDeparture(opening = false): void {
+    // An in-app opening is refused before its address is kept: put this window's conversation back,
+    // so the address names it again and the view is not mismatched (the refused save explains why
+    // it stayed). It goes back as the opening, which only this window follows, so no other Search
+    // window moves with it. A traversal already moved the address; that mismatch blocks work until
+    // resolved.
+    if (opening) this.transport.restoreActiveConversation(this.sessions.activeId, 'open');
+    this.draftDomain.departureBlocked = !opening;
     this.draftDomain.revokeHumanTask(true);
     this.host.revealRecoveryOutcome();
   }

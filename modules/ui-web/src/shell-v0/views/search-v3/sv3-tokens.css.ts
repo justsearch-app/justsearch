@@ -238,13 +238,6 @@ export const sv3Tokens = css`
     --sidebar-icon-color: color-mix(in srgb, var(--sidebar-muted-foreground) 60%, var(--sidebar));
     --command-shell-inset: 0.5rem;
     --command-content-inset: 1rem;
-    /* The palette popup's box (max-h-105 / max-w-xl). */
-    --command-popup-max-height: 26.25rem;
-    --command-popup-max-width: 36rem;
-    /* The spec's scroll-fade band is 2.5rem over a chat timeline and cut to 1.5rem for its one DENSE
-       list sitting directly under its own chrome, "so the fade stays while the controls start near
-       the chrome" — which is exactly the palette list. */
-    --command-scroll-fade-height: 1.5rem;
     /* The composer field's two floors. The spec ships ONE editor at 70px and swaps the whole block
        out for a single truncating line when the composer is compact; the window keeps a typable field
        in both forms, so the compact form is expressed as a one-LINE floor instead. The ceiling is

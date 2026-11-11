@@ -59,7 +59,6 @@ interface DraftHost {
   clearRenaming(): void;
   clearRecordNotice(): void;
   detachRun(): void;
-  dismissPalette(): void;
   focusIncomingComposer(): void;
   searchFilterLabels(): string[];
   search(): DraftSearch;
@@ -1034,7 +1033,6 @@ export class Sv3DraftDomain {
       this.placeTiers.set(id, this.tier);
     }
     this.host.clearRenaming();
-    this.host.dismissPalette();
     this.host.startNewSession();
     this.search.hide(); this.search.clearScope(); this.host.closePane();
     this.host.setActiveConversation(null); this.host.clearLastViewed();

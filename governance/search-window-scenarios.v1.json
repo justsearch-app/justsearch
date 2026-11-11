@@ -2753,7 +2753,7 @@
     },
     {
       "id": "SW-KEY-02",
-      "behavior": "The command palette opens only for its own window and remains responsive after removal and reattachment.",
+      "behavior": "One chord opens the app's one palette from Search as from every other area; Search keeps no palette, chord listener or focus trap of its own, and its palette commands stay with exactly one connected Search window across removal and reattachment. (Replaces the retired window-scoped Search palette, S6 SP1/SP7.)",
       "kind": "works-today",
       "races": [
         "second-conversation-or-tab",
@@ -2762,8 +2762,8 @@
       "observations": [
         {
           "layer": "view",
-          "file": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Palette.test.ts",
-          "test": "leaves an unmounted window deaf, so a stale surface cannot answer the chord"
+          "file": "modules/ui-web/src/shell-v0/chrome/Shell.palette.test.ts",
+          "test": "SP1 one chord press toggles exactly one palette from Search's composer, Library, AI Brain and a contributed window"
         },
         {
           "layer": "real-ui-fixture",
@@ -2772,20 +2772,20 @@
         },
         {
           "layer": "view",
-          "file": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Palette.test.ts",
-          "test": "opens the palette for a chord raised inside the window"
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.paletteActions.test.ts",
+          "test": "SP7 exactly one owner across departure, retained return, split-layout re-parenting and previews; teardown removes only its own"
         },
         {
           "layer": "view",
-          "file": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Palette.test.ts",
-          "test": "ignores a chord raised outside the window entirely"
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.paletteActions.test.ts",
+          "test": "SP7 Search's working commands are app palette actions under their ids; the seven inert entries and the second palette are gone"
         }
       ]
     },
     {
       "id": "SW-KEY-11",
-      "behavior": "The command palette stops responding after its window is removed.",
-      "kind": "known-gap",
+      "behavior": "Search's palette commands leave the app palette when their Search window is removed, and a result captured before the removal runs nothing. (Replaces the retired Search palette's own removal behaviour, S6 SP7.)",
+      "kind": "works-today",
       "races": [
         "second-conversation-or-tab",
         "screen-switch"
@@ -2793,26 +2793,31 @@
       "observations": [
         {
           "layer": "view",
-          "binding": null,
-          "reason": "The removal test checks one chord after reattachment, without raising a chord while the window is removed."
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.paletteActions.test.ts",
+          "test": "SP7 exactly one owner across departure, retained return, split-layout re-parenting and previews; teardown removes only its own"
+        },
+        {
+          "layer": "view",
+          "file": "modules/ui-web/src/shell-v0/commands/CommandPalette.overlay.test.ts",
+          "test": "SP4-SP9 shown actions follow their result: a removed or replaced registration runs nothing and says so"
         },
         {
           "layer": "real-ui-fixture",
           "binding": null,
-          "reason": "The removal test checks one chord after reattachment, without raising a chord while the window is removed."
+          "reason": "No real UI fixture step removes the Search window with the palette open."
         }
       ]
     },
     {
       "id": "SW-KEY-03",
-      "behavior": "Palette commands can be filtered, selected with arrows, and activated by keyboard or pointer.",
+      "behavior": "Palette results can be filtered, moved through with the arrow keys in their shown order, and run by keyboard or pointer; Tab shows the chosen result's actions. (The app's one palette replaces the Search palette, S6 SP5/SP8.)",
       "kind": "works-today",
       "races": [],
       "observations": [
         {
           "layer": "view",
-          "file": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Palette.test.ts",
-          "test": "runs the highlighted command on Enter, which becomes the new selection"
+          "file": "modules/ui-web/src/shell-v0/commands/CommandPalette.overlay.test.ts",
+          "test": "SP8 every match is reachable by arrow keys alone: moving past a group's first rows shows the rest"
         },
         {
           "layer": "real-ui-fixture",
@@ -2821,52 +2826,52 @@
         },
         {
           "layer": "view",
-          "file": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Palette.test.ts",
-          "test": "filters on the query and shows the spec empty row when nothing matches"
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.paletteActions.test.ts",
+          "test": "SP7 \"Search everything\" searches the composer draft and \"Search for\" the palette text; opening, filtering or cancelling submits neither"
         },
         {
           "layer": "view",
-          "file": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Palette.test.ts",
-          "test": "moves the highlight with the arrow keys and wraps at both ends"
+          "file": "modules/ui-web/src/shell-v0/components/StatusPill.test.ts",
+          "test": "B4 the palette entry \"What's going on\" opens the panel once the palette has closed"
         },
         {
           "layer": "view",
-          "file": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Palette.test.ts",
-          "test": "906: a pointer press cannot dismiss the option before its click dispatches"
+          "file": "modules/ui-web/src/shell-v0/commands/CommandPalette.overlay.test.ts",
+          "test": "SP5 Tab shows each result kind's actions, primary first; Escape returns to the results"
         }
       ]
     },
     {
       "id": "SW-KEY-04",
-      "behavior": "The palette contains keyboard focus and returns it to the opener when dismissed.",
+      "behavior": "The palette keeps keyboard focus inside its dialog and returns it to the opener when dismissed, or to the main content when the opener is gone. (The app's one palette replaces the Search palette, S6 SP9.)",
       "kind": "works-today",
       "races": [],
       "observations": [
         {
           "layer": "view",
-          "file": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Palette.test.ts",
-          "test": "traps Tab inside the popup instead of walking out into the shell behind the backdrop"
+          "file": "modules/ui-web/src/shell-v0/commands/CommandPalette.overlay.test.ts",
+          "test": "SP5 with no result, Tab opens no stale actions and keeps focus in the dialog"
         },
         {
           "layer": "real-ui-fixture",
           "binding": null,
-          "reason": "The sv3-palette-forced-colors step observes presentation, not focus containment or restoration."
+          "reason": "The palette-forced-colors step observes presentation, not focus containment or restoration."
         },
         {
           "layer": "view",
-          "file": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Palette.test.ts",
-          "test": "focuses the field on open and returns focus to the invoker on Escape"
+          "file": "modules/ui-web/src/shell-v0/commands/CommandPalette.overlay.test.ts",
+          "test": "SP9 dismissal returns focus to the invoker, or to the main region when the invoker is gone"
         },
         {
           "layer": "view",
-          "file": "modules/ui-web/src/shell-v0/views/search-v3/Sv3Palette.test.ts",
-          "test": "closes on a backdrop click and still restores the invoker"
+          "file": "modules/ui-web/src/shell-v0/chrome/Shell.palette.test.ts",
+          "test": "SP1 the Search topbar button opens the same palette through the toggle action"
         }
       ]
     },
     {
       "id": "SW-KEY-05",
-      "behavior": "Escape dismisses the active rename, mode menu, reader, or sidebar, while an IME Escape leaves the composer and sidebar open.",
+      "behavior": "Escape dismisses the active rename, mode menu, reader, or sidebar, while an IME Escape leaves the composer and sidebar open; the app palette's Escape closes only the palette.",
       "kind": "works-today",
       "races": [],
       "observations": [
@@ -2888,7 +2893,7 @@
         {
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.pane.test.ts",
-          "test": "closes the pane and leaves an open palette open"
+          "test": "SP9 one chord in the composer opens only the app palette, and its Escape closes the palette while the pane stays open"
         },
         {
           "layer": "view",

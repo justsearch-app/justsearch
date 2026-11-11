@@ -8,9 +8,9 @@
  * feed grows over the rail, the nav-toast overlaps the composer). This host
  * owns named, fixed-positioned **slots** with one z-index scale; an overlay
  * docks by `slot="…"` and drops its own positioning — so "an overlay picks raw
- * coordinates" becomes unrepresentable (collapse, tier-1). Popover-API overlays
- * (ProvenanceBadge, CommandPalette) still escape to the browser top layer
- * transparently; the slot is just their DOM parent.
+ * coordinates" becomes unrepresentable (collapse, tier-1). Top-layer overlays
+ * (ProvenanceBadge's popover; the modal dialogs: CommandPalette, SettingsWindow)
+ * still escape to the browser top layer transparently; the slot is just their DOM parent.
  *
  * Slot containers are **content-sized at a viewport anchor** (not full-bleed),
  * with `pointer-events:none` on the container + `auto` on slotted children, so

@@ -31,9 +31,11 @@ export interface StoreAdapter {
    * Apply a snapshot — replace the store's current state with the values in
    * the bag. Implementations silently coerce types (URL args arrive as
    * strings; the store coerces against its typed shape). Missing keys
-   * preserve current defaults.
+   * preserve current defaults. `opening` is true when the app pushes the address after this
+   * restore (an in-app navigation, not a traversal or an address the browser already holds), so
+   * the address it pushes is what the store holds afterwards.
    */
-  restore(snapshot: StateSnapshot): void;
+  restore(snapshot: StateSnapshot, opening?: boolean): void;
 
   /**
    * Subscribe to store changes. Listener fires whenever the addressable

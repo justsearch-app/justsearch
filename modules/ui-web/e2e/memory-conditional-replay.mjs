@@ -198,10 +198,13 @@ try {
       await navigation('core.brain-surface');
       await page.getByRole('tab', { name: 'Memory', exact: true }).click();
     } else {
-      const palette = page.locator('jf-sv3-palette');
-      await palette.evaluate(el => el.show());
-      await palette.locator('input').fill('memory');
-      await palette.locator('input').press('Enter');
+      // Search's "Open AI Brain › Memory" in the app's one palette, opened by its chord from Search.
+      await page.locator('jf-sv3-window textarea[data-testid="sv3-composer-input"]').focus();
+      await page.keyboard.press('ControlOrMeta+k');
+      const field = page.locator('jf-command-palette input[role="combobox"]');
+      await field.fill('Open AI Brain Memory');
+      await page.locator('jf-command-palette [role="option"][aria-selected="true"]', { hasText: 'Open AI Brain › Memory' }).waitFor();
+      await field.press('Enter');
     }
     await page.locator('jf-memory-surface').waitFor();
     await eventually(async () => assert.equal(await page.locator('jf-memory-surface').evaluate(el => el.loading), false));

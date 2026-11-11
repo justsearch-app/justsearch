@@ -250,18 +250,10 @@ describe('WP5.7 conversation export', () => {
   });
 });
 
-// Run the pre-existing palette route on the baseline, and the visible replacement on the candidate.
-// These cases reach the old serializer too: their fail-before is the missing fact, not a missing import.
+// The visible export route. (The Search palette's Markdown command, the old baseline route, is retired.)
 async function markdownThroughAvailableRoute(view: SearchV3View): Promise<{ text: string; receipt: string }> {
-  if (view.shadowRoot!.querySelector('jf-sv3-conversation-export')) {
-    const panel = await open(view); await act(panel, 'Copy Markdown');
-    return { text: copy.mock.calls[0]?.[0] as string ?? '', receipt: receipt(panel) };
-  }
-  view.shadowRoot!.querySelector('jf-sv3-palette')!.dispatchEvent(new CustomEvent('sv3-palette-run', {
-    bubbles: true, composed: true, detail: { id: 'cmd-export-markdown' },
-  }));
-  await settle(view);
-  return { text: copy.mock.calls[0]?.[0] as string ?? '', receipt: view.shadowRoot!.textContent ?? '' };
+  const panel = await open(view); await act(panel, 'Copy Markdown');
+  return { text: copy.mock.calls[0]?.[0] as string ?? '', receipt: receipt(panel) };
 }
 it('S571 baseline reproduction retains source labels and locations per answer', async () => {
   const { text } = await markdownThroughAvailableRoute(await mount());
