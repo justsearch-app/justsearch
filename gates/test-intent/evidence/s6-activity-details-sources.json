@@ -1,0 +1,127 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-11T21:36:03.371Z",
+  "revision": "324e423d5becbb045471af8362d3fb07d0cb2524",
+  "tree": "e37649b0c94544aca9ce2aea46d0161a9fbec7b9",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.group-details.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/6jyb3g6d/tmp/test-intent-vitest-4-1794432955175.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 3070
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts#an indexing record names Background indexing as its source",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c2a8772f3859518d045bc09c464afa795e0b145514d86e35da278e4b7e0fad4e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Activity details name sources in words an indexing record names Background indexing as its source",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts#an indexing burst names Background indexing as its shared source",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c2a8772f3859518d045bc09c464afa795e0b145514d86e35da278e4b7e0fad4e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Activity details name sources in words an indexing burst names Background indexing as its shared source",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts#an unknown transport reads Another source and its raw code appears nowhere in the pane",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c2a8772f3859518d045bc09c464afa795e0b145514d86e35da278e4b7e0fad4e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Activity details name sources in words an unknown transport reads Another source and its raw code appears nowhere in the pane",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts#every backend transport and WORKER_INDEXER has source words in the rendered pane",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c2a8772f3859518d045bc09c464afa795e0b145514d86e35da278e4b7e0fad4e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Activity details name sources in words every backend transport and WORKER_INDEXER has source words in the rendered pane",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "324e423d5b",
+    "revision": "324e423d5becbb045471af8362d3fb07d0cb2524",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.group-details.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/6jyb3g6d/tmp/test-intent-vitest-4-1794432960267.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 2645,
+        "output": "JSON report written to /home/elias/.cache/am/6jyb3g6d/tmp/test-intent-vitest-4-1794432960267.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts#an indexing record names Background indexing as its source",
+        "classification": "assertion",
+        "detail": "Activity details name sources in words an indexing record names Background indexing as its source:  AssertionError: expected 'WORKER_INDEXER' to be 'Background indexing' // Object.is equality\n    at /home/elias/.cache/am/6jyb3g6d/tmp/test-intent-before-sOfLnJ/modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts:244:49\n    at file:///home/elias/.cache/am/6jyb3g6d/tmp/test-intent-"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts#an indexing burst names Background indexing as its shared source",
+        "classification": "assertion",
+        "detail": "Activity details name sources in words an indexing burst names Background indexing as its shared source:  AssertionError: expected 'WORKER_INDEXER' to be 'Background indexing' // Object.is equality\n    at /home/elias/.cache/am/6jyb3g6d/tmp/test-intent-before-sOfLnJ/modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts:251:49\n    at file:///home/elias/.cache/am/6jyb3g6d/tmp/test-intent-"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts#an unknown transport reads Another source and its raw code appears nowhere in the pane",
+        "classification": "assertion",
+        "detail": "Activity details name sources in words an unknown transport reads Another source and its raw code appears nowhere in the pane:  AssertionError: expected 'FUTURE_TRANSPORT' to be 'Another source' // Object.is equality\n    at /home/elias/.cache/am/6jyb3g6d/tmp/test-intent-before-sOfLnJ/modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts:258:54\n    at file:///home/elias/.cache/am/6jyb3g6d/tmp/test-intent-bef"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts#every backend transport and WORKER_INDEXER has source words in the rendered pane",
+        "classification": "assertion",
+        "detail": "Activity details name sources in words every backend transport and WORKER_INDEXER has source words in the rendered pane:  AssertionError: URL_BAR: expected 'URL_BAR' to be 'You, from the address bar' // Object.is equality\n    at /home/elias/.cache/am/6jyb3g6d/tmp/test-intent-before-sOfLnJ/modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts:285:67\n    at file:///home/elias/.cache/am/6jyb3g6d/tmp/test"
+      }
+    ]
+  },
+  "digest": "sha256:adfd4a6ee460d03605d9a7e8fd18133840e37cb9aec7d1ffa0e0e1c1d725c7c8"
+}

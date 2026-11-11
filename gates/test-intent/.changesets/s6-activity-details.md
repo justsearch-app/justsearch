@@ -439,6 +439,31 @@ Repair after verification v1 (three defects): Escape with the keyboard on the pa
         "modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts#System in the second pane: Escape on the page closes Activity's details only when that pane is the window in use"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Activity details render Background indexing for an indexing record and burst; an unknown transport renders Another source with its raw code nowhere in the pane; every TransportTag enum value plus WORKER_INDEXER renders the specified source words.",
+      "repaired": true,
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "Bring the aspects of the UI between the main windows up to date and remove bad practices and code implemented without an overarching design.",
+          "choice": "Orchestrator decision, 2026-11-11: the Activity details pane never shows a raw backend source code. Map WORKER_INDEXER to Background indexing, URL_BAR to You, from the address bar, URL_DEEPLINK to A link from another app, PALETTE to You, from the command palette, RAIL to You, in the app, and PLUGIN_EMITTED to A plugin. Keep existing labels and missing-transport rules; unknown codes read Another source. Groups use these words under their existing shared/several rule.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-activity-details-sources.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts#an indexing record names Background indexing as its source",
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts#an indexing burst names Background indexing as its shared source",
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts#an unknown transport reads Another source and its raw code appears nowhere in the pane",
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts#every backend transport and WORKER_INDEXER has source words in the rendered pane"
+      ]
     }
   ]
 }

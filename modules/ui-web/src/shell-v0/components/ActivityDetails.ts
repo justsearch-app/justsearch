@@ -71,6 +71,12 @@ interface JournalPreview {
 }
 
 const SOURCE_WORDS: Record<string, string> = {
+  WORKER_INDEXER: 'Background indexing',
+  URL_BAR: 'You, from the address bar',
+  URL_DEEPLINK: 'A link from another app',
+  PALETTE: 'You, from the command palette',
+  RAIL: 'You, in the app',
+  PLUGIN_EMITTED: 'A plugin',
   BUTTON: 'You, in the app',
   KEYBOARD: 'You, from the keyboard',
   COMMAND_PALETTE: 'You, from the command palette',
@@ -108,7 +114,7 @@ function count(n: number, noun: string): string {
 /** Where a record came from, in words: its recorded transport, this window's journal, or not recorded. */
 function sourceWords(row: FeedRow): string {
   const transport = transportOf(row);
-  return transport ? (SOURCE_WORDS[transport] ?? transport) : row.journal ? 'This window' : 'Not recorded';
+  return transport ? (SOURCE_WORDS[transport] ?? 'Another source') : row.journal ? 'This window' : 'Not recorded';
 }
 
 /** A group's source: the one its members share, else each of theirs, in the order the members are listed. */

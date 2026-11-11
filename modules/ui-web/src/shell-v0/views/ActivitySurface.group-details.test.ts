@@ -159,6 +159,14 @@ const fact = (el: ActivitySurface, id: string): string => text(details(el)?.quer
 const members = (el: ActivitySurface): string[] =>
   [...(details(el)?.querySelectorAll('[data-testid="activity-details-member"]') ?? [])].map((m) => text(m));
 
+/** Select the only individual record in the feed. */
+async function selectRecord(el: ActivitySurface): Promise<void> {
+  feedRoot(el).querySelector<HTMLElement>('[data-quick="indexing"]')!.click();
+  await settle(el);
+  feedRoot(el).querySelector<HTMLElement>('.entry')!.click();
+  await settle(el);
+}
+
 /** Show the Indexing records and select the one burst they collapse into. */
 async function selectBurst(el: ActivitySurface): Promise<Element> {
   feedRoot(el).querySelector<HTMLElement>('[data-quick="indexing"]')!.click();
@@ -228,6 +236,57 @@ describe('D4 — a scan rollup\'s details list the per-document records of that 
 });
 
 // ---------------------------------------------------------------- how long, and from where
+
+describe('Activity details name sources in words', () => {
+  it('an indexing record names Background indexing as its source', async () => {
+    const el = await mount([index(1, 'DONE', { transport: 'WORKER_INDEXER' })]);
+    await selectRecord(el);
+    expect(fact(el, 'activity-details-source')).toBe('Background indexing');
+  });
+
+  it('an indexing burst names Background indexing as its shared source', async () => {
+    const el = await mount([index(1, 'DONE', { transport: 'WORKER_INDEXER' }),
+      index(2, 'DONE', { transport: 'WORKER_INDEXER' })]);
+    await selectBurst(el);
+    expect(fact(el, 'activity-details-source')).toBe('Background indexing');
+  });
+
+  it('an unknown transport reads Another source and its raw code appears nowhere in the pane', async () => {
+    const transport = 'FUTURE_TRANSPORT';
+    const el = await mount([index(1, 'DONE', { transport })]);
+    await selectRecord(el);
+    expect.soft(fact(el, 'activity-details-source')).toBe('Another source');
+    expect.soft(text(details(el))).not.toContain(transport);
+  });
+
+  it('every backend transport and WORKER_INDEXER has source words in the rendered pane', async () => {
+    // All enum values from modules/app-agent-api/src/main/java/io/justsearch/agent/api/registry/TransportTag.java,
+    // plus the indexing transport from ActionLedgerProjection.projectIndex.
+    const transports = [
+      ['URL_BAR', 'You, from the address bar'],
+      ['URL_DEEPLINK', 'A link from another app'],
+      ['LLM_EMISSION', 'The assistant'],
+      ['PALETTE', 'You, from the command palette'],
+      ['BUTTON', 'You, in the app'],
+      ['RAIL', 'You, in the app'],
+      ['AGENT_LOOP', 'The assistant'],
+      ['WORKFLOW', 'A workflow'],
+      ['MCP', 'An outside assistant (MCP)'],
+      ['PLUGIN_EMITTED', 'A plugin'],
+      ['SCHEDULED', 'A schedule'],
+      ['RULE_ENGINE', 'A rule'],
+      ['SYSTEM_INTERNAL', 'The engine'],
+      ['HTTP_API', 'The local API'],
+      ['WORKER_INDEXER', 'Background indexing'],
+    ] as const;
+    for (const [transport, words] of transports) {
+      const el = await mount([index(1, 'DONE', { transport })]);
+      await selectRecord(el);
+      expect.soft(fact(el, 'activity-details-source'), transport).toBe(words);
+      el.remove();
+    }
+  });
+});
 
 describe('14:10Z decision — a burst says how long it took and where it came from', () => {
   it('members that record neither: the burst says both are not recorded, as an ordinary record does', async () => {
