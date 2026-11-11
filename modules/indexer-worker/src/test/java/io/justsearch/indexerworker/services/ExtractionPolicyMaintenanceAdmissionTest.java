@@ -33,6 +33,11 @@ final class ExtractionPolicyMaintenanceAdmissionTest extends LuceneExecutorTestB
     check("completed", false);
   }
 
+  @Test
+  void olderTerminalExtractionFailureIsReadmitted() throws Exception {
+    check("extraction-terminal", false);
+  }
+
   @ParameterizedTest
   @ValueSource(strings = {"terminal", "future-retry"})
   void staleExtractionDoesNotResetProtectedFailureState(String state) throws Exception {
@@ -91,20 +96,28 @@ final class ExtractionPolicyMaintenanceAdmissionTest extends LuceneExecutorTestB
       Map<String, String> saved;
       try (var queue = new SqliteJobQueue(db)) {
         queue.open();
+        queue.useDeclaredCollectionRoots(() -> List.of(
+            new io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding(root, null)));
         assertEquals(1, queue.enqueueEntries(List.of(JobQueue.EnqueueEntry.stat(file).withinRoot(root))));
         if (state.equals("completed")) queue.markDone(file);
+        else if (state.equals("extraction-terminal")) queue.markFailed(file,
+            IngestionOutcome.of(IngestionOutcomeClass.PARSER_FAILED, "PARSER_FAILED", IngestionRetryPolicy.NONE),
+            new JobQueue.IngestionLedgerEntry(null, null, Files.size(file), Files.getLastModifiedTime(file).toMillis(),
+                "FILE", "FAILED", "tika-default-v7", "fixture"));
         else queue.markFailed(file, IngestionOutcome.of(IngestionOutcomeClass.IO_FAILED, "fixture.io",
             state.equals("terminal") ? IngestionRetryPolicy.NONE : IngestionRetryPolicy.RETRY_WITH_BACKOFF));
         saved = queue.watcherReconciliationRow(id);
       }
       try (var queue = new SqliteJobQueue(db)) {
         queue.open();
+        queue.useDeclaredCollectionRoots(() -> List.of(
+            new io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding(root, null)));
         var sync = new SyncDirectoryOps(runtime.readPathOps(), null, null, queue, IndexingPacing.unthrottled());
         sync.setDocumentFieldOps(runtime.documentFieldOps());
         var result = sync.execute(root.toString(), false, null, () -> false, null,
             SyncDirectoryOps.AdmissionMode.MAINTENANCE);
         assertEquals("", result.getError());
-        if (state.equals("completed")) {
+        if (state.equals("completed") || state.equals("extraction-terminal")) {
           assertEquals(1, result.getFilesAdded(), "routine reconciliation must re-admit an unchanged completed older extraction");
           var jobs = queue.pollPending(2);
           assertEquals(1, jobs.size());

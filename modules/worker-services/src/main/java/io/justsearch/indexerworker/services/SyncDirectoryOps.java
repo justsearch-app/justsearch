@@ -105,7 +105,9 @@ final class SyncDirectoryOps {
       return new DocumentFieldOps.ReuseCandidate(PathNormalizer.normalizeKey(entry.getKey()),
           stamp.modifiedAtMs(), stamp.sizeBytes(), stamp.sourceSha256(), extractionPolicyId);
     }).toList();
-    return documentFieldOps.isUnmodified(candidates, cancelled);
+    var reusable = new HashSet<>(documentFieldOps.isUnmodified(candidates, cancelled));
+    if (jobQueue != null) reusable.removeAll(jobQueue.extractionPolicyRetryPaths(reusable, extractionPolicyId));
+    return reusable;
   }
 
   private void addIncompleteFamilies(Map<Path, IndexedFileStamp> pending,
@@ -1277,6 +1279,7 @@ final class SyncDirectoryOps {
               return recoveryAdmission.applyAsInt(() -> jobQueue.enqueueUpgradeRecoveryEntries(admitted, collection));
             }
             if (admissionMode == AdmissionMode.MAINTENANCE) {
+              jobQueue.useExtractionPolicy(extractionPolicyId);
               return admitWhileCurrent(cancelled, () -> jobQueue.enqueueMaintenanceScanEntries(admitted, collection, null));
             }
             return admitWhileCurrent(cancelled, () -> admitted.isEmpty() ? 0 : collection == null

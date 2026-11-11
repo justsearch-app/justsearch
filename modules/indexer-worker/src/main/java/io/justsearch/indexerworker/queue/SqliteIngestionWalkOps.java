@@ -335,13 +335,15 @@ final class SqliteIngestionWalkOps {
     String priorKey = null;
     Long epoch = null;
     String plannedHash = null;
-    try (var query = connection.prepareStatement("SELECT scan_id, walk_seen_epoch, planned_source_sha256 FROM jobs WHERE path = ?")) {
+    String extractionPolicy = null;
+    try (var query = connection.prepareStatement("SELECT scan_id, walk_seen_epoch, planned_source_sha256, extraction_policy_id FROM jobs WHERE path = ?")) {
       query.setString(1, path);
       try (var row = query.executeQuery()) {
         if (row.next()) {
           priorKey = row.getString(1);
           long value = row.getLong(2); epoch = row.wasNull() ? null : value;
           plannedHash = row.getString(3);
+          extractionPolicy = row.getString(4);
         }
       }
     }
@@ -360,8 +362,16 @@ final class SqliteIngestionWalkOps {
       priorKey = null;
     }
     String selected = requestedKey != null ? requestedKey : priorKey;
-    if (selected != null && find(connection, selected).isPresent()) {
-      throw new SQLException("Recorded membership requires explicit enumeration admission");
+    if (selected != null) {
+      var recorded = find(connection, selected);
+      if (recorded.isPresent()) {
+        // A post-rebuild policy attempt keeps the admitting scan as attribution, with no
+        // membership in its immutable, sealed enumeration.
+        if (epoch == null && extractionPolicy != null && Objects.equals(selected, priorKey)
+            && recorded.orElseThrow().capturedPlan() && recorded.orElseThrow().sealedAt() != null)
+          return new Membership(selected, null, null);
+        throw new SQLException("Recorded membership requires explicit enumeration admission");
+      }
     }
     return new Membership(selected, null, null);
   }

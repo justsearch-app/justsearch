@@ -1,0 +1,182 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-10T23:15:24.438Z",
+  "revision": "d45201e7ff37be7772c29113880351e0b1105001",
+  "tree": "6edda458dafca9d695455df18bbf67125f4640be",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.SyncDirectoryOpsChangedStampTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 10783
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SyncDirectoryOpsChangedStampTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SyncDirectoryOpsChangedStampTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2e3de753942efd7cda83ea62a2f51c90dbf7ade6d63f8d3098d3da53b628429d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "candidateDiscoveryIncludesDamagedIndexedFamily(String, boolean) [1] missing, false",
+          "status": "passed"
+        },
+        {
+          "name": "candidateDiscoveryIncludesDamagedIndexedFamily(String, boolean) [2] missing, true",
+          "status": "passed"
+        },
+        {
+          "name": "candidateDiscoveryIncludesDamagedIndexedFamily(String, boolean) [3] duplicate, false",
+          "status": "passed"
+        },
+        {
+          "name": "candidateDiscoveryIncludesDamagedIndexedFamily(String, boolean) [4] duplicate, true",
+          "status": "passed"
+        },
+        {
+          "name": "candidateDiscoveryIncludesDamagedIndexedFamily(String, boolean) [5] revision, false",
+          "status": "passed"
+        },
+        {
+          "name": "candidateDiscoveryIncludesDamagedIndexedFamily(String, boolean) [6] revision, true",
+          "status": "passed"
+        },
+        {
+          "name": "censusCapsStillAllowPeriodicRecoveryOfAdditionsAndEdits(String) [1] paths",
+          "status": "passed"
+        },
+        {
+          "name": "censusCapsStillAllowPeriodicRecoveryOfAdditionsAndEdits(String) [2] characters",
+          "status": "passed"
+        },
+        {
+          "name": "[1] false",
+          "status": "passed"
+        },
+        {
+          "name": "[2] true",
+          "status": "passed"
+        },
+        {
+          "name": "completeIndexedFamilyStaysSuppressedUnlessForced(String) [1] DEFAULT",
+          "status": "passed"
+        },
+        {
+          "name": "completeIndexedFamilyStaysSuppressedUnlessForced(String) [2] MAINTENANCE",
+          "status": "passed"
+        },
+        {
+          "name": "completeIndexedFamilyStaysSuppressedUnlessForced(String) [3] CANDIDATE",
+          "status": "passed"
+        },
+        {
+          "name": "failedLaterCensusPageWithholdsVerificationAndStillWalksDisk()",
+          "status": "passed"
+        },
+        {
+          "name": "unchangedThousandFileSyncMeasuresIndexReadBudget(String) [1] DEFAULT",
+          "status": "passed"
+        },
+        {
+          "name": "unchangedThousandFileSyncMeasuresIndexReadBudget(String) [2] MAINTENANCE",
+          "status": "passed"
+        },
+        {
+          "name": "unchangedThousandFileSyncMeasuresIndexReadBudget(String) [3] CANDIDATE",
+          "status": "passed"
+        },
+        {
+          "name": "[1] size",
+          "status": "passed"
+        },
+        {
+          "name": "[2] mtime",
+          "status": "passed"
+        },
+        {
+          "name": "[3] missing-size",
+          "status": "passed"
+        },
+        {
+          "name": "ordinarySyncReadmitsDamagedIndexedFamily(String, boolean, AdmissionMode) [1] missing, false, DEFAULT",
+          "status": "passed"
+        },
+        {
+          "name": "ordinarySyncReadmitsDamagedIndexedFamily(String, boolean, AdmissionMode) [2] missing, false, MAINTENANCE",
+          "status": "passed"
+        },
+        {
+          "name": "ordinarySyncReadmitsDamagedIndexedFamily(String, boolean, AdmissionMode) [3] missing, true, DEFAULT",
+          "status": "passed"
+        },
+        {
+          "name": "ordinarySyncReadmitsDamagedIndexedFamily(String, boolean, AdmissionMode) [4] missing, true, MAINTENANCE",
+          "status": "passed"
+        },
+        {
+          "name": "ordinarySyncReadmitsDamagedIndexedFamily(String, boolean, AdmissionMode) [5] duplicate, false, DEFAULT",
+          "status": "passed"
+        },
+        {
+          "name": "ordinarySyncReadmitsDamagedIndexedFamily(String, boolean, AdmissionMode) [6] duplicate, false, MAINTENANCE",
+          "status": "passed"
+        },
+        {
+          "name": "ordinarySyncReadmitsDamagedIndexedFamily(String, boolean, AdmissionMode) [7] duplicate, true, DEFAULT",
+          "status": "passed"
+        },
+        {
+          "name": "ordinarySyncReadmitsDamagedIndexedFamily(String, boolean, AdmissionMode) [8] duplicate, true, MAINTENANCE",
+          "status": "passed"
+        },
+        {
+          "name": "ordinarySyncReadmitsDamagedIndexedFamily(String, boolean, AdmissionMode) [9] revision, false, DEFAULT",
+          "status": "passed"
+        },
+        {
+          "name": "ordinarySyncReadmitsDamagedIndexedFamily(String, boolean, AdmissionMode) [10] revision, false, MAINTENANCE",
+          "status": "passed"
+        },
+        {
+          "name": "ordinarySyncReadmitsDamagedIndexedFamily(String, boolean, AdmissionMode) [11] revision, true, DEFAULT",
+          "status": "passed"
+        },
+        {
+          "name": "ordinarySyncReadmitsDamagedIndexedFamily(String, boolean, AdmissionMode) [12] revision, true, MAINTENANCE",
+          "status": "passed"
+        },
+        {
+          "name": "[1] size",
+          "status": "passed"
+        },
+        {
+          "name": "[2] mtime",
+          "status": "passed"
+        },
+        {
+          "name": "[3] missing-size",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:2ab1c85b7f3c227dd049d11105d631e7da84f4fe467b98601626bc3a1fec3237"
+}

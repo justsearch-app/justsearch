@@ -37,6 +37,7 @@ package io.justsearch.indexerworker.queue;
  *   <li>V26: Durable force intent and rediscovery source identity</li>
  *   <li>V27: Durable source declaration and approval evidence</li>
  *   <li>V28: Versioned import approval bindings and predecessor origins</li>
+ *   <li>V29: Job-bound extraction attempt policy, independent of ledger retention</li>
  * </ul>
  */
 public final class SqliteSchema {
@@ -49,7 +50,7 @@ public final class SqliteSchema {
    * Target schema version. The migrate() method will upgrade the database
    * to this version using the migration ladder.
    */
-  public static final int TARGET_VERSION = 28;
+  public static final int TARGET_VERSION = 29;
 
   static final String CREATE_SOURCE_ORIGIN = """
       CREATE TABLE IF NOT EXISTS source_origin (
@@ -89,6 +90,7 @@ public final class SqliteSchema {
         walk_seen_epoch=excluded.walk_seen_epoch, planned_source_sha256=excluded.planned_source_sha256,
         force_reindex=MAX(excluded.force_reindex, jobs.force_reindex),
         admitted_source_sha256=excluded.admitted_source_sha256,
+        extraction_policy_id=excluded.extraction_policy_id,
         ingestion_root=excluded.ingestion_root, error_message=NULL, retry_after=NULL, first_failed_at=NULL,
         content_hash=NULL, last_outcome_class=NULL, last_reason_code=NULL, last_retry_policy=NULL,
         last_diagnostic_summary=NULL, last_outcome_at=NULL

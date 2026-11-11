@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import io.justsearch.app.observability.operations.SqliteOperationStore;
 import io.justsearch.indexerworker.queue.SqliteJobQueue;
+import io.justsearch.indexerworker.queue.SqliteSchema;
 import java.lang.reflect.Proxy;
 import java.nio.file.Path;
 import java.sql.DriverManager;
@@ -37,14 +38,14 @@ final class ImportStoreMixedUpgradeTest {
       assertEquals(27, version(jobs)); assertEquals(7, version(operations));
     } else {
       try (var queue = new SqliteJobQueue(jobs)) { queue.open(); }
-      assertEquals(28, version(jobs), "the queue migration must commit independently");
+      assertEquals(SqliteSchema.TARGET_VERSION, version(jobs), "the queue migration must commit independently");
       var failure = assertThrows(java.lang.reflect.InvocationTargetException.class, () -> failingOperations(operations));
       assertInstanceOf(java.io.IOException.class, failure.getCause());
-      assertEquals(6, version(operations)); assertEquals(28, version(jobs));
+      assertEquals(6, version(operations)); assertEquals(SqliteSchema.TARGET_VERSION, version(jobs));
     }
     try (var store = new SqliteOperationStore(operations); var queue = new SqliteJobQueue(jobs)) {
       queue.open(); assertTrue(store.recovery().isEmpty()); assertEquals(1, queue.queueDepth());
-      assertEquals(7, version(operations)); assertEquals(28, version(jobs));
+      assertEquals(7, version(operations)); assertEquals(SqliteSchema.TARGET_VERSION, version(jobs));
     }
   }
 
