@@ -406,7 +406,7 @@ export class HealthSurface extends JfElement {
       max-width: 100%;
     }
     .health-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(8rem, 100%), 1fr)); gap: .75rem; margin: 0; }
-    .health-metrics dd { margin: .25rem 0 0; font-size: 1.2rem; overflow-wrap: anywhere; }
+    .health-metrics dd { margin: .25rem 0 0; font-size: var(--font-size-lg); overflow-wrap: anywhere; }
     .health-rows { margin: 0; }
     .health-row { display: grid; grid-template-columns: minmax(8rem, 1fr) minmax(0, 3fr); gap: 1rem; padding: .8rem 0; border-bottom: 1px solid var(--border-subtle); }
     .health-row dt { font-weight: 600; }

@@ -16,7 +16,7 @@ and one case in `HealthSurface.quiet.test.ts`; their entries below point at `gat
 (fail-before on 394467ba1d). The second verifier repair (SH3 per-source ages in Diagnostics, SH14 a section intent kept across
 engine loss and recovery) adds the isolated `HealthSurface.freshness-lockdown.test.ts`; its entry points at
 `gates/test-intent/evidence/s6-health-verifier-2.json` (fail-before on bf1b6b5688). Its third case, recovery without a pending
-intent still moving focus to the main content, is a preservation check and passes on bf1b6b5688 too. The frame check's 900x700 and 1280x720 layout reference was recorded on 394467ba1d. Independent acceptance is pending.
+intent still moving focus to the main content, is a preservation check and passes on bf1b6b5688 too. The third verifier repair (one AI-engine lifecycle derivation) gives `computeAiEngineVerdict` two observed per-model facts, the failed models and where the active models run, which Health's AI models and Graphics card rows now read instead of the raw feature list; its two new cases in `aiVerdict.test.ts` point at `gates/test-intent/evidence/s6-health-verifier-3.json` (fail-before on fc724ede88). Its third case, no fact when nothing failed and nothing is active, is a preservation check and passes on fc724ede88 too. The frame check's 900x700 and 1280x720 layout reference was recorded on 394467ba1d and re-recorded on fc724ede88's working tree after the Diagnostics metric values moved from a literal 1.2rem to the `--font-size-lg` token (1.125rem): the metric boxes are 2px shorter and the boxes below them move by at most 2px; nothing else in the reference changed. Independent acceptance is pending.
 
 What each Obsolete entry removes:
 
@@ -453,6 +453,35 @@ What each Obsolete entry removes:
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/HealthSurface.freshness-lockdown.test.ts#status stops for 45 s while inference answers: the status age reads its own receipt, contact and inference stay just now",
         "modules/ui-web/src/shell-v0/views/HealthSurface.freshness-lockdown.test.ts#AI Brain's engine-history intent during the loss: after recovery Diagnostics is open and focus stays on the AI Engine section"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/aiVerdict.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "The one AI-engine derivation names each failed model with the backend's reason beside the lifecycle kind (an online engine with a failed reranker still says which model failed), and says where the active models run: every active model on CPU without a fallback, or at least one active model that fell back from the GPU. Health's AI models and Graphics card rows read these facts instead of the raw feature list.",
+      "repaired": true,
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "design decisions of the frame build, within the canonical design",
+          "choice": "Orchestrator decision on the ai-verdict-derivation gate (option a): extend the one shared derivation, not the gate's allowed list. computeAiEngineVerdict gains additive observed facts (failed models with their reason; the placement of the active models) without changing any existing kind or consumer, and Health's AI models and Graphics card rows consume them instead of reading runtimeStatus.onnxFeatures.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design.",
+          "location": "task t-20261103-shell user turn requesting S6 piece 8, quoted in the piece 8 builder brief, 2026-11-11",
+          "label": "owner request for this piece"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-health-verifier-3.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/state/aiVerdict.test.ts#names each failed model with its reason, even while the engine is online",
+        "modules/ui-web/src/shell-v0/state/aiVerdict.test.ts#says where the active models run: CPU-only, or a GPU fallback"
       ]
     }
   ]

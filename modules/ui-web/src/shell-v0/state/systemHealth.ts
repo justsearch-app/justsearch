@@ -87,16 +87,15 @@ export function projectSystemHealth(input: HealthInput): HealthRow[] {
     : ai?.status?.worker?.core?.indexHealthy !== true ? 'Index health unconfirmed' : '';
   const model = !headCurrent || !workerCurrent || !runtimeCurrent || !installCurrent ? 'AI-model status unconfirmed'
     : ai?.chatFailureReason ? presentAiEngineVerdict(ai.aiEngine).body
-    : ai?.runtimeStatus?.onnxFeatures?.some(feature => feature.status === 'failed') ? 'An AI model failed — open AI Brain'
+    : ai?.aiEngine.failedModels?.length ? 'An AI model failed — open AI Brain'
     : ai?.chatDisabledBySpec && !['installing', 'install_failed', 'starting', 'paused'].includes(ai.aiEngine.kind) ? ''
     : ai?.aiEngine.kind === 'online' ? '' : ai ? presentAiEngineVerdict(ai.aiEngine).headline : 'AI-model status unconfirmed';
-  const features = ai?.runtimeStatus?.onnxFeatures?.filter(feature => feature.modelActive) ?? [];
+  const placement = ai?.aiEngine.activeModelPlacement;
   const active = ai?.runtimeStatus?.active;
-  const cpuLoaded = (features.length > 0 || !!active?.modelPath)
-    && features.every(feature => feature.executionProvider === 'cpu' && !feature.gpuFallback)
+  const cpuLoaded = (!!placement || !!active?.modelPath) && (placement?.cpuOnly ?? true)
     && (!active?.modelPath || active.gpuLayers === 0);
   const gpuFailed = ai?.status?.gpu?.available === true && ai.status.gpu.cudaFunctional === false
-    || features.some(feature => feature.gpuFallback);
+    || placement?.gpuFallback === true;
   const gpu = !headCurrent ? 'Graphics-card status unconfirmed' : gpuFailed ? 'Graphics acceleration needs attention'
     : ai?.status?.gpu?.available === true && ai.status.gpu.cudaFunctional === true ? ''
     : runtimeCurrent && cpuLoaded ? '' : 'Graphics-card status unconfirmed';
@@ -112,7 +111,7 @@ export function projectSystemHealth(input: HealthInput): HealthRow[] {
     ? [progress.activity.summary, progress.activity.detail].filter(Boolean).join(' — ') : '';
   const work = operationWords || input.activeTasks.join('; ') || (runs.length ? 'Background agent working' : '') || indexingWork
     || (!workerCurrent || !runtimeCurrent || !installCurrent || !presenceCurrent ? 'Background-work status unconfirmed'
-      : ai?.installStatus?.state === 'running' ? 'Installing AI models'
+      : ai?.aiEngine.kind === 'installing' ? 'Installing AI models'
       : ai?.runtimeStatus?.activation?.state === 'running' ? 'Starting AI models' : '');
   return [row('engine', 'Engine', engine, 'core.logs-surface', 'Open Logs'),
     row('folders', 'Folders', folderWords, 'core.library-surface', 'Open Library'),
