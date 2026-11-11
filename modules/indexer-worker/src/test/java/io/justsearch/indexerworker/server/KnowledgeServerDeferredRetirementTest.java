@@ -149,9 +149,8 @@ final class KnowledgeServerDeferredRetirementTest {
         attachQuery.setAccessible(true);
         attachQuery.invoke(aView, aQuery);
 
-        invoke(server, "closeRetiredSource",
-            new Class<?>[] {aView.getClass(), EncoderSet.class, QueryRoleSet.class},
-            aView, bOwner, bQuery);
+        // B's sets exist but no view references A's; sharing is judged at cleanup time.
+        invoke(server, "closeRetiredSource", new Class<?>[] {aView.getClass()}, aView);
 
         var order = org.mockito.Mockito.inOrder(aServices, aSurface, aWrapper,
             aQueryHandle, aQueryWrapper);

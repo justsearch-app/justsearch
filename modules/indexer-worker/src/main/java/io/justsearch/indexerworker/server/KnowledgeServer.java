@@ -248,6 +248,17 @@ public final class KnowledgeServer implements Closeable {
   private final Object servingViewMonitor = new Object();
   private ServingView servingView;
   private final List<ServingView> retiredServingViews = new ArrayList<>();
+  /**
+   * The deferred model start holds its wiring leases: from their capture until its finally block
+   * has released them. Promotion is not attempted meanwhile. Guarded by servingViewMonitor.
+   */
+  private boolean modelWiringInFlight;
+  /**
+   * Advanced on every exit of the deferred model start, after its failure cleanup and lease
+   * release. A promotion that prepared its successor under another value prepares it again.
+   * Guarded by servingViewMonitor.
+   */
+  private long modelWiringGeneration;
 
   private static final class ServingView {
     private final WorkerAppServices services;
@@ -5291,7 +5302,14 @@ public final class KnowledgeServer implements Closeable {
       modelReadyLatch.countDown();
       EncoderSet initial = initialEncoderSet;
       if (initial != null) initial.releaseModelReady();
-      for (ServingLease lease : modelWiringLeases) lease.close();
+      try {
+        for (ServingLease lease : modelWiringLeases) lease.close();
+      } finally {
+        synchronized (servingViewMonitor) {
+          modelWiringInFlight = false;
+          modelWiringGeneration++;
+        }
+      }
       if (recordedCandidate != null && gapWaitProducerPaused) {
         if (appServices instanceof DefaultWorkerAppServices producer) {
           producer.parkCandidateProducerModels();
@@ -5441,8 +5459,42 @@ public final class KnowledgeServer implements Closeable {
     }
   }
 
-  /** The serving set's query encoders, held by an encoder-set lease while a pass uses them. */
+  /**
+   * As {@link #heldQueryPrewarmSelection}. A serving view whose model set refuses acquisition while
+   * it retires is reported apart from warm and from no models: one warning, and health (M2).
+   */
   private QueryEncoderPrewarm.Selection queryPrewarmSelection() {
+    QueryEncoderPrewarm.Selection selected;
+    try {
+      selected = heldQueryPrewarmSelection();
+    } catch (IllegalStateException refused) {
+      String reason;
+      synchronized (servingViewMonitor) {
+        ServingView view = servingView;
+        reason = view != null && (view.encoderSet != null && view.encoderSet.isRetiring()
+            || view.queryRoleSet != null && view.queryRoleSet.isRetiring())
+            ? refused.getMessage() : null;
+      }
+      if (reason != null) reportServingModelsUnavailable(reason);
+      throw refused;
+    }
+    reportServingModelsUnavailable(null);
+    return selected;
+  }
+
+  /** Records whether the serving view's model sets can be acquired; a change to refused warns once. */
+  private void reportServingModelsUnavailable(String reason) {
+    WorkerAppServices services = appServices;
+    if (services == null) return;
+    String previous = services.healthService().queryReadiness().servingModelsUnavailable(reason);
+    if (reason != null && previous == null) {
+      log.warn("Serving model set cannot be acquired: {}; query encoders are not warm and the"
+          + " serving generation has no usable models", reason);
+    }
+  }
+
+  /** The serving set's query encoders, held by an encoder-set lease while a pass uses them. */
+  private QueryEncoderPrewarm.Selection heldQueryPrewarmSelection() {
     QueryEncoderPrewarm.Selection index;
     QueryRoleSet queryOwner;
     QueryRoleSet.Lease hold;
@@ -8391,6 +8443,7 @@ public final class KnowledgeServer implements Closeable {
               leases.add(new ServingLease(retired));
             }
           }
+          modelWiringInFlight = true;
         }
       } finally {
         publicationLock.readLock().unlock();
@@ -9164,6 +9217,11 @@ public final class KnowledgeServer implements Closeable {
     return KnowledgeServerMigrationOps.parseMigrationState(raw);
   }
 
+  /** How long a switch waits for an in-flight deferred model start: the switching deadline. */
+  long modelWiringBoundMillis() {
+    return MIGRATION_SWITCHING_MAX_DURATION_MS;
+  }
+
   private synchronized void startMigrationCutoverMonitorBestEffort() {
     if (migrationCutoverThread != null && migrationCutoverThread.isAlive()) {
       return;
@@ -9225,6 +9283,14 @@ public final class KnowledgeServer implements Closeable {
 
                            @Override public void transition(String point) throws IOException, InterruptedException {
                              migrationTransition(point);
+                           }
+
+                           @Override public boolean modelWiringInFlight() {
+                             synchronized (servingViewMonitor) { return modelWiringInFlight; }
+                           }
+
+                           @Override public long modelWiringMaxDurationMs() {
+                             return modelWiringBoundMillis();
                            }
 
                            @Override public boolean refuseUncertifiable() {
@@ -10258,6 +10324,13 @@ public final class KnowledgeServer implements Closeable {
           || buildingIndexPath == null) {
         throw new IOException("Green no longer has a live source and writer");
       }
+      // The in-flight model start attaches its sets to whatever view serves when it ends.
+      // Not yet: retried under the switching deadline, as the conditions below.
+      final long wiringAtPreparation;
+      synchronized (servingViewMonitor) {
+        if (modelWiringInFlight) return null;
+        wiringAtPreparation = modelWiringGeneration;
+      }
       incumbent = current;
       successor = prepareServingSuccessor(green);
       // A post-pointer failure must leave the transferred Green producer reachable by close().
@@ -10440,6 +10513,11 @@ public final class KnowledgeServer implements Closeable {
                           || old.searchRuntime != searchLifecycle || old.ingestRuntime != green) {
                         throw new IOException("Serving source changed before pointer commitment");
                       }
+                      // A model start may have run while preparation left the runtime lock: the
+                      // successor copied A's wiring before it. Not yet; the next attempt prepares again.
+                      if (modelWiringInFlight || modelWiringGeneration != wiringAtPreparation) {
+                        return null;
+                      }
                     }
                     ServingView next = new ServingView(preparedServices, green, green, successorPath);
                     EncoderSet successorEncoder = recordedCandidate == null ? old.encoderSet
@@ -10449,7 +10527,7 @@ public final class KnowledgeServer implements Closeable {
                     if (successorEncoder != null) next.attachEncoderSet(successorEncoder);
                     if (successorQuery != null) next.attachQueryRoleSet(successorQuery);
                     preparedView.set(next);
-                    Runnable cleanup = () -> closeRetiredSource(old, successorEncoder, successorQuery);
+                    Runnable cleanup = () -> closeRetiredSource(old);
                     IndexGenerationManager.State promoted;
                     try {
                       if (projection != null) projection.admitBeforePointer();
@@ -10640,8 +10718,9 @@ public final class KnowledgeServer implements Closeable {
     }
   }
 
-  private void closeRetiredSource(ServingView old, EncoderSet successorEncoder,
-      QueryRoleSet successorQuery) {
+  private void closeRetiredSource(ServingView old) {
+    boolean closeIndex;
+    boolean closeQuery;
     synchronized (servingViewMonitor) {
       LuceneRuntime retiringRuntime = old.searchRuntime;
       if (retiringRuntime != null && retiringRuntime != ingestLifecycle
@@ -10653,16 +10732,28 @@ public final class KnowledgeServer implements Closeable {
       }
       // Once physical ownership clears, a service close refusal belongs to the maintenance reaper.
       old.runtimeRetirementDependency = null;
+      // A set another view still references stays open; this view releases only its own holds.
+      EncoderSet index = old.encoderSet;
+      QueryRoleSet query = old.queryRoleSet;
+      closeIndex = index != null && !referencedByAnotherView(old, view -> view.encoderSet == index);
+      closeQuery = query != null && !referencedByAnotherView(old, view -> view.queryRoleSet == query);
     }
     try {
       old.services.close();
       old.releaseModelSets();
-      if (old.encoderSet != null && old.encoderSet != successorEncoder) old.encoderSet.close();
-      if (old.queryRoleSet != null && old.queryRoleSet != successorQuery) old.queryRoleSet.close();
+      if (closeIndex) old.encoderSet.close();
+      if (closeQuery) old.queryRoleSet.close();
       if (old.searchRuntime != null && old.searchRuntime != ingestLifecycle) old.searchRuntime.close();
     } catch (IOException failure) {
       throw new IllegalStateException("Retired generation still owns resources", failure);
     }
+  }
+
+  /** Under servingViewMonitor: whether the serving view or another retained view matches. */
+  private boolean referencedByAnotherView(ServingView old,
+      java.util.function.Predicate<ServingView> references) {
+    if (servingView != null && servingView != old && references.test(servingView)) return true;
+    return retiredServingViews.stream().anyMatch(view -> view != old && references.test(view));
   }
 
   private static boolean referencesRuntime(ServingView view, LuceneRuntime runtime) {

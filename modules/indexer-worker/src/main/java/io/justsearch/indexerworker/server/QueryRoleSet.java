@@ -66,6 +66,13 @@ final class QueryRoleSet implements AutoCloseable {
     }
   }
 
+  /** True after retirement starts; monotonic, as {@link EncoderSet#isRetiring()}. */
+  boolean isRetiring() {
+    synchronized (monitor) {
+      return retiring;
+    }
+  }
+
   Lease acquire() {
     synchronized (monitor) {
       if (retiring) throw new IllegalStateException("Query role set is retiring");
