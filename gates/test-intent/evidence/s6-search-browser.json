@@ -1,0 +1,107 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
+  },
+  "createdAt": "2026-11-11T03:21:04.406Z",
+  "revision": "af8fe12233aaa2d29595629d0fded7b644690953",
+  "tree": "f51b7a3fa16ad41efbe8bd01c2400ca3752f1059",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/7l43yq9l/tmp/test-intent-vitest-64-1794366864561.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 202689
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SR2 SR5 control-word search arrives visibly and clears on interaction at 600x400, 200 percent text, reduced motion and light forced colours",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f80b98adb88773b53ffed7fe20c3125d273197805243e0c73f3532bb40adee14",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SR2 SR5 control-word search arrives visibly and clears on interaction at 600x400, 200 percent text, reduced motion and light forced colours",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SR2 SR5 control-word search arrives visibly and clears on interaction at 600x400, 200 percent text, reduced motion and dark forced colours",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f80b98adb88773b53ffed7fe20c3125d273197805243e0c73f3532bb40adee14",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SR2 SR5 control-word search arrives visibly and clears on interaction at 600x400, 200 percent text, reduced motion and dark forced colours",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SR2 search opens containing folds before focusing the row, and pointer interaction removes the mark",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f80b98adb88773b53ffed7fe20c3125d273197805243e0c73f3532bb40adee14",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SR2 search opens containing folds before focusing the row, and pointer interaction removes the mark",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "af8fe12233",
+    "revision": "af8fe12233aaa2d29595629d0fded7b644690953",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/7l43yq9l/tmp/test-intent-vitest-64-1794367070380.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 193510,
+        "output": "JSON report written to /home/elias/.cache/am/7l43yq9l/tmp/test-intent-vitest-64-1794367070380.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SR2 SR5 control-word search arrives visibly and clears on interaction at 600x400, 200 percent text, reduced motion and light forced colours",
+        "classification": "assertion",
+        "detail": "SR2 SR5 control-word search arrives visibly and clears on interaction at 600x400, 200 percent text, reduced motion and light forced colours:  AssertionError: expected +0 to be 1 // Object.is equality\n    at /home/elias/.cache/am/7l43yq9l/tmp/test-intent-before-Rn2mLf/modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts:942:32\n    at file:///home/elias/.cache/am/7l43yq9l/tmp/test-intent-before-Rn2mLf/modules/ui-web/node_modules/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SR2 SR5 control-word search arrives visibly and clears on interaction at 600x400, 200 percent text, reduced motion and dark forced colours",
+        "classification": "assertion",
+        "detail": "SR2 SR5 control-word search arrives visibly and clears on interaction at 600x400, 200 percent text, reduced motion and dark forced colours:  AssertionError: expected +0 to be 1 // Object.is equality\n    at /home/elias/.cache/am/7l43yq9l/tmp/test-intent-before-Rn2mLf/modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts:942:32\n    at file:///home/elias/.cache/am/7l43yq9l/tmp/test-intent-before-Rn2mLf/modules/ui-web/node_modules/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts#SR2 search opens containing folds before focusing the row, and pointer interaction removes the mark",
+        "classification": "assertion",
+        "detail": "SR2 search opens containing folds before focusing the row, and pointer interaction removes the mark:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/7l43yq9l/tmp/test-intent-before-Rn2mLf/modules/ui-web/src/shell-v0/chrome/Shell.frame-lockdown.test.ts:980:138\n    at file:///home/elias/.cache/am/7l43yq9l/tmp/test-intent-before-Rn2mLf/modules/ui-web/node_m"
+      }
+    ]
+  },
+  "digest": "sha256:85176f1792133d8ad8b39ccf129ddfef5fb5c3d13eaf4db8361d0dc6c8ecdcf8"
+}

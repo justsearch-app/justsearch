@@ -17,6 +17,7 @@
  *
  * This is the move that was previously buried in Settings; Settings now stays focused on settings.
  */
+import { SETTINGS_CONTROL_LABELS } from './settingsControlLabels.js';
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
 import { DraftPersistence } from '../controllers/draftPersistence.js';
@@ -382,10 +383,10 @@ export class PresentationEditorSurface extends JfElement {
         <h2>${icon({ name: 'palette', size: 14 })} Presentation editor</h2>
         <div class="toolbar">
           <jf-control data-testid="editor-fork" .onActivate=${() => this.forkActive()}
-            >Fork active surface</jf-control
+            >${SETTINGS_CONTROL_LABELS['core.presentation-editor-surface'].fork}</jf-control
           >
           <jf-control data-testid="editor-apply" .onActivate=${() => this.applyDraft()}
-            >Certify &amp; apply</jf-control
+            >${SETTINGS_CONTROL_LABELS['core.presentation-editor-surface'].apply}</jf-control
           >
         </div>
         <div class="split">
@@ -404,7 +405,7 @@ export class PresentationEditorSurface extends JfElement {
               )}
             </div>
             <textarea
-              aria-label="Presentation declaration JSON"
+              aria-label=${SETTINGS_CONTROL_LABELS['core.presentation-editor-surface'].json}
               .value=${this.declText}
               @input=${(e: Event) => {
                 this.declText = (e.target as HTMLTextAreaElement).value;
@@ -413,8 +414,8 @@ export class PresentationEditorSurface extends JfElement {
             <div class="prompt-row">
               <input
                 type="text"
-                aria-label="Describe a surface"
-                placeholder="Describe a look… e.g. warm dark theme"
+                aria-label=${SETTINGS_CONTROL_LABELS['core.presentation-editor-surface'].describe}
+                placeholder=${SETTINGS_CONTROL_LABELS['core.presentation-editor-surface'].prompt}
                 .value=${this.promptText}
                 ?disabled=${this.busy}
                 @input=${(e: Event) => {
@@ -423,10 +424,10 @@ export class PresentationEditorSurface extends JfElement {
               />
               <jf-control
                 data-testid="editor-generate"
-                label="Generate from prompt"
+                label=${SETTINGS_CONTROL_LABELS['core.presentation-editor-surface'].generate}
                 ?disabled=${this.busy || this.promptText.trim() === ''}
                 .onActivate=${() => void this.generate()}
-                >${this.busy ? 'Generating…' : 'Generate (on-device)'}</jf-control
+                >${this.busy ? 'Generating…' : SETTINGS_CONTROL_LABELS['core.presentation-editor-surface'].generateLocal}</jf-control
               >
             </div>
             ${this.renderLinter()}

@@ -425,6 +425,8 @@ export class SettingsNav extends JfElement {
     while (!settled) {
       settled = await this.updateComplete;
     }
+    // Row arrivals own focus. Restoring category focus here would steal it after the host lands.
+    if (result.section) return;
     const activeRow = this.shadowRoot?.querySelector<HTMLButtonElement>('.category-row.active');
     if (activeRow) {
       activeRow.focus();
@@ -438,7 +440,7 @@ export class SettingsNav extends JfElement {
     isRoving: boolean,
     onFocus: () => void,
   ): TemplateResult {
-    const label = result.section ? entryLabel(result.section) : categoryLabel(result.category);
+    const label = result.label;
     return html`
       <li>
         <button

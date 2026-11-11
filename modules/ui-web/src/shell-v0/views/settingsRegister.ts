@@ -2,10 +2,18 @@
 /** The one Settings register: navigation, content, search and incoming coordinates. */
 import { getShowDeveloperTools } from '../state/developerToolsState.js';
 import { getViewerAudience } from '../state/viewerAudienceState.js';
+import { getUserConfig } from '../state/userConfigState.js';
 import { getOperation } from '../../api/registry/OperationCatalogClient.js';
 import { operationVisibleTo } from '../aggregate-substrate/queryPrimitives.js';
 import { localizeResourceKey } from '../../i18n/resourceCatalog.js';
+import { Resolve, type ControlElement, type UISchemaElement } from '@jsonforms/core';
+import { activeBodyFor } from '../state/presentationRuntime.js';
+import { SETTINGS_INTERFACE_REGION } from '../themes/builtinPresentations.js';
+import { listLayouts } from '../layout/LayoutManifest.js';
+import { listAvailableThemes } from '../themes/themesCatalog.js';
+import { SETTINGS_CONTROL_LABELS } from './settingsControlLabels.js';
 import { present } from '../display/present.js';
+
 
 type SettingsCategoryKind = 'native' | 'member';
 
@@ -13,6 +21,10 @@ type SettingsCategoryKind = 'native' | 'member';
 export interface SettingsSectionEntry {
   /** Stable key: the scroll-spy anchor id AND the `SettingsSurface` section-renderer dispatch key. */
   readonly key: string;
+  /** Searchable words from the same labels the controls render. */
+  readonly controlWords?: () => readonly string[];
+  readonly keywords?: readonly string[];
+  readonly destination?: 'indexing-hours' | 'reading-memory';
   /** `registry-surface` catalog key resolving this sub-anchor's label. */
   readonly labelKey: string;
   /** Catalog member rendered alongside native entries in this section. */
@@ -102,53 +114,57 @@ export const SETTINGS_REGISTER: readonly SettingsGroup[] = [
   {
     id: 'general', labelKey: 'settings.category.general', categories: [{
       id: 'general', kind: 'native', labelKey: 'settings.category.general', sections: [
-        { key: 'desktop', labelKey: 'settings.section.desktop', requires: NATIVE },
-        { key: 'notifications', labelKey: 'settings.section.notifications' },
-        { key: 'app-updates', labelKey: 'settings.section.app-updates', requires: NATIVE },
-        { key: 'keyboard', labelKey: 'settings.section.keyboard' },
-        { key: 'indexing', labelKey: 'settings.section.indexing' },
-        { key: 'context-window', labelKey: 'settings.section.context-window' },
+        { key: 'desktop', keywords: ['shortcut', 'hotkey'], controlWords: () => Object.values(SETTINGS_CONTROL_LABELS['desktop']), labelKey: 'settings.section.desktop', requires: NATIVE },
+        { key: 'notifications', controlWords: () => Object.values(SETTINGS_CONTROL_LABELS['notifications']), labelKey: 'settings.section.notifications' },
+        { key: 'app-updates', controlWords: () => Object.values(SETTINGS_CONTROL_LABELS['app-updates']), labelKey: 'settings.section.app-updates', requires: NATIVE },
+        { key: 'keyboard', controlWords: () => Object.values(SETTINGS_CONTROL_LABELS['keyboard']), labelKey: 'settings.section.keyboard' },
+        { key: 'indexing', destination: 'indexing-hours', keywords: ['battery', 'schedule'], controlWords: () => Object.values(SETTINGS_CONTROL_LABELS['indexing']), labelKey: 'settings.section.indexing' },
+        { key: 'context-window', destination: 'reading-memory', keywords: ['context window', 'tokens'], controlWords: () => Object.values(SETTINGS_CONTROL_LABELS['context-window']), labelKey: 'settings.section.context-window' },
       ],
     }],
   },
   {
     id: 'appearance', labelKey: 'settings.category.appearance', categories: [{
       id: 'appearance', kind: 'native', labelKey: 'settings.category.appearance', sections: [
-        { key: 'interface', labelKey: 'settings.section.interface' },
-        { key: 'theme', labelKey: 'settings.section.theme' },
-        { key: 'core.presentation-gallery-surface', labelKey: 'registry-surface.core.presentation-gallery-surface.label', memberSurfaceId: 'core.presentation-gallery-surface' },
-        { key: 'core.presentation-editor-surface', labelKey: 'registry-surface.core.presentation-editor-surface.label', memberSurfaceId: 'core.presentation-editor-surface' },
-        { key: 'token-editor', labelKey: 'settings.section.token-editor' },
-        { key: 'layout', labelKey: 'settings.section.layout' },
-        { key: 'rail', labelKey: 'settings.section.rail' },
-        { key: 'chat-width', labelKey: 'settings.section.chat-width' },
-        { key: 'accessibility', labelKey: 'settings.section.accessibility' },
+        { key: 'interface', controlWords: interfaceControlWords, labelKey: 'settings.section.interface' },
+        { key: 'theme', controlWords: () => [...Object.values(SETTINGS_CONTROL_LABELS['theme']), ...listAvailableThemes().map(t => t.displayName)], labelKey: 'settings.section.theme' },
+        { key: 'core.presentation-gallery-surface', controlWords: () => Object.values(SETTINGS_CONTROL_LABELS['core.presentation-gallery-surface']), labelKey: 'registry-surface.core.presentation-gallery-surface.label', memberSurfaceId: 'core.presentation-gallery-surface' },
+        { key: 'core.presentation-editor-surface', controlWords: () => Object.values(SETTINGS_CONTROL_LABELS['core.presentation-editor-surface']), labelKey: 'registry-surface.core.presentation-editor-surface.label', memberSurfaceId: 'core.presentation-editor-surface' },
+        { key: 'token-editor', controlWords: () => Object.values(SETTINGS_CONTROL_LABELS['token-editor']), labelKey: 'settings.section.token-editor' },
+        { key: 'layout', controlWords: () => listLayouts().map(l => l.displayName), labelKey: 'settings.section.layout' },
+        { key: 'rail', controlWords: () => {
+          const config = getUserConfig();
+          return [SETTINGS_CONTROL_LABELS.rail.up, SETTINGS_CONTROL_LABELS.rail.down,
+            ...(config.surfaceVisibility !== undefined || config.surfaceOrder !== undefined ? [SETTINGS_CONTROL_LABELS.rail.reset] : [])];
+        }, labelKey: 'settings.section.rail' },
+        { key: 'chat-width', controlWords: () => Object.values(SETTINGS_CONTROL_LABELS['chat-width']), labelKey: 'settings.section.chat-width' },
+        { key: 'accessibility', controlWords: () => Object.values(SETTINGS_CONTROL_LABELS['accessibility']), labelKey: 'settings.section.accessibility' },
       ],
     }],
   },
   {
     id: 'security-privacy', labelKey: 'settings.category.security-privacy', categories: [{
       id: 'security-privacy', kind: 'native', labelKey: 'settings.category.security-privacy', sections: [
-        { key: 'core.security-surface', labelKey: 'registry-surface.core.security-surface.label', memberSurfaceId: 'core.security-surface' },
-        { key: 'durable-grants', labelKey: 'settings.section.durable-grants' },
-        { key: 'plugin-permissions', labelKey: 'settings.section.plugin-permissions', audience: operatorOrAbove },
-        { key: 'agent-autonomy', labelKey: 'settings.section.agent-autonomy' },
-        { key: 'feedback-capture', labelKey: 'settings.section.feedback-capture' },
+        { key: 'core.security-surface', controlWords: () => Object.values(SETTINGS_CONTROL_LABELS['core.security-surface']), labelKey: 'registry-surface.core.security-surface.label', memberSurfaceId: 'core.security-surface' },
+        { key: 'durable-grants', controlWords: () => Object.values(SETTINGS_CONTROL_LABELS['durable-grants']), labelKey: 'settings.section.durable-grants' },
+        { key: 'plugin-permissions', controlWords: () => Object.values(SETTINGS_CONTROL_LABELS['plugin-permissions']), labelKey: 'settings.section.plugin-permissions', audience: operatorOrAbove },
+        { key: 'agent-autonomy', controlWords: () => Object.values(SETTINGS_CONTROL_LABELS['agent-autonomy']), labelKey: 'settings.section.agent-autonomy' },
+        { key: 'feedback-capture', controlWords: () => Object.values(SETTINGS_CONTROL_LABELS['feedback-capture']), labelKey: 'settings.section.feedback-capture' },
       ],
     }],
   },
   {
     id: 'data-reset', labelKey: 'settings.category.data-reset', danger: true, categories: [{
       id: 'data-reset', kind: 'native', labelKey: 'settings.category.data-reset', sections: [
-        { key: 'reset-settings', labelKey: 'settings.section.reset-settings', audience: resetSettingsOffered, savedSettings: true },
-        { key: 'data', labelKey: 'settings.section.data' },
+        { key: 'reset-settings', controlWords: () => [present({ kind: 'operation', id: 'core.reset-settings' }).label], labelKey: 'settings.section.reset-settings', audience: resetSettingsOffered, savedSettings: true },
+        { key: 'data', controlWords: () => Object.values(SETTINGS_CONTROL_LABELS['data']), labelKey: 'settings.section.data' },
       ],
     }],
   },
   {
     id: 'plugins', labelKey: 'settings.category.plugins', categories: [{
       id: 'plugins', kind: 'native', labelKey: 'settings.category.plugins', sections: [
-        { key: 'plugins', labelKey: 'settings.section.plugins' },
+        { key: 'plugins', controlWords: () => Object.values(SETTINGS_CONTROL_LABELS['plugins']), labelKey: 'settings.section.plugins' },
         { key: 'delivered-contributions', labelKey: 'settings.section.delivered-contributions' },
       ],
     }],
@@ -157,8 +173,8 @@ export const SETTINGS_REGISTER: readonly SettingsGroup[] = [
     id: 'advanced', labelKey: 'settings.category.advanced', categories: [{
       id: 'advanced', kind: 'native', labelKey: 'settings.category.advanced', sections: [
         { key: 'show-developer-tools', labelKey: 'settings.section.show-developer-tools' },
-        { key: 'view-tier', labelKey: 'settings.section.view-tier', developerTool: true },
-        { key: 'workspace-profiles', labelKey: 'settings.section.workspace-profiles', audience: developerOnly, developerTool: true },
+        { key: 'view-tier', controlWords: () => Object.values(SETTINGS_CONTROL_LABELS['view-tier']), labelKey: 'settings.section.view-tier', developerTool: true },
+        { key: 'workspace-profiles', controlWords: () => Object.values(SETTINGS_CONTROL_LABELS['workspace-profiles']), labelKey: 'settings.section.workspace-profiles', audience: developerOnly, developerTool: true },
       ],
     }],
   },
@@ -166,7 +182,7 @@ export const SETTINGS_REGISTER: readonly SettingsGroup[] = [
     id: 'about', labelKey: 'settings.category.about', categories: [{
       id: 'about', kind: 'native', labelKey: 'settings.category.about', sections: [
         { key: 'version', labelKey: 'settings.section.version' },
-        { key: 'update-information', labelKey: 'settings.section.update-information' },
+        { key: 'update-information', controlWords: () => Object.values(SETTINGS_CONTROL_LABELS['update-information']), labelKey: 'settings.section.update-information' },
       ],
     }],
   },
@@ -241,51 +257,83 @@ export function categoryLabel(category: SettingsCategory): string {
   return category.labelKey ? localizeResourceKey(category.labelKey) : category.id;
 }
 
-/** One `searchRegister()` hit: a category match (`section` absent) or a sub-anchor match. */
+/** The declaration renderer and search resolve the same control schemas and enum labels. */
+function interfaceControlWords(): readonly string[] {
+  const body = activeBodyFor(SETTINGS_INTERFACE_REGION);
+  if (!body) return Object.values(SETTINGS_CONTROL_LABELS.interface);
+  const words: string[] = [];
+  const visit = (element: UISchemaElement): void => {
+    if (element.type === 'Control') {
+      const control = element as ControlElement;
+      const schema = Resolve.schema(body.schema, control.scope, body.schema);
+      if (typeof control.label === 'string') words.push(control.label);
+      if (schema?.title) words.push(schema.title);
+      const labels = (schema as { 'x-enum-labels'?: Record<string, string> } | undefined)?.['x-enum-labels'];
+      for (const value of schema?.enum ?? []) words.push(labels?.[String(value)] ?? String(value));
+    }
+    for (const child of (element as UISchemaElement & { elements?: UISchemaElement[] }).elements ?? []) visit(child);
+  };
+  visit(body.uischema);
+  return words;
+}
+
+/** A destination a future palette provider can use without mounting Settings. */
+export type SettingsSearchDestination =
+  | { readonly kind: 'settings'; readonly section: string; readonly anchor?: string }
+  | { readonly kind: 'indexing-hours' | 'reading-memory' };
+
+/** One search hit: a category or an individual registered row and its final destination. */
 export interface SettingsSearchResult {
   readonly group: SettingsGroup;
   readonly category: SettingsCategory;
   readonly section?: SettingsSectionEntry;
+  readonly destination: SettingsSearchDestination;
+  readonly label: string;
 }
 
-function includesCaseInsensitive(label: string, needle: string): boolean {
-  return label.toLowerCase().includes(needle);
+/** Unicode words, including numbers: punctuation separates words, never matches inside one. */
+function words(text: string): string[] {
+  return text.toLocaleLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
 }
 
-/**
- * 855 §6 Phase 4 / §9.3 item 4 — the register's second projection: a query over the SAME resolved
- * labels the nav renders (native via `localizeResourceKey`, member categories via `present()`),
- * plus group labels. Case-insensitive substring match only (~30 entries total — no fuzzy scoring,
- * 855 Phase-4 brief). An empty/whitespace-only query returns no results (the caller's signal to
- * show the grouped nav instead of a flat result list).
- */
+/** All query words must match; a row label outranks keywords, then its controls. Register order
+ * breaks ties. Category/group matches retain their existing category-only destinations. */
 export function searchRegister(
   query: string,
   register: readonly SettingsGroup[] = SETTINGS_REGISTER,
   viewer?: SettingsViewer,
 ): SettingsSearchResult[] {
-  const needle = query.trim().toLowerCase();
-  if (!needle) return [];
-  const results: SettingsSearchResult[] = [];
-  const seen = new Set<string>();
-  const push = (result: SettingsSearchResult): void => {
-    const dedupeKey = `${result.category.id}::${result.section?.key ?? ''}`;
-    if (seen.has(dedupeKey)) return;
-    seen.add(dedupeKey);
-    results.push(result);
+  const queryWords = words(query);
+  if (!queryWords.length) return [];
+  const results: Array<{ result: SettingsSearchResult; rank: number }> = [];
+  const rank = (labels: readonly string[], keywords: readonly string[] = [], controls: readonly string[] = []): number | undefined => {
+    const sources = [labels, keywords, controls].map(source => source.flatMap(words));
+    const hits = queryWords.map(word => sources.findIndex(source => source.some(candidate => candidate.startsWith(word))));
+    return hits.includes(-1) ? undefined : Math.max(...hits);
+  };
+  const push = (group: SettingsGroup, category: SettingsCategory, score: number | undefined, section?: SettingsSectionEntry): void => {
+    if (score === undefined) return;
+    const destination: SettingsSearchDestination = section?.destination
+      ? { kind: section.destination }
+      : { kind: 'settings', section: category.id, ...(section ? { anchor: section.key } : {}) };
+    const label = section?.destination === 'indexing-hours'
+      ? 'Library › When to index'
+      : section?.destination === 'reading-memory'
+        ? 'AI Brain › Reading memory'
+        : section ? entryLabel(section) : categoryLabel(category);
+    results.push({ rank: score, result: { group, category, section, destination, label } });
   };
   for (const group of register) {
-    const groupHit = includesCaseInsensitive(localizeResourceKey(group.labelKey), needle);
     for (const category of group.categories) {
-      if (groupHit || includesCaseInsensitive(categoryLabel(category), needle)) {
-        push({ group, category });
-      }
+      push(group, category, rank([localizeResourceKey(group.labelKey), categoryLabel(category)]));
       for (const section of shownEntries(category, viewer)) {
-        if (includesCaseInsensitive(entryLabel(section), needle)) {
-          push({ group, category, section });
-        }
+        push(group, category, rank([entryLabel(section)], section.keywords, [
+          ...(section.controlWords?.() ?? []),
+          ...(section.destination === 'indexing-hours' ? ['Library', 'When to index']
+            : section.destination === 'reading-memory' ? ['AI Brain', 'Reading memory'] : []),
+        ]), section);
       }
     }
   }
-  return results;
+  return results.sort((a, b) => a.rank - b.rank).map(({ result }) => result);
 }

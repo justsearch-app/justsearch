@@ -11,6 +11,7 @@
  *
  * Side-effect registers `<jf-security-surface>` for the chrome dispatcher.
  */
+import { SETTINGS_CONTROL_LABELS } from './settingsControlLabels.js';
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
 import { surfaceScrollLayoutStyles } from '../primitives/surfaceLayout.js';
@@ -396,7 +397,7 @@ export class SecuritySurface extends JfElement {
             >Download kit</jf-button
           >
           <jf-button .onActivate=${() => this.acknowledgeRecoverySaved()}
-            >I've saved my recovery key</jf-button
+            >${SETTINGS_CONTROL_LABELS['core.security-surface'].saved}</jf-button
           >
         </div>
       `;
@@ -409,12 +410,12 @@ export class SecuritySurface extends JfElement {
           search index is unaffected (it rebuilds from your files). You'll save a recovery key next.
         </p>
         <div style=${row}>
-          <input id="enc-pass" type="password" placeholder="Choose a passphrase" style=${inputStyle} />
+          <input id="enc-pass" type="password" placeholder=${SETTINGS_CONTROL_LABELS['core.security-surface'].choose} style=${inputStyle} />
           <jf-button
             ?disabled=${this.encBusy}
             .onActivate=${() => void this.setupEncryption(this.encInputValue())}
           >
-            ${this.encBusy ? 'Setting up…' : 'Encrypt chat history'}
+            ${this.encBusy ? 'Setting up…' : SETTINGS_CONTROL_LABELS['core.security-surface'].encrypt}
           </jf-button>
         </div>
       `;
@@ -424,12 +425,12 @@ export class SecuritySurface extends JfElement {
           Your new chat messages are <strong>locked</strong>. Enter your passphrase to unlock them.
         </p>
         <div style=${row}>
-          <input id="enc-pass" type="password" placeholder="Passphrase" style=${inputStyle} />
+          <input id="enc-pass" type="password" placeholder=${SETTINGS_CONTROL_LABELS['core.security-surface'].passphrase} style=${inputStyle} />
           <jf-button
             ?disabled=${this.encBusy}
             .onActivate=${() => void this.unlockEncryption(this.encInputValue())}
           >
-            ${this.encBusy ? 'Unlocking…' : 'Unlock'}
+            ${this.encBusy ? 'Unlocking…' : SETTINGS_CONTROL_LABELS['core.security-surface'].unlock}
           </jf-button>
         </div>
       `;
@@ -445,7 +446,7 @@ export class SecuritySurface extends JfElement {
             >
               <strong>You haven't confirmed saving your recovery key.</strong> It can't be shown again
               — if you lose it and forget your passphrase, your chat history is gone. Use
-              <em>Regenerate recovery key</em> to get a fresh one to save.
+              <em>${SETTINGS_CONTROL_LABELS['core.security-surface'].regenerate}</em> to get a fresh one to save.
             </div>`
           : nothing}
         <div style=${row}>
@@ -453,29 +454,29 @@ export class SecuritySurface extends JfElement {
             variant="secondary"
             ?disabled=${this.encBusy}
             .onActivate=${() => void this.regenerateRecovery()}
-            >Regenerate recovery key</jf-button
+            >${SETTINGS_CONTROL_LABELS['core.security-surface'].regenerate}</jf-button
           >
           <jf-button
             variant="secondary"
             ?disabled=${this.encBusy}
             .onActivate=${() => (this.encShowChangePass = !this.encShowChangePass)}
-            >Change passphrase</jf-button
+            >${SETTINGS_CONTROL_LABELS['core.security-surface'].changePassphrase}</jf-button
           >
           <jf-button
             variant="secondary"
             ?disabled=${this.encBusy}
             .onActivate=${() => void this.exportBackup()}
-            >Export encrypted backup</jf-button
+            >${SETTINGS_CONTROL_LABELS['core.security-surface'].export}</jf-button
           >
           <jf-button
             variant="secondary"
             ?disabled=${this.encBusy}
             .onActivate=${() => (this.encShowImport = !this.encShowImport)}
-            >Import backup</jf-button
+            >${SETTINGS_CONTROL_LABELS['core.security-surface'].import}</jf-button
           >
           <jf-button variant="secondary" ?disabled=${this.encBusy} .onActivate=${() =>
             void this.lockEncryption()}>
-            ${icon({ name: 'shield', size: 14 })} Lock now
+            ${icon({ name: 'shield', size: 14 })} ${SETTINGS_CONTROL_LABELS['core.security-surface'].lock}
           </jf-button>
         </div>
         ${this.encShowImport
@@ -489,7 +490,7 @@ export class SecuritySurface extends JfElement {
               <input
                 id="enc-import-pass"
                 type="password"
-                placeholder="Backup's passphrase"
+                placeholder=${SETTINGS_CONTROL_LABELS['core.security-surface'].backupPassphrase}
                 style=${inputStyle}
               />
               <jf-button
@@ -504,7 +505,7 @@ export class SecuritySurface extends JfElement {
                   if (f) void this.importBackup(f, p);
                   else this.encError = 'Choose a backup file to restore.';
                 }}
-                >${this.encBusy ? 'Restoring…' : 'Restore'}</jf-button
+                >${this.encBusy ? 'Restoring…' : SETTINGS_CONTROL_LABELS['core.security-surface'].restore}</jf-button
               >
             </div>`
           : nothing}
@@ -515,7 +516,7 @@ export class SecuritySurface extends JfElement {
           : nothing}
         <div style=${row}>
           <label class="help" for="enc-autolock" style="margin:0"
-            >Auto-lock after inactivity</label
+            >${SETTINGS_CONTROL_LABELS['core.security-surface'].autoLock}</label
           >
           <select
             id="enc-autolock"
@@ -524,16 +525,16 @@ export class SecuritySurface extends JfElement {
             @change=${(e: Event) =>
               this.setAutoLock(Number((e.target as HTMLSelectElement).value))}
           >
-            <option value="0">Off</option>
-            <option value="5">5 minutes</option>
-            <option value="15">15 minutes</option>
-            <option value="30">30 minutes</option>
+            <option value="0">${SETTINGS_CONTROL_LABELS['core.security-surface'].off}</option>
+            <option value="5">${SETTINGS_CONTROL_LABELS['core.security-surface'].five}</option>
+            <option value="15">${SETTINGS_CONTROL_LABELS['core.security-surface'].fifteen}</option>
+            <option value="30">${SETTINGS_CONTROL_LABELS['core.security-surface'].thirty}</option>
           </select>
         </div>
         ${this.encShowChangePass
           ? html`<div style=${row}>
-              <input id="enc-oldpass" type="password" placeholder="Current passphrase" style=${inputStyle} />
-              <input id="enc-newpass" type="password" placeholder="New passphrase" style=${inputStyle} />
+              <input id="enc-oldpass" type="password" placeholder=${SETTINGS_CONTROL_LABELS['core.security-surface'].currentPassphrase} style=${inputStyle} />
+              <input id="enc-newpass" type="password" placeholder=${SETTINGS_CONTROL_LABELS['core.security-surface'].newPassphrase} style=${inputStyle} />
               <jf-button
                 ?disabled=${this.encBusy}
                 .onActivate=${() =>
@@ -543,7 +544,7 @@ export class SecuritySurface extends JfElement {
                     (this.shadowRoot?.querySelector('#enc-newpass') as HTMLInputElement | null)?.value ??
                       '',
                   )}
-                >${this.encBusy ? 'Changing…' : 'Change'}</jf-button
+                >${this.encBusy ? 'Changing…' : SETTINGS_CONTROL_LABELS['core.security-surface'].change}</jf-button
               >
             </div>`
           : nothing}

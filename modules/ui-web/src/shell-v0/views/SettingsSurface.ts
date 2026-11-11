@@ -18,6 +18,7 @@
  * Side-effect registers `<jf-settings-surface>` for the chrome dispatcher.
  */
 
+import { SETTINGS_CONTROL_LABELS } from './settingsControlLabels.js';
 import { html, css, nothing, type TemplateResult, type PropertyValues } from 'lit';
 import { captureSettingsPatch, saveAbsoluteSettings, type SettingsPatch } from '../../api/settingsAttempt.js';
 import { ifDefined } from 'lit/directives/if-defined.js';
@@ -312,6 +313,7 @@ export class SettingsSurface extends JfElement {
   declare activeAnchor: string | null;
   declare private addressAnchor: string | null;
   private arrivalRevision = 0;
+  private clearArrivalHighlight: (() => void) | null = null;
   private operationCatalogUnsub: (() => void) | null = null;
   /** Ends the current arrival's hold on its row (see `holdArrival`). */
   private releaseArrival: (() => void) | null = null;
@@ -654,6 +656,19 @@ export class SettingsSurface extends JfElement {
       color: var(--text-secondary);
       margin-top: 0.125rem;
     }
+    [data-settings-anchor].arrival-highlight {
+      outline: 2px solid var(--focus-ring-color);
+      outline-offset: -2px;
+      background: var(--surface-active);
+    }
+    @media (forced-colors: active) {
+      [data-settings-anchor].arrival-highlight {
+        outline-color: Highlight;
+        background: Canvas;
+        color: CanvasText;
+      }
+    }
+
     /* 855 §17 R1 — the cross-link row's affordance (see renderRelatedSettingsRow). */
     .link-row {
       display: inline-flex;
@@ -1151,6 +1166,7 @@ export class SettingsSurface extends JfElement {
     this.consentUnsub = null;
     this.teardownAnchorObservers();
     this.releaseArrival?.();
+    this.clearArrivalHighlight?.();
   }
 
   protected override willUpdate(): void {
@@ -1578,14 +1594,14 @@ export class SettingsSurface extends JfElement {
     // this.ui.mode snapshot) so this control stays in sync with the topbar Simple/Detailed toggle.
     const mode: 'simple' | 'advanced' = getUiMode();
     const options: OptionButtonGroupOption[] = [
-      { value: 'simple', label: 'Simple', description: 'Standard view', icon: 'list' },
-      { value: 'advanced', label: 'Detailed', description: 'Full controls + diagnostics', icon: 'maximize-2' },
+      { value: 'simple', label: SETTINGS_CONTROL_LABELS['interface'].simple, description: 'Standard view', icon: 'list' },
+      { value: 'advanced', label: SETTINGS_CONTROL_LABELS['interface'].detailed, description: 'Full controls + diagnostics', icon: 'maximize-2' },
     ];
     return html`
       <div class="section">
         <h3>${icon({ name: 'layers', size: 12 })} Interface</h3>
         ${this.renderSettingRow(
-          'Mode',
+          SETTINGS_CONTROL_LABELS['interface'].mode,
           'Detailed mode shows technical detail and unlocks AI runtime configuration, GPU controls ' +
             'and library management tools. Search mode supports quotes, -exclusions, title: and author: in both views.',
           html`
@@ -1618,11 +1634,11 @@ export class SettingsSurface extends JfElement {
     return [
       {
         value: 'system',
-        label: 'System',
+        label: SETTINGS_CONTROL_LABELS['interface'].system,
         swatch: { split: [THEME_VARIANT_DARK, THEME_VARIANT_LIGHT] },
       },
-      { value: 'dark', label: 'Dark', swatch: { fill: THEME_VARIANT_DARK } },
-      { value: 'light', label: 'Light', swatch: { fill: THEME_VARIANT_LIGHT } },
+      { value: 'dark', label: SETTINGS_CONTROL_LABELS['interface'].dark, swatch: { fill: THEME_VARIANT_DARK } },
+      { value: 'light', label: SETTINGS_CONTROL_LABELS['interface'].light, swatch: { fill: THEME_VARIANT_LIGHT } },
     ];
   }
 
@@ -1632,7 +1648,7 @@ export class SettingsSurface extends JfElement {
       <div class="section">
         <h3>${icon({ name: 'palette', size: 12 })} Appearance</h3>
         ${this.renderSettingRow(
-          'Theme variant',
+          SETTINGS_CONTROL_LABELS['interface'].theme,
           'Follows your OS, or pin dark/light.',
           html`
             <jf-option-button-group
@@ -1647,12 +1663,12 @@ export class SettingsSurface extends JfElement {
           { below: true },
         )}
         ${this.renderSettingRow(
-          'Solid surfaces',
+          SETTINGS_CONTROL_LABELS['interface'].solid,
           'Opaque panels, no glass blur',
           html`
             <jf-switch
               .checked=${this.surfaceMode === 'solid'}
-              label="Solid surfaces"
+              label=${SETTINGS_CONTROL_LABELS['interface'].solid}
               @change=${() => this.toggleSurfaceMode()}
             ></jf-switch>
           `,
@@ -1722,9 +1738,9 @@ export class SettingsSurface extends JfElement {
    */
   /** Tempdoc 855 §15.2 — Density's three stops, as the `<jf-discrete-slider>` step vocabulary. */
   private static readonly DENSITY_STEPS: readonly DiscreteSliderStep[] = [
-    { value: 'compact', label: 'Compact' },
-    { value: 'comfortable', label: 'Comfortable' },
-    { value: 'spacious', label: 'Spacious' },
+    { value: 'compact', label: SETTINGS_CONTROL_LABELS['accessibility'].compact },
+    { value: 'comfortable', label: SETTINGS_CONTROL_LABELS['accessibility'].comfortable },
+    { value: 'spacious', label: SETTINGS_CONTROL_LABELS['accessibility'].spacious },
   ];
 
   private renderAccessibility(): TemplateResult {
@@ -1735,13 +1751,13 @@ export class SettingsSurface extends JfElement {
       <div class="section" data-testid="settings-accessibility">
         <h3>${icon({ name: 'layers', size: 12 })} Accessibility</h3>
         ${this.renderSettingRow(
-          'Density',
+          SETTINGS_CONTROL_LABELS['accessibility'].density,
           nothing,
           html`
             <jf-discrete-slider
               .steps=${SettingsSurface.DENSITY_STEPS}
               .value=${density}
-              label="Density"
+              label=${SETTINGS_CONTROL_LABELS['accessibility'].density}
               ?disabled=${this.readOnly}
               @change=${(e: CustomEvent<{ value: string }>) =>
                 applyAdaptationProfile({
@@ -1752,13 +1768,13 @@ export class SettingsSurface extends JfElement {
           { below: true },
         )}
         ${this.renderSettingRow(
-          'High contrast',
+          SETTINGS_CONTROL_LABELS['accessibility'].contrast,
           'Guaranteed AA — better visibility',
           html`
             <jf-switch
               .checked=${this.ui.highContrast === true}
               ?disabled=${this.readOnly}
-              label="High contrast"
+              label=${SETTINGS_CONTROL_LABELS['accessibility'].contrast}
               @change=${(e: CustomEvent<{ checked: boolean }>) =>
                 void this.patch({ highContrast: e.detail.checked })}
             ></jf-switch>
@@ -1766,13 +1782,13 @@ export class SettingsSurface extends JfElement {
           { testid: 'settings-high-contrast' },
         )}
         ${this.renderSettingRow(
-          'Reduce motion',
+          SETTINGS_CONTROL_LABELS['accessibility'].motion,
           'Turns off non-essential animations',
           html`
             <jf-switch
               .checked=${motion === 'reduced'}
               ?disabled=${this.readOnly}
-              label="Reduce motion"
+              label=${SETTINGS_CONTROL_LABELS['accessibility'].motion}
               @change=${(e: CustomEvent<{ checked: boolean }>) =>
                 applyAdaptationProfile({ motion: e.detail.checked ? 'reduced' : 'full' })}
             ></jf-switch>
@@ -1791,23 +1807,23 @@ export class SettingsSurface extends JfElement {
    * `renderRelatedSettingsRow`'s comment above).
    */
   private static readonly CHAT_WIDTH_STEPS: readonly DiscreteSliderStep[] = [
-    { value: 'narrow', label: 'Narrow' },
-    { value: 'default', label: 'Default' },
-    { value: 'wide', label: 'Wide' },
+    { value: 'narrow', label: SETTINGS_CONTROL_LABELS['chat-width'].narrow },
+    { value: 'default', label: SETTINGS_CONTROL_LABELS['chat-width'].default },
+    { value: 'wide', label: SETTINGS_CONTROL_LABELS['chat-width'].wide },
   ];
 
   private renderChatWidth(): TemplateResult {
     return html`
       <div class="section" data-testid="settings-chat-width">
-        <h3>${icon({ name: 'arrow-right-left', size: 12 })} Chat width</h3>
+        <h3>${icon({ name: 'arrow-right-left', size: 12 })} ${SETTINGS_CONTROL_LABELS['chat-width'].label}</h3>
         ${this.renderSettingRow(
-          'Chat width',
+          SETTINGS_CONTROL_LABELS['chat-width'].label,
           'How wide the chat column may grow. Narrower lines are easier to read; wider fits more on screen.',
           html`
             <jf-discrete-slider
               .steps=${SettingsSurface.CHAT_WIDTH_STEPS}
               .value=${this.chatWidth}
-              label="Chat width"
+              label=${SETTINGS_CONTROL_LABELS['chat-width'].label}
               ?disabled=${this.readOnly}
               @change=${(e: CustomEvent<{ value: string }>) =>
                 this.selectChatWidth(e.detail.value as ChatWidth)}
@@ -1830,9 +1846,9 @@ export class SettingsSurface extends JfElement {
   }
 
   private static readonly NOTIFICATIONS_OPTIONS: OptionButtonGroupOption[] = [
-    { value: 'off', label: 'Off' },
-    { value: 'on', label: 'On' },
-    { value: 'sound', label: 'On with sound' },
+    { value: 'off', label: SETTINGS_CONTROL_LABELS['notifications'].off },
+    { value: 'on', label: SETTINGS_CONTROL_LABELS['notifications'].on },
+    { value: 'sound', label: SETTINGS_CONTROL_LABELS['notifications'].sound },
   ];
 
   /** DE5 / ref-13 — the one Notifications choice; the taskbar badge is passive and stays either way. */
@@ -1841,13 +1857,13 @@ export class SettingsSurface extends JfElement {
       <div class="section" data-testid="settings-notifications">
         <h3>${icon({ name: 'monitor', size: 12 })} Notifications</h3>
         ${this.renderSettingRow(
-          'Desktop notifications',
+          SETTINGS_CONTROL_LABELS['notifications'].label,
           'Only while JustSearch is in the background: an agent request is waiting, or long work finished or failed. The taskbar badge always counts what needs you.',
           html`
             <jf-option-button-group
               .options=${SettingsSurface.NOTIFICATIONS_OPTIONS}
               .value=${this.notifications}
-              .groupLabel=${'Desktop notifications'}
+              .groupLabel=${SETTINGS_CONTROL_LABELS['notifications'].label}
               ?enabled=${!this.readOnly}
               @change=${(e: CustomEvent<{ value: string }>) =>
                 this.selectNotifications(e.detail.value as NotificationsChoice)}
@@ -1939,15 +1955,15 @@ export class SettingsSurface extends JfElement {
   private renderViewerAudience(): TemplateResult {
     const audience: Audience = this.viewerAudience;
     const options: OptionButtonGroupOption[] = [
-      { value: 'USER', label: 'User', description: 'Default tier', icon: 'monitor' },
-      { value: 'OPERATOR', label: 'Operator', description: 'Shows admin ops', icon: 'shield' },
-      { value: 'DEVELOPER', label: 'Developer', description: 'Show everything', icon: 'database' },
+      { value: 'USER', label: SETTINGS_CONTROL_LABELS['view-tier'].user, description: 'Default tier', icon: 'monitor' },
+      { value: 'OPERATOR', label: SETTINGS_CONTROL_LABELS['view-tier'].operator, description: 'Shows admin ops', icon: 'shield' },
+      { value: 'DEVELOPER', label: SETTINGS_CONTROL_LABELS['view-tier'].developer, description: 'Show everything', icon: 'database' },
     ];
     return html`
       <div class="section" id="settings-view-tier" tabindex="-1" role="group" aria-label="View tier settings">
         <h3>${icon({ name: 'shield', size: 12 })} View tier</h3>
         ${this.renderSettingRow(
-          'View tier preference',
+          SETTINGS_CONTROL_LABELS['view-tier'].label,
           'Controls which operations and surfaces the UI renders for you. This is a view ' +
             'preference — it does not restrict backend access. Leave on "User" for the default ' +
             'experience; switch up for admin or debug workflows.',
@@ -1972,7 +1988,7 @@ export class SettingsSurface extends JfElement {
       <div class="section">
         <h3>${icon({ name: 'keyboard', size: 12 })} Keyboard</h3>
         ${this.renderSettingRow(
-          'Enter action',
+          SETTINGS_CONTROL_LABELS['keyboard'].action,
           'Default action when pressing Enter on a result',
           html`
             <!-- Tempdoc 543 §20.7 B1 — schema-driven form via the
@@ -1988,7 +2004,7 @@ export class SettingsSurface extends JfElement {
                     // 855 P1 (a11y fix riding along) — `title` is the schema-standard field
                     // EnterActionPickerRenderer reads for the control's accessible name (axe
                     // `select-name`, baselined in governance/ui-a11y-baseline.v1.json until this fix).
-                    title: 'Enter action',
+                    title: SETTINGS_CONTROL_LABELS['keyboard'].action,
                     enum: ['open', 'reveal', 'preview'],
                     'x-ui-renderer': 'enter-action-select',
                   },
@@ -2021,14 +2037,14 @@ export class SettingsSurface extends JfElement {
   private renderFeedbackCapture(): TemplateResult | typeof nothing {
     if (this.feedbackCaptureEnabled === null) return nothing;
     return this.renderSettingRow(
-      'Improve ranking from your activity (local only)',
+      SETTINGS_CONTROL_LABELS['feedback-capture'].label,
       this.feedbackPrivacyNote ||
         'Clicks, opens, and dwell time on results and chat citations are recorded on this ' +
           'machine to improve ranking. Nothing is ever uploaded.',
       html`
         <jf-switch
           .checked=${!!this.feedbackCaptureEnabled}
-          label="Improve ranking from your activity (local only)"
+          label=${SETTINGS_CONTROL_LABELS['feedback-capture'].label}
           @change=${() => void this.toggleFeedbackCapture()}
         ></jf-switch>
       `,
@@ -2040,24 +2056,24 @@ export class SettingsSurface extends JfElement {
       <div class="section">
         <h3>${icon({ name: 'power', size: 12 })} Desktop</h3>
         ${this.autostartLoaded && this.autostart !== null ? this.renderSettingRow(
-          'Launch on startup',
+          SETTINGS_CONTROL_LABELS['desktop'].startup,
           'Start minimized in the system tray',
           html`
             <jf-switch
               .checked=${!!this.autostart}
-              label="Launch on startup"
+              label=${SETTINGS_CONTROL_LABELS['desktop'].startup}
               @change=${() => void this.toggleAutostart()}
             ></jf-switch>
           `,
         ) : nothing}
         <div data-testid="settings-search-shortcut">
           ${this.renderSettingRow(
-            'Global search shortcut',
+            SETTINGS_CONTROL_LABELS['desktop'].shortcut,
             'Alt + Shift + Space',
             html`<jf-switch
               .checked=${this.searchShortcut?.enabled ?? false}
               .disabled=${this.searchShortcutBusy || this.searchShortcut === null}
-              label="Global search shortcut"
+              label=${SETTINGS_CONTROL_LABELS['desktop'].shortcut}
               .description=${[this.searchShortcutError, this.searchShortcut?.reason
                 ? `Shortcut not active. ${this.searchShortcut.reason} Alternatively, run JustSearch with --focus-search.`
                 : 'Alt + Shift + Space. Alternatively, run JustSearch with --focus-search.'].filter(Boolean).join(' ')}
@@ -2180,7 +2196,7 @@ export class SettingsSurface extends JfElement {
               <jf-button
                 variant="ghost"
                 size="icon"
-                label="Save new name"
+                label=${SETTINGS_CONTROL_LABELS['theme'].save}
                 title="Save"
                 .onActivate=${() => this.commitRenameTheme(entry.id)}
               >
@@ -2189,7 +2205,7 @@ export class SettingsSurface extends JfElement {
               <jf-button
                 variant="ghost"
                 size="icon"
-                label="Cancel rename"
+                label=${SETTINGS_CONTROL_LABELS['theme'].cancelRename}
                 title="Cancel"
                 .onActivate=${() => this.cancelRenameTheme()}
               >
@@ -2280,7 +2296,7 @@ export class SettingsSurface extends JfElement {
           class="theme-import-toggle"
           variant="ghost"
           size="sm"
-          label="Import a theme from JSON"
+          label=${SETTINGS_CONTROL_LABELS['theme'].import}
           .onActivate=${() => {
             this.error = null;
             this.themeImporting = true;
@@ -2292,7 +2308,7 @@ export class SettingsSurface extends JfElement {
     }
     return html`
       <div class="theme-import">
-        <label class="help" for="theme-import-json">Paste a theme's exported JSON</label>
+        <label class="help" for="theme-import-json">${SETTINGS_CONTROL_LABELS['theme'].paste}</label>
         <textarea
           id="theme-import-json"
           class="theme-import-json"
@@ -2305,7 +2321,7 @@ export class SettingsSurface extends JfElement {
           <jf-button
             variant="primary"
             size="sm"
-            label="Import the pasted theme"
+            label=${SETTINGS_CONTROL_LABELS['theme'].importPasted}
             ?disabled=${this.themeImportDraft.trim() === ''}
             .onActivate=${() => this.importThemeFromDraft()}
           >
@@ -2314,7 +2330,7 @@ export class SettingsSurface extends JfElement {
           <jf-button
             variant="ghost"
             size="sm"
-            label="Cancel import"
+            label=${SETTINGS_CONTROL_LABELS['theme'].cancelImport}
             .onActivate=${() => {
               this.themeImporting = false;
               this.themeImportDraft = '';
@@ -2338,14 +2354,14 @@ export class SettingsSurface extends JfElement {
       <div class="section">
         <h3>${icon({ name: 'layers', size: 12 })} Token Editor</h3>
         ${this.renderSettingRow(
-          'Custom theme tokens',
+          SETTINGS_CONTROL_LABELS['token-editor'].label,
           'Author colors, seeds, and roles in the dedicated editor.',
           html`
             <jf-button
               variant="secondary"
               .onActivate=${() =>
                 this.host_.navigation.navigate('vendor.token-editor.editor-surface')}
-              >Open Token Editor</jf-button
+              >${SETTINGS_CONTROL_LABELS['token-editor'].open}</jf-button
             >
           `,
         )}
@@ -2388,7 +2404,7 @@ export class SettingsSurface extends JfElement {
               class="rail-arrow"
               variant="ghost"
               size="icon"
-              label="Move up"
+              label=${SETTINGS_CONTROL_LABELS['rail'].up}
               title="Move up"
               ?disabled=${move.idx === 0}
               .onActivate=${() => this.moveRailSurface(move.idx, -1)}
@@ -2399,7 +2415,7 @@ export class SettingsSurface extends JfElement {
               class="rail-arrow"
               variant="ghost"
               size="icon"
-              label="Move down"
+              label=${SETTINGS_CONTROL_LABELS['rail'].down}
               title="Move down"
               ?disabled=${move.idx === move.last}
               .onActivate=${() => this.moveRailSurface(move.idx, 1)}
@@ -2418,12 +2434,12 @@ export class SettingsSurface extends JfElement {
             ? html`
                 <jf-button
                   size="sm"
-                  label="Reset"
+                  label=${SETTINGS_CONTROL_LABELS['rail'].reset}
                   style="margin-left: 0.5rem"
                   title="Show every area and window in the default order"
                   .onActivate=${() => this.host_.layout.clearAllLayoutOverrides()}
                 >
-                  Reset
+                  ${SETTINGS_CONTROL_LABELS['rail'].reset}
                 </jf-button>
               `
             : nothing}
@@ -2512,14 +2528,14 @@ export class SettingsSurface extends JfElement {
           <input
             type="text"
             class="filter-input"
-            placeholder="Plugin URL (e.g., http://localhost:3000/plugin.js)"
+            placeholder=${SETTINGS_CONTROL_LABELS['plugins'].url}
             style="flex: 1; padding: 0.4rem 0.625rem; background: var(--surface-secondary); border: 1px solid var(--border-subtle); border-radius: 0.375rem; color: var(--text-primary); font-size: var(--font-size-sm);"
             @keydown=${(e: KeyboardEvent) => {
               if (e.key === 'Enter') void this.loadPluginFromInput();
             }}
           />
           <jf-button .onActivate=${() => void this.loadPluginFromInput()}>
-            ${icon({ name: 'folder-plus', size: 12 })} Load
+            ${icon({ name: 'folder-plus', size: 12 })} ${SETTINGS_CONTROL_LABELS['plugins'].load}
           </jf-button>
         </div>
       </div>
@@ -2886,7 +2902,7 @@ export class SettingsSurface extends JfElement {
         <div style="margin-top: 0.75rem">
           <jf-button
             variant="danger"
-            label="Delete all local data"
+            label=${SETTINGS_CONTROL_LABELS['data'].delete}
             aria-haspopup="dialog"
             ?disabled=${!tauri || this.deleting}
             title=${tauri
@@ -2895,7 +2911,7 @@ export class SettingsSurface extends JfElement {
             .onActivate=${() => this.deleteMachine?.send('REQUEST')}
           >
             ${icon({ name: 'trash-2', size: 14 })}
-            ${this.deleting ? 'Restarting…' : 'Delete all local data'}
+            ${this.deleting ? 'Restarting…' : SETTINGS_CONTROL_LABELS['data'].delete}
           </jf-button>
           ${this.deleteState === 'confirming' ? this.renderDeleteConfirm() : nothing}
         </div>
@@ -2923,16 +2939,16 @@ export class SettingsSurface extends JfElement {
         <div class="row" style="margin-top: 0.5rem">
           <jf-button
             variant="secondary"
-            label="Check for updates"
+            label=${SETTINGS_CONTROL_LABELS['app-updates'].check}
             ?disabled=${this.updateBusy || repairRequired}
             .onActivate=${() => void this.checkForAppUpdate()}
           >
-            ${this.updateBusy && status?.state === 'checking' ? 'Checkingâ€¦' : 'Check for updates'}
+            ${this.updateBusy && status?.state === 'checking' ? 'Checkingâ€¦' : SETTINGS_CONTROL_LABELS['app-updates'].check}
           </jf-button>
           ${available
             ? html`<jf-button
                 variant="primary"
-                label="Install update"
+                label=${SETTINGS_CONTROL_LABELS['app-updates'].install}
                 ?disabled=${this.updateBusy}
                 .onActivate=${() => void this.installAppUpdate()}
               >
@@ -3086,8 +3102,8 @@ export class SettingsSurface extends JfElement {
       ${status?.availableVersion ? html`<p>Available version: ${status.availableVersion}</p>` : nothing}
       ${status?.error ? html`<p>${status.error}</p>` : nothing}
       ${status?.state === 'repair_required' ? html`<p>Re-run the signed installer for ${status.availableVersion ?? 'the target release'}, then restart JustSearch.</p>` : nothing}
-      ${updates && entryState(updates, this.viewer()) === 'shown' ? html`<jf-button variant="ghost" label="Open Updates"
-        .onActivate=${() => this.activateSearchHit('general', 'app-updates')}>Open Updates</jf-button>` : nothing}
+      ${updates && entryState(updates, this.viewer()) === 'shown' ? html`<jf-button variant="ghost" label=${SETTINGS_CONTROL_LABELS['update-information'].open}
+        .onActivate=${() => this.activateSearchHit('general', 'app-updates')}>${SETTINGS_CONTROL_LABELS['update-information'].open}</jf-button>` : nothing}
     </section>`;
   }
 
@@ -3223,8 +3239,8 @@ export class SettingsSurface extends JfElement {
       ${progress.pause?.reason !== 'settings_recovery' ? html`<p>Pause processing while keeping indexed files searchable. Resume clears your manual pause; indexing hours and battery rules still apply.</p>` : nothing}
       <jf-indexing-controls allow-pause .progress=${progress} api-base=${this.apiBase}></jf-indexing-controls>
       <p>Choose indexing hours and battery rules in Library.</p>
-      <jf-button variant="ghost" label="Change when to index"
-        .onActivate=${() => requestIndexingRuleNavigation('hours')}>Change when to index</jf-button>
+      <jf-button variant="ghost" label=${SETTINGS_CONTROL_LABELS['indexing'].change}
+        .onActivate=${() => requestIndexingRuleNavigation('hours')}>${SETTINGS_CONTROL_LABELS['indexing'].change}</jf-button>
     </section>`;
   }
 
@@ -3268,6 +3284,7 @@ export class SettingsSurface extends JfElement {
     if (id === this.activeCategory) return;
     this.arrivalRevision++;
     this.releaseArrival?.();
+    this.clearArrivalHighlight?.();
     this.hiddenDestinationKey = null;
     this.activeCategory = id;
     this.addressAnchor = null;
@@ -3287,7 +3304,11 @@ export class SettingsSurface extends JfElement {
    *  schedules its own `updateComplete` continuation (scrollTop reset + anchor-observer rewire), so
    *  this chains a second one that runs after it in the same microtask batch (registration order). */
   private activateSearchHit(categoryId: string, sectionKey?: string): void {
-    if (sectionKey) this.receiveCoordinate(categoryId, sectionKey);
+    const entry = findCategory(categoryId)?.sections?.find(section => section.key === sectionKey);
+    if (entry && entryState(entry, this.viewer()) !== 'shown') return;
+    if (entry?.destination === 'indexing-hours') requestIndexingRuleNavigation('hours');
+    else if (entry?.destination === 'reading-memory') requestReadingMemoryNavigation();
+    else if (sectionKey) this.receiveCoordinate(categoryId, sectionKey);
     else {
       const coordinate = resolveSettingsCoordinate(categoryId);
       if (coordinate) this.selectCategory(coordinate.section);
@@ -3308,6 +3329,7 @@ export class SettingsSurface extends JfElement {
     const destination = hidden ? 'show-developer-tools' : state === 'absent' ? undefined : coordinate.anchor;
     const revision = ++this.arrivalRevision;
     this.releaseArrival?.();
+    this.clearArrivalHighlight?.();
     this.addressAnchor = destination ?? null;
     void this.updateComplete.then(() => {
       if (revision !== this.arrivalRevision || !destination) return;
@@ -3351,11 +3373,27 @@ export class SettingsSurface extends JfElement {
         ?.querySelector<HTMLButtonElement>('.category-row.active')?.focus();
       return;
     }
+    for (let ancestor = target.parentElement; ancestor; ancestor = ancestor.parentElement) {
+      if (ancestor instanceof HTMLDetailsElement) ancestor.open = true;
+    }
     const reduce = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     target.scrollIntoView({ block: 'start', behavior: focus || reduce ? 'auto' : 'smooth' });
     this.activeAnchor = key;
     this.addressAnchor = key;
-    if (focus) target.focus({ preventScroll: true });
+    if (focus) {
+      target.focus({ preventScroll: true });
+      this.clearArrivalHighlight?.();
+      target.classList.add('arrival-highlight');
+      const clear = (): void => {
+        target.classList.remove('arrival-highlight');
+        this.ownerDocument.removeEventListener('pointerdown', clear, true);
+        this.ownerDocument.removeEventListener('keydown', clear, true);
+        if (this.clearArrivalHighlight === clear) this.clearArrivalHighlight = null;
+      };
+      this.ownerDocument.addEventListener('pointerdown', clear, true);
+      this.ownerDocument.addEventListener('keydown', clear, true);
+      this.clearArrivalHighlight = clear;
+    }
   }
 
   private onLocalEscape(e: KeyboardEvent): void {
@@ -3466,8 +3504,8 @@ export class SettingsSurface extends JfElement {
 
   private renderReadingMemoryLink(): TemplateResult {
     return html`<div class="section" data-testid="settings-context-window">
-      <jf-button variant="ghost" label="Reading memory (context window)"
-        .onActivate=${() => requestReadingMemoryNavigation()}>Reading memory (context window)</jf-button>
+      <jf-button variant="ghost" label=${SETTINGS_CONTROL_LABELS['context-window'].open}
+        .onActivate=${() => requestReadingMemoryNavigation()}>${SETTINGS_CONTROL_LABELS['context-window'].open}</jf-button>
       <p class="help">Change how much text the answer model reads at once in AI Brain → Advanced → Answers.</p>
     </div>`;
   }
@@ -3565,11 +3603,11 @@ export class SettingsSurface extends JfElement {
                     </div>
                     <jf-button
                       variant="danger"
-                      label="Revoke"
+                      label=${SETTINGS_CONTROL_LABELS['durable-grants'].revoke}
                       .onActivate=${() =>
                         void this.revokeDurableGrant(g.kind, g.target, g.sourceTier)}
                     >
-                      ${icon({ name: 'trash-2', size: 14 })} Revoke
+                      ${icon({ name: 'trash-2', size: 14 })} ${SETTINGS_CONTROL_LABELS['durable-grants'].revoke}
                     </jf-button>
                   </li>
                 `,
@@ -3582,14 +3620,14 @@ export class SettingsSurface extends JfElement {
           <input
             type="text"
             class="filter-input grant-family-input"
-            placeholder="Capability family (e.g. file-operations)"
+            placeholder=${SETTINGS_CONTROL_LABELS['durable-grants'].family}
             style="flex: 1; padding: 0.4rem 0.625rem; background: var(--surface-secondary); border: 1px solid var(--border-subtle); border-radius: 0.375rem; color: var(--text-primary); font-size: var(--font-size-sm);"
             @keydown=${(e: KeyboardEvent) => {
               if (e.key === 'Enter') void this.grantFamilyFromInput();
             }}
           />
           <jf-button .onActivate=${() => void this.grantFamilyFromInput()}>
-            ${icon({ name: 'shield', size: 12 })} Grant family
+            ${icon({ name: 'shield', size: 12 })} ${SETTINGS_CONTROL_LABELS['durable-grants'].grant}
           </jf-button>
         </div>
       </div>
@@ -3697,8 +3735,8 @@ export class SettingsSurface extends JfElement {
                                 (e.target as HTMLSelectElement).value,
                               )}
                           >
-                            <option value="allow-always" ?selected=${c.decision === 'allow-always'}>allow-always</option>
-                            <option value="deny" ?selected=${c.decision === 'deny'}>deny</option>
+                            <option value="allow-always" ?selected=${c.decision === 'allow-always'}>${SETTINGS_CONTROL_LABELS['plugin-permissions'].allow}</option>
+                            <option value="deny" ?selected=${c.decision === 'deny'}>${SETTINGS_CONTROL_LABELS['plugin-permissions'].deny}</option>
                           </select>
                         </td>
                         <td style="padding:0.25rem 0.5rem;color:var(--text-tertiary);">
@@ -3710,7 +3748,7 @@ export class SettingsSurface extends JfElement {
                             @click=${() =>
                               void this.handleRevokeConsent(c.contributorId, c.capability)}
                           >
-                            Revoke
+                            ${SETTINGS_CONTROL_LABELS['plugin-permissions'].revoke}
                           </button>
                         </td>
                       </tr>
@@ -3768,7 +3806,7 @@ export class SettingsSurface extends JfElement {
               this.requestUpdate();
             }}
           >
-            <option value="">— No parent (flat profile) —</option>
+            <option value="">${SETTINGS_CONTROL_LABELS['workspace-profiles'].parent}</option>
             ${this.workspaceProfiles.map(
               (p) => html`<option value=${p.id} ?selected=${this.snapshotInheritsFrom === p.id}>${p.label}</option>`,
             )}
@@ -3777,7 +3815,7 @@ export class SettingsSurface extends JfElement {
             class="option-btn"
             @click=${() => void this.handleSnapshotWorkspaceProfile()}
           >
-            Snapshot current as Profile
+            ${SETTINGS_CONTROL_LABELS['workspace-profiles'].snapshot}
           </button>
           <select
             data-testid="workspace-profile-switcher"
@@ -3786,7 +3824,7 @@ export class SettingsSurface extends JfElement {
               if (id) void this.handleActivateWorkspaceProfile(id);
             }}
           >
-            <option value="">— Activate a profile —</option>
+            <option value="">${SETTINGS_CONTROL_LABELS['workspace-profiles'].activate}</option>
             ${this.workspaceProfiles.map(
               (p) => html`<option value=${p.id}>${p.label}</option>`,
             )}
