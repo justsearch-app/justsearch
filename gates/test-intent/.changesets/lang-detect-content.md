@@ -237,3 +237,14 @@ are exempt (isolated new tests).
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "cb931fec-4aa3-4c83-8112-969f6334cf08:verifier-3",
+  "verdict": "accept",
+  "digest": "sha256:140999fcae78aaf6ed6ab24ff45eabefed7d04642e79ac9d331058e28bbd8225",
+  "note": "Rebased onto 07769e24e2: the remaining entries hold against the new base. Before-state run on 07769e24e2 with the candidate's checks overlaid: every repaired check fails by assertion for the reason under test (locale tag en-US/de-DE instead of a content label or none; help marker stays v4, or a v4 marker triggers no re-ingest); retainsExistingScriptLabels and the passage-label check pass on both. Non-blocking wording: the prose says three new test files are exempt (two are; ContentLanguageTest is covered by entries), and the help entry says the released v4 marker names help under policy v9 (v0.3.2 shipped v4 with v7); neither changes an oracle."
+}
+```
