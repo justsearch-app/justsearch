@@ -67,8 +67,12 @@ final class IndexingRulesBootstrapIntegrationTest {
       assertFalse(waiting.path("operating").path("indexing").path("reasons").toString().contains("on_battery"),
           "unknown is never advertised as battery");
       battery.control("RELEASE BATTERY");
+      // The operating view is published in its own lane and can lag the worker's queue count, so
+      // wait for the whole held state; a queue that really drained still fails here.
       var held = battery.awaitStatus(s -> s.path("indexAvailable").asBoolean()
-          && s.path("operating").path("indexing").path("reasons").toString().contains("on_battery"));
+          && s.path("operating").path("indexing").path("reasons").toString().contains("on_battery")
+          && s.path("operating").path("indexing").path("pendingJobs").asLong() > 0
+          && "PAUSED".equals(s.path("operating").path("indexing").path("state").asText()));
       assertTrue(held.path("operating").path("indexing").path("pendingJobs").asLong() > 0,
           "fresh BATTERY before timeout starts with the persisted queue held");
       assertEquals("PAUSED", held.path("operating").path("indexing").path("state").asText());
