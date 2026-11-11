@@ -125,3 +125,13 @@ acceptance is intentionally absent.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "test-intent-verifier-f8e9566a-dab7-45c1-a80a-dda0fa704847",
+  "verdict": "accept",
+  "digest": "sha256:3928b6f95b02ef03db3fa6645be0134e877937a36994121e0b0e8c192f65d2a2"
+}
+```
