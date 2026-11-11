@@ -42,7 +42,7 @@ export const HERO_HEADLINE = 'What are you looking for?';
  * what the window can do.
  */
 
-/* ── Slice 4: the palette and the empty states ─────────────────────────────────────────────── */
+/* ── Slice 4: the empty states ─────────────────────────────────────────────── */
 
 /**
  * The `fixtures` dev handle that used to switch the sidebar between a fixture list and its zero state
@@ -141,74 +141,6 @@ export const TURN_FAILED = 'The answer failed.';
  * yields the moment `hasServerAcknowledgedLocalDispatch` holds (`sv3-run.ts`).
  */
 export const RUN_DISPATCHING = 'Sending…';
-
-export interface Sv3Command {
-  readonly id: string;
-  readonly label: string;
-  /** The keyboard hint rendered at the row's trailing edge; absent means the command has none. */
-  readonly shortcut?: string;
-  /** The CURRENT choice — distinct from the keyboard position, which the palette owns at runtime. */
-  readonly selected?: boolean;
-}
-
-/**
- * Named rather than inlined, because the window matches on it and a typo would silently do nothing.
- * WP1.1 — "Search everything" is live: it puts the composer in Search mode and searches the draft.
- */
-export const SV3_COMMAND_SEARCH = 'cmd-everything';
-
-export interface Sv3CommandGroup {
-  readonly id: string;
-  readonly label: string;
-  readonly commands: readonly Sv3Command[];
-}
-
-/**
- * Commands over two groups, so the ONE separator between them is exercised. Exactly one command
- * is `selected` — the palette's current choice — which is what makes the two-state distinction
- * visible: the highlight starts on the first row while the selection sits elsewhere.
- */
-export const COMMAND_GROUPS: readonly Sv3CommandGroup[] = [
-  {
-    id: 'cg-search',
-    label: 'Search',
-    commands: [
-      { id: SV3_COMMAND_SEARCH, label: 'Search everything' },
-      { id: 'cmd-scope-sources', label: 'Scope to all sources', selected: true },
-      { id: 'cmd-scope-recent', label: 'Scope to the last 7 days' },
-      { id: 'cmd-similar', label: 'Find documents like this one' },
-      { id: 'cmd-explain', label: 'Explain why this result ranked' },
-    ],
-  },
-  {
-    id: 'cg-workspace',
-    label: 'Workspace',
-    commands: [
-      { id: 'cmd-memory', label: 'Open Memory' },
-      { id: 'cmd-folders', label: 'Manage indexed folders' },
-      { id: 'cmd-reindex', label: 'Reindex this folder' },
-      { id: 'cmd-diagnostics', label: 'Open indexing diagnostics', shortcut: 'Ctrl D' },
-    ],
-  },
-];
-
-export const COMMANDS: readonly Sv3Command[] = COMMAND_GROUPS.flatMap((g) => g.commands);
-
-export const PALETTE_PLACEHOLDER = 'Type a command or search…';
-
-export const PALETTE_EMPTY = 'No matching commands';
-
-/** The spec's footer gutter: one hint per key group, navigate / act / dismiss. */
-export interface Sv3PaletteHint {
-  readonly keys: readonly string[];
-  readonly label: string;
-}
-
-export const PALETTE_HINTS: readonly Sv3PaletteHint[] = [
-  { keys: ['↑', '↓'], label: 'Navigate' },
-  { keys: ['Enter'], label: 'Run' },
-  { keys: ['Esc'], label: 'Close' },
-];
 
 /* ── Phase F7: the honesty pack ────────────────────────────────────────────────────────────── */
 

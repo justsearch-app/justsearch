@@ -739,12 +739,13 @@ export class Shell extends JfElement {
       toggleInspector: () => {
         setInspectorOpen(!getInspectorStateInternal().isOpen);
       },
+      // The one palette's one toggle: the chord's binding and Search's topbar button both arrive
+      // here. Modality is read when the (deferred) action runs, so a dialog that opened in between
+      // — Settings, a confirmation, the security dialog — keeps the keyboard.
       togglePalette: () => {
         const palette = this.shadowRoot?.querySelector('jf-command-palette') as CommandPalette | null;
-        if (palette) {
-          if (palette.open) palette.hide();
-          else palette.show();
-        }
+        if (palette?.open) palette.hide();
+        else if (palette && !modalOwnsFocus()) palette.show();
       },
     });
     // §25.δ2 — register the toggle-audit-log Action. Idempotent (the

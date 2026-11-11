@@ -1,28 +1,28 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * CommandPalette — Tempdoc 508 §3.3 — searchable overlay for all
- * invocable actions.
+ * CommandPalette — the app's one palette (Tempdoc 508 §3.3, shell S6).
  *
- * Activated via Ctrl+K (configurable). Projects the CommandRegistry
- * with fuzzy search, category grouping, and shortcut display.
+ * Opened only through the `shell.toggle-palette` action, whose one binding (Ctrl K, Cmd K on macOS)
+ * lives in the keybinding registry; Search's topbar button asks the same action. One ranked list over
+ * the five providers of `CommandPaletteProjection`; Tab shows the selected result's actions.
  *
- * Target: sub-50ms render (per Superhuman research).
+ * Keyboard: the field keeps focus; arrows move the active option (`aria-activedescendant`), Enter
+ * runs it, Tab shows its actions, Escape or Shift Tab returns from them with query, selection and
+ * scroll kept, and Escape on the results closes. Keys that end an IME composition are the IME's.
  */
 
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
 import { ModalityController } from '../primitives/modality.js';
 import { closeOthersInLayer } from '../state/transientLayerArbiter.js';
+import { deepActiveElement } from '../utils/keyboardHandler.js';
+import { focusRegion } from '../chrome/frameRegions.js';
 import { repeat } from 'lit/directives/repeat.js';
-import {
-  parsePaletteQuery,
-} from './CommandRegistry.js';
-// §21.C — palette consumes the unified projection over Action.listActions
-// + legacy Commands. ScoredPaletteEntry retires in favor of ScoredPaletteEntry.
 import {
   searchPaletteEntries,
   invokePaletteEntry,
   paletteNotes,
+  paletteSourceState,
   watchPaletteEntries,
   type ScoredPaletteEntry,
   type PaletteEntry,
@@ -51,12 +51,21 @@ function sameResult(entry: PaletteEntry, selected: PaletteEntry): boolean {
     && (selected.target.kind !== 'command' || (entry.target.kind === 'command' && entry.target.command === selected.target.command));
 }
 
+/** A key that ends or steers an IME composition belongs to the IME (229 is the legacy composing code). */
+const composing = (e: KeyboardEvent): boolean => e.isComposing || e.keyCode === 229;
+
+const FIRST_BOUND = 8;
+const LIST_ID = 'palette-listbox';
+const ACTIONS_ID = 'palette-actions';
+
 export class CommandPalette extends JfElement {
   static properties = {
     open: { type: Boolean, reflect: true },
     query: { state: true },
     results: { state: true },
     selectedIndex: { state: true },
+    actionsFor: { state: true },
+    actionIndex: { state: true },
     wizardActive: { state: true },
     wizardInput: { state: true },
     wizardCompletedLabels: { state: true },
@@ -66,6 +75,9 @@ export class CommandPalette extends JfElement {
   declare query: string;
   declare results: ScoredPaletteEntry[];
   declare selectedIndex: number;
+  /** The result whose actions are shown (Tab), or null while the results are shown. */
+  declare actionsFor: PaletteEntry | null;
+  declare actionIndex: number;
   /** Tempdoc 508-followup §δ1 — palette is in slot-collection mode. */
   declare wizardActive: boolean;
   /** Tempdoc 508-followup §δ1 — current wizard input value (prefilled with default). */
@@ -77,6 +89,12 @@ export class CommandPalette extends JfElement {
   private wizardStep: WizardStep | null = null;
   private wizardCancelled = false;
   private wizardInvocationActive = false;
+  /** The shown actions' result left the providers; Enter then runs nothing. */
+  private actionsGone = false;
+  /** The selected result left while shown; said once, until the reader moves on. */
+  private selectionLost = false;
+  /** Where the results list was scrolled when Tab showed actions. */
+  private resultsScroll = 0;
 
   constructor() {
     super();
@@ -84,6 +102,8 @@ export class CommandPalette extends JfElement {
     this.query = '';
     this.results = [];
     this.selectedIndex = 0;
+    this.actionsFor = null;
+    this.actionIndex = 0;
     this.wizardActive = false;
     this.wizardInput = '';
     this.wizardCompletedLabels = [];
@@ -91,8 +111,8 @@ export class CommandPalette extends JfElement {
 
   /**
    * The palette owns the keyboard while open (backdrop + focus in its field), so it enters the app's
-   * one modality authority like the Search palette does: global shortcuts — the status panel's
-   * among them — stand down under it. Focus stays this component's own (no restore on exit).
+   * one modality authority: global shortcuts — the status panel's among them — stand down under it,
+   * and the toggle action leaves another dialog in control. Closing gives focus back to the invoker.
    */
   private readonly modality = new ModalityController(this);
 
@@ -100,6 +120,18 @@ export class CommandPalette extends JfElement {
   private enterOverlay(): void {
     closeOthersInLayer('transient', 'command-palette');
     this.modality.enter();
+  }
+
+  /**
+   * Leave the overlay; focus goes back to the invoker. When the invoker is gone, the deliberate
+   * fallback is the main content region (never a hidden field or the page).
+   */
+  private exitOverlay(): void {
+    this.modality.exit();
+    const active = deepActiveElement();
+    if (active !== null && active !== document.body && !this.shadowRoot?.contains(active)) return;
+    const main = (this.getRootNode() as ParentNode).querySelector?.<HTMLElement>('[role="main"]') ?? null;
+    if (focusRegion([{ kind: 'content', root: main }], 1) === null && active instanceof HTMLElement && active !== document.body) active.blur();
   }
 
   connectedCallback(): void {
@@ -122,6 +154,7 @@ export class CommandPalette extends JfElement {
   disconnectedCallback(): void {
     super.disconnectedCallback();
     this.hide();
+    this.dismissPeek();
     setSlotPromptProvider(null);
     // If a wizard was active, resolve with null (cancel) so any
     // in-flight template expansion unblocks.
@@ -193,7 +226,8 @@ export class CommandPalette extends JfElement {
       display: none;
       align-items: flex-start;
       justify-content: center;
-      padding-top: 15vh;
+      --palette-top: min(15vh, 8rem);
+      padding-top: var(--palette-top);
     }
     :host([open]) {
       display: flex;
@@ -207,25 +241,29 @@ export class CommandPalette extends JfElement {
     .panel {
       position: relative;
       z-index: 1;
-      width: min(540px, 90vw);
-      max-height: 60vh;
+      box-sizing: border-box;
+      width: min(40rem, calc(100vw - 1rem));
+      max-height: calc(100dvh - var(--palette-top) - 0.5rem);
       background: var(--surface-1);
       border: 1px solid var(--border-subtle);
-      border-radius: 0.75rem;
-      box-shadow: var(--shadow-float);
+      border-radius: 0.875rem;
+      box-shadow: 0 24px 64px -24px rgb(0 0 0 / 0.65);
       display: flex;
       flex-direction: column;
       overflow: hidden;
     }
     .search-row {
       display: flex;
+      flex: none;
       align-items: center;
       padding: 0.75rem 1rem;
       border-bottom: 1px solid var(--border-subtle);
       gap: 0.5rem;
     }
+    .search-glyph { flex: none; color: var(--text-muted); }
     .search-row input {
       flex: 1;
+      min-width: 0;
       background: transparent;
       border: none;
       color: var(--text-primary);
@@ -239,9 +277,13 @@ export class CommandPalette extends JfElement {
       outline: 2px solid transparent;
       outline-offset: -2px;
     }
-    .search-hint {
+    kbd {
+      font: inherit;
       font-size: var(--font-size-xs);
-      color: var(--text-muted);
+      color: var(--text-secondary);
+      padding: 0 0.375rem;
+      border: 1px solid var(--border-subtle);
+      border-radius: 0.25rem;
       white-space: nowrap;
     }
     .mode-chip {
@@ -254,57 +296,95 @@ export class CommandPalette extends JfElement {
       white-space: nowrap;
     }
     .results {
+      flex: 1 1 auto;
+      min-height: 0;
       overflow-y: auto;
-      max-height: calc(60vh - 3.5rem);
+      padding: 0.25rem 0.5rem 0.5rem;
     }
     .category-header {
       font-size: var(--font-size-xs);
-      font-weight: 600;
       color: var(--text-secondary);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      padding: 0.5rem 1rem 0.25rem;
+      padding: 0.5rem 0.5rem 0.25rem;
     }
     .result-row {
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
-      padding: 0.5rem 1rem;
+      padding: 0.5rem;
+      border-radius: 0.5rem;
       cursor: pointer;
-      gap: 0.5rem;
+      column-gap: 0.75rem;
+      row-gap: 0.125rem;
     }
-    .result-row:hover,
+    .result-row:hover { background: var(--surface-hover); }
     .result-row[data-selected] {
       background: var(--surface-hover);
+      box-shadow: inset 2px 0 0 var(--accent, currentColor);
     }
     .result-label {
-      flex: 1;
       font-size: var(--font-size-sm);
       color: var(--text-primary);
-    }
-    .result-shortcut {
-      font-size: var(--font-size-xs);
-      color: var(--text-muted);
-      font-family: var(--font-mono);
-      padding: 0.125rem 0.375rem;
-      background: var(--surface-2);
-      border-radius: 0.25rem;
-      border: 1px solid var(--border-subtle);
+      overflow-wrap: anywhere;
     }
     .result-source {
+      flex: 1 1 8rem;
+      min-width: 0;
       font-size: var(--font-size-xs);
-      color: var(--text-ghost);
+      color: var(--text-muted);
+      overflow-wrap: anywhere;
+    }
+    .result-keys { display: flex; align-items: center; gap: 0.375rem; margin-inline-start: auto; font-size: var(--font-size-xs); color: var(--text-muted); }
+    /* Matched word starts are bold; colour alone never carries them. */
+    .result-label mark {
+      background: transparent;
+      color: inherit;
+      font-weight: 700;
+    }
+    .more {
+      display: block;
+      margin: 0.125rem 0.5rem;
+      background: none;
+      border: none;
+      padding: 0.25rem 0;
+      color: var(--text-secondary);
+      font: inherit;
+      font-size: var(--font-size-xs);
+      cursor: pointer;
+    }
+    .actions-of {
+      font-size: var(--font-size-xs);
+      color: var(--text-secondary);
+      padding: 0.5rem 0.5rem 0.25rem;
+      overflow-wrap: anywhere;
+    }
+    .note {
+      margin: 0;
+      font-size: var(--font-size-xs);
+      color: var(--text-secondary);
+      padding: 0.25rem 0.5rem;
+    }
+    .footer {
+      display: flex;
+      flex: none;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.25rem 0.75rem;
+      padding: 0.5rem 1rem;
+      border-top: 1px solid var(--border-subtle);
+      font-size: var(--font-size-xs);
+      color: var(--text-muted);
+    }
+    .footer .end { margin-inline-start: auto; }
+    /* A short window keeps the field, the list and the active row; the key hints go first. */
+    @media (max-height: 30rem) {
+      :host { --palette-top: 0.5rem; }
+      .footer { display: none; }
     }
     .empty {
       padding: 1.5rem;
       text-align: center;
       color: var(--text-secondary);
       font-size: var(--font-size-sm);
-    }
-    /* §11.9 polish — fuzzy-match highlight inside .result-label */
-    .result-label mark {
-      background: transparent;
-      color: var(--text-tint);
-      font-weight: 600;
     }
     .empty-headline { margin-bottom: 0.75rem; }
     .empty-fallbacks { display: flex; flex-direction: column; gap: 0.25rem; align-items: stretch; }
@@ -317,6 +397,22 @@ export class CommandPalette extends JfElement {
       text-align: left;
     }
     .empty-fallback:hover { background: var(--surface-active); }
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+    /* Forced colours drop fills and shadows: the active option keeps a system-colour outline, the
+       field its focus outline, so selection and focus stay distinct in light and dark themes. */
+    @media (forced-colors: active) {
+      .panel { border-color: CanvasText; }
+      .result-row[data-selected] { outline: 2px solid Highlight; outline-offset: -2px; }
+      .search-row input:focus-visible { outline-color: Highlight; }
+      kbd { border-color: CanvasText; }
+    }
   `;
 
   private stopWatching?: () => void;
@@ -332,13 +428,24 @@ export class CommandPalette extends JfElement {
       const group = row.entry.category;
       const count = (counts.get(group) ?? 0) + 1;
       counts.set(group, count);
-      return count <= (this.groupLimits.get(group) ?? 8);
+      return count <= (this.groupLimits.get(group) ?? FIRST_BOUND);
     });
-    if (selected) this.selectedIndex = this.results.findIndex(row => sameResult(row.entry, selected));
+    if (selected) {
+      this.selectedIndex = this.results.findIndex(row => sameResult(row.entry, selected));
+      if (this.selectedIndex < 0) this.selectionLost = true;
+    }
+    if (this.actionsFor) {
+      const shown = this.actionsFor;
+      const current = results.find(row => sameResult(row.entry, shown))?.entry;
+      if (current) this.actionsFor = current;
+      else this.actionsGone = true;
+      if (this.actionIndex >= this.actionsFor.actions.length) this.actionIndex = Math.max(0, this.actionsFor.actions.length - 1);
+    }
+    if (this.peekRowId !== null && (this.actionsFor !== null || !this.results.some(row => row.entry.id === this.peekRowId))) this.dismissPeek();
   }
 
   private showMore(group: string): void {
-    this.groupLimits.set(group, (this.groupLimits.get(group) ?? 8) + 24);
+    this.groupLimits.set(group, (this.groupLimits.get(group) ?? FIRST_BOUND) + 24);
     this.setResults(this.sourceResults, true);
   }
 
@@ -357,6 +464,8 @@ export class CommandPalette extends JfElement {
     this.enterOverlay();
     this.open = true;
     this.query = '';
+    this.leaveActions();
+    this.selectionLost = false;
     this.groupLimits.clear();
     this.setResults(searchPaletteEntries(''));
     this.stopWatching?.();
@@ -372,6 +481,7 @@ export class CommandPalette extends JfElement {
     if (this.wizardInvocationActive) this.wizardCancelled = true;
     this.stopWatching?.();
     this.stopWatching = undefined;
+    this.dismissPeek();
     if (this.wizardStep) {
       const step = this.wizardStep;
       this.wizardStep = null;
@@ -379,12 +489,15 @@ export class CommandPalette extends JfElement {
       this.wizardInput = '';
       step.resolver(null);
     }
+    const wasOpen = this.open;
     this.open = false;
-    this.modality.exit({ skipFocusRestore: true });
+    if (wasOpen) this.exitOverlay();
+    else this.modality.exit();
     this.query = '';
     this.results = [];
     this.sourceResults = [];
     this.selectedIndex = 0;
+    this.leaveActions();
     this.wizardCompletedLabels = [];
   }
 
@@ -394,6 +507,9 @@ export class CommandPalette extends JfElement {
       this.wizardInput = value;
       return;
     }
+    // Typing returns from a result's actions to the results it filters.
+    this.leaveActions();
+    this.selectionLost = false;
     this.query = value;
     this.groupLimits.clear();
     this.setResults(searchPaletteEntries(this.query, this.settingsViewer));
@@ -401,32 +517,132 @@ export class CommandPalette extends JfElement {
   }
 
   private handleKeydown(e: KeyboardEvent): void {
+    if (composing(e)) return;
     // Tempdoc 508-followup §δ1 — wizard mode: Enter confirms,
     // Escape cancels; arrow keys are no-ops since there's no result list.
     if (this.wizardActive) {
       if (e.key === 'Escape') {
         e.preventDefault();
+        e.stopPropagation();
         this.cancelWizard();
       } else if (e.key === 'Enter') {
         e.preventDefault();
         this.confirmWizardStep();
+      } else if (e.key === 'Tab') {
+        e.preventDefault();
       }
       return;
     }
+    if (this.actionsFor) {
+      this.handleActionsKeydown(e, this.actionsFor);
+      return;
+    }
     if (e.key === 'Escape') {
+      // The palette's Escape: nothing beneath it (a Search pane, the page's details) sees it.
       e.preventDefault();
+      e.stopPropagation();
       this.hide();
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
-      this.selectedIndex = Math.min(this.selectedIndex + 1, this.results.length - 1);
+      this.moveDown();
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
+      this.selectionLost = false;
       this.selectedIndex = Math.max(this.selectedIndex - 1, 0);
     } else if (e.key === 'Enter') {
       e.preventDefault();
       const selected = this.results[this.selectedIndex];
       if (selected) this.runEntry(selected.entry);
+    } else if (e.key === 'Tab') {
+      // Focus never leaves the dialog; with no result there are no actions to show.
+      e.preventDefault();
+      const selected = this.results[this.selectedIndex];
+      if (!e.shiftKey && selected && selected.entry.actions.length > 0) this.showActions(selected.entry);
+      else if (!selected) this.cycleFocus(e.shiftKey ? -1 : 1);
     }
+  }
+
+  /**
+   * Keys raised on the dialog's other controls (an empty state's fallbacks): Escape closes, and Tab
+   * moves among the dialog's own controls, never out to the page behind the backdrop.
+   */
+  private handlePanelKeydown(e: KeyboardEvent): void {
+    if (composing(e) || e.composedPath()[0] instanceof HTMLInputElement) return;
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      this.hide();
+    } else if (e.key === 'Tab') {
+      e.preventDefault();
+      this.cycleFocus(e.shiftKey ? -1 : 1);
+    }
+  }
+
+  private cycleFocus(direction: 1 | -1): void {
+    const stops = [...(this.shadowRoot?.querySelectorAll<HTMLElement>('input, .empty :is(button, a[href], [tabindex]:not([tabindex="-1"]))') ?? [])];
+    if (stops.length < 2) return;
+    const at = stops.indexOf(deepActiveElement() as HTMLElement);
+    stops[(Math.max(at, 0) + direction + stops.length) % stops.length]!.focus();
+  }
+
+  /**
+   * Arrow order is the rendered order. Past the last shown row of a group that holds more matches,
+   * the group grows first, so every match is reachable by keyboard alone.
+   */
+  private moveDown(): void {
+    this.selectionLost = false;
+    const current = this.results[this.selectedIndex];
+    const next = current ? this.sourceResults[this.sourceResults.indexOf(current) + 1] : undefined;
+    if (next && !this.results.includes(next) && next.entry.category === current?.entry.category) {
+      this.showMore(next.entry.category);
+    }
+    this.selectedIndex = Math.min(this.selectedIndex + 1, this.results.length - 1);
+  }
+
+  private handleActionsKeydown(e: KeyboardEvent, entry: PaletteEntry): void {
+    const actions = this.actionsGone ? [] : entry.actions;
+    if (e.key === 'Escape' || (e.key === 'Tab' && e.shiftKey)) {
+      e.preventDefault();
+      e.stopPropagation();
+      this.returnToResults();
+    } else if (e.key === 'Tab') {
+      e.preventDefault();
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      this.actionIndex = Math.min(this.actionIndex + 1, Math.max(actions.length - 1, 0));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      this.actionIndex = Math.max(this.actionIndex - 1, 0);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const action = actions[this.actionIndex];
+      if (action) this.runEntry(entry, action.target);
+    }
+  }
+
+  private showActions(entry: PaletteEntry): void {
+    this.resultsScroll = this.shadowRoot?.querySelector('.results')?.scrollTop ?? 0;
+    this.dismissPeek();
+    this.actionsFor = entry;
+    this.actionsGone = false;
+    this.actionIndex = 0;
+  }
+
+  private leaveActions(): void {
+    this.actionsFor = null;
+    this.actionsGone = false;
+    this.actionIndex = 0;
+  }
+
+  /** Back to the results as they were: same query, the same selected result, the same scroll. */
+  private returnToResults(): void {
+    this.leaveActions();
+    const scroll = this.resultsScroll;
+    void this.updateComplete.then(() => {
+      const list = this.shadowRoot?.querySelector('.results');
+      if (list) list.scrollTop = scroll;
+      this.shadowRoot?.querySelector<HTMLElement>('[data-selected]')?.scrollIntoView?.({ block: 'nearest' });
+    });
   }
 
   private handleSelect(index: number): void {
@@ -438,9 +654,9 @@ export class CommandPalette extends JfElement {
    * Close, then run: the chosen command (e.g. "What's going on") acts on the page, not under the
    * palette's modality. The query is read before closing clears it.
    */
-  private runEntry(entry: PaletteEntry): void {
+  private runEntry(entry: PaletteEntry, target = entry.target): void {
     this.hide();
-    void invokePaletteEntry(entry, entry.target, this.settingsViewer).finally(() => {
+    void invokePaletteEntry(entry, target, this.settingsViewer).finally(() => {
       if (this.open && !this.wizardStep) this.hide();
     });
   }
@@ -449,13 +665,14 @@ export class CommandPalette extends JfElement {
    * Tempdoc 508-followup §δ2 — hover-preview dispatch. When a result
    * row is hovered with Alt held, we map the command to a surfaceId
    * (today: `shell.go-to-<id>` navigation commands) and fire a
-   * `jf-peek-request` event picked up by `<jf-peek>`. Releasing Alt
-   * or moving the cursor off the row fires `jf-peek-dismiss`.
+   * `jf-peek-request` event picked up by `<jf-peek>`. Releasing Alt,
+   * leaving or losing the row, closing the palette or removing it
+   * fires `jf-peek-dismiss` and drops the Alt listener.
    *
    * Working assumption: Alt is the least-collidey modifier per the
    * plan's flagged decision.
    */
-  private peekActive = false;
+  private peekRowId: string | null = null;
   private peekKeyupHandler: ((e: KeyboardEvent) => void) | null = null;
 
   private handlePeekMouseEnter(e: MouseEvent, item: ScoredPaletteEntry): void {
@@ -463,29 +680,24 @@ export class CommandPalette extends JfElement {
     const surfaceId = this.commandToSurfaceId(item.entry.id);
     if (!surfaceId) return;
     document.dispatchEvent(new CustomEvent('jf-peek-request', { detail: { surfaceId } }));
-    this.peekActive = true;
+    this.peekRowId = item.entry.id;
     // Hook keyup so releasing Alt dismisses without requiring mouseleave.
     if (!this.peekKeyupHandler) {
       this.peekKeyupHandler = (ev: KeyboardEvent) => {
-        if (ev.key === 'Alt' && this.peekActive) {
-          this.dismissPeek();
-        }
+        if (ev.key === 'Alt') this.dismissPeek();
       };
       document.addEventListener('keyup', this.peekKeyupHandler);
     }
   }
 
-  private handlePeekMouseLeave(): void {
-    if (this.peekActive) this.dismissPeek();
-  }
-
   private dismissPeek(): void {
-    this.peekActive = false;
-    document.dispatchEvent(new CustomEvent('jf-peek-dismiss'));
     if (this.peekKeyupHandler) {
       document.removeEventListener('keyup', this.peekKeyupHandler);
       this.peekKeyupHandler = null;
     }
+    if (this.peekRowId === null) return;
+    this.peekRowId = null;
+    document.dispatchEvent(new CustomEvent('jf-peek-dismiss'));
   }
 
   /**
@@ -510,6 +722,24 @@ export class CommandPalette extends JfElement {
     return null;
   }
 
+  /** What a screen reader hears when the list changes: the count, or the empty, loading or error state. */
+  private announcement(): string {
+    if (this.actionsFor) {
+      if (this.actionsGone) return `${this.actionsFor.label} is no longer available.`;
+      const count = this.actionsFor.actions.length;
+      return `Actions for ${this.actionsFor.label}: ${count} ${count === 1 ? 'action' : 'actions'}. Escape goes back.`;
+    }
+    const sources = paletteSourceState();
+    const count = this.sourceResults.length;
+    const parts = [
+      this.selectionLost ? 'The selected result is no longer available.' : '',
+      count === 0 && this.query ? `No results for "${this.query}".` : `${count} ${count === 1 ? 'result' : 'results'}.`,
+      sources.loading ? 'Still loading folders and conversations.' : '',
+      sources.failed ? 'Folders could not be loaded, so results may be incomplete.' : '',
+    ];
+    return parts.filter(Boolean).join(' ');
+  }
+
   override render(): TemplateResult {
     if (!this.open) return html``;
 
@@ -521,17 +751,18 @@ export class CommandPalette extends JfElement {
       const slot = this.wizardStep.slot;
       return html`
         <div class="backdrop" @click=${() => this.cancelWizard()}></div>
-        <div class="panel">
+        <div class="panel" role="dialog" aria-modal="true" aria-label="Command palette">
           <div class="search-row">
             <span class="mode-chip">${this.wizardStep.templateId}</span>
             <input
               type="text"
+              aria-label=${slot.name}
               placeholder=${slot.name}
               .value=${this.wizardInput}
               @input=${this.handleInput}
               @keydown=${this.handleKeydown}
             />
-            <span class="search-hint">Enter to continue · Esc to cancel</span>
+            <span class="result-keys"><kbd>Enter</kbd> continue <kbd>Esc</kbd> cancel</span>
           </div>
           <div class="results">
             <div class="category-header" data-wizard-slot-name=${slot.name}>
@@ -548,59 +779,114 @@ export class CommandPalette extends JfElement {
       `;
     }
 
-    const grouped = this.groupByCategory(this.results);
-    const parsed = parsePaletteQuery(this.query);
-    const modeLabel = parsed.mode === 'commands' ? '' : parsed.mode === 'surfaces' ? 'Surfaces' : 'Settings';
-    const placeholder = parsed.mode === 'commands'
-      ? "Type a command... (> commands, # surfaces, @ settings)"
-      : `Filter ${modeLabel.toLowerCase()}...`;
+    const prefix = this.query.charAt(0);
+    const modeLabel = prefix === '>' ? 'Actions' : prefix === '#' ? 'Areas' : prefix === '@' ? 'Settings' : '';
+    const actions = this.actionsFor;
+    const activeId = actions
+      ? (!this.actionsGone && actions.actions[this.actionIndex] ? `palette-action-${this.actionIndex}` : '')
+      : (this.results[this.selectedIndex] ? `palette-opt-${this.selectedIndex}` : '');
 
     return html`
       <div class="backdrop" @click=${() => this.hide()}></div>
-      <div class="panel">
+      <div class="panel" role="dialog" aria-modal="true" aria-label="Command palette" @keydown=${this.handlePanelKeydown}>
         <div class="search-row">
-          ${modeLabel ? html`<span class="mode-chip">${modeLabel}</span>` : ''}
+          <svg class="search-glyph" aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3"/></svg>
+          ${modeLabel ? html`<span class="mode-chip">${modeLabel}</span>` : nothing}
           <input
             type="text"
-            placeholder=${placeholder}
+            role="combobox"
+            aria-label="Search actions, settings, folders, conversations and areas"
+            aria-expanded="true"
+            aria-autocomplete="list"
+            aria-controls=${actions ? ACTIONS_ID : LIST_ID}
+            aria-activedescendant=${activeId || nothing}
+            autocomplete="off"
+            spellcheck="false"
+            placeholder=${modeLabel ? `Filter ${modeLabel.toLowerCase()}…` : 'Search, or type > for actions only'}
             .value=${this.query}
             @input=${this.handleInput}
             @keydown=${this.handleKeydown}
           />
-          <span class="search-hint">Esc to close</span>
+          <kbd aria-hidden="true">Esc</kbd>
         </div>
         <div class="results">
-          ${this.results.length === 0 && this.query.length > 0
-            ? this.renderEmptyState()
-            : nothing}
-          ${grouped.map(([category, items]) => html`
-            <div class="category-header">${category || 'Commands'}</div>
-            ${items.map((item) => {
-              const globalIndex = this.results.indexOf(item);
-              return html`
-                <div
-                  class="result-row"
-                  id=${`palette-opt-${globalIndex}`}
-                  role="option"
-                  aria-selected=${globalIndex === this.selectedIndex}
-                  ?data-selected=${globalIndex === this.selectedIndex}
-                  @click=${() => this.handleSelect(globalIndex)}
-                  @mouseenter=${(e: MouseEvent) => this.handlePeekMouseEnter(e, item)}
-                  @mouseleave=${() => this.handlePeekMouseLeave()}
-                >
-                  <span class="result-label">${this.renderLabelWithMatches(item.entry.label, item.matches)}</span>
-                  ${item.entry.shortcut
-                    ? html`<span class="result-shortcut">${item.entry.shortcut}</span>`
-                    : nothing}
-                  <span class="result-source">${item.entry.description}</span>
-                </div>
-              `;
-            })}
-            ${this.sourceResults.filter(row => row.entry.category === category).length > items.length
-              ? html`<button type="button" @click=${() => this.showMore(category)}>Show more ${category.toLowerCase()}</button>` : nothing}
-          `)}
-          ${paletteNotes(this.query).map(note => html`<p class="category-header" role="note" data-testid="palette-note">${note}</p>`)}
+          ${actions ? this.renderActions(actions) : this.renderResults()}
         </div>
+        <div class="visually-hidden" role="status" aria-live="polite" data-testid="palette-status">${this.announcement()}</div>
+        <div class="footer" aria-hidden="true">
+          ${actions
+            ? html`<span><kbd>↑</kbd> <kbd>↓</kbd> move</span><span><kbd>Enter</kbd> run</span><span><kbd>Esc</kbd> back</span>`
+            : html`<span><kbd>↑</kbd> <kbd>↓</kbd> move</span><span><kbd>Enter</kbd> open</span><span><kbd>Tab</kbd> actions</span>
+              <span class="end">Type <kbd>&gt;</kbd> for actions only</span>`}
+        </div>
+      </div>
+    `;
+  }
+
+  private renderResults(): TemplateResult {
+    const positions = new Map(this.sourceResults.map((row, index) => [row, index + 1]));
+    const option = (item: ScoredPaletteEntry): TemplateResult => {
+      const index = this.results.indexOf(item);
+      const selected = index === this.selectedIndex;
+      return html`
+        <div
+          class="result-row"
+          id=${`palette-opt-${index}`}
+          role="option"
+          aria-selected=${selected ? 'true' : 'false'}
+          aria-posinset=${positions.get(item) ?? index + 1}
+          aria-setsize=${this.sourceResults.length}
+          ?data-selected=${selected}
+          @click=${() => this.handleSelect(index)}
+          @mouseenter=${(e: MouseEvent) => this.handlePeekMouseEnter(e, item)}
+          @mouseleave=${() => this.dismissPeek()}
+        >
+          <span class="result-label">${this.renderLabelWithMatches(item.entry.label, item.matches)}</span>
+          ${item.entry.description ? html`<span class="result-source">${item.entry.description}</span>` : nothing}
+          ${item.entry.shortcut || selected
+            ? html`<span class="result-keys">
+                ${item.entry.shortcut ? html`<kbd>${item.entry.shortcut}</kbd>` : nothing}
+                ${selected && item.entry.actions.length > 0 ? html`<span aria-hidden="true"><kbd>Tab</kbd> actions</span>` : nothing}
+              </span>`
+            : nothing}
+        </div>
+      `;
+    };
+    const groups = this.groupByCategory(this.results);
+    return html`
+      ${this.results.length === 0 && this.query.length > 0 ? this.renderEmptyState() : nothing}
+      <div role="listbox" id=${LIST_ID} aria-label="Results">
+        ${groups.map(([category, items], groupIndex) => category ? html`
+          <div role="group" aria-labelledby=${`palette-group-${groupIndex}`}>
+            <div class="category-header" role="presentation" id=${`palette-group-${groupIndex}`}>${category}</div>
+            ${items.map(option)}
+            ${this.sourceResults.filter(row => row.entry.category === category).length > items.length
+              ? html`<button class="more" type="button" tabindex="-1" aria-hidden="true" @click=${() => this.showMore(category)}>Show more ${category.toLowerCase()}</button>`
+              : nothing}
+          </div>` : items.map(option))}
+      </div>
+      ${paletteNotes(this.query).map(note => html`<p class="note" role="note" data-testid="palette-note">${note}</p>`)}
+    `;
+  }
+
+  private renderActions(entry: PaletteEntry): TemplateResult {
+    const actions = this.actionsGone ? [] : entry.actions;
+    return html`
+      <div class="actions-of" id="palette-actions-of">Actions for ${entry.label}</div>
+      ${this.actionsGone ? html`<p class="note" role="note">This result is no longer available. Escape goes back.</p>` : nothing}
+      <div role="listbox" id=${ACTIONS_ID} aria-labelledby="palette-actions-of">
+        ${actions.map((action, index) => html`
+          <div
+            class="result-row"
+            id=${`palette-action-${index}`}
+            role="option"
+            aria-selected=${index === this.actionIndex ? 'true' : 'false'}
+            aria-posinset=${index + 1}
+            aria-setsize=${actions.length}
+            ?data-selected=${index === this.actionIndex}
+            @click=${() => this.runEntry(entry, action.target)}
+          ><span class="result-label">${action.label}</span></div>
+        `)}
       </div>
     `;
   }
@@ -608,7 +894,7 @@ export class CommandPalette extends JfElement {
   /**
    * §11.9 polish — render the command label with matched characters
    * highlighted. `matches` is a sorted array of character indices
-   * produced by the fuzzy scorer; we wrap each contiguous matched
+   * produced by the scorer; we wrap each contiguous matched
    * run in a <mark> tag. Empty matches produces plain text.
    */
   private renderLabelWithMatches(label: string, matches: ReadonlyArray<number>): TemplateResult | string {
@@ -663,22 +949,16 @@ export class CommandPalette extends JfElement {
       query: this.query,
     });
     if (contributions.length === 0) {
-      return html`<div class="empty">No commands match "${this.query}"</div>`;
+      return html`<div class="empty">No results for "${this.query}"</div>`;
     }
     return html`
       <div class="empty">
-        <div class="empty-headline">No commands match "${this.query}"</div>
+        <div class="empty-headline">No results for "${this.query}"</div>
         <div class="empty-fallbacks">
-          ${repeat(contributions, (c) => c.id, (c) => {
-            const rendered = c.render({
-              context: 'palette-no-results',
-              query: this.query,
-            });
-            if (typeof rendered === 'string') {
-              return html`<div class="empty-fallback" data-fallback-id=${c.id}>${rendered}</div>`;
-            }
-            return html`<div class="empty-fallback" data-fallback-id=${c.id}>${rendered}</div>`;
-          })}
+          ${repeat(contributions, (c) => c.id, (c) => html`<div class="empty-fallback" data-fallback-id=${c.id}>${c.render({
+            context: 'palette-no-results',
+            query: this.query,
+          })}</div>`)}
         </div>
       </div>
     `;

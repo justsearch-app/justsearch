@@ -4,7 +4,11 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { render } from 'lit';
 import { renderWhyDisclosure } from '../../components/searchResults/whyThisResult.js';
 import './SearchV3View.js';
+import '../../commands/CommandPalette.js';
 import type { SearchV3View } from './SearchV3View.js';
+import type { CommandPalette } from '../../commands/CommandPalette.js';
+import { attachKeybindingDispatcher, registerKeybinding, __resetForTest as resetKeybindings } from '../../commands/KeybindingRegistry.js';
+import { CORE_PROVENANCE } from '../../primitives/provenance.js';
 import type { Sv3Composer } from './Sv3Composer.js';
 import { __feedContactForTest, __feedForTest, __resetAiStateForTest } from '../../state/aiStateStore.js';
 import { __resetConversationListForTest } from '../../state/conversationListStore.js';
@@ -455,18 +459,25 @@ it('HO3 D7 a Structured hand-off with no files uses typed text and waits for sen
   expect(c.shadowRoot!.textContent).toContain('typed text'); expect(dispatches()).toHaveLength(0);
   const body = await send(view); expect(body.shapeId).toBe('core.extract'); expect(body.selection).toBeUndefined();
 });
-it('HO12 keyboard palette search after a hand-off returns focus to the composer', async () => {
-  const view = await mount(); await navigate({ query: 'Northfield', forceShapeId: 'core.summarize', docIds: ['chosen.md'] }); await drain(view);
-  const c = await composer(view); const input = q<HTMLTextAreaElement>(c, 'sv3-composer-input')!; input.focus();
-  input.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true, composed: true })); await drain(view);
-  const palette = view.shadowRoot!.querySelector('jf-sv3-palette') as ElementView;
-  const field = q<HTMLInputElement>(palette, 'sv3-palette-input'); expect(field).not.toBeNull();
-  field!.value = 'Search everything'; field!.dispatchEvent(new Event('input')); await drain(view);
-  field!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, composed: true })); await drain(view);
-  const current = await composer(view);
-  expect(current.getAttribute('tier')).toBe('search');
-  expect(current.shadowRoot!.activeElement).toBe(q(current, 'sv3-composer-input'));
-  expect(dispatches()).toHaveLength(0);
+it('SP7 HO12 the app palette\'s "Search everything" after a hand-off searches in Search mode and returns focus to the composer', async () => {
+  // The app's one palette and its one chord binding, as the Shell wires them.
+  const palette = document.createElement('jf-command-palette') as CommandPalette; document.body.append(palette);
+  registerKeybinding({ key: 'mod+k', commandId: 'shell.toggle-palette', source: 'default', provenance: CORE_PROVENANCE });
+  const detach = attachKeybindingDispatcher(id => { if (id === 'shell.toggle-palette') { if (palette.open) palette.hide(); else palette.show(); } });
+  try {
+    const view = await mount(); await navigate({ query: 'Northfield', forceShapeId: 'core.summarize', docIds: ['chosen.md'] }); await drain(view);
+    const c = await composer(view); const input = q<HTMLTextAreaElement>(c, 'sv3-composer-input')!; input.focus();
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true, composed: true, cancelable: true })); await drain(view);
+    expect(palette.open).toBe(true);
+    const field = palette.shadowRoot!.querySelector('input')!;
+    field.value = 'Search everything'; field.dispatchEvent(new Event('input')); await palette.updateComplete;
+    field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, composed: true })); await drain(view);
+    const current = await composer(view);
+    expect(palette.open).toBe(false);
+    expect(current.getAttribute('tier')).toBe('search');
+    expect(current.shadowRoot!.activeElement).toBe(q(current, 'sv3-composer-input'));
+    expect(dispatches()).toHaveLength(0);
+  } finally { detach(); resetKeybindings(); }
 });
 
 

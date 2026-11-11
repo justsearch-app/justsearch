@@ -176,6 +176,12 @@ export function paletteNotes(raw: string): string[] {
   return ['Recent conversations searches only the recent list. Older conversations are outside this list; find them in Search\'s conversation list.'];
 }
 
+/** Whether the read-backed providers are still loading, or the folder read failed, for the announced state. */
+export function paletteSourceState(): { readonly loading: boolean; readonly failed: boolean } {
+  const roots = getIndexedRoots();
+  return { loading: getConversationListState().loading || (!roots.confirmed && roots.error === null), failed: roots.error !== null };
+}
+
 /** Revalidate identity and eligibility, including the captured registration, before activation. */
 export async function invokePaletteEntry(entry: PaletteEntry, target = entry.target, settingsViewer = viewer()): Promise<boolean> {
   const profileId = getActiveProfileId();

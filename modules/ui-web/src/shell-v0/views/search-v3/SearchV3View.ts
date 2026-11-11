@@ -178,6 +178,9 @@ import {
 import { ReasoningController } from '../../controllers/ReasoningController.js';
 // Tempdoc 596 §11.4 — the shared remedy navigation, reached from exactly one place in this window.
 import { requestSurfaceNavigation } from '../../controllers/navigateRequest.js';
+import { getAction, registerAction, unregisterAction, type Action } from '../../substrates/actions/index.js';
+import { CORE_PROVENANCE } from '../../primitives/provenance.js';
+import { modalOwnsFocus } from '../../primitives/modality.js';
 import { retainedTaskNotice } from './sv3-recovery-notice.js';
 import { projectSv3RecordTurns } from './sv3-record.js';
 import {
@@ -283,18 +286,14 @@ import type { CardForgetDetail, ResultsCard } from '../../components/searchResul
 import { projectSv3Degradation, type Sv3Degradation } from './sv3-degradation.js';
 import {
   PANE_LABEL,
-  SV3_COMMAND_SEARCH,
   SV3_DRAFT_KEY,
   SV3_SURFACE_KEY,
 } from './fixtures.js';
-import { type Sv3PaletteRun } from './Sv3Palette.js';
-import type { Sv3Palette } from './Sv3Palette.js';
 import './Sv3Topbar.js';
 import './Sv3Sidebar.js';
 import './Sv3Main.js';
 import './Sv3ContextBar.js';
 import './Sv3Composer.js';
-import './Sv3Palette.js';
 // The window's citation-inspection region (tempdoc 822 Phase F8). It mounts the product's ONE reading
 // surface by its own side-effect import; this host owns only where it sits and how wide it may be.
 import './Sv3Pane.js';
@@ -315,22 +314,13 @@ const OCCLUSION_VAR = '--sv3-composer-occlusion';
 const SIDEBAR_GRIP_LABEL =
   'Resize the sidebar — arrow keys resize, Home returns to automatic, double-click resets';
 
-/**
- * The palette chord, matched only for events that reach THIS window. The shipped shell binds the same
- * chord globally (`mod+k` → `shell.toggle-palette`), so the scope is the whole contract: a keystroke
- * outside the window must never be seen here.
- */
-const isPaletteChord = (event: KeyboardEvent): boolean =>
-  (event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'k';
-
 const isComposerState = (value: string | null): value is Sv3ComposerState =>
   value === 'hero' || value === 'docked';
 
 /**
  * Is the keystroke coming out of a session row that is BEING RENAMED? The row is asked, not the
  * DOM shape: `renaming` is the row's own public state, so the test cannot drift from the markup the
- * edit happens to use. Open shadow roots put the real origin in the composed path (the same
- * property the palette's invoker lookup relies on), so a capture-phase listener on the host can see
+ * edit happens to use. Open shadow roots put the real origin in the composed path, so a capture-phase listener on the host can see
  * an editor three shadow roots down.
  */
 const renamingRowInPath = (event: KeyboardEvent): boolean =>
@@ -371,8 +361,8 @@ export class SearchV3View extends JfElement {
         height: 100%;
         min-height: 0;
         overflow: hidden;
-        /* The containing block for the palette overlay, which is why the palette can be window-scoped
-           at all: it is absolutely positioned against THIS box and cannot reach the shipped chrome. */
+        /* The containing block for the window's own overlays (the hero composer, the overlaid
+           pane): they are absolutely positioned against THIS box and cannot reach the app frame. */
         position: relative;
         background: var(--background);
         color: var(--foreground);
@@ -538,8 +528,8 @@ export class SearchV3View extends JfElement {
          the composer because it IS composer chrome — leaving it in flow would leave a second
          horizontal cut across the transcript, the exact defect being removed.
 
-         --z-sticky, deliberately BELOW --z-overlay: the hero composer, the overlaid citation pane
-         and the palette all share the overlay rung and must stay above a bottom band. .column has
+         --z-sticky, deliberately BELOW --z-overlay: the hero composer and the overlaid citation
+         pane share the overlay rung and must stay above a bottom band. .column has
          z-index:auto so it opens no stacking context and the rungs compare globally.
 
          The positioning is STATE-GATED, and that is load-bearing rather than tidy: the hero
@@ -942,7 +932,6 @@ export class SearchV3View extends JfElement {
     clearRenaming: () => { this.renamingId = null; },
     clearRecordNotice: () => { this.contextDomain.recordNotice = false; },
     detachRun: () => this.runDomain.detach(),
-    dismissPalette: () => this.palette?.dismiss(),
     focusIncomingComposer: () => {
       void this.updateComplete.then(async () => { const c = this.composer; if (c !== null) { await c.updateComplete; c.focusField(); } });
     },
@@ -1317,19 +1306,17 @@ export class SearchV3View extends JfElement {
     // The store notifies on change only, so the first look has to be taken here — see
     // `syncRunPresence` for why an unrepresented live run is this window's problem to state.
     this.runDomain.syncRunPresence();
-    // Scoped to the HOST, not to `window`. A host listener is only reached by events whose composed
-    // path runs through this window, so a chord pressed anywhere else in the shipped app is invisible
-    // here by construction — there is no "is the focus inside?" test to get wrong. Capture phase so
-    // the palette's own field cannot swallow the chord before the window sees it.
+    // Scoped to the HOST, not to `window`: only Escapes raised inside this window reach it. The app's
+    // one palette is outside the window, so its Escape never closes a pane here.
     this.addEventListener('keydown', this.onHostKeydown, true);
     this.addEventListener('click', this.details.onHostClick, true);
-    this.addEventListener('focusout', this.onHostFocusOut);
+    SearchV3View.syncPaletteActions(this, true);
     this.details.connect();
     // Tempdoc 864 Layer 1(c2), PR B — Ctrl+L / '/' dispatch `jf-focus-composer` on `window`
     // (`chrome/Shell.ts`, `shell.focus-composer`); `UnifiedChatView` is the only other listener
     // (`views/UnifiedChatView.ts` connectedCallback). Routed through the SAME `focusComposer()` as
     // every other entry path below, not a second focus mechanism — its refusal set (renaming,
-    // palette open, already typing elsewhere) applies here exactly as it does on mount.
+    // a dialog open, already typing elsewhere) applies here exactly as it does on mount.
     window.addEventListener('jf-focus-composer', this.onFocusComposerEvent);
     this.contextController.connect();
     // Tempdoc 864 Layer 1(a) — ARRIVING AT THIS WINDOW PUTS THE READER IN THE COMPOSER. Activation is
@@ -1360,12 +1347,9 @@ export class SearchV3View extends JfElement {
    *  - the RENAME refusal is independently reachable and tested: `renamingId` survives an unmount, so
    *    re-entering this window mid-rename is an entry path arriving at a half-finished edit with
    *    focus wherever the unmount left it;
-   *  - the PALETTE refusal is belt-and-braces TODAY and kept deliberately. The popup's only focusable
-   *    is its own field, and `onHostFocusOut` dismisses the palette as soon as focus falls out of the
-   *    window — so "open palette, focus not in a field" is currently unreachable and the typing guard
-   *    covers the rest. `Sv3Palette.trapTab` already enumerates buttons and tabindex nodes, so the
-   *    first non-field focusable added to that popup makes the state live (§2.9(e)), and the failure
-   *    it would cause — a caret yanked out of an open modal — is silent.
+   *  - the DIALOG refusal: while a modal owns the keyboard (the app's palette, Settings, a
+   *    confirmation), the caret is never yanked out of it into the composer underneath — focus on a
+   *    dialog's non-field control would otherwise pass the typing guard (§2.9(e)).
    *
    * A row button or `<body>` is not a transient: those are the parked-nowhere states this exists to
    * end, and refusing them would refuse the entire fix.
@@ -1376,7 +1360,7 @@ export class SearchV3View extends JfElement {
     if (composer === null) return;
     await composer.updateComplete;
     if (this.renamingId !== null) return;
-    if (this.palette?.open === true) return;
+    if (modalOwnsFocus()) return;
     if (isTypingTarget(deepActiveElement())) return;
     composer.focusField();
   }
@@ -1422,7 +1406,7 @@ export class SearchV3View extends JfElement {
     this.removeEventListener('keydown', this.onHostKeydown, true);
     this.removeEventListener('click', this.details.onHostClick, true);
     this.details.disconnect();
-    this.removeEventListener('focusout', this.onHostFocusOut);
+    SearchV3View.syncPaletteActions(this, false);
     window.removeEventListener('jf-focus-composer', this.onFocusComposerEvent);
     window.removeEventListener('sv3-handoff', this.draftDomain.receiveHandoff);
     // Tempdoc 864 PR E — LAST, so a re-parent is recorded however the teardown above went. See
@@ -2133,12 +2117,12 @@ export class SearchV3View extends JfElement {
   }
 
   private readonly onHostKeydown = (event: KeyboardEvent): void => {
-    // ESCAPE ORDER — rename > pane > sidebar sheet > palette > composer flip. The MOST LOCAL transient state wins:
+    // ESCAPE ORDER — rename > pane > sidebar sheet > composer flip. The MOST LOCAL transient state wins:
     // an Escape belongs to the smallest thing the reader is currently inside, and only after that
     // to the regions around it. Stopping the event at the winner is what makes the order true
-    // rather than approximately true — unstopped, the SAME keystroke would also hide the palette
-    // (`Sv3Palette.onKeydown`) or flip the composer back to its hero (`Sv3Composer.onKeydown`),
-    // closing two things at once.
+    // rather than approximately true — unstopped, the SAME keystroke would also flip the composer
+    // back to its hero (`Sv3Composer.onKeydown`), closing two things at once. The app's palette is
+    // above all of these and outside this window: its Escape is its own and never arrives here.
     //
     // Rename is FIRST and is served by yielding rather than by handling: an inline editor owns its
     // own cancel key (`Sv3SessionRow.onRenameKeydown`), and this listener is on the CAPTURE phase,
@@ -2165,40 +2149,12 @@ export class SearchV3View extends JfElement {
       void this.dismissSidebarSheet();
       return;
     }
-    if (!isPaletteChord(event)) return;
-    event.preventDefault();
-    event.stopPropagation();
-    // The deepest node in the composed path is the real invoker; `document.activeElement` retargets
-    // to this host at the shadow boundary and would send focus back to a non-focusable element.
-    const invoker = (event.composedPath()[0] ?? null) as HTMLElement | null;
-    this.togglePalette(invoker);
-  };
-
-  /**
-   * The palette may never be left OPEN with the keyboard somewhere else. Its own exits (Escape,
-   * backdrop click) both assume focus is still inside it; when something outside the window takes
-   * focus away — the shipped shell binds the same Ctrl+K and its palette steals the field
-   * (`KeybindingRegistry.ts:178`, the recorded cutover-scope duplicate) — the capture-phase Escape
-   * listener above is never reached again and the sv3 palette becomes visible-but-unreachable, a
-   * keyboard trap only a pointer could clear (F-series fit audit, DEFECT-8).
-   *
-   * `relatedTarget` is the test rather than `document.activeElement`, which during `focusout` still
-   * reports the OLD node. `null` (focus fell to `<body>`) and any node outside the window close it;
-   * focus moving anywhere inside — including into the palette's own field — leaves it open. Closing
-   * does NOT reclaim focus: the invoker restore in `hide()` would yank the caret back out of
-   * whatever legitimately took it, which is the fight the shipped Ctrl+K already starts.
-   */
-  private readonly onHostFocusOut = (event: FocusEvent): void => {
-    const palette = this.palette;
-    if (palette === null || !palette.open) return;
-    if (this.ownsNode(event.relatedTarget as Node | null)) return;
-    palette.dismiss();
   };
 
   /**
    * Tempdoc 864 Layer 1(c2), PR B — the `jf-focus-composer` window event (Ctrl+L / '/', dispatched
    * by `shell.focus-composer`) reaches this window. Delegates straight to {@link focusComposer}: no
-   * second focus path, so the same three refusals (renaming, palette open, already typing elsewhere)
+   * second focus path, so the same three refusals (renaming, a dialog open, already typing elsewhere)
    * govern an explicit keypress exactly as they govern an entry path.
    */
   private readonly onFocusComposerEvent = (): void => {
@@ -2220,22 +2176,6 @@ export class SearchV3View extends JfElement {
       current = root.host;
     }
     return false;
-  }
-
-  private get palette(): Sv3Palette | null {
-    return this.shadowRoot?.querySelector('jf-sv3-palette') ?? null;
-  }
-
-  /** The one way the palette opens or closes, whichever affordance asked. */
-  togglePalette(invoker: HTMLElement | null): void {
-    const palette = this.palette;
-    if (palette === null) return;
-    if (palette.open) palette.hide();
-    else void palette.show(invoker);
-  }
-
-  private onPaletteRequest(event: Event): void {
-    this.togglePalette((event.composedPath()[0] ?? null) as HTMLElement | null);
   }
 
   override attributeChangedCallback(name: string, older: string | null, value: string | null): void {
@@ -2577,21 +2517,36 @@ export class SearchV3View extends JfElement {
   }
 
   /**
-   * The SECONDARY axis (822 §4b course correction). Phase A1's search seam stays wired and tested,
-   * but a plain submit no longer reaches it — it is called from the palette's "Search this text"
-   * command, which keeps the seam demonstrable until the deferred search-integration conversation
-   * decides what search means in a conversational window. It deliberately does NOT touch the session
+   * Search's two actions in the app's palette, under their original ids. "Search everything" is
+   * Search mode applied to the composer's draft (never to the palette's text): the draft is searched
+   * exactly as Enter would search it, and the caret goes back to it. It does NOT touch the session
    * list: a search is not a turn, and recording it as one would fabricate a conversation.
    */
-  private onPaletteRun(event: Event): void {
-    const id = (event as CustomEvent<Sv3PaletteRun>).detail?.id ?? '';
-    // WP1.1 S1.11 — the palette's search IS Search mode: the mode changes where the reader can see
-    // it, the draft is searched exactly as Enter would search it, and the caret goes back to it.
-    if (id === SV3_COMMAND_SEARCH) {
-      this.search.paletteSearch();
-      return;
-    }
-    if (id === 'cmd-memory') requestSurfaceNavigation('core.memory-surface');
+  private readonly paletteActions: readonly Action[] = [
+    { id: 'cmd-everything', title: 'Search everything', category: 'Search', provenance: CORE_PROVENANCE,
+      handler: () => { this.search.paletteSearch(); return { kind: 'noop' as const }; } },
+    { id: 'cmd-memory', title: 'Open AI Brain › Memory', category: 'Search', provenance: CORE_PROVENANCE,
+      handler: () => { requestSurfaceNavigation('core.memory-surface'); return { kind: 'noop' as const }; } },
+  ];
+
+  /** Connected Search windows that may own the actions, oldest first; a preview never may. */
+  private static readonly paletteOwners: SearchV3View[] = [];
+
+  /**
+   * Exactly one owner: the latest connected window that is not a preview. Leaving (departure, a
+   * retained window's detach, a split-layout re-parent) removes only registrations that are still
+   * this window's own and hands the actions to the previous owner still connected; a re-parented or
+   * returning window registers the same action objects again.
+   */
+  private static syncPaletteActions(view: SearchV3View, connected: boolean): void {
+    const owners = SearchV3View.paletteOwners;
+    const previous = owners.at(-1);
+    owners.splice(0, owners.length, ...owners.filter(owner => owner !== view && owner.isConnected));
+    if (connected && !view.hasAttribute('data-preview-mode')) owners.push(view);
+    const next = owners.at(-1);
+    if (next === previous) return;
+    for (const action of previous?.paletteActions ?? []) if (getAction(action.id) === action) unregisterAction(action.id);
+    for (const action of next?.paletteActions ?? []) if (getAction(action.id) === undefined) registerAction(action);
   }
 
   private get composer(): Sv3Composer | null {
@@ -2795,7 +2750,6 @@ export class SearchV3View extends JfElement {
         @sv3-effort-change=${this.onEffortChange}
         @sv3-tier-change=${this.onTierChange}
         @sv3-run-decision=${(event: CustomEvent<Sv3RunDecision>) => this.runDomain.decide(event.detail)}
-        @sv3-palette-request=${this.onPaletteRequest}
         @sv3-remedy=${this.onRemedy}
         @sv3-citation-open=${this.onCitationOpen}
         @sv3-record-check=${() => {
@@ -2902,11 +2856,6 @@ export class SearchV3View extends JfElement {
         </div>
       </div>
       ${this.pane()}
-      <!-- LAST in the shadow root on purpose: the palette and the hero composer share the overlay
-           rung, so DOM order is what puts the palette on top. The pane above shares that rung too
-           when it is overlaid, and is deliberately BEFORE the palette for the same reason: a command
-           palette invoked over an open document belongs on top of it. -->
-      <jf-sv3-palette data-testid="sv3-palette" @sv3-palette-run=${this.onPaletteRun}></jf-sv3-palette>
     `;
   }
 }
