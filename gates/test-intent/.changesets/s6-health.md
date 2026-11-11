@@ -460,3 +460,13 @@ What each Obsolete entry removes:
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-fjfobbud-round3",
+  "verdict": "accept",
+  "digest": "sha256:eb00c515502693e2f1dc1732531829dfc91db6b3421571eb4a28f79798d105af"
+}
+```
