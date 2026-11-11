@@ -45,6 +45,7 @@ dependencies {
 
   // Tika for content extraction
   implementation(libs.tika.core)
+  implementation("org.apache.tika:tika-langdetect-optimaize:${libs.versions.tika.get()}")
   // The owned text parser reuses Tika's CSV sniffing and table implementation.
   implementation("org.apache.tika:tika-parser-text-module:${libs.versions.tika.get()}")
   implementation("org.apache.pdfbox:pdfbox:3.0.6")
@@ -225,10 +226,14 @@ tasks.withType<Test>().matching { it.name == "test" || it.name.startsWith("ciUni
   // no shared file paths (all use @TempDir), no port bindings, and the
   // System.setProperty("justsearch.config", ...) usage is per-test with
   // save/restore — each fork gets its own JVM properties.
-  // Each fork uses ~384 MB heap (JvmBaseConventionsPlugin default), so
-  // 2 forks = ~768 MB total per worker-services:test invocation.
+  // Each fork uses up to 512 MB heap (set below), so
+  // 2 forks = ~1 GB total per worker-services:test invocation.
   // Empirically: 1 fork → 27.2s; 2 forks → 21.9s; 3 forks → 26.95s
   // (3-fork JVM-startup overhead overwhelms the parallelism gain on this
   // workload distribution). 2 forks is the local optimum.
   maxParallelForks = 2
+  // Content language detection keeps Tika's bundled language models (about 96 MiB, all profiles)
+  // for the life of the JVM once any test indexes Latin text; the convention's 384m fork then ran
+  // out of memory in the full suite.
+  maxHeapSize = "512m"
 }

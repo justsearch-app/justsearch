@@ -621,7 +621,7 @@ Five markdown help files ship in `SSOT/docs/help/` and are auto-ingested on star
 - `ai-features.md` (what each install profile includes, Ask/Delegate/Structured, MCP, requirements)
 - `troubleshooting.md` (symptom-based guidance, data and log folders on Windows and Linux, resetting data)
 
-**Auto-ingestion:** `KnowledgeServerBootstrap.tryIngestHelpFiles()` runs after `reindexPersistedRoots()`. Uses a version-stamped marker file (`.help-ingested-version`) in the data directory for idempotency — only re-ingests when `HELP_FILES_VERSION` changes. Current version: `v3`.
+**Auto-ingestion:** `KnowledgeServerBootstrap.tryIngestHelpFiles()` runs after `reindexPersistedRoots()`. Uses a version-stamped marker file (`.help-ingested-version`) in the data directory for idempotency — only re-ingests when `HELP_FILES_VERSION` changes, which is bumped for new help content and for extraction-policy changes that alter the stored help documents. Current version: `v5`.
 
 **Collection threading:** `target_collection` field flows through: proto `BatchRequest` → `WorkerIngestService` → `SqliteJobQueue` (V4 schema migration adds `collection` column) → `IndexingDocumentOps.buildDocument()` (called from the indexing loop) → `SchemaFields.COLLECTION` → Lucene field catalog (`fields.v1.json`).
 

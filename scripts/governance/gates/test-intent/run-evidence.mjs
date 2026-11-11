@@ -175,6 +175,18 @@ function vitestEntry(uiWeb) {
   return path.join(dir, typeof bin === 'string' ? bin : bin.vitest);
 }
 
+/**
+ * A JVM check's JUnit reports: the class's own XML plus the separate XML Gradle writes for each
+ * nested class (TEST-<fqcn>$<Nested>.xml).
+ */
+function junitReports(root, t) {
+  const dir = path.join(root, path.dirname(t.resultFile));
+  const prefix = `TEST-${t.fqcn}$`;
+  const nested = fs.existsSync(dir) ? fs.readdirSync(dir).filter((n) => n.startsWith(prefix) && n.endsWith('.xml')) : [];
+  return [{ path: path.join(root, t.resultFile), nested: false },
+    ...nested.sort().map((n) => ({ path: path.join(dir, n), nested: true, classname: n.slice('TEST-'.length, -'.xml'.length) }))];
+}
+
 /** Run every check in `root`; returns {runs, results: Map<checkId, {cases, buildOutput, fileStatus, fileMessage}>}. */
 function runChecks(checks, root) {
   const runs = [];
@@ -213,14 +225,16 @@ function runChecks(checks, root) {
     // sibling. Keep class checks grouped, and use a fresh, isolated run for every method check.
     const batches = [...(classes.length ? [classes] : []), ...group.filter(({ t }) => t.method).map((entry) => [entry])];
     for (const batch of batches) {
-      for (const { t } of batch) fs.rmSync(path.join(root, t.resultFile), { force: true });
+      for (const { t } of batch) for (const xml of junitReports(root, t)) fs.rmSync(xml.path, { force: true });
       const filters = [...new Set(batch.map(({ t }) => (t.method ? `${t.fqcn}.${t.method}` : t.fqcn)))];
       const run = sh(command(filters), root);
       runs.push(run);
       for (const { id, t } of batch) {
-        const xmlPath = path.join(root, t.resultFile);
-        const parsed = fs.existsSync(xmlPath) ? parseJUnitXml(fs.readFileSync(xmlPath, 'utf8')) : [];
-        const cases = t.method ? parsed.filter((c) => c.classname === t.fqcn) : selectJUnitCases(parsed, t);
+        // A nested class's cases count only from its own fresh report, under its own classname.
+        const reports = junitReports(root, t).filter((xml) => fs.existsSync(xml.path)).map((xml) => ({ ...xml,
+          cases: parseJUnitXml(fs.readFileSync(xml.path, 'utf8')).filter((c) => !xml.nested || c.classname === xml.classname) }));
+        const cases = reports.flatMap((xml) => (xml.nested ? xml.cases
+          : t.method ? xml.cases.filter((c) => c.classname === t.fqcn) : selectJUnitCases(xml.cases, t)));
         results.set(id, { runner: 'gradle', cases, buildOutput: run.output });
       }
     }

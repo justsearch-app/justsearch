@@ -130,8 +130,10 @@ const args = process.argv.slice(2);
 const filters = args.flatMap((arg, i) => arg === '--tests' ? [args[i + 1]] : []);
 const task = config.task ?? 'test', fqcn = config.fqcn ?? 'io.x.ProbeTest';
 const report = 'modules/core/build/test-results/' + task + '/TEST-' + fqcn + '.xml';
+const reports = path.dirname(report);
+const nestedExisted = fs.existsSync(reports) && fs.readdirSync(reports).some(n => n.startsWith('TEST-' + fqcn + '$'));
 fs.appendFileSync(path.join(process.env.PROBE_CONTROL, 'gradle-runs.jsonl'),
-  JSON.stringify({ before, args, reportExisted: fs.existsSync(report) }) + '\n');
+  JSON.stringify({ before, args, reportExisted: fs.existsSync(report), nestedExisted }) + '\n');
 const cases = Object.entries(config.methods).flatMap(([method, invocations]) =>
   filters.some(f => f === fqcn || f === fqcn + '.' + method) ? invocations : []);
 if (cases.length) {
@@ -141,9 +143,14 @@ if (cases.length) {
       ? '<failure type="org.opentest4j.AssertionFailedError" message="expected old behaviour"/>'
       : status === 'exception' ? '<failure type="java.lang.IllegalStateException"/>' : '';
     return '<testcase classname="' + (c.classname ?? fqcn) + '" name="' + c.name + '">' + body + '</testcase>';
-  }).join('');
-  fs.mkdirSync(path.dirname(report), { recursive: true });
-  fs.writeFileSync(report, '<testsuite>' + xml + '</testsuite>');
+  });
+  // Gradle writes a nested class's cases to its own report, TEST-<outer>$<Nested>.xml.
+  const files = {};
+  cases.forEach((c, i) => { (files[c.report ?? fqcn] ??= []).push(xml[i]); });
+  fs.mkdirSync(reports, { recursive: true });
+  for (const [cls, list] of Object.entries(files)) {
+    fs.writeFileSync(path.join(reports, 'TEST-' + cls + '.xml'), '<testsuite>' + list.join('') + '</testsuite>');
+  }
 }
 process.exitCode = cases.length === 0 || cases.some(c =>
   ['assertion', 'exception'].includes(before ? (c.before ?? c.status) : c.status)) ? 1 : 0;
@@ -238,6 +245,10 @@ try {
       const { task = 'test', fqcn = 'io.x.ProbeTest' } = options.gradle;
       write(`modules/core/build/test-results/${task}/TEST-${fqcn}.xml`,
         `<testsuite><testcase classname="${fqcn}" name="stale earlier run"/></testsuite>`);
+      if (options.gradle.staleNested) {
+        write(`modules/core/build/test-results/${task}/TEST-${fqcn}$Stale.xml`,
+          `<testsuite><testcase classname="${fqcn}$Stale" name="stale nested run"/></testsuite>`);
+      }
     }
     const gitBefore = options.lfs ? gitSnapshot(path.join(root, '.git')) : null;
     const gitEvents = [];
@@ -395,6 +406,27 @@ test('CLI: identical display names, class-wide results and failing siblings stay
       assert.ok(runs.every(run => (run.command.match(/--tests /g) ?? []).length === 1));
     }
     assert.ok(gradleRuns(scratch).every(run => !run.reportExisted));
+  });
+});
+
+test('CLI: nested-class cases count from their own fresh reports, under their own classname', async () => {
+  const classId = CHECK.split('#')[0];
+  const checks = [`${classId}#nested`, classId];
+  await fixture({ checks, gradle: { staleNested: true, methods: { nested: [
+    { name: 'nested display', classname: 'io.x.ProbeTest$Inner', report: 'io.x.ProbeTest$Inner', before: 'assertion' },
+    // Gradle's Outer.method filter also selects a same-named method of another nested class.
+    { name: 'same method elsewhere', classname: 'io.x.ProbeTest$Other', report: 'io.x.ProbeTest$Other', before: 'passed' },
+    { name: 'foreign in nested report', classname: 'io.x.Foreign', report: 'io.x.ProbeTest$Inner', before: 'assertion' },
+  ] } } }, ({ result, output, out, scratch, root }) => {
+    assert.equal(result.status, 0, output);
+    const evidence = readEvidence(out);
+    const expected = [{ name: 'nested display', status: 'passed' }, { name: 'same method elsewhere', status: 'passed' }];
+    assert.deepEqual(evidence.checks.map(c => [c.outcome, c.cases]), [['passed', expected], ['passed', expected]]);
+    assert.deepEqual(evidence.failBefore.checks.map(c => c.classification), ['assertion', 'assertion']);
+    assert.ok(gradleRuns(scratch).every(run => !run.reportExisted && !run.nestedExisted),
+      'every run starts without stale outer or nested XML');
+    assert.deepEqual(validateEvidence({ evidenceText: fs.readFileSync(out, 'utf8'), evidencePath: out,
+      newChecks: checks, requireFailBefore: true, readWorking: rel => fs.readFileSync(path.join(root, rel), 'utf8') }), []);
   });
 });
 

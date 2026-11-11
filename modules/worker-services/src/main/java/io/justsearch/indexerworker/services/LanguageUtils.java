@@ -2,8 +2,8 @@
 package io.justsearch.indexerworker.services;
 
 import java.util.List;
-import java.util.Locale;
 import java.util.Set;
+import io.justsearch.indexerworker.extract.LatinLanguageDetector;
 import org.commonmark.node.BlockQuote;
 import org.commonmark.node.Image;
 import org.commonmark.node.Link;
@@ -17,13 +17,16 @@ import org.commonmark.renderer.text.TextContentRenderer;
 /**
  * Utility for detecting/resolving language from text content.
  *
- * <p>This is used by both live VDU update and switch-buffer replay paths
- * to ensure parity (P1.5).
+ * <p>Indexing, VDU replacement and passage regeneration use the same prepared preview.
  */
 public final class LanguageUtils {
 
-  private static final String DEFAULT_LANGUAGE = resolveDefaultLanguageTag();
+  private static final int MIN_LATIN_LETTERS = 50;
   private static final char BOM = '\uFEFF';
+  private static final Set<String> STRUCTURED_DATA_MIMES = Set.of(
+      "text/csv", "text/tab-separated-values", "application/json", "application/x-ndjson",
+      "application/yaml", "application/x-yaml", "text/yaml", "text/x-yaml", "application/toml",
+      "application/sql", "application/x-sql", "text/x-sql");
   private static final List<String> DESCRIPTION_KEYS =
       List.of("description", "summary", "excerpt", "abstract");
 
@@ -35,20 +38,36 @@ public final class LanguageUtils {
   /**
    * Resolves the language for a content preview.
    *
-   * <p>Uses script-based heuristics to detect non-Latin languages;
-   * falls back to the system default locale for Latin-script content.
+   * <p>Retains the existing non-Latin script rules and uses bundled statistical models for
+   * Latin prose. Insufficient evidence has no label; the machine locale is never consulted.
+   * Tika HIGH confidence requires a probability greater than 0.9.
    *
    * @param preview the content preview (first ~4K chars)
-   * @return an IETF BCP 47 language tag (e.g., "en-US", "zh", "ja")
+   * @return an ISO language code, or null when the evidence is insufficient
    */
   public static String resolveLanguage(String preview) {
-    String detected = detectLanguage(preview);
-    if (detected != null && !detected.isBlank()) {
-      return detected;
+    return detectLanguage(preview);
+  }
+
+  /**
+   * Resolves the language of a document of the given kind. Source code and structured data, as
+   * the app classifies them by file kind and MIME type, have no natural language and get no label.
+   *
+   * @param preview the content preview (first ~4K chars)
+   * @param fileKind the stored file kind ({@code code}, {@code text}, {@code markdown}, ...)
+   * @param mimeBase the stored MIME type without parameters
+   * @return an ISO language code, or null for code, data or insufficient evidence
+   */
+  public static String resolveLanguage(String preview, String fileKind, String mimeBase) {
+    return isCodeOrData(fileKind, mimeBase) ? null : detectLanguage(preview);
+  }
+
+  private static boolean isCodeOrData(String fileKind, String mimeBase) {
+    if ("code".equals(fileKind)) {
+      return true;
     }
-    // Script-based detection cannot distinguish Latin languages reliably;
-    // treat them as the default locale.
-    return DEFAULT_LANGUAGE != null && !DEFAULT_LANGUAGE.isBlank() ? DEFAULT_LANGUAGE : "und";
+    return mimeBase != null
+        && (STRUCTURED_DATA_MIMES.contains(mimeBase) || mimeBase.endsWith("+json"));
   }
 
   /**
@@ -466,31 +485,11 @@ public final class LanguageUtils {
     return null;
   }
 
-  private static String resolveDefaultLanguageTag() {
-    try {
-      Locale locale = Locale.getDefault();
-      if (locale != null) {
-        String tag = locale.toLanguageTag();
-        if (tag != null && !tag.isBlank()) {
-          return tag;
-        }
-      }
-    } catch (RuntimeException ignored) {
-      // best-effort
-    }
-    return "en-US";
-  }
-
-  /**
-   * Very lightweight script heuristic:
-   * - returns explicit language codes for non-Latin scripts
-   * - returns null for Latin (caller should use default language tag)
-   */
   private static String detectLanguage(String text) {
     if (text == null) {
       return null;
     }
-    String sample = text.strip();
+    String sample = contentPreview(text, 4096);
     if (sample.isEmpty()) {
       return null;
     }
@@ -557,8 +556,8 @@ public final class LanguageUtils {
     if (greek >= threshold) {
       return "el";
     }
-    if (latin >= threshold) {
-      return null;
+    if (latin >= MIN_LATIN_LETTERS && latin >= examined * 0.8) {
+      return LatinLanguageDetector.detect(sample);
     }
     return null;
   }
@@ -567,19 +566,29 @@ public final class LanguageUtils {
     return block == Character.UnicodeBlock.BASIC_LATIN
         || block == Character.UnicodeBlock.LATIN_1_SUPPLEMENT
         || block == Character.UnicodeBlock.LATIN_EXTENDED_A
+        || block == Character.UnicodeBlock.LATIN_EXTENDED_ADDITIONAL
         || block == Character.UnicodeBlock.LATIN_EXTENDED_B
-        || block == Character.UnicodeBlock.LATIN_EXTENDED_ADDITIONAL;
+        || block == Character.UnicodeBlock.LATIN_EXTENDED_C
+        || block == Character.UnicodeBlock.LATIN_EXTENDED_D
+        || block == Character.UnicodeBlock.LATIN_EXTENDED_E
+        || block == Character.UnicodeBlock.LATIN_EXTENDED_F
+        || block == Character.UnicodeBlock.LATIN_EXTENDED_G;
   }
 
   private static boolean isCyrillic(Character.UnicodeBlock block) {
     return block == Character.UnicodeBlock.CYRILLIC
-        || block == Character.UnicodeBlock.CYRILLIC_SUPPLEMENTARY;
+        || block == Character.UnicodeBlock.CYRILLIC_SUPPLEMENTARY
+        || block == Character.UnicodeBlock.CYRILLIC_EXTENDED_A
+        || block == Character.UnicodeBlock.CYRILLIC_EXTENDED_B
+        || block == Character.UnicodeBlock.CYRILLIC_EXTENDED_C;
   }
 
   private static boolean isHan(Character.UnicodeBlock block) {
     return block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS
         || block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_A
         || block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_B
+        || block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_C
+        || block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_D
         || block == Character.UnicodeBlock.CJK_COMPATIBILITY_IDEOGRAPHS
         || block == Character.UnicodeBlock.CJK_COMPATIBILITY_IDEOGRAPHS_SUPPLEMENT;
   }
@@ -593,20 +602,27 @@ public final class LanguageUtils {
   private static boolean isHangul(Character.UnicodeBlock block) {
     return block == Character.UnicodeBlock.HANGUL_SYLLABLES
         || block == Character.UnicodeBlock.HANGUL_JAMO
-        || block == Character.UnicodeBlock.HANGUL_COMPATIBILITY_JAMO;
+        || block == Character.UnicodeBlock.HANGUL_COMPATIBILITY_JAMO
+        || block == Character.UnicodeBlock.HANGUL_JAMO_EXTENDED_A
+        || block == Character.UnicodeBlock.HANGUL_JAMO_EXTENDED_B;
   }
 
   private static boolean isArabic(Character.UnicodeBlock block) {
     return block == Character.UnicodeBlock.ARABIC
-        || block == Character.UnicodeBlock.ARABIC_SUPPLEMENT;
+        || block == Character.UnicodeBlock.ARABIC_PRESENTATION_FORMS_A
+        || block == Character.UnicodeBlock.ARABIC_PRESENTATION_FORMS_B
+        || block == Character.UnicodeBlock.ARABIC_SUPPLEMENT
+        || block == Character.UnicodeBlock.ARABIC_EXTENDED_A;
   }
 
   private static boolean isDevanagari(Character.UnicodeBlock block) {
-    return block == Character.UnicodeBlock.DEVANAGARI;
+    return block == Character.UnicodeBlock.DEVANAGARI
+        || block == Character.UnicodeBlock.DEVANAGARI_EXTENDED;
   }
 
   private static boolean isGreek(Character.UnicodeBlock block) {
     return block == Character.UnicodeBlock.GREEK
         || block == Character.UnicodeBlock.GREEK_EXTENDED;
   }
+
 }

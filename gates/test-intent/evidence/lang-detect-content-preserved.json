@@ -1,0 +1,91 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-11T02:52:55.050Z",
+  "revision": "b68e81beaa0f5a832fa07d2b3eb3e77c16cb877e",
+  "tree": "af3094e8d1bebf6eb2441347bf522d9d88f18375",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.ContentLanguageTest.retainsExistingScriptLabels\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3886
+    },
+    {
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.services.WorkerIngestServiceChunkRegenerationTest.updateVduResultRegeneratesChunksWithOffsetsAndMetadata\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 8758
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/ContentLanguageTest.java#retainsExistingScriptLabels",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/ContentLanguageTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c4a926815554d0f45a7421e79e75f46b5a8392d491d2922154a27dd7b672f085",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] zh, 这是一段中文文本用于测试。",
+          "status": "passed"
+        },
+        {
+          "name": "[2] ru, Это текст на русском языке.",
+          "status": "passed"
+        },
+        {
+          "name": "[3] ja, これはひらがなとカタカナのテキストです。",
+          "status": "passed"
+        },
+        {
+          "name": "[4] ko, 이것은 한국어 텍스트입니다.",
+          "status": "passed"
+        },
+        {
+          "name": "[5] ar, هذا نص باللغة العربية.",
+          "status": "passed"
+        },
+        {
+          "name": "[6] hi, यह हिंदी भाषा में लिखा गया पाठ है।",
+          "status": "passed"
+        },
+        {
+          "name": "[7] el, Αυτό είναι ένα κείμενο στην ελληνική γλώσσα.",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WorkerIngestServiceChunkRegenerationTest.java#updateVduResultRegeneratesChunksWithOffsetsAndMetadata",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WorkerIngestServiceChunkRegenerationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:285ac70c623b986dfb91b49e338efba475b397755a9e0344ba87779a4dc25451",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "updateVduResult regenerates chunks with offsets + metadata",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:8098c74a0e5343f122e556a8674a64f7107c05dfafa81151a82ccd6df2816c08"
+}
