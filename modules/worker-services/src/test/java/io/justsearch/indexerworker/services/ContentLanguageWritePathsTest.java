@@ -50,9 +50,10 @@ class ContentLanguageWritePathsTest extends LuceneExecutorTestBase {
     var metadata = IndexingDocumentOps.deriveParentMetadata(source, extraction, null, null);
     var plan = IndexingDocumentOps.chunkPlan(source, extraction, metadata);
     var document = TestDocumentBuilder.buildDocument(source, extraction, "documents", null, metadata);
-    runtime.indexingCoordinator().indexSingle(IndexingDocumentOps.withChunkDeclaration(document, plan));
-    IndexingDocumentOps.indexDeclaredChunks(source, extraction, runtime.indexingCoordinator(), metadata,
-        "documents", (String) document.fields().get(SchemaFields.DOC_UID), false, plan);
+    var chunks = IndexingDocumentOps.buildDeclaredChunks(source, extraction, metadata, "documents",
+        (String) document.fields().get(SchemaFields.DOC_UID), false, plan, Map.of());
+    runtime.indexingCoordinator().replaceTextFamily(
+        IndexingDocumentOps.withChunkDeclaration(document, plan), chunks, true);
     refresh(runtime);
     return (String) document.fields().get(SchemaFields.DOC_ID);
   }
