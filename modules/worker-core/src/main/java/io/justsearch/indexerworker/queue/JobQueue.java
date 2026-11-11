@@ -535,6 +535,14 @@ public interface JobQueue extends Closeable {
     return enqueueEntries(entries, collection, scanId);
   }
 
+  /** Applied extractor identity used by automatic watched-file admissions. */
+  default void useExtractionPolicy(String policyId) {}
+
+  /** Bounded discovery of terminal extraction failures hidden by reusable indexed parents. */
+  default java.util.Set<String> extractionPolicyRetryPaths(java.util.Collection<String> paths, String policyId) {
+    return java.util.Set.of();
+  }
+
   /** Upgrade reconciliation admits missing/DONE paths without disturbing any pending retry. */
   default int enqueueUpgradeRecoveryEntries(List<EnqueueEntry> entries, String collection) {
     throw new UnsupportedOperationException("Upgrade recovery enqueue is unavailable");

@@ -36,7 +36,7 @@ final class SourceOriginLookupTest {
       Path queuedRoot = Path.of(io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(root));
       assertEquals(Optional.of(one.id()), lookup(queue, claim(queuedRoot.resolve("a.txt"), queuedRoot, "operation-one", 1L)));
       try (var connection = DriverManager.getConnection("jdbc:sqlite:" + db); var query = connection.createStatement()) {
-        try (var rows = query.executeQuery("PRAGMA user_version")) { assertTrue(rows.next()); assertEquals(28, rows.getInt(1)); }
+        try (var rows = query.executeQuery("PRAGMA user_version")) { assertTrue(rows.next()); assertEquals(SqliteSchema.TARGET_VERSION, rows.getInt(1)); }
         try (var rows = query.executeQuery("SELECT count(*) FROM source_origin")) { assertTrue(rows.next()); assertEquals(3, rows.getInt(1)); }
       }
     }

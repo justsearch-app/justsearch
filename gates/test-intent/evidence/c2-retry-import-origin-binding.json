@@ -1,0 +1,54 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-10T23:14:36.336Z",
+  "revision": "d45201e7ff37be7772c29113880351e0b1105001",
+  "tree": "f8c0f4a9925dc70e96b1bc250dc3ff665cd74b02",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.queue.ImportOriginBindingMigrationTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 7311
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/ImportOriginBindingMigrationTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/ImportOriginBindingMigrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f2c990958dcbe9a7d1a5030615529818a9c11ee1f913126bc7bcde8ca8ea18ef",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] false",
+          "status": "passed"
+        },
+        {
+          "name": "[2] true",
+          "status": "passed"
+        },
+        {
+          "name": "failedV28MigrationRollsBackBindingColumnsAndVersion()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:10aa0cda6fe6f9c01c23734664bc8464c094f9671495fb1b5f9a8caea1d35436"
+}

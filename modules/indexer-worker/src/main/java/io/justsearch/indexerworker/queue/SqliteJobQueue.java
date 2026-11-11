@@ -76,6 +76,68 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     declaredCollectionRoots = Objects.requireNonNull(roots);
   }
 
+  private volatile String extractionPolicyId;
+
+  @Override
+  public void useExtractionPolicy(String policyId) {
+    extractionPolicyId = Objects.requireNonNull(policyId);
+  }
+
+  private static final String TERMINAL_EXTRACTION_FAILURE =
+      "state='FAILED' AND last_retry_policy='NONE' "
+          + "AND (walk_seen_epoch IS NULL OR EXISTS (SELECT 1 FROM ingestion_walk_progress w "
+          + "WHERE w.operation_key=jobs.scan_id AND w.captured_plan=1 AND w.sealed_at IS NOT NULL)) "
+          + "AND last_outcome_class IN ('BUDGET_EXCEEDED','PARSER_FAILED','PARSER_TIMEOUT','UNSUPPORTED')";
+
+  @Override
+  public Set<String> extractionPolicyRetryPaths(java.util.Collection<String> paths, String policyId) {
+    if (paths.isEmpty()) return Set.of();
+    lockTimed();
+    try {
+      ensureOpen();
+      var result = new HashSet<String>();
+      try (var query = connection.prepareStatement("SELECT path FROM jobs WHERE path=? AND "
+          + TERMINAL_EXTRACTION_FAILURE + " AND (extraction_policy_id IS NULL OR extraction_policy_id<>?)")) {
+        for (var path : paths) {
+          query.setString(1, path);
+          query.setString(2, policyId);
+          try (var row = query.executeQuery()) { if (row.next()) result.add(row.getString(1)); }
+        }
+      }
+      return Set.copyOf(result);
+    } catch (SQLException failure) {
+      throw new IngestionServiceUnavailableException("Extraction policy discovery failed", failure);
+    } finally { unlockAfterChanges(); }
+  }
+
+  private boolean needsExtractionPolicyRetry(JobQueue.EnqueueEntry entry,
+      List<IngestCollectionPolicy.RootBinding> declared) throws SQLException {
+    if (extractionPolicyId == null || IngestCollectionPolicy.owningRoot(entry.path(), declared) == null) return false;
+    try (var query = connection.prepareStatement("SELECT 1 FROM jobs WHERE path=? AND "
+        + TERMINAL_EXTRACTION_FAILURE + " AND (extraction_policy_id IS NULL OR extraction_policy_id<>?)")) {
+      query.setString(1, normalizePath(entry.path()));
+      query.setString(2, extractionPolicyId);
+      try (var row = query.executeQuery()) { return row.next(); }
+    }
+  }
+
+  private boolean watchedTerminalExtractionFailure(JobQueue.EnqueueEntry entry,
+      List<IngestCollectionPolicy.RootBinding> declared) throws SQLException {
+    if (IngestCollectionPolicy.owningRoot(entry.path(), declared) == null) return false;
+    try (var query = connection.prepareStatement("SELECT 1 FROM jobs WHERE path=? AND " + TERMINAL_EXTRACTION_FAILURE)) {
+      query.setString(1, normalizePath(entry.path()));
+      try (var row = query.executeQuery()) { return row.next(); }
+    }
+  }
+
+  private static boolean extractionFailure(IngestionOutcome outcome) {
+    if (outcome == null) return false;
+    return switch (outcome.outcomeClass()) {
+      case BUDGET_EXCEEDED, PARSER_FAILED, PARSER_TIMEOUT, UNSUPPORTED -> true;
+      default -> false;
+    };
+  }
+
   private void requireSourceAccess(EnqueueEntry entry) throws IOException {
     io.justsearch.indexerworker.loop.SourceAccess.requireContained(entry.path(), entry.ingestionRoot());
     if (io.justsearch.indexerworker.ingest.CloudPlaceholderDetector.isCloudPlaceholder(entry.path())) {
@@ -2875,9 +2937,10 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       return 0;
     }
 
-    var declared = !exactCollection && unitRevision == null && (collection == null || collection.isBlank())
+    var declared = unitRevision == null && (preserveRetryWaits
+        || (!exactCollection && (collection == null || collection.isBlank())))
         ? declaredCollectionRoots.get() : List.<IngestCollectionPolicy.RootBinding>of();
-    var sources = unitRevision == null ? observeAdmissionSources(entries, null, collection) : Map.<JobQueue.EnqueueEntry, AdmissionSource>of();
+    var sources = unitRevision == null ? observeAdmissionSources(entries, null, collection, preserveRetryWaits) : Map.<JobQueue.EnqueueEntry, AdmissionSource>of();
     lockTimed();
     DbRecovery dbRecovery = preserveRetryWaits ? captureDbRecovery(DbOperation.MAINTENANCE_ADMISSION) : null;
     boolean dbRecoveryEligible = false;
@@ -3369,7 +3432,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     String sourceHash;
     String ingestionRoot;
     try (PreparedStatement query = connection.prepareStatement(
-        "SELECT collection, originator, transport, unit_revision, planned_source_sha256, ingestion_root "
+        "SELECT collection, originator, transport, unit_revision, COALESCE(planned_source_sha256, admitted_source_sha256) AS planned_source_sha256, ingestion_root "
             + "FROM jobs WHERE path = ?")) {
       query.setString(1, normalizedPath);
       try (ResultSet row = query.executeQuery()) {
@@ -3457,6 +3520,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     long modified() { return witness.modifiedAtMs(); }
 
     boolean stillCurrent(Path path) {
+      if (witness == null) return false;
       try {
         io.justsearch.indexerworker.loop.SourceAccess.requireContained(path, ingestionRoot);
         return witness.validateNow() == io.justsearch.indexerworker.loop.FileFreshnessSnapshot.SourceValidationResult.FRESH;
@@ -3471,7 +3535,13 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   }
 
   private AdmissionSource observeAdmissionSource(JobQueue.EnqueueEntry entry, String operationKey, String collection) {
-    if (entry == null || entry.path() == null || entry.plannedSourceSha256() != null) return null;
+    return observeAdmissionSource(entry, operationKey, collection, false);
+  }
+
+  private AdmissionSource observeAdmissionSource(JobQueue.EnqueueEntry entry, String operationKey,
+      String collection, boolean observePlannedBytes) {
+    if (entry == null || entry.path() == null
+        || (!observePlannedBytes && entry.plannedSourceSha256() != null)) return null;
     try {
       requireSourceAccess(entry);
       var before = io.justsearch.indexerworker.loop.FileFreshnessSnapshot.capture(entry.path());
@@ -3483,24 +3553,36 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       var source = new AdmissionSource(before, hash, entry.ingestionRoot());
       return source.stillCurrent(entry.path()) ? source : null;
     } catch (IOException | SecurityException unavailable) {
+      if (observePlannedBytes && (Files.notExists(entry.path(), LinkOption.NOFOLLOW_LINKS)
+          || !Files.isReadable(entry.path())
+          || (entry.ingestionRoot() != null && !Files.isDirectory(entry.ingestionRoot())))) {
+        // Keep availability protection distinct from a hash that failed or expired on a
+        // present source: only the latter must leave new, retryable observation work.
+        return new AdmissionSource(null, null, entry.ingestionRoot());
+      }
       return null;
     }
   }
 
   private Map<JobQueue.EnqueueEntry, AdmissionSource> observeAdmissionSources(
       List<JobQueue.EnqueueEntry> entries, String operationKey, String collection) {
+    return observeAdmissionSources(entries, operationKey, collection, false);
+  }
+
+  private Map<JobQueue.EnqueueEntry, AdmissionSource> observeAdmissionSources(
+      List<JobQueue.EnqueueEntry> entries, String operationKey, String collection, boolean observePlannedBytes) {
     Map<JobQueue.EnqueueEntry, AdmissionSource> sources = new HashMap<>();
     for (var entry : entries) {
-      var source = collection == null ? observeAdmissionSource(entry, operationKey)
-          : observeAdmissionSource(entry, operationKey, collection);
-      if (source != null) sources.put(entry, source);
+      var source = collection == null && !observePlannedBytes
+          ? observeAdmissionSource(entry, operationKey)
+          : observeAdmissionSource(entry, operationKey, collection, observePlannedBytes);
+      if (source != null || observePlannedBytes) sources.put(entry, source);
     }
     return sources;
   }
 
   private boolean preservesMaintenanceWork(JobQueue.EnqueueEntry entry, String collection, boolean exactCollection,
       String sourceIdentity, AdmissionSource source, long now, boolean validatedRecoveryOwner) throws SQLException {
-    if (source != null && !source.stillCurrent(entry.path())) return false;
     try (var query = connection.prepareStatement(
         "SELECT state,collection,admitted_source_sha256,planned_source_sha256,unit_revision,ingestion_root,"
             + "size_bytes,last_updated,CASE WHEN admitted_source_sha256 IS NULL AND planned_source_sha256 IS NULL "
@@ -3511,7 +3593,13 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       query.setString(1, normalizePath(entry.path()));
       try (var row = query.executeQuery()) {
         if (!row.next() || STATE_DONE.equals(row.getString(1))) return false;
-        if (source == null && entry.plannedSourceSha256() == null) {
+        if (source != null && source.witness() == null) {
+          // Known unavailability cannot authorize another attempt.
+          return STATE_FAILED.equals(row.getString(1))
+              || (STATE_PENDING.equals(row.getString(1)) && preservesMaintenanceRetryWait(entry.path(), now));
+        }
+        if (source != null && !source.stillCurrent(entry.path())) return false;
+        if (source == null) {
           return STATE_PENDING.equals(row.getString(1)) && preservesMaintenanceRetryWait(entry.path(), now);
         }
         String revision = row.getString(5);
@@ -3570,7 +3658,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       Map<JobQueue.EnqueueEntry, AdmissionSource> sources) throws SQLException {
     String sql = """
         INSERT INTO jobs
-          (path, state, attempts, last_updated, collection, size_bytes, scan_id, originator, transport, unit_revision, walk_seen_epoch, planned_source_sha256, ingestion_root, force_reindex, admitted_source_sha256)
+          (path, state, attempts, last_updated, collection, size_bytes, scan_id, originator, transport, unit_revision, walk_seen_epoch, planned_source_sha256, ingestion_root, force_reindex, admitted_source_sha256, extraction_policy_id)
         VALUES (
           ?, 'PENDING', 0, ?,
           CASE WHEN ? = 1 THEN ? ELSE COALESCE(?, (SELECT prior.collection FROM jobs prior WHERE prior.path = ?)) END,
@@ -3579,7 +3667,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           COALESCE(?, (SELECT prior.originator FROM jobs prior WHERE prior.path = ?)),
           COALESCE(?, (SELECT prior.transport FROM jobs prior WHERE prior.path = ?)),
           COALESCE(?, lower(hex(randomblob(16)))), ?, ?,
-          COALESCE(?, (SELECT prior.ingestion_root FROM jobs prior WHERE prior.path = ?)), ?, ?)
+          COALESCE(?, (SELECT prior.ingestion_root FROM jobs prior WHERE prior.path = ?)), ?, ?, ?)
         """ + SqliteSchema.REENQUEUE_JOB_ON_CONFLICT;
     var frozen = frozenCollectionRoots.get();
     int accepted = 0;
@@ -3598,6 +3686,10 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
             ? source != null && source.stillCurrent(entry.path()) ? source.sha256() : null
             : ordinaryAdmission ? entry.plannedSourceSha256() : null;
         sealBeforeMaintenance(normalizedPath);
+        boolean policyRetry = source != null && source.stillCurrent(entry.path())
+            && needsExtractionPolicyRetry(entry, declared);
+        var previousPolicyWork = policyRetry || (!preserveRetryWaits && extractionPolicyId != null)
+            ? watcherRowLocked(normalizedPath) : null;
         var membership =
             SqliteIngestionWalkOps.maintenanceMembership(connection, normalizedPath, scanId);
         stmt.setString(1, normalizedPath);
@@ -3621,7 +3713,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
             }
           }
         }
-        if (preserveRetryWaits && !entry.forceReindex()
+        if (preserveRetryWaits && !policyRetry && !entry.forceReindex()
             && (ordinaryAdmission
                 ? preservesMaintenanceWork(entry, effectiveCollection, exact, sourceIdentity, source, now, false)
                 : preservesMaintenanceRetryWait(entry.path(), now))) {
@@ -3637,10 +3729,13 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         } else {
           stmt.setNull(7, java.sql.Types.INTEGER);
         }
-        stmt.setString(8, membership.key());
-        stmt.setString(9, entry.provenance() == null ? null : entry.provenance().originator());
+        stmt.setString(8, membership.key() == null && policyRetry && previousPolicyWork != null
+            ? previousPolicyWork.get("scan_id") : membership.key());
+        stmt.setString(9, policyRetry ? previousPolicyWork.get("originator")
+            : entry.provenance() == null ? null : entry.provenance().originator());
         stmt.setString(10, normalizedPath);
-        stmt.setString(11, entry.provenance() == null ? null : entry.provenance().transport());
+        stmt.setString(11, policyRetry ? previousPolicyWork.get("transport")
+            : entry.provenance() == null ? null : entry.provenance().transport());
         stmt.setString(12, normalizedPath);
         stmt.setString(13, unitRevision);
         if (membership.epoch() == null) stmt.setNull(14, java.sql.Types.BIGINT);
@@ -3651,6 +3746,10 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         stmt.setString(17, normalizedPath);
         stmt.setInt(18, entry.forceReindex() ? 1 : 0);
         stmt.setString(19, sourceIdentity);
+        stmt.setString(20, membership.epoch() == null
+            && ((source != null && IngestCollectionPolicy.owningRoot(entry.path(), declared) != null)
+                || (previousPolicyWork != null && previousPolicyWork.get("extraction_policy_id") != null))
+            ? extractionPolicyId : null);
         int changed = stmt.executeUpdate();
         enqueued += changed;
         if (changed > 0 && membership.epoch() != null) {
@@ -3713,7 +3812,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     List<JobQueue.EnqueueEntry> witnessedEntries = new ArrayList<>(entries.size());
     Map<JobQueue.EnqueueEntry, AdmissionSource> sources = new HashMap<>();
     try {
-      declared = !enumeration && (collection == null || collection.isBlank())
+      declared = extractionPolicyId != null || (!enumeration && (collection == null || collection.isBlank()))
           ? declaredCollectionRoots.get() : List.of();
       for (JobQueue.EnqueueEntry entry : entries) {
         Path sourcePath = entry.path();
@@ -3760,8 +3859,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         var witnessed = new JobQueue.EnqueueEntry(
             entry.path(), entry.sizeBytes(), provenance, hash, entry.ingestionRoot(), entry.forceReindex());
         witnessedEntries.add(witnessed);
-        var source = before == null || !before.regularFile() || observedHash == null || !observedHash.equals(hash)
-            ? null : new AdmissionSource(before, observedHash, entry.ingestionRoot());
+        var source = before == null || !before.regularFile() || observedHash == null
+            || (!maintenance && !enumeration && !observedHash.equals(hash)) ? null : new AdmissionSource(before, observedHash, entry.ingestionRoot());
         sources.put(witnessed, source != null && source.stillCurrent(entry.path()) ? source : null);
       }
     } catch (IOException | RuntimeException unreadable) {
@@ -3787,11 +3886,21 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
             var source = sources.get(entry);
             boolean current = source != null && source.sha256().equals(entry.plannedSourceSha256())
                 && source.stillCurrent(entry.path());
-            if ((enumeration && enumerationSupersededByAcceptedMutation(
+            boolean policyRetry = needsExtractionPolicyRetry(entry, declared);
+            if ((maintenance || enumeration) && current && !entry.forceReindex() && !policyRetry
+                && extractionPolicyId != null && watchedTerminalExtractionFailure(entry, declared)
+                && preservesMaintenanceWork(entry, normalizedCollection, enumeration,
+                    source.sha256(), source, System.currentTimeMillis(), false)) {
+              if (!identicalCandidateAdmission(generation, entry, normalizedCollection))
+                bufferAdmittedFile(generation, entry);
+              superseded++;
+              continue;
+            }
+            if (!policyRetry && ((enumeration && enumerationSupersededByAcceptedMutation(
                 generation, normalizePath(entry.path()), entry.plannedSourceSha256(), normalizedCollection, current))
                 || (current && !entry.forceReindex()
                     && (identicalCandidateAdmission(generation, entry, normalizedCollection)
-                        || (maintenance && attachCapturedCandidateReceipt(generation, entry, normalizedCollection))))) {
+                        || (maintenance && attachCapturedCandidateReceipt(generation, entry, normalizedCollection)))))) {
               superseded++;
             } else {
               admitted.add(entry);
@@ -3875,7 +3984,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       String collection) throws SQLException {
     if (releaseRecovery != null && releaseRecovery.retiringBuild()) return false;
     try (var query = connection.prepareStatement(
-        "SELECT j.unit_revision,j.planned_source_sha256,j.collection,b.op,b.payload,j.ingestion_root FROM jobs j "
+        "SELECT j.unit_revision,COALESCE(j.planned_source_sha256,j.admitted_source_sha256),j.collection,b.op,b.payload,j.ingestion_root FROM jobs j "
             + "JOIN switch_buffer b ON b.key='path:' || j.path AND b.generation=? WHERE j.path=?")) {
       query.setString(1, generation);
       query.setString(2, normalizePath(entry.path()));
@@ -4300,10 +4409,33 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         if (!Objects.equals(row, file.expectedRow())) return false;
         freshProof.run();
         if (activeClaims.containsKey(file.path()) || row != null && STATE_PROCESSING.equals(row.get("state"))) return false;
-        if (row != null && (row.get("walk_seen_epoch") != null
-            || row.get("unit_revision") != null && (row.get("unit_revision").startsWith("release030") || releaseRecovery != null && releaseRecovery.retiringBuild() && (row.get("unit_revision").startsWith("root1:") || row.get("unit_revision").startsWith("root2:")))
-            || release030ExactFiles.contains(path) || release030IndependentDebt.contains(path)
-            || recordedWatcherRow(row))) return independentWatcherEffect(file, row, debt);
+        if (row != null && (row.get("unit_revision") != null
+            && (row.get("unit_revision").startsWith("release030") || releaseRecovery != null && releaseRecovery.retiringBuild()
+                && (row.get("unit_revision").startsWith("root1:") || row.get("unit_revision").startsWith("root2:")))
+            || release030ExactFiles.contains(path) || release030IndependentDebt.contains(path)))
+          return independentWatcherEffect(file, row, debt);
+
+        // A returned root is automatic discovery too. Reuse ordinary policy admission
+        // before preserving a failed source owner, and replace its candidate receipt in
+        // the same transaction so a later replay cannot reinstall the stale failure.
+        if (!file.sourceSha256().isEmpty() && row != null
+            && Objects.equals(rootOwner(debt.collection()), rootOwner(row.get("collection")))) {
+          var entry = new EnqueueEntry(path, file.size(), null, file.sourceSha256(), Path.of(debt.root()));
+          var declared = declaredCollectionRoots.get();
+          if (needsExtractionPolicyRetry(entry, declared)) {
+            var source = observeAdmissionSource(entry, null, debt.collection(), true);
+            if (source == null || !source.stillCurrent(path) || !file.sourceSha256().equals(source.sha256())) return false;
+            if (enqueueEntriesInTransaction(List.of(entry), debt.collection(), null,
+                System.currentTimeMillis(), true, null, false, declared, Map.of(entry, source)).covered() != 1)
+              throw new SQLException("Returned-root extraction policy admission refused");
+            bufferAdmittedFile(file.candidate(), entry);
+            freshProof.run();
+            return false; // The new receipt requires a fresh frozen journal on the next attempt.
+          }
+        }
+
+        if (row != null && (row.get("walk_seen_epoch") != null || recordedWatcherRow(row)))
+          return independentWatcherEffect(file, row, debt);
 
         SwitchBufferOp predecessor = null;
         boolean laterAdmission = false;
@@ -4849,12 +4981,14 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           inTransaction(
           () -> {
             String previousState = null;
+            boolean policyBound = false;
             try (PreparedStatement read =
-                connection.prepareStatement("SELECT state FROM jobs WHERE path = ?")) {
+                connection.prepareStatement("SELECT state, extraction_policy_id FROM jobs WHERE path = ?")) {
               read.setString(1, normalizedPath);
               try (ResultSet rs = read.executeQuery()) {
                 if (rs.next()) {
                   previousState = rs.getString(1);
+                  policyBound = rs.getString(2) != null;
                 }
               }
             }
@@ -4867,14 +5001,14 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                 INSERT INTO jobs
                   (path, state, attempts, last_updated, collection, size_bytes, scan_id,
                    originator, transport, unit_revision, walk_seen_epoch, planned_source_sha256, ingestion_root,
-                   admitted_source_sha256, force_reindex)
+                   admitted_source_sha256, force_reindex, extraction_policy_id)
                 VALUES (?, 'PENDING', 0, ?,
                   (SELECT prior.collection FROM jobs prior WHERE prior.path = ?), ?,
                   ?,
                   COALESCE(?, (SELECT prior.originator FROM jobs prior WHERE prior.path = ?)),
                   COALESCE(?, (SELECT prior.transport FROM jobs prior WHERE prior.path = ?)),
                   lower(hex(randomblob(16))), ?, ?,
-                  COALESCE(?, (SELECT prior.ingestion_root FROM jobs prior WHERE prior.path = ?)), ?, ?)
+                  COALESCE(?, (SELECT prior.ingestion_root FROM jobs prior WHERE prior.path = ?)), ?, ?, ?)
                 """ + SqliteSchema.REENQUEUE_JOB_ON_CONFLICT;
             int accepted;
             try (PreparedStatement write = connection.prepareStatement(sql)) {
@@ -4898,6 +5032,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
               write.setString(14, entry.plannedSourceSha256() != null ? entry.plannedSourceSha256()
                   : source != null && source.stillCurrent(entry.path()) ? source.sha256() : null);
               write.setInt(15, entry.forceReindex() ? 1 : 0);
+              write.setString(16, membership.epoch() == null && policyBound ? extractionPolicyId : null);
               accepted = executeMutation(write::executeUpdate) > 0 ? 1 : 0;
             }
             if (accepted > 0 && membership.epoch() != null) SqliteIngestionWalkOps.noteMutation(connection, membership.key());
@@ -5990,7 +6125,11 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                     SET state = ?, attempts = ?, last_updated = ?, error_message = ?, retry_after = ?,
                         first_failed_at = ?,
                         last_outcome_class = ?, last_reason_code = ?, last_retry_policy = ?,
-                        last_diagnostic_summary = ?, last_outcome_at = ?
+                        last_diagnostic_summary = ?, last_outcome_at = ?,
+                        extraction_policy_id = CASE WHEN ? AND (walk_seen_epoch IS NULL
+                          OR EXISTS (SELECT 1 FROM ingestion_walk_progress w
+                            WHERE w.operation_key=jobs.scan_id AND w.captured_plan=1))
+                          THEN ? ELSE extraction_policy_id END
                     WHERE path = ?
                     """;
                 try (PreparedStatement stmt = connection.prepareStatement(updateSql)) {
@@ -6005,6 +6144,11 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                   }
                   stmt.setLong(6, firstFailedAt);
                   bindOutcomeOnly(stmt, 7, outcome, normalizedPath);
+                  stmt.setBoolean(12, extractionFailure(outcome) && entry != null
+                      && entry.policyId() != null && !entry.policyId().isBlank()
+                      && !"UNKNOWN".equals(entry.policyId()) && !"n/a".equals(entry.policyId()));
+                  stmt.setString(13, entry == null ? null : entry.policyId());
+                  stmt.setString(14, normalizedPath);
                   int rows = executeMutation(stmt::executeUpdate);
                   if (rows > 0) {
                     insertLedgerEvent(normalizedPath, outcome, ledgerEntryForClaim(normalizedPath, entry, claim),
@@ -6664,11 +6808,17 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
    */
   @Override
   public int cleanupOldJobs(int retentionDays) {
+    var watchedRoots = List.copyOf(declaredCollectionRoots.get());
     var retainedImports = Set.copyOf(retainedWalks.get());
     lock.lock();
     try {
       ensureOpen();
       installRetentionFence(retainedImports);
+      org.sqlite.Function.create(connection, "watched_policy_retained", new org.sqlite.Function() {
+        @Override protected void xFunc() throws SQLException {
+          result(IngestCollectionPolicy.owningRoot(Path.of(value_text(0)), watchedRoots) == null ? 0 : 1);
+        }
+      });
 
       var retained = retainedRootScopes(retirementReplayOps());
       var retainedDeletes = releaseRecovery != null && releaseRecovery.retiringBuild()
@@ -6681,14 +6831,17 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       });
       long cutoff = retentionClock.millis() - (retentionDays * 24L * 60L * 60L * 1000L);
 
-      // Original exact receipts still settle native replay or authorize FAILED recovery.
+      // A watched extraction failure is the durable once-per-policy memory, even after its
+      // ledger history expires. Its normal age cleanup resumes when the root is unwatched.
+      // Original exact receipts also settle native replay or authorize FAILED recovery.
       // Release them only after the recovery checkpoint is conclusively gone.
       String jobsWhere = """
           state IN ('DONE', 'FAILED', 'RETRY_EXHAUSTED') AND last_updated < ?
             AND import_child_retained(scan_id)=0
             AND (walk_seen_epoch IS NULL OR EXISTS (SELECT 1 FROM ingestion_walk_progress p
               WHERE p.operation_key = jobs.scan_id AND p.sealed_at IS NOT NULL AND p.acknowledged_revision = p.revision))
-          """ + " AND release_root_retained(path,unit_revision,collection)=0" + (Files.notExists(Release030RecoveryState.path(dbPath), LinkOption.NOFOLLOW_LINKS)
+          """ + " AND NOT (" + TERMINAL_EXTRACTION_FAILURE + " AND watched_policy_retained(path)=1)"
+              + " AND release_root_retained(path,unit_revision,collection)=0" + (Files.notExists(Release030RecoveryState.path(dbPath), LinkOption.NOFOLLOW_LINKS)
               ? "" : " AND (unit_revision NOT LIKE 'release030/%' OR ingestion_root IS NOT path)");
 
       int deleted;

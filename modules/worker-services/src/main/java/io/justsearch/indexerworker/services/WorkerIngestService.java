@@ -992,6 +992,7 @@ public final class WorkerIngestService {
       var source = io.justsearch.indexerworker.loop.FileFreshnessSnapshot.capture(path);
       var fields = ingestLifecycle.documentFieldOps();
       String key = PathNormalizer.normalizeKey(path);
+      if (jobQueue.extractionPolicyRetryPaths(List.of(key), extractionPolicyId).contains(key)) return false;
       if (!source.regularFile()
           || !fields.isUnmodified(key, source.modifiedAtMs(), source.sizeBytes(), null, extractionPolicyId)
           || !Objects.equals(normalizeRootCollection(collection),
@@ -1953,6 +1954,7 @@ public final class WorkerIngestService {
   /** Uses the same applied policy as the worker's extractor, including configured limits. */
   public void setExtractionPolicy(io.justsearch.indexerworker.extract.TikaExtractionPolicy policy) {
     extractionPolicyId = Objects.requireNonNull(policy, "policy").policyId();
+    if (jobQueue != null) jobQueue.useExtractionPolicy(extractionPolicyId);
     syncOps.setExtractionPolicyId(extractionPolicyId);
     candidateDiscoveryOps.setExtractionPolicyId(extractionPolicyId);
   }
@@ -3589,9 +3591,8 @@ public final class WorkerIngestService {
                 io.justsearch.indexerworker.loop.SourceContentHash.sha256WithinRoot(path, root)).withinRoot(root);
             SyncDirectoryOps.checkCancelled(cancelled);
             if (switchBufferOps.buildingGenerationForFileAdmission() != null
-                || jobQueue.enqueueEntriesWithExactCollection(
-                    List.of(capturedEntry),
-                    subscription.collection()) != 1) {
+                || jobQueue.enqueueMaintenanceScanEntries(
+                    List.of(capturedEntry), subscription.collection(), null) < 0) {
               throw new IOException("Committed boot root admission failed");
             }
           }
@@ -3687,6 +3688,7 @@ public final class WorkerIngestService {
 
   private boolean committedBootFileMatches(Path file, String collection, Path root) throws IOException {
     String id = PathNormalizer.normalizeKey(file);
+    if (jobQueue.extractionPolicyRetryPaths(List.of(id), extractionPolicyId).contains(id)) return false;
     var fields = ingestLifecycle.documentFieldOps();
     String source = fields.getDocumentField(
         id, SchemaFields.SOURCE_SHA256);

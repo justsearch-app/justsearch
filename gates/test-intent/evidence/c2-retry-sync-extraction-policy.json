@@ -1,0 +1,66 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:7ac818af3ec04b090d45ed6b5c1b84c485252c7de6c467aad7e0d35e8210b680"
+  },
+  "createdAt": "2026-11-10T23:15:30.703Z",
+  "revision": "d45201e7ff37be7772c29113880351e0b1105001",
+  "tree": "5ea16b641b0ca8c827e56117c52e7cc4d693324c",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.SyncExtractionPolicyTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3839
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SyncExtractionPolicyTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SyncExtractionPolicyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:26547947aaf485d84bedd036f3452eeb82266d476f80afadf938b1fe64980644",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "currentEffectivePolicyKeepsUnchangedFilesSkipped(String) [1] default",
+          "status": "passed"
+        },
+        {
+          "name": "currentEffectivePolicyKeepsUnchangedFilesSkipped(String) [2] configured",
+          "status": "passed"
+        },
+        {
+          "name": "reconciliationSelectsStaleExtractionThroughExistingAdmission(String) [1] old-policy",
+          "status": "passed"
+        },
+        {
+          "name": "reconciliationSelectsStaleExtractionThroughExistingAdmission(String) [2] missing-policy",
+          "status": "passed"
+        },
+        {
+          "name": "reconciliationSelectsStaleExtractionThroughExistingAdmission(String) [3] missing-hash",
+          "status": "passed"
+        },
+        {
+          "name": "reconciliationSelectsStaleExtractionThroughExistingAdmission(String) [4] configured-policy",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:2fc3064038ed526395fd2dda95b6121f6b7391d77b6ef44b98cfe8f39879dc50"
+}
