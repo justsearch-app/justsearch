@@ -25,7 +25,9 @@ export async function runLifecycle({ name, testCase, policy, io }) {
     const planPath=path.join(workDir,'fake-engine.plan.json');if(!fs.existsSync(planPath))io.writeEnginePlan(workDir,enginePlanFor(testCase));
     const faultGatePath=testCase.probe==='locked-renewed'?path.join(workDir,'running.json'):null;
     const run=runBinary({binary:binaryPath(io.repoRoot),workDir,dataDir,planPath,io,
-      env:{...process.env,...io.harnessOverrides,...(faultGatePath?{JUSTSEARCH_FAKE_ENGINE_FAULT_GATE:faultGatePath}:{}),JUSTSEARCH_SUPERVISOR_START_DEADLINE_MS:String(testCase.startTimeoutMs??4000)},stopAfterIncarnation:0});
+      env:{...process.env,...io.harnessOverrides,...(faultGatePath?{JUSTSEARCH_FAKE_ENGINE_FAULT_GATE:faultGatePath}:{}),JUSTSEARCH_SUPERVISOR_START_DEADLINE_MS:String(testCase.startTimeoutMs??4000)},stopAfterIncarnation:0,
+      // For the session case the binary's 90 s run time covers the 25 s setup wait and the probe's own 60 s limit, plus margin.
+      ...(testCase.probe==='session'?{runMs:90000}:{})});
     Object.assign(run,{dataDir,faultGatePath,statePath:path.join(dataDir,'runtime/supervisor.v1.json'),seen:new Map()});runs.push(run);return run;
   }
   function send(run,reason='quit',action=null) {
@@ -100,10 +102,10 @@ export async function runLifecycle({ name, testCase, policy, io }) {
         return {problems:[]};
       }
       if(probe==='session') {
-        const child=spawn('powershell.exe',['-NoProfile','-ExecutionPolicy','Bypass','-File',path.join(io.repoRoot,'scripts/dev/test-session-end.ps1'),'-SupervisorPid',String(run.child.pid),'-DataDir',run.dataDir],{windowsHide:true});
+        const child=spawn('powershell.exe',['-NoProfile','-ExecutionPolicy','Bypass','-File',path.join(io.repoRoot,'scripts/dev/test-session-end.ps1'),'-SupervisorPid',String(run.child.pid),'-DataDir',run.dataDir],{windowsHide:true,timeout:60000});
         let output='';child.stdout.on('data',b=>output+=b);child.stderr.on('data',b=>output+=b);
-        const code=await new Promise((resolve,reject)=>{child.on('error',reject);child.on('exit',resolve);});
-        assert.equal(code,0,output);await waitState(run,s=>s.state==='stopped');return {problems:[]};
+        const [code,signal]=await new Promise((resolve,reject)=>{child.on('error',reject);child.on('exit',(c,s)=>resolve([c,s]));});
+        assert.equal(code,0,`${signal?`session probe killed after its 60 s limit (${signal})\n`:''}${output}`);await waitState(run,s=>s.state==='stopped');return {problems:[]};
       }
       let stream=null;let helper=null;
       if(probe==='stream') {

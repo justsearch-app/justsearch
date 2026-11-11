@@ -67,7 +67,7 @@ const RESTART_CASES = new Set([
   'requested-restart-completion-failure-is-counted',
 ]);
 
-export function runBinary({ binary, workDir, dataDir, planPath, io, env, stopAfterIncarnation, requestReason, stopOnExhausted = true, failSpawnAt = 0 }) {
+export function runBinary({ binary, workDir, dataDir, planPath, io, env, stopAfterIncarnation, requestReason, stopOnExhausted = true, failSpawnAt = 0, runMs = 25000 }) {
   io.timings?.launch(workDir);
   const child = spawn(
     binary,
@@ -78,7 +78,7 @@ export function runBinary({ binary, workDir, dataDir, planPath, io, env, stopAft
       '--fake-engine', io.fakeEngine,
       '--plan', planPath,
       '--node', process.execPath,
-      '--run-ms', '25000',
+      '--run-ms', String(runMs),
       '--request-reason', requestReason ?? '',
       // A restart case is answered the moment a second incarnation is running; a terminal case has
       // to be allowed to REACH its terminal state, so it gets no early stop at all. Passing this in
