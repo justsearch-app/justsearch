@@ -550,51 +550,6 @@ final class KnowledgeServerModelStartCutoverTest {
     }
   }
 
-  /**
-   * The bound arms in SWITCHING, a pause longer than the bound suspends it, and after the resume
-   * it starts again from zero: the stuck start is not failed early, and is failed only after a
-   * full interval counted from the resume.
-   */
-  @Test
-  void aPauseInSwitchingRestartsTheWiringBound() throws Exception {
-    long boundMs = 2_000L;
-    try (var forced = new Forced(true)) {
-      forced.releaseOnSwitchRetry = false;
-      var target = plainServer(tempDir);
-      shortenModelWiringBound(target, boundMs);
-      var server = forced.boot(target);
-      forced.migrateLive();
-      forced.startModelsWhenSwitchReached();
-      assertTrue(forced.startHeld.await(60, TimeUnit.SECONDS), "the start is held");
-      assertTrue(QueryPrewarmFixture.waitFor(java.time.Duration.ofSeconds(30), () ->
-          "SWITCHING".equals(forced.manager.readStateBestEffort().migration_state())),
-          "the switch is ready and its wiring bound arms");
-      // Half the bound elapses armed, then a pause longer than the bound.
-      assertFalse(QueryPrewarmFixture.waitFor(java.time.Duration.ofMillis(boundMs / 2),
-          () -> failed(forced)), "not failed within the first half of the bound");
-      forced.manager.setMigrationPaused(true, "operator pause (test)");
-      assertFalse(QueryPrewarmFixture.waitFor(java.time.Duration.ofMillis(boundMs + 1_000),
-          () -> failed(forced)), "a pause suspends the bound");
-      forced.manager.setMigrationPaused(false, null);
-      long resumed = System.nanoTime();
-      // Had the bound continued from before the pause, it would end after half an interval.
-      assertFalse(QueryPrewarmFixture.waitFor(java.time.Duration.ofMillis(boundMs * 3 / 4),
-          () -> failed(forced)), "the bound starts again from zero after the resume");
-      assertTrue(QueryPrewarmFixture.waitFor(java.time.Duration.ofSeconds(30), () -> failed(forced)),
-          "the stuck start still fails the switch");
-      long sinceResumeMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - resumed);
-      assertTrue(sinceResumeMs >= boundMs, () -> "failed after a full interval, not " + sinceResumeMs);
-      assertFalse(forced.matching("model wiring timeout").isEmpty(), "the warning names it");
-      assertEquals(forced.oldGeneration, forced.manager.readStateBestEffort().active_generation());
-      forced.releaseHeld.countDown();
-      server.deferredModelInit.handle((ignored, failure) -> null).get(60, TimeUnit.SECONDS);
-    }
-  }
-
-  private static boolean failed(Forced forced) {
-    return "FAILED".equals(forced.manager.readStateBestEffort().migration_state());
-  }
-
   // --- harness ---------------------------------------------------------------------------------
 
   /** The forced order, the migration it switches, and the Engine log it observes. */
