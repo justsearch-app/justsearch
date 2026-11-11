@@ -79,7 +79,7 @@ existing address path selects it with its own draft departure checks once connec
         "modules/ui-web/src/shell-v0/chrome/Shell.navigation.test.ts"
       ],
       "class": "New",
-      "behaviour": "SP4b opening a recent conversation from the palette is one navigation to Search with the conversation in its address; from active, cold and retained Search it opens exactly that conversation with one history entry and correct Back, Forward and reload; from active and retained Search a refused draft departure keeps text, preparation, the shown conversation and the reload pointer, and Back returns to the origin address.",
+      "behaviour": "SP4b opening a recent conversation from the palette is one navigation to Search with the conversation in its address; from active, cold and retained Search it opens exactly that conversation with one history entry and correct Back, Forward and reload; the navigation journal gains one entry, for the opened conversation, marking the current history entry, and Back and Forward move its cursor without adding entries. The refused-departure cases moved to Shell.paletteConversationRefusal.test.ts with the repaired oracles.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -94,6 +94,94 @@ existing address path selects it with its own draft departure checks once connec
       "newChecks": [
         "modules/ui-web/src/shell-v0/chrome/Shell.navigation.test.ts"
       ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.paletteConversationRefusal.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "SP4b from active and retained Search, a palette opening that Search's draft departure refuses leaves nothing of itself: Search keeps the conversation, text, structured preparation and schema and shows its refused-save explanation (not the mismatched-address notice); the address, the conversation store and the reload pointer name the shown conversation; active Search adds no history entry and retained Search only its arrival entry; reload reopens the shown conversation with its draft; Back goes where it went before the attempt.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "An in-app opening reaches Search as an open (not a traversal restore) before its address is pushed; a refusing Search puts its own conversation back and the handler pushes the address Search accepted. A retained Search refuses the same opening when it reconnects, and the projector replaces the arrival address. Traversal refusals keep their current behaviour."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-palette-a-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.paletteConversationRefusal.test.ts"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.paletteConversationRefusal.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "SP4b from active and retained Search, after a palette opening that Search's draft departure refuses, the navigation journal's latest entry names the conversation Search shows and marks the history entry the app is on; no journal entry names the refused conversation; active Search adds no journal entry and retained Search only its arrival in Search; a bare launch (no address) reopens Search on that conversation with its draft.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "The navigation handler journals an in-app conversation opening with the address Search accepted, just before pushing it, instead of the Shell journalling the requested address before distribution. When Search puts its conversation back after the arrival was pushed (retained Search), the projector's in-place address write also writes the journal entry that marks that history entry. Browser arrivals, accepted openings and Back and Forward journal as before."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-palette-a-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.paletteConversationRefusal.test.ts"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.paletteConversationRefusal.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "SP4b in a split layout showing two Search windows (a contributed window mounting the Search element), a palette opening reaches the Search window the address names although the second window refuses to depart; when that first window refuses an opening it keeps its conversation and draft, the address, conversation store and journal name its conversation, the reload pointer is unchanged, no history entry is added, and the second window is not moved.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "An in-app opening is followed, and may be refused, only by the Search window mounted for Search's address; a refusing window puts its conversation back as the opening, which no other Search window follows. Other Search windows keep following traversal restores and keep their own claims, as before."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-palette-a-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.paletteConversationRefusal.test.ts"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/commands/CommandPalette.selection.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "SP6/SP8 with SP4/SP9: expanding a group with Show more keeps the selected result by identity (the Settings row General stays selected and Enter opens General, no action runs); a selection that disappears after expansion leaves no selection and Enter invokes nothing.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "Keep the selection by result identity in the one place the shown results are rebuilt, for both live refreshes and Show more."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-palette-a-repair.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/commands/CommandPalette.selection.test.ts"
+      ],
+      "repaired": true
     },
     {
       "items": [

@@ -542,17 +542,18 @@ describe('SP4b palette conversation arrivals are one navigation through Search a
   function search(shell: Shell): SearchV3View | null {
     return shell.shadowRoot!.querySelector('jf-stage')!.shadowRoot!.querySelector('jf-sv3-window') as SearchV3View | null;
   }
-  async function field(shell: Shell): Promise<HTMLTextAreaElement> {
-    const composer = search(shell)!.shadowRoot!.querySelector('jf-sv3-composer')! as HTMLElement & { updateComplete: Promise<unknown> };
-    await composer.updateComplete;
-    return composer.shadowRoot!.querySelector<HTMLTextAreaElement>('[data-testid="sv3-composer-input"]')!;
-  }
   for (const start of ['active', 'cold', 'retained'] as const) {
     it(`SP4b ${start} Search opens exactly the selected conversation with one history transition and keeps Back Forward and reload correct`, async () => {
       const shell = await setup(start);
-      const before = window.location.hash;
+      const before = window.location.hash, journalBefore = getJournalState();
       const pushes = vi.spyOn(window.history, 'pushState');
       await open(shell, 'conv-b');
+      // The journal gains one entry, for B, and it marks the history entry the app is on; Back and
+      // Forward move its cursor without adding entries.
+      const journal = getJournalState(), shown = (): string | undefined => getJournalState().entries[getJournalState().cursor]?.url;
+      expect([journal.entries.length, journal.cursor]).toEqual([journalBefore.entries.length + 1, journalBefore.entries.length]);
+      expect(shown()).toBe(`justsearch://surface/${SEARCH}?conversationId=conv-b`);
+      expect(window.history.state?.navigationJournalId).toBe(journal.entries[journal.cursor]!.id);
       expect(search(shell)?.isConnected).toBe(true);
       expect(search(shell)!.sessions.activeId).toBe('conv-b');
       expect(getConversationListState().activeId).toBe('conv-b');
@@ -560,47 +561,16 @@ describe('SP4b palette conversation arrivals are one navigation through Search a
       expect(address()).toBe(`${SEARCH}?conversationId=conv-b`);
       expect(pushes).toHaveBeenCalledTimes(1);
       await browserBack(shell); expect(window.location.hash).toBe(before);
+      expect([getJournalState().entries.length, getJournalState().cursor]).toEqual([journal.entries.length, journal.cursor - 1]);
+      expect(shown()).toBe(journalBefore.entries[journalBefore.cursor]!.url);
       await browserForward(shell); expect(address()).toBe(`${SEARCH}?conversationId=conv-b`);
+      expect([getJournalState().entries.length, getJournalState().cursor]).toEqual([journal.entries.length, journal.cursor]);
+      expect(shown()).toBe(`justsearch://surface/${SEARCH}?conversationId=conv-b`);
       expect(search(shell)!.sessions.activeId).toBe('conv-b');
       shell.remove(); __resetBootstrapForTest(); deactivateProjection(); const reloaded = await mount();
       expect(getConversationListState().activeId).toBe('conv-b'); expect(address()).toBe(`${SEARCH}?conversationId=conv-b`);
       expect(search(reloaded)!.sessions.activeId).toBe('conv-b');
     });
   }
-  for (const start of ['active', 'retained'] as const) {
-    it(`SP4b ${start} refused departure keeps draft, preparation, shown conversation and reload pointer; Back returns`, async () => {
-      const shell = await setup('active'); await open(shell, 'conv-a');
-      const view = search(shell)!;
-      const prepare = (name: string, detail: unknown): void => { view.shadowRoot!.querySelector('jf-sv3-composer')!
-        .dispatchEvent(new CustomEvent(name, { bubbles: true, composed: true, detail })); };
-      prepare('sv3-tier-change', { tier: 'structured' }); await settle(shell);
-      prepare('sv3-schema-change', { text: '{"type":"object"}' }); await settle(shell);
-      const input = await field(shell);
-      input.value = 'Keep this draft'; input.dispatchEvent(new Event('input')); await settle(shell);
-      if (start === 'retained') await go(shell, LIBRARY);
-      const origin = window.location.hash, pointer = readLastViewedConversation(), tier = view.tier;
-      expect([view.sessions.activeId, pointer, tier]).toEqual(['conv-a', 'conv-a', 'structured']);
-      const pushes = vi.spyOn(window.history, 'pushState');
-      const set = sessionStorage.setItem.bind(sessionStorage);
-      Object.defineProperty(sessionStorage, 'setItem', { configurable: true, value: (key: string, value: string) => {
-        if (key.startsWith('justsearch.draft.attachment.')) throw new Error('Test storage refusal');
-        set(key, value);
-      } });
-      try {
-        await open(shell, 'conv-b');
-        expect(search(shell)).toBe(view);
-        expect(view.sessions.activeId).toBe('conv-a'); expect(readLastViewedConversation()).toBe(pointer);
-        expect((await field(shell)).value).toBe('Keep this draft'); expect(view.tier).toBe(tier);
-        expect((view.shadowRoot!.querySelector('jf-sv3-composer') as unknown as { schemaDraft: string }).schemaDraft).toBe('{"type":"object"}');
-        expect(pushes).toHaveBeenCalledTimes(1);
-        expect(view.shadowRoot!.querySelector('[data-testid="sv3-departure-notice"]')).not.toBeNull();
-      } finally { Object.defineProperty(sessionStorage, 'setItem', { configurable: true, value: set }); }
-      await browserBack(shell);
-      expect(window.location.hash).toBe(origin);
-      if (start === 'active') {
-        expect(view.sessions.activeId).toBe('conv-a'); expect((await field(shell)).value).toBe('Keep this draft');
-        expect(readLastViewedConversation()).toBe(pointer);
-      }
-    });
-  }
+  // A refused opening from active and retained Search: Shell.paletteConversationRefusal.test.ts.
 });

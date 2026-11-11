@@ -771,6 +771,11 @@ export class SearchV3View extends JfElement {
   /** Shell settles cold ingress before this mount may dispose of the legacy draft. */
   declare initialNavigationPending: boolean;
   /**
+   * Is this the Search window the address names? The stage clears it for a second Search window
+   * (a split layout's other pane), which keeps its own conversation when Search is opened.
+   */
+  ownsAddress = true;
+  /**
    * The window's session list — a PROJECTION and a per-render cache of the app-wide conversation
    * store plus the canonical thread record, not an authority of its own (Phase F6; the exact split
    * between what the store owns and what stays window-local is in `sv3-sessions.ts`).
@@ -1142,6 +1147,7 @@ export class SearchV3View extends JfElement {
     renamingId: () => this.renamingId,
     setRenamingId: id => { this.renamingId = id; },
     connected: () => this.isConnected,
+    ownsAddress: () => this.ownsAddress,
     historyLocked: () => this.historyLocked,
     apiBase: () => this.apiBase,
     runGate: () => this.runGate(),

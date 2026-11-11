@@ -44,6 +44,13 @@ interface WizardStep {
   readonly resolver: (value: string | null) => void;
 }
 
+/** One result: the same id and, for runnable results, the same captured registration. */
+function sameResult(entry: PaletteEntry, selected: PaletteEntry): boolean {
+  return entry.id === selected.id
+    && (selected.target.kind !== 'action' || (entry.target.kind === 'action' && entry.target.action === selected.target.action))
+    && (selected.target.kind !== 'command' || (entry.target.kind === 'command' && entry.target.command === selected.target.command));
+}
+
 export class CommandPalette extends JfElement {
   static properties = {
     open: { type: Boolean, reflect: true },
@@ -316,7 +323,9 @@ export class CommandPalette extends JfElement {
   private sourceResults: ScoredPaletteEntry[] = [];
   private groupLimits = new Map<string, number>();
 
-  private setResults(results: ScoredPaletteEntry[]): void {
+  /** Rebuilds the shown results; a kept selection follows its result's identity, never its index. */
+  private setResults(results: ScoredPaletteEntry[], keepSelection = false): void {
+    const selected = keepSelection ? this.results[this.selectedIndex]?.entry : undefined;
     this.sourceResults = results;
     const counts = new Map<string, number>();
     this.results = results.filter(row => {
@@ -325,11 +334,12 @@ export class CommandPalette extends JfElement {
       counts.set(group, count);
       return count <= (this.groupLimits.get(group) ?? 8);
     });
+    if (selected) this.selectedIndex = this.results.findIndex(row => sameResult(row.entry, selected));
   }
 
   private showMore(group: string): void {
     this.groupLimits.set(group, (this.groupLimits.get(group) ?? 8) + 24);
-    this.setResults(this.sourceResults);
+    this.setResults(this.sourceResults, true);
   }
 
   protected override updated(): void {
@@ -340,12 +350,7 @@ export class CommandPalette extends JfElement {
   private refreshResults = (viewer: SettingsViewer): void => {
     this.settingsViewer = viewer;
     if (!this.open || this.wizardActive) return;
-    const selected = this.results[this.selectedIndex]?.entry;
-    this.setResults(searchPaletteEntries(this.query, viewer));
-    if (!selected) return;
-    this.selectedIndex = this.results.findIndex(row => row.entry.id === selected.id
-      && (selected.target.kind !== 'action' || (row.entry.target.kind === 'action' && row.entry.target.action === selected.target.action))
-      && (selected.target.kind !== 'command' || (row.entry.target.kind === 'command' && row.entry.target.command === selected.target.command)));
+    this.setResults(searchPaletteEntries(this.query, viewer), true);
   };
 
   show(): void {

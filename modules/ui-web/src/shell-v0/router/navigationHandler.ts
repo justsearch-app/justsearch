@@ -54,6 +54,7 @@ import {
   adoptCurrentEntry,
   currentAddress,
   flushPendingNavigationWrite,
+  projectedState,
   pushAddress,
 } from './URLProjector.js';
 
@@ -108,6 +109,23 @@ export interface NavigationHandlerConfig {
   openModal?: OpenModalFn;
   /** Optional — defaults to a console.warn. */
   onUnknownSurface?: OnUnknownSurfaceFn;
+  /**
+   * Optional — journals an in-app conversation opening ({@link opensConversation}) as the address
+   * about to be pushed: the conversation Search accepted, not the one a refusing Search kept out.
+   */
+  journalOpening?: (addr: ShellAddressNavigation) => void;
+}
+
+/** Search's task arguments: an address carrying one hands Search a task rather than opening a place. */
+const SEARCH_TASK_KEYS = ['query', 'docIds', 'forceShapeId', 'mode', 'affordance', 'selection'];
+
+/**
+ * Does this address open a Search conversation? Search's draft departure may refuse it while the
+ * navigation runs, so what it opened is known only after distribution.
+ */
+export function opensConversation(addr: ShellAddressNavigation): boolean {
+  return addr.target === 'core.search-v3-surface' && Object.hasOwn(addr.state, 'conversationId')
+    && !SEARCH_TASK_KEYS.some(key => Object.hasOwn(addr.state, key));
 }
 
 export interface NavigationHandleOptions {
@@ -208,8 +226,7 @@ export function createNavigationHandler(config: NavigationHandlerConfig): Naviga
 
       // A hand-off is consumed only after safe intake. Its verb's task outranks a conversation id.
       const incomingState = addr.state;
-      if (addr.target === 'core.search-v3-surface' &&
-          ['query', 'docIds', 'forceShapeId', 'mode', 'affordance', 'selection'].some(key => Object.hasOwn(addr.state, key))) {
+      if (addr.target === 'core.search-v3-surface' && SEARCH_TASK_KEYS.some(key => Object.hasOwn(addr.state, key))) {
         parkSearchV3Handoff(addr.state, options?.taskOrigin ?? (traversal ? 'restore' : 'fresh'));
         addr = { ...addr, state: {} };
       } else {
@@ -221,7 +238,8 @@ export function createNavigationHandler(config: NavigationHandlerConfig): Naviga
       // 1. Distribute state to registered StoreAdapters per the schema.
       //    Pre-distribution: validate the snapshot against the surface's
       //    schema; group by adapter; restore each.
-      applyState(addr.target, addr.state, traversal);
+      const push = options?.push !== false;
+      applyState(addr.target, addr.state, traversal, push);
 
       // 2. Mount the surface (Shell-level activeId).
       config.setActiveSurface(addr.target);
@@ -236,14 +254,19 @@ export function createNavigationHandler(config: NavigationHandlerConfig): Naviga
       // the prior surface entirely). The same invariant applied when this
       // body lived in Shell.activateSurface pre-slice-492; it lives here now
       // because Navigation realization moved to the handler.
-      const push = options?.push !== false;
       if (push) {
         const pending = addr.target === 'core.search-v3-surface' ? peekSearchV3Handoff() : null;
-        pushAddress({
+        // An opened conversation is recorded as the one Search accepted: a refused departure put
+        // the shown conversation back during distribution, so nothing of the refused one is pushed
+        // or journalled.
+        const opened = opensConversation(addr) ? projectedState(addr.target) : null;
+        const pushed: ShellAddressNavigation = {
           kind: 'navigate',
           target: addr.target,
-          state: pending?.origin === 'fresh' ? incomingState : addr.state,
-        });
+          state: pending?.origin === 'fresh' ? incomingState : opened ?? addr.state,
+        };
+        if (opened) config.journalOpening?.(pushed);
+        pushAddress(pushed);
       } else {
         // The browser already moved (Back, Forward, a pasted address): the entry it landed on
         // becomes an app entry with its position and journal marker (FR3).
@@ -269,7 +292,7 @@ export function createNavigationHandler(config: NavigationHandlerConfig): Naviga
  * URLHydrator.applyState. Behavior is identical to ensure refresh-restore
  * semantics round-trip unchanged.
  */
-function applyState(surfaceId: string, state: StateSnapshot, traversal = false): void {
+function applyState(surfaceId: string, state: StateSnapshot, traversal = false, opening = false): void {
   const schema = getSurfaceStateSchema(surfaceId);
   if (!schema) return;
   const validation = coerceAndValidate(state, schema.schema);
@@ -299,7 +322,7 @@ function applyState(surfaceId: string, state: StateSnapshot, traversal = false):
   }
   for (const [adapter, bag] of byStore.entries()) {
     try {
-      adapter.restore(bag);
+      adapter.restore(bag, opening);
     } catch (err) {
       console.warn(
         `[NavigationHandler] restore failed for storeId="${adapter.storeId}":`,

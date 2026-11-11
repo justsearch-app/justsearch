@@ -229,10 +229,10 @@ function buildSv3ConversationAdapter(): StoreAdapter {
       const id = getConversationListState().activeId;
       return id === null ? {} : { conversationId: id };
     },
-    restore(snapshot: StateSnapshot): void {
+    restore(snapshot: StateSnapshot, opening?: boolean): void {
       const raw = snapshot.conversationId;
       const id = Array.isArray(raw) ? raw[0] : raw;
-      restoreActiveConversation(typeof id === 'string' && id !== '' ? id : null);
+      restoreActiveConversation(typeof id === 'string' && id !== '' ? id : null, opening ? 'open' : 'restore');
     },
     subscribe(listener: (s: StateSnapshot) => void): () => void {
       let last = getConversationListState().activeId;

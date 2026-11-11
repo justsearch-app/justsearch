@@ -244,7 +244,7 @@ import { copyToClipboard } from '../utils/clipboardCopy.js';
 // supplants slice 489's reverted dual-path Shell.ts integration; the
 // router substrate (parser, surfaceSchemas, storeRegistry, projector)
 // remains as shipped on origin/main.
-import { createNavigationHandler } from '../router/navigationHandler.js';
+import { createNavigationHandler, opensConversation } from '../router/navigationHandler.js';
 import { createInvocationHandler } from '../router/invocationHandler.js';
 import { createIntentRouter, type IntentRouter } from '../router/intentRouter.js';
 import { resolveSurface as catalogResolveSurface, resolveOperation as catalogResolveOperation, refreshPromotedAliases } from '../router/catalogResolver.js';
@@ -1395,7 +1395,20 @@ export class Shell extends JfElement {
       delete state.focusSettingsRecovery;
       return { ...address, state };
     };
+    const journal = (address: ShellAddressNavigation, transport: string): void => {
+      const url = canonicalize(persistentAddress(address));
+      recordNavigation(address.target, url,
+        deriveRichLabel(address.target, url, present({ kind: 'surface', id: address.target }).label), transport);
+    };
+    // An in-app conversation opening is journalled by the handler, with what Search accepted, just
+    // before its address is pushed; this is the transport of the opening now being realized.
+    let openingTransport: string | null = null;
     const navigationHandler = createNavigationHandler({
+      journalOpening: (address) => {
+        const transport = openingTransport;
+        openingTransport = null;
+        if (transport !== null) journal(address, transport);
+      },
       setActiveSurface: (id) => {
         // Slice 496 P1+P6 — track previous surface for navigation toast.
         const prev = this.activeId;
@@ -1591,13 +1604,12 @@ export class Shell extends JfElement {
         // Settle a claimed conversation before recording the surface that follows it.
         // A browser traversal has already moved its address and must never push here.
         if (intent.transport !== 'URL_BAR') flushPendingNavigationWrite();
-        const url = canonicalize(persistentAddress(intent.address));
-        const label = deriveRichLabel(
-          intent.address.target,
-          url,
-          present({ kind: 'surface', id: intent.address.target }).label,
-        );
-        recordNavigation(intent.address.target, url, label, intent.transport);
+        // Search may refuse an in-app conversation opening; the handler journals what it accepted.
+        // A browser arrival (URL_BAR) is journalled here, where its history marker is matched.
+        const target = outcome.status === 'auto-corrected' ? outcome.canonicalId : intent.address.target;
+        openingTransport = intent.transport !== 'URL_BAR' && opensConversation({ ...intent.address, target })
+          ? intent.transport : null;
+        if (openingTransport === null) journal(intent.address, intent.transport);
         // The window tab is part of the address: an address naming a tab opens it, and an address
         // without one is completed with the tab the window shows (after the handler wrote it).
         const tab = intent.address.state?.tab;
@@ -2845,6 +2857,11 @@ export class Stage extends JfElement {
         (el as unknown as { host_?: PluginHostApi }).host_ = this.hostApi_ ?? undefined;
         if (surface.id === INTERACTION_SURFACE_ID) {
           (el as HTMLElement & { initialNavigationPending: boolean }).initialNavigationPending = this.initialNavigationPending;
+        }
+        // Only the Search window mounted for Search's address follows and may refuse an opening of
+        // it; another window that mounts the Search element keeps its own conversation.
+        if (el.localName === 'jf-sv3-window') {
+          (el as HTMLElement & { ownsAddress: boolean }).ownsAddress = surface.id === INTERACTION_SURFACE_ID;
         }
         const isAiSurface = surface.consumes?.conversationShapes && surface.consumes.conversationShapes.length > 0;
         if (isAiSurface) {

@@ -83,8 +83,14 @@ let state: ConversationListState = {
  *    conversation is not somewhere the reader can go back to (the address would restore a phantom
  *    row and a 404 record), so the URL is corrected in place instead of earning an entry. The
  *    projector keys on the VALUE changing, so the correction still happens — as a replace.
+ *  - `open` — an in-app navigation is about to push an address naming this conversation. A window
+ *    that refuses to depart puts its own conversation back before the push, so the address the
+ *    navigation records is the one that window still shows (a history traversal is a `restore`).
  */
-export type ConversationListChange = 'claim' | 'restore' | 'list';
+export type ConversationListChange = 'claim' | 'restore' | 'list' | 'open';
+
+/** The conversation the latest `open` named, until another write to the open conversation. */
+let opened: string | null = null;
 
 const listeners = new Set<
   (s: ConversationListState, change: ConversationListChange) => void
@@ -280,8 +286,9 @@ export function subscribeConversationList(
   listeners.add(listener);
   // The catch-up call is a `restore`: it reports state that already exists rather than a claim
   // somebody just made, so a subscriber taken while a conversation is open must not read it as a
-  // fresh navigation (tempdoc 864 PR C).
-  listener(state, 'restore');
+  // fresh navigation (tempdoc 864 PR C). An opening no other write has followed yet is still an
+  // `open`, so a window that reconnects to it (a retained Search) may refuse it the same way.
+  listener(state, state.activeId !== null && state.activeId === opened ? 'open' : 'restore');
   return () => listeners.delete(listener);
 }
 
@@ -661,6 +668,7 @@ async function adoptLegacyTitles(legacy: Record<string, string>): Promise<void> 
 }
 
 export function setActiveConversation(id: string | null): void {
+  opened = null;
   state = { ...state, activeId: id !== null && state.deletedIds.includes(id) ? null : id };
   emit('claim');
 }
@@ -672,9 +680,10 @@ export function setActiveConversation(id: string | null): void {
  * before a reload. Both are re-establishing a position the reader already had, so neither may add
  * a history entry — see {@link ConversationListChange}.
  */
-export function restoreActiveConversation(id: string | null): void {
+export function restoreActiveConversation(id: string | null, change: 'restore' | 'open' = 'restore'): void {
   state = { ...state, activeId: id !== null && state.deletedIds.includes(id) ? null : id };
-  emit('restore');
+  opened = change === 'open' ? state.activeId : null;
+  emit(change);
 }
 
 /**
@@ -1621,6 +1630,7 @@ export async function deleteConversationWithCascade(
 }
 
 export function __resetConversationListForTest(): void {
+  opened = null;
   stopHistoryStatus?.();
   stopHistoryStatus = null;
   historyLocked = false;
