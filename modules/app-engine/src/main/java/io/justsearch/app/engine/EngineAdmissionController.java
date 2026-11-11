@@ -47,7 +47,7 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
   private boolean closing;
   private final java.util.concurrent.atomic.AtomicReference<StatusAdmission> statusAdmission =
       new java.util.concurrent.atomic.AtomicReference<>(
-          new StatusAdmission(false, 0, Map.of(), 0, Map.of()));
+          new StatusAdmission(false, 0, Map.of(), 0, Map.of(), 0));
   private final io.justsearch.core.scheduling.UserActivity userActivity =
       new io.justsearch.core.scheduling.UserActivity();
 
@@ -165,7 +165,7 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
       if (closing) refuse(EngineAdmissionException.Reason.FROZEN);
       if (preparationId != null && !allowWhileFrozen) refuse(EngineAdmissionException.Reason.FROZEN);
       Bucket bucket = Bucket.of(context);
-      reserveAdmission(bucket, allowWhileFrozen, observation);
+      reserveAdmission(bucket, allowWhileFrozen, observation, false);
       UUID id = UUID.randomUUID();
       Work work = new Work(context.withWorkId(id), bucket, observation);
       active.put(id, work);
@@ -182,14 +182,15 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
   public StatusReservation reserveStatusAdmission(EngineContext context) {
     Objects.requireNonNull(context, "context");
     Bucket bucket = Bucket.of(context);
-    reserveAdmission(bucket, false, true);
+    reserveAdmission(bucket, false, true, true);
     var released = new java.util.concurrent.atomic.AtomicBoolean();
     return () -> {
-      if (released.compareAndSet(false, true)) releaseReservation(bucket, true);
+      if (released.compareAndSet(false, true)) releaseReservation(bucket, true, true);
     };
   }
 
-  private void reserveAdmission(Bucket bucket, boolean allowWhileFrozen, boolean observation) {
+  private void reserveAdmission(Bucket bucket, boolean allowWhileFrozen, boolean observation,
+      boolean status) {
     for (;;) {
       StatusAdmission observed = statusAdmission.get();
       if (observed.frozen() && !allowWhileFrozen) refuse(EngineAdmissionException.Reason.FROZEN);
@@ -204,24 +205,26 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
       }
       var nextCounts = new HashMap<>(selectedCounts);
       nextCounts.merge(bucket, 1, Integer::sum);
+      int nextStatusCount = observed.statusCount() + (status ? 1 : 0);
       StatusAdmission next = observation
           ? new StatusAdmission(observed.frozen(), observed.activeCount() + 1, observed.counts(),
-              observed.observationCount() + 1, Map.copyOf(nextCounts))
+              observed.observationCount() + 1, Map.copyOf(nextCounts), nextStatusCount)
           : new StatusAdmission(observed.frozen(), observed.activeCount() + 1, Map.copyOf(nextCounts),
-              observed.observationCount(), observed.observationCounts());
+              observed.observationCount(), observed.observationCounts(), nextStatusCount);
       if (statusAdmission.compareAndSet(observed, next)) return;
     }
   }
 
-  private void releaseReservation(Bucket bucket, boolean observation) {
+  private void releaseReservation(Bucket bucket, boolean observation, boolean status) {
     statusAdmission.updateAndGet(observed -> {
       var nextCounts = new HashMap<>(observation ? observed.observationCounts() : observed.counts());
       nextCounts.compute(bucket, (ignored, count) -> count == 1 ? null : count - 1);
+      int nextStatusCount = observed.statusCount() - (status ? 1 : 0);
       return observation
           ? new StatusAdmission(observed.frozen(), observed.activeCount() - 1, observed.counts(),
-              observed.observationCount() - 1, Map.copyOf(nextCounts))
+              observed.observationCount() - 1, Map.copyOf(nextCounts), nextStatusCount)
           : new StatusAdmission(observed.frozen(), observed.activeCount() - 1, Map.copyOf(nextCounts),
-              observed.observationCount(), observed.observationCounts());
+              observed.observationCount(), observed.observationCounts(), nextStatusCount);
     });
   }
 
@@ -229,7 +232,7 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
   private void publishStatusAdmission() {
     statusAdmission.updateAndGet(observed -> new StatusAdmission(
         closing || preparationId != null, observed.activeCount(), observed.counts(),
-        observed.observationCount(), observed.observationCounts()));
+        observed.observationCount(), observed.observationCounts(), observed.statusCount()));
   }
 
   @Override
@@ -363,6 +366,16 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
     return statusAdmission.get().activeCount();
   }
 
+  /**
+   * Live slots that may use the index owner: every slot except plain status reservations, read
+   * from one publication so a concurrent status release cannot mask real work. Physical reads a
+   * status response makes hold their own slot and are counted here.
+   */
+  int indexRetainingWorkCount() {
+    StatusAdmission observed = statusAdmission.get();
+    return observed.activeCount() - observed.statusCount();
+  }
+
   @Override
   public boolean awaitDrained(java.time.Duration timeout) {
     Objects.requireNonNull(timeout, "timeout");
@@ -426,10 +439,11 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
   /**
    * Lock-free admission publication. {@code activeCount} holds every live slot (work and
    * observations); work capacity is {@code activeCount - observationCount}, so observations never
-   * consume search or generation capacity.
+   * consume search or generation capacity. {@code statusCount} is the subset of observations held
+   * by plain status reservations, which never reach the index themselves.
    */
   private record StatusAdmission(boolean frozen, int activeCount, Map<Bucket, Integer> counts,
-      int observationCount, Map<Bucket, Integer> observationCounts) {}
+      int observationCount, Map<Bucket, Integer> observationCounts, int statusCount) {}
 
   private static final class Work {
     private final EngineContext initial;
@@ -536,7 +550,7 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
         if (--work.references == 0) {
           work.completed = true;
           active.remove(work.initial.workId().orElseThrow());
-          releaseReservation(work.bucket, work.observation);
+          releaseReservation(work.bucket, work.observation, false);
           if (work.inference) {
             inferenceCount--;
             inferenceCounts.compute(work.bucket, (key, count) -> count == 1 ? null : count - 1);

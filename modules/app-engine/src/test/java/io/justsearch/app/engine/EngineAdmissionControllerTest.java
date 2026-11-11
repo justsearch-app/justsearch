@@ -201,6 +201,79 @@ final class EngineAdmissionControllerTest {
   }
 
   @Test
+  void shutdownDrainWaitsForAHeldStatusReservationThatTheIndexCloseDoesNotCount() {
+    var admission = new EngineAdmissionController(2, 2, 1);
+    var status = admission.reserveStatusAdmission(context("ui", EngineContext.Survival.INTERACTIVE));
+    var observation = admission.admitObservation(context("mcp", EngineContext.Survival.INTERACTIVE));
+    assertEquals(2, admission.activeWorkCount());
+    assertEquals(1, admission.indexRetainingWorkCount(),
+        "an admitted observation may reach the index; only the plain status reservation is excluded");
+    observation.close();
+    assertEquals(1, admission.activeWorkCount());
+    assertEquals(0, admission.indexRetainingWorkCount());
+    admission.freezeAdmission("upgrade");
+    admission.beginClosing();
+    assertEquals(0, admission.indexRetainingWorkCount(), "freeze publication keeps the status count");
+    assertFalse(admission.awaitDrained(java.time.Duration.ZERO),
+        "process shutdown still drains status reservations");
+    status.close();
+    status.close();
+    assertEquals(0, admission.activeWorkCount());
+    assertEquals(0, admission.indexRetainingWorkCount());
+    assertTrue(admission.awaitDrained(java.time.Duration.ZERO));
+  }
+
+  /**
+   * Stress test with a bounded loop (the compare-and-set loop has no interleaving seam): status
+   * reservations and ordinary admissions churn concurrently while one ordinary work slot stays
+   * held; the index close's count must never drop below that slot, exceed the possible real work,
+   * or go negative.
+   */
+  @Test
+  void concurrentStatusChurnNeverMasksOrUnderflowsTheIndexRetainingCount() throws Exception {
+    var admission = new EngineAdmissionController(4, 16, 1);
+    int statusThreads = 4;
+    int iterations = 20_000;
+    var start = new CountDownLatch(1);
+    var violations = new java.util.concurrent.ConcurrentLinkedQueue<Integer>();
+    var running = new java.util.concurrent.atomic.AtomicBoolean(true);
+    var held = admission.admit(context("held", EngineContext.Survival.INTERACTIVE), false);
+    try (var threads = java.util.concurrent.Executors.newFixedThreadPool(statusThreads + 2)) {
+      var churn = new java.util.ArrayList<CompletableFuture<Void>>();
+      for (int t = 0; t < statusThreads; t++) {
+        var client = context("status-" + t, EngineContext.Survival.INTERACTIVE);
+        churn.add(CompletableFuture.runAsync(() -> {
+          await(start);
+          for (int i = 0; i < iterations; i++) {
+            admission.reserveStatusAdmission(client).close();
+          }
+        }, threads));
+      }
+      var work = context("work", EngineContext.Survival.INTERACTIVE);
+      churn.add(CompletableFuture.runAsync(() -> {
+        await(start);
+        for (int i = 0; i < iterations; i++) admission.admit(work, false).close();
+      }, threads));
+      var reader = CompletableFuture.runAsync(() -> {
+        await(start);
+        while (running.get()) {
+          int count = admission.indexRetainingWorkCount();
+          if (count < 1 || count > 2) violations.add(count);
+        }
+      }, threads);
+      start.countDown();
+      CompletableFuture.allOf(churn.toArray(CompletableFuture[]::new)).get(60, TimeUnit.SECONDS);
+      running.set(false);
+      reader.get(5, TimeUnit.SECONDS);
+    }
+    assertTrue(violations.isEmpty(), "observed index-retaining counts " + violations);
+    assertEquals(1, admission.indexRetainingWorkCount());
+    held.close();
+    assertEquals(0, admission.indexRetainingWorkCount());
+    assertEquals(0, admission.activeWorkCount());
+  }
+
+  @Test
   void equalAttributionHasIndependentCancellationAndDurableDetachment() {
     var admission = new EngineAdmissionController(3, 3, 1);
     try (var first = admission.admit(context("a", EngineContext.Survival.INTERACTIVE), false);

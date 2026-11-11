@@ -681,7 +681,13 @@ export class Sv3DraftDomain {
       return;
     }
     // Other refusals require manual retry. A timer only refreshes their affordance.
-    this.humanRetryTimer = setTimeout(() => { this.humanRetryTimer = null; this.host.requestUpdate(); }, Math.min(2147483647, Math.max(0, task.retryAt - Date.now())));
+    this.humanRetryTimer = setTimeout(() => {
+      this.humanRetryTimer = null;
+      // The timer can wake before the wall-clock deadline. Keep a wake-up pending
+      // until rendering can enable Retry, even without another state update.
+      if (Date.now() < task.retryAt) this.scheduleHumanRetry(task);
+      else this.host.requestUpdate();
+    }, Math.min(2147483647, Math.max(0, task.retryAt - Date.now())));
   }
 
   /**

@@ -46,6 +46,15 @@ final class ApiSecurityFilters {
       "/api/health", "/api/runtime/live", "/api/runtime/ready", "/api/status",
       "/api/runtime/manifest", "/.well-known/justsearch/manifest.json");
 
+  /**
+   * Routinely polled GET reads of published in-process state that never reach the index, its
+   * client, job queue or serving views. They take a status reservation instead of a work slot, so
+   * an index recovery close does not count them as live index work. Anything else stays work.
+   */
+  private static final Set<String> STATUS_RESERVATION_PATHS = Set.of(
+      "/api/status", "/api/runtime/live", "/api/diagnostics/traces", "/api/inference/transitions",
+      "/api/ai/packs/status", "/api/conversations/encryption");
+
   /** Contract-facing projection of the filters that actually enforce this route. */
   record ContractSecurity(
       boolean loopbackHostRequired, boolean sessionTokenRequired, boolean mcpOriginValidated) {}
@@ -197,7 +206,7 @@ final class ApiSecurityFilters {
       try {
         RequestReleaseOwner.requireLiveIfInstalled(ctx);
         var incoming = RequestEngineContext.get(ctx);
-        if ("GET".equals(ctx.method().name()) && "/api/status".equals(ctx.path())) {
+        if ("GET".equals(ctx.method().name()) && STATUS_RESERVATION_PATHS.contains(ctx.path())) {
           // A status request occupies its fairness slot through response serialization.
           ctx.attribute(RequestReleaseOwner.STATUS_RESERVATION_ATTRIBUTE, engineAdmission.reserveStatusAdmission(incoming));
           return;

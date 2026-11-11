@@ -87,6 +87,46 @@ function clickAction(el: SearchV3View, id: string): void {
 function emit(el: SearchV3View, name: string, detail: unknown): void {
   composer(el).dispatchEvent(new CustomEvent(name, { detail, bubbles: true, composed: true }));
 }
+/** Control elapsed time and the wall clock separately: a timeout may wake just before its deadline. */
+async function checkRetryInterval(earlyByMs = 0): Promise<void> {
+  http.mockImplementation(async (url: unknown) => String(url).includes('/dispatch')
+    ? dispatches().length === 1 ? refusal(false, 'RELOAD_BACKOFF', 80) : done() : new Response('{}'));
+  const el = await mount();
+  let now = Date.now();
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  const clock = vi.spyOn(Date, 'now').mockImplementation(() => now);
+  const flush = async () => {
+    for (let i = 0; i < 7; i++) await vi.advanceTimersByTimeAsync(0);
+    await el.updateComplete;
+    await composer(el).updateComplete;
+  };
+  try {
+    await type(el, 'A');
+    composer(el).shadowRoot!.querySelector<HTMLElement>('[data-testid=sv3-composer-send]')!.click();
+    await flush();
+    expect(action(el, 'sv3-residency-retry')?.disabled).toBe(true);
+    now += 79;
+    await vi.advanceTimersByTimeAsync(79); await el.updateComplete;
+    expect(action(el, 'sv3-residency-retry')?.disabled).toBe(true);
+    now += 1 - earlyByMs;
+    await vi.advanceTimersByTimeAsync(1); await el.updateComplete;
+    if (earlyByMs > 0) {
+      expect(action(el, 'sv3-residency-retry')?.disabled).toBe(true);
+      expect(dispatches()).toHaveLength(1);
+      now += earlyByMs;
+      await vi.advanceTimersByTimeAsync(earlyByMs); await el.updateComplete;
+    }
+    expect(action(el, 'sv3-residency-retry')?.disabled).toBe(false);
+    now += 100;
+    await vi.advanceTimersByTimeAsync(100); await flush();
+    expect(dispatches()).toHaveLength(1); expect(loads()).toHaveLength(0);
+    clickAction(el, 'sv3-residency-retry'); await flush(); expect(dispatches()).toHaveLength(2);
+  } finally {
+    el.remove();
+    clock.mockRestore();
+    vi.useRealTimers();
+  }
+}
 beforeEach(() => {
   sessionStorage.clear(); localStorage.clear(); __resetConversationListForTest(); __resetDraftProvidersForTest(); __resetAiStateForTest();
   http = vi.fn(async (url: unknown) => String(url).includes('/api/chat/dispatch') ? refusal() : new Response('{}'));
@@ -841,15 +881,10 @@ describe('NR15 human admission and RR15 refusal recovery', () => {
   });
 
   it('ordinary Retry becomes available after its interval but the timer never submits', async () => {
-    http.mockImplementation(async (url: unknown) => String(url).includes('/dispatch')
-      ? dispatches().length === 1 ? refusal(false, 'RELOAD_BACKOFF', 80) : done() : new Response('{}'));
-    const el = await mount(); await send(el, 'A');
-    expect(action(el, 'sv3-residency-retry')?.disabled).toBe(true);
-    // Real time, not a fixed sleep: a loaded runner can deliver the 80 ms interval late.
-    await vi.waitFor(async () => { await settle(el); expect(action(el, 'sv3-residency-retry')?.disabled).toBe(false); }, { timeout: 5000, interval: 20 });
-    await new Promise(r => setTimeout(r, 100)); await settle(el);
-    expect(dispatches()).toHaveLength(1); expect(loads()).toHaveLength(0);
-    clickAction(el, 'sv3-residency-retry'); await settle(el); expect(dispatches()).toHaveLength(2);
+    await checkRetryInterval();
+  });
+  it('Retry still becomes available when its timer wakes before the wall-clock deadline', async () => {
+    await checkRetryInterval(1);
   });
   it('context that changes during the follow-up confirmation cannot replace the captured force context', async () => {
     const el = await mount(); await send(el, 'A'); let release!: (v: Response) => void;
