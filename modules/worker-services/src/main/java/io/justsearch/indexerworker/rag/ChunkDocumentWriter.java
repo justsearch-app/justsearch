@@ -108,7 +108,7 @@ public final class ChunkDocumentWriter {
 
     boolean isMarkdown = "markdown".equalsIgnoreCase(fileKind);
     String preview = LanguageUtils.contentPreview(content, CONTENT_PREVIEW_MAX_CHARS, isMarkdown);
-    String language = LanguageUtils.resolveLanguage(preview);
+    String language = LanguageUtils.resolveLanguage(preview, fileKind, mimeBase);
 
     return regenerateChunks(
         documentFieldOps,

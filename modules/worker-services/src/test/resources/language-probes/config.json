@@ -1,0 +1,19 @@
+{
+  "name": "vmarkjson",
+  "version": "1.4.2",
+  "description": "service configuration",
+  "server": {
+    "host": "localhost",
+    "port": 8080,
+    "timeout": 30,
+    "retries": 3
+  },
+  "logging": {
+    "level": "info",
+    "format": "json",
+    "rotate": true,
+    "maxFiles": 10
+  },
+  "features": ["search", "index", "export", "import", "preview"],
+  "database": {"driver": "sqlite", "path": "data/main.db", "poolSize": 4}
+}

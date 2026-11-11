@@ -66,10 +66,10 @@ final class HelpIngestMarkerRecoveryTest {
         "a stale marker that survives the re-ingest would make the next boot skip it again");
   }
 
-  // Upgrading from a v2 marker re-ingests the current help exactly once and writes v4. No @DisplayName, so
+  // Upgrading from a v2 marker re-ingests the current help exactly once and writes v5. No @DisplayName, so
   // the JUnit report names the method and test-intent evidence can select this case by it.
   @Test
-  void v2MarkerReingestsOnceAndWritesV4() throws Exception {
+  void v2MarkerReingestsOnceAndWritesV5() throws Exception {
     Path dataDir = Files.createDirectories(tempDir.resolve("data"));
     Path workingDir = helpTreeUnder(tempDir.resolve("working"));
     // A historical v2 marker must also advance to the current shortcut-help generation.
@@ -82,14 +82,14 @@ final class HelpIngestMarkerRecoveryTest {
     }
     // JUnit assertions rather than Mockito verify, so a before-state failure is an assertion failure.
     assertEquals(1, submitBatchCalls(first), "a v2 marker must trigger exactly one help re-ingest");
-    assertEquals("v4", Files.readString(dataDir.resolve(MARKER)).trim());
+    assertEquals("v5", Files.readString(dataDir.resolve(MARKER)).trim());
 
     KnowledgeClient second = mock(KnowledgeClient.class);
     try (var fixture =
         KnowledgeServerBootstrapTestFixture.create(configFor(dataDir, workingDir))) {
       fixture.bootstrap().tryIngestHelpFiles(second, configFor(dataDir, workingDir), helpSource(workingDir));
     }
-    assertEquals(0, submitBatchCalls(second), "the v4 marker must suppress a second re-ingest");
+    assertEquals(0, submitBatchCalls(second), "the v5 marker must suppress a second re-ingest");
   }
 
   private static long submitBatchCalls(KnowledgeClient client) {
@@ -99,7 +99,7 @@ final class HelpIngestMarkerRecoveryTest {
   }
 
   @Test
-  void v3MarkerReingestsOnceAndWritesV4() throws Exception {
+  void v3MarkerReingestsOnceAndWritesV5() throws Exception {
     Path dataDir = Files.createDirectories(tempDir.resolve("data"));
     Path workingDir = helpTreeUnder(tempDir.resolve("working"));
     Files.writeString(dataDir.resolve(MARKER), "v3");
@@ -108,12 +108,35 @@ final class HelpIngestMarkerRecoveryTest {
       fixture.bootstrap().tryIngestHelpFiles(first, configFor(dataDir, workingDir), helpSource(workingDir));
     }
     assertEquals(1, submitBatchCalls(first), "a v3 marker must trigger the shortcut-help upgrade");
-    assertEquals("v4", Files.readString(dataDir.resolve(MARKER)).trim());
+    assertEquals("v5", Files.readString(dataDir.resolve(MARKER)).trim());
     KnowledgeClient second = mock(KnowledgeClient.class);
     try (var fixture = KnowledgeServerBootstrapTestFixture.create(configFor(dataDir, workingDir))) {
       fixture.bootstrap().tryIngestHelpFiles(second, configFor(dataDir, workingDir), helpSource(workingDir));
     }
     assertEquals(0, submitBatchCalls(second), "the upgraded marker suppresses another ingest");
+  }
+
+  // The released v4 marker names help stored under extraction policy v9, whose language labels
+  // came from the machine locale. The help folder is no watched root, so only this marker brings
+  // those documents to the current policy: one forced re-ingest, then none.
+  @Test
+  void v4MarkerReingestsOnceAndWritesV5() throws Exception {
+    Path dataDir = Files.createDirectories(tempDir.resolve("data"));
+    Path workingDir = helpTreeUnder(tempDir.resolve("working"));
+    Files.writeString(dataDir.resolve(MARKER), "v4");
+    KnowledgeClient first = mock(KnowledgeClient.class);
+    try (var fixture = KnowledgeServerBootstrapTestFixture.create(configFor(dataDir, workingDir))) {
+      fixture.bootstrap().tryIngestHelpFiles(first, configFor(dataDir, workingDir), helpSource(workingDir));
+    }
+    assertEquals(1, submitBatchCalls(first), "a v4 marker must re-read the help under the current policy");
+    verify(first).submitBatch(anyList(), org.mockito.ArgumentMatchers.eq(true), anyString(),
+        org.mockito.ArgumentMatchers.any());
+    assertEquals("v5", Files.readString(dataDir.resolve(MARKER)).trim());
+    KnowledgeClient second = mock(KnowledgeClient.class);
+    try (var fixture = KnowledgeServerBootstrapTestFixture.create(configFor(dataDir, workingDir))) {
+      fixture.bootstrap().tryIngestHelpFiles(second, configFor(dataDir, workingDir), helpSource(workingDir));
+    }
+    assertEquals(0, submitBatchCalls(second), "after a successful re-ingest the help is not read again");
   }
 
   @Test
