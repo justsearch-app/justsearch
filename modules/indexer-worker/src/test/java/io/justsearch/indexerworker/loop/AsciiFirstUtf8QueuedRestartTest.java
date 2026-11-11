@@ -96,7 +96,7 @@ class AsciiFirstUtf8QueuedRestartTest extends LuceneExecutorTestBase {
           "text/plain; charset=windows-1252") : parser.extract(file);
       var fields = new HashMap<>(buildDocument(file, extraction).fields());
       fields.put(SchemaFields.DOC_UID, "stable-uid");
-      fields.put(SchemaFields.EXTRACTION_POLICY_ID, old ? "tika-default-v5" : "tika-default-v9");
+      fields.put(SchemaFields.EXTRACTION_POLICY_ID, old ? "tika-default-v5" : "tika-default-v10");
       fields.put(SchemaFields.CONTENT_SHA256, ChunkParentRevision.sha256Hex(extraction.content()));
       runtime.indexingCoordinator().indexSingle(new IndexDocument(fields));
       refresh(runtime);
@@ -107,13 +107,13 @@ class AsciiFirstUtf8QueuedRestartTest extends LuceneExecutorTestBase {
           runtime.documentFieldOps().getDocumentField(id, SchemaFields.CHUNK_PARENT_CONTENT_SHA256));
       assertTrue(runtime.documentFieldOps().isUnmodified(id, Files.getLastModifiedTime(file).toMillis()));
       original = snapshot(runtime, id);
-      assertEquals(old ? "tika-default-v5" : "tika-default-v9",
+      assertEquals(old ? "tika-default-v5" : "tika-default-v10",
           original.get(id).get(SchemaFields.EXTRACTION_POLICY_ID));
       if (!old) assertCorrect(runtime, id, sourceSha);
       queue.recordIngestionEvent(file, IngestionOutcome.of(IngestionOutcomeClass.SUCCESS_FULL, "SUCCESS", IngestionRetryPolicy.NONE),
           new JobQueue.IngestionLedgerEntry("fixture-path-hash", null, Files.size(file),
               Files.getLastModifiedTime(file).toMillis(), "FILE", "SUCCESS_FULL",
-              old ? "tika-default-v5" : "tika-default-v9", "restart-fixture"));
+              old ? "tika-default-v5" : "tika-default-v10", "restart-fixture"));
       historical = queue.recentIngestionEvents(100);
       assertEquals(1, historical.size());
       assertEquals(1, queue.enqueueEntries(List.of(JobQueue.EnqueueEntry.stat(file).withinRoot(tempDir))));
@@ -170,7 +170,7 @@ class AsciiFirstUtf8QueuedRestartTest extends LuceneExecutorTestBase {
         assertEquals(SOURCE, runtime.documentFieldOps().getDocumentContent(id).strip());
         assertEquals(TITLE, runtime.documentFieldOps().getDocumentField(id, SchemaFields.TITLE));
         assertEquals("מרים", runtime.documentFieldOps().getDocumentField(id, SchemaFields.META_AUTHOR));
-        assertEquals("tika-default-v9", runtime.documentFieldOps().getDocumentField(id, SchemaFields.EXTRACTION_POLICY_ID));
+        assertEquals("tika-default-v10", runtime.documentFieldOps().getDocumentField(id, SchemaFields.EXTRACTION_POLICY_ID));
         assertCorrect(runtime, id, sourceSha);
         assertNotEquals(original.get(id).get(SchemaFields.CONTENT_SHA256),
             runtime.documentFieldOps().getDocumentField(id, SchemaFields.CONTENT_SHA256));
@@ -178,7 +178,7 @@ class AsciiFirstUtf8QueuedRestartTest extends LuceneExecutorTestBase {
             runtime.documentFieldOps().getDocumentField(id, SchemaFields.CHUNK_PARENT_CONTENT_SHA256));
         assertTrue(queue.recentIngestionEvents(100).containsAll(historical), "historical ledger rows remain");
         assertTrue(queue.recentIngestionEvents(100).stream().anyMatch(event ->
-            "tika-default-v9".equals(event.policyId()) && "SUCCESS_FULL".equals(event.artifactStatus())));
+            "tika-default-v10".equals(event.policyId()) && "SUCCESS_FULL".equals(event.artifactStatus())));
         String content = runtime.documentFieldOps().getDocumentContent(id);
         String revision = ChunkParentRevision.sha256Hex(content);
         assertEquals(revision, runtime.documentFieldOps().getDocumentField(id, SchemaFields.CHUNK_PARENT_CONTENT_SHA256));
@@ -204,7 +204,7 @@ class AsciiFirstUtf8QueuedRestartTest extends LuceneExecutorTestBase {
     assertEquals(HEBREW.repeat(100).substring(0, 4096),
         runtime.documentFieldOps().getDocumentField(id, SchemaFields.CONTENT_PREVIEW));
     assertEquals("SUCCESS_FULL", runtime.documentFieldOps().getDocumentField(id, SchemaFields.EXTRACTION_STATUS));
-    assertEquals("tika-default-v9", runtime.documentFieldOps().getDocumentField(id, SchemaFields.EXTRACTION_POLICY_ID));
+    assertEquals("tika-default-v10", runtime.documentFieldOps().getDocumentField(id, SchemaFields.EXTRACTION_POLICY_ID));
     assertEquals(sourceSha, runtime.documentFieldOps().getDocumentField(id, SchemaFields.SOURCE_SHA256));
   }
 
