@@ -64,3 +64,14 @@ Pending independent review. The builder has not recorded acceptance.
   "note": "Independent round 3: all 5184 settled measurements match; the 15 raw differences exactly coincide with early baseline engine-recovery samples. Real Tab and pointer input matches CDP styles and compositor pixels on all 12 surfaces. Both planted faults rejected by all 12 cases on both trees. Full suites, controlled load, and ten loaded SA6 repetitions pass; reverse palette order preserves all measurements."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1caf4-8f2d-7c52-8013-c834209adbea",
+  "verdict": "accept",
+  "digest": "sha256:f7491e9ae54486af1688a9533ca65c41f85d82746f62218a3457e842fe84a7f0",
+  "note": "Independent verification of ef456380: 135/135 whole-file cases alone and loaded on both trees; 12/12 SW5 cases at 6x and 8x on both; all 5184 settled measurements exactly match, including reversed palette order. Real input equals forced states across all 5184 combinations. Both planted faults rejected by all 12 cases on each tree with the complete 72/108 failure matrices. Other 123 cases and prior helpers byte-identical. Evidence: mebeoll1."
+}
+```
