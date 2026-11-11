@@ -48,7 +48,7 @@ final class TikaProbeOwnerIntentTest {
       io.justsearch.app.api.runtime.child.OwnedHelper.recordTo(sink, self);
       Thread.sleep(500); // the job's initial inventory (this JVM and its console host) settles
       List<Object> before = records.stream().map(r -> r.get("witnessId")).toList();
-      var method = StructuredContentExtractor.class.getDeclaredMethod("parseContextWithMarkedPdfContent");
+      var method = StructuredContentExtractor.class.getDeclaredMethod("parseContextWithPdfText");
       method.setAccessible(true);
       for (int i = 0; i < 20; i++) method.invoke(null);
       job.finishProcessRecording(Duration.ofSeconds(3));

@@ -21,6 +21,8 @@ import org.xml.sax.helpers.DefaultHandler;
 public final class StructuredContentHandler extends DefaultHandler {
 
   private final int maxContentLength;
+  private final boolean pdf;
+  private int paragraphDepth;
   private final List<Element> elements = new ArrayList<>();
   private int currentPageIndex = 0;
   private boolean hasPageWrappers = false;
@@ -51,7 +53,12 @@ public final class StructuredContentHandler extends DefaultHandler {
   private boolean inListItem = false;
 
   public StructuredContentHandler(int maxContentLength) {
+    this(maxContentLength, false);
+  }
+
+  StructuredContentHandler(int maxContentLength, boolean pdf) {
     this.maxContentLength = maxContentLength;
+    this.pdf = pdf;
   }
 
   @Override
@@ -69,6 +76,7 @@ public final class StructuredContentHandler extends DefaultHandler {
         headingBuffer = new StringBuilder();
       }
       case "p" -> {
+        paragraphDepth++;
         // Flush any accumulated text before the paragraph
         if (headingLevel == 0 && !inTable && !inListItem) {
           flushTextBuffer();
@@ -147,7 +155,7 @@ public final class StructuredContentHandler extends DefaultHandler {
     switch (nameLower) {
       case "h1", "h2", "h3", "h4", "h5", "h6" -> {
         if (headingLevel > 0 && headingBuffer != null) {
-          String text = headingBuffer.toString().strip();
+          String text = finishText(headingBuffer);
           if (!text.isEmpty()) {
             addElement(new Heading(headingLevel, text, currentPageIndex));
           }
@@ -156,6 +164,7 @@ public final class StructuredContentHandler extends DefaultHandler {
         }
       }
       case "p" -> {
+        paragraphDepth--;
         if (!inTable && !inListItem && headingLevel == 0) {
           flushTextBuffer();
         }
@@ -185,7 +194,7 @@ public final class StructuredContentHandler extends DefaultHandler {
       }
       case "td", "th" -> {
         if (inTable && tableNestingDepth == 1 && cellBuffer != null && currentRow != null) {
-          currentRow.add(cellBuffer.toString().strip());
+          currentRow.add(finishText(cellBuffer));
           cellBuffer = new StringBuilder();
           inCell = false;
         }
@@ -202,7 +211,7 @@ public final class StructuredContentHandler extends DefaultHandler {
       }
       case "li" -> {
         if (inList && listNestingDepth == 1 && itemBuffer != null) {
-          String text = itemBuffer.toString().strip();
+          String text = finishText(itemBuffer);
           if (!text.isEmpty()) {
             listItems.add(text);
           }
@@ -242,6 +251,20 @@ public final class StructuredContentHandler extends DefaultHandler {
     }
   }
 
+  @Override
+  public void ignorableWhitespace(char[] ch, int start, int length) throws SAXException {
+    if (pdf && (paragraphDepth > 0 || headingLevel > 0 || inCell || inListItem)) {
+      // PDFBox's physical line separators arrive here, including between characters callbacks.
+      // Reuse character admission so retained separators consume the same surrogate-safe budget.
+      characters(ch, start, length);
+    }
+  }
+
+  private String finishText(StringBuilder buffer) {
+    String text = buffer.toString().strip();
+    return pdf ? PdfTextNormalization.joinLineEndHyphens(text) : text;
+  }
+
   /**
    * Returns true if the parser stopped processing SAX events because {@code totalChars} reached
    * {@code maxContentLength}. Authoritative truncation signal — cheaper and more reliable than a
@@ -260,14 +283,14 @@ public final class StructuredContentHandler extends DefaultHandler {
   public StructuredDocument getDocument() {
     // Finalize unfinished structures as well as body text; clear each buffer after emitting it.
     if (headingBuffer != null) {
-      String text = headingBuffer.toString().strip();
+      String text = finishText(headingBuffer);
       if (!text.isEmpty()) elements.add(new Heading(headingLevel, text, currentPageIndex));
       headingBuffer = null;
       headingLevel = 0;
     }
     if (inTable) {
       if (inCell && cellBuffer != null && currentRow != null) {
-        currentRow.add(cellBuffer.toString().strip());
+        currentRow.add(finishText(cellBuffer));
       }
       if (currentRow != null && !currentRow.isEmpty()) tableRows.add(currentRow);
       if (!tableRows.isEmpty()) elements.add(new Table(List.copyOf(tableRows), currentPageIndex, limitReached));
@@ -280,7 +303,7 @@ public final class StructuredContentHandler extends DefaultHandler {
     }
     if (inList) {
       if (itemBuffer != null && !itemBuffer.toString().isBlank()) {
-        listItems.add(itemBuffer.toString().strip());
+        listItems.add(finishText(itemBuffer));
       }
       if (!listItems.isEmpty()) elements.add(new ListBlock(List.copyOf(listItems), orderedList, currentPageIndex));
       inList = false;
@@ -296,7 +319,7 @@ public final class StructuredContentHandler extends DefaultHandler {
 
   private void flushTextBuffer() {
     if (textBuffer.isEmpty()) return;
-    String text = textBuffer.toString().strip();
+    String text = finishText(textBuffer);
     textBuffer.setLength(0);
     if (!text.isEmpty()) {
       addElement(new Paragraph(text, currentPageIndex));
@@ -306,7 +329,7 @@ public final class StructuredContentHandler extends DefaultHandler {
   /** Like {@link #flushTextBuffer()} but bypasses the limit check (used in getDocument). */
   private void flushTextBufferFinal() {
     if (textBuffer.isEmpty()) return;
-    String text = textBuffer.toString().strip();
+    String text = finishText(textBuffer);
     textBuffer.setLength(0);
     if (!text.isEmpty()) {
       elements.add(new Paragraph(text, currentPageIndex));
