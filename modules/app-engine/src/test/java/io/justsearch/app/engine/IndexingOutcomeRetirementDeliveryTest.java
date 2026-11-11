@@ -58,9 +58,10 @@ final class IndexingOutcomeRetirementDeliveryTest {
     var ingest = mock(WorkerIngestService.class);
     doAnswer(call -> {
       Consumer<IndexingJobsFrame> outcomes = call.getArgument(0);
+      // Publish the sink before the snapshot: the snapshot completes the start the test awaits.
+      sink.set(outcomes);
       outcomes.accept(IndexingJobsFrame.newBuilder().setSeq(1)
           .setSnapshot(IndexingJobsSnapshot.getDefaultInstance()).build());
-      sink.set(outcomes);
       return null;
     }).when(ingest).subscribeIndexingJobOutcomes(any(), any());
     when(services.ingestService()).thenReturn(ingest);
