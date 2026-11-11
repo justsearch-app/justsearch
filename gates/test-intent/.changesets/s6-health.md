@@ -16,7 +16,7 @@ and one case in `HealthSurface.quiet.test.ts`; their entries below point at `gat
 (fail-before on 394467ba1d). The second verifier repair (SH3 per-source ages in Diagnostics, SH14 a section intent kept across
 engine loss and recovery) adds the isolated `HealthSurface.freshness-lockdown.test.ts`; its entry points at
 `gates/test-intent/evidence/s6-health-verifier-2.json` (fail-before on bf1b6b5688). Its third case, recovery without a pending
-intent still moving focus to the main content, is a preservation check and passes on bf1b6b5688 too. The third verifier repair (one AI-engine lifecycle derivation) gives `computeAiEngineVerdict` two observed per-model facts, the failed models and where the active models run, which Health's AI models and Graphics card rows now read instead of the raw feature list; its two new cases in `aiVerdict.test.ts` point at `gates/test-intent/evidence/s6-health-verifier-3.json` (fail-before on fc724ede88). Its third case, no fact when nothing failed and nothing is active, is a preservation check and passes on fc724ede88 too. The frame check's 900x700 and 1280x720 layout reference was recorded on 394467ba1d and re-recorded on fc724ede88's working tree after the Diagnostics metric values moved from a literal 1.2rem to the `--font-size-lg` token (1.125rem): the metric boxes are 2px shorter and the boxes below them move by at most 2px; nothing else in the reference changed. Independent acceptance is pending.
+intent still moving focus to the main content, is a preservation check and passes on bf1b6b5688 too. The third verifier repair (one AI-engine lifecycle derivation) gives `computeAiEngineVerdict` two observed per-model facts, the failed models and where the active models run, which Health's AI models and Graphics card rows now read instead of the raw feature list; its two new cases in `aiVerdict.test.ts` point at `gates/test-intent/evidence/s6-health-verifier-3.json` (fail-before on fc724ede88). Its third case, no fact when nothing failed and nothing is active, is a preservation check and passes on fc724ede88 too. The frame check's 900x700 and 1280x720 cases no longer compare against pixel geometry recorded on one machine (CI renders fonts differently): with long unbroken values they check that Health and Diagnostics do not scroll sideways, that every row and metric is shown inside Health in its order, and that the design's multi-column arrangement holds; they are new checks of this entry and fail on 394467ba1d. Independent acceptance is pending.
 
 What each Obsolete entry removes:
 
@@ -401,7 +401,7 @@ What each Obsolete entry removes:
         "modules/ui-web/src/shell-v0/views/HealthSurface.frame-lockdown.test.ts"
       ],
       "class": "New",
-      "behaviour": "SH13: in real Chromium, every Health row action (Open Logs, Open Library, Open AI Brain, Recent activity) and every remedy declared in Diagnostics reaches its window through the shell's navigate-with-context path and the address follows, including the Graphics card row with GPU telemetry unavailable and a GPU-backed model. SH16: at 600x400 with 200% root text Health and its open Diagnostics never scroll sideways and truncated values keep their full text; 900x700 and 1280x720 at 100% keep the layout recorded on 394467ba1d.",
+      "behaviour": "SH13: in real Chromium, every Health row action (Open Logs, Open Library, Open AI Brain, Recent activity) and every remedy declared in Diagnostics reaches its window through the shell's navigate-with-context path and the address follows, including the Graphics card row with GPU telemetry unavailable and a GPU-backed model. SH16: at 600x400 with 200% root text Health and its open Diagnostics never scroll sideways and truncated values keep their full text; at 900x700 and 1280x720 with 100% text and long unbroken values nothing scrolls sideways or leaves Health, truncated values keep their full text, the six health rows stack in order, the four metrics share one line in order, several Diagnostics stat cards share a line, and the Connection and GPU readouts sit side by side above 60rem and stack below it.",
       "repaired": true,
       "sources": [
         {
@@ -423,7 +423,9 @@ What each Obsolete entry removes:
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/HealthSurface.frame-lockdown.test.ts#every row action and Diagnostics remedy reaches its window through the shell and the address follows (current status, GPU telemetry unavailable, GPU-backed model)",
         "modules/ui-web/src/shell-v0/views/HealthSurface.frame-lockdown.test.ts#every row action and Diagnostics remedy reaches its window through the shell and the address follows (engine starting)",
-        "modules/ui-web/src/shell-v0/views/HealthSurface.frame-lockdown.test.ts#600x400 with 200% text: Health and the open Diagnostics never scroll sideways and long values stay readable"
+        "modules/ui-web/src/shell-v0/views/HealthSurface.frame-lockdown.test.ts#600x400 with 200% text: Health and the open Diagnostics never scroll sideways and long values stay readable",
+        "modules/ui-web/src/shell-v0/views/HealthSurface.frame-lockdown.test.ts#900x700 at 100% with long values: no sideways overflow, every row and metric shown in order, the multi-column layout kept",
+        "modules/ui-web/src/shell-v0/views/HealthSurface.frame-lockdown.test.ts#1280x720 at 100% with long values: no sideways overflow, every row and metric shown in order, the multi-column layout kept"
       ]
     },
     {

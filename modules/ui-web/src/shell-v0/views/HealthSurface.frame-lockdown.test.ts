@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // S6 piece 8 SH13 SH16 — Health inside the real Shell, router and System hub in real Chromium over a
 // private Vite server and a stubbed backend: every row action and declared remedy reaches its window
-// through the app's navigation path, and Health and Diagnostics reflow at 600x400 with 200% text.
+// through the app's navigation path, and Health and Diagnostics reflow at 600x400 with 200% text and keep their
+// multi-column layout at 900x700 and 1280x720 without scrolling sideways.
 // The destination windows are probes. Run separately with
 // npx vitest run --config vitest.config.lockdown.ts src/shell-v0/views/HealthSurface.frame-lockdown.test.ts
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -209,20 +210,24 @@ const reflow = (page: Page) => page.locator('jf-health-surface').evaluate(host =
     outside: [...new Set(outside)].slice(0, 8), cut };
 });
 
-/** Bounding boxes of Health's layout landmarks, for the unchanged look at ordinary sizes. */
-const boxes = (page: Page) => page.locator('jf-health-surface').evaluate(host => {
+/** Health's layout landmarks with Diagnostics open: each row and metric in document order with its box, and the boxes of the
+ *  Diagnostics stat cards and of the first two-column readout group. Rounded to whole pixels; only relations between boxes are asserted. */
+const layout = (page: Page) => page.locator('jf-health-surface').evaluate(host => {
   const root = host.shadowRoot!;
-  const pick = (selector: string) => [...root.querySelectorAll<HTMLElement>(selector)].map(node => {
-    const rect = node.getBoundingClientRect(); return [Math.round(rect.left), Math.round(rect.top), Math.round(rect.width), Math.round(rect.height)].join(',');
-  });
-  return { rows: pick('.health-row'), metrics: pick('.health-metrics > div'), grids: pick('details .grid-2 > *'), cards: pick('details .card') };
+  const box = (node: Element) => { const r = node.getBoundingClientRect(); return { left: Math.round(r.left), top: Math.round(r.top), right: Math.round(r.right), bottom: Math.round(r.bottom) }; };
+  const edge = box(host);
+  return { edge,
+    rows: [...root.querySelectorAll('.health-row')].map(node => ({ id: node.getAttribute('data-health-row') ?? '', ...box(node) })),
+    metrics: [...root.querySelectorAll('.health-metrics > div')].map(node => ({ id: node.querySelector('dt')?.textContent?.trim() ?? '', ...box(node) })),
+    stats: [...root.querySelectorAll('details .stats > *')].map(box),
+    readouts: [...root.querySelector('details .grid-2')?.children ?? []].map(box) };
 });
 
-/** Health's layout at ordinary sizes with Diagnostics open, recorded on 394467ba1d and re-recorded after the metric values took the `--font-size-lg` token (left, top, width, height). */
-const REFERENCE: Record<string, Awaited<ReturnType<typeof boxes>>> = {
-  '900x700': { rows: ['24,97,852,51', '24,148,852,91', '24,239,852,91', '24,330,852,91', '24,421,852,91', '24,513,852,91'], metrics: ['24,26,204,55', '240,26,204,55', '456,26,204,55', '672,26,204,55'], grids: ['24,1052,852,281', '24,1345,852,90', '24,1435,852,86', '24,1533,852,506', '24,2039,852,298'], cards: ['24,740,204,128', '240,740,204,128', '456,740,204,128', '672,740,204,128', '24,1052,852,281', '24,1345,852,90', '24,1435,852,86', '24,1533,852,506', '24,2039,852,298', '24,2337,852,110', '24,2447,852,55', '24,2501,852,106'] },
-  '1280x720': { rows: ['24,117,1232,51', '24,168,1232,91', '24,259,1232,91', '24,350,1232,91', '24,441,1232,91', '24,533,1232,91'], metrics: ['24,46,299,55', '335,46,299,55', '646,46,299,55', '957,46,299,55'], grids: ['24,1072,610,281', '646,1072,610,281', '24,1353,610,506', '646,1353,610,506', '24,1859,610,337'], cards: ['24,760,299,128', '335,760,299,128', '646,760,299,128', '957,760,299,128', '24,1072,610,281', '646,1072,610,281', '24,1353,610,506', '646,1353,610,506', '24,1859,610,337', '24,2196,1232,110', '24,2306,1232,55', '24,2360,1232,106'] },
-};
+type Box = { left: number; top: number; right: number; bottom: number };
+/** Boxes that start on the same line as the first one. */
+const firstLine = (boxes: readonly Box[]) => boxes.filter(b => Math.abs(b.top - boxes[0]!.top) <= 1);
+/** Document order is reading order: each box is right of the one before on its line, or on a later line. */
+const readingOrder = (boxes: readonly Box[]) => boxes.every((b, i) => i === 0 || (Math.abs(b.top - boxes[i - 1]!.top) <= 1 ? b.left >= boxes[i - 1]!.right : b.top >= boxes[i - 1]!.bottom - 1));
 
 describe('SH16 Health and Diagnostics reflow', () => {
   it('600x400 with 200% text: Health and the open Diagnostics never scroll sideways and long values stay readable', async () => {
@@ -236,12 +241,33 @@ describe('SH16 Health and Diagnostics reflow', () => {
     expect(measured.cut, 'truncated values without their full text').toEqual([]);
   }, 120_000);
 
-  it.each([[900, 700], [1280, 720]])('%ix%i at 100%: no sideways overflow and the layout matches the reference', async (width, height) => {
-    const page = await openHealth(width, height);
+  // The ordinary window sizes with long unbroken values: nothing scrolls sideways, every health row and metric is shown inside
+  // Health in its order, the metrics and Diagnostics stat cards share lines, and Diagnostics' readouts pair up only when the
+  // window is wider than 60rem (the design's breakpoint, measured against the browser's default text size).
+  it.each([[900, 700], [1280, 720]])('%ix%i at 100% with long values: no sideways overflow, every row and metric shown in order, the multi-column layout kept', async (width, height) => {
+    const page = await openHealth(width, height, 1, '?long=1');
     await openDiagnostics(page);
     const measured = await reflow(page);
-    expect(measured.body[1]).toBeLessThanOrEqual(measured.body[0]! + 1);
-    expect(measured.details[1]).toBeLessThanOrEqual(measured.details[0]! + 1);
-    expect(await boxes(page)).toEqual(REFERENCE[`${width}x${height}`]);
+    expect(measured.body[1], `Health body ${measured.body.join(' / ')}; outside: ${measured.outside.join(' ')}`).toBeLessThanOrEqual(measured.body[0]! + 1);
+    expect(measured.details[1], `Diagnostics ${measured.details.join(' / ')}`).toBeLessThanOrEqual(measured.details[0]! + 1);
+    expect(measured.host[1], 'Health').toBeLessThanOrEqual(measured.host[0]! + 1);
+    expect(measured.outside, 'elements beyond Health\'s right edge').toEqual([]);
+    expect(measured.cut, 'truncated values without their full text').toEqual([]);
+    const { edge, rows, metrics, stats, readouts } = await layout(page);
+    expect(rows.map(row => row.id), 'health rows').toEqual(['engine', 'folders', 'index', 'models', 'gpu', 'work']);
+    expect(metrics.map(metric => metric.id), 'metrics').toEqual(['Files', 'Size', 'Memory', 'Queue']);
+    for (const b of [...rows, ...metrics, ...stats, ...readouts]) {
+      expect(b.right > b.left && b.bottom > b.top, `${JSON.stringify(b)} has a size`).toBe(true);
+      expect(b.left >= edge.left && b.right <= edge.right + 1, `${JSON.stringify(b)} inside Health ${edge.left}..${edge.right}`).toBe(true);
+    }
+    expect(rows.every((row, i) => i === 0 || row.top >= rows[i - 1]!.bottom - 1), 'rows stacked in order').toBe(true);
+    expect(readingOrder(metrics), 'metrics in reading order').toBe(true);
+    expect(firstLine(metrics).length, 'metrics on one line').toBe(metrics.length);
+    expect(stats.length, 'Diagnostics stat cards').toBeGreaterThan(1);
+    expect(readingOrder(stats), 'stat cards in reading order').toBe(true);
+    expect(firstLine(stats).length, 'stat cards sharing the first line').toBeGreaterThan(1);
+    expect(readouts.length, 'Connection and GPU readouts').toBe(2);
+    expect(readingOrder(readouts), 'readouts in reading order').toBe(true);
+    expect(firstLine(readouts).length, 'readouts side by side').toBe(width > 960 ? 2 : 1);
   }, 120_000);
 });
