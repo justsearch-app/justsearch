@@ -53,14 +53,20 @@ for (const expected of uploadPolicy.uploads) {
 }
 
 // Bounded child logs supplement the existing complete fixture artifacts.
-test('both installed Engine tiers always collect and upload additional child logs', () => {
+test('both installed Engine tiers always collect and upload additional child logs, kept longer on failure', () => {
   for (const id of ['integration-tests', 'lifecycle-integration-tests']) {
     const job = workflowJobs(workflow).find((entry) => entry.id === id);
     const collection = job.runs.find((run) => run.text === 'node scripts/ci/collect-e2e-child-logs.mjs');
     assert.equal(collection?.step?.if, 'always()', id);
-    assert.match(job.text, /name: Upload E2E child process logs\n        if: always\(\)/);
-    assert.match(job.text, /path: build\/ci\/e2e-child-logs\/\*\*/);
-    assert.match(job.text, /retention-days: 3/);
+    // A failed run keeps its logs 30 days; any other outcome keeps them 3 days, under one name.
+    const uploads = load(workflow).jobs[id].steps.filter((step) => step.name?.startsWith('Upload E2E child process logs'));
+    assert.deepEqual(uploads.map((step) => [step.if, step.with['retention-days']]), [['failure()', 30], ['${{ !failure() }}', 3]], id);
+    for (const step of uploads) {
+      assert.equal(step.uses, 'actions/upload-artifact@v7', id);
+      assert.equal(step.with.name, `${id}-child-logs-attempt-\${{ github.run_attempt }}`, id);
+      assert.equal(step.with.path, 'build/ci/e2e-child-logs/**', id);
+      assert.equal(step.with['if-no-files-found'], 'error', id);
+    }
   }
 });
 

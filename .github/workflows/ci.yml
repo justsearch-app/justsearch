@@ -1763,7 +1763,7 @@ jobs:
         with:
           name: supervisor-conformance-windows-attempt-${{ github.run_attempt }}
           path: tmp/supervisor-conformance/**
-          retention-days: 7
+          retention-days: 30
 
   windows-native-contracts:
     needs: changes
@@ -2135,8 +2135,19 @@ jobs:
         if: always()
         run: node scripts/ci/collect-e2e-child-logs.mjs
 
-      - name: Upload E2E child process logs
-        if: always()
+      # A failed run's logs are what a later diagnosis needs, so they outlive a passing run's.
+      # !failure() also covers a cancelled run, as always() did, and never overlaps failure().
+      - name: Upload E2E child process logs (failed run)
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: integration-tests-child-logs-attempt-${{ github.run_attempt }}
+          path: build/ci/e2e-child-logs/**
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Upload E2E child process logs (passing or cancelled run)
+        if: ${{ !failure() }}
         uses: actions/upload-artifact@v7
         with:
           name: integration-tests-child-logs-attempt-${{ github.run_attempt }}
@@ -2242,8 +2253,19 @@ jobs:
         if: always()
         run: node scripts/ci/collect-e2e-child-logs.mjs
 
-      - name: Upload E2E child process logs
-        if: always()
+      # A failed run's logs are what a later diagnosis needs, so they outlive a passing run's.
+      # !failure() also covers a cancelled run, as always() did, and never overlaps failure().
+      - name: Upload E2E child process logs (failed run)
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: lifecycle-integration-tests-child-logs-attempt-${{ github.run_attempt }}
+          path: build/ci/e2e-child-logs/**
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Upload E2E child process logs (passing or cancelled run)
+        if: ${{ !failure() }}
         uses: actions/upload-artifact@v7
         with:
           name: lifecycle-integration-tests-child-logs-attempt-${{ github.run_attempt }}
