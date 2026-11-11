@@ -258,6 +258,15 @@ runner label, Gradle tasks, local reproduction command, owner, platform classifi
 warn-only budget settings. The verifier fails when that policy drifts from the `ci.yml` unit-test
 matrix or the workflow-signal required checks.
 
+The UI jobs split frontend work: `app-ui-ui` runs frontend unit tests and
+`:modules:ui:ciUnitTest1`; `app-ui-ui-2` installs headless Chromium and runs frontend lockdown
+tests before `:modules:ui:ciUnitTest2`. The search-worker jobs split indexer-worker and
+worker-services classes between `ciUnitTest1` and `ciUnitTest2`.
+`unit-tests-search-worker-2` also owns `:modules:adapters-lucene:test`, and
+`io.justsearch.indexerworker.server.SyncRootPromotionCrashRecoveryTest` is explicitly assigned
+to indexer-worker's `ciUnitTest2` (shard value `1`). These moves balance the longer jobs using
+main CI run 43094849517; their resulting hosted wall times still need measurement.
+
 The public `Unit tests` lanes also publish unit-test attribution and advisory budget reports from
 existing Gradle/JUnit XML. Attribution shows module totals, slow suites, skips, failures, errors,
 lane identity, and hosted runner image identity. Budget reports are diagnostic and warn-only; Gradle

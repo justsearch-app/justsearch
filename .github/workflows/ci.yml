@@ -1107,7 +1107,7 @@ jobs:
         run: |
           chmod +x ./gradlew 2>/dev/null || true
           GW='./gradlew'; [ "$RUNNER_OS" = "Windows" ] && GW='./gradlew.bat'
-          "$GW" :modules:indexer-worker:ciUnitTest1 :modules:worker-services:ciUnitTest1 :modules:adapters-lucene:test -PskipWebBuild=true --console=plain
+          "$GW" :modules:indexer-worker:ciUnitTest1 :modules:worker-services:ciUnitTest1 -PskipWebBuild=true --console=plain
 
       - name: Report unit-test attribution
         if: always()
@@ -1135,7 +1135,7 @@ jobs:
     if: needs.changes.outputs.search != 'false'
     name: Unit tests (search-worker-2)
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -1160,7 +1160,7 @@ jobs:
         run: |
           chmod +x ./gradlew 2>/dev/null || true
           GW='./gradlew'; [ "$RUNNER_OS" = "Windows" ] && GW='./gradlew.bat'
-          "$GW" :modules:indexer-worker:ciUnitTest2 :modules:worker-services:ciUnitTest2 :modules:worker-core:test :modules:configuration:test :modules:core:test :modules:indexing:test :modules:core-contracts:test :modules:ipc-common:test -PskipWebBuild=true --console=plain
+          "$GW" :modules:indexer-worker:ciUnitTest2 :modules:worker-services:ciUnitTest2 :modules:adapters-lucene:test :modules:worker-core:test :modules:configuration:test :modules:core:test :modules:indexing:test :modules:core-contracts:test :modules:ipc-common:test -PskipWebBuild=true --console=plain
 
       - name: Report unit-test attribution
         if: always()
@@ -1331,14 +1331,6 @@ jobs:
       - name: Frontend unit tests
         run: npm run test:unit:run --prefix modules/ui-web -- --maxWorkers=4
 
-      # boot-lockdown.test.ts loads the production bundle under SES in headless Chromium.
-      - name: Install headless Chromium for lockdown tests
-        working-directory: modules/ui-web
-        run: npx --no-install playwright-core install --with-deps chromium
-
-      - name: Frontend lockdown tests
-        run: npm run test:unit:lockdown --prefix modules/ui-web -- --maxWorkers=4
-
       - name: Stage Linux process-lifetime helper
         shell: bash
         run: |
@@ -1413,6 +1405,14 @@ jobs:
         run: |
           npm ci --audit=false
           npm ci --prefix modules/ui-web --audit=false
+
+      # boot-lockdown.test.ts loads the production bundle under SES in headless Chromium.
+      - name: Install headless Chromium for lockdown tests
+        working-directory: modules/ui-web
+        run: npx --no-install playwright-core install --with-deps chromium
+
+      - name: Frontend lockdown tests
+        run: npm run test:unit:lockdown --prefix modules/ui-web -- --maxWorkers=4
 
       - name: Stage Linux process-lifetime helper
         shell: bash

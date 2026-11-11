@@ -1,6 +1,6 @@
 {
   "kind": "justsearch-unit-test-class-shards.v1",
-  "note": "Hosted candidate attribution from 2026-10-21. Measured slow classes are balanced explicitly; unlisted and future classes use floorMod(String.hashCode(), count). Nested classes stay with their outer class. Local test tasks remain complete.",
+  "note": "Hosted candidate attribution from 2026-10-21, with indexer-worker rebalanced from main CI run 43094849517. Measured slow classes are balanced explicitly; unlisted and future classes use floorMod(String.hashCode(), count). Nested classes stay with their outer class. Local test tasks remain complete.",
   "modules": {
     "ui": {
       "count": 2,
@@ -110,6 +110,7 @@
         "io.justsearch.indexerworker.server.PlannedQueryReplacementAdmissionTest": 0,
         "io.justsearch.indexerworker.server.PreOpenSchemaMismatchBootTest": 1,
         "io.justsearch.indexerworker.server.ResumedMigrationMismatchBootTest": 0,
+        "io.justsearch.indexerworker.server.SyncRootPromotionCrashRecoveryTest": 1,
         "io.justsearch.indexerworker.server.ops.LiveMigrationCutoverTest": 1,
         "io.justsearch.indexerworker.server.ops.PrunePrefixReplayFenceTest": 1,
         "io.justsearch.indexerworker.splade.SeatForEveryGpuRunTest": 1,
