@@ -18,8 +18,8 @@ re-indexing". The specific choices (the shared v10 re-index, full re-index accep
 Tika-backed detector confined to the extraction package, no label when the evidence is too little)
 are the orchestrator's, recorded as delegated choices. A repair round added: no label for code and
 structured-data kinds, stronger prose evidence for every other kind, the built-in help documents
-re-indexed through a help marker bump, and one detector shared per JVM. The three new test files
-are exempt (isolated new tests).
+re-indexed through a help marker bump, and one detector shared per JVM. The two new test files
+ContentLanguageWritePathsTest and ContentLanguageMaintenanceTest are exempt (isolated new tests).
 
 ```json
 {
@@ -86,7 +86,7 @@ are exempt (isolated new tests).
         "modules/app-services/src/test/java/io/justsearch/app/services/worker/HelpIngestMarkerRecoveryTest.java"
       ],
       "class": "New",
-      "behaviour": "The released v4 help marker names built-in help stored under extraction policy v9, with the machine locale as language label; the help folder is no watched root, so the maintenance scan never re-reads it. The new v4MarkerReingestsOnceAndWritesV5 check requires a v4 marker to trigger exactly one forced help re-ingest, advance the marker to v5, and suppress another re-ingest on the next start. The historical v2 and v3 checks now expect the v5 marker and are renamed from ...WritesV4 to ...WritesV5; their once-only oracle (one re-ingest, then none) is retained. The eval-mode, stale, unreadable and current-marker checks are unchanged.",
+      "behaviour": "The released v4 help marker (v0.3.2, extraction policy v7) names built-in help stored with the machine locale as language label; the help folder is no watched root, so the maintenance scan never re-reads it. The new v4MarkerReingestsOnceAndWritesV5 check requires a v4 marker to trigger exactly one forced help re-ingest, advance the marker to v5, and suppress another re-ingest on the next start. The historical v2 and v3 checks now expect the v5 marker and are renamed from ...WritesV4 to ...WritesV5; their once-only oracle (one re-ingest, then none) is retained. The eval-mode, stale, unreadable and current-marker checks are unchanged.",
       "sources": [
         {
           "kind": "owner-words",
