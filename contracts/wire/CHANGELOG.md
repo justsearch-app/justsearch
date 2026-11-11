@@ -11,6 +11,11 @@ the V1.5 follow-up per slice 3a-1-8f.
 
 ### Changed
 
+- Indexed-root JSON view (`SSOT/schemas/indexed-root.v1.json`, outside the protobuf spec): job
+  counts and their enrichment coverage are nullable. A failed count query reports null (unknown)
+  instead of a fabricated zero; an observed empty queue stays zero. First-party readers treat null
+  as unconfirmed. No `.proto` change, so no VERSION bump; no stored state.
+
 - Wire3.0.0 replaces schema1 status component messages with schema2 API, index,
   encoders and generative component states. The old StatusResponse field4/name are
   reserved; the replacement uses field35 and distinct messages. This is a breaking

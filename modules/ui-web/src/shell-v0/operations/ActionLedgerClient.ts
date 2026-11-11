@@ -129,6 +129,7 @@ export interface BackendLedgerEntry {
 export interface UnifiedActionEntry {
   /** Read details from the existing receipt rather than duplicating them in the audit journal. */
   readonly operationOutcomeKey?: string;
+  readonly operationId?: string;
   /** Stable event id (the one ActionEvent schema's key) — a render key + dedup handle. */
   readonly id: string;
   /** Where the record came from: an authoritative backend record, or a FE-local effect. */
@@ -363,6 +364,7 @@ export function projectBackend(e: BackendLedgerEntry): UnifiedActionEntry {
       ...(e.transport ? { transport: e.transport } : {}) } } : {}),
     ...((e.kind === 'grant' || e.kind === 'operation') && e.pendingId ? { allowedBy: e.pendingId } : {}),
     ...removedFolderOf(e),
+    ...(e.operationId ? { operationId: e.operationId } : {}),
     ...(e.kind === 'operation'
       && ['core.bulk-reindex', 'core.rebuild-index', 'core.activate-installed-models'].includes(e.operationId ?? '')
       && /^operation:[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(e.id)

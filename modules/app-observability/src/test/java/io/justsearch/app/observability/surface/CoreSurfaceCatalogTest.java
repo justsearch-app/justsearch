@@ -297,8 +297,8 @@ final class CoreSurfaceCatalogTest {
     assertEquals(
         List.of(
             new SurfaceRef("core.health-surface"),
-            new SurfaceRef("core.logs-surface"),
-            new SurfaceRef("core.activity-surface")),
+            new SurfaceRef("core.activity-surface"),
+            new SurfaceRef("core.logs-surface")),
         entry.members());
     // Post-review honesty fix (571 §8): the hub COMPOSES members; it declares NO authority it does not
     // itself project. Empty consumes ⟹ derives PRODUCT. The per-member altitude framing lives inside

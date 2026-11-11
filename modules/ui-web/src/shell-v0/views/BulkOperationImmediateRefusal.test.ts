@@ -38,6 +38,8 @@ let invocations = 0;
 let holdInvoke = false;
 let pendingInvoke: (() => void) | null = null;
 let invokeRefusal = { message, code };
+/** Health offers a recommended remedy only from a current read of the recovery index. */
+let recoveryIndex = false;
 
 function operation(id: string): Operation {
   return { id, presentation: { labelKey: id, descriptionKey: '', iconHint: null, category: null },
@@ -55,7 +57,7 @@ function feed(migrationState = 'IDLE') {
 }
 beforeEach(async () => {
   accepted = false; finished = false; gapDecision = false; reads = 0; invocations = 0;
-  holdInvoke = false; pendingInvoke = null; invokeRefusal = { message, code };
+  holdInvoke = false; pendingInvoke = null; invokeRefusal = { message, code }; recoveryIndex = false;
   server = createServer((req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Headers', '*');
@@ -71,6 +73,8 @@ beforeEach(async () => {
       status = accepted ? 200 : 500;
       body = accepted ? { success: true, message: 'Accepted', structuredData: { operationKey: key } }
         : { success: false, message: decision[0], errorClass: 'HANDLER_FAILURE', errorCode: decision[1] };
+    } else if (recoveryIndex && req.url === '/api/condition-recovery-index') {
+      status = 200; body = { entries: [{ target: 'core.rebuild-index', conditions: [{ conditionId: 'index.embedding_legacy', subject: 'index', defaultArgsJson: '{}' }] }] };
     } else if (req.url === `/api/operation-history/${key}`) {
       reads++; status = 200;
       body = finished ? { state: 'failed', historySince: 0, message: laterMessage, reason: laterCode, result: { code: laterCode } }
@@ -102,7 +106,8 @@ afterEach(async () => {
 });
 function host() {
   return createMockHostApi({ data: {
-    fetch: path => path.startsWith('/api/operation-history/') ? fetch(base + path) : Promise.resolve(new Response('{}', { status: 503 })),
+    fetch: path => path.startsWith('/api/operation-history/') || path === '/api/condition-recovery-index'
+      ? fetch(base + path) : Promise.resolve(new Response('{}', { status: 503 })),
     invokeOperation: (id, args, opts) => getOperationClient(base).invokeWithConsent(id, { args: args ?? {} }, opts ?? {}),
   }, ui: { showConfirmDialog: async () => true } });
 }
@@ -141,10 +146,9 @@ async function startPendingControl(surface: typeof bulkControls[number]) {
   const el = document.createElement(brain ? 'jf-brain-surface' : 'jf-health-surface') as BrainSurface | HealthSurface;
   el.apiBase = base; el.host_ = host();
   if (brain) vi.spyOn(el as unknown as { refreshAll(): Promise<void> }, 'refreshAll').mockResolvedValue();
+  recoveryIndex = surface === 'health-recommended';
   document.body.append(el); await pump(el);
-  if (surface === 'health-recommended') {
-    (el as HealthSurface).recommendedActions = new Map([['index.embedding_legacy|index', { target: 'core.rebuild-index', args: {} }]]);
-  }
+  if (recoveryIndex) await vi.waitFor(() => expect((el as HealthSurface).recommendedActions.size).toBe(1));
   if (surface === 'activation') {
     const b = el as BrainSurface;
     b.expanded = { ...b.expanded, install: true };
@@ -211,10 +215,9 @@ it.each(['health', 'brain', 'health-recommended', 'activation'] as const)(
     const el = document.createElement(brain ? 'jf-brain-surface' : 'jf-health-surface') as BrainSurface | HealthSurface;
     el.apiBase = base; el.host_ = host();
     if (brain) vi.spyOn(el as unknown as { refreshAll(): Promise<void> }, 'refreshAll').mockResolvedValue();
+    recoveryIndex = surface === 'health-recommended';
     document.body.append(el); await pump(el);
-    if (surface === 'health-recommended') {
-      (el as HealthSurface).recommendedActions = new Map([['index.embedding_legacy|index', { target: 'core.rebuild-index', args: {} }]]);
-    }
+    if (recoveryIndex) await vi.waitFor(() => expect((el as HealthSurface).recommendedActions.size).toBe(1));
     if (surface === 'activation') {
       const b = el as BrainSurface;
       b.expanded = { ...b.expanded, install: true };

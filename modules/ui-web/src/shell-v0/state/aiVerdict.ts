@@ -97,6 +97,22 @@ export interface AiEngineVerdict {
    * amount, rather than each surface re-reading `installStatus` and formatting its own number.
    */
   readonly resumableBytes?: number;
+  /**
+   * Observed per-model facts, beside the lifecycle `kind` and independent of it: an engine can be
+   * `online` while one ONNX model (an embedder, the reranker) failed to load. Read off the same
+   * `runtimeStatus.onnxFeatures` this function already reads, so a surface that needs them (Health's
+   * AI models and Graphics card rows) consumes them here instead of re-reading the raw feature list.
+   * Each is absent when it has nothing to say.
+   *
+   * `failedModels`: the features whose status is `failed`, with the backend's reason.
+   */
+  readonly failedModels?: readonly { readonly id: string; readonly reason: string | null }[];
+  /**
+   * Where the ACTIVE (loaded) ONNX models actually run. `cpuOnly`: every active model runs on CPU
+   * without a GPU fallback; `gpuFallback`: at least one active model was configured for the GPU but
+   * fell back to CPU. Absent when no ONNX model is active.
+   */
+  readonly activeModelPlacement?: { readonly cpuOnly: boolean; readonly gpuFallback: boolean };
 }
 
 /**
@@ -142,6 +158,28 @@ export interface AiEngineObservedInput {
  * instead read the result off `AiState.aiEngine` (optionally overlaid via `applyLocalIntent`).
  */
 export function computeAiEngineVerdict(input: AiEngineObservedInput): AiEngineVerdict {
+  const lifecycle = computeLifecycle(input);
+  const features = input.runtimeStatus?.onnxFeatures ?? [];
+  const failedModels = features
+    .filter((f) => f.status === 'failed')
+    .map((f) => ({ id: f.id ?? f.label ?? 'unknown', reason: f.reason ?? null }));
+  const active = features.filter((f) => f.modelActive);
+  return {
+    ...lifecycle,
+    ...(failedModels.length > 0 ? { failedModels } : {}),
+    ...(active.length > 0
+      ? {
+          activeModelPlacement: {
+            cpuOnly: active.every((f) => f.executionProvider === 'cpu' && !f.gpuFallback),
+            gpuFallback: active.some((f) => f.gpuFallback === true),
+          },
+        }
+      : {}),
+  };
+}
+
+/** The lifecycle half of {@link computeAiEngineVerdict}: the `kind`, its stability and kind-scoped details. */
+function computeLifecycle(input: AiEngineObservedInput): AiEngineVerdict {
   const {
     installStatus,
     runtimeStatus,

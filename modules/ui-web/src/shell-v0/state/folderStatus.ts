@@ -178,8 +178,8 @@ export function rootCoverage(
    */
   const addStage = (
     applicable: boolean,
-    stageTotal: number | undefined,
-    stageSettled: number | undefined,
+    stageTotal: number | null | undefined,
+    stageSettled: number | null | undefined,
   ): void => {
     if (!applicable) return;
     if (typeof stageSettled !== 'number' || !Number.isFinite(stageSettled)) return;
@@ -314,6 +314,13 @@ export function folderStatus(row: IndexedRootView, ctx: FolderStatusContext): Fo
       failed: failedShown,
       failedIsLastKnown,
     };
+  }
+
+  // A failed count query (explicit null on the wire) is no observation of job drain: retain the
+  // last-known failure, never a zero. An absent field keeps its older meaning.
+  if (row.inFlightCount === null || row.failedCount === null) {
+    return { state: 'unknown', glyph: 'pending', metaText: `${collection} · Folder status unconfirmed`,
+      inFlight, failed: failedShown, failedIsLastKnown: failedShown > 0 };
   }
 
   // In-flight jobs → indexing, even while the walk is still discovering more (a count-down is more
@@ -547,7 +554,8 @@ export function rememberFailedCounts(
       next[hash] = failed;
       continue;
     }
-    const settled = count(row.inFlightCount) === 0 && opts.provisional !== true;
+    const settled = row.inFlightCount !== null && row.failedCount !== null
+      && count(row.inFlightCount) === 0 && opts.provisional !== true;
     if (!settled) {
       const carried = count(previous[hash]);
       if (carried > 0) next[hash] = carried;

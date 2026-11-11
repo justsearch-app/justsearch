@@ -442,6 +442,38 @@ describe('computeAiEngineVerdict — a retained observation is not a present-ten
   });
 });
 
+describe('computeAiEngineVerdict — observed per-model facts beside the lifecycle kind', () => {
+  it('names each failed model with its reason, even while the engine is online', () => {
+    const runtimeStatus: AiRuntimeStatus = {
+      onnxFeatures: [
+        { id: 'embed', status: 'active', modelActive: true, executionProvider: 'cuda' },
+        { id: 'rerank', status: 'failed', reason: 'model file missing', modelActive: false },
+      ],
+    };
+    const v = computeAiEngineVerdict(input({ runtimeStatus, runtime: runtime({ mode: 'online' }) }));
+    expect(v.kind).toBe('online');
+    expect(v.failedModels).toEqual([{ id: 'rerank', reason: 'model file missing' }]);
+  });
+
+  it('says where the active models run: CPU-only, or a GPU fallback', () => {
+    const cpu = computeAiEngineVerdict(input({ runtimeStatus: { onnxFeatures: [
+      { id: 'embed', modelActive: true, executionProvider: 'cpu' },
+      { id: 'idle', modelActive: false, executionProvider: 'cuda' },
+    ] } }));
+    expect(cpu.activeModelPlacement).toEqual({ cpuOnly: true, gpuFallback: false });
+    const fallback = computeAiEngineVerdict(input({ runtimeStatus: { onnxFeatures: [
+      { id: 'embed', modelActive: true, executionProvider: 'cpu', gpuFallback: true },
+    ] } }));
+    expect(fallback.activeModelPlacement).toEqual({ cpuOnly: false, gpuFallback: true });
+  });
+
+  it('carries neither fact when no model failed and none is active', () => {
+    const v = computeAiEngineVerdict(input({ runtimeStatus: { onnxFeatures: [{ id: 'embed', status: 'disabled' }] } }));
+    expect(v.failedModels).toBeUndefined();
+    expect(v.activeModelPlacement).toBeUndefined();
+  });
+});
+
 describe('applyLocalIntent (surface-local optimistic overlay — BrainSurface only)', () => {
   const settledOffline: AiEngineVerdict = {
     kind: 'offline',

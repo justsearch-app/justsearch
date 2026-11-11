@@ -1,0 +1,87 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
+  },
+  "createdAt": "2026-11-11T16:56:14.497Z",
+  "revision": "fc724ede88d6c5f5a74dc8d3c09679f4245d350f",
+  "tree": "82b356cb3ed2d481d2251bd9b2a140a6542cfd16",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/aiVerdict.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/4ddjgf3n/tmp/test-intent-vitest-631-1794416171649.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 601
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/state/aiVerdict.test.ts#names each failed model with its reason, even while the engine is online",
+      "file": "modules/ui-web/src/shell-v0/state/aiVerdict.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ce4861be781e1978ccf38ae679d9951e1b2cd01435fcef2f5acfadbc0517ff04",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "computeAiEngineVerdict — observed per-model facts beside the lifecycle kind names each failed model with its reason, even while the engine is online",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/aiVerdict.test.ts#says where the active models run: CPU-only, or a GPU fallback",
+      "file": "modules/ui-web/src/shell-v0/state/aiVerdict.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ce4861be781e1978ccf38ae679d9951e1b2cd01435fcef2f5acfadbc0517ff04",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "computeAiEngineVerdict — observed per-model facts beside the lifecycle kind says where the active models run: CPU-only, or a GPU fallback",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "fc724ede88",
+    "revision": "fc724ede88d6c5f5a74dc8d3c09679f4245d350f",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/aiVerdict.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/4ddjgf3n/tmp/test-intent-vitest-631-1794416173583.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 662,
+        "output": "JSON report written to /home/elias/.cache/am/4ddjgf3n/tmp/test-intent-vitest-631-1794416173583.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/state/aiVerdict.test.ts#names each failed model with its reason, even while the engine is online",
+        "classification": "assertion",
+        "detail": "computeAiEngineVerdict — observed per-model facts beside the lifecycle kind names each failed model with its reason, even while the engine is online:  AssertionError: expected undefined to deeply equal [ { id: 'rerank', …(1) } ]\n    at /home/elias/.cache/am/4ddjgf3n/tmp/test-intent-before-YybwW7/modules/ui-web/src/shell-v0/state/aiVerdict.test.ts:455:28\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-health/modules/ui-web/node_module"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/aiVerdict.test.ts#says where the active models run: CPU-only, or a GPU fallback",
+        "classification": "assertion",
+        "detail": "computeAiEngineVerdict — observed per-model facts beside the lifecycle kind says where the active models run: CPU-only, or a GPU fallback:  AssertionError: expected undefined to deeply equal { cpuOnly: true, gpuFallback: false }\n    at /home/elias/.cache/am/4ddjgf3n/tmp/test-intent-before-YybwW7/modules/ui-web/src/shell-v0/state/aiVerdict.test.ts:463:38\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-health/modules/ui-web/"
+      }
+    ]
+  },
+  "digest": "sha256:e15e2ca3bb932b231cb33ba5fde95ffa208bed3acb2691feb6c4d5a244faf334"
+}

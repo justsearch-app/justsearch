@@ -1,0 +1,180 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
+  },
+  "createdAt": "2026-11-11T18:16:26.755Z",
+  "revision": "da18b4bc0ba90b6acf0a09338d7894bac4cea20b",
+  "tree": "41f2a97cd8c9bddabaf5fd5ade7397b03a6b6127",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/HealthSurface.quiet.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/sb7vtc7b/tmp/test-intent-vitest-1654-1794420953394.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2492
+    },
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/HealthSurface.frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/sb7vtc7b/tmp/test-intent-vitest-1654-1794420955887.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 18296
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HealthSurface.quiet.test.ts#SH7 a retired failure stays retired when its receipts leave the bounded history; a new failure is reported",
+      "file": "modules/ui-web/src/shell-v0/views/HealthSurface.quiet.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:02f4738c7a51763a6e8eb8776461e5d4a8b98c3b97b7539784af3f26339a8a46",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "quiet System Health SH7 a retired failure stays retired when its receipts leave the bounded history; a new failure is reported",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HealthSurface.frame-lockdown.test.ts#every row action and Diagnostics remedy reaches its window through the shell and the address follows (current status, GPU telemetry unavailable, GPU-backed model)",
+      "file": "modules/ui-web/src/shell-v0/views/HealthSurface.frame-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f9015520bff8869ea15bd07b01c41d7416deed98623ce9eb8f8ee6c34e24f7b8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SH13 Health row actions and declared remedies navigate every row action and Diagnostics remedy reaches its window through the shell and the address follows (current status, GPU telemetry unavailable, GPU-backed model)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HealthSurface.frame-lockdown.test.ts#every row action and Diagnostics remedy reaches its window through the shell and the address follows (engine starting)",
+      "file": "modules/ui-web/src/shell-v0/views/HealthSurface.frame-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f9015520bff8869ea15bd07b01c41d7416deed98623ce9eb8f8ee6c34e24f7b8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SH13 Health row actions and declared remedies navigate every row action and Diagnostics remedy reaches its window through the shell and the address follows (engine starting)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HealthSurface.frame-lockdown.test.ts#600x400 with 200% text: Health and the open Diagnostics never scroll sideways and long values stay readable",
+      "file": "modules/ui-web/src/shell-v0/views/HealthSurface.frame-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f9015520bff8869ea15bd07b01c41d7416deed98623ce9eb8f8ee6c34e24f7b8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SH16 Health and Diagnostics reflow 600x400 with 200% text: Health and the open Diagnostics never scroll sideways and long values stay readable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HealthSurface.frame-lockdown.test.ts#900x700 at 100% with long values: no sideways overflow, every row and metric shown in order, the multi-column layout kept",
+      "file": "modules/ui-web/src/shell-v0/views/HealthSurface.frame-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f9015520bff8869ea15bd07b01c41d7416deed98623ce9eb8f8ee6c34e24f7b8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SH16 Health and Diagnostics reflow 900x700 at 100% with long values: no sideways overflow, every row and metric shown in order, the multi-column layout kept",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HealthSurface.frame-lockdown.test.ts#1280x720 at 100% with long values: no sideways overflow, every row and metric shown in order, the multi-column layout kept",
+      "file": "modules/ui-web/src/shell-v0/views/HealthSurface.frame-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f9015520bff8869ea15bd07b01c41d7416deed98623ce9eb8f8ee6c34e24f7b8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SH16 Health and Diagnostics reflow 1280x720 at 100% with long values: no sideways overflow, every row and metric shown in order, the multi-column layout kept",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "394467ba1d",
+    "revision": "394467ba1dfffd53f64bdae13d3dd66d77628ec1",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/HealthSurface.quiet.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/sb7vtc7b/tmp/test-intent-vitest-1654-1794420975511.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 2077,
+        "output": "JSON report written to /home/elias/.cache/am/sb7vtc7b/tmp/test-intent-vitest-1654-1794420975511.json\n\n"
+      },
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/HealthSurface.frame-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/sb7vtc7b/tmp/test-intent-vitest-1654-1794420977589.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 8874,
+        "output": "JSON report written to /home/elias/.cache/am/sb7vtc7b/tmp/test-intent-vitest-1654-1794420977589.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/HealthSurface.quiet.test.ts#SH7 a retired failure stays retired when its receipts leave the bounded history; a new failure is reported",
+        "classification": "assertion",
+        "detail": "quiet System Health SH7 a retired failure stays retired when its receipts leave the bounded history; a new failure is reported:  AssertionError: retired by a later success: expected 'Rebuild Index: failedRecent activity' not to contain ': failed'\n    at /home/elias/.cache/am/sb7vtc7b/tmp/test-intent-before-VXilyq/modules/ui-web/src/shell-v0/views/HealthSurface.quiet.test.ts:154:54\n    at file:///home/elias/dev/justsearch/.cla"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/HealthSurface.frame-lockdown.test.ts#every row action and Diagnostics remedy reaches its window through the shell and the address follows (current status, GPU telemetry unavailable, GPU-backed model)",
+        "classification": "assertion",
+        "detail": "SH13 Health row actions and declared remedies navigate every row action and Diagnostics remedy reaches its window through the shell and the address follows (current status, GPU telemetry unavailable, GPU-backed model):  AssertionError: folders row: Open Library: expected { stage: 'jf-health-surface', …(1) } to deeply equal { stage: 'jf-probe-library', …(1) }\n    at navigatesEverywhere (/home/elias/.cache/am/sb7vtc7b/tmp/test-intent-before-VXilyq/modules/ui-web/src/shell-v0/views/HealthSurface.fr"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/HealthSurface.frame-lockdown.test.ts#every row action and Diagnostics remedy reaches its window through the shell and the address follows (engine starting)",
+        "classification": "assertion",
+        "detail": "SH13 Health row actions and declared remedies navigate every row action and Diagnostics remedy reaches its window through the shell and the address follows (engine starting):  AssertionError: engine row: Open Logs: expected { stage: 'jf-health-surface', …(1) } to deeply equal { stage: 'jf-probe-logs', …(1) }\n    at navigatesEverywhere (/home/elias/.cache/am/sb7vtc7b/tmp/test-intent-before-VXilyq/modules/ui-web/src/shell-v0/views/HealthSurface.frame-lockdown.test.ts:166:55"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/HealthSurface.frame-lockdown.test.ts#600x400 with 200% text: Health and the open Diagnostics never scroll sideways and long values stay readable",
+        "classification": "assertion",
+        "detail": "SH16 Health and Diagnostics reflow 600x400 with 200% text: Health and the open Diagnostics never scroll sideways and long values stay readable:  AssertionError: Health body 600 / 877; outside: div.card section h3. div.data-row span.val span. div. p. details.transitions: expected 877 to be less than or equal to 601\n    at /home/elias/.cache/am/sb7vtc7b/tmp/test-intent-before-VXilyq/modules/ui-web/src/shell-v0/views/HealthSurface.frame-lockdow"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/HealthSurface.frame-lockdown.test.ts#900x700 at 100% with long values: no sideways overflow, every row and metric shown in order, the multi-column layout kept",
+        "classification": "assertion",
+        "detail": "SH16 Health and Diagnostics reflow 900x700 at 100% with long values: no sideways overflow, every row and metric shown in order, the multi-column layout kept:  AssertionError: truncated values without their full text: expected [ Array(1) ] to deeply equal []\n    at /home/elias/.cache/am/sb7vtc7b/tmp/test-intent-before-VXilyq/modules/ui-web/src/shell-v0/views/HealthSurface.frame-lockdown.test.ts:255:70\n    at file:///home/elias/dev/justsearch/.claude/worktr"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/HealthSurface.frame-lockdown.test.ts#1280x720 at 100% with long values: no sideways overflow, every row and metric shown in order, the multi-column layout kept",
+        "classification": "assertion",
+        "detail": "SH16 Health and Diagnostics reflow 1280x720 at 100% with long values: no sideways overflow, every row and metric shown in order, the multi-column layout kept:  AssertionError: truncated values without their full text: expected [ Array(1) ] to deeply equal []\n    at /home/elias/.cache/am/sb7vtc7b/tmp/test-intent-before-VXilyq/modules/ui-web/src/shell-v0/views/HealthSurface.frame-lockdown.test.ts:255:70\n    at file:///home/elias/dev/justsearch/.claude/worktr"
+      }
+    ]
+  },
+  "digest": "sha256:2cc1cb30612110a5d488286ce1af53306debc1b4c89e3bcd6374191ca2a9efac"
+}

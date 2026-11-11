@@ -7,6 +7,7 @@ import io.justsearch.app.api.settings.QueryRoleSelection;
 import io.justsearch.configuration.EnvRegistry;
 import io.justsearch.configuration.PlatformPaths;
 import io.justsearch.configuration.persistence.AtomicFileWrites;
+import io.justsearch.configuration.persistence.ContendedFileReads;
 import io.justsearch.configuration.persistence.CorruptDurableStoreException;
 import io.justsearch.configuration.persistence.StoreFormatVersions;
 import tools.jackson.databind.DeserializationFeature;
@@ -52,6 +53,11 @@ import org.slf4j.LoggerFactory;
  * {@code schemaVersion} is a different question and stays fail-loud: {@link
  * StoreFormatVersions#requireReadable} still throws, because refusing to touch state a newer build
  * wrote is the safe answer, while defaulting over it would silently downgrade it on the next save.
+ *
+ * <p>A file that cannot be READ at all (open denied, lock held, I/O failure) says nothing about its
+ * content: every read waits through {@link ContendedFileReads} and a read that still fails is
+ * "settings unavailable" ({@link UncheckedIOException}), never quarantined and never defaulted, so
+ * a later save cannot overwrite the user's real settings.
  *
  * <p>A PAST {@code schemaVersion} is neither: it is listed in {@link #READABLE_LEGACY_VERSIONS} and
  * forward-migrated by {@link #migrate} on load (tempdoc 883). Migration runs on every load until the
@@ -204,12 +210,8 @@ public final class UiSettingsStore {
       if (!Files.notExists(settingsFile)) throw new IllegalStateException("Settings changed during inspection");
       return new ExactSnapshot(absent, "absent");
     }
-    try {
-      byte[] bytes = Files.readAllBytes(settingsFile);
-      return new ExactSnapshot(parseOrThrow(bytes), HexFormat.of().formatHex(sha256().digest(bytes)));
-    } catch (IOException failure) {
-      throw new UncheckedIOException("Cannot inspect exact settings witness", failure);
-    }
+    byte[] bytes = readSettingsBytes();
+    return new ExactSnapshot(parseOrThrow(bytes), HexFormat.of().formatHex(sha256().digest(bytes)));
   }
 
   /** Reads without quarantine/default recovery, for commitment classification by the apply owner. */
@@ -218,7 +220,7 @@ public final class UiSettingsStore {
       return new Snapshot(new UiSettings(), new SettingsWitness(0, null), null);
     }
     if (!Files.notExists(settingsFile)) {
-      // Unknown accessibility is not absence. Parsing fails closed if the file cannot be read.
+      // Unknown accessibility is not absence. A file that cannot be read fails as unavailable.
       return parseOrThrow();
     }
     if (lastRecovery != null) {
@@ -302,9 +304,17 @@ public final class UiSettingsStore {
   }
 
   private synchronized Snapshot parseOrThrow() {
-    try { return parseOrThrow(Files.readAllBytes(settingsFile)); }
+    return parseOrThrow(readSettingsBytes());
+  }
+
+  /**
+   * One complete version of the named file, waiting through a held lock, a denied open or an
+   * atomic replacement. A read that still fails is unavailability, not corruption.
+   */
+  private byte[] readSettingsBytes() {
+    try { return ContendedFileReads.readAllBytes(settingsFile); }
     catch (IOException failure) {
-      throw new CorruptDurableStoreException("ui-settings", "cannot read " + settingsFile, failure);
+      throw new UncheckedIOException("Settings unavailable: cannot read " + settingsFile, failure);
     }
   }
 

@@ -21,6 +21,7 @@
  * `null`) and invalidates its observation until a later read succeeds.
  */
 
+import { subscribeStatusEpoch } from '../../api/statusInvalidation.js';
 import { authorizedFetch } from '../api/authorizedFetch.js';
 import { observeAdmissionWait } from '../../api/admissionFetch.js';
 import type { AiInstallStatus } from '../../api/generated/schema-types/ai-install-status.js';
@@ -189,6 +190,12 @@ export function isAiObservationLive(observation: AiObservation | undefined): boo
   return observation !== undefined && !observation.latestReadFailed;
 }
 
+/** When the poller last received a successful answer for this endpoint; readers apply their own expiry. */
+const receivedAtMs: Partial<Record<'install' | 'runtime' | 'packs', number>> = {};
+export function aiObservationReceivedAtMs(key: 'install' | 'runtime'): number | undefined {
+  return receivedAtMs[key];
+}
+
 /** Settles on abort even when the awaited fetch or response body ignores the signal. */
 function untilAbandoned<T>(step: Promise<T>, signal: AbortSignal): Promise<T> {
   return new Promise<T>((resolve, reject) => {
@@ -240,6 +247,7 @@ async function readStatus(key: 'install' | 'runtime' | 'packs', current: AbortCo
   if (key === 'runtime' && typeof value === 'object' && value !== null) runtimeReadStarts.set(value as AiRuntimeStatus, startedAt);
   // A failed read retains history but immediately invalidates its observation.
   const observationKey = `${key}Observation` as const;
+  if (value !== null) receivedAtMs[key] = Date.now();
   last = { ...last, [key]: value ?? last[key], [observationKey]: {
     latestReadFailed: value === null,
   } };
@@ -292,6 +300,7 @@ function stop(): void {
     timer = null;
   }
   last = { install: null, runtime: null, packs: null };
+  for (const key of Object.keys(receivedAtMs) as (keyof typeof receivedAtMs)[]) delete receivedAtMs[key];
 }
 
 /**
@@ -349,3 +358,11 @@ export function __resetAiInstallPollForTest(): void {
   listeners.clear();
   apiBase = '';
 }
+
+// A fast producer restart revokes the previous process's runtime and install observations too.
+subscribeStatusEpoch(() => {
+  if (!controller) return;
+  stop();
+  ensureRunning();
+  if (controller) publish(controller);
+});

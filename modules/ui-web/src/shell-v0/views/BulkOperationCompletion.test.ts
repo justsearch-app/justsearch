@@ -14,10 +14,12 @@ const key = '0194f72c-0000-7000-8000-000000000001';
 const message = 'The rebuild or migration could not safely start or resume the new index; check index health and current settings before starting a new rebuild. (Code: BULK_GENERATION_REFUSED)';
 let terminal = false;
 let reads = 0;
+/** The recovery index Health reads; a remedy is offered only from a current read of it. */
+let recovery: unknown = null;
 
 beforeEach(() => {
   __resetUiModeForTest(); setUiMode('advanced');
-  vi.useFakeTimers(); terminal = false; reads = 0;
+  vi.useFakeTimers(); terminal = false; reads = 0; recovery = null;
   vi.stubGlobal('fetch', vi.fn(async (path: string) => {
     if (path.endsWith(`/api/operation-history/${key}`)) {
       reads++;
@@ -25,6 +27,7 @@ beforeEach(() => {
         ? { state: 'failed', historySince: 0, message, reason: 'BULK_GENERATION_REFUSED', result: { code: 'BULK_GENERATION_REFUSED' } }
         : { state: 'running', historySince: 0 }));
     }
+    if (recovery && path.endsWith('/api/condition-recovery-index')) return new Response(JSON.stringify(recovery));
     return new Response('{}', { status: 503 });
   }));
   __feedForTest({ status: { worker: { core: { indexHealthy: true, indexState: 'IDLE' } },
@@ -81,10 +84,10 @@ it('a model activation displays its later migration failure', async () => {
 });
 
 it('Health recommended rebuild action observes the same later outcome', async () => {
+  recovery = { entries: [{ target: 'core.bulk-reindex', conditions: [{ conditionId: 'index.embedding_legacy', subject: 'index', defaultArgsJson: '{}' }] }] };
   const el = document.createElement('jf-health-surface') as HealthSurface;
+  el.host_ = { data: { fetch: (path: string, init?: RequestInit) => fetch(path, init) } } as unknown as PluginHostApi;
   document.body.append(el); await pump(el);
-  el.recommendedActions = new Map([['index.embedding_legacy|index', { target: 'core.bulk-reindex', args: {} }]]);
-  await pump(el);
   const button = el.shadowRoot!.querySelector('jf-operation[operation-id="core.bulk-reindex"]');
   expect(button).not.toBeNull();
   button!.dispatchEvent(new CustomEvent('op-success', { bubbles: true, composed: true,
