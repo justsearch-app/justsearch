@@ -1,0 +1,67 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
+  },
+  "createdAt": "2026-11-11T05:13:49.853Z",
+  "revision": "5cc78ebcb40ed0bbc24dbdd31cf09a73e5660d50",
+  "tree": "607518b1f90ebc7082dec996d4fd54f6561dd149",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/SearchV3View.residency.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/h8fz3vx6/tmp/test-intent-vitest-35-1794374009048.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 8401
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#Retry still becomes available when its timer wakes before the wall-clock deadline",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:154fe2c17745e03c46aa090f2c9951d46bf3bd0af6c79bfb6d53ec346f48d509",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "NR15 human admission and RR15 refusal recovery Retry still becomes available when its timer wakes before the wall-clock deadline",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "5cc78ebcb40ed0bbc24dbdd31cf09a73e5660d50",
+    "revision": "5cc78ebcb40ed0bbc24dbdd31cf09a73e5660d50",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/SearchV3View.residency.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/h8fz3vx6/tmp/test-intent-vitest-35-1794374020530.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 8806,
+        "output": "JSON report written to /home/elias/.cache/am/h8fz3vx6/tmp/test-intent-vitest-35-1794374020530.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts#Retry still becomes available when its timer wakes before the wall-clock deadline",
+        "classification": "assertion",
+        "detail": "NR15 human admission and RR15 refusal recovery Retry still becomes available when its timer wakes before the wall-clock deadline:  AssertionError: expected true to be false // Object.is equality\n    at checkRetryInterval (/home/elias/.cache/am/h8fz3vx6/tmp/test-intent-before-yPYq37/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.residency.test.ts:119:57)\n    at /home/elias/.cache/am/h8fz3vx6/tmp/test-intent-before-yPYq"
+      }
+    ]
+  },
+  "digest": "sha256:dbea7a2f499ac025f5fdf37da71c1ac46ff825386500f202e5c058ed16f7ad8c"
+}
