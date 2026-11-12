@@ -78,3 +78,14 @@ opened beneath the frame out of the top layer.
   "note": "Reject: the delegated-choice is acceptable (owner's release request delegates fix-before-ship triage; cut-a-release.md section 4 confirms agents decide; no stronger source conflicts, base 10-ui-ux-design.md agrees Settings is modal and closed by Escape and X), and it validly serves as defectSource.stronger. Evidence and assertion fail-before hold. But R1 also asserts a mechanism the choice does not state: removedFromRoot equals ['div'] (the application never leaves #root at hand-off). The behaviour field lists it; no source supports it, and it would fail a fix that keeps Settings modal another way. Clear by either dropping that assertion (':modal' alone fails on a003b507f4 by assertion) and regenerating evidence, or widening the choice to state that the hand-off removes only the start-up cover and keeps the application attached to #root."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "acceptor-settings-3-1794483774",
+  "verdict": "accept",
+  "digest": "sha256:40089034b843826e6a046fc04665b7b5f900f87dcff85410fdf2fe395ae1c50b",
+  "note": "Accept: Defect pin. defectSource.stronger and sources are a delegated-choice quoting the owner's release request (fix-before-ship triage delegated; cut-a-release.md s4 at base confirms agents decide); no stronger source conflicts (base 10-ui-ux-design.md: Settings is a modal top-layer dialog closed by Escape and X; window controls wait while it is open). Every R1 assertion is within the choice: ':modal' with backdrop and X topmost at its centre are what staying modal above the window controls means; X and Escape closing are stated; jf-shell not inert is the base hand-off's own release, a sync point. The mechanism assertion is gone. Evidence current; fail-before on a003b507f4 is an assertion at line 915 (the ':modal'/backdrop check)."
+}
+```
