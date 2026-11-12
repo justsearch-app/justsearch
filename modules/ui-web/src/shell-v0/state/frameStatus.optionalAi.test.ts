@@ -4,14 +4,22 @@ import { describe, expect, it } from 'vitest';
 import { deriveFrameStatus } from './frameStatus.js';
 import type { AiState } from './aiStateStore.js';
 
-type Engine = 'not_installed' | 'connecting' | 'installing' | 'starting' | 'install_failed' | 'paused' | 'offline';
+type Engine = 'not_installed' | 'connecting' | 'installing' | 'starting' | 'offline';
 
-/** A fresh install's status: keyword index done, its documents waiting for semantic vectors. */
+/**
+ * A fresh install's status: keyword index done, its documents waiting for semantic vectors. The search
+ * verdict is the one a real Engine without AI models reports (retrieval and AI-features reason codes
+ * as measured); the AI verdict says nobody asked for AI unless semantic search is switched on.
+ */
 function ai(engine: Engine, enrichment: Record<string, unknown> = {}, install: Record<string, unknown> | null = null): AiState {
+  const asked = enrichment.embeddingEnabled === true;
   return {
     phase: 'connected', connection: { reachable: true, lastSuccessMs: 100000, lastContactMs: 100000, consecutiveFailures: 0 },
-    verdict: { kind: 'operational', severity: 'info', reasons: [] }, stability: { kind: 'settled' },
-    aiEngine: { kind: engine, stability: { kind: 'settled' }, installFailure: engine === 'install_failed' ? 'Download failed' : null },
+    verdict: { kind: 'degraded', severity: 'warn',
+      reasons: ['index.dense_unavailable', 'lambdamart.not_configured', 'inference.deactivated', 'encoders.health.embedding_not_ready'] },
+    stability: { kind: 'settled' },
+    aiEngine: { kind: engine, stability: { kind: 'settled' }, installFailure: null,
+      ...(engine === 'not_installed' && !asked ? { notRequested: true } : {}) },
     activity: { state: 'idle', shapeId: null, startedAtMs: null, canCancel: false, cancel: null },
     status: { worker: { core: { indexState: 'IDLE', pendingJobs: 0, indexedDocuments: 7, searchableDocuments: 7 }, enrichment: {
       embeddingEnabled: false, spladeEnabled: false, nerEnabled: false, embeddingDocCount: 7, embeddingPendingCount: 7,
@@ -46,10 +54,9 @@ describe('FA3 optional AI and the status pill', () => {
   });
 });
 
+// A failed or interrupted AI install: unrequestedAi.test.ts (FA3c).
 describe('FA3 what still needs the person', () => {
   it.each([
-    ['an AI install they started that failed', ai('install_failed')],
-    ['an interrupted install left waiting', ai('paused')],
     ['installed AI models that are not running', ai('offline')],
     ['semantic search turned on that cannot run', ai('not_installed', { embeddingEnabled: true, embeddingAvailable: false })],
     ['another enabled producer that cannot run', ai('not_installed', { spladeEnabled: true, spladeAvailable: false, spladePendingCount: 4 })],

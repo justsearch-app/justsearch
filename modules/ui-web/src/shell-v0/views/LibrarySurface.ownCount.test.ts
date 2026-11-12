@@ -57,6 +57,11 @@ it('FA4 an Engine that does not report the own count: unknown in words, never a 
   expect(count).toBe('Searchable document count not known');
 });
 
+it('FA4a with the own count unknown (only Help and an indexed folder reported), no headline says the person\'s files are searchable', async () => {
+  observe(undefined);
+  expect(await header()).toEqual({ headline: 'Your folders are indexed', count: 'Searchable document count not known' });
+});
+
 it('FA4 the own count reported late replaces the unknown one', async () => {
   observe(undefined);
   expect((await header()).count).toBe('Searchable document count not known');

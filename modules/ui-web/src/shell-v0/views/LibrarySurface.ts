@@ -2136,15 +2136,18 @@ export class LibrarySurface extends JfElement {
 
   private renderHeader(): TemplateResult {
     const count = this.attentionItems().length;
-    // The person's own files; an Engine that does not report them leaves only the Help-inclusive count.
-    const documents = this.ownDocuments.known ? this.ownDocuments : this.defaultScopeDocuments;
+    // The person's own files (Help excluded). Unknown own files are never said to be searchable: once
+    // the Engine has answered without them (an older Engine), the headline says only what is known.
+    const documents = this.ownDocuments;
+    const ownUnknown = !this.defaultScopeDocuments.known ? 'Checking your folders'
+      : this.indexProgress.phase === 'indexing' ? this.indexingActivity.summary : 'Your folders are indexed';
     const headline = this.loading ? 'Loading your Library…'
       : !this.indexProgress.live || this.contactUnconfirmed ? 'Indexing status unconfirmed'
         : count ? `${count} ${count === 1 ? 'thing needs' : 'things need'} your attention`
           : this.provisional ? this.provisionalHeadline
             : !this.indexingActivity.confirmed ? this.indexingActivity.summary
               : !this.roots.length ? 'Add a folder to start searching'
-                : !documents.known ? 'Checking your folders'
+                : !documents.known ? ownUnknown
                   : documents.value === 0 ? 'Indexing your files' : 'Your files are searchable';
     return html`<div class="header"><div class="header-left"><h2>${headline}</h2>
       <p class="subtitle">${!this.ownDocuments.known ? 'Searchable document count not known'

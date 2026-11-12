@@ -2,7 +2,8 @@
 /** Read-only frame projection. Urgency, freshness, acknowledgement and lifecycle are independent. */
 import type { AiState } from './aiStateStore.js';
 import { selectIndexingProgress, type IndexingProgress } from './indexingProgress.js';
-import { isSearchUnavailableCause, isReindexCause } from './readinessNotice.js';
+import { awaitsUnrequestedAi, gapOnlyAiProvides, isSearchUnavailableCause, isReindexCause, readinessNotice, warrantsSearchDegradationBanner } from './readinessNotice.js';
+import { aiEngineBody } from './aiVerdict.js';
 import { formatBytes, formatCount } from '../display/format.js';
 import { indexingCountsLine, indexingCountsLabel, enrichingCountsLine, enrichingCountsLabel } from './statusProgress.js';
 import { indexingTaskStatus } from './indexingProgress.js';
@@ -470,18 +471,23 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
     ...((input.tasks ?? []).some(task => task.id.startsWith('idxjob:')) ? [{ id: 'file-window', section: 'running' as const,
       title: 'File details are a live window, showing up to 8 tasks; queue totals include files outside it.' }] : []),
   ];
-  // AI is optional (ref-01): semantic work that waits only for AI models nobody has asked for yet,
-  // or that are still being installed or started, needs nothing from the person and is no Needs-you
-  // row. Any other blocked producer, a failed or interrupted install, or installed models that cannot
-  // run still are.
+  // AI is optional (ref-01). The AI verdict says whether anyone asked for AI (`notRequested`) and how
+  // an install the person started stands; the cause vocabulary says whether a search gap is only what
+  // AI provides. Semantic work waiting only for AI nobody asked for, or for AI being installed or
+  // started, needs nothing from the person. A failed or interrupted install needs them: one row, which
+  // also stands for the semantic work and the search gap waiting on it. Any other blocked producer and
+  // AI that was asked for but cannot run still need them through their own rows.
+  const engine = ai?.aiEngine;
+  const aiInstallNeedsYou = engine?.kind === 'install_failed' || engine?.kind === 'paused';
+  const aiOnTheWay = ['connecting', 'installing', 'starting'].includes(engine?.kind ?? '');
   const enrichment = ai?.status?.worker?.enrichment;
-  const waitsForOptionalAi = progress.phase === 'blocked' && enrichment?.embeddingEnabled === false
-    && progress.blockedPending === Math.max(0, enrichment.embeddingPendingCount ?? 0) + Math.max(0, enrichment.chunk?.chunkEmbeddingPendingCount ?? 0)
-    && ['not_installed', 'connecting', 'installing', 'starting'].includes(ai!.aiEngine.kind);
+  const semanticWaitsForAi = progress.phase === 'blocked' && enrichment?.embeddingEnabled === false
+    && progress.blockedPending === Math.max(0, enrichment.embeddingPendingCount ?? 0) + Math.max(0, enrichment.chunk?.chunkEmbeddingPendingCount ?? 0);
+  const waitsForOptionalAi = semanticWaitsForAi && (engine?.notRequested === true || aiOnTheWay);
   if (progress.pause) add({ id: 'indexing-hold', section: 'needs', indexing: true,
     title: progress.activity.summary, detail: progress.activity.detail ?? progress.pause.reason,
     stale: !progress.activity.confirmed });
-  else if (progress.phase !== 'ready' && progress.phase !== 'unknown' && !waitsForOptionalAi) add({ id: 'indexing',
+  else if (progress.phase !== 'ready' && progress.phase !== 'unknown' && !waitsForOptionalAi && !(semanticWaitsForAi && aiInstallNeedsYou)) add({ id: 'indexing',
     section: progress.phase === 'error' ? 'problems' : progress.phase === 'blocked' ? 'needs' : 'running', indexing: true,
     title: progress.activity.summary,
     detail: progress.activity.confirmed ? [progress.phase === 'indexing' ? indexingCountsLine(progress)
@@ -512,9 +518,19 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
   const limited = ai?.verdict.reasons.some(code => isSearchUnavailableCause(code) || isReindexCause(code)) ?? false;
   if (limited && ai) add({ id: 'search-limited', section: 'problems', title: 'Search limited',
     detail: verdictHeadline(ai.verdict), stale: ai.phase !== 'connected', actions: [go('Health', 'core.health-surface')] });
-  if (ai?.aiEngine.kind === 'install_failed') add({ id: 'ai-install-failed', section: 'problems',
-    title: 'AI install failed', detail: ai.aiEngine.installFailure ?? 'Review the AI models and try again.',
-    stale: !ai.snapshotLive, actions: [go('Open AI Brain', 'core.brain-surface')] });
+  if (ai && engine && aiInstallNeedsYou) add({ id: engine.kind === 'install_failed' ? 'ai-install-failed' : 'ai-install-paused',
+    section: 'needs', title: engine.kind === 'install_failed' ? 'AI install failed' : 'AI download paused', detail: aiEngineBody(engine),
+    stale: !ai.installObservationLive, actions: [go('Open AI Brain', 'core.brain-surface')] });
+  // A known reduced search is said, never "Checking" (search limits, `limited`, speak for themselves).
+  // Lacking only what AI provides, it is AI nobody asked for (calm), AI on its way, or AI waiting on the
+  // person: an install row above, the blocked semantic work row, or else this row under Needs you. Any
+  // other reduction is a problem right now.
+  const reduced = ai && !limited && ai.verdict.kind === 'degraded' ? readinessNotice(ai.verdict) : null;
+  const aiGap = !!ai && gapOnlyAiProvides(ai.verdict);
+  if (ai && reduced && warrantsSearchDegradationBanner(ai.verdict, engine)
+    && !(aiGap && (aiInstallNeedsYou || aiOnTheWay || sections.needs.some(row => row.id === 'indexing')))) add({
+    id: 'search-reduced', section: aiGap ? 'needs' : 'problems', title: reduced.headline.replace(/\.$/, ''), detail: reduced.body,
+    stale: ai.phase !== 'connected', actions: [aiGap ? go('Open AI Brain', 'core.brain-surface') : go('Health', 'core.health-surface')] });
   const install = ai?.installStatus;
   if (ai && (install?.state === 'running' || ['installing', 'starting'].includes(ai.aiEngine.kind))) add({ id: 'ai-install', section: 'running',
     title: install?.paused ? 'AI download paused' : ai.aiEngine.kind === 'starting' ? 'Starting AI models' : 'Installing AI models',
@@ -576,6 +592,8 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
   sections.running.sort((a, b) => runningRank(a) - runningRank(b));
   sections.earlier.sort((a, b) => (b.occurredAt ?? '').localeCompare(a.occurredAt ?? ''));
   const stale = !ai || ai.phase !== 'connected';
+  // `info`-only causes leave search serving fully (the banner's own tier rule).
+  const searchServesFully = ai?.verdict.kind === 'operational' || ai?.verdict.kind === 'degraded' && ai.verdict.severity === 'info';
   let pill: StatusPillState;
   const pastGrace = input.contactLostAt !== null && now - input.contactLostAt >= RECONNECT_GRACE_MS;
   if (ai && !ai.connection.reachable && pastGrace) pill = { kind: 'unreachable', label: "Can't reach the engine", stale: false };
@@ -588,9 +606,10 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
   // A completion is a ready claim: it needs a fresh observation like calm does (ST2).
   } else if (!stale && input.finished && now - input.finished.at < FINISHED_DWELL_MS) pill = { kind: 'finished', label: input.finished.title, stale: false };
   else if (input.gettingStarted?.visible && input.gettingStarted.known) pill = { kind: 'calm', label: `Getting started · ${input.gettingStarted.currentStep} of 3`, stale: false };
-  else if (!stale && ai?.verdict.kind === 'operational' && progress.phase === 'ready') pill = { kind: 'calm', label: 'Up to date', stale: false };
+  else if (!stale && searchServesFully && progress.phase === 'ready') pill = { kind: 'calm', label: 'Up to date', stale: false };
   // Not "Up to date": that is a coverage claim, and semantic coverage is what is missing.
-  else if (!stale && ai?.verdict.kind === 'operational' && waitsForOptionalAi) pill = { kind: 'calm', label: 'Keyword search ready', stale: false };
+  else if (!stale && engine?.notRequested && (searchServesFully || awaitsUnrequestedAi(ai!.verdict, engine))
+    && (progress.phase === 'ready' || waitsForOptionalAi)) pill = { kind: 'calm', label: 'Keyword search ready', stale: false };
   else pill = { kind: 'unknown', label: 'Checking search status', stale: true };
   if (pill.stale) {
     const age = ai?.connection.lastSuccessMs == null ? null : Math.max(0, Math.floor((now - ai.connection.lastSuccessMs) / 60_000));

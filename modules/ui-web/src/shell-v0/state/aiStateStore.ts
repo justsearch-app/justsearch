@@ -970,6 +970,7 @@ function buildSnapshot(): AiState {
     chatEnabledSpec: status?.inference?.chatEnabledSpec,
     procedure: status?.inference?.procedure,
     engineReason: status?.inference?.engineReason,
+    semanticEnabled: status?.worker?.enrichment?.embeddingEnabled,
   });
   const statusLabel = computeStatusLabel(verdict, runtime, activity, aiEngine);
   const statusTier = computeStatusTier(verdict, runtime);

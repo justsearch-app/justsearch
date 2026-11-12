@@ -12,7 +12,7 @@ async function settle(el: LibrarySurface) {
 
 function observe(indexState = 'IDLE', catchingUp = false, migrationState = 'IDLE') {
   __feedForTest({ status: { catchingUp, worker: {
-    core: { indexedDocuments: 20, indexState, indexHealthy: true },
+    core: { indexedDocuments: 20, ownSearchableDocuments: 20, indexState, indexHealthy: true },
     migration: { migrationState },
   } } as unknown as StatusSnapshot });
 }

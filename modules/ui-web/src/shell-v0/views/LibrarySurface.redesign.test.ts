@@ -25,7 +25,8 @@ async function settle(el: { updateComplete: Promise<unknown> }) {
   for (let i = 0; i < 30; i++) { await Promise.resolve(); await el.updateComplete; }
 }
 function observe(documents?: number) {
-  __feedForTest({ status: { worker: { core: { indexedDocuments: documents, indexState: 'IDLE', indexHealthy: true },
+  __feedForTest({ status: { worker: { core: { indexedDocuments: documents,
+    ...(documents === undefined ? {} : { ownSearchableDocuments: documents }), indexState: 'IDLE', indexHealthy: true },
     migration: { migrationState: 'IDLE' } } } as unknown as StatusSnapshot });
 }
 async function mount() {

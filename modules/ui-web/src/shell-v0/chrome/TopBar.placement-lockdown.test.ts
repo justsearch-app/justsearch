@@ -189,6 +189,42 @@ describe('FA1 the top bar at 600x400 with 200% text and the window controls', ()
   }, 120_000);
 });
 
+/** The open status panel's edges and the window's width. */
+async function panelBox(page: Page): Promise<{ left: number; right: number; window: number }> {
+  return page.locator('jf-status-pill jf-status-panel').evaluate(el => {
+    const r = el.getBoundingClientRect();
+    return { left: r.left, right: r.right, window: innerWidth };
+  });
+}
+
+describe('FA1a what is open while the window shrinks stays inside it', () => {
+  it('the status panel opened at 900x800 stays inside as the window shrinks to 600x400 and the text grows to 200%', async () => {
+    const page = await open({ width: 900, height: 800, text: 100, controls: true });
+    await page.locator('jf-status-pill button.trigger').click();
+    await page.locator('jf-status-pill jf-status-panel').waitFor();
+    await settle(page);
+    for (const step of ['shrink', 'text'] as const) {
+      if (step === 'shrink') await page.setViewportSize({ width: 600, height: 400 });
+      else await page.evaluate(() => { document.documentElement.style.fontSize = '200%'; });
+      await settle(page);
+      const panel = await panelBox(page);
+      expect(panel.left, `${step} ${JSON.stringify(panel)}`).toBeGreaterThanOrEqual(0);
+      expect(panel.right, `${step} ${JSON.stringify(panel)}`).toBeLessThanOrEqual(panel.window);
+    }
+  }, 120_000);
+
+  it('More opened at 900x800 stays inside as the window shrinks to 600x400 and the text grows to 200%', async () => {
+    const page = await open({ width: 900, height: 800, text: 100, controls: true });
+    await openMenu(page, '.more-trigger');
+    await page.setViewportSize({ width: 600, height: 400 });
+    await settle(page);
+    inside(await menuLayout(page, '.more-trigger'));
+    await page.evaluate(() => { document.documentElement.style.fontSize = '200%'; });
+    await settle(page);
+    inside(await menuLayout(page, '.more-trigger'));
+  }, 120_000);
+});
+
 describe('FA1 the larger windows keep their menus where they were', () => {
   it.each([[1280, 720], [900, 800]])('%ix%i: More hangs under its button, its end edge on the button\'s', async (width, height) => {
     for (const controls of [false, true]) {

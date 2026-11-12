@@ -148,7 +148,7 @@ export class StatusPill extends JfElement {
     this.narrowQuery = typeof window.matchMedia === 'function' ? window.matchMedia('(max-width: 999px)') : null;
     this.narrowQuery?.addEventListener('change', this.narrowChange);
     this.narrowChange();
-    if (typeof ResizeObserver !== 'undefined') this.noticeResize = new ResizeObserver(this.placeNotice);
+    if (typeof ResizeObserver !== 'undefined') this.noticeResize = new ResizeObserver(this.relayout);
   }
   override disconnectedCallback(): void {
     super.disconnectedCallback();
@@ -175,36 +175,51 @@ export class StatusPill extends JfElement {
     this.noticeResize?.disconnect();
     this.noticeResize?.observe(this);
     if (this.parentElement) this.noticeResize?.observe(this.parentElement);
-    for (const element of this.shadowRoot!.querySelectorAll('.beside-notice, .notice-below, .trigger, .label, .transient-action')) {
+    for (const element of this.shadowRoot!.querySelectorAll('.beside-notice, .notice-below, .trigger, .label, .transient-action, jf-status-panel')) {
       this.noticeResize?.observe(element);
     }
     this.placeNotice();
     if (changed.has('open')) {
       if (this.open) {
         this.transient.open();
-        const rect = this.shadowRoot!.querySelector('.trigger')!.getBoundingClientRect();
-        this.style.setProperty('--frame-status-panel-top', `${rect.bottom}px`);
-        // R2 — the dim starts below the bar the pill sits in: the pill and its neighbours keep
-        // their own contrast while the panel is open.
-        this.style.setProperty('--frame-status-dim-top', `${Math.max(rect.bottom, this.parentElement?.getBoundingClientRect().bottom ?? 0)}px`);
+        this.placePanel();
         const panel = this.shadowRoot!.querySelector<StatusPanel>('jf-status-panel');
         void panel?.updateComplete.then(() => {
-          // R4 — under the pill, kept a margin away from both window edges; the arrow points at the
-          // pill's centre and stays on the straight part of the panel's top edge.
-          const margin = cssLength(this, '--jf-space-2');
-          const width = panel.getBoundingClientRect().width;
-          const right = window.innerWidth - rect.right - shiftIntoWindow({ left: rect.right - width, right: rect.right }, margin);
-          this.style.setProperty('--frame-status-panel-right', `${right}px`);
-          const placed = panel.getBoundingClientRect();
-          const inset = cssLength(this, '--frame-panel-radius') + margin / 2;
-          const fromRight = Math.min(Math.max(inset, placed.right - (rect.left + rect.width / 2)), Math.max(inset, placed.width - inset));
-          this.style.setProperty('--frame-status-arrow-right', `calc(${fromRight}px - var(--jf-space-2) / 2)`);
+          this.placePanel();
           // The panel's answers just appeared where the pointer may already be: they arm from now (C12).
           panel.placeControls();
           panel.shadowRoot?.querySelector<HTMLElement>('[role="dialog"]')?.focus();
         });
       } else this.transient.close();
     }
+  }
+  /** The window, the text size or the bar changed: the inline notice, and an open panel, are placed again. */
+  private readonly relayout = (): void => {
+    this.placeNotice();
+    if (this.open) this.placePanel();
+  };
+  /**
+   * R4 — the panel hangs under the pill, kept a margin away from both window edges (the top bar's one
+   * placement rule); the arrow points at the pill's centre and stays on the straight part of the
+   * panel's top edge. Placed on opening and again on every relayout while open (FA1a).
+   */
+  private placePanel(): void {
+    const rect = this.shadowRoot?.querySelector('.trigger')?.getBoundingClientRect();
+    if (!rect) return;
+    this.style.setProperty('--frame-status-panel-top', `${rect.bottom}px`);
+    // R2 — the dim starts below the bar the pill sits in: the pill and its neighbours keep
+    // their own contrast while the panel is open.
+    this.style.setProperty('--frame-status-dim-top', `${Math.max(rect.bottom, this.parentElement?.getBoundingClientRect().bottom ?? 0)}px`);
+    const panel = this.shadowRoot!.querySelector<StatusPanel>('jf-status-panel');
+    if (!panel) return;
+    const margin = cssLength(this, '--jf-space-2');
+    const width = panel.getBoundingClientRect().width;
+    const right = window.innerWidth - rect.right - shiftIntoWindow({ left: rect.right - width, right: rect.right }, margin);
+    this.style.setProperty('--frame-status-panel-right', `${right}px`);
+    const placed = panel.getBoundingClientRect();
+    const inset = cssLength(this, '--frame-panel-radius') + margin / 2;
+    const fromRight = Math.min(Math.max(inset, placed.right - (rect.left + rect.width / 2)), Math.max(inset, placed.width - inset));
+    this.style.setProperty('--frame-status-arrow-right', `calc(${fromRight}px - var(--jf-space-2) / 2)`);
   }
   /** Recheck the inline slot on text, font or frame-size changes, including a return from below. */
   private readonly placeNotice = (): void => {
@@ -221,7 +236,6 @@ export class StatusPill extends JfElement {
     this.style.setProperty('--frame-status-notice-top', `${bar.bottom}px`);
     this.setAttribute('notice-under', '');
   };
-  /** A length token in px (rem resolves against the root font size); 0 when the token is not defined. */
   toggle(): void { if (this.open) this.close(); else if (!modalOwnsFocus()) this.open = true; }
   close(restoreFocus = true): void {
     if (!this.open) return;
