@@ -25,8 +25,8 @@ class WindowsCPUReadinessTests(unittest.TestCase):
                             [dict(packageId=name, state='skipped', skipCause='hardware', error='')
                              for name in ('chat', 'cuda-runtime')]}
 
-    def run_ai(self, status, *, platform='windows', inactive=None, resumed=False):
-        run = Mock(platform=platform, facts={'resumedSetup': resumed})
+    def run_ai(self, status, *, platform='windows', inactive=None):
+        run = Mock(platform=platform, facts={})
         run.wd.execute.return_value = []
         run.wd.text.return_value = 'Chat is not supported here.'
         runtime = {'onnxFeatures': [
@@ -71,35 +71,31 @@ class WindowsCPUReadinessTests(unittest.TestCase):
             with self.subTest(status=value), self.assertRaisesRegex(AssertionError, 'Downloaded default CPU search encoders activated'):
                 self.run_ai(value)
 
-    def test_disabled_splade_allows_fresh_and_resumed_cpu_activation(self):
+    def test_disabled_splade_allows_fresh_cpu_activation(self):
         for platform in ('linux', 'windows'):
-            for resumed in (False, True):
-                with self.subTest(platform=platform, resumed=resumed):
-                    status = self.status()
-                    status['installedFully'] = platform == 'linux'
-                    result = self.run_ai(status, platform=platform, inactive='splade', resumed=resumed)
-                    self.assertEqual(result['runtime']['onnxFeatures'][1], {
-                        'id': 'splade', 'status': 'unknown', 'reason': 'worker_not_answered',
-                        'modelActive': False})
+            with self.subTest(platform=platform):
+                status = self.status()
+                status['installedFully'] = platform == 'linux'
+                result = self.run_ai(status, platform=platform, inactive='splade')
+                self.assertEqual(result['runtime']['onnxFeatures'][1], {
+                    'id': 'splade', 'status': 'unknown', 'reason': 'worker_not_answered',
+                    'modelActive': False})
 
     def test_inactive_embed_does_not_satisfy_cpu_activation(self):
         for platform in ('linux', 'windows'):
-            for resumed in (False, True):
-                error = linux.Infrastructure if resumed else AssertionError
-                with self.subTest(platform=platform, resumed=resumed), self.assertRaisesRegex(
-                        error, 'Default CPU AI install|Downloaded default CPU search encoders activated'):
-                    status = self.status()
-                    status['installedFully'] = platform == 'linux'
-                    self.run_ai(status, platform=platform, inactive='embed', resumed=resumed)
+            with self.subTest(platform=platform), self.assertRaisesRegex(
+                    AssertionError, 'Default CPU AI install|Downloaded default CPU search encoders activated'):
+                status = self.status()
+                status['installedFully'] = platform == 'linux'
+                self.run_ai(status, platform=platform, inactive='embed')
 
-    def test_default_off_reranker_allows_fresh_and_resumed_cpu_activation(self):
+    def test_default_off_reranker_allows_fresh_cpu_activation(self):
         for platform in ('linux', 'windows'):
-            for resumed in (False, True):
-                with self.subTest(platform=platform, resumed=resumed):
-                    status = self.status()
-                    status['installedFully'] = platform == 'linux'
-                    result = self.run_ai(status, platform=platform, inactive='reranker', resumed=resumed)
-                    self.assertFalse(result['runtime']['onnxFeatures'][2]['modelActive'])
+            with self.subTest(platform=platform):
+                status = self.status()
+                status['installedFully'] = platform == 'linux'
+                result = self.run_ai(status, platform=platform, inactive='reranker')
+                self.assertFalse(result['runtime']['onnxFeatures'][2]['modelActive'])
 
     def test_citation_scorer_remains_required(self):
         for platform in ('linux', 'windows'):

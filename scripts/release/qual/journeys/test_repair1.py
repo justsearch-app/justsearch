@@ -144,51 +144,6 @@ class RepairTests(unittest.TestCase):
         run.wd.execute.return_value = {'documentFocused': True, 'searchFocused': True, 'value': 'query'}
         self.assertTrue(linux.shortcut_receiver(run, 'query'))
 
-    def test_j3_restored_downloads_are_not_downloaded_again(self):
-        run = Mock()
-        run.facts = {'resumedSetup': True}
-        run.wd.text.return_value = 'Chat is not supported here.'
-        run.wd.execute.return_value = []
-        installed = {'state': 'completed', 'phase': 'done', 'installedFully': True,
-                     'readyCapabilities': ['retrieval-core']}
-        retrieval = {'results': [linux.OPEN_FILE], 'searchTrace': {'effectiveMode': 'VECTOR',
-                     'stages': [{'id': 'dense-retrieval', 'status': 'executed'}, {'id': 'cross-encoder', 'status': 'skipped', 'reason': 'PIPELINE_NOT_ELIGIBLE'}]}}
-        run.api.side_effect = lambda path, *args: {
-            '/api/ai/install/plan-preview': {'downloadProfile': 'CPU', 'components': [
-                {'id': 'chat', 'state': 'unavailable'}, {'id': 'embedding', 'state': 'installed'}]},
-            '/api/ai/install/manifest': {}, '/api/ai/install/status': installed,
-            '/api/ai/runtime/status': {'onnxFeatures': [{'id': name, 'modelActive': True}
-                for name in ('embed', 'splade', 'reranker', 'citation_scorer')]},
-            '/api/knowledge/search': retrieval,
-        }[path]
-        with patch.object(linux, 'wait_for', once):
-            result = linux.install_ai(run)
-        self.assertEqual(result['activeRetrieval'], retrieval)
-        run.wd.click.assert_not_called()
-
-    def test_j3_restored_idle_staged_models_activate_without_a_new_download(self):
-        run = Mock()
-        run.facts = {'resumedSetup': True}
-        run.wd.text.return_value = 'Chat is not supported here.'
-        run.wd.execute.side_effect = lambda script: {'typed': False, 'operationKeys': ['receipt']} if 'const typed=' in script else []
-        staged = {'state': 'idle', 'phase': 'activation_required', 'installedFully': False, 'readyCapabilities': []}
-        active = {'state': 'idle', 'phase': 'done', 'installedFully': True, 'readyCapabilities': ['retrieval-core']}
-        statuses = iter([staged, active])
-        retrieval = {'results': [linux.OPEN_FILE], 'searchTrace': {'effectiveMode': 'VECTOR',
-                     'stages': [{'id': 'dense-retrieval', 'status': 'executed'}, {'id': 'cross-encoder', 'status': 'skipped', 'reason': 'PIPELINE_NOT_ELIGIBLE'}]}}
-        def api(path, *args):
-            if path == '/api/ai/install/status':
-                return next(statuses)
-            return {'/api/ai/install/plan-preview': {'downloadProfile': 'CPU', 'components': [
-                    {'id': 'chat', 'state': 'unavailable'}, {'id': 'embedding', 'state': 'installed'}]},
-                '/api/ai/install/manifest': {},
-                '/api/ai/runtime/status': {'onnxFeatures': [{'id': name, 'modelActive': True}
-                    for name in ('embed', 'splade', 'reranker', 'citation_scorer')]},
-                '/api/knowledge/search': retrieval}[path]
-        run.api.side_effect = api
-        with patch.object(linux, 'wait_for', once):
-            self.assertEqual(linux.install_ai(run)['activeRetrieval'], retrieval)
-        run.wd.click.assert_called_once_with('button[aria-label="Activate downloaded models"]')
 
 
 if __name__ == '__main__':

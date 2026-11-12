@@ -290,10 +290,11 @@ def install_ai(run):
     run.evidence('J3-default-plan', preview)
     manifest = run.api('/api/ai/install/manifest')
     run.evidence('J3-production-manifest', manifest)
-    resumed = run.facts.get('resumedSetup') is True
-    if not resumed:
-        run.wd.click('button[aria-label^="Install AI"]')
-        run.wd.click('button[aria-label="Accept and download"]')
+    if run.facts.get('resumedSetup') is True:
+        run.evidence('J3-resume-runtime', run.api('/api/ai/runtime/status'))
+        raise Unavailable('cached setup: activation cannot be re-observed; run J3 on a fresh install')
+    run.wd.click('button[aria-label^="Install AI"]')
+    run.wd.click('button[aria-label="Accept and download"]')
     samples = []
     def settled():
         status = run.api('/api/ai/install/status')
@@ -304,21 +305,10 @@ def install_ai(run):
             if any(x in raw.lower() for x in ('connection reset', 'connection timed out', 'connect timeout', 'read timed out', 'read timeout', 'download timed out', 'download timeout', 'curl exit 28', 'curl: (28)', 'resolve host', 'http 503', 'http 502', 'http 429')):
                 raise RuntimeError('Production AI download failed; see J3-install-observations.json')
             raise ProductFailure('Install AI failed: ' + raw)
-        if resumed:
-            runtime = run.api('/api/ai/runtime/status')
-            run.evidence('J3-resume-runtime', runtime)
-            features = {f['id']: f for f in runtime.get('onnxFeatures', [])}
-            # installedFully can briefly be true before reboot initialization
-            # publishes activation_required. Require the API's terminal phase
-            # and completeness evidence as well as a serving embed model;
-            # an older active model does not prove the candidate was published.
-            return status if (status.get('phase') == 'activation_required'
-                              or (status.get('phase') == 'done' and cpu_install_ready(run, status)
-                                  and features.get('embed', {}).get('modelActive') is True)) else None
         return status if (status.get('state') in ('completed', 'installed', 'succeeded')
                           or status.get('installedFully') is True) else None
-    status = wait_for(settled, 'Default CPU AI install', seconds=900 if resumed else 1800, interval=5,
-                      error=Infrastructure if resumed else AssertionError)
+    status = wait_for(settled, 'Default CPU AI install', seconds=1800, interval=5,
+                      error=AssertionError)
     assert preview.get('downloadProfile') == 'CPU', 'Default plan did not select CPU'
     run.evidence('J3-downloaded', status)
     memory_samples = []
@@ -335,23 +325,13 @@ print(json.dumps(dict(m,epochSeconds=time.time(),usedKiB=m['MemTotal']-m['MemAva
         memory_samples.append(sample)
         run.evidence('J3-activation-memory', memory_samples)
     sample_memory()
-    activation_invoked = False
-    if not resumed or status.get('phase') == 'activation_required':
-        activate_downloaded(run)
-        activation_invoked = True
-    else:
-        run.evidence('J3-activation-consent', {'restoredActivatedSetup': True,
-            'reason': 'Development rerun; original UI action belongs to the snapshot source report'})
+    activate_downloaded(run)
     activation_samples = []
     def activated():
-        nonlocal activation_invoked
         sample_memory()
         install = run.api('/api/ai/install/status')
         if install.get('state') in ('failed', 'error'):
             raise ProductFailure('Install AI failed during activation: ' + json.dumps(install))
-        if install.get('phase') == 'activation_required' and not activation_invoked:
-            activate_downloaded(run)
-            activation_invoked = True
         runtime = run.api('/api/ai/runtime/status')
         ui = run.wd.text()
         outcomes = run.wd.execute("return all(document,'jf-operation-outcome-detail').map(e=>e.operationKey).filter(Boolean)")
@@ -364,13 +344,10 @@ print(json.dumps(dict(m,epochSeconds=time.time(),usedKiB=m['MemTotal']-m['MemAva
         features = {f['id']: f for f in runtime.get('onnxFeatures', [])}
         return {'install': install, 'runtime': runtime} if (cpu_install_ready(run, install)
             and install.get('phase') != 'activation_required'
-            and (not resumed or install.get('phase') == 'done')
             and features.get('embed', {}).get('modelActive') is True) else None
     active = wait_for(activated, 'Downloaded default CPU search encoders activated', seconds=900, interval=5)
     status = active['install']
-    # Acquisition stages belong to this download session, not rebooted caches.
-    if not resumed:
-        assert 'retrieval-core' in status.get('readyCapabilities', []), 'Installed CPU search capability is not ready'
+    assert 'retrieval-core' in status.get('readyCapabilities', []), 'Installed CPU search capability is not ready'
     runtime = run.api('/api/ai/runtime/status')
     run.evidence('J3-runtime', runtime)
     components = preview.get('components', [])
