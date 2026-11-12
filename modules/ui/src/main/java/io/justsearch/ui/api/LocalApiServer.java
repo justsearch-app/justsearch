@@ -203,7 +203,9 @@ public class LocalApiServer {
     this.indexingController =
         new IndexingController(indexingSvcSupplier, excludesService, b.userHome, this.telemetry,
             b.HeadAssembly == null ? io.justsearch.app.api.operations.ForgetService::unavailable
-                : b.HeadAssembly.lateBindings()::forgetService);
+                : b.HeadAssembly.lateBindings()::forgetService,
+            b.HeadAssembly == null ? io.justsearch.app.api.operations.RecordedIngestionService::unavailable
+                : b.HeadAssembly::recordedIngestion);
     if (b.HeadAssembly != null) {
       this.indexingController.setWorkerCapability(b.HeadAssembly.capabilities().worker());
     }

@@ -1,0 +1,50 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-12T02:08:05.881Z",
+  "revision": "3dd9ba8d43273d42230420cb7c0118c149380a50",
+  "tree": "b1612ea456f103e1174b18cd435da80fd0ed5fac",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineForgetQueueRuntimeTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 41432
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetQueueRuntimeTest.java",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineForgetQueueRuntimeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b3591775cdb4e0046a7c17ead97da9a254f2dbfabae311a34c766ccb13c03a7e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Q55FileTryUnwindsRuntimeDuringActualInlineOverflowRetirement()",
+          "status": "passed"
+        },
+        {
+          "name": "Q55QueueTryUnwindsRuntimeDuringActualInlineOverflowRetirement()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:a383836632388a0079826c17c37fd9381337a373558b2d4f0752752acb8e9e3a"
+}

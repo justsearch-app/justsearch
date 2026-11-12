@@ -251,6 +251,11 @@ public interface OperationStore extends AutoCloseable {
     return java.util.Optional.empty();
   }
 
+  /** Idempotent retained interruption. Cancellation is monotonic and overrides other reasons. */
+  default boolean interruptImport(long id, String reason) {
+    throw new UnsupportedOperationException("Import interruption is unavailable");
+  }
+
   /** Open rows for owner-scoped reconciliation, in acceptance order. */
   java.util.List<OperationRecord> openRecords();
 
