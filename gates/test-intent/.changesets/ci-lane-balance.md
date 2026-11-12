@@ -59,3 +59,14 @@ Moving the frontend lockdown run from app-ui-ui to its sibling job app-ui-ui-2.
   "note": "Class Structural rule kept holds on 89103fbdfc vs 718e761989. Parsed ci.yml: same 29 jobs, names, needs, if, runs-on, env; the only differences are the two lockdown steps (byte-identical, unconditional) moved from app-ui-ui to app-ui-ui-2 and unit-tests-search-worker-2 timeout 25 to 35 min (declared; named in the brief, not in the owner's words). 6 npm test commands and 61 Gradle test-task occurrences on both sides; none runs twice in the unit-test lanes. Shard predicate and policy verifier unchanged; old policy with new workflow and new policy with old workflow both fail. Static mirror of the predicate over 371 indexer-worker classes: only SyncRootPromotionCrashRecoveryTest changes shard (1 to 2). Its Gradle execution in ciUnitTest2 is relied on from the check of 579e52b2e5 (identical inputs), not re-run. Hosted run 43094849517: the class took 240 s in ciUnitTest1; search-worker-1 24.7 min, search-worker-2 17.7 min. Delegation quote checked against the brief only, not the task record. No decision record conflicts. Not run: the lockdown tests in their new job, and any hosted run of this candidate."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-3-ci-lane-balance-20261112",
+  "verdict": "reject",
+  "digest": "sha256:1a65bc98cd59afcb50740b35b73b2be699e4967114707f20435aa7525d0c0808",
+  "note": "Class Structural rule kept and the rule hold on 1df6ac5e27 vs 5358c3952a: parsed ci.yml equal apart from the two lockdown steps moved unchanged from app-ui-ui to app-ui-ui-2 and that job's timeout 25 to 40; 6 npm test commands, 61 Gradle test-task occurrences, each once in the unit-test lanes; policy verifier passes and fails on either mixed state; runs 43113951688 and 43119363223 show the lockdown step passing in app-ui-ui-2 (34 files) and 13.2/14.4 and 19.5/16.7 min. Rejected for the reason given for the one looser limit, which the cited run contradicts. Run 43094662574 app-ui-ui-2: 20.6 min = Gradle 8m27s with 29 of 89 tasks from cache (not cold) plus an 11.3 min failed artifact upload (Failed to CreateArtifact after 5 attempts). The fully cold case with the lockdown run is run 43113951688: 89 of 89 tasks executed, 19.5 min, under 25. Must change: restate in whySurvives why 40 minutes is needed from numbers that hold, or keep 25; and correct the same claim where the candidate repeats it (ci.yml comment on app-ui-ui-2 'exceed 25 minutes whenever the test task cannot come from the build cache'; docs/explanation/09-testing-strategy.md 'cold Java compile alone can take about 18 minutes': measured cold compiles are 3.8 to 5.0 min). Delegation quote checked against the brief only, not the task record. Not run: the lockdown tests locally, and any hosted run of this candidate."
+}
+```
