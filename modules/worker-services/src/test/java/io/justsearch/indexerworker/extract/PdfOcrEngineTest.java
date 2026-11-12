@@ -794,18 +794,40 @@ final class PdfOcrEngineTest {
     return new TikaOcrRuntime.RuntimePaths(executable, executable.getParent(), null);
   }
 
+  @Test
+  @Timeout(30)
+  void fakeTesseractLanguageProbeDoesNotWriteOcrOutput() throws Exception {
+    Path executable = writeFakeTesseract(tempDir.resolve("runtime"), "OCR TEXT");
+    Path workingDirectory = Files.createDirectory(tempDir.resolve("probe"));
+    Path output = tempDir.resolve("languages.txt");
+    Process process = new ProcessBuilder(executable.toString(), "--list-langs")
+        .directory(workingDirectory.toFile()).redirectErrorStream(true)
+        .redirectOutput(output.toFile()).start();
+    try {
+      assertTrue(process.waitFor(5, TimeUnit.SECONDS));
+      assertEquals(0, process.exitValue());
+      try (var files = Files.list(workingDirectory)) {
+        assertEquals(List.of(), files.toList(), "A language probe must not emit an OCR .txt file");
+      }
+      assertTrue(Files.readString(output).lines().anyMatch("eng"::equals));
+    } finally {
+      if (process.isAlive()) process.destroyForcibly();
+    }
+  }
+
   /** A fake tesseract script that writes {@code <outputBase>.txt} the way the real binary would. */
   private static Path writeFakeTesseract(Path directory, String text) throws IOException {
     if (System.getProperty("os.name").toLowerCase(java.util.Locale.ROOT).contains("win"))
       return NativeTesseractFixture.write(directory, text, true);
     Files.createDirectories(directory);
-    boolean windows =
-        System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win");
-    Path executable = directory.resolve(windows ? "tesseract.cmd" : "tesseract");
-    String script =
-        windows
-            ? "@echo off\r\necho " + text + "> \"%~2.txt\"\r\nexit /b 0\r\n"
-            : "#!/usr/bin/env sh\nprintf '" + text + "' > \"$2.txt\"\nexit 0\n";
+    Path executable = directory.resolve("tesseract");
+    String script = "#!/usr/bin/env sh\n"
+        + "case \"$1\" in\n"
+        + "  --list-langs) printf 'List of available languages (fixture):\\neng\\n'; exit 0;;\n"
+        + "  --version) printf 'tesseract fixture\\n'; exit 0;;\n"
+        + "esac\n"
+        + "[ \"$#\" -ge 2 ] || exit 2\n"
+        + "printf '" + text + "' > \"$2.txt\"\nexit 0\n";
     Files.writeString(executable, script);
     executable.toFile().setExecutable(true, false);
     return executable;

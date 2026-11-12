@@ -1295,7 +1295,7 @@ val downloadTesseractRuntimeArtifacts by tasks.registering {
       layout.buildDirectory.file("downloads/tesseract/tesseract-ocr-w64-setup-5.5.0.20241111.exe")
           .get()
           .asFile
-  val engFile = layout.buildDirectory.file("downloads/tesseract/eng.traineddata").get().asFile
+  val tessdataDownloads = layout.buildDirectory.dir("downloads/tesseract/tessdata").get().asFile
   val sourceUrlOverride = tesseractSourceUrlOverride
   val sourceSha256Override = tesseractSourceSha256Override
   inputs.file(manifestFile)
@@ -1303,7 +1303,7 @@ val downloadTesseractRuntimeArtifacts by tasks.registering {
   inputs.property("sourceUrlOverride", sourceUrlOverride ?: "")
   inputs.property("sourceSha256Override", sourceSha256Override ?: "")
   outputs.file(sourceFile)
-  outputs.file(engFile)
+  outputs.dir(tessdataDownloads)
   doLast {
     fun sha256Hex(file: File): String {
       val digest = MessageDigest.getInstance("SHA-256")
@@ -1361,14 +1361,13 @@ val downloadTesseractRuntimeArtifacts by tasks.registering {
     val sourceSha = sourceSha256Override ?: (manifest["sourceSha256"] as String)
     @Suppress("UNCHECKED_CAST")
     val files = manifest["files"] as List<Map<String, Any>>
-    val engEntry =
-        files.firstOrNull { it["path"] == "tessdata/eng.traineddata" }
-            ?: throw GradleException("Tesseract manifest is missing tessdata/eng.traineddata")
-    val engUrl = engEntry["sourceUrl"] as String
-    val engSha = engEntry["sha256"] as String
-
+    val tessdataEntries = files.filter { (it["path"] as String).startsWith("tessdata/") }
+    if (tessdataEntries.isEmpty()) throw GradleException("Tesseract manifest has no tessdata entries")
     download(sourceUrl, sourceSha, sourceFile)
-    download(engUrl, engSha, engFile)
+    for (entry in tessdataEntries) {
+      val name = File(entry["path"] as String).name
+      download(entry["sourceUrl"] as String, entry["sha256"] as String, tessdataDownloads.resolve(name))
+    }
   }
 }
 
@@ -1383,11 +1382,11 @@ val stageTesseractRuntime by tasks.registering {
       layout.buildDirectory.file("downloads/tesseract/tesseract-ocr-w64-setup-5.5.0.20241111.exe")
           .get()
           .asFile
-  val engFile = layout.buildDirectory.file("downloads/tesseract/eng.traineddata").get().asFile
+  val tessdataDownloads = layout.buildDirectory.dir("downloads/tesseract/tessdata").get().asFile
   val stageRoot = layout.buildDirectory.dir("runtime/tesseract-windows").get().asFile
   inputs.file(manifestFile)
   inputs.file(sourceFile)
-  inputs.file(engFile)
+  inputs.dir(tessdataDownloads)
   outputs.dir(stageRoot)
   outputs.upToDateWhen { false }
   doLast {
@@ -1426,10 +1425,14 @@ val stageTesseractRuntime by tasks.registering {
     stageRoot.resolve("$" + "PLUGINSDIR").deleteRecursively()
     val tessdata = stageRoot.resolve("tessdata")
     tessdata.mkdirs()
-    Files.copy(
-        engFile.toPath(),
-        tessdata.resolve("eng.traineddata").toPath(),
-        StandardCopyOption.REPLACE_EXISTING)
+    val manifest = ObjectMapper().readValue(manifestFile, Map::class.java) as Map<*, *>
+    @Suppress("UNCHECKED_CAST")
+    val files = manifest["files"] as List<Map<String, Any>>
+    for (entry in files.filter { (it["path"] as String).startsWith("tessdata/") }) {
+      val name = File(entry["path"] as String).name
+      Files.copy(tessdataDownloads.resolve(name).toPath(), tessdata.resolve(name).toPath(),
+          StandardCopyOption.REPLACE_EXISTING)
+    }
   }
 }
 
@@ -1511,8 +1514,11 @@ val verifyTesseractRuntime by tasks.registering {
       throw GradleException("Tesseract runtime validation timed out")
     }
     val output = process.inputStream.bufferedReader().readText()
-    if (process.exitValue() != 0 || !output.lineSequence().any { it.trim() == "eng" }) {
-      throw GradleException("Tesseract runtime validation failed; expected --list-langs to include eng. Output: $output")
+    val validation = manifest["validation"] as Map<*, *>
+    val requiredLanguages = validation["requiredLanguages"] as List<*>
+    val availableLanguages = output.lineSequence().map { it.trim() }.toSet()
+    if (process.exitValue() != 0 || !availableLanguages.containsAll(requiredLanguages)) {
+      throw GradleException("Tesseract runtime validation failed; expected --list-langs to include $requiredLanguages. Output: $output")
     }
   }
 }

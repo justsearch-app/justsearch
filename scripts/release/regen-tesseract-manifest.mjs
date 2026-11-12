@@ -21,7 +21,7 @@
  *    `packaging/signed-mirrors.v1.json`, which is what drives the gradle override pair; the
  *    manifest keeps pinning the genuine UPSTREAM archive so the default (no-mirror) build is
  *    unchanged.
- *  - Any `files[]` entry carrying its own `sourceUrl` (today: `tessdata/eng.traineddata`). Those
+ *  - Any `files[]` entry carrying its own `sourceUrl` (German, English and OSD tessdata). Those
  *    are downloaded separately and copied over the extraction
  *    (modules/ui/build.gradle.kts:1321-1328, 1385-1389) — they are not in the archive at all, and
  *    signing cannot have changed them.

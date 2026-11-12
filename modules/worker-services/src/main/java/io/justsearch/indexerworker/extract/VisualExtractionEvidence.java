@@ -16,6 +16,8 @@ public record VisualExtractionEvidence(
     double charsPerPage,
     double alphanumericRatio,
     String ocrLanguage,
+    java.util.List<String> ocrMissingDefaultLanguages,
+    Boolean ocrOrientationDetection,
     Double ocrMeanConfidence,
     Integer ocrLowConfidenceWordCount,
     Integer ocrWordCount,
@@ -89,6 +91,9 @@ public record VisualExtractionEvidence(
     OcrConfidenceExtractor.Summary confidence =
         ocrConfidence == null ? OcrConfidenceExtractor.Summary.empty() : ocrConfidence;
     RoutingFacts f = facts == null ? RoutingFacts.empty() : facts;
+    TikaOcrRuntime.RuntimePaths runtime = ocrRoute ? TikaOcrRuntime.resolve() : null;
+    java.util.List<String> effectiveLanguages = ocrRoute && ocrConfig != null
+        ? TikaOcrRuntime.effectiveLanguages(ocrConfig, runtime) : java.util.List.of();
     return new VisualExtractionEvidence(
         SCHEMA_VERSION,
         s.pageCount(),
@@ -96,7 +101,11 @@ public record VisualExtractionEvidence(
         round(quality),
         round(charsPerPage),
         round(TextQualityAnalyzer.getAlphanumericRatio(text)),
-        ocrRoute && ocrConfig != null ? ocrConfig.tikaLanguage() : null,
+        ocrRoute && ocrConfig != null ? String.join("+", effectiveLanguages) : null,
+        ocrRoute && ocrConfig != null && !ocrConfig.languagesExplicit()
+            ? ocrConfig.languages().stream().filter(language -> !effectiveLanguages.contains(language)).toList()
+            : null,
+        ocrRoute ? TikaOcrRuntime.supportsOrientation(runtime) : null,
         confidence.present() ? round(confidence.meanConfidence()) : null,
         confidence.present() ? confidence.lowConfidenceWordCount() : null,
         confidence.present() ? confidence.wordCount() : null,
@@ -124,6 +133,10 @@ public record VisualExtractionEvidence(
       put(value, "charsPerPage", charsPerPage);
       put(value, "alphanumericRatio", alphanumericRatio);
       put(value, "ocrLanguage", ocrLanguage);
+      if (ocrMissingDefaultLanguages != null && !ocrMissingDefaultLanguages.isEmpty()) {
+        put(value, "ocrMissingDefaultLanguages", ocrMissingDefaultLanguages);
+      }
+      put(value, "ocrOrientationDetection", ocrOrientationDetection);
       put(value, "ocrMeanConfidence", ocrMeanConfidence);
       put(value, "ocrLowConfidenceWordCount", ocrLowConfidenceWordCount);
       put(value, "ocrWordCount", ocrWordCount);
