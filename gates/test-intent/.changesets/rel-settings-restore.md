@@ -67,3 +67,14 @@ opened beneath the frame out of the top layer.
   "note": "Reject: every source (and defectSource.stronger) is kind owner-words citing docs/explanation/10-ui-ux-design.md, whose cited lines came from agent co-authored PRs (#527, #1134, #1194); only the user's own words are owner-words, and no listed safeguard fits. Behaviour, evidence and fail-before hold (R1 fails on a003b507f4 by assertion; :modal alone also fails there). Clear by re-sourcing: a delegated-choice quoting the owner's release request verbatim with its task location and the choice 'restored Settings stays modal after hand-off; X and Escape close it', or an owner-adopted-scenario R1, used both as sources and as defectSource.stronger."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "acceptor-settings-2-1794483387",
+  "verdict": "reject",
+  "digest": "sha256:f885275774528fc00f4fae4c2a7179cbeb3e0b13da66a51896db40d7e5d40026",
+  "note": "Reject: the delegated-choice is acceptable (owner's release request delegates fix-before-ship triage; cut-a-release.md section 4 confirms agents decide; no stronger source conflicts, base 10-ui-ux-design.md agrees Settings is modal and closed by Escape and X), and it validly serves as defectSource.stronger. Evidence and assertion fail-before hold. But R1 also asserts a mechanism the choice does not state: removedFromRoot equals ['div'] (the application never leaves #root at hand-off). The behaviour field lists it; no source supports it, and it would fail a fix that keeps Settings modal another way. Clear by either dropping that assertion (':modal' alone fails on a003b507f4 by assertion) and regenerating evidence, or widening the choice to state that the hand-off removes only the start-up cover and keeps the application attached to #root."
+}
+```
