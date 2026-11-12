@@ -7,7 +7,7 @@ author-session: p5-upkeep-sx7uillm
 
 # Test intent
 
-The before-state for this assignment is 317831ee434b4b45bf37e782904128086916b6ab. No acceptance record is supplied by the builder. Detailed U/N cases and settled design rules are attributed to the orchestrator's delegation; only the quoted snapshot decision is attributed to the owner.
+The existing New-check evidence uses before-state 317831ee434b4b45bf37e782904128086916b6ab. The enumeration-double repair compares preservation checks with HEAD~1 (1e6255f3f65e1ba6ac923eefb458cc67de5d0121). No acceptance record is supplied by the builder. Every source quote below is the snapshot decision reproduced verbatim in the repair assignment; detailed scenarios and test arrangements remain agent choices, not owner-authored scenarios.
 
 ```json
 {
@@ -26,9 +26,9 @@ The before-state for this assignment is 317831ee434b4b45bf37e782904128086916b6ab
         },
         {
           "kind": "delegated-choice",
-          "delegationQuote": "Tests: real SQLite stores, real Lucene, real files in temp folders, real worker maintenance pass; mount topology may be injected through the existing StorageObservationSnapshot / mountinfo seams (no new framework). Reuse IndexedSourceMaintenanceTest, IndexedExcludesTest and their fixtures.",
+          "delegationQuote": "One-off imports: a snapshot that stays correct: deleted files and subfolders leave search, exclusions apply, changed files are refreshed; new files are not picked up (that is watching).",
           "delegationLocation": "task p5-import-upkeep request",
-          "delegationScope": "The orchestrator-settled D1-D7 and S1-S4 rules and U/N cases in this builder assignment. Detailed cases are delegated intent, not owner-authored scenarios.",
+          "delegationScope": "Keep completed one-off import snapshots correct without discovering new files. The detailed test arrangements below are agent choices under this decision.",
           "choice": "Use temporary real stores and worker maintenance, a controlled existing mount observation seam, and the real extraction/publication pipeline with a file-reading test extractor. Each new case names its assigned U/N scenario; baseline-compatible reflection only exposes missing behavior rather than emulating it.",
           "label": "agent choice"
         }
@@ -64,9 +64,9 @@ The before-state for this assignment is 317831ee434b4b45bf37e782904128086916b6ab
         },
         {
           "kind": "delegated-choice",
-          "delegationQuote": "D3 Apply Excludes matches an import member with a valid origin record against its origin root, so root-relative patterns apply; members without one keep today's matching; watched matching unchanged. Before removal, revalidate under the fence that the member's current owner and the matching rule still hold.",
+          "delegationQuote": "One-off imports: a snapshot that stays correct: deleted files and subfolders leave search, exclusions apply, changed files are refreshed; new files are not picked up (that is watching).",
           "delegationLocation": "task p5-import-upkeep request",
-          "delegationScope": "The orchestrator-settled D1-D7 and S1-S4 rules and U/N cases in this builder assignment. Detailed cases are delegated intent, not owner-authored scenarios.",
+          "delegationScope": "Keep completed one-off import snapshots correct without discovering new files. The detailed test arrangements below are agent choices under this decision.",
           "choice": "Enumerate path plus origin, resolve the origin root through the worker port and require conditional deletion. Worker maintenance class covers the real-store changed-owner fence and refresh cancellation race.",
           "label": "agent choice"
         }
@@ -91,9 +91,9 @@ The before-state for this assignment is 317831ee434b4b45bf37e782904128086916b6ab
         },
         {
           "kind": "delegated-choice",
-          "delegationQuote": "S1 Authority and eligibility (D2, D6): a read-only, fail-closed query from the worker to the app's operation owner, answering per origin_id: eligible for upkeep (no open producer: no open walk and the operation not running, interrupted or recovering; origin approval revalidates through OperationAuthority.evaluateOriginApproval), or not. Unknown, error or timeout = not eligible. It never seals, claims or modifies a producer.",
+          "delegationQuote": "One-off imports: a snapshot that stays correct: deleted files and subfolders leave search, exclusions apply, changed files are refreshed; new files are not picked up (that is watching).",
           "delegationLocation": "task p5-import-upkeep request",
-          "delegationScope": "The orchestrator-settled D1-D7 and S1-S4 rules and U/N cases in this builder assignment. Detailed cases are delegated intent, not owner-authored scenarios.",
+          "delegationScope": "Keep completed one-off import snapshots correct without discovering new files. The detailed test arrangements below are agent choices under this decision.",
           "choice": "Exercise the owner bridge using actual expired operation and job histories, preserving the existing exact-grant, revocation and session evaluator checks.",
           "label": "agent choice"
         }
@@ -103,6 +103,18 @@ The before-state for this assignment is 317831ee434b4b45bf37e782904128086916b6ab
       ],
       "repaired": true,
       "evidence": "gates/test-intent/evidence/p5-import-upkeep.json"
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/DeletionCompletionOutcomeTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/excludes/ExcludesOutcomeTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/DeletionCommitObligationTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "input re-encoding"
+      ],
+      "whatMoved": "The three existing Apply Excludes doubles now accept both the path-only and path/origin enumeration ports. The two empty enumerations still return zero without invoking the consumer. The deletion-commit double emits its same single path, wrapped with an absent origin only for the new port. Inputs, deletion faults, conditions, assertions and expected values are unchanged. Execution: js-gradle-slot -w 3600 ./gradlew :modules:app-services:test :modules:indexer-worker:test -PskipWebBuild=true --continue ran on HEAD~1 (1e6255f3f65e1ba6ac923eefb458cc67de5d0121) and the repaired candidate. DeletionCompletionOutcomeTest passed 4/4, ExcludesOutcomeTest passed 7/7 and DeletionCommitObligationTest passed 11/11 on both, with no skips in these classes. Each full suite exited 1 with the same 110 failing test names (89 app-services, 21 indexer-worker); candidate-only failures: none. Command logs and paired target XML are retained in tmp/p5-repair/. The existing generated New-check evidence is unchanged because none of its check sources changed."
     }
   ]
 }
