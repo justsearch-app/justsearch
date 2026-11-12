@@ -92,10 +92,21 @@ class WindowsCPUReadinessTests(unittest.TestCase):
                     status['installedFully'] = platform == 'linux'
                     self.run_ai(status, platform=platform, inactive='embed', resumed=resumed)
 
-    def test_reranker_and_citation_scorer_remain_required(self):
-        for inactive in ('reranker', 'citation_scorer'):
-            with self.subTest(inactive=inactive), self.assertRaisesRegex(AssertionError, 'All default retrieval models active'):
-                self.run_ai(self.status(), inactive=inactive)
+    def test_default_off_reranker_allows_fresh_and_resumed_cpu_activation(self):
+        for platform in ('linux', 'windows'):
+            for resumed in (False, True):
+                with self.subTest(platform=platform, resumed=resumed):
+                    status = self.status()
+                    status['installedFully'] = platform == 'linux'
+                    result = self.run_ai(status, platform=platform, inactive='reranker', resumed=resumed)
+                    self.assertFalse(result['runtime']['onnxFeatures'][2]['modelActive'])
+
+    def test_citation_scorer_remains_required(self):
+        for platform in ('linux', 'windows'):
+            with self.subTest(platform=platform), self.assertRaisesRegex(AssertionError, 'All default retrieval models active'):
+                status = self.status()
+                status['installedFully'] = platform == 'linux'
+                self.run_ai(status, platform=platform, inactive='citation_scorer')
 
     def test_linux_completion_requirement_is_preserved(self):
         with self.assertRaisesRegex(AssertionError, 'Downloaded default CPU search encoders activated'):

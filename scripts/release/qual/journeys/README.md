@@ -619,10 +619,13 @@ qualification. Explicit `--journeys` subsets likewise never qualify a release.
   determine which file was opened.
 - J3: default production downloads, then **Activate downloaded models** and the
   UI's typed authorization when requested (immediate operation acceptance is
-  also observed). The embedding, reranker and citation-scorer models must be active (SPLADE is off by default since #1162 and not required)
+  also observed). The embedding and citation-scorer models must be active;
+  SPLADE and CPU reranking are off by default (#1162, #1182), so their models
+  need not be active on CPU.
   and installation fully complete. A semantic vector query must return the
-  fixture with a dense-only execution trace and an executed cross-encoder, without
-  keyword fallback. Fresh downloads also require the session acquisition capability;
+  fixture with a dense-only execution trace, without keyword fallback or blocked
+  vector retrieval. CPU requires an explicitly skipped cross-encoder stage;
+  GPU still requires an executed cross-encoder. Fresh downloads also require the session acquisition capability;
   cached reboots prove readiness through active runtime encoders and that query.
   Activation polls record `/proc/meminfo` samples about every five seconds. The CPU
   plan and chat-unavailable explanation are also checked. Downloads are not seeded.

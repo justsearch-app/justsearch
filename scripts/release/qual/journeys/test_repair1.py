@@ -78,22 +78,22 @@ class RepairTests(unittest.TestCase):
         run = Mock()
         for trace in [
             {'effectiveMode': 'TEXT'},
-            {'effectiveMode': 'VECTOR', 'degradation': {'hybridFallback': True}, 'stages': [{'id': 'dense-retrieval', 'status': 'executed'}, {'id': 'cross-encoder', 'status': 'executed'}]},
-            {'effectiveMode': 'VECTOR', 'stages': [{'id': 'dense-retrieval', 'status': 'skipped'}, {'id': 'cross-encoder', 'status': 'executed'}]},
-            {'effectiveMode': 'VECTOR', 'stages': [{'id': 'dense-retrieval', 'status': 'executed'}, {'id': 'cross-encoder', 'status': 'executed'}, {'id': 'sparse-retrieval', 'status': 'executed'}]},
+            {'effectiveMode': 'VECTOR', 'degradation': {'hybridFallback': True}, 'stages': [{'id': 'dense-retrieval', 'status': 'executed'}, {'id': 'cross-encoder', 'status': 'skipped', 'reason': 'PIPELINE_NOT_ELIGIBLE'}]},
+            {'effectiveMode': 'VECTOR', 'stages': [{'id': 'dense-retrieval', 'status': 'skipped'}, {'id': 'cross-encoder', 'status': 'skipped', 'reason': 'PIPELINE_NOT_ELIGIBLE'}]},
+            {'effectiveMode': 'VECTOR', 'stages': [{'id': 'dense-retrieval', 'status': 'executed'}, {'id': 'cross-encoder', 'status': 'skipped', 'reason': 'PIPELINE_NOT_ELIGIBLE'}, {'id': 'sparse-retrieval', 'status': 'executed'}]},
         ]:
             run.api.return_value = {'results': [linux.OPEN_FILE], 'searchTrace': trace}
             with patch.object(linux, 'wait_for', once), self.assertRaises(AssertionError):
                 linux.semantic_search(run)
         good = {'results': [linux.OPEN_FILE], 'searchTrace': {'effectiveMode': 'VECTOR',
-                'stages': [{'id': 'dense-retrieval', 'status': 'executed'}, {'id': 'cross-encoder', 'status': 'executed'}]}}
+                'stages': [{'id': 'dense-retrieval', 'status': 'executed'}, {'id': 'cross-encoder', 'status': 'skipped', 'reason': 'PIPELINE_NOT_ELIGIBLE'}]}}
         run.api.return_value = good
         with patch.object(linux, 'wait_for', once):
             self.assertEqual(linux.semantic_search(run), good)
         self.assertEqual(run.api.call_args.args[1]['mode'], 'vector')
 
     def test_j3_query_loads_lazy_models_and_keeps_final_active_assertion(self):
-        for typed, reranker_active in ((True, True), (False, True), (False, False)):
+        for typed, citation_active in ((True, True), (False, True), (False, False)):
             run = Mock()
             run.facts = {}
             run.wd.text.return_value = 'Chat is not supported here.'
@@ -103,7 +103,7 @@ class RepairTests(unittest.TestCase):
             active = dict(downloaded, phase='completed', installedFully=True)
             statuses = iter([downloaded, active])
             retrieval = {'results': [linux.OPEN_FILE], 'searchTrace': {'effectiveMode': 'VECTOR',
-                         'stages': [{'id': 'dense-retrieval', 'status': 'executed'}, {'id': 'cross-encoder', 'status': 'executed'}]}}
+                         'stages': [{'id': 'dense-retrieval', 'status': 'executed'}, {'id': 'cross-encoder', 'status': 'skipped', 'reason': 'PIPELINE_NOT_ELIGIBLE'}]}}
             queried = False
             def api(path, *args):
                 nonlocal queried
@@ -115,11 +115,11 @@ class RepairTests(unittest.TestCase):
                 return {'/api/ai/install/plan-preview': {'downloadProfile': 'CPU', 'components': [
                     {'id': 'chat', 'state': 'unavailable'}, {'id': 'embedding', 'state': 'to-download'}]},
                     '/api/ai/install/manifest': {}, '/api/ai/runtime/status': {'onnxFeatures': [
-                        {'id': name, 'modelActive': (queried and reranker_active) or name != 'reranker'}
+                        {'id': name, 'modelActive': name != 'reranker' and (name != 'citation_scorer' or queried and citation_active)}
                         for name in ('embed', 'splade', 'reranker', 'citation_scorer')]}}[path]
             run.api.side_effect = api
             with patch.object(linux, 'wait_for', once):
-                if not reranker_active:
+                if not citation_active:
                     with self.assertRaisesRegex(AssertionError, 'All default retrieval models active'):
                         linux.install_ai(run)
                     self.assertTrue(queried, 'Dense retrieval ran before the final active-model failure')
@@ -152,7 +152,7 @@ class RepairTests(unittest.TestCase):
         installed = {'state': 'completed', 'phase': 'completed', 'installedFully': True,
                      'readyCapabilities': ['retrieval-core']}
         retrieval = {'results': [linux.OPEN_FILE], 'searchTrace': {'effectiveMode': 'VECTOR',
-                     'stages': [{'id': 'dense-retrieval', 'status': 'executed'}, {'id': 'cross-encoder', 'status': 'executed'}]}}
+                     'stages': [{'id': 'dense-retrieval', 'status': 'executed'}, {'id': 'cross-encoder', 'status': 'skipped', 'reason': 'PIPELINE_NOT_ELIGIBLE'}]}}
         run.api.side_effect = lambda path, *args: {
             '/api/ai/install/plan-preview': {'downloadProfile': 'CPU', 'components': [
                 {'id': 'chat', 'state': 'unavailable'}, {'id': 'embedding', 'state': 'installed'}]},
@@ -175,7 +175,7 @@ class RepairTests(unittest.TestCase):
         active = {'state': 'idle', 'phase': 'done', 'installedFully': True, 'readyCapabilities': ['retrieval-core']}
         statuses = iter([staged, active])
         retrieval = {'results': [linux.OPEN_FILE], 'searchTrace': {'effectiveMode': 'VECTOR',
-                     'stages': [{'id': 'dense-retrieval', 'status': 'executed'}, {'id': 'cross-encoder', 'status': 'executed'}]}}
+                     'stages': [{'id': 'dense-retrieval', 'status': 'executed'}, {'id': 'cross-encoder', 'status': 'skipped', 'reason': 'PIPELINE_NOT_ELIGIBLE'}]}}
         def api(path, *args):
             if path == '/api/ai/install/status':
                 return next(statuses)

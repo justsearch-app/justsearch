@@ -712,7 +712,7 @@ def gpu_installed_checks(run, preview=None):
     else:
         start_chat(run)
     run.activation_checkpoint()
-    retrieval = linux.semantic_search(run)
+    retrieval = linux.semantic_search(run, reranking=True)
     runtime = run.api('/api/ai/runtime/status')
     run.evidence('J3-gpu-runtime', runtime)
     require_gpu_encoders(runtime)

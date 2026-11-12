@@ -21,7 +21,7 @@ class Repair2Tests(unittest.TestCase):
         run.wd.text.return_value = 'Chat is not supported here.'
         run.wd.execute.return_value = []
         inactive = {'onnxFeatures': []}
-        runtime = {'onnxFeatures': [{'id': name, 'modelActive': name != 'reranker'}
+        runtime = {'onnxFeatures': [{'id': name, 'modelActive': name not in ('reranker', 'citation_scorer')}
                    for name in ('embed', 'splade', 'reranker', 'citation_scorer')]}
         transient = {'state': 'idle', 'phase': 'idle', 'installedFully': True}
         staged = dict(transient, phase='activation_required', installedFully=False)
@@ -30,7 +30,7 @@ class Repair2Tests(unittest.TestCase):
         statuses = iter([transient, staged])
         retrieval = {'results': [linux.OPEN_FILE], 'searchTrace': {'effectiveMode': 'VECTOR',
             'stages': [{'id': 'dense-retrieval', 'status': 'executed'},
-                       {'id': 'cross-encoder', 'status': 'executed'}]}}
+                       {'id': 'cross-encoder', 'status': 'skipped', 'reason': 'PIPELINE_NOT_ELIGIBLE'}]}}
         def activate(_):
             nonlocal activated
             activated = True
@@ -55,7 +55,7 @@ class Repair2Tests(unittest.TestCase):
         self.assertEqual(classify(failure.exception), 'failed-product')
         reason = str(failure.exception)
         for expected in ('reranker.modelActive=false', 'embed.modelActive=true',
-                         'citation_scorer.modelActive=true', 'cross-encoder'):
+                         'citation_scorer.modelActive=false', 'cross-encoder'):
             self.assertIn(expected, reason)
         run.wd.click.assert_not_called()  # No repeated download.
         self.assertNotIn('ai', run.facts)

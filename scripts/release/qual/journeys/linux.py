@@ -374,15 +374,14 @@ print(json.dumps(dict(m,epochSeconds=time.time(),usedKiB=m['MemTotal']-m['MemAva
     text = run.wd.text()
     assert (chat.get('unavailableReason') or 'Chat is not supported here.') in text, 'CPU chat unavailable explanation is not shown'
     run.native.shot('J3-cpu-search-without-chat')
-    # RerankerConfig documents lazy initialization on a retrieval query. Check
-    # required retrieval models after exercising retrieval, not before it.
-    # SPLADE is downloaded by default but runs only when enabled.
+    # Check required retrieval models after exercising retrieval. SPLADE and
+    # CPU reranking are off by default, even with their files downloaded.
     def models_active():
         observed = run.api('/api/ai/runtime/status')
         run.evidence('J3-runtime', observed)
         features = {f['id']: f for f in observed.get('onnxFeatures', [])}
         return observed if all(features.get(name, {}).get('modelActive') is True
-                               for name in ('embed', 'reranker', 'citation_scorer')) else None
+                               for name in ('embed', 'citation_scorer')) else None
     try:
         runtime = wait_for(models_active, 'All default retrieval models active after vector query', seconds=120, interval=3)
     except AssertionError as exc:
@@ -416,16 +415,18 @@ return typed || operationKeys.length ? {typed,operationKeys} : null;
         run.wd.click('button[aria-label="Approve"]')
 
 
-def semantic_search(run):
+def semantic_search(run, *, reranking=False):
     def probe():
         result = run.api('/api/knowledge/search', {'query': 'flower coastal navigation tower', 'mode': 'vector', 'limit': 20})
         run.evidence('J3-vector-query', result)
         trace = result.get('searchTrace', {})
         degradation = trace.get('degradation', {})
         stages = trace.get('stages', [])
+        cross_encoder = [s for s in stages if s.get('id') == 'cross-encoder']
+        expected = 'executed' if reranking else 'skipped'
         return result if fixture_present(run, result.get('results', [])) and trace.get('effectiveMode') == 'VECTOR' and not degradation.get('hybridFallback') and not degradation.get('vectorBlocked') and any(
-            s.get('id') == 'dense-retrieval' and s.get('status') == 'executed' for s in stages) and any(
-            s.get('id') == 'cross-encoder' and s.get('status') == 'executed' for s in stages) and not any(
+            s.get('id') == 'dense-retrieval' and s.get('status') == 'executed' for s in stages) and cross_encoder and all(
+            s.get('status') == expected for s in cross_encoder) and not any(
             s.get('id') == 'sparse-retrieval' and s.get('status') == 'executed' for s in stages) else None
     return wait_for(probe, 'Semantic fixture retrieval without keyword fallback', seconds=240, interval=3)
 
