@@ -39,7 +39,10 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Reconnect handling: if the flow fails, the bridge re-issues the subscribe call on a bounded
  * backoff; the new stream begins with a fresh snapshot which replaces {@link #latestSnapshot} and
- * emits a {@link Delta.SnapshotReplaced} event so listeners can rebuild their keyed state.
+ * emits a {@link Delta.SnapshotReplaced} event so listeners can rebuild their keyed state. A
+ * client that retires (an index recovery replaces it) completes the stream instead: the bridge
+ * resets its started state without a backoff, and the next {@link #start} after the replacement
+ * is published subscribes to it with a fresh snapshot.
  *
  * <p><b>This paragraph used to describe behaviour the class did not have</b> (lane F review,
  * blocker 2). The error path logged "will rely on caller-driven reconnect" and returned; the

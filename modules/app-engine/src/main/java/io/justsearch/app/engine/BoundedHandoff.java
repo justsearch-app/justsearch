@@ -125,6 +125,10 @@ final class BoundedHandoff<T> implements AutoCloseable {
   private final AtomicBoolean closed = new AtomicBoolean(false);
   private final AtomicBoolean failed = new AtomicBoolean(false);
   private final AtomicReference<Runnable> onClose = new AtomicReference<>();
+  /** Guards the count of consumer calls in progress and a terminal waiting for them. */
+  private final Object deliveryLock = new Object();
+  private int delivering;
+  private Runnable pendingTerminal;
   private final Consumer<T> sink;
   private final Consumer<Throwable> onError;
   private final String name;
@@ -374,6 +378,35 @@ final class BoundedHandoff<T> implements AutoCloseable {
   }
 
   /**
+   * The producer ended the stream normally: closes the flow, then runs {@code onCompleted} once,
+   * after any consumer call already in progress returns (on that delivery's thread), never
+   * concurrently with it. No-op for the terminal if the flow already failed or completed.
+   */
+  void complete(Runnable onCompleted) {
+    java.util.Objects.requireNonNull(onCompleted, "onCompleted");
+    if (!failed.compareAndSet(false, true)) {
+      close();
+      return;
+    }
+    close();
+    synchronized (deliveryLock) {
+      if (delivering != 0) {
+        pendingTerminal = onCompleted;
+        return;
+      }
+    }
+    runTerminal(onCompleted);
+  }
+
+  private void runTerminal(Runnable terminal) {
+    try {
+      terminal.run();
+    } catch (RuntimeException e) {
+      log.warn("{}: completion handler threw", name, e);
+    }
+  }
+
+  /**
    * A task cancelled before entry cannot report failure from its body. Its exceptional exit must
    * close this flow too. Normal task return is not completion of a live change-feed subscription.
    */
@@ -446,9 +479,22 @@ final class BoundedHandoff<T> implements AutoCloseable {
     }
   }
 
+  /**
+   * Delivers one frame on the producer's own thread, without the queue, for a lossless producer
+   * whose consumer must accept before the producer moves on. It shares the delivery count with
+   * queued delivery, so {@link #complete} waits for it, and refuses once the flow is closed.
+   */
+  void deliverSynchronously(T frame) {
+    deliverFrame(frame);
+  }
+
   private boolean deliverFrame(T frame) {
-    // A queued delivery can enter here after the outer drain passed its close check.
-    if (closed.get()) return false;
+    // A queued delivery can enter here after the outer drain passed its close check. The check
+    // and the in-progress count share one lock, so complete() sees every call that can still run.
+    synchronized (deliveryLock) {
+      if (closed.get()) return false;
+      delivering++;
+    }
     try {
       sink.accept(frame);
       delivered.incrementAndGet();
@@ -459,6 +505,15 @@ final class BoundedHandoff<T> implements AutoCloseable {
       fail(t);
       if (t instanceof Error error) throw error;
       return false;
+    } finally {
+      Runnable terminal = null;
+      synchronized (deliveryLock) {
+        if (--delivering == 0) {
+          terminal = pendingTerminal;
+          pendingTerminal = null;
+        }
+      }
+      if (terminal != null) runTerminal(terminal);
     }
   }
 
