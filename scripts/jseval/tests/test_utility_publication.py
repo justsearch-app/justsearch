@@ -107,6 +107,26 @@ def _setup_accepted(tmp_path):
     return root, record_path, evidence, policy_path
 
 
+@pytest.fixture(scope="module")
+def accepted_template(tmp_path_factory):
+    # Finalize the identical 200-observation campaign once. Tests get private
+    # copies below so evidence, policies and publication bundles remain mutable.
+    return _setup_accepted(tmp_path_factory.mktemp("accepted-publication"))
+
+
+@pytest.fixture
+def accepted_publication(tmp_path, accepted_template):
+    root, record, evidence, policy = accepted_template
+    shutil.copytree(record.parent, tmp_path / record.parent.name)
+    shutil.copytree(root, tmp_path / root.name)
+    return (
+        tmp_path / root.name,
+        tmp_path / record.parent.name / record.name,
+        tmp_path / evidence.parent.name / evidence.name,
+        tmp_path / policy.parent.name / policy.name,
+    )
+
+
 def test_publication_builder_refuses_rejected_record(tmp_path):
     root, record, evidence = _setup_rejected(tmp_path)
     with pytest.raises(ValueError, match="only an accepted"):
@@ -116,12 +136,12 @@ def test_publication_builder_refuses_rejected_record(tmp_path):
         )
 
 
-def test_publication_builder_refuses_evidence_above_the_size_ceiling(tmp_path):
+def test_publication_builder_refuses_evidence_above_the_size_ceiling(accepted_publication):
     """tempdoc 719 follow-up: a bundle is a COMMITTED artifact, and the 2026-07-28 hero
     campaign's inline-`source` evidence was 788 MB -- past GitHub's 100 MB blob limit,
     discovered only at push time, after the immutable bundle already existed. The
     builder now fails closed BEFORE writing anything, naming the deduped format."""
-    root, record, evidence, policy_path = _setup_accepted(tmp_path)
+    root, record, evidence, policy_path = accepted_publication
     ceiling = evidence.stat().st_size - 1
     with pytest.raises(ValueError, match="publication ceiling") as excinfo:
         publication.build_publication(
@@ -139,13 +159,13 @@ def test_publication_builder_refuses_evidence_above_the_size_ceiling(tmp_path):
     ).is_file()
 
 
-def test_publication_manifest_records_the_evidence_format_it_bundled(tmp_path):
+def test_publication_manifest_records_the_evidence_format_it_bundled(accepted_publication):
     """`sanitizer_version` is read off the copied evidence, not hardcoded -- a v2
     bundle that claimed v1 would be exactly the stale-residue class the format bump
     is supposed to make legible."""
     from jseval.utility_evidence import SCHEMA, SCHEMA_V2, dedupe_source_blocks, read_evidence
 
-    root, record, evidence, policy_path = _setup_accepted(tmp_path)
+    root, record, evidence, policy_path = accepted_publication
     inline_manifest = json.loads(publication.build_publication(
         root=root, record_path=record, evidence_path=evidence,
         publication_id="inline-format", policy_path=policy_path,
@@ -179,8 +199,8 @@ def test_publication_manifest_records_the_evidence_format_it_bundled(tmp_path):
     jsonschema.validate(deduped_manifest, schema)
 
 
-def test_replay_rejects_a_manifest_that_misdeclares_the_evidence_format(tmp_path):
-    root, record, evidence, policy_path = _setup_accepted(tmp_path)
+def test_replay_rejects_a_manifest_that_misdeclares_the_evidence_format(accepted_publication):
+    root, record, evidence, policy_path = accepted_publication
     manifest_path = publication.build_publication(
         root=root, record_path=record, evidence_path=evidence,
         publication_id="format-tamper", policy_path=policy_path,
@@ -192,8 +212,8 @@ def test_replay_rejects_a_manifest_that_misdeclares_the_evidence_format(tmp_path
         publication.replay_publication(manifest_path)
 
 
-def test_replay_detects_evidence_tampering(tmp_path):
-    root, record, evidence, policy_path = _setup_accepted(tmp_path)
+def test_replay_detects_evidence_tampering(accepted_publication):
+    root, record, evidence, policy_path = accepted_publication
     manifest = publication.build_publication(
         root=root, record_path=record, evidence_path=evidence,
         publication_id="tamper-test", policy_path=policy_path,
@@ -204,8 +224,8 @@ def test_replay_detects_evidence_tampering(tmp_path):
         publication.replay_publication(manifest)
 
 
-def test_replay_uses_bundled_policy_not_changed_default(tmp_path, monkeypatch):
-    root, record, evidence, policy_path = _setup_accepted(tmp_path)
+def test_replay_uses_bundled_policy_not_changed_default(accepted_publication, monkeypatch):
+    root, record, evidence, policy_path = accepted_publication
     manifest = publication.build_publication(
         root=root, record_path=record, evidence_path=evidence,
         publication_id="policy-snapshot", policy_path=policy_path,
@@ -219,8 +239,8 @@ def test_replay_uses_bundled_policy_not_changed_default(tmp_path, monkeypatch):
     assert publication.replay_publication(manifest)["ok"] is True
 
 
-def test_replay_rejects_manifest_state_that_disagrees_with_verdict(tmp_path):
-    root, record, evidence, policy_path = _setup_accepted(tmp_path)
+def test_replay_rejects_manifest_state_that_disagrees_with_verdict(accepted_publication):
+    root, record, evidence, policy_path = accepted_publication
     manifest_path = publication.build_publication(
         root=root, record_path=record, evidence_path=evidence,
         publication_id="state-tamper", policy_path=policy_path,
@@ -232,8 +252,8 @@ def test_replay_rejects_manifest_state_that_disagrees_with_verdict(tmp_path):
         publication.replay_publication(manifest_path)
 
 
-def test_replay_rejects_unknown_manifest_fields(tmp_path):
-    root, record, evidence, policy_path = _setup_accepted(tmp_path)
+def test_replay_rejects_unknown_manifest_fields(accepted_publication):
+    root, record, evidence, policy_path = accepted_publication
     manifest_path = publication.build_publication(
         root=root, record_path=record, evidence_path=evidence,
         publication_id="shape-tamper", policy_path=policy_path,
@@ -245,8 +265,8 @@ def test_replay_rejects_unknown_manifest_fields(tmp_path):
         publication.replay_publication(manifest_path)
 
 
-def test_replay_rejects_paths_escaping_the_immutable_bundle(tmp_path):
-    root, record, evidence, policy_path = _setup_accepted(tmp_path)
+def test_replay_rejects_paths_escaping_the_immutable_bundle(accepted_publication):
+    root, record, evidence, policy_path = accepted_publication
     manifest_path = publication.build_publication(
         root=root, record_path=record, evidence_path=evidence,
         publication_id="path-escape", policy_path=policy_path,

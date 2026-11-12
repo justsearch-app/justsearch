@@ -781,7 +781,8 @@ jobs:
     # (`tests/test_suite_stats_properties.py:10`), which is why the `dev` extra is
     # installed in full below.
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Hosted pytest took 1161s; allow 25% headroom, rounded up to a minute.
+    timeout-minutes: 25
     steps:
       - name: Checkout
         uses: actions/checkout@v7
