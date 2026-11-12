@@ -46,16 +46,26 @@ Windows-specific behaviour (WebView2 focus on restore from the taskbar or tray, 
 the drag region's window menu) is exercised here only through the production assets in headless
 Chromium with the native IPC double; the real Windows check is the orchestrator's.
 
-`src/boot/desktopEngineLossStart.test.ts` is new and isolated (`[exempt]` at the gate); it is entered
-here anyway so its expectations carry sources and evidence.
+`src/boot/desktopEngineLossStart.test.ts`, `src/boot/desktopChrome-lockdown.test.ts`,
+`src/boot/windowLayer.test.ts` and `src/boot/desktopWindow.test.ts` are new and isolated (`[exempt]`
+at the gate); they are entered here anyway so their expectations carry sources and evidence.
 
-Changed existing checks in `src/boot/boot-frame-lockdown.test.ts`: the harness gains a `noEngine`
-option (the host's `api_port` answers no engine) and an init-script listener that holds the last
-`contextmenu` event so its `defaultPrevented` is read after dispatch; neither changes another case.
-The `connecting` surface (window-layer cases) and the `connecting` state of the SW5 legibility cases
+The window and start-up checks in real Chromium (FD1, the SA7 SA10 deadline over Connecting, FW1,
+FW2) live in `src/boot/desktopChrome-lockdown.test.ts`, with a build, server and browser of their own,
+and keep one page per behaviour: FW1 Minimize on the running app and Close on the start-up frame,
+FW2 on the running app's top area and content, plus the text-field case. The rules are
+page-independent, so the other pages are covered without page loads: `windowLayer.test.ts` runs
+index.html's own inline script on its own markup (FW1 letting go of focus, FW2's policy) over every
+kind of page the root holds, and `desktopWindow.test.ts` covers where focus returns
+(`boot/desktopWindow.ts` with `utils/focusReturn.ts`).
+
+Changed existing checks in `src/boot/boot-frame-lockdown.test.ts` (entry below): the harness gains a
+`noEngine` option (the host's `api_port` answers no engine), which changes no other case. The
+`connecting` surface (window-layer cases) and the `connecting` state of the SW5 legibility cases
 opened Connecting by holding discovery forever, which FD1 retires: they now open it by a discovery
-that found no engine. "SA7 SA10 deadline survives a long connecting interval
-before the frame returns" becomes "... which a running engine ends by reloading" (entry below).
+that found no engine. "SA7 SA10 deadline survives a long connecting interval before the frame
+returns" is removed there; its rewrite, "... which a running engine ends by reloading", is in
+`src/boot/desktopChrome-lockdown.test.ts`.
 
 ```json
 {
@@ -150,10 +160,10 @@ before the frame returns" becomes "... which a running engine ends by reloading"
       ]
     },
     {
-      "items": ["modules/ui-web/src/boot/boot-frame-lockdown.test.ts"],
+      "items": ["modules/ui-web/src/boot/desktopChrome-lockdown.test.ts", "modules/ui-web/src/boot/windowLayer.test.ts"],
       "class": "New",
       "repaired": true,
-      "behaviour": "Production assets in headless Chromium with the native IPC double and Tauri's drag script. FW1, on the start-up frame, the engine terminal page, the running app and the held hand-off: Minimize and Close, by pointer, Enter and Space, each send exactly one native command and leave focus off the window controls; in the running app focus is back on the More control that had it before; one more Space or Enter then sends no window command. Maximize by Enter keeps its focus. FW2, on the start-up frame, the entry failure page, the engine terminal page, the running app and the held hand-off: a right-click on the top area's drag region and on the content outside text fields leaves the context-menu event's default prevented (no web view menu). FD1: discovery held for a while keeps the start-up frame in the root, no Connecting page is attached at any moment, the app then takes over with no blank sample.",
+      "behaviour": "Production assets in headless Chromium with the native IPC double and Tauri's drag script (desktopChrome-lockdown), one page per behaviour. FW1: Minimize on the running app and Close on the start-up frame (no application module), by pointer, Enter and Space, each send exactly one native command and leave focus off the window controls; in the running app focus is back on the More control that had it before; one more Space or Enter then sends no window command. Maximize by Enter keeps its focus. FW2: a right-click on the running app's top-area drag region and on its content outside text fields leaves the context-menu event's default prevented (no web view menu). FD1: discovery held for a while keeps the start-up frame in the root, no Connecting page is attached at any moment, the app then takes over with no blank sample. index.html's own inline script on its own markup in happy-dom (windowLayer), on the start-up frame, the failure page, a recovery or reset page, the running app and the app held beneath the start-up frame: FW1 Minimize and Close send their one command and focus leaves the window controls, Maximize keeps its focus; FW2 in the production build a right-click on the top area, its drag region, the content (light DOM and shadow roots) and the window controls is default-prevented while the element's own listener still receives it; so is a right-click on checkboxes, radios, ranges, button inputs and disabled text fields, in light DOM and shadow roots (they take no typing).",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -166,22 +176,27 @@ before the frame returns" becomes "... which a running engine ends by reloading"
       ],
       "evidence": "gates/test-intent/evidence/f-desktop-b2-window.json",
       "newChecks": [
-        "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#FW1 Minimize and Close leave focus where it was before the control on start-up frame, so one key cannot send the window away again",
-        "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#FW1 Minimize and Close leave focus where it was before the control on engine terminal, so one key cannot send the window away again",
-        "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#FW1 Minimize and Close leave focus where it was before the control on running app, so one key cannot send the window away again",
-        "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#FW1 Minimize and Close leave focus where it was before the control on held hand-off, so one key cannot send the window away again",
-        "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#FW2 production build: right-click on the top area and the content of start-up frame opens no web view menu",
-        "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#FW2 production build: right-click on the top area and the content of entry failure opens no web view menu",
-        "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#FW2 production build: right-click on the top area and the content of engine terminal opens no web view menu",
-        "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#FW2 production build: right-click on the top area and the content of running app opens no web view menu",
-        "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#FW2 production build: right-click on the top area and the content of held hand-off opens no web view menu",
-        "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#FD1 a slow discovery keeps the start-up frame, never a Connecting page, until the app takes over"
+        "modules/ui-web/src/boot/desktopChrome-lockdown.test.ts#FW1 Minimize on the running app returns focus to where it was before the control, so one key cannot minimize again; Maximize keeps its focus",
+        "modules/ui-web/src/boot/desktopChrome-lockdown.test.ts#FW1 Close on the start-up frame lets go of focus with no application module, so one key cannot hide the window again",
+        "modules/ui-web/src/boot/desktopChrome-lockdown.test.ts#FW2 production build: right-click on the top area and the content of the running app opens no web view menu",
+        "modules/ui-web/src/boot/desktopChrome-lockdown.test.ts#FD1 a slow discovery keeps the start-up frame, never a Connecting page, until the app takes over",
+        "modules/ui-web/src/boot/windowLayer.test.ts#FW2 production build: the top area, the drag region, the content and the window controls of the start-up frame open no web view menu",
+        "modules/ui-web/src/boot/windowLayer.test.ts#FW1 Minimize and Close on the start-up frame let go of focus as they send the window away; Maximize keeps it",
+        "modules/ui-web/src/boot/windowLayer.test.ts#FW2 production build: the top area, the drag region, the content and the window controls of the failure page open no web view menu",
+        "modules/ui-web/src/boot/windowLayer.test.ts#FW1 Minimize and Close on the failure page let go of focus as they send the window away; Maximize keeps it",
+        "modules/ui-web/src/boot/windowLayer.test.ts#FW2 production build: the top area, the drag region, the content and the window controls of a recovery or reset page open no web view menu",
+        "modules/ui-web/src/boot/windowLayer.test.ts#FW1 Minimize and Close on a recovery or reset page let go of focus as they send the window away; Maximize keeps it",
+        "modules/ui-web/src/boot/windowLayer.test.ts#FW2 production build: the top area, the drag region, the content and the window controls of the running app open no web view menu",
+        "modules/ui-web/src/boot/windowLayer.test.ts#FW1 Minimize and Close on the running app let go of focus as they send the window away; Maximize keeps it",
+        "modules/ui-web/src/boot/windowLayer.test.ts#FW2 production build: the top area, the drag region, the content and the window controls of the app held beneath the start-up frame open no web view menu",
+        "modules/ui-web/src/boot/windowLayer.test.ts#FW1 Minimize and Close on the app held beneath the start-up frame let go of focus as they send the window away; Maximize keeps it",
+        "modules/ui-web/src/boot/windowLayer.test.ts#FW2 production build: controls that take no typing and disabled fields open no web view menu"
       ]
     },
     {
-      "items": ["modules/ui-web/src/boot/boot-frame-lockdown.test.ts"],
+      "items": ["modules/ui-web/src/boot/desktopChrome-lockdown.test.ts", "modules/ui-web/src/boot/windowLayer.test.ts"],
       "class": "New",
-      "behaviour": "Preservation, passing on the base and the candidate: in the production build, a right-click in the command palette's text field leaves the event's default alone (the platform edit menu stays).",
+      "behaviour": "Preservation, passing on the base and the candidate. In the production build in Chromium a right-click in the command palette's text field leaves the event's default alone (the platform edit menu stays); in index.html's script text, search, email, password, url and number fields, textareas and contenteditable regions, in light DOM and shadow roots, keep the menu; a development build prevents no menu. SA7 SA10 in Chromium: a discovery that finds no engine shows Connecting, 60 s pass with no failure page and Connecting still in the root, and a running supervisor state reloads the window.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -190,11 +205,68 @@ before the frame returns" becomes "... which a running engine ends by reloading"
           "delegationScope": "the UI between the main windows (start-up, engine loss and recovery, window chrome), its design choices",
           "choice": "FW2: Editable text fields keep the platform's edit menu.",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design. proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell request",
+          "delegationScope": "the UI between the main windows (start-up, engine loss and recovery, window chrome), its design choices",
+          "choice": "FW2 (decision 2026-11-12): the web view's own context menu is suppressed app-wide in production builds only; development builds keep it (Inspect).",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design. proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell request",
+          "delegationScope": "the UI between the main windows (start-up, engine loss and recovery, window chrome), its design choices",
+          "choice": "FD1: after a restart no full-page 'Connecting to JustSearch' replaces a booted app. The Connecting page therefore no longer shows while discovery runs; it shows when discovery found no engine.",
+          "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/f-desktop-b2-window.json",
+      "evidence": "gates/test-intent/evidence/f-desktop-b2-window-preserved.json",
       "newChecks": [
-        "modules/ui-web/src/boot/boot-frame-lockdown.test.ts#FW2 production build: a text field keeps the platform edit menu; the app opens its own menus as before"
+        "modules/ui-web/src/boot/desktopChrome-lockdown.test.ts#FW2 production build: a text field keeps the platform edit menu; the app opens its own menus as before",
+        "modules/ui-web/src/boot/desktopChrome-lockdown.test.ts#SA7 SA10 deadline survives a long connecting interval, which a running engine ends by reloading",
+        "modules/ui-web/src/boot/windowLayer.test.ts#FW2 production build: text fields keep the platform edit menu",
+        "modules/ui-web/src/boot/windowLayer.test.ts#FW2 development build: the web view menu stays for Inspect"
+      ]
+    },
+    {
+      "items": ["modules/ui-web/src/boot/desktopWindow.test.ts"],
+      "class": "New",
+      "behaviour": "Unit level in happy-dom, the window layer's controls beside a root, boot/desktopWindow.ts installed: after Minimize or Close (also clicked through an inner element of the control) focus is on the control that had it before, across shadow roots; when that control is gone (the page changed beneath the controls) focus is on the page's main landmark, made focusable once (tabindex -1, removed on blur); on the start-up frame over an inert app nothing in the app takes focus; Maximize keeps its focus and a click outside the controls moves nothing. The focus-return rule (utils/focusReturn.ts): an element that can still take focus gets it; a disconnected or inert one does not, the main content does; a main landmark's own tabindex is kept; with no main landmark nothing takes focus. The modules are new in this changeset, so there is no assertion fail-before: the repaired behaviour's fail-before is the FW1 entry's.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design. proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell request",
+          "delegationScope": "the UI between the main windows (start-up, engine loss and recovery, window chrome), its design choices",
+          "choice": "FW1: on Windows (and every desktop platform), after minimizing or closing to tray with the window controls and bringing the window back, keyboard focus is not on that control (one Space or Enter must not minimize or hide it again): it returns to where it was before the control was used, else the main content.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design. proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell request",
+          "delegationScope": "the UI between the main windows (start-up, engine loss and recovery, window chrome), its design choices",
+          "choice": "FD2 (orchestrator, 2026-11-12, reversible): when the treatment ends (engine back) with focus inside it, or after 'Open Health' from it, focus returns to where it was before the treatment (or to the main content if that is gone), never the page body; the recovery is announced once to screen readers.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/f-desktop-b2-focus.json",
+      "newChecks": [
+        "modules/ui-web/src/boot/desktopWindow.test.ts#FW1 Minimize on the running app returns focus to the control that had it before, across shadow roots",
+        "modules/ui-web/src/boot/desktopWindow.test.ts#FW1 Minimize on a page whose remembered control is gone puts focus on the main content",
+        "modules/ui-web/src/boot/desktopWindow.test.ts#FW1 Minimize on the start-up frame over an inert app leaves focus off the app: nothing beneath the frame takes it",
+        "modules/ui-web/src/boot/desktopWindow.test.ts#FW1 Minimize used through an inner element of the control returns focus too",
+        "modules/ui-web/src/boot/desktopWindow.test.ts#FW1 Close on the running app returns focus to the control that had it before, across shadow roots",
+        "modules/ui-web/src/boot/desktopWindow.test.ts#FW1 Close on a page whose remembered control is gone puts focus on the main content",
+        "modules/ui-web/src/boot/desktopWindow.test.ts#FW1 Close on the start-up frame over an inert app leaves focus off the app: nothing beneath the frame takes it",
+        "modules/ui-web/src/boot/desktopWindow.test.ts#FW1 Close used through an inner element of the control returns focus too",
+        "modules/ui-web/src/boot/desktopWindow.test.ts#FW1 Maximize keeps its focus, and a click outside the window controls moves nothing",
+        "modules/ui-web/src/boot/desktopWindow.test.ts#focus returns to the remembered element when it can still take focus",
+        "modules/ui-web/src/boot/desktopWindow.test.ts#an element that is gone or inert is not returned to: the main content takes focus for one visit",
+        "modules/ui-web/src/boot/desktopWindow.test.ts#the main content keeps its own tabindex, and with no main content nothing takes focus"
       ]
     },
     {
@@ -211,8 +283,8 @@ before the frame returns" becomes "... which a running engine ends by reloading"
         }
       ],
       "conflictSearch": "decision records searched for a conflict: none (docs/decisions has no record on the desktop Connecting page; SA7/SA10 of shell-s5-startup pin the deadline, not when Connecting shows)",
-      "whatChanged": "'SA7 SA10 deadline survives a long connecting interval before the frame returns' held discovery for over 60 s to keep the Connecting page in the root, then released it and expected the stalled failure page followed by the app. FD1 retires Connecting during discovery, so a held discovery now shows the frame and its own deadline (covered by the existing 'SA10 stalled catalog discovery...' and 'SA10 60-second deadline...' cases). The case is now 'SA7 SA10 deadline survives a long connecting interval, which a running engine ends by reloading': a discovery that finds no engine shows Connecting, 60 s pass with no failure page and Connecting still in the root, and a running supervisor state reloads the window. The 'connecting' surface of the window-layer cases (SW1 SW2 SW3 SW7 commands, SW1 SW2 top area) and the 'connecting' state of the twelve 'SW5 X1 window controls are legible over every surface with <palette> <mode>, and in forced colours' cases open the same page by that no-engine discovery instead of a held one; their oracle is unchanged. The harness's added `noEngine` option and context-menu event holder change no other case. All pass on the candidate (gates/test-intent/evidence/f-desktop-b2-window.json).",
-      "evidence": "gates/test-intent/evidence/f-desktop-b2-window.json"
+      "whatChanged": "'SA7 SA10 deadline survives a long connecting interval before the frame returns' held discovery for over 60 s to keep the Connecting page in the root, then released it and expected the stalled failure page followed by the app. FD1 retires Connecting during discovery, so a held discovery now shows the frame and its own deadline (covered by the existing 'SA10 stalled catalog discovery...' and 'SA10 60-second deadline...' cases). The case is removed from this file; its rewrite, 'SA7 SA10 deadline survives a long connecting interval, which a running engine ends by reloading' (a discovery that finds no engine shows Connecting, 60 s pass with no failure page and Connecting still in the root, and a running supervisor state reloads the window), is in modules/ui-web/src/boot/desktopChrome-lockdown.test.ts (preservation entry above). The 'connecting' surface of the window-layer cases (SW1 SW2 SW3 SW7 commands, SW1 SW2 top area) and the 'connecting' state of the twelve 'SW5 X1 window controls are legible over every surface with <palette> <mode>, and in forced colours' cases open the same page by that no-engine discovery instead of a held one; their oracle is unchanged. The harness's added `noEngine` option changes no other case. All pass on the base and the candidate (gates/test-intent/evidence/f-desktop-b2-window-adapted.json).",
+      "evidence": "gates/test-intent/evidence/f-desktop-b2-window-adapted.json"
     }
   ]
 }

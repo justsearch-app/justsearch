@@ -83,8 +83,6 @@ async function create(options: Options = {}): Promise<Page> {
       requestAnimationFrame(sample);
     };
     requestAnimationFrame(sample);
-    // The last context-menu event, held from before every page listener; read after its dispatch.
-    window.addEventListener('contextmenu', event => { (window as unknown as { lastMenu?: Event }).lastMenu = event; }, true);
     const define = customElements.define.bind(customElements);
     customElements.define = (name, ctor, config) => {
       if (name === 'jf-shell') {
@@ -733,40 +731,6 @@ for (const os of ['light', 'dark'] as const) it(`X1 X2 ${os} frame colours and b
   } finally { await page.close(); }
 });
 
-it('SA7 SA10 deadline survives a long connecting interval, which a running engine ends by reloading', async () => {
-  const page = await create({ noEngine: true });
-  try {
-    await pauseClockBeforeNavigation(page); await page.goto(url); await page.waitForSelector('jf-engine-recovery');
-    await page.clock.fastForward(60_001);
-    expect(await page.locator('#boot-failure').count()).toBe(0);
-    expect(await page.locator('#root > jf-engine-recovery').count()).toBe(1);
-    const reloaded = page.waitForEvent('framenavigated');
-    await page.evaluate(() => window.frameHarness.emit({ schemaVersion: 1, kind: 'engine-supervisor-state.v1', supervisor: 'tauri', state: 'running', incarnation: 1, restartCount: 0, maxRestartAttempts: 3 }));
-    await reloaded;
-  } finally { await page.close(); }
-}, 15_000);
-
-it('FD1 a slow discovery keeps the start-up frame, never a Connecting page, until the app takes over', async () => {
-  const page = await create({ discoveryHold: true });
-  try {
-    await page.addInitScript(() => {
-      const seen = (window as unknown as { recoverySeen: boolean }).recoverySeen = false;
-      void seen;
-      new MutationObserver(() => { if (document.querySelector('#root > jf-engine-recovery')) (window as unknown as { recoverySeen: boolean }).recoverySeen = true; })
-        .observe(document, { childList: true, subtree: true });
-    });
-    await page.goto(url);
-    await expect.poll(() => page.evaluate(() => window.frameHarness.calls.includes('api_port'))).toBe(true);
-    await page.waitForTimeout(500);
-    expect(await page.locator('#root > #boot-frame').count(), 'the frame stays while discovery runs').toBe(1);
-    await page.evaluate(() => { window.frameHarness.discoveryHold = false; });
-    await page.waitForSelector('jf-top-bar .more-trigger');
-    await expect.poll(() => page.locator('#boot-frame').count()).toBe(0);
-    expect(await page.evaluate(() => (window as unknown as { recoverySeen: boolean }).recoverySeen), 'no Connecting page at any moment').toBe(false);
-    expect(await page.evaluate(() => window.frameHarness.samples)).not.toContain('blank');
-  } finally { await page.close(); }
-});
-
 // Window layer (SW1-SW9). The native double answers window commands; Tauri's real drag script serves drag regions.
 const exhausted = { state: 'exhausted', restartCount: 3 };
 type Surface = { name: string; open: () => Promise<Page>; handOff?: boolean };
@@ -920,81 +884,6 @@ it('SW2 controls and moving keep working after the hand-off releases the app', a
     await page.mouse.move(8, 8); await page.mouse.down(); await page.mouse.up();
     expect(await windowCalls(page, from)).toEqual(['plugin:window|close', 'plugin:window|start_dragging']);
     await shellWorksAfterCover(page);
-  } finally { await page.close(); }
-});
-const onControl = (page: Page) => page.evaluate(() => {
-  let el = document.activeElement;
-  while (el?.shadowRoot?.activeElement) el = el.shadowRoot.activeElement;
-  return !!el?.closest('#window-controls');
-});
-for (const surface of [surfaces[0]!, surfaces[5]!, surfaces[11]!, surfaces[12]!]) it(`FW1 Minimize and Close leave focus where it was before the control on ${surface.name}, so one key cannot send the window away again`, async () => {
-  const page = await surface.open();
-  try {
-    const app = surface.name === 'running app';
-    const more = page.locator('jf-top-bar .more-trigger');
-    const onMore = () => more.evaluate(el => (el.getRootNode() as ShadowRoot).activeElement === el);
-    for (const [name, command] of [['Minimize', 'minimize'], ['Close', 'close']] as const) {
-      for (const how of ['pointer', 'Enter', 'Space'] as const) {
-        if (app) await more.focus();
-        const from = await callCount(page);
-        const button = control(page, name);
-        if (how === 'pointer') { const box = (await button.boundingBox())!; await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2); }
-        else { await button.focus(); await page.keyboard.press(how); }
-        await expect.poll(() => windowCalls(page, from), { timeout: 2000 }).toEqual([`plugin:window|${command}`]);
-        // The window comes back (the host shows it again); the document's focus is what it returns to.
-        expect(await onControl(page), `${name} by ${how}: focus left the control`).toBe(false);
-        if (app) expect(await onMore(), `${name} by ${how}: focus is back where it was`).toBe(true);
-        const after = await callCount(page);
-        await page.keyboard.press(how === 'Enter' ? 'Enter' : 'Space');
-        if (app) await page.keyboard.press('Escape');
-        expect(await windowCalls(page, after), `${name} by ${how}: one more key sends no window command`).toEqual([]);
-      }
-    }
-    // Maximize keeps its focus: the window stays and may be toggled again.
-    await control(page, 'Maximize').focus();
-    await page.keyboard.press('Enter');
-    expect(await onControl(page)).toBe(true);
-  } finally { await page.close(); }
-}, 30_000);
-
-/** Right-click at a point; whether the web view's own menu would open (the event's default was not prevented). */
-async function webviewMenuAt(page: Page, x: number, y: number) {
-  await page.evaluate(() => { delete (window as unknown as { lastMenu?: Event }).lastMenu; });
-  await page.mouse.click(x, y, { button: 'right' });
-  return page.evaluate(([x, y]) => {
-    const event = (window as unknown as { lastMenu?: Event }).lastMenu;
-    let el = document.elementFromPoint(x, y);
-    while (el?.shadowRoot) { const inner = el.shadowRoot.elementFromPoint(x, y); if (!inner || inner === el) break; el = inner; }
-    return event ? { menu: !event.defaultPrevented, at: el?.localName } : null;
-  }, [x, y] as const);
-}
-for (const surface of [surfaces[0]!, surfaces[1]!, surfaces[5]!, surfaces[11]!, surfaces[12]!]) it(`FW2 production build: right-click on the top area and the content of ${surface.name} opens no web view menu`, async () => {
-  const page = await surface.open();
-  try {
-    const root = parseFloat(await page.evaluate(() => getComputedStyle(document.documentElement).fontSize));
-    const viewport = page.viewportSize()!;
-    expect(await webviewMenuAt(page, root * 0.5, root * 0.5), 'the drag region of the top area').toMatchObject({ menu: false });
-    // The content area outside any text field (the running app's centre holds the search box).
-    let checked = 0;
-    for (const y of [0.3, 0.6, 0.9]) {
-      const result = await webviewMenuAt(page, viewport.width / 2, viewport.height * y);
-      if (['input', 'textarea'].includes(result?.at ?? '')) continue;
-      expect(result, `the content area at ${y}`).toMatchObject({ menu: false });
-      checked++;
-    }
-    expect(checked, 'some content outside text fields was right-clicked').toBeGreaterThan(0);
-  } finally { await page.close(); }
-}, 20_000);
-it('FW2 production build: a text field keeps the platform edit menu; the app opens its own menus as before', async () => {
-  const page = await create();
-  try {
-    await page.goto(url); await page.waitForSelector('jf-top-bar .more-trigger');
-    await expect.poll(() => page.locator('#boot-frame').count()).toBe(0);
-    await page.keyboard.press('Control+k');
-    const field = page.locator('jf-command-palette input').first();
-    await field.waitFor({ state: 'visible' });
-    const box = (await field.boundingBox())!;
-    expect(await webviewMenuAt(page, box.x + box.width / 2, box.y + box.height / 2), 'the palette field').toMatchObject({ menu: true, at: 'input' });
   } finally { await page.close(); }
 });
 it('R1 Settings opened beneath the start-up frame stays modal after hand-off and closes by X and Escape', async () => {
