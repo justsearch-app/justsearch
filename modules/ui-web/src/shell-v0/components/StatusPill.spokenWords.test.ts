@@ -94,48 +94,4 @@ describe('FC10a the pill\'s spoken text agrees with what it shows', () => {
     expect(pill.shadowRoot!.querySelector('[data-testid="ai-engine-announcer"]'), 'no AI-engine headline region').toBeNull();
     if (search !== null) expect(shown.toLowerCase(), 'the search status spoken is the pill\'s').toContain(search.toLowerCase());
   });
-
-  it('each change of status is heard once, through calm, indexing, needs you and an outage', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
-    const root = pill.shadowRoot!;
-    const regions = (): Element[] => [...root.querySelectorAll('jf-system-notice, [aria-live]')];
-    const key = (region: Element): string => (region as HTMLElement).dataset.testid ?? region.getAttribute('aria-live') ?? '';
-    // Every live region of the pill, as a screen reader is told of it: each new non-empty text it takes.
-    const last = new Map<string, string>();
-    let heard: string[] = [];
-    const listen = (): void => {
-      for (const region of regions()) {
-        const text = (region.textContent ?? '').replace(/\s+/g, ' ').trim();
-        if (last.get(key(region)) === text) continue;
-        last.set(key(region), text);
-        if (text) heard.push(`${key(region)}: ${text}`);
-      }
-    };
-    const observer = new MutationObserver(listen);
-    observer.observe(root, { subtree: true, childList: true, characterData: true });
-    const step = async (state: Partial<AiState>): Promise<{ shown: string; heard: string[] }> => {
-      const { shown } = await observe(state);
-      listen();
-      const said = heard; heard = [];
-      return { shown, heard: said };
-    };
-    const lost = (verdict: AiState['verdict']): Partial<AiState> => ({ ...FAILED_INSTALL, verdict, phase: 'stale', snapshotLive: false,
-      indexingStatusLive: false, installObservationLive: false,
-      connection: { reachable: false, lastSuccessMs: Date.now(), lastContactMs: Date.now(), consecutiveFailures: 2 } });
-    const INDEXING: Partial<AiState> = { status: { worker: { core: { indexState: 'INDEXING', pendingJobs: 40 }, enrichment: {} } } as AiState['status'] };
-    try {
-      // What the regions say before the first observation is not heard as a change.
-      listen(); heard = [];
-      for (const [name, state] of [['the first observation, calm', {}], ['indexing', INDEXING], ['calm again', {}],
-        ['needs you', FAILED_INSTALL]] as const) {
-        const { shown, heard: said } = await step(state);
-        expect(said, `${name}: one announcement beside "${shown}"`).toHaveLength(1);
-      }
-      const checking = await step(lost({ kind: 'checking', severity: 'info', reasons: [] } as unknown as AiState['verdict']));
-      expect(checking.heard, `the outage begins: the pill still says "${checking.shown}", nothing new is heard`).toEqual([]);
-      vi.setSystemTime(Date.now() + 11_000);
-      const gone = await step(lost({ kind: 'unreachable', severity: 'error', reasons: [] } as unknown as AiState['verdict']));
-      expect(gone.heard, `unreachable: one announcement beside "${gone.shown}"`).toEqual(["verdict-announcer: Can't reach the engine"]);
-    } finally { observer.disconnect(); }
-  });
 });

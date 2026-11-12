@@ -59,12 +59,9 @@ export class FrameStatusController implements ReactiveController {
   snapshot: AdvisorySnapshot = { advisories: [], unreadCount: 0, isConnected: false, lastFrameKind: 'initial' };
   polite = '';
   politeKey = '';
-  /** FC10a — the pill's one live announcement: each change of status, said once. */
-  announcement: Spoken = { text: '', politeness: 'status' };
-  /** The pill's words in the last announcement; null when it said none. */
-  private spokenVerdict: string | null = null;
-  /** Indexing's own words, changed only on its edges (a hold, its resume, its progress). */
-  private indexingWords = '';
+  indexingAnnouncement = '';
+  verdictAnnouncement: Spoken | null = null;
+  private indexingTransition = false;
   private indexingWasPaused = false;
   private indexingAnnouncementKey: string | null = null;
   private transientQueue: string[] = [];
@@ -459,46 +456,36 @@ export class FrameStatusController implements ReactiveController {
         void this.notifyDesktop(workFailedNotice('AI install failed', installEndSeenLive, endEventId('AI install failed', installStart)));
       }
     }
-    // 595 §15.1, FC10, FC10a — one announcer, always mounted with the pill, says each change of
-    // status once, by the rule that decides the visible pill (frameStatus), in its words: the AI
-    // engine's own headlines ("Not Installed", "Install Failed") are words the pill never shows, so
+    // 595 §15.1 — one verdict announcer, moved from the retired status bar into this always-mounted
+    // owner. Indexing transitions speak through the indexing announcer, in the indexing row's words.
+    // FC10, FC10a — spoken by the rule that decides the visible pill (frameStatus), in its words: the
+    // AI engine's own headlines ("Not Installed", "Install Failed") are words the pill never shows, so
     // they are not spoken; its install's end is said by its notice, its needs by the pill's state.
-    // Indexing adds to it only what the pill's words do not say: the confirmed progress of indexing
-    // the panel lists (a hold, an error, files waiting), the resume that ended a hold, and an indexing
-    // transition (a rebuild), said as the work it runs is titled. Ready, unconfirmed or unreachable
-    // indexing is the search status the pill already says ("Up to date", "Checking search status").
     const spoken = spokenStatus(next, this.ai);
-    const indexingTransition = this.ai?.verdict.kind === 'transitioning' && this.ai.verdict.reasons.some(isIndexingObservation);
-    const verdict = indexingTransition ? null : spoken.verdict;
-    const transition = indexingTransition && p.activity.confirmed && next.pill.kind === 'working' ? spoken.verdict?.text ?? null : null;
+    this.indexingTransition = this.ai?.verdict.kind === 'transitioning' && this.ai.verdict.reasons.some(isIndexingObservation);
+    this.verdictAnnouncement = spoken.verdict && !this.indexingTransition ? spoken.verdict : null;
+    // An indexing transition (a rebuild) is said by the indexing announcer, as the work it runs is titled.
+    const transition = this.indexingTransition && p.activity.confirmed && next.pill.kind === 'working' ? spoken.verdict?.text ?? null : null;
     const activityAnnouncement = [transition ?? p.activity.summary, p.activity.detail].filter(Boolean).join(' — ');
     if (!spoken.indexing) {
       // Indexing work left out of the panel because it only waits for AI: nothing about it is said.
-      this.indexingWords = '';
+      this.indexingAnnouncement = '';
       this.indexingAnnouncementKey = null;
       this.indexingWasPaused = false;
     } else if (p.activity.confirmed) {
       const resumedKey = `resumed:${activityAnnouncement}`;
       if (p.pause) {
-        if (this.indexingAnnouncementKey !== p.pause.state) this.indexingWords = activityAnnouncement;
+        if (this.indexingAnnouncementKey !== p.pause.state) this.indexingAnnouncement = activityAnnouncement;
         this.indexingAnnouncementKey = p.pause.state;
       } else if (this.indexingWasPaused) {
-        this.indexingWords = 'Indexing resumed.';
+        this.indexingAnnouncement = 'Indexing resumed.';
         this.indexingAnnouncementKey = resumedKey;
       } else if (this.indexingAnnouncementKey !== resumedKey) {
-        this.indexingWords = activityAnnouncement;
+        this.indexingAnnouncement = activityAnnouncement;
         this.indexingAnnouncementKey = null;
       }
       this.indexingWasPaused = !!p.pause;
-    }
-    const progress = spoken.indexing && p.activity.confirmed
-      && (spoken.listed || transition !== null || !!this.indexingAnnouncementKey?.startsWith('resumed:')) ? this.indexingWords : '';
-    const text = [verdict?.text, progress].filter(Boolean).join('. ');
-    // Only indexing words falling away beside the same pill words is nothing new to say.
-    const nothingNew = !progress && verdict !== null && verdict.text === this.spokenVerdict
-      && this.announcement.text.startsWith(`${verdict.text}. `);
-    if (!nothingNew) this.announcement = { text, politeness: verdict?.politeness ?? 'status' };
-    this.spokenVerdict = verdict?.text ?? null;
+    } else if (this.indexingAnnouncementKey === null) this.indexingAnnouncement = activityAnnouncement;
     // An edge observed in this refresh shows in this refresh, not a timer tick later.
     if (this.finished !== finishedBefore) next = derive();
     const needsKey = new Set(next.sections.needs.map(f => f.id));

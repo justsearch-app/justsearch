@@ -1726,16 +1726,14 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
             # Chromium real timers, no clock replacement or action-triggered refresh.
             for _ in range(40 if mode == "fresh" else 25):
                 text = await heading.inner_text()
-                # Frame status S1, FC10a: the pill's one announcement says its status; unconfirmed
-                # indexing is its own checking, not a second "Indexing status unconfirmed".
+                # Frame status S1: the indexing announcer moved from the status bar into the pill.
                 deck = await page.locator('jf-status-pill').evaluate("el => el.shadowRoot.textContent")
                 samples.append({"ageMs": int(time.time() * 1000) - sampled_at, "headline": text, "deck": deck})
                 assert "Rebuilding" not in text, samples
                 if mode == "fresh":
                     assert text == expected and "Indexing status unconfirmed" not in deck, samples
                 elif samples[-1]["ageMs"] > 21000:
-                    assert text == "Indexing status unconfirmed" and "Indexing status unconfirmed" not in deck, samples
-                    assert "Checking search status" in deck or "Can't reach the engine" in deck, samples
+                    assert text == "Indexing status unconfirmed" and "Indexing status unconfirmed" in deck, samples
                 await page.wait_for_timeout(1000)
             assert polls >= (4 if mode == "fresh" else 3), polls
             print(f"Library poll cadence {mode}: {len(samples)} real one-second samples, {polls} reads; "

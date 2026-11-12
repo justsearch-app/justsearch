@@ -446,8 +446,9 @@ export class StatusPill extends JfElement {
           if (record && !record.acknowledged && record.sourceRenderHint !== 'EPHEMERAL') this.store?.acknowledge(record.key);
         }}
         @status-read-all=${() => this.store?.acknowledgeAll()}></jf-status-panel>
-      <jf-system-notice class="visually-hidden" live=${this.status.announcement.politeness}
-        data-testid="verdict-announcer">${this.status.announcement.text}</jf-system-notice>
+      <jf-system-notice class="visually-hidden" live="status" data-testid="indexing-announcer">${this.status.indexingAnnouncement}</jf-system-notice>
+      ${this.status.verdictAnnouncement ? html`<jf-system-notice class="visually-hidden" live=${this.status.verdictAnnouncement.politeness}
+        data-testid="verdict-announcer">${this.status.verdictAnnouncement.text}</jf-system-notice>` : nothing}
       ${keyed(this.status.politeKey, html`<span class="visually-hidden" role="status" aria-live="polite">${this.status.polite}</span>`)}
       ${keyed(this.status.assertiveKey, html`<span class="visually-hidden" role="alert" aria-live="assertive">${this.status.assertive}</span>`)}`;
   }

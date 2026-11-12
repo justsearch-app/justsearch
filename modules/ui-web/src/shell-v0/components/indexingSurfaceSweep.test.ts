@@ -323,7 +323,7 @@ describe('WP3.3 complete surface sweep', () => {
     const state = observe('energy');
     const pill = new StatusPill(); pill.status.ai = state; pill.status.refresh();
     const output = dom(pill.render());
-    expect(output.querySelector('[data-testid="verdict-announcer"]')?.textContent).toContain(expectedReason('energy'));
+    expect(output.querySelector('[data-testid="indexing-announcer"]')?.textContent).toContain(expectedReason('energy'));
     expect(output.querySelector('[data-testid="ai-engine-announcer"]')?.textContent?.trim() ?? '').toBe('');
   });
 

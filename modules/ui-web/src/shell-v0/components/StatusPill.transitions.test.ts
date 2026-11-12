@@ -215,7 +215,7 @@ describe('task rows and announcements moved from the task tray and status bar', 
   it('announces retry waiting with its backlog and deadline', async () => {
     await observe({ status: { worker: { core: { indexState: 'WAITING', pendingJobs: 2, indexHealthy: true },
       failure: { nextRetryAtMs: Date.now() + 60_000 } } } as AiState['status'] });
-    const text = notice('verdict-announcer')!.textContent!;
+    const text = notice('indexing-announcer')!.textContent!;
     expect(text).toContain('Waiting to retry'); expect(text).toContain('2 files waiting'); expect(text).toContain('Next retry');
   });
 });
