@@ -9,7 +9,7 @@ author-session: p2-intent-builder-20261110
 
 Owner agreement, 2026-11-02: "i agree with your recommendations." Only the adopted interrupted-import recommendation below is owner-adopted; all detailed I/N scenario choices are delegated-choice. No product or test source is changed by this record. Original case numbers refer to the 22-case disposition supplied with the assignment. Case 9 (cancellationCannotRecreateProgressAfterAnEnumerationHasStarted) keeps its original oracle and is exercised by the required suite; it has no changed expectation. New files are gate-exempt and remain subject to independent verification.
 
-Execution evidence is written by run-evidence.mjs (fail-before with gates/test-intent/compat/p2-interrupted-imports-before.patch); acceptance is intentionally empty.
+Execution evidence is written by run-evidence.mjs. The original repaired checks use gates/test-intent/compat/p2-interrupted-imports-before.patch against their original before revision 982069c83b34cd56e01332283e95ae3d10c08ae3 (origin/main in the isolated evidence clone). I18 uses gates/test-intent/compat/p2-i18-confirmed-counts-before.patch against HEAD, removing only commit 9273dbb240's coordinator change while retaining the current test source. The existing acceptance records are retained for independent re-review.
 
 ```json
 {
@@ -375,7 +375,7 @@ Execution evidence is written by run-evidence.mjs (fail-before with gates/test-i
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/p2-interrupted-imports.json",
+      "evidence": "gates/test-intent/evidence/p2-interrupted-imports-repaired.json",
       "newChecks": [
         "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java#replacementRevalidatesPersistedParentAndChildInsteadOfCachedAuthority"
       ],
@@ -513,7 +513,7 @@ Execution evidence is written by run-evidence.mjs (fail-before with gates/test-i
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/p2-interrupted-imports.json",
+      "evidence": "gates/test-intent/evidence/p2-interrupted-imports-repaired.json",
       "newChecks": [
         "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java#freshOriginWriteFailureRetainsTheImportAndAcceptedChild"
       ],
@@ -630,7 +630,7 @@ Execution evidence is written by run-evidence.mjs (fail-before with gates/test-i
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/p2-interrupted-imports.json",
+      "evidence": "gates/test-intent/evidence/p2-interrupted-imports-repaired.json",
       "newChecks": [
         "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java#malformedRefusalWitnessCannotFallBackToCurrentAuthority"
       ],
@@ -798,6 +798,109 @@ Execution evidence is written by run-evidence.mjs (fail-before with gates/test-i
       "evidence": "gates/test-intent/evidence/p2-interrupted-imports.json",
       "newChecks": [
         "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/CoreOperationCatalogTest.java#definitionsContainTheExpectedSeedEntries"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java"
+      ],
+      "class": "New",
+      "behaviour": "I18: successful and failed issued claims count only after confirmation, including completed earlier roots exactly once. Parent and child interruption state, cursor and approval stay unchanged; an unchanged maintenance pass writes no counts; Resume issues only pending work and never doubles totals.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "Import interrupted by a crash: resume automatically for exactly the folders originally approved; if that approval was session-only, show it as interrupted with a resume action; never silently drop.",
+          "delegationLocation": "task t-20261102-redesign request",
+          "delegationScope": "Orchestrator-settled P2 scenario I18 supplied in this assignment; this is delegated intent, not a verbatim owner-authored scenario.",
+          "choice": "I18: while an import is interrupted, work that the worker had already been given and then confirms is counted in the import's visible totals, durably and exactly once; the interruption cursor and state stay unchanged; unchanged totals are not rewritten; after restart or Resume the totals are not doubled.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/p2-i18-confirmed-counts.json",
+      "newChecks": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java#latchedDrainCountsOnlyConfirmedWorkWithoutRewritingAndResumesOnce"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java"
+      ],
+      "class": "New",
+      "behaviour": "I18: successful and failed confirmations while interrupted survive both operation and queue stores reopening under new owners. Parent and child counts, interruption records and walk progress are unchanged after repeated maintenance; pending work remains blocked without re-enumeration or double counting.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "Import interrupted by a crash: resume automatically for exactly the folders originally approved; if that approval was session-only, show it as interrupted with a resume action; never silently drop.",
+          "delegationLocation": "task t-20261102-redesign request",
+          "delegationScope": "Orchestrator-settled P2 scenario I18 supplied in this assignment; this is delegated intent, not a verbatim owner-authored scenario.",
+          "choice": "I18: while an import is interrupted, work that the worker had already been given and then confirms is counted in the import's visible totals, durably and exactly once; the interruption cursor and state stay unchanged; unchanged totals are not rewritten; after restart or Resume the totals are not doubled.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/p2-i18-confirmed-counts.json",
+      "newChecks": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java#latchedDrainCountsSurviveBothStoresReopeningWithoutDoubling"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java"
+      ],
+      "class": "New",
+      "behaviour": "I18: work confirmed after a checkpoint-write interruption is counted in parent and child totals even while the worker or generation is unavailable. State and interruption cursors stay unchanged, pending work stays blocked, and repeated maintenance does not rewrite unchanged totals.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "Import interrupted by a crash: resume automatically for exactly the folders originally approved; if that approval was session-only, show it as interrupted with a resume action; never silently drop.",
+          "delegationLocation": "task t-20261102-redesign request",
+          "delegationScope": "Orchestrator-settled P2 scenario I18 supplied in this assignment; this is delegated intent, not a verbatim owner-authored scenario.",
+          "choice": "I18: while an import is interrupted, work that the worker had already been given and then confirms is counted in the import's visible totals, durably and exactly once; the interruption cursor and state stay unchanged; unchanged totals are not rewritten; after restart or Resume the totals are not doubled.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/p2-i18-confirmed-counts.json",
+      "newChecks": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java#interruptedDrainCountsWhileWorkerOrGenerationIsUnavailable"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/registry/validator/ValidatorRunnerTest.java"
+      ],
+      "class": "Structural rule kept",
+      "rule": "Every selected registry shape validator reports zero ERROR findings against the core, agent-tools and composed catalogs, including resolving each declared executor binding to its registered handler.",
+      "whySurvives": "Only the core.resume-import and core.cancel-import fixture handler registrations are added, mirroring the production registrations. Validator selection, catalogs, observation, assertions and the projected-workflow coverage guard are unchanged. No operation is excluded or allowed to bypass a validator."
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/resources/registry/emitter/ui-operation-wire.golden.json"
+      ],
+      "class": "New",
+      "behaviour": "Expose core.resume-import and core.cancel-import as USER operations with only a UI executor, MEDIUM risk, inline confirmation, metadata-only audit, no undo, derived label/description keys and core provenance version 1.0. Resume accepts exactly a 36-character operationKey and an integer interruptionRevision of at least 1; Cancel accepts exactly a 36-character operationKey. Both reject additional input properties, declare empty result/errors/uiHints, availability, lineage and consumers, and no inverse operation. All pre-existing wire entries retain their expectations.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "Resume requires fresh approval of the original plan; rejection, dismissal or a direct unapproved call changes nothing. A persisted session label never authorizes.",
+          "delegationLocation": "task t-20261102-redesign request",
+          "delegationScope": "Orchestrator-settled P2 scenario I5 supplied in this assignment; this is delegated intent, not a verbatim owner-authored scenario.",
+          "choice": "Expose core.resume-import and core.cancel-import as USER operations with only a UI executor, MEDIUM risk, inline confirmation, metadata-only audit, no undo, derived label/description keys and core provenance version 1.0. Resume accepts exactly a 36-character operationKey and an integer interruptionRevision of at least 1; Cancel accepts exactly a 36-character operationKey. Both reject additional input properties, declare empty result/errors/uiHints, availability, lineage and consumers, and no inverse operation. All pre-existing wire entries retain their expectations.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "Cancel racing Resume, then restart: cancel wins and drains safely; no later automatic restart.",
+          "delegationLocation": "task t-20261102-redesign request",
+          "delegationScope": "Orchestrator-settled P2 scenario I14 supplied in this assignment; this is delegated intent, not a verbatim owner-authored scenario.",
+          "choice": "Expose core.resume-import and core.cancel-import as USER operations with only a UI executor, MEDIUM risk, inline confirmation, metadata-only audit, no undo, derived label/description keys and core provenance version 1.0. Resume accepts exactly a 36-character operationKey and an integer interruptionRevision of at least 1; Cancel accepts exactly a 36-character operationKey. Both reject additional input properties, declare empty result/errors/uiHints, availability, lineage and consumers, and no inverse operation. All pre-existing wire entries retain their expectations.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/p2-operation-registration.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/registry/emitter/UIOperationViewConformanceTest.java#coreOperationWireMatchesGolden"
       ]
     }
   ]

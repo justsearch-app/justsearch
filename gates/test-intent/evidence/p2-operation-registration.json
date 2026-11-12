@@ -1,0 +1,127 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-12T02:40:42.470Z",
+  "revision": "8d7e65b2822371bea1f4271e8b32b894f34679c0",
+  "tree": "b5eafef6ee004a8bdcb28d54ea989cd5fc1611ae",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.registry.validator.ValidatorRunnerTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4290
+    },
+    {
+      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.registry.emitter.UIOperationViewConformanceTest.coreOperationWireMatchesGolden\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4638
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/registry/emitter/UIOperationViewConformanceTest.java#coreOperationWireMatchesGolden",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/registry/emitter/UIOperationViewConformanceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:cfc429b85dbe0d040048c849450e487e64d2ea969a64396a051c35107b3d2aeb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the emitted core-operation wire matches the committed golden",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/registry/validator/ValidatorRunnerTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/registry/validator/ValidatorRunnerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:93afcafc5a4be471d2984af352eb5168542e70941bfd4d3383800dffc5046a27",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] io.justsearch.app.services.registry.validator.RiskAuditValidator@634aa81e",
+          "status": "passed"
+        },
+        {
+          "name": "[2] io.justsearch.app.services.registry.validator.ConfirmValidator@49cb5030",
+          "status": "passed"
+        },
+        {
+          "name": "[3] io.justsearch.app.services.registry.validator.ExecutorBindingValidator@5f883d90",
+          "status": "passed"
+        },
+        {
+          "name": "[4] io.justsearch.app.services.registry.validator.NamespacingValidator@5cc3e49b",
+          "status": "passed"
+        },
+        {
+          "name": "[5] io.justsearch.app.services.registry.validator.I18nKeyValidator@7d88fa9c",
+          "status": "passed"
+        },
+        {
+          "name": "[1] io.justsearch.app.services.registry.validator.RiskAuditValidator@2ab9e43e",
+          "status": "passed"
+        },
+        {
+          "name": "[2] io.justsearch.app.services.registry.validator.ConfirmValidator@9f0fc36",
+          "status": "passed"
+        },
+        {
+          "name": "[3] io.justsearch.app.services.registry.validator.ExecutorBindingValidator@5a06904",
+          "status": "passed"
+        },
+        {
+          "name": "[4] io.justsearch.app.services.registry.validator.NamespacingValidator@1b4a3a1",
+          "status": "passed"
+        },
+        {
+          "name": "[5] io.justsearch.app.services.registry.validator.I18nKeyValidator@786a3477",
+          "status": "passed"
+        },
+        {
+          "name": "[1] io.justsearch.app.services.registry.validator.RiskAuditValidator@ce561cc",
+          "status": "passed"
+        },
+        {
+          "name": "[2] io.justsearch.app.services.registry.validator.ConfirmValidator@667797f",
+          "status": "passed"
+        },
+        {
+          "name": "[3] io.justsearch.app.services.registry.validator.ExecutorBindingValidator@46ea78f0",
+          "status": "passed"
+        },
+        {
+          "name": "[4] io.justsearch.app.services.registry.validator.NamespacingValidator@6598caab",
+          "status": "passed"
+        },
+        {
+          "name": "[5] io.justsearch.app.services.registry.validator.I18nKeyValidator@52ca0ad4",
+          "status": "passed"
+        },
+        {
+          "name": "composedCatalogActuallyCoversProjectedWorkflowTools()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:4b8c62349c1d8387726fe4127640cf04f8b592ad4f83db78dc137a028fee7577"
+}
