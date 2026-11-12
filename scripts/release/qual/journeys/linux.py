@@ -428,6 +428,8 @@ return {typed,blocked,operationKeys};
                 try:
                     run.wd.keys('input[data-testid="authorization-typed-input"]', 'core.activate-installed-models')
                     run.wd.click('button[aria-label="Approve"]')
+                except RunStopped:
+                    raise
                 except Infrastructure as exc:
                     observations.append({'interactionError': str(exc)})
                     # keys/click may exhaust their own timeout as the prompt
@@ -450,6 +452,8 @@ return {typed,blocked,operationKeys};
     run.wd.click('button[aria-label="Activate downloaded models"]')
     try:
         path = wait_for(consent, 'Activation typed authorization', seconds=30, error=Infrastructure)
+    except RunStopped:
+        raise
     except (Infrastructure, AssertionError) as exc:
         if last_failure:
             raise Infrastructure('Activation typed authorization did not settle; last observation: '
