@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
   },
-  "createdAt": "2026-11-11T22:38:44.335Z",
-  "revision": "6c718b9b8d13fa334d1d94b9897a4667d3311a39",
-  "tree": "1dde2bc549a8d3c7ee46a39a4c77c511070f9f7d",
+  "createdAt": "2026-11-12T01:11:36.290Z",
+  "revision": "5caec23f136e7e63d7f6ed2cb0d2d7c4bbedefb3",
+  "tree": "7731b4eace85e32f4f71dc496499b6b795a96009",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.scroll-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/tmp/test-intent-vitest-518430-1794436682635.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.scroll-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/wkihx4tu/tmp/test-intent-vitest-4-1794445854140.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 41698
+      "durationMs": 42149
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.scroll-lockdown.test.ts#at 1280×720, one scroller holds the Activity feed, and the wheel, touch and keys reach both ends",
       "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.scroll-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:767917e0d909895ae70f1e6141964a0ae57caafc4b9166ab64d15ffd7653e3e6",
+      "contentDigest": "sha256:908d50534739ade57c56d3d79d11f277b033102660a428465a251f03e1cd68f9",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.scroll-lockdown.test.ts#at 600×400 with 200% text, one scroller holds the Activity feed, and the wheel, touch and keys reach both ends",
       "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.scroll-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:767917e0d909895ae70f1e6141964a0ae57caafc4b9166ab64d15ffd7653e3e6",
+      "contentDigest": "sha256:908d50534739ade57c56d3d79d11f277b033102660a428465a251f03e1cd68f9",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -57,5 +57,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:f0042eaab48fc3c118e1a838146beb3d71cdc71518854e64c0e6c5437c26833c"
+  "digest": "sha256:725238a7e8088343a08cd742d5a2e2d76336c4a2a116aec8499f21e435b71095"
 }

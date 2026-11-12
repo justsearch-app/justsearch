@@ -744,6 +744,26 @@ Repair after the real-Engine recheck and verification of 2026-11-12 (design choi
         "modules/ui-web/src/shell-v0/views/ActivitySurface.details-integrity-lockdown.test.ts#A7: the keyboard stays on a selected running operation when its completed record joins it past five newer ones"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.scroll-lockdown.test.ts"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "Before the first scroller measurement in the wheel, touch and keys case at both sizes, poll for exactly one scroller for up to 15 seconds after the virtualizer has received its items. The count assertion failure message now includes the feed and every ancestor across shadow roots and slots (tag, class, computed overflowY and display, clientHeight and scrollHeight), viewport size, devicePixelRatio and virtualizer item count. The whole oracle is kept: exactly one scroller, geometry, wheel, touch, keyboard, focus and Health/Logs assertions and their expected values remain unchanged.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "the shell redesign's slices including Settings and secondary pages",
+          "label": "agent choice",
+          "choice": "Wait up to 15 seconds for exactly one ancestor scroller before the first Activity feed measurement, then retain the entire scrolling oracle and enrich only the count failure message with layout diagnostics. This applies the flaky-check rule in docs/reference/contributing/development-philosophy.md: fix a red/flaky verification command rather than leave it red; no check is weakened, skipped or quarantined."
+        }
+      ]
     }
   ]
 }
