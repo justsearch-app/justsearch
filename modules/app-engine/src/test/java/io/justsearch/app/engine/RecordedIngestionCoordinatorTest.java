@@ -1881,6 +1881,231 @@ final class RecordedIngestionCoordinatorTest {
     }
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void latchedDrainCountsOnlyConfirmedWorkWithoutRewritingAndResumesOnce(boolean failed) throws Exception {
+    try (Fixture f = new Fixture(temp, 2)) {
+      var generation = new AtomicReference<>(GENERATION);
+      f.attachment.close();
+      f.attachment = f.coordinator.attach(f.queue, () -> Optional.of(generation.get()), () -> true);
+      var starts = new AtomicInteger();
+      bindProducer(f.coordinator, (plan, key, epoch, context, cancellation) -> {
+        starts.incrementAndGet();
+        Path root = plan.roots().getFirst().path();
+        f.queue.enqueueRecordedEntries(key, epoch, List.of(
+            JobQueue.EnqueueEntry.ofUnknownSize(root.resolve("issued.txt")),
+            JobQueue.EnqueueEntry.ofUnknownSize(root.resolve("pending.txt"))), null);
+        return CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.COMPLETE);
+      });
+      var request = f.request();
+      var accepted = f.accept(request);
+      try (var work = f.admission.admit(request.context(), false)) {
+        f.runner.start(accepted, handle -> f.coordinator.execute(handle, work.context()));
+      }
+      // Finish the first root so the parent must include prior roots exactly once.
+      for (var claim : f.queue.pollPending(2)) finishIssuedClaim(f.queue, claim, false);
+      f.coordinator.maintain();
+      assertEquals(2, starts.get());
+      var issued = f.queue.pollPending(1).getFirst();
+      var child = f.operations.find(issued.scanId()).orElseThrow();
+      assertEquals(2, f.operations.find(request.key()).orElseThrow().unitsCompleted());
+      generation.set("replacement-generation");
+      f.coordinator.maintain();
+      var interrupted = f.operations.find(request.key()).orElseThrow();
+      var interruptedChild = f.operations.find(child.key()).orElseThrow();
+      var approval = f.operations.importApprovalState(interrupted.id()).orElseThrow();
+      assertRetainedImport(f.coordinator, f.operations, request.key(), "RECOVERY_GENERATION_MISMATCH");
+      assertEquals(2, interrupted.unitsCompleted(), "an issued claim is not confirmed work");
+      assertEquals(0, interrupted.unitsFailed());
+      finishIssuedClaim(f.queue, issued, failed);
+      f.coordinator.maintain();
+      var counted = f.operations.find(request.key()).orElseThrow();
+      var countedChild = f.operations.find(child.key()).orElseThrow();
+      long completed = failed ? 0 : 1;
+      long failures = failed ? 1 : 0;
+      assertEquals(2 + completed, counted.unitsCompleted());
+      assertEquals(failures, counted.unitsFailed());
+      assertEquals(completed, countedChild.unitsCompleted());
+      assertEquals(failures, countedChild.unitsFailed());
+      assertEquals(interrupted.state(), counted.state());
+      assertEquals(interruptedChild.state(), countedChild.state());
+      assertEquals(interrupted.checkpointCursor(), counted.checkpointCursor());
+      assertEquals(interruptedChild.checkpointCursor(), countedChild.checkpointCursor());
+      assertEquals(approval, f.operations.importApprovalState(interrupted.id()).orElseThrow());
+      var walk = f.queue.recordedWalk(child.key()).orElseThrow();
+      assertEquals(completed, walk.completedUnits());
+      assertEquals(failures, walk.failedUnits());
+      assertNull(walk.sealedAt());
+      assertEquals(1, f.queue.jobStateCounts().pendingCount());
+      assertTrue(f.queue.pollPending(1).isEmpty());
+      // Count writes are observable even if the clock returns the same millisecond.
+      try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + temp.resolve("operations.db"));
+          var statement = connection.createStatement()) {
+        statement.executeUpdate("CREATE TRIGGER reject_count_rewrite BEFORE UPDATE OF units_completed, units_failed ON operations BEGIN SELECT RAISE(FAIL,'unexpected count write'); END");
+        f.coordinator.maintain();
+        assertRetainedImport(f.coordinator, f.operations, request.key(), "RECOVERY_GENERATION_MISMATCH");
+        assertEquals(counted, f.operations.find(request.key()).orElseThrow());
+        assertEquals(countedChild, f.operations.find(child.key()).orElseThrow());
+        assertEquals(approval, f.operations.importApprovalState(interrupted.id()).orElseThrow());
+        assertEquals(walk, f.queue.recordedWalk(child.key()).orElseThrow());
+        statement.executeUpdate("DROP TRIGGER reject_count_rewrite");
+      }
+      generation.set(GENERATION);
+      dispatchResume(f, capacityDispatcher(f), request.key());
+      assertTrue(f.coordinator.interruptedImports().isEmpty());
+      assertEquals(2, starts.get(), "closed roots do not enumerate again on Resume");
+      var remaining = f.queue.pollPending(10);
+      assertEquals(1, remaining.size(), "Resume must not issue the committed file again");
+      assertEquals(issued.path().getParent().resolve("pending.txt"), remaining.getFirst().path());
+      finishIssuedClaim(f.queue, remaining.getFirst(), false);
+      f.coordinator.maintain();
+      var finished = f.operations.find(request.key()).orElseThrow();
+      assertTrue(finished.state().terminal());
+      assertEquals(3 + completed, finished.unitsCompleted());
+      assertEquals(failures, finished.unitsFailed());
+      assertEquals(1 + completed, f.operations.find(child.key()).orElseThrow().unitsCompleted());
+      assertEquals(failures, f.operations.find(child.key()).orElseThrow().unitsFailed());
+      assertTrue(f.queue.pollPending(1).isEmpty());
+      assertEquals(0, f.admission.activeWorkCount());
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void latchedDrainCountsSurviveBothStoresReopeningWithoutDoubling(boolean failed) throws Exception {
+    String parentKey;
+    String childKey;
+    OperationRecord counted;
+    OperationRecord countedChild;
+    JobQueue.WalkProgress walk;
+    try (Fixture f = new Fixture(temp, 1)) {
+      var generation = new AtomicReference<>(GENERATION);
+      f.attachment.close();
+      f.attachment = f.coordinator.attach(f.queue, () -> Optional.of(generation.get()), () -> true);
+      bindProducer(f.coordinator, (plan, key, epoch, context, cancellation) -> {
+        Path root = plan.roots().getFirst().path();
+        f.queue.enqueueRecordedEntries(key, epoch, List.of(
+            JobQueue.EnqueueEntry.ofUnknownSize(root.resolve("issued.txt")),
+            JobQueue.EnqueueEntry.ofUnknownSize(root.resolve("pending.txt"))), null);
+        return CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.COMPLETE);
+      });
+      var request = f.request();
+      parentKey = request.key();
+      var accepted = f.accept(request);
+      try (var work = f.admission.admit(request.context(), false)) {
+        f.runner.start(accepted, handle -> f.coordinator.execute(handle, work.context()));
+      }
+      var issued = f.queue.pollPending(1).getFirst();
+      childKey = issued.scanId();
+      generation.set("replacement-generation");
+      f.coordinator.maintain();
+      finishIssuedClaim(f.queue, issued, failed);
+      f.coordinator.maintain();
+      counted = f.operations.find(parentKey).orElseThrow();
+      countedChild = f.operations.find(childKey).orElseThrow();
+      walk = f.queue.recordedWalk(childKey).orElseThrow();
+      assertEquals(failed ? 0 : 1, counted.unitsCompleted());
+      assertEquals(failed ? 1 : 0, counted.unitsFailed());
+      assertEquals(counted.unitsCompleted(), countedChild.unitsCompleted());
+      assertEquals(counted.unitsFailed(), countedChild.unitsFailed());
+    }
+    try (var operations = new SqliteOperationStore(temp.resolve("operations.db"))) {
+      var runner = new OperationAttemptRunnerImpl(operations, CLOCK,
+          Set.of(OperationKind.INGEST, OperationKind.REINDEX, OperationKind.ACCEPT_GAPS), null, new RecordedIngestPlanResolver());
+      var admission = new EngineAdmissionController(2, 2, 1);
+      var recovered = new RecordedIngestionCoordinator(operations, runner, admission,
+          OperationAuthority.load(temp.resolve("authority")));
+      try (var queue = new SqliteJobQueue(temp.resolve("jobs.db"), recovered::recordedClaimDecision)) {
+        queue.open();
+        try (var attachment = recovered.attach(queue, () -> Optional.of(GENERATION), () -> true)) {
+          assertNotNull(attachment);
+          bindProducer(recovered, (plan, key, epoch, context, cancellation) -> {
+            throw new AssertionError("a latched import must not enumerate after restart");
+          });
+          recovered.maintain(); recovered.maintain();
+          assertRetainedImport(recovered, operations, parentKey, "RECOVERY_GENERATION_MISMATCH");
+          assertEquals(counted, operations.find(parentKey).orElseThrow());
+          assertEquals(countedChild, operations.find(childKey).orElseThrow());
+          assertEquals(walk, queue.recordedWalk(childKey).orElseThrow());
+          assertEquals(1, queue.jobStateCounts().pendingCount());
+          assertTrue(queue.pollPending(1).isEmpty());
+          assertEquals(0, admission.activeWorkCount());
+        }
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void interruptedDrainCountsWhileWorkerOrGenerationIsUnavailable(boolean missingGeneration) throws Exception {
+    try (Fixture f = new Fixture(temp, 1)) {
+      var available = new AtomicBoolean(true);
+      f.attachment.close();
+      f.attachment = f.coordinator.attach(f.queue,
+          () -> !available.get() && missingGeneration ? Optional.empty() : Optional.of(GENERATION),
+          () -> available.get() || missingGeneration);
+      var exit = new CompletableFuture<JobQueue.WalkEnumerationOutcome>();
+      bindProducer(f.coordinator, (plan, key, epoch, context, cancellation) -> {
+        Path root = plan.roots().getFirst().path();
+        f.queue.enqueueRecordedEntries(key, epoch, List.of(
+            JobQueue.EnqueueEntry.ofUnknownSize(root.resolve("issued.txt")),
+            JobQueue.EnqueueEntry.ofUnknownSize(root.resolve("pending.txt"))), null);
+        return exit;
+      });
+      var request = f.request();
+      var accepted = f.accept(request);
+      try (var work = f.admission.admit(request.context(), false)) {
+        f.runner.start(accepted, handle -> f.coordinator.execute(handle, work.context()));
+      }
+      var issued = f.queue.pollPending(1).getFirst();
+      // A failed checkpoint interrupts the live owner without revoking its approval.
+      // Unavailable runtime services then keep that owner in the recovery Wait path.
+      try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + temp.resolve("operations.db"));
+          var statement = connection.createStatement()) {
+        statement.executeUpdate("CREATE TRIGGER refuse_checkpoint BEFORE UPDATE OF units_completed ON operations BEGIN SELECT RAISE(FAIL,'checkpoint unavailable'); END");
+        f.coordinator.maintain();
+        statement.executeUpdate("DROP TRIGGER refuse_checkpoint");
+      }
+      assertRetainedImport(f.coordinator, f.operations, request.key(), "RECOVERY_WRITE_UNAVAILABLE");
+      var interrupted = f.operations.find(request.key()).orElseThrow();
+      var interruptedChild = f.operations.find(issued.scanId()).orElseThrow();
+      available.set(false);
+      finishIssuedClaim(f.queue, issued, false);
+      f.coordinator.maintain();
+      var counted = f.operations.find(request.key()).orElseThrow();
+      var countedChild = f.operations.find(issued.scanId()).orElseThrow();
+      assertRetainedImport(f.coordinator, f.operations, request.key(), "RECOVERY_WRITE_UNAVAILABLE");
+      assertEquals(1, counted.unitsCompleted());
+      assertEquals(0, counted.unitsFailed());
+      assertEquals(1, countedChild.unitsCompleted());
+      assertEquals(0, countedChild.unitsFailed());
+      assertEquals(interrupted.state(), counted.state());
+      assertEquals(interruptedChild.state(), countedChild.state());
+      assertEquals(interrupted.checkpointCursor(), counted.checkpointCursor());
+      assertEquals(interruptedChild.checkpointCursor(), countedChild.checkpointCursor());
+      assertEquals(1, f.queue.recordedWalk(issued.scanId()).orElseThrow().completedUnits());
+      assertTrue(f.queue.pollPending(1).isEmpty());
+      assertEquals(1, f.queue.jobStateCounts().pendingCount());
+      f.coordinator.maintain();
+      assertEquals(counted, f.operations.find(request.key()).orElseThrow());
+      assertEquals(countedChild, f.operations.find(issued.scanId()).orElseThrow());
+      exit.complete(JobQueue.WalkEnumerationOutcome.CANCELLED);
+    }
+  }
+
+  private static void finishIssuedClaim(SqliteJobQueue queue, JobQueue.IndexJob claim, boolean failed) {
+    if (failed) {
+      assertTrue(queue.markClaimFailed(claim, io.justsearch.indexerworker.ingest.IngestionOutcome.of(
+          io.justsearch.indexerworker.ingest.IngestionOutcomeClass.PARSER_FAILED, "PARSER_FAILED",
+          io.justsearch.indexerworker.ingest.IngestionRetryPolicy.NONE), null));
+    } else {
+      queue.markDoneTransitions(List.of(new JobQueue.IngestionLedgerTransition(claim, null, "a".repeat(64))),
+          io.justsearch.indexerworker.ingest.IngestionOutcome.of(
+              io.justsearch.indexerworker.ingest.IngestionOutcomeClass.SUCCESS_FULL, "SUCCESS",
+              io.justsearch.indexerworker.ingest.IngestionRetryPolicy.NONE));
+    }
+  }
+
   @ParameterizedTest(name = "{displayName} [{index}] {arguments}")
   @ValueSource(strings = {"ingest-refusal:2:RECOVERY_GENERATION_MISMATCH", "ingest-refusal:1:UNKNOWN", "ingest-refusal:1:RECOVERY_GENERATION_MISMATCH"})
   void malformedRefusalWitnessCannotFallBackToCurrentAuthority(String marker) throws Exception {

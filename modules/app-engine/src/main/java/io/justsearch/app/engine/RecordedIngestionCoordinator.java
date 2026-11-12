@@ -979,6 +979,11 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     var decision = importRecovery(parent.row, parent.preparation, physical);
     if (decision instanceof RecordedIngestRecoveryDecision.Refused refused) {
       interrupt(parent.row, refused.receipt().code());
+    }
+    if (parent.interrupted && parent.child != null) {
+      checkpointLive(parent, parent.child, operations.find(parent.child.row.key()).orElseThrow(), physical);
+    }
+    if (decision instanceof RecordedIngestRecoveryDecision.Refused) {
       Child child = parent.child;
       if (child != null && (child.exit == null || child.exit.isDone())
           && !physical.queue.hasIssuedRecordedClaims(child.row.key())) {
@@ -1654,21 +1659,27 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
 
   private void checkpointLive(Parent parent, Child child, OperationRecord row, Attached physical) {
     try {
-      var progress = physical.queue.recordedWalk(row.key()).orElseThrow(
+      var observed = physical.queue.recordedWalk(row.key());
+      if (parent.interrupted && child.createIfMissing && observed.isEmpty()) return;
+      var progress = observed.orElseThrow(
           () -> new JobQueue.RecordedWalkGapException("Live recorded progress disappeared"));
       if (!planHash(child.plan).equals(progress.planHash()) || progress.completedUnits() < row.unitsCompleted()
           || progress.failedUnits() < row.unitsFailed()) {
         throw new JobQueue.RecordedWalkGapException("Live recorded progress contradicted its operation");
       }
-      String cursor = "ingest-progress:1:" + progress.revision();
-      if (progress.sealedAt() == null && !cursor.equals(row.checkpointCursor())) {
+      String cursor = parent.interrupted ? row.checkpointCursor() : "ingest-progress:1:" + progress.revision();
+      boolean countsChanged = progress.completedUnits() != row.unitsCompleted() || progress.failedUnits() != row.unitsFailed();
+      if (!row.state().terminal() && progress.sealedAt() == null
+          && (parent.interrupted ? countsChanged : !cursor.equals(row.checkpointCursor()))) {
         child.handle.checkpoint(cursor, progress.completedUnits(), progress.failedUnits());
       }
       var parentRow = operations.find(parent.row.key()).orElseThrow();
       long completed = Math.addExact(parent.completed, progress.completedUnits());
       long failed = Math.addExact(parent.failed, progress.failedUnits());
-      if (completed >= parentRow.unitsCompleted() && failed >= parentRow.unitsFailed()) {
-        parent.handle.checkpoint(parentCursor(parentRow, parent.nextRoot), completed, failed);
+      if (completed >= parentRow.unitsCompleted() && failed >= parentRow.unitsFailed()
+          && (!parent.interrupted || completed != parentRow.unitsCompleted() || failed != parentRow.unitsFailed())) {
+        parent.handle.checkpoint(parent.interrupted ? parentRow.checkpointCursor()
+            : parentCursor(parentRow, parent.nextRoot), completed, failed);
       }
     } catch (JobQueue.RecordedWalkGapException unavailable) {
       permissions.remove(row.key());
