@@ -1,0 +1,107 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-12T00:20:27.915Z",
+  "revision": "ac14166633ec2cb4cc21fc7f2d5ebe9a511b656f",
+  "tree": "ee280d111b879337752628a49a08f70d74e980b0",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.details-repair.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/1azc7zu9/tmp/test-intent-vitest-13127-1794442823019.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1679
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-repair.test.ts#an approval is titled in words, in the details and on their tab, and its request names no code",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-repair.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:fc514d5cbafa3629bb0084dec19757ca9c629cc07cd239e3d02b64127dd799e1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "decision 2026-11-11 — the details pane builds nothing from a raw code an approval is titled in words, in the details and on their tab, and its request names no code",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-repair.test.ts#a successful receipt has no code line",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-repair.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:fc514d5cbafa3629bb0084dec19757ca9c629cc07cd239e3d02b64127dd799e1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "decision 2026-11-11 — the details pane builds nothing from a raw code a successful receipt has no code line",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-repair.test.ts#what this window recorded names the operation by its label, and an export is titled Copy to clipboard",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-repair.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:fc514d5cbafa3629bb0084dec19757ca9c629cc07cd239e3d02b64127dd799e1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "decision 2026-11-11 — the details pane builds nothing from a raw code what this window recorded names the operation by its label, and an export is titled Copy to clipboard",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "ac14166633",
+    "revision": "ac14166633ec2cb4cc21fc7f2d5ebe9a511b656f",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.details-repair.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/1azc7zu9/tmp/test-intent-vitest-13127-1794442825995.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1699,
+        "output": "JSON report written to /home/elias/.cache/am/1azc7zu9/tmp/test-intent-vitest-13127-1794442825995.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-repair.test.ts#an approval is titled in words, in the details and on their tab, and its request names no code",
+        "classification": "assertion",
+        "detail": "decision 2026-11-11 — the details pane builds nothing from a raw code an approval is titled in words, in the details and on their tab, and its request names no code:  AssertionError: expected 'DENIED Rebuild Index (TYPED_CONFIRM)' to be 'Denied: Rebuild Index' // Object.is equality\n    at /home/elias/.cache/am/1azc7zu9/tmp/test-intent-before-brFszn/modules/ui-web/src/shell-v0/views/ActivitySurface.details-repair.test.ts:313:48\n    at file:///home/elias/dev/justse"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-repair.test.ts#a successful receipt has no code line",
+        "classification": "assertion",
+        "detail": "decision 2026-11-11 — the details pane builds nothing from a raw code a successful receipt has no code line:  AssertionError: expected <dd …(1)><span …(1)></span></dd> to be null\n    at /home/elias/.cache/am/1azc7zu9/tmp/test-intent-before-brFszn/modules/ui-web/src/shell-v0/views/ActivitySurface.details-repair.test.ts:329:58\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-activity-details/modu"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-repair.test.ts#what this window recorded names the operation by its label, and an export is titled Copy to clipboard",
+        "classification": "assertion",
+        "detail": "decision 2026-11-11 — the details pane builds nothing from a raw code what this window recorded names the operation by its label, and an export is titled Copy to clipboard:  AssertionError: expected 'Run core.clear-failed-jobs' to be 'Run Clear Failed Jobs' // Object.is equality\n    at /home/elias/.cache/am/1azc7zu9/tmp/test-intent-before-brFszn/modules/ui-web/src/shell-v0/views/ActivitySurface.details-repair.test.ts:339:24\n    at file:///home/elias/dev/justsearch/.clau"
+      }
+    ]
+  },
+  "digest": "sha256:c0b1a7eaec7b5b722923d512b3c351b7fb9447f15dae6c2773bd1a8e56c64013"
+}

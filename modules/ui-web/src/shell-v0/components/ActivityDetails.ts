@@ -161,6 +161,36 @@ function recorderWords(entry: JournalEntry): string {
   return `${words(RECORDER_WORDS, by.tier)}${by.contributorId ? ` (${by.contributorId})` : ''}`;
 }
 
+/**
+ * What the details call a record. The feed's titles are kept where they are words already; an
+ * approval, a permission and an action this window journaled are titled here from their recorded
+ * fields, so no recorded code reads as a word (decision 2026-11-11). An effect another window
+ * recorded keeps the title its backend copy gives: the details hold nothing more to word it from.
+ */
+export function recordTitle(record: SelectedRecord): string {
+  return record.row ? rowTitle(record.row) : record.label;
+}
+
+function rowTitle(row: FeedRow): string {
+  const ledger = row.ledger;
+  if (ledger?.kind === 'gate') {
+    return `${ledger.disposition ? words(GATE_WORDS, ledger.disposition) : 'Approval'}: ${operationWords(ledger.operationId)}`;
+  }
+  if (ledger?.kind === 'grant') {
+    return `${ledger.action ? words(GRANT_WORDS, ledger.action) : 'Permission'}${ledger.subject ? `: ${operationWords(ledger.subject)}` : ''}`;
+  }
+  const effect = row.journal?.effect;
+  // An invocation is titled by its operation already, as the ledger's own operation rows are.
+  if (!effect || effect.kind === 'invoke-operation') return row.entry.label;
+  const decision = row.journal?.pendingOutcome === 'rejected' ? 'Proposal rejected · '
+    : row.journal?.pendingOutcome === 'accepted' ? 'Proposal accepted · ' : '';
+  return `${decision}${present({ kind: 'effect', effect }).label}`;
+}
+
+function operationWords(id: string | undefined): string {
+  return id ? present({ kind: 'operation', id }).label : 'an operation not recorded';
+}
+
 function when(iso: string): string {
   const parsed = new Date(iso);
   return Number.isNaN(parsed.getTime()) ? iso : formatDateTime(parsed);
@@ -285,7 +315,7 @@ export class ActivityDetails extends JfElement {
     const record = this.record;
     if (!record) return nothing;
     return html`<div data-testid="activity-details" data-kind=${record.kind}>
-      <h3 data-testid="activity-details-title">${record.label}</h3>
+      <h3 data-testid="activity-details-title">${recordTitle(record)}</h3>
       ${this.evicted ? html`<p class="evicted" role="status" data-testid="activity-details-evicted">This record is no longer
         among the loaded records. What it showed when it was last loaded is kept below; its actions are not offered.</p>` : nothing}
       ${record.row ? this.renderFacts(record.row) : this.renderGroupFacts(record)}
@@ -348,7 +378,8 @@ export class ActivityDetails extends JfElement {
         <dt>Decision</dt><dd>${GATE_WORDS[ledger.disposition ?? ''] ?? ledger.disposition ?? 'Not recorded'}</dd>
         <dt>Operation</dt><dd>${present({ kind: 'operation', id: ledger.operationId ?? '' }).label}</dd>
         ${ledger.gateBehavior ? html`<dt>Asked as</dt><dd data-testid="activity-details-asked">${words(ASKED_WORDS, ledger.gateBehavior)}</dd>` : nothing}
-        ${ledger.pendingId ? html`<dt>Request</dt><dd>${ledger.pendingId}</dd>` : nothing}
+        ${ledger.pendingId ? html`<dt>Request reference</dt><dd data-testid="activity-details-request">${ledger.pendingId}
+          <span class="note">(for support)</span></dd>` : nothing}
       </dl>`;
     }
     if (ledger?.kind === 'grant') {
@@ -407,7 +438,9 @@ export class ActivityDetails extends JfElement {
       return html`<p class="note" data-testid="activity-details-receipt" data-state="behind">Finished as recorded above; its
         receipt has not caught up yet.</p>`;
     }
-    const code = outcome.result?.code ?? outcome.reason;
+    const recorded = outcome.result?.code ?? outcome.reason;
+    // A success needs no code: a code is kept, for support, only beside something other than success.
+    const code = recorded && !(outcome.state !== 'failed' && recorded === 'SUCCESS') ? recorded : undefined;
     return html`<dl data-testid="activity-details-receipt" data-state=${outcome.state}>
       <dt>Receipt</dt><dd>${RECEIPT_WORDS[outcome.state] ?? outcome.state}${outcome.phase ? ` · ${outcome.phase}` : ''}</dd>
       ${outcome.unitsCompleted !== undefined || outcome.unitsFailed !== undefined ? html`<dt>Items</dt><dd>${
@@ -457,10 +490,10 @@ export class ActivityDetails extends JfElement {
   }
 
   private renderRelated(related: readonly FeedRow[]): TemplateResult {
-    return html`<h4>Same request</h4><ul data-testid="activity-details-related">${related.map((r) => html`<li>${r.entry.label}${
-      r.entry.gate ? ` · ${GATE_WORDS[r.entry.gate.disposition] ?? r.entry.gate.disposition}` : ''}${
-      r.entry.grant ? ` · ${GRANT_WORDS[r.entry.grant.action] ?? r.entry.grant.action}` : ''}${
-      r.entry.outcome ? ` · ${words(OUTCOME_WORDS, r.entry.outcome)}` : ''} · ${when(r.entry.occurredAt)}</li>`)}</ul>`;
+    // An approval's or a permission's title says its decision; only an execution adds how it ended.
+    return html`<h4>Same request</h4><ul data-testid="activity-details-related">${related.map((r) => html`<li>${rowTitle(r)}${
+      r.entry.outcome && r.ledger?.kind !== 'gate' && r.ledger?.kind !== 'grant' ? ` · ${words(OUTCOME_WORDS, r.entry.outcome)}` : ''
+    } · ${when(r.entry.occurredAt)}</li>`)}</ul>`;
   }
 
   /** The agent run a record names, linked only where Activity knows that run. */

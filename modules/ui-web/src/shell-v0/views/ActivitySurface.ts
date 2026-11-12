@@ -34,8 +34,7 @@ import '../components/ActionLedgerView.js';
 import type { ActionLedgerView } from '../components/ActionLedgerView.js';
 import '../components/RunActivity.js';
 import type { RunActivity } from '../components/RunActivity.js';
-import '../components/ActivityDetails.js';
-import type { ActivityDetails } from '../components/ActivityDetails.js';
+import { recordTitle, type ActivityDetails } from '../components/ActivityDetails.js';
 import '../components/detailsPane/DetailsPane.js';
 import type { DetailsPane } from '../components/detailsPane/DetailsPane.js';
 import {
@@ -347,7 +346,8 @@ export class ActivitySurface extends JfElement {
 
   /**
    * Tempdoc 613 §6 — the export confirmation is a receipt flashed in its button, not a window toast.
-   * It is flashed only once the clipboard took the archive; a refused write says so and stays.
+   * It is flashed only once the clipboard took the archive; a refused write says so and stays. Each
+   * attempt withdraws the previous one's receipt, so a refused retry never stands beside "Exported".
    */
   private readonly exportReceipt = new ReceiptController(this);
 
@@ -355,6 +355,7 @@ export class ActivitySurface extends JfElement {
     const entries = this.chosenEntries();
     if (!entries.length) return;
     this.exportFailed = false;
+    this.exportReceipt.clear();
     const copied = await applyClipboardEffect(exportJournalArchive(entries));
     if (!this.isConnected) return;
     if (copied) this.exportReceipt.flash(`Exported ${entries.length} entr${entries.length === 1 ? 'y' : 'ies'}`);
@@ -557,7 +558,7 @@ export class ActivitySurface extends JfElement {
     const chosen = this.chosen.size;
     const pane = html`<jf-details-pane ?overlay=${this.overlay} region-label="Activity details" close-label="Close details"
         data-testid="activity-details-pane"
-        .tabs=${[{ id: DETAILS_TAB, label: record.label }]} .activeTab=${DETAILS_TAB}
+        .tabs=${[{ id: DETAILS_TAB, label: recordTitle(record) }]} .activeTab=${DETAILS_TAB}
         @details-close=${() => this.closeDetails()}>
         <jf-activity-details .record=${record} ?evicted=${this.evicted} api-base=${this.apiBase} .journalSelection=${this.chosen}
           @journal-choose=${(event: CustomEvent<{ id: number; chosen: boolean }>) => this.choose(event.detail.id, event.detail.chosen)}

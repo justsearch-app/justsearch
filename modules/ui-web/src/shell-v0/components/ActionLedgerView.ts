@@ -225,6 +225,8 @@ export class ActionLedgerView extends JfElement {
   private retryHistory: (() => void) | null = null;
   /** The first record on screen before new records arrive, when the reader has scrolled into the list. */
   private readingAnchor: { key: string; top: number } | null = null;
+  /** The record the keyboard was on when an update began, by the key its row was drawn with. */
+  private focusedRecord: string | null = null;
   /** The feed entry Tab lands on: the one last focused, else the newest. */
   private tabStop = 0;
   /** Bumped by each scrolling key and by the reader's own wheel or pointer: the latest one wins. */
@@ -565,6 +567,8 @@ export class ActionLedgerView extends JfElement {
    */
   protected override willUpdate(changed: PropertyValues<this>): void {
     this.readingAnchor = null;
+    const active = (this.renderRoot as ShadowRoot).activeElement;
+    this.focusedRecord = active?.closest<HTMLElement>('.entry')?.dataset.entryKey ?? null;
     const arrivals = changed.has('ledger') || changed.has('history') || changed.has('journal') || changed.has('seed')
       || changed.has('runRecords');
     if (!arrivals || changed.has('filter') || this.getBoundingClientRect().top >= 0) return;
@@ -582,6 +586,8 @@ export class ActionLedgerView extends JfElement {
       this.dispatchEvent(new CustomEvent<{ key: string; record: SelectedRecord | null }>('feed-record',
         { detail: { key: this.selectedKey, record: this.recordFor(this.selectedKey) } }));
     }
+    if (this.focusedRecord !== null) void this.keepFocus(this.focusedRecord);
+    this.focusedRecord = null;
     const anchor = this.readingAnchor;
     if (!anchor) return;
     this.readingAnchor = null;
@@ -720,6 +726,21 @@ export class ActionLedgerView extends JfElement {
     const related = request ? feed.filter((r) => r !== found && r.ledger?.pendingId === request) : [];
     return { key: row.key, kind: 'record', row, label: row.entry.label, occurredAt: row.entry.occurredAt,
       members: [], related, paths };
+  }
+
+  /**
+   * A record that moved in the list keeps the keyboard. A row element moved to its record's new place
+   * (a join that re-keys it and sorts it past newer rows) loses focus on the move, which would leave
+   * the keyboard on the page; once the list has laid out, the keyboard goes back to the same record,
+   * found by the key it was drawn with (now one of its aliases). Focus that went anywhere else stays.
+   */
+  private async keepFocus(key: string): Promise<void> {
+    await this.updateComplete;
+    await this.renderRoot.querySelector<HTMLElement & { updateComplete?: Promise<unknown> }>('lit-virtualizer')?.updateComplete;
+    if (!this.isConnected || (this.renderRoot as ShadowRoot).activeElement) return;
+    const active = deepActiveElement();
+    if (active !== null && active !== document.body) return;
+    await this.focusRecord(key);
   }
 
   /** Put the keyboard on the record `key` (bringing it into the windowed list); false when not shown. */

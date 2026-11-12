@@ -60,6 +60,17 @@ export class ReceiptController implements ReactiveController {
     this.host.requestUpdate();
   }
 
+  /** Withdraw the live receipt: a later attempt at the same action must not stand beside an earlier success. */
+  clear(): void {
+    if (this.timer !== null) {
+      clearTimeout(this.timer);
+      this.timer = null;
+    }
+    if (this._active === null) return;
+    this._active = null;
+    this.host.requestUpdate();
+  }
+
   hostDisconnected(): void {
     if (this.timer !== null) {
       clearTimeout(this.timer);

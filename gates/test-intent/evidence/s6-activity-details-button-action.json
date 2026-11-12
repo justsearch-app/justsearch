@@ -1,0 +1,87 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-12T00:19:58.487Z",
+  "revision": "ac14166633ec2cb4cc21fc7f2d5ebe9a511b656f",
+  "tree": "d71eca54b554e3358d16ab35376f0b4accfda918",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/Button.action.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/1azc7zu9/tmp/test-intent-vitest-12545-1794442795360.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 654
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/Button.action.test.ts#a click runs the action the button was last rendered with, also when nothing else about it changed",
+      "file": "modules/ui-web/src/shell-v0/components/Button.action.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:fd4e6c4a0e3c81849ec45d4f23ea5c061c47bdc01de2484cfcd3671a856a4a01",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a click runs the action the button was last rendered with, also when nothing else about it changed",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/Button.action.test.ts#an action set on the element directly also reaches the click",
+      "file": "modules/ui-web/src/shell-v0/components/Button.action.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:fd4e6c4a0e3c81849ec45d4f23ea5c061c47bdc01de2484cfcd3671a856a4a01",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "an action set on the element directly also reaches the click",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "ac14166633",
+    "revision": "ac14166633ec2cb4cc21fc7f2d5ebe9a511b656f",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/Button.action.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/1azc7zu9/tmp/test-intent-vitest-12545-1794442797616.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 640,
+        "output": "JSON report written to /home/elias/.cache/am/1azc7zu9/tmp/test-intent-vitest-12545-1794442797616.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/components/Button.action.test.ts#a click runs the action the button was last rendered with, also when nothing else about it changed",
+        "classification": "assertion",
+        "detail": "a click runs the action the button was last rendered with, also when nothing else about it changed:  AssertionError: the action given last runs: expected \"vi.fn()\" to be called 1 times, but got 0 times\n    at /home/elias/.cache/am/1azc7zu9/tmp/test-intent-before-k5fdPw/modules/ui-web/src/shell-v0/components/Button.action.test.ts:35:48\n    at processTicksAndRejections (node:internal/process/task_que"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/Button.action.test.ts#an action set on the element directly also reaches the click",
+        "classification": "assertion",
+        "detail": "an action set on the element directly also reaches the click:  AssertionError: expected \"vi.fn()\" to be called 1 times, but got 2 times\n    at /home/elias/.cache/am/1azc7zu9/tmp/test-intent-before-k5fdPw/modules/ui-web/src/shell-v0/components/Button.action.test.ts:49:17\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-activity-details/modules/ui-we"
+      }
+    ]
+  },
+  "digest": "sha256:d0d0c7aae5d176d8fc9e730aef6fa5de9c72a3f2f67502f7d9752908ee729047"
+}

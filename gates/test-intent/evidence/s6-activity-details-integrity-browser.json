@@ -1,0 +1,107 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-12T00:20:50.191Z",
+  "revision": "ac14166633ec2cb4cc21fc7f2d5ebe9a511b656f",
+  "tree": "95ab322ecb061ecdc6a2ceb0d8c5382a147eab25",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.details-integrity-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/1azc7zu9/tmp/test-intent-vitest-13326-1794442830246.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 10317
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-integrity-lockdown.test.ts#going straight from one record's details to another's, Restore to this point and Undo this AI turn preview the record shown",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-integrity-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:2b6f54b2e5fb9571a72897f1d1ab898b07e3c08de6979557dbde7e9dc21fbe36",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "going straight from one record's details to another's, Restore to this point and Undo this AI turn preview the record shown",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-integrity-lockdown.test.ts#going straight from one record's details to another's, Ask the engine to undo names the record shown",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-integrity-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:2b6f54b2e5fb9571a72897f1d1ab898b07e3c08de6979557dbde7e9dc21fbe36",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "going straight from one record's details to another's, Ask the engine to undo names the record shown",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-integrity-lockdown.test.ts#A7: the keyboard stays on a selected running operation when its completed record joins it past five newer ones",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-integrity-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:2b6f54b2e5fb9571a72897f1d1ab898b07e3c08de6979557dbde7e9dc21fbe36",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "A7: the keyboard stays on a selected running operation when its completed record joins it past five newer ones",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "ac14166633",
+    "revision": "ac14166633ec2cb4cc21fc7f2d5ebe9a511b656f",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.details-integrity-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/1azc7zu9/tmp/test-intent-vitest-13326-1794442841824.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 8124,
+        "output": "JSON report written to /home/elias/.cache/am/1azc7zu9/tmp/test-intent-vitest-13326-1794442841824.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-integrity-lockdown.test.ts#going straight from one record's details to another's, Restore to this point and Undo this AI turn preview the record shown",
+        "classification": "assertion",
+        "detail": "going straight from one record's details to another's, Restore to this point and Undo this AI turn preview the record shown:  AssertionError: Restore previews for the record shown: expected null to be 'restore' // Object.is equality\n    at /home/elias/.cache/am/1azc7zu9/tmp/test-intent-before-YSxvyb/modules/ui-web/src/shell-v0/views/ActivitySurface.details-integrity-lockdown.test.ts:260:68\n    at file:///home/elias/dev/jus"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-integrity-lockdown.test.ts#going straight from one record's details to another's, Ask the engine to undo names the record shown",
+        "classification": "assertion",
+        "detail": "going straight from one record's details to another's, Ask the engine to undo names the record shown:  AssertionError: one request, for the execution shown: expected [ 'execution-earlier' ] to deeply equal [ 'execution-shown' ]\n    at /home/elias/.cache/am/1azc7zu9/tmp/test-intent-before-YSxvyb/modules/ui-web/src/shell-v0/views/ActivitySurface.details-integrity-lockdown.test.ts:281:102\n    at file://"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-integrity-lockdown.test.ts#A7: the keyboard stays on a selected running operation when its completed record joins it past five newer ones",
+        "classification": "assertion",
+        "detail": "A7: the keyboard stays on a selected running operation when its completed record joins it past five newer ones:  AssertionError: the keyboard is not left on the page: expected 'body' not to be 'body' // Object.is equality\n    at /home/elias/.cache/am/1azc7zu9/tmp/test-intent-before-YSxvyb/modules/ui-web/src/shell-v0/views/ActivitySurface.details-integrity-lockdown.test.ts:300:68\n    at file:///home/elias/dev/j"
+      }
+    ]
+  },
+  "digest": "sha256:2886048e4456ed9c0dddd07f691e2ae3849a9e526f68c5419f7f660a1bfbccc1"
+}

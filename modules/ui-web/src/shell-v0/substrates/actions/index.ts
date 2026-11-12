@@ -429,18 +429,20 @@ export function applyEffect(
 }
 
 /**
- * The copy-to-clipboard effect applied as {@link applyEffect} applies it — journaled first, written
- * by the one clipboard authority — for a caller that says whether the copy happened: resolves `true`
- * only once the clipboard took the text, `false` when it was refused or there is no clipboard.
- * (`applyEffect` answers before the clipboard does, so its `true` is not a copy.)
+ * The copy-to-clipboard effect, written by the one clipboard authority, for a caller that says
+ * whether the copy happened: resolves `true` only once the clipboard took the text, `false` when it
+ * was refused or there is no clipboard. (`applyEffect` answers before the clipboard does, so its
+ * `true` is not a copy.) The journal records what was done, and it has no way to mark an effect as
+ * refused, so the copy is journaled once the clipboard took it and a refused copy not at all.
  */
-export function applyClipboardEffect(
+export async function applyClipboardEffect(
   text: string,
   invokedBy: Provenance = CORE_PROVENANCE,
   originator: EffectOriginator = 'user',
 ): Promise<boolean> {
-  recordEffect({ kind: 'copy-to-clipboard', text }, invokedBy, { originator });
-  return copyToClipboard(text);
+  const copied = await copyToClipboard(text);
+  if (copied) recordEffect({ kind: 'copy-to-clipboard', text }, invokedBy, { originator });
+  return copied;
 }
 
 /**

@@ -1,0 +1,87 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-12T00:20:20.719Z",
+  "revision": "ac14166633ec2cb4cc21fc7f2d5ebe9a511b656f",
+  "tree": "2d26cd1b0fbd2d84aef1514d6526636b70352efd",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.details-repair.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/1azc7zu9/tmp/test-intent-vitest-12937-1794442815823.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1724
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-repair.test.ts#a refused export right after a successful one withdraws \"Exported\" beside its alert",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-repair.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:fc514d5cbafa3629bb0084dec19757ca9c629cc07cd239e3d02b64127dd799e1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "amendment 14 — an export says only what happened a refused export right after a successful one withdraws \"Exported\" beside its alert",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-repair.test.ts#a refused copy is not recorded as done; a copy the clipboard took is recorded once",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-repair.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:fc514d5cbafa3629bb0084dec19757ca9c629cc07cd239e3d02b64127dd799e1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "amendment 14 — an export says only what happened a refused copy is not recorded as done; a copy the clipboard took is recorded once",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "ac14166633",
+    "revision": "ac14166633ec2cb4cc21fc7f2d5ebe9a511b656f",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.details-repair.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/1azc7zu9/tmp/test-intent-vitest-12937-1794442818852.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1631,
+        "output": "JSON report written to /home/elias/.cache/am/1azc7zu9/tmp/test-intent-vitest-12937-1794442818852.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-repair.test.ts#a refused export right after a successful one withdraws \"Exported\" beside its alert",
+        "classification": "assertion",
+        "detail": "amendment 14 — an export says only what happened a refused export right after a successful one withdraws \"Exported\" beside its alert:  AssertionError: no success stands beside it: expected '✓ Exported 1 entry ✓ Exported 1 entry' not to match /Exported/\n    at /home/elias/.cache/am/1azc7zu9/tmp/test-intent-before-68xzQa/modules/ui-web/src/shell-v0/views/ActivitySurface.details-repair.test.ts:282:64\n    at file:///home/elias/dev/just"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details-repair.test.ts#a refused copy is not recorded as done; a copy the clipboard took is recorded once",
+        "classification": "assertion",
+        "detail": "amendment 14 — an export says only what happened a refused copy is not recorded as done; a copy the clipboard took is recorded once:  AssertionError: a refused copy is not in the journal: expected 1 to be +0 // Object.is equality\n    at /home/elias/.cache/am/1azc7zu9/tmp/test-intent-before-68xzQa/modules/ui-web/src/shell-v0/views/ActivitySurface.details-repair.test.ts:293:62\n    at file:///home/elias/dev/justsearch/.claude/worktre"
+      }
+    ]
+  },
+  "digest": "sha256:124b68217040d6dade36e3266ff6f6ede07214ec234a2d92ea8870a66ea32b0c"
+}

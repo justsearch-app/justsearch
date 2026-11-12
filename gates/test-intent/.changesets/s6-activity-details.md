@@ -19,6 +19,8 @@ Repair after verification v1 (three defects): Escape with the keyboard on the pa
 
 
 Repair after the real-Engine check of 2026-11-12 (five defects; design choices delegated by the user, 2026-11-03: "proceed accordingly. tell me when you need me to juge, try to ask me sparely"): the records chosen for a macro or an export are acted on from controls at the end of the details' scrolling content, not a footer that covered the sheet at 600×400 with 200% text; Export chosen confirms only a copy the clipboard took; Cancel on a preview returns the keyboard to the control that opened it; feed rows keep their element by record identity, so a dialog returning the keyboard returns it to the same record; the details say outcomes, approval kinds and recorders in words and label codes as codes. Its checks fail before at d5d95eb7d6, except the 1280×720 layout check, a preservation check of the same design. Three expected values in ActivitySurface.details.test.ts changed from SUCCESS to Succeeded under the same decision; their evidence was regenerated with its original before-states.
+
+Repair after the real-Engine recheck and verification of 2026-11-12 (design choices delegated by the user, 2026-11-03): the shared jf-button passes its current action to its control, so every details action acts on the record shown after any sequence of selections; the feed keeps the keyboard on a record a join moves past newer rows; an export attempt withdraws an earlier success receipt and a refused copy is not journaled; the details pane titles approvals, permissions and this window's records in words, labels a request identifier for support and shows no code for a success. Its checks fail before at ac14166633. No existing check changed.
 ```json
 {
   "entries": [
@@ -622,6 +624,124 @@ Repair after the real-Engine check of 2026-11-12 (five defects; design choices d
         "modules/ui-web/src/shell-v0/views/ActivitySurface.details-honesty.test.ts#a failed receipt's error code is labelled as a code for support, beside what happened",
         "modules/ui-web/src/shell-v0/views/ActivitySurface.details-honesty.test.ts#a record this window journaled is titled by what it did, and says who recorded it in words",
         "modules/ui-web/src/shell-v0/views/ActivitySurface.details-honesty.test.ts#a plugin that recorded an entry is named with how far it is trusted, not by its raw tier"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/Button.action.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "jf-button runs the action it was last given (safety defect of the real-Engine recheck of 2026-11-12): re-rendered with a new action and nothing else changed, or given one directly, a click runs that action, never the one the button was first drawn with. Both fail before at ac14166633, where the action was a plain field that the composed jf-control received only when another property re-rendered the button.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "Bring the aspects of the UI between the main windows up to date and remove bad practices and code implemented without an overarching design.",
+          "label": "agent choice",
+          "choice": "Fix at the owning layer: jf-button's onActivate is a reactive property, so every user of the shared button passes its current action to jf-control. Callers that pass a new closure each render re-render the button; behaviour is otherwise unchanged (the whole unit suite and the Activity browser suites pass)."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-activity-details-button-action.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/Button.action.test.ts#a click runs the action the button was last rendered with, also when nothing else about it changed",
+        "modules/ui-web/src/shell-v0/components/Button.action.test.ts#an action set on the element directly also reaches the click"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.details-repair.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Safety (A12, A14): every details action acts on the record shown after any sequence of selections. Records chosen one after another without waiting: Ask the engine to undo requests the last one's execution only. A record re-keyed by a join after the details moved to it from another record: the selection follows it and Ask the engine to undo names its execution. After the details moved from another record, Restore to this point and Undo this AI turn preview the record shown. Each fails before at ac14166633, which asked for, or staged a preview of, the record shown earlier.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "Bring the aspects of the UI between the main windows up to date and remove bad practices and code implemented without an overarching design.",
+          "label": "agent choice",
+          "choice": "Every action in the details pane must act on the record currently shown, pinned by the request or preview it produces (live recheck of 2026-11-12, defect 1)."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-activity-details-switch-actions.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.details-repair.test.ts#records chosen one after another without waiting: Ask the engine to undo names the last one",
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.details-repair.test.ts#a record re-keyed by a join after the details moved to it: Ask the engine to undo names it",
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.details-repair.test.ts#Restore to this point and Undo this AI turn, after the details moved from another record, preview the record shown"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.details-repair.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Amendment 14 for Export chosen (verifier F1 and the live recheck of 2026-11-12): an export refused right after a successful one shows its alert with no Exported beside it; a refused copy is not in the effect journal, and a copy the clipboard took is journaled once. Both fail before at ac14166633, which kept the earlier receipt and journaled every copy before the clipboard answered.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "Bring the aspects of the UI between the main windows up to date and remove bad practices and code implemented without an overarching design.",
+          "label": "agent choice",
+          "choice": "Each export attempt withdraws the previous attempt's receipt (ReceiptController.clear). The effect journal has no way to mark an effect refused, so applyClipboardEffect journals the copy once the clipboard took it and a refused copy not at all."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-activity-details-export-retry.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.details-repair.test.ts#a refused export right after a successful one withdraws \"Exported\" beside its alert",
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.details-repair.test.ts#a refused copy is not recorded as done; a copy the clipboard took is recorded once"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.details-repair.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Decision 2026-11-11 for what the details pane builds (live recheck of 2026-11-12): an approval is titled in words (Denied: <operation>), in the details and on their tab; the same request's other approval reads Asked for approval: <operation>, never Not described (code GATED); the request identifier is labelled Request reference (for support); a successful receipt has no code line; an operation this window ran is named by its label (Run <label>) under Recorded in this window; an export record is titled Copy to clipboard. Each fails before at ac14166633.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "Bring the aspects of the UI between the main windows up to date and remove bad practices and code implemented without an overarching design.",
+          "label": "agent choice",
+          "choice": "Titles for approvals, permissions and records this window journaled are built in the details from their recorded fields (recordTitle); feed rows keep their titles (out of scope). The effect projector (present) names invoke- and undo-operation effects by the operation's label, as it already names navigation by the surface's; an effect another window recorded keeps the title its backend copy gives."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-activity-details-pane-words.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.details-repair.test.ts#an approval is titled in words, in the details and on their tab, and its request names no code",
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.details-repair.test.ts#a successful receipt has no code line",
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.details-repair.test.ts#what this window recorded names the operation by its label, and an export is titled Copy to clipboard"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.details-integrity-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "In real Chromium with the real Shell at 1280×720 (live recheck of 2026-11-12, defects 1 and 2): clicking one record and then another directly, Restore to this point and Undo this AI turn preview the record shown, and Ask the engine to undo names its execution; A7: with the keyboard on a selected running operation, five newer operations arrive, then its completed ledger record joins it and sorts it past them, and the keyboard stays on that record (now answering to its operation) instead of dropping to the page. Each fails before at ac14166633.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "Bring the aspects of the UI between the main windows up to date and remove bad practices and code implemented without an overarching design.",
+          "label": "agent choice",
+          "choice": "A7 and amendment 3: the feed keeps the keyboard on a record whose row element a re-render moved (the move blurs it): once the list has laid out, focus that went nowhere returns to the same record by the key it was drawn with."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/s6-activity-details-integrity-browser.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.details-integrity-lockdown.test.ts#going straight from one record's details to another's, Restore to this point and Undo this AI turn preview the record shown",
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.details-integrity-lockdown.test.ts#going straight from one record's details to another's, Ask the engine to undo names the record shown",
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.details-integrity-lockdown.test.ts#A7: the keyboard stays on a selected running operation when its completed record joins it past five newer ones"
       ],
       "repaired": true
     }
