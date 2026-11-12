@@ -170,6 +170,12 @@ export interface AiIndex {
    * falls back to `documentCount` there, but a KNOWN `0` is a real value and must be shown as 0.
    */
   searchableDocumentCount: Maybe<number>;
+  /**
+   * The person's own files: the searchable documents outside the bundled Help
+   * (`ownSearchableDocuments`). What a "Searching N files" string reads. UNKNOWN when the backend
+   * does not report it (an older Engine) or could not count — never the Help-inclusive count, never 0.
+   */
+  ownDocumentCount: Maybe<number>;
   pendingJobs: Maybe<number>;
   embeddingPending: Maybe<number>;
   embeddingBlocked: Maybe<boolean>;
@@ -303,13 +309,12 @@ export interface AiState {
    * stops reading as data loss. `null` until the first settled poll. Stamped imperatively in
    * `onStatusUpdate` (the poll callback), never written by a `computed`, so the graph is acyclic.
    *
-   * <p>811 C-4: `searchableDocumentCount` is the default-search-scope population (see
-   * {@link AiIndex}); `null` means the backend did not report it, NOT "zero searchable documents" —
-   * a consumer falls back to `documentCount` on `null` and shows a real `0` as `0`.
+   * <p>`ownDocumentCount` is the person's own searchable files (see {@link AiIndex}); `null` means
+   * the backend did not report it, NOT "zero files" — a real `0` is retained as `0`.
    */
   lastSettledIndex: {
     documentCount: number;
-    searchableDocumentCount: number | null;
+    ownDocumentCount: number | null;
     indexSizeBytes: number | null;
   } | null;
   /**
@@ -393,7 +398,7 @@ const packStatusSig = signal<PackImportStatus | null>(null);
 // callback (`onStatusUpdate`), read by `buildSnapshot`; no computed writes it.
 const lastSettledIndexSig = signal<{
   documentCount: number;
-  searchableDocumentCount: number | null;
+  ownDocumentCount: number | null;
   indexSizeBytes: number | null;
 } | null>(null);
 // 813 §19 (W2) — the drain episode's high-water backlog. Written ONLY by the poll
@@ -768,6 +773,9 @@ function computeIndex(): AiIndex {
     searchableDocumentCount: documentCountUnknown(status, 'searchable')
       ? UNKNOWN
       : fromStatus(status?.worker?.core?.searchableDocuments),
+    ownDocumentCount: documentCountUnknown(status, 'searchable')
+      ? UNKNOWN
+      : fromStatus(status?.worker?.core?.ownSearchableDocuments),
     pendingJobs: fromStatus(status?.worker?.core?.pendingJobs),
     embeddingPending: fromStatus(status?.embedding?.pendingCount),
     embeddingBlocked:
@@ -962,6 +970,7 @@ function buildSnapshot(): AiState {
     chatEnabledSpec: status?.inference?.chatEnabledSpec,
     procedure: status?.inference?.procedure,
     engineReason: status?.inference?.engineReason,
+    semanticEnabled: status?.worker?.enrichment?.embeddingEnabled,
   });
   const statusLabel = computeStatusLabel(verdict, runtime, activity, aiEngine);
   const statusTier = computeStatusTier(verdict, runtime);
@@ -1154,9 +1163,9 @@ function stampSettledIndex(snap: StatusSnapshot): void {
   if (documentCount == null) return;
   lastSettledIndexSig.set({
     documentCount,
-    // 811 C-4: `null` = the backend never reported it (fall back to documentCount); a reported 0 is
-    // a real "the default scope searches nothing" and is retained as 0.
-    searchableDocumentCount: snap.worker?.core?.searchableDocuments ?? null,
+    // `null` = the backend never reported it (an older Engine); a reported 0 is a real "none of the
+    // person's files are searchable" and is retained as 0.
+    ownDocumentCount: snap.worker?.core?.ownSearchableDocuments ?? null,
     // Honesty: a size that was never observed stays `null` (renderers show "…" for Size, not
     // a confident "0 B"). Files retention is gated on documentCount above, the primary path.
     indexSizeBytes: snap.worker?.core?.indexSizeBytes ?? null,

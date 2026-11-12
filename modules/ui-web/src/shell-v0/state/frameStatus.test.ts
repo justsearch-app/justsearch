@@ -241,7 +241,7 @@ describe('concurrent source facts', () => {
   it('ST5 active folder failures and AI failure leave Problems on recovery without turning acknowledgement into recovery', () => {
     const root = { pathHash: 'notes', collection: 'Notes', status: 'unavailable', fileCount: 4, failedCount: 2 } as NonNullable<FrameStatusInput['roots']>[number];
     const m = derive({ roots: [root], rootsLive: true, ai: ai({ aiEngine: { kind: 'install_failed', stability: { kind: 'settled' }, installFailure: 'No space' } }), advisories: [advisory(true)] });
-    expect(m.sections.problems.map(f => f.id)).toEqual(['folder:notes', 'files:notes', 'ai-install-failed']);
+    expect(m.sections.problems.map(f => f.id)).toEqual(['folder:notes', 'files:notes']);
     expect(m.sections.problems[0]!.actions![0]!.target).toBe('core.library-surface');
     const recovered = derive({ roots: [{ ...root, status: 'indexed', failedCount: 0 }], rootsLive: true, advisories: [advisory(true)] });
     expect(recovered.sections.problems).toEqual([]); expect(recovered.sections.earlier).toHaveLength(1);

@@ -154,14 +154,14 @@ export function sv3DegradationCauses(
 /**
  * The window's reduced-capability fact, or `null` when there is nothing warranting the banner.
  *
- * `null` covers three genuinely different cases on purpose — healthy, still connecting, and a
- * cosmetic `info`-severity gap Health carries calmly — because all three mean the same thing to
- * this slot: do not spend a line on it.
+ * `null` covers four genuinely different cases on purpose — healthy, still connecting, a cosmetic
+ * `info`-severity gap Health carries calmly, and semantic search waiting only for AI nobody asked
+ * for — because all four mean the same thing to this slot: do not spend a line on it.
  */
 export function projectSv3Degradation(snapshot: AiState | null): Sv3Degradation | null {
   const verdict = snapshot?.verdict;
   if (verdict === undefined) return null;
-  if (!warrantsSearchDegradationBanner(verdict)) return null;
+  if (!warrantsSearchDegradationBanner(verdict, snapshot?.aiEngine)) return null;
   const activity = snapshot ? selectIndexingProgress(snapshot.status, snapshot.indexingStatusLive,
     snapshot.episodeMaxPendingJobs, snapshot.enrichSettleSamples).activity : undefined;
   const notice = readinessNotice(verdict, activity,

@@ -170,6 +170,12 @@ export const REWRITE_NOTE_LABEL = 'Interpreted as:';
  */
 export const CORPUS_ADD_FOLDERS = 'Add folders in Library to start searching';
 
+/** Beside the remedy: the reader has no files of their own to search yet (the bundled Help aside). */
+export const CORPUS_NONE = 'None of your files are searchable yet.';
+
+/** The person's own file count is not known: said in words, never a number (FA4). */
+export const CORPUS_UNKNOWN = 'Searching your files · how many is not known yet';
+
 /** Where {@link CORPUS_ADD_FOLDERS} goes. The surface that OWNS folder management, not one hop short. */
 export const CORPUS_REMEDY_TARGET = 'core.library-surface';
 

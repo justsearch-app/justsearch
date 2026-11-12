@@ -1809,7 +1809,8 @@ export class BrainSurface extends JfElement {
 
   private renderFeaturePath(): TemplateResult {
     const features = this.brainFeatures();
-    const count = this._unifiedAiState?.index?.documentCount;
+    // The person's own files (Help excluded), as the composer and Library count them.
+    const count = this._unifiedAiState?.index?.ownDocumentCount;
     const renderStep = (feature: BrainFeature, glyph: 'zap' | 'list' | 'message-square' | 'image') => html`
       <div class="path-step" data-feature=${feature.id}>
         <button type="button" class="step-info" @click=${(event: Event) => this.openFeatureInfo(feature.id, event)} aria-expanded=${this.featureInfo === feature.id} aria-controls=${`brain-feature-panel-${feature.id}`}>
@@ -1822,7 +1823,7 @@ export class BrainSurface extends JfElement {
         ${this.renderFeaturePanel(feature)}
       </div>`;
     return html`<section class="brain-path" aria-label="How AI uses your files">
-      <div class="path-step files-step"><span class="step-symbol">${icon({ name: 'copy', size: 20 })}</span><span>Your files</span><span class="step-meta">${!this.aiKnown() ? 'Unknown — checking AI status' : count?.known ? `${NUM.format(count.value)} files` : 'File count unknown'}</span></div>
+      <div class="path-step files-step"><span class="step-symbol">${icon({ name: 'copy', size: 20 })}</span><span>Your files</span><span class="step-meta">${!this.aiKnown() ? 'Unknown — checking AI status' : !count?.known ? 'File count unknown' : count.value === 0 ? 'None yet' : `${NUM.format(count.value)} ${count.value === 1 ? 'file' : 'files'}`}</span></div>
       <div class="path-step read-step"><span class="step-symbol">${icon({ name: 'file-text', size: 20 })}</span><span>Read the text</span><span class="step-meta">${this.aiKnown() ? 'Built in' : 'Unknown — checking AI status'}</span></div>
       <div class="picture-branch">${renderStep(features.pictures, 'image')}</div>
       ${renderStep(features.meaning, 'zap')}
