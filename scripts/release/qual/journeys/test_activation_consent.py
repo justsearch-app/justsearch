@@ -11,8 +11,12 @@ class ActivationConsentTests(unittest.TestCase):
     def run_with_observations(self, observations, install=None):
         run = Mock()
         remaining = iter(observations)
-        run.wd.execute.side_effect = lambda script: next(remaining, observations[-1])
-        run.api.return_value = install or {'state': 'completed', 'phase': 'activation_required'}
+        run.wd.execute.side_effect = lambda script: (dict(next(remaining, observations[-1]))
+            if run.wd.click.called else {'typed': False, 'operationKeys': []})
+        run.api.side_effect = lambda path: ({'entries': [
+            {'operationKey': 'activation-operation', 'operationId': 'core.activate-installed-models'}]}
+            if path == '/api/operation-history' else
+            install or {'state': 'completed', 'phase': 'activation_required'})
         return run
 
     def activate(self, run):

@@ -183,9 +183,10 @@ class ClassificationTests(unittest.TestCase):
              self.assertRaises(AssertionError):
             runner.Run.start_ui(run)
 
-    def test_activation_neither_consent_nor_operation_is_product(self):
+    def test_activation_neither_consent_nor_operation_is_infrastructure(self):
         run = Mock(); run.wd.execute.return_value = None
-        with patch.object(linux,'wait_for',immediate), self.assertRaises(AssertionError):
+        run.api.return_value = {'state': 'completed', 'phase': 'activation_required'}
+        with patch.object(linux,'wait_for',immediate), self.assertRaises(runner.Infrastructure):
             linux.activate_downloaded(run)
 
     def test_generic_product_timeout_is_not_download_transport(self):
