@@ -15,7 +15,7 @@
  */
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
-import { subscribeAiState, type AiState } from '../state/aiStateStore.js';
+import { statusLabelSubject, subscribeAiState, type AiState } from '../state/aiStateStore.js';
 import { present } from '../display/present.js';
 import { selectIndexingProgress } from '../state/indexingProgress.js';
 import { isIndexingObservation } from '../state/readinessNotice.js';
@@ -118,9 +118,13 @@ export class LivenessReadout extends JfElement {
       ? selectIndexingProgress(state.status, state.indexingStatusLive, state.episodeMaxPendingJobs, state.enrichSettleSamples).activity
       : null;
     const tone = activity && !activity.confirmed ? 'idle' : toneFor(state);
-    // The accessible name projects through the one display authority (no inline string).
-    const name = this.metricId ? present({ kind: 'metric', id: this.metricId }).label : '';
-    const liveText = activity && (!indexingTransition || !activity.confirmed) ? [activity.summary, activity.detail].filter(Boolean).join(' — ') : state?.statusLabel ?? 'unknown';
+    const indexingText = activity && (!indexingTransition || !activity.confirmed);
+    // The name says what the words are about: the status line's AI-engine words ("Offline") describe
+    // the AI models, never the declared signal (search keeps working while the AI is off). Otherwise
+    // the accessible name projects through the one display authority.
+    const name = !indexingText && state && statusLabelSubject(state) === 'ai' ? 'AI models'
+      : this.metricId ? present({ kind: 'metric', id: this.metricId }).label : '';
+    const liveText = indexingText ? [activity.summary, activity.detail].filter(Boolean).join(' — ') : state?.statusLabel ?? 'unknown';
     return html`
       <span
         class="dot"

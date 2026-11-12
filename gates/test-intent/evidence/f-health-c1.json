@@ -1,0 +1,440 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-12T06:31:33.226Z",
+  "revision": "ac7ad2beb168c3e68c1cae2d47aada804026f8ed",
+  "tree": "ab31cbe82be90da133f083a9b3d1e56ba0b98cfc",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/HealthSurface.outage.test.ts\" \"src/shell-v0/views/HealthSurface.connection.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/l14ouwz8/tmp/test-intent-vitest-28881-1794464919199.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 3171
+    },
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/HealthSurface.outage-lockdown.test.ts\" \"src/shell-v0/views/SurfaceReach-lockdown.test.ts\" \"src/shell-v0/views/ActivitySurface.scroll-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/l14ouwz8/tmp/test-intent-vitest-28881-1794464922371.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 99376
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HealthSurface.outage.test.ts#Engine refused with Health open: rows and counts unconfirmed within one read, words instead of a raw error; rows return when reads resume",
+      "file": "modules/ui-web/src/shell-v0/views/HealthSurface.outage.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7f13410a40c8f3e99574e9366f9885fea2263937c112164b11a59791b1a29e39",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC1 FC2 one failed status read makes the dependent facts unconfirmed at once Engine refused with Health open: rows and counts unconfirmed within one read, words instead of a raw error; rows return when reads resume",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HealthSurface.outage.test.ts#Engine aborted with Health open: rows and counts unconfirmed within one read, words instead of a raw error; rows return when reads resume",
+      "file": "modules/ui-web/src/shell-v0/views/HealthSurface.outage.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7f13410a40c8f3e99574e9366f9885fea2263937c112164b11a59791b1a29e39",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC1 FC2 one failed status read makes the dependent facts unconfirmed at once Engine aborted with Health open: rows and counts unconfirmed within one read, words instead of a raw error; rows return when reads resume",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HealthSurface.outage.test.ts#Engine server error with Health open: rows and counts unconfirmed within one read, words instead of a raw error; rows return when reads resume",
+      "file": "modules/ui-web/src/shell-v0/views/HealthSurface.outage.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7f13410a40c8f3e99574e9366f9885fea2263937c112164b11a59791b1a29e39",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC1 FC2 one failed status read makes the dependent facts unconfirmed at once Engine server error with Health open: rows and counts unconfirmed within one read, words instead of a raw error; rows return when reads resume",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HealthSurface.outage.test.ts#Engine refused while Health is hidden: Health shows the rows unconfirmed when it returns",
+      "file": "modules/ui-web/src/shell-v0/views/HealthSurface.outage.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7f13410a40c8f3e99574e9366f9885fea2263937c112164b11a59791b1a29e39",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC1 FC2 one failed status read makes the dependent facts unconfirmed at once Engine refused while Health is hidden: Health shows the rows unconfirmed when it returns",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HealthSurface.outage.test.ts#the Engine comes back while Health is hidden: Health returns quiet, without a reload",
+      "file": "modules/ui-web/src/shell-v0/views/HealthSurface.outage.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7f13410a40c8f3e99574e9366f9885fea2263937c112164b11a59791b1a29e39",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC1 FC2 one failed status read makes the dependent facts unconfirmed at once the Engine comes back while Health is hidden: Health returns quiet, without a reload",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HealthSurface.outage.test.ts#a reload while the Engine is down: no raw transport error, no claim of health",
+      "file": "modules/ui-web/src/shell-v0/views/HealthSurface.outage.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7f13410a40c8f3e99574e9366f9885fea2263937c112164b11a59791b1a29e39",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC1 FC2 one failed status read makes the dependent facts unconfirmed at once a reload while the Engine is down: no raw transport error, no claim of health",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HealthSurface.outage.test.ts#reads fail while the event stream still beats: no \"Catching up\", \"backend is busy\" or \"Rebuilding\"",
+      "file": "modules/ui-web/src/shell-v0/views/HealthSurface.outage.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7f13410a40c8f3e99574e9366f9885fea2263937c112164b11a59791b1a29e39",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC3 during an outage Index and Folders claim no work that is not happening reads fail while the event stream still beats: no \"Catching up\", \"backend is busy\" or \"Rebuilding\"",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HealthSurface.outage.test.ts#reads stop answering while the event stream still beats: Index names no catching up",
+      "file": "modules/ui-web/src/shell-v0/views/HealthSurface.outage.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7f13410a40c8f3e99574e9366f9885fea2263937c112164b11a59791b1a29e39",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC3 during an outage Index and Folders claim no work that is not happening reads stop answering while the event stream still beats: Index names no catching up",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HealthSurface.outage-lockdown.test.ts#refused with Health open: rows unconfirmed within one failed read, then quiet again without a reload",
+      "file": "modules/ui-web/src/shell-v0/views/HealthSurface.outage-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ca1c29b433bd0321f5d61d09b2bf75c9537dad5e446619bac9b314d00bf82771",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC1 FC2 FC3 the Engine stops answering refused with Health open: rows unconfirmed within one failed read, then quiet again without a reload",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HealthSurface.outage-lockdown.test.ts#aborted with Health hidden: unconfirmed on return; the Engine back while hidden: quiet on return",
+      "file": "modules/ui-web/src/shell-v0/views/HealthSurface.outage-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ca1c29b433bd0321f5d61d09b2bf75c9537dad5e446619bac9b314d00bf82771",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC1 FC2 FC3 the Engine stops answering aborted with Health hidden: unconfirmed on return; the Engine back while hidden: quiet on return",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HealthSurface.outage-lockdown.test.ts#server errors and a reload mid-outage: no raw error and no claim of health; quiet again when it answers",
+      "file": "modules/ui-web/src/shell-v0/views/HealthSurface.outage-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ca1c29b433bd0321f5d61d09b2bf75c9537dad5e446619bac9b314d00bf82771",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC1 FC2 FC3 the Engine stops answering server errors and a reload mid-outage: no raw error and no claim of health; quiet again when it answers",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HealthSurface.outage-lockdown.test.ts#a second window: both say the rows are unconfirmed within one failed read of their own",
+      "file": "modules/ui-web/src/shell-v0/views/HealthSurface.outage-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ca1c29b433bd0321f5d61d09b2bf75c9537dad5e446619bac9b314d00bf82771",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC1 FC2 FC3 the Engine stops answering a second window: both say the rows are unconfirmed within one failed read of their own",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HealthSurface.outage-lockdown.test.ts#forced colours: the outage is said in words that stay visible",
+      "file": "modules/ui-web/src/shell-v0/views/HealthSurface.outage-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ca1c29b433bd0321f5d61d09b2bf75c9537dad5e446619bac9b314d00bf82771",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC1 FC2 FC3 the Engine stops answering forced colours: the outage is said in words that stay visible",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HealthSurface.connection.test.ts#keyword search works and AI chat is off: no \"Retrieval: Offline\", the readout names the AI",
+      "file": "modules/ui-web/src/shell-v0/views/HealthSurface.connection.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:65f6bbed616753671a64830e26e65bfca1a37675328db744bdcd11e718d19541",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC4 the Connection card names what it reports keyword search works and AI chat is off: no \"Retrieval: Offline\", the readout names the AI",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HealthSurface.connection.test.ts#with the AI online the readout still names the AI as its subject",
+      "file": "modules/ui-web/src/shell-v0/views/HealthSurface.connection.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:65f6bbed616753671a64830e26e65bfca1a37675328db744bdcd11e718d19541",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC4 the Connection card names what it reports with the AI online the readout still names the AI as its subject",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SurfaceReach-lockdown.test.ts#Health at 600x400 with 200% text: the wheel and End reach the end of the content",
+      "file": "modules/ui-web/src/shell-v0/views/SurfaceReach-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a3668bc24e539a4e9c1683f6e52fb1fb2eb13a32a543097501f4444d91382c59",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC5 a short window with large text keeps every surface reachable Health at 600x400 with 200% text: the wheel and End reach the end of the content",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SurfaceReach-lockdown.test.ts#Logs at 600x400 with 200% text: the wheel and End reach the end of the content",
+      "file": "modules/ui-web/src/shell-v0/views/SurfaceReach-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a3668bc24e539a4e9c1683f6e52fb1fb2eb13a32a543097501f4444d91382c59",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC5 a short window with large text keeps every surface reachable Logs at 600x400 with 200% text: the wheel and End reach the end of the content",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SurfaceReach-lockdown.test.ts#Library › Browse at 600x400 with 200% text: the wheel and End reach the end of the content",
+      "file": "modules/ui-web/src/shell-v0/views/SurfaceReach-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a3668bc24e539a4e9c1683f6e52fb1fb2eb13a32a543097501f4444d91382c59",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC5 a short window with large text keeps every surface reachable Library › Browse at 600x400 with 200% text: the wheel and End reach the end of the content",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.scroll-lockdown.test.ts#at 600×400 with 200% text, the Health and Logs tabs keep their own scrolling",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.scroll-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8fd53e11fd92a27248219a8ba40845878b395b9009a2cc65eee8dbd88a583a0a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "at 600×400 with 200% text, the Health and Logs tabs keep their own scrolling",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "origin/main",
+    "revision": "ac7ad2beb168c3e68c1cae2d47aada804026f8ed",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/HealthSurface.outage.test.ts\" \"src/shell-v0/views/HealthSurface.connection.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/l14ouwz8/tmp/test-intent-vitest-28881-1794465023616.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 4730,
+        "output": "JSON report written to /home/elias/.cache/am/l14ouwz8/tmp/test-intent-vitest-28881-1794465023616.json\n\n"
+      },
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/HealthSurface.outage-lockdown.test.ts\" \"src/shell-v0/views/SurfaceReach-lockdown.test.ts\" \"src/shell-v0/views/ActivitySurface.scroll-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/l14ouwz8/tmp/test-intent-vitest-28881-1794465028346.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 64603,
+        "output": "JSON report written to /home/elias/.cache/am/l14ouwz8/tmp/test-intent-vitest-28881-1794465028346.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/HealthSurface.outage.test.ts#Engine refused with Health open: rows and counts unconfirmed within one read, words instead of a raw error; rows return when reads resume",
+        "classification": "assertion",
+        "detail": "FC1 FC2 one failed status read makes the dependent facts unconfirmed at once Engine refused with Health open: rows and counts unconfirmed within one read, words instead of a raw error; rows return when reads resume:  AssertionError: Engine row: expected '' to match /unconfirmed/i\n    at /home/elias/.cache/am/l14ouwz8/tmp/test-intent-before-vHMvb1/modules/ui-web/src/shell-v0/views/HealthSurface.outage.test.ts:93:41\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-health-c1/modules/ui-"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/HealthSurface.outage.test.ts#Engine aborted with Health open: rows and counts unconfirmed within one read, words instead of a raw error; rows return when reads resume",
+        "classification": "assertion",
+        "detail": "FC1 FC2 one failed status read makes the dependent facts unconfirmed at once Engine aborted with Health open: rows and counts unconfirmed within one read, words instead of a raw error; rows return when reads resume:  AssertionError: Engine row: expected '' to match /unconfirmed/i\n    at /home/elias/.cache/am/l14ouwz8/tmp/test-intent-before-vHMvb1/modules/ui-web/src/shell-v0/views/HealthSurface.outage.test.ts:93:41\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-health-c1/modules/ui-"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/HealthSurface.outage.test.ts#Engine server error with Health open: rows and counts unconfirmed within one read, words instead of a raw error; rows return when reads resume",
+        "classification": "assertion",
+        "detail": "FC1 FC2 one failed status read makes the dependent facts unconfirmed at once Engine server error with Health open: rows and counts unconfirmed within one read, words instead of a raw error; rows return when reads resume:  AssertionError: Engine row: expected '' to match /unconfirmed/i\n    at /home/elias/.cache/am/l14ouwz8/tmp/test-intent-before-vHMvb1/modules/ui-web/src/shell-v0/views/HealthSurface.outage.test.ts:93:41\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-health-c1/module"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/HealthSurface.outage.test.ts#Engine refused while Health is hidden: Health shows the rows unconfirmed when it returns",
+        "classification": "assertion",
+        "detail": "FC1 FC2 one failed status read makes the dependent facts unconfirmed at once Engine refused while Health is hidden: Health shows the rows unconfirmed when it returns:  AssertionError: expected '' to match /unconfirmed/i\n    at /home/elias/.cache/am/l14ouwz8/tmp/test-intent-before-vHMvb1/modules/ui-web/src/shell-v0/views/HealthSurface.outage.test.ts:121:27\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-health-c1/modules/ui-web/node_modules/@vitest/run"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/HealthSurface.outage.test.ts#the Engine comes back while Health is hidden: Health returns quiet, without a reload",
+        "classification": "assertion",
+        "detail": "FC1 FC2 one failed status read makes the dependent facts unconfirmed at once the Engine comes back while Health is hidden: Health returns quiet, without a reload:  AssertionError: expected '' to match /unconfirmed/i\n    at /home/elias/.cache/am/l14ouwz8/tmp/test-intent-before-vHMvb1/modules/ui-web/src/shell-v0/views/HealthSurface.outage.test.ts:131:27\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-health-c1/modules/ui-web/node_modules/@vitest/run"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/HealthSurface.outage.test.ts#a reload while the Engine is down: no raw transport error, no claim of health",
+        "classification": "assertion",
+        "detail": "FC1 FC2 one failed status read makes the dependent facts unconfirmed at once a reload while the Engine is down: no raw transport error, no claim of health:  AssertionError: expected '\\n      \\n      \\n        \\n         …' not to match /Failed to fetch/\n    at /home/elias/.cache/am/l14ouwz8/tmp/test-intent-before-vHMvb1/modules/ui-web/src/shell-v0/views/HealthSurface.outage.test.ts:149:24\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-heal"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/HealthSurface.outage.test.ts#reads fail while the event stream still beats: no \"Catching up\", \"backend is busy\" or \"Rebuilding\"",
+        "classification": "assertion",
+        "detail": "FC3 during an outage Index and Folders claim no work that is not happening reads fail while the event stream still beats: no \"Catching up\", \"backend is busy\" or \"Rebuilding\":  AssertionError: index: expected 'Catching up… — The backend is busy; s…' not to match /Catching up|backend is busy|Rebuildi…/i\n    at /home/elias/.cache/am/l14ouwz8/tmp/test-intent-before-vHMvb1/modules/ui-web/src/shell-v0/views/HealthSurface.outage.test.ts:165:31\n    at file:///home/elias/dev/justs"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/HealthSurface.outage.test.ts#reads stop answering while the event stream still beats: Index names no catching up",
+        "classification": "assertion",
+        "detail": "FC3 during an outage Index and Folders claim no work that is not happening reads stop answering while the event stream still beats: Index names no catching up:  AssertionError: index: expected 'Catching up… — The backend is busy; s…' not to match /Catching up|backend is busy|Rebuildi…/i\n    at /home/elias/.cache/am/l14ouwz8/tmp/test-intent-before-vHMvb1/modules/ui-web/src/shell-v0/views/HealthSurface.outage.test.ts:176:68\n    at file:///home/elias/dev/justs"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/HealthSurface.outage-lockdown.test.ts#refused with Health open: rows unconfirmed within one failed read, then quiet again without a reload",
+        "classification": "assertion",
+        "detail": "FC1 FC2 FC3 the Engine stops answering refused with Health open: rows unconfirmed within one failed read, then quiet again without a reload:  Error: expected false to be true // Object.is equality\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/dev/justsearch/.claude/worktrees/f-health-c1/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3748:47)\n    at unconfirmedAfter (/home/elias/.cache/am/l14ouwz8/tmp/test-intent-"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/HealthSurface.outage-lockdown.test.ts#aborted with Health hidden: unconfirmed on return; the Engine back while hidden: quiet on return",
+        "classification": "assertion",
+        "detail": "FC1 FC2 FC3 the Engine stops answering aborted with Health hidden: unconfirmed on return; the Engine back while hidden: quiet on return:  Error: expected false to be true // Object.is equality\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/dev/justsearch/.claude/worktrees/f-health-c1/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3748:47)\n    at unconfirmedAfter (/home/elias/.cache/am/l14ouwz8/tmp/test-intent-"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/HealthSurface.outage-lockdown.test.ts#server errors and a reload mid-outage: no raw error and no claim of health; quiet again when it answers",
+        "classification": "assertion",
+        "detail": "FC1 FC2 FC3 the Engine stops answering server errors and a reload mid-outage: no raw error and no claim of health; quiet again when it answers:  Error: expected false to be true // Object.is equality\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/dev/justsearch/.claude/worktrees/f-health-c1/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3748:47)\n    at unconfirmedAfter (/home/elias/.cache/am/l14ouwz8/tmp/test-intent-"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/HealthSurface.outage-lockdown.test.ts#a second window: both say the rows are unconfirmed within one failed read of their own",
+        "classification": "assertion",
+        "detail": "FC1 FC2 FC3 the Engine stops answering a second window: both say the rows are unconfirmed within one failed read of their own:  Error: expected false to be true // Object.is equality\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/dev/justsearch/.claude/worktrees/f-health-c1/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3748:47)\n    at unconfirmedAfter (/home/elias/.cache/am/l14ouwz8/tmp/test-intent-"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/HealthSurface.outage-lockdown.test.ts#forced colours: the outage is said in words that stay visible",
+        "classification": "assertion",
+        "detail": "FC1 FC2 FC3 the Engine stops answering forced colours: the outage is said in words that stay visible:  Error: expected false to be true // Object.is equality\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/dev/justsearch/.claude/worktrees/f-health-c1/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3748:47)\n    at unconfirmedAfter (/home/elias/.cache/am/l14ouwz8/tmp/test-intent-"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/HealthSurface.connection.test.ts#keyword search works and AI chat is off: no \"Retrieval: Offline\", the readout names the AI",
+        "classification": "assertion",
+        "detail": "FC4 the Connection card names what it reports keyword search works and AI chat is off: no \"Retrieval: Offline\", the readout names the AI:  AssertionError: visible words: expected 'Retrieval Offline' not to match /Retrieval/i\n    at /home/elias/.cache/am/l14ouwz8/tmp/test-intent-before-vHMvb1/modules/ui-web/src/shell-v0/views/HealthSurface.connection.test.ts:78:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-health-c1/mo"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/HealthSurface.connection.test.ts#with the AI online the readout still names the AI as its subject",
+        "classification": "assertion",
+        "detail": "FC4 the Connection card names what it reports with the AI online the readout still names the AI as its subject:  AssertionError: expected 'Retrieval: Online' to match /^AI models: Online/\n    at /home/elias/.cache/am/l14ouwz8/tmp/test-intent-before-vHMvb1/modules/ui-web/src/shell-v0/views/HealthSurface.connection.test.ts:88:19\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-health-c1/modules/ui-we"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SurfaceReach-lockdown.test.ts#Health at 600x400 with 200% text: the wheel and End reach the end of the content",
+        "classification": "assertion",
+        "detail": "FC5 a short window with large text keeps every surface reachable Health at 600x400 with 200% text: the wheel and End reach the end of the content:  AssertionError: Health: the wheel reaches \"Event history unconfirmed — the stream l\" {\"visible\":{\"top\":178,\"bottom\":400},\"header\":{\"top\":178,\"bottom\":435,\"height\":257},\"body\":{\"top\":435,\"bottom\":499,\"height\":64},\"last\":{\"top\":9703,\"bottom\":9884,\"height\":181},\"lastText\":\"Event history unconfirmed — t"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SurfaceReach-lockdown.test.ts#Logs at 600x400 with 200% text: the wheel and End reach the end of the content",
+        "classification": "assertion",
+        "detail": "FC5 a short window with large text keeps every surface reachable Logs at 600x400 with 200% text: the wheel and End reach the end of the content:  AssertionError: Logs: the wheel reaches \"Waiting for log events…\" {\"visible\":{\"top\":178,\"bottom\":400},\"header\":{\"top\":178,\"bottom\":668,\"height\":490},\"body\":{\"top\":668,\"bottom\":700,\"height\":32},\"last\":{\"top\":684,\"bottom\":851,\"height\":167},\"lastText\":\"Waiting for log events…\",\"hostScroll\":0,\"bodyScrol"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SurfaceReach-lockdown.test.ts#Library › Browse at 600x400 with 200% text: the wheel and End reach the end of the content",
+        "classification": "assertion",
+        "detail": "FC5 a short window with large text keeps every surface reachable Library › Browse at 600x400 with 200% text: the wheel and End reach the end of the content:  AssertionError: Library › Browse: the wheel reaches \"\" {\"visible\":{\"top\":268,\"bottom\":400},\"header\":{\"top\":268,\"bottom\":381,\"height\":113},\"body\":{\"top\":505,\"bottom\":537,\"height\":32},\"last\":{\"top\":2690,\"bottom\":2692,\"height\":3},\"lastText\":\"\",\"hostScroll\":0,\"bodyScroll\":0}: expected false to be true /"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.scroll-lockdown.test.ts#at 600×400 with 200% text, the Health and Logs tabs keep their own scrolling",
+        "classification": "assertion",
+        "detail": "at 600×400 with 200% text, the Health and Logs tabs keep their own scrolling:  AssertionError: jf-health-surface scrolls as a whole: expected 'visible' to be 'auto' // Object.is equality\n    at /home/elias/.cache/am/l14ouwz8/tmp/test-intent-before-vHMvb1/modules/ui-web/src/shell-v0/views/ActivitySurface.scroll-lockdown.test.ts:326:65\n    at file:///home/elias/dev/justsearch/.c"
+      }
+    ]
+  },
+  "digest": "sha256:db231108eb7f7b516522c72f6a172ad6fc66a928b72374c42e9ddaa167c53398"
+}

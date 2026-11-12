@@ -308,25 +308,31 @@ for (const [width, height, text] of [[1280, 720, ''], [600, 400, '200%']] as con
         { timeout: 15_000 }).toBe(true);
       await settle(page, 800);
       // The tab hands the member its height: the member ends inside the window, and its own body is
-      // its scroller. The wheel moves the body when it overflows.
+      // its scroller. The wheel moves the body when it overflows. In the short window (600×400 with
+      // 200% text) the member scrolls as a whole, its header with its body, so a header taller than
+      // the tab cannot leave the body out of reach (follow-up C1 FC5).
       const body = await page.evaluate((tag) => {
         const member = window.__deep(tag)!;
         const b = member.shadowRoot!.querySelector('.body')!;
         const r = b.getBoundingClientRect();
-        const header = member.shadowRoot!.querySelector('.header')?.getBoundingClientRect();
         const host = member.getBoundingClientRect();
         return { overflowY: getComputedStyle(b).overflowY, hostBottom: host.bottom, bottom: r.bottom,
-          innerHeight: window.innerHeight, headerFillsTab: !!header && header.bottom >= host.bottom,
+          innerHeight: window.innerHeight, hostOverflowY: getComputedStyle(member).overflowY,
+          hostMax: member.scrollHeight - member.clientHeight, hostX: host.x + 20, hostY: Math.max(host.y, 0) + 10,
           x: r.x + 20, y: Math.min(r.y + r.height / 2, host.bottom - 4), height: r.height, max: b.scrollHeight - b.clientHeight };
       }, tag);
-      expect(body.overflowY, `${tag} scrolls in its own body`).toBe('auto');
       expect(body.hostBottom, `${tag} ends inside the window`).toBeLessThanOrEqual(body.innerHeight + 0.5);
-      // Named limit, outside this change: at 600×400 with 200% text the Health and Logs windows'
-      // own fixed headers are taller than the tab, so their bodies start below the window.
-      if (text && body.headerFillsTab) {
-        console.info(`${tag} at ${size}: header fills the tab: ${body.headerFillsTab}`);
+      if (text) {
+        expect(body.hostOverflowY, `${tag} scrolls as a whole`).toBe('auto');
+        expect(body.hostMax, `${tag} is longer than its tab`).toBeGreaterThan(1);
+        await page.mouse.move(body.hostX, body.hostY);
+        await page.mouse.wheel(0, 300);
+        await settle(page);
+        const moved = await page.evaluate((tag) => window.__deep(tag)!.scrollTop, tag);
+        expect(moved, `the wheel moves ${tag}`).toBeGreaterThan(0);
         continue;
       }
+      expect(body.overflowY, `${tag} scrolls in its own body`).toBe('auto');
       expect(body.bottom, `${tag}'s body ends inside the window`).toBeLessThanOrEqual(body.innerHeight + 0.5);
       expect(body.height, `${tag}'s body shows something`).toBeGreaterThan(20);
       if (body.max > 1) {

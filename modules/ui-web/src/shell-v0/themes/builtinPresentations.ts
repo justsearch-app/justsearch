@@ -443,7 +443,8 @@ export const HEALTH_STATUS_REGION = 'core.health.status';
 export const HEALTH_STATUS_BODY: SurfaceBodyDeclaration = {
   heading: 'Connection',
   placement: 'STAGE',
-  liveness: 'core.retrieval',
+  // The app's status line (the status bar's words), named "Status"; its AI-engine words name the AI models.
+  liveness: 'core.status',
   schema: { type: 'object', properties: {} } as unknown as JsonSchema,
   uischema: { type: 'VerticalLayout', elements: [] } as UISchemaElement,
 };

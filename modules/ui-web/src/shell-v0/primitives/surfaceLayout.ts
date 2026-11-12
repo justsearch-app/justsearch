@@ -95,6 +95,18 @@ export const surfaceLayoutStyles = css`
     overflow-y: auto;
     padding: var(--density-inner-pad-y) var(--density-inner-pad-x);
   }
+  /* A short window: a fixed header (with its filters and notices) can fill it and leave the body
+     below the window, as at 600x400 with 200% text. There the header scrolls with the body, and the
+     surface is the one scroller. Scoped by :host so it outranks a surface's own .body rule. */
+  @media (max-height: 30rem) {
+    :host {
+      overflow-y: auto;
+    }
+    :host .body {
+      flex: none;
+      overflow-y: visible;
+    }
+  }
 `;
 
 /** Variant: the whole host scrolls under a sticky header. */
