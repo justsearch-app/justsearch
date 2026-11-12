@@ -7,9 +7,9 @@ author-session: 1b9a57ec-4aff-4d94-8769-ca04d8745758
 
 # Test-intent entries
 
-Follow-up batch C2 (FC6–FC11): Activity arrival, file names by Engine, many Activity records, Activity rows in words, the status pill's spoken status and failed-install wording.
+Follow-up batch C2 (FC6–FC12): Activity arrival, file names by Engine, many Activity records, Activity rows in words, the status pill's spoken status and failed-install wording.
 The scenarios are the orchestrator's decisions under the owner's quoted delegation, recorded as agent choices.
-Builder execution evidence: `gates/test-intent/evidence/f-activity-c2.json` (one run, `--before origin/main` = d8f6c9d13f) for the repaired checks, each failing on the before-state with an assertion in the named check; and `gates/test-intent/evidence/f-activity-c2-preserved.json` (candidate only) for checks that pass on the before-state too or cannot run there, as each entry says.
+Builder execution evidence: `gates/test-intent/evidence/f-activity-c2.json` (one run, `--before origin/main` = d8f6c9d13f) for the repaired checks, each failing on the before-state with an assertion in the named check; `gates/test-intent/evidence/f-activity-c2-fc12.json` (`--before a3457998b6`, the branch head before FC12, since FC12 was found after that run) for FC12's repaired checks; and `gates/test-intent/evidence/f-activity-c2-preserved.json` (candidate only) for checks that pass on the before-state too or cannot run there, as each entry says.
 Existing tests changed in this branch are classified as Obsolete (expectations FC9, FC10 or FC11 replace, with the checks that replace them named) or Adaptation (the arrival request's addressed signature, FC6).
 What each Obsolete entry replaces:
 - `ActionLedgerView.test.ts` (Obsolete, FC9): The outcome cell's text 'SUCCESS'/'FAILURE' and the who cell's 'agent' (row text in recorded codes) are expectations FC9 replaces; tone, glyph, structure and the filtering are unchanged. Replaced by: modules/ui-web/src/shell-v0/components/ActionLedgerView.test.ts#projects occurredAt + outcome — the "timing" and "outcomes" the subtitle promises (tempdoc 558 Deepening 3), modules/ui-web/src/shell-v0/components/ActionLedgerView.test.ts#renders a FAILURE outcome as the error tone + glyph — failed must read as failed (tempdoc 558), modules/ui-web/src/shell-v0/components/ActionLedgerView.test.ts#filters the stream by originator via FilterChip facets (tempdoc 558 §E1), modules/ui-web/src/shell-v0/components/ActionLedgerView.rowWords.test.ts#the backend's records: who, what and how it ended in words, never their codes, modules/ui-web/src/shell-v0/components/ActionLedgerView.rowWords.test.ts#index records say indexed or failed, and who did it is the engine, modules/ui-web/src/shell-v0/components/ActionLedgerView.rowWords.test.ts#this window's journal: its actions in words, an invocation by its operation, modules/ui-web/src/shell-v0/components/ActionLedgerView.rowWords.test.ts#after a reload, the restored journal's rows read in words too.
@@ -686,6 +686,61 @@ Independent acceptance is pending.
         "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts#the rows say what happened in the AI verdict's own words"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "FC12 repaired: at 600x400 with 200% text, with and without forced colours, Activity with 160 records (the windowed list), whose list starts below what the window shows, draws its first rows without the person scrolling: on opening, after a quick filter change made with the filters at the top of the view, after a reload and after switching to Health and back; when the list is then brought to the top of the view, its first row is on screen in the same moment, in real Chromium.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design.",
+          "location": "task t-20261103-shell request"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn (2026-11-03)",
+          "delegationScope": "Design choices for the in-between UI of the main windows (Activity, file names, the status pill and panel, AI Brain's install line): i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design.",
+          "choice": "FC12 (found by the C2 builder; also on main) At 600x400 with 200% text (and every size), Activity's feed draws its rows as soon as they are loaded, without the person scrolling first; the first rows are visible on opening, after a filter change, after a reload and after returning to Activity.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/f-activity-c2-fc12.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts#FC12 at 600×400 with 200% text, the first rows are drawn on opening, after a filter change, a reload and a return from Health",
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts#FC12 at 600×400 with 200% text in forced colours, the first rows are drawn on opening, after a filter change, a reload and a return from Health"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "FC12 at 1280x720: the same sequence draws the first rows at each step (passes on the before-state too: there the list starts inside the view, so it was drawn already).",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design.",
+          "location": "task t-20261103-shell request"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn (2026-11-03)",
+          "delegationScope": "Design choices for the in-between UI of the main windows (Activity, file names, the status pill and panel, AI Brain's install line): i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design.",
+          "choice": "FC12 (found by the C2 builder; also on main) At 600x400 with 200% text (and every size), Activity's feed draws its rows as soon as they are loaded, without the person scrolling first; the first rows are visible on opening, after a filter change, after a reload and after returning to Activity.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/f-activity-c2-preserved.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts#FC12 at 1280×720, the first rows are drawn on opening, after a filter change, a reload and a return from Health"
+      ],
+      "repaired": false
     }
   ]
 }

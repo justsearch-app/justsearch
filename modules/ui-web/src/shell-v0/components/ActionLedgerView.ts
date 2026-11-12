@@ -139,6 +139,13 @@ const VIRTUALIZE_ABOVE = 100;
  * text size, and applies what was measured in the next frame, outside the delivery, where the
  * browser observes the resized list in its next pass. Both go through the layout's public extension
  * point (`{ type, ...config }` and its `updateItemSizes`); the library itself is not changed.
+ *
+ * FC12 — the library measures its view as the part of the list its scroller shows, and with none of
+ * the list showing (at 600×400 with 200% text the list starts below what the window shows) that
+ * view is zero tall, for which the library's flow layout draws no rows at all instead of the rows
+ * within its overhang: the feed stayed empty until the person scrolled it into view. While the list
+ * is laid out (it has a width), the view is never less than the edge of the list nearest what the
+ * scroller shows, so the rows nearest it are drawn; a list in a hidden panel (no width) draws none.
  */
 class FeedRowsLayout extends FlowLayout {
   private measured: Parameters<FlowLayout['updateItemSizes']>[0] = {};
@@ -153,6 +160,14 @@ class FeedRowsLayout extends FlowLayout {
 
   set rowEstimatePx(px: number) {
     this._itemSize = { width: this._itemSize.width, height: px };
+  }
+
+  override get viewportSize(): FlowLayout['viewportSize'] {
+    return super.viewportSize;
+  }
+
+  override set viewportSize(view: FlowLayout['viewportSize']) {
+    super.viewportSize = view.width > 0 ? { width: view.width, height: Math.max(1, view.height) } : view;
   }
 
   override updateItemSizes(sizes: Parameters<FlowLayout['updateItemSizes']>[0]): void {

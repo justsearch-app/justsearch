@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
   },
-  "createdAt": "2026-11-12T09:12:01.591Z",
-  "revision": "d8f6c9d13ff0e8fb6af13a248855d3f7508c0d9d",
-  "tree": "d387ab78b0c31d3107e037015de2f76fe41ce776",
+  "createdAt": "2026-11-12T09:40:41.943Z",
+  "revision": "a3457998b6d695c614e696712bdfa6c275824e32",
+  "tree": "c88cc9354be4f04f1d4866319361bb1275f657ca",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,16 +18,16 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.arrival-lockdown.test.ts\" \"src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/9p2yna62/tmp/test-intent-vitest-63084-1794474662546.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.arrival-lockdown.test.ts\" \"src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/8jrt7cf8/tmp/test-intent-vitest-31834-1794476356401.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 56050
+      "durationMs": 82517
     },
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/hooks/resolvePathLazy.engineAddress.test.ts\" \"src/shell-v0/state/pillAnnouncements.test.ts\" \"src/shell-v0/views/ActivitySurface.details.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/9p2yna62/tmp/test-intent-vitest-63084-1794474718596.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/hooks/resolvePathLazy.engineAddress.test.ts\" \"src/shell-v0/state/pillAnnouncements.test.ts\" \"src/shell-v0/views/ActivitySurface.details.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/8jrt7cf8/tmp/test-intent-vitest-31834-1794476438920.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 2994
+      "durationMs": 3022
     }
   ],
   "checks": [
@@ -80,7 +80,7 @@
       "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts#FC8 at 1280×720, 160 records draw and scroll without an uncaught ResizeObserver loop error",
       "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:07d902ab17ad63c6cb3ff4c17ff308587328841b06f63230c0914fae175fd1e5",
+      "contentDigest": "sha256:bf75a377006abf5c7cf6e0b9971a664a800369f085221e777e24e26f94c5598c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -95,7 +95,7 @@
       "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts#FC8 at 1280×720 in forced colours, 160 records draw and scroll without an uncaught ResizeObserver loop error",
       "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:07d902ab17ad63c6cb3ff4c17ff308587328841b06f63230c0914fae175fd1e5",
+      "contentDigest": "sha256:bf75a377006abf5c7cf6e0b9971a664a800369f085221e777e24e26f94c5598c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -165,8 +165,23 @@
           "status": "passed"
         }
       ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts#FC12 at 1280×720, the first rows are drawn on opening, after a filter change, a reload and a return from Health",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:bf75a377006abf5c7cf6e0b9971a664a800369f085221e777e24e26f94c5598c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC12 at 1280×720, the first rows are drawn on opening, after a filter change, a reload and a return from Health",
+          "status": "passed"
+        }
+      ]
     }
   ],
   "failBefore": null,
-  "digest": "sha256:24038712ee892240772b86bc4dbff6f7d259e93f50285e478fb32ddd04503e44"
+  "digest": "sha256:f9f40f50493c3d64943f3ae31e2816c1aebd97a1ee82e1340e60f8ede8e4d10b"
 }

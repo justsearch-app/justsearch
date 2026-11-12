@@ -7,6 +7,8 @@
 // shell-events stream the way an Engine sends it. Records mix one-line operations with index
 // records and approvals, whose rows are of other heights.
 // FC9 in the real page: the rows on screen read in words, not in recorded codes.
+// FC12: the windowed feed draws its first rows as soon as they are loaded, also while the list starts
+// below what the window shows (600×400 with 200% text), so they are there when the person scrolls to them.
 import { afterAll, afterEach, beforeAll, expect, it } from 'vitest';
 import { createServer, type ViteDevServer } from 'vite';
 import { chromium, type Browser, type BrowserContext, type BrowserServer, type Page } from 'playwright-core';
@@ -139,6 +141,12 @@ async function open(width: number, height: number, text: string, forcedColors: b
     window.addEventListener('error', (event) => { window.__uncaught.push(String(event.message ?? event.error ?? 'error')); });
   });
   await page.goto(`${url}${text ? `?text=${text}` : ''}#justsearch://surface/core.activity-surface`, { timeout: 45_000 });
+  await loaded(page);
+  return { page, pageErrors };
+}
+
+/** The page is up and Activity holds its records in the windowed list. */
+async function loaded(page: Page): Promise<void> {
   await page.locator('body[data-ready="true"]').waitFor({ timeout: 45_000 });
   await page.evaluate(() => {
     window.__deep = (tag) => {
@@ -155,7 +163,6 @@ async function open(width: number, height: number, text: string, forcedColors: b
   });
   await expect.poll(() => page.evaluate(() => (window.__deep('jf-action-ledger')?.shadowRoot?.querySelector('lit-virtualizer') as
     unknown as { items?: unknown[] } | null)?.items?.length ?? 0), { timeout: 15_000 }).toBeGreaterThan(100);
-  return { page, pageErrors };
 }
 
 async function settle(page: Page, ms = 400): Promise<void> {
@@ -210,8 +217,7 @@ for (const [width, height, text, forced] of [[1280, 720, '', false], [600, 400, 
 
   it(`FC9 at ${size}, the rows on screen read in words, never in recorded codes`, async () => {
     const opened = await open(width, height, text, forced);
-    // At 600×400 with 200% text the list starts below what the window shows, and the windowed list
-    // draws rows only once it is in view: bring it there first.
+    // At 600×400 with 200% text the list starts below what the window shows: bring it on screen first.
     await opened.page.evaluate(() => window.__deep('jf-action-ledger')!.shadowRoot!.querySelector('[data-testid="feed-list"]')!
       .scrollIntoView({ block: 'start', behavior: 'instant' }));
     await settle(opened.page, 600);
@@ -221,5 +227,65 @@ for (const [width, height, text, forced] of [[1280, 720, '', false], [600, 400, 
     for (const row of rows) {
       expect(row, `row text: ${row}`).not.toMatch(/\b(SUCCESS|FAILURE|DENIED|GATED|DONE|FAILED|TYPED_CONFIRM)\b|\bbackend\b/);
     }
+  }, 90_000);
+}
+
+/**
+ * The feed's rows as the person finds them: how many are drawn, how far the feed's scroller is
+ * scrolled, and whether the first row is on screen at once when the list is brought to the top of
+ * the view (read in the same task, before the list could draw anything in response).
+ */
+function firstRows(page: Page): Promise<{ drawn: number; scrollTop: number; firstOnScreen: boolean }> {
+  return page.evaluate(() => {
+    const root = window.__deep('jf-action-ledger')!.shadowRoot!;
+    let node: Node | null = root.host;
+    let scroller: Element | null = null;
+    while (node && !scroller) {
+      node = node instanceof ShadowRoot ? node.host : (node as Element).assignedSlot ?? node.parentNode;
+      if (node instanceof Element && /(auto|scroll)/.test(getComputedStyle(node).overflowY)) scroller = node;
+    }
+    const drawn = root.querySelectorAll('.entry').length;
+    const scrollTop = scroller!.scrollTop;
+    const list = root.querySelector('[data-testid="feed-list"]')!;
+    scroller!.scrollTop += list.getBoundingClientRect().top - scroller!.getBoundingClientRect().top;
+    const view = scroller!.getBoundingClientRect();
+    const first = root.querySelector('.entry[data-index="0"]')?.getBoundingClientRect();
+    const firstOnScreen = !!first && first.height > 0 && first.top < view.bottom && first.bottom > view.top;
+    scroller!.scrollTop = scrollTop;
+    return { drawn, scrollTop, firstOnScreen };
+  });
+}
+
+/** Without the person scrolling, the first rows are drawn and on screen as soon as the list is. */
+async function expectFirstRows(page: Page, when: string): Promise<void> {
+  await expect.poll(() => page.evaluate(() => window.__deep('jf-action-ledger')!.shadowRoot!.querySelectorAll('.entry').length),
+    { message: `rows drawn ${when}, before any scroll`, timeout: 4_000 }).toBeGreaterThan(0);
+  const rows = await firstRows(page);
+  expect(rows.firstOnScreen, `the first row is on screen as soon as the list is, ${when}`).toBe(true);
+}
+
+for (const [width, height, text, forced] of [[1280, 720, '', false], [600, 400, '200%', false], [600, 400, '200%', true]] as const) {
+  const size = `${width}×${height}${text ? ` with ${text} text` : ''}${forced ? ' in forced colours' : ''}`;
+
+  it(`FC12 at ${size}, the first rows are drawn on opening, after a filter change, a reload and a return from Health`, async () => {
+    const { page } = await open(width, height, text, forced);
+    expect((await firstRows(page)).scrollTop, 'Activity opens at its top').toBe(0);
+    await expectFirstRows(page, 'on opening');
+
+    // The person brings the quick filters to the top of the view and changes the filter there.
+    const quick = page.locator('jf-action-ledger [data-testid="feed-quick"]');
+    await quick.evaluate((group) => group.scrollIntoView({ block: 'start', behavior: 'instant' }));
+    await quick.locator('[data-quick="agents"]').click();
+    await quick.locator('[data-quick="all"]').click();
+    await expectFirstRows(page, 'after a filter change');
+
+    await page.reload({ timeout: 45_000 });
+    await loaded(page);
+    await expectFirstRows(page, 'after a reload');
+
+    await page.getByRole('tab', { name: 'Health' }).click();
+    await page.getByRole('tab', { name: /^Activity/ }).click();
+    await loaded(page);
+    await expectFirstRows(page, 'after returning from Health');
   }, 90_000);
 }

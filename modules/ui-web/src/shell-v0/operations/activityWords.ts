@@ -93,7 +93,7 @@ export function rowOutcomeWords(kind: string, outcome: string): string {
   return kind === 'index' ? indexResultWords(outcome) : words(OUTCOME_WORDS, outcome);
 }
 
-export function operationWords(id: string | undefined): string {
+function operationWords(id: string | undefined): string {
   return id ? present({ kind: 'operation', id }).label : 'an operation not recorded';
 }
 
