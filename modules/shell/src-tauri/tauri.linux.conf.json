@@ -19,7 +19,9 @@
           "libstdc++6 (>= 14)",
           "curl",
           "tesseract-ocr",
-          "tesseract-ocr-eng"
+          "tesseract-ocr-eng",
+          "tesseract-ocr-deu",
+          "tesseract-ocr-osd"
         ]
       }
     }

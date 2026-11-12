@@ -1,0 +1,66 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
+  },
+  "createdAt": "2026-11-11T20:15:51.418Z",
+  "revision": "3c158d013567bdc2d1f9daf9aa2f087d9adf6be0",
+  "tree": "f0aa19f223a00bee0205d5d76b619aee05e2fe24",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.gpl.GplJobCoordinatorTest.negativeSampling_usesStage3aPipelineAndWritesBranchColumns\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5758
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpl/GplJobCoordinatorTest.java#negativeSampling_usesStage3aPipelineAndWritesBranchColumns",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpl/GplJobCoordinatorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:312a4125dd5a32d08918c75e931e3825cb80bcb1445c2a5c58df318016096cbd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "negative sampling uses explicit Stage 3A pipeline and writes branch columns",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "07769e24e2",
+    "revision": "07769e24e258644638934ef96ccd0cefe20bc24a",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.gpl.GplJobCoordinatorTest.negativeSampling_usesStage3aPipelineAndWritesBranchColumns\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 13011
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpl/GplJobCoordinatorTest.java#negativeSampling_usesStage3aPipelineAndWritesBranchColumns",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:c33392d866e17efa2986b84566857872a02ee75d7eea0c574c5715defa848c24"
+}

@@ -1,0 +1,66 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:cd593cd74eead6a7609598a84ea002c56461a905383efd799d04b4f7acb8d738"
+  },
+  "createdAt": "2026-11-11T20:06:41.251Z",
+  "revision": "fc2aee832e2f1d8a78ec78d8fffc08c12f712d3e",
+  "tree": "2773a4981f9f4d75ea86ba07070ad4b2e9b7e536",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.extract.PdfOcrEngineTest.fakeTesseractLanguageProbeDoesNotWriteOcrOutput\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 10626
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PdfOcrEngineTest.java#fakeTesseractLanguageProbeDoesNotWriteOcrOutput",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PdfOcrEngineTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:458a5b531f8b46cdf676cb7326b072ac5e4ffa2ecbb35257e2815cd27c29b4ba",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "fakeTesseractLanguageProbeDoesNotWriteOcrOutput()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "07769e24e2",
+    "revision": "07769e24e258644638934ef96ccd0cefe20bc24a",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.extract.PdfOcrEngineTest.fakeTesseractLanguageProbeDoesNotWriteOcrOutput\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 9662
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PdfOcrEngineTest.java#fakeTesseractLanguageProbeDoesNotWriteOcrOutput",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:210932d5c22f634fa0122fc9c95628bdfe21c82d265bc3e9d701baaabc422a82"
+}

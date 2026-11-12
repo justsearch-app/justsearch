@@ -872,7 +872,7 @@ Licenses of third-party components redistributed with JustSearch.
   NVIDIA cuDNN runtime — LicenseRef-NVIDIA-cuDNN-SLA
     https://docs.nvidia.com/deeplearning/cudnn/sla/ — governed by the cuDNN SLA, which is SEPARATE from the CUDA Toolkit EULA
 
-  Tesseract OCR 5.5.0.20241111 — Apache-2.0; English tessdata — Apache-2.0
+  Tesseract OCR 5.5.0.20241111 — Apache-2.0; German, English and orientation (OSD) tessdata_fast — Apache-2.0
   Bundled Windows runtime libraries (MSYS2/mingw-w64):
     Brotli — MIT
     bzip2 — bzip2-1.0.6

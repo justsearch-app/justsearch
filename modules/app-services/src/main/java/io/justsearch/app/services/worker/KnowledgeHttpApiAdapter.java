@@ -169,7 +169,8 @@ public final class KnowledgeHttpApiAdapter {
 
     List<FolderFilesResponse.FileEntry> files = new ArrayList<>();
     for (FolderFileEntry entry : proto.getFilesList()) {
-      files.add(new FolderFilesResponse.FileEntry(entry.getDocId(), entry.getFieldsMap()));
+      files.add(new FolderFilesResponse.FileEntry(
+          entry.getDocId(), SearchResultMapper.withoutWireOnlyFields(entry.getFieldsMap())));
     }
     return new FolderFilesResponse(files, proto.getTotalCount(), proto.getTookMs());
   }

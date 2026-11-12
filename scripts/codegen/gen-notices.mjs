@@ -127,7 +127,7 @@ function renderThirdParty(jvm, npm, models, native, cargo = []) {
     L.push(`    ${r.ref}${r.bundled ? `; bundled: ${r.bundled}` : ''}`);
   }
   L.push('');
-  L.push(`  Tesseract OCR ${native.tessCore.version} — ${native.tessCore.license}; English tessdata — Apache-2.0`);
+  L.push(`  Tesseract OCR ${native.tessCore.version} — ${native.tessCore.license}; German, English and orientation (OSD) tessdata_fast — Apache-2.0`);
   L.push('  Bundled Windows runtime libraries (MSYS2/mingw-w64):');
   // Group DLL entries by library to keep the notice compact + deterministic.
   const byLib = new Map();
