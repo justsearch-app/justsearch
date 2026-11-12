@@ -69,24 +69,6 @@ function readSessionActivity(sessionsDir, sessionId) {
 }
 
 /**
- * Merge a patch into a session's activity stamp (best-effort, atomic-ish). Used by the
- * dev-runner to record `ownedEpoch` at takeover so a later displaced owner can detect it
- * (tempdoc 606 3a notification). Same file shape the retired session hooks wrote.
- */
-function mergeSessionActivity(sessionsDir, sessionId, patch) {
-  if (!sessionId) return;
-  try {
-    fs.mkdirSync(sessionsDir, { recursive: true });
-    const file = path.join(sessionsDir, `${sessionId}.json`);
-    let cur = {};
-    try { cur = JSON.parse(fs.readFileSync(file, 'utf8')) || {}; } catch { /* fresh */ }
-    const tmp = `${file}.${process.pid}.tmp`;
-    fs.writeFileSync(tmp, JSON.stringify({ ...cur, ...patch }), 'utf8');
-    fs.renameSync(tmp, file);
-  } catch { /* best-effort */ }
-}
-
-/**
  * Classify owner activity into staleness flags. Returns `known:false` when no
  * stamp exists — callers MUST then treat the owner as active (conservative).
  */
@@ -432,7 +414,6 @@ function computeProvenanceMismatch(leaseProvenance, callerRepoRoot) {
 module.exports = {
   DEFAULT_THRESHOLDS,
   readSessionActivity,
-  mergeSessionActivity,
   classifyActivity,
   computeOwnershipVerdict,
   computeDisplacedNotice,

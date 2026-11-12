@@ -31,6 +31,7 @@ import { enginePlanFor } from '../contract.mjs';
 import { proveEssentialStability } from '../essential-stability.mjs';
 
 const require = createRequire(import.meta.url);
+const { ownerPidPresence } = require('../../dev/lib/owner-presence.cjs');
 
 export const name = 'dev-runner';
 
@@ -260,11 +261,11 @@ const RESTART_CASES = new Set([
   'requested-restart-completion-failure-is-counted',
 ]);
 
-export async function runCase({ testCase, policy, io }) {
+export async function runCase({ testCase, policy, io, kill = process.kill }) {
   if (testCase.id.startsWith('recovery-')) return runRecoveryCase({ name, testCase, policy, io });
   if (testCase.probe || (name === "tauri" && testCase.expect?.ledger)) return runLifecycle({ name, testCase, policy, io });
   if ((testCase.drives ?? []).some((d) => phases.includes(d)) && !(testCase.drives ?? []).includes('actuator')) {
-    return runLifecycleCase({ testCase, policy, io });
+    return runLifecycleCase({ testCase, policy, io, kill });
   }
   const problems = [];
   const run = await driveCase({ testCase, policy, io });
@@ -631,7 +632,7 @@ async function waitForLedger(io, dataDir, expected, ids, timeoutMs = 10_000) {
   }
 }
 
-async function runLifecycleCase({ testCase, policy, io }) {
+async function runLifecycleCase({ testCase, policy, io, kill }) {
   const problems = [];
   const expect = testCase.expect ?? {};
   const workDir = io.makeWorkDir(testCase.id);
@@ -658,7 +659,7 @@ async function runLifecycleCase({ testCase, policy, io }) {
       first.child.kill(process.platform === 'win32' ? undefined : 'SIGKILL');
       await Promise.race([first.exited, io.sleep(5000)]);
       const enginePid = up.pid;
-      await io.waitFor(() => { try { process.kill(enginePid, 0); return false; } catch { return true; } },
+      await io.waitFor(() => ownerPidPresence({ pid: enginePid }, { env: {}, kill }) === 'absent',
         { timeoutMs: 10_000, what: 'the orphaned Engine to end with the runner' })
         .catch(() => problems.push(`the Engine (pid ${enginePid}) outlived its killed supervisor`));
     }

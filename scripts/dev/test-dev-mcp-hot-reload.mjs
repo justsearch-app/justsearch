@@ -241,8 +241,10 @@ const ownershipTests = [
     assert.equal(g.refusal.error.code, 'OWNER_CONFLICT');
   }],
   ['a dead supervisor is reclaimable, not a permanent refusal', async () => {
+    const { spawnSync } = require('node:child_process');
+    const deadRunner = spawnSync(process.execPath, ['-e', '']);
     const g = await checkRunMutationOwnership(ownershipArgs({
-      runJson: runRecord(fx.treeA, { pids: { runnerPid: 0 } }),
+      runJson: runRecord(fx.treeA, { pids: { runnerPid: deadRunner.pid } }),
     }));
     assert.equal(g.allowed, true);
     assert.equal(g.decision.verdict, 'RECLAIM_DEAD');

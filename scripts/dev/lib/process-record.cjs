@@ -32,6 +32,7 @@
 const fsp = require('node:fs/promises');
 const path = require('node:path');
 const http = require('node:http');
+const { ownerPidPresence } = require('./owner-presence.cjs');
 
 /* ── Generic: directory resolution ──────────────────────────────────────────────────────────── */
 
@@ -165,9 +166,9 @@ async function writeRecordAtomic(filePath, record) {
 
 /* ── Generic: pid liveness, an HTTP status probe, and state derivation ─────────────────────────*/
 
-function pidAlive(pid) {
+function pidAlive(pid, { kill = process.kill } = {}) {
   if (typeof pid !== 'number' || pid <= 0) return false;
-  try { process.kill(pid, 0); return true; } catch { return false; }
+  return ownerPidPresence({ pid }, { env: {}, kill }) !== 'absent';
 }
 
 function httpGetStatusCode(urlStr, timeoutMs) {
