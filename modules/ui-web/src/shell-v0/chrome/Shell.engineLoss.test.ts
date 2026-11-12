@@ -272,7 +272,7 @@ describe('SC1 SC7 what is not an outage', () => {
 
 describe('SC4 Open Health', () => {
   it('shows the last known facts, each with when it was seen, and nothing live', async () => {
-    engine.status = statusBody({ indexState: 'SERVING', searchableDocuments: 1234, pendingJobs: 7 },
+    engine.status = statusBody({ indexState: 'SERVING', searchableDocuments: 1234, ownSearchableDocuments: 1234, pendingJobs: 7 },
       { indexBasePath: '/home/secret-person/.justsearch/index' });
     const shell = await mountShell();
     await goTo(shell, SEARCH);
@@ -359,7 +359,7 @@ const STATUS_FACTS = ['Index', 'Searchable files', 'Files waiting'];
 
 describe('SC4 each Health fact carries the time it was itself observed', () => {
   it('status failing while inference answers: the index facts keep the status answer’s age, not the newer contact', async () => {
-    engine.status = statusBody({ indexState: 'SERVING', searchableDocuments: 1234, pendingJobs: 7 });
+    engine.status = statusBody({ indexState: 'SERVING', searchableDocuments: 1234, ownSearchableDocuments: 1234, pendingJobs: 7 });
     const shell = await mountShell();
     await goTo(shell, SEARCH);
     await pass(10_000);
@@ -375,7 +375,7 @@ describe('SC4 each Health fact carries the time it was itself observed', () => {
   });
 
   it('polls failing while live streams keep arriving: the index facts keep the last status answer’s age', async () => {
-    engine.status = statusBody({ indexState: 'SERVING', searchableDocuments: 1234, pendingJobs: 7 });
+    engine.status = statusBody({ indexState: 'SERVING', searchableDocuments: 1234, ownSearchableDocuments: 1234, pendingJobs: 7 });
     const shell = await mountShell();
     await goTo(shell, SEARCH);
     await pass(10_000);
@@ -393,7 +393,7 @@ describe('SC4 each Health fact carries the time it was itself observed', () => {
   });
 
   it('everything lost at once: every fact states the same age, its own', async () => {
-    engine.status = statusBody({ indexState: 'SERVING', searchableDocuments: 1234, pendingJobs: 7 });
+    engine.status = statusBody({ indexState: 'SERVING', searchableDocuments: 1234, ownSearchableDocuments: 1234, pendingJobs: 7 });
     const shell = await mountShell();
     await goTo(shell, SEARCH);
     await pass(10_000);

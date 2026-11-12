@@ -181,13 +181,16 @@ const FACTS: Record<string, FactDef> = {
     label: 'Files',
     source: {
       kind: 'observed',
-      // #758: an index the backend could not count reads "Checking…" while the
-      // server is starting and "Unknown" after — never "0", which would say the index is empty.
+      // The person's own files (bundled Help excluded), the count the composer, Library and AI Brain
+      // read. #758: a count the backend could not take reads "Checking…" while the server is
+      // starting and "Unknown" after — never "0", which would say there are no files.
       read: (s) =>
-        unknownDocumentCountLabel(s.status) ??
-        (s.index ? whenKnown(s.index.documentCount, (n) => formatCount(n), () => undefined) : undefined),
+        unknownDocumentCountLabel(s.status, 'searchable') ??
+        (s.index
+          ? whenKnown(s.index.ownDocumentCount, (n) => formatCount(n), () => (s.status ? 'Unknown' : undefined))
+          : undefined),
       provenance: (s) => {
-        const observation = s.status?.worker?.countObservations?.active;
+        const observation = s.status?.worker?.countObservations?.searchable;
         return observation?.state === 'stale'
           ? `Last known · observed ${observation.observedAtMs ? formatDateTime(new Date(observation.observedAtMs)) : 'at an unknown time'}`
           : undefined;
@@ -198,7 +201,10 @@ const FACTS: Record<string, FactDef> = {
     label: 'Size',
     source: {
       kind: 'observed',
-      read: (s) => (s.status ? formatBytes(s.status.worker?.core?.indexSizeBytes) : undefined),
+      // A Worker count like the Files count: unknown words while the Engine has none, never "0 B".
+      read: (s) => (s.status
+        ? unknownDocumentCountLabel(s.status) ?? formatBytes(s.status.worker?.core?.indexSizeBytes)
+        : undefined),
     },
   },
   'core.memory': {

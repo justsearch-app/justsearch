@@ -14,6 +14,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 
 import { discover, pinnedEngine } from './discovery.mjs';
 import { engineRequest } from '../../../packaging/mcpb/server/engine-discovery.cjs';
+import { workerCountsKnown } from '../../lib/worker-counts.mjs';
 import {
   AnswerInputSchema,
   AnswerOutputSchema,
@@ -959,7 +960,9 @@ export async function main() {
     {
       description:
         'Get the current status of the JustSearch knowledge index. ' +
-        'Returns document count, queue depth, readiness state, health, and enrichment coverage ' +
+        'Returns document count and queue depth (both omitted, with the enrichment counts, while the ' +
+        'Engine does not know its index counts), ' +
+        'readiness state, health, and enrichment coverage ' +
         '(embeddingCoveragePercent, spladeCoveragePercent, pendingNerCount, completedNerCount). ' +
         'After ingesting documents, poll this endpoint to check if enrichment (embeddings, NER, SPLADE) ' +
         'is complete before using entity filters or semantic search.',
@@ -976,19 +979,22 @@ export async function main() {
       const { parsed, error } = parseJsonResponse(res);
       if (error) return error;
 
+      // The Engine marks Worker counts it does not have; their placeholder 0s are no empty index or
+      // drained queue, so every Worker count is omitted then.
+      const counts = workerCountsKnown(parsed);
       return toToolResult(
         StatusOutputSchema.parse({
           ok: true,
           state: parsed.state,
           ready: parsed.ready,
-          docCount: parsed.docCount ?? parsed.indexedDocuments,
-          queueDepth: parsed.queueDepth ?? parsed.pendingJobs,
+          docCount: counts ? parsed.docCount ?? parsed.indexedDocuments : undefined,
+          queueDepth: counts ? parsed.queueDepth ?? parsed.pendingJobs : undefined,
           healthy: parsed.healthy,
           indexState: parsed.indexState,
-          embeddingCoveragePercent: parsed.embeddingCoveragePercent ?? undefined,
-          spladeCoveragePercent: parsed.spladeCoveragePercent ?? undefined,
-          pendingNerCount: parsed.pendingNerCount ?? undefined,
-          completedNerCount: parsed.completedNerCount ?? undefined,
+          embeddingCoveragePercent: counts ? parsed.embeddingCoveragePercent ?? undefined : undefined,
+          spladeCoveragePercent: counts ? parsed.spladeCoveragePercent ?? undefined : undefined,
+          pendingNerCount: counts ? parsed.pendingNerCount ?? undefined : undefined,
+          completedNerCount: counts ? parsed.completedNerCount ?? undefined : undefined,
         }),
       );
     },

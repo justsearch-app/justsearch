@@ -21,6 +21,7 @@ import fs from 'node:fs';
 import runtime from './lib/dev-runtime.cjs';
 import nativeTargets from '../lib/native-targets.cjs';
 import processRecords from './lib/process-record.cjs';
+import { workerCountsKnown } from '../lib/worker-counts.mjs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -181,20 +182,20 @@ async function main() {
       getJson(stack.apiBaseUrl, '/api/runtime/manifest'),
     ]);
     if (status) {
-      const worker = status.components?.worker;
-      // LifecycleSnapshotV2's six real states (LifecycleState proto; UNSPECIFIED/UNRECOGNIZED are
-      // rejected sentinels, never actually sent — see LifecycleSnapshotV2.Lifecycle). STARTING
-      // is a normal transient state during stack boot, not an environment defect — exclude it from
-      // "broken" so a doctor run during startup doesn't exit 2 for a stack that just hasn't finished
-      // coming up yet. Only DEGRADED/ERROR/STOPPING/STOPPED (i.e. anything but READY or STARTING)
-      // count as "actually broken".
-      const workerStarting = worker?.state === 'LIFECYCLE_STATE_STARTING';
-      workerBroken = worker && worker.state && worker.state !== 'LIFECYCLE_STATE_READY' && !workerStarting;
+      // The Worker is the Engine's `index` component (health-readiness contract: the lifecycle
+      // subset's fixed `components` slots, six registry states). STARTING and RELOADING are normal
+      // transient states (stack boot, a model change), not an environment defect — a doctor run then
+      // doesn't exit 2 for a stack that just hasn't finished. Only UNAVAILABLE and FAILED count as
+      // "actually broken". No reported state: the field is omitted.
+      const workerState = typeof status.components?.index?.state === 'string' ? status.components.index.state : undefined;
+      const workerStarting = workerState === 'STARTING' || workerState === 'RELOADING';
+      workerBroken = workerState === 'UNAVAILABLE' || workerState === 'FAILED';
       report.live = {
         apiBaseUrl: stack.apiBaseUrl,
-        worker: worker?.state,
+        worker: workerState,
         workerStarting,
-        indexedDocuments: status.worker?.core?.indexedDocuments,
+        // null when the Engine says its Worker counts are unknown (its 0 is then a placeholder, not an empty index).
+        indexedDocuments: workerCountsKnown(status) ? status.worker?.core?.indexedDocuments : null,
         aiReady: status.aiReady,
         embeddingReady: status.embeddingReady,
         aiReason: manifest?.ai?.pendingReason ?? status.components?.inference?.reason_code ?? null,
@@ -211,7 +212,7 @@ async function main() {
     console.log(`GPU runtime resolvable: ${offline.runtime ? 'yes' : 'no'}` +
       (offline.runtime ? ` (GPU verified: ${offline.gpuVerified === true ? 'yes' : 'not verified'})` : ''));
     if (report.live) {
-      console.log(`\nLive stack (${report.live.apiBaseUrl}): worker=${report.live.worker}, indexed=${report.live.indexedDocuments}, aiReady=${report.live.aiReady}` +
+      console.log(`\nLive stack (${report.live.apiBaseUrl}): ${report.live.worker ? `worker=${report.live.worker}, ` : ''}indexed=${report.live.indexedDocuments ?? 'unknown'}, aiReady=${report.live.aiReady}` +
         (report.live.aiReason ? `, ai=${report.live.aiReason}` : ''));
       if (report.live.workerStarting) console.log(`(stack is starting — worker not yet READY; this is informational, not an error)`);
     } else {

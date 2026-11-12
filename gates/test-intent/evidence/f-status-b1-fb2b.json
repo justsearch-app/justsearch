@@ -1,0 +1,167 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-12T17:52:33.170Z",
+  "revision": "0ed9b40662c4f9285b23af7e5376c6b566a3e5c9",
+  "tree": "a5fb680785da7f89e1a2b6ea998f846b3ce4d44f",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/workerCountsUnknown.test.ts\" \"src/shell-v0/views/HealthSurface.unknown-worker-counts.test.ts\" \"src/shell-v0/state/indexingProgress.test.ts\" \"src/shell-v0/views/HealthSurface.truthfulness.test.ts\" \"src/shell-v0/state/uncountedIndex.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/ks3br6qw/tmp/test-intent-vitest-110114-1794505944262.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2654
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/state/workerCountsUnknown.test.ts#a status that marks its counts unknown gives no Worker count to any reader",
+      "file": "modules/ui-web/src/shell-v0/state/workerCountsUnknown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7a00947fe86476ac37e91e15839ec896ae354bd10d36791db1df455d3e417a01",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FB2b the unknown flag covers every Worker count a status that marks its counts unknown gives no Worker count to any reader",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HealthSurface.unknown-worker-counts.test.ts#Size and Queue are not known, never the placeholder or the carried number",
+      "file": "modules/ui-web/src/shell-v0/views/HealthSurface.unknown-worker-counts.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:15000adb3d072d069c7f0375f6bea3c3a06e97e12693f828949f1b9bb8fadda8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FB2b Health shows no Worker count from a status whose counts are unknown Size and Queue are not known, never the placeholder or the carried number",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HealthSurface.unknown-worker-counts.test.ts#during an outage, an Engine that reported no own count reads Unknown, not the searchable count",
+      "file": "modules/ui-web/src/shell-v0/views/HealthSurface.unknown-worker-counts.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:15000adb3d072d069c7f0375f6bea3c3a06e97e12693f828949f1b9bb8fadda8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FB5a Health never shows a Help-inclusive count as Files during an outage, an Engine that reported no own count reads Unknown, not the searchable count",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/indexingProgress.test.ts#does not infer zero passage work from a unknown parent count",
+      "file": "modules/ui-web/src/shell-v0/state/indexingProgress.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:74045de8e358e7dbd5905a59c46f2c538a1487b99816404fb44e532a3f5b71a4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "does not infer zero passage work from a unknown parent count",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HealthSurface.truthfulness.test.ts#last-known facts keep an uncounted index unknown and state the sample age beside the receipt",
+      "file": "modules/ui-web/src/shell-v0/views/HealthSurface.truthfulness.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9d0c19b7a76d4a2c134543234f9a1275e223667303a0d90ccac5c707ba1297de",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "frozen worker sample, then engine loss last-known facts keep an uncounted index unknown and state the sample age beside the receipt",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/uncountedIndex.test.ts#a failed filtered count leaves every count unknown, also beside a fresh whole-index count",
+      "file": "modules/ui-web/src/shell-v0/state/uncountedIndex.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ccdcaedb9de8ce49ee66fcec6ba8d95dcee3a4b0ecf841a51f9d758b2da69379",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "count observation provenance a failed filtered count leaves every count unknown, also beside a fresh whole-index count",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "0ed9b40662c4f9285b23af7e5376c6b566a3e5c9",
+    "revision": "0ed9b40662c4f9285b23af7e5376c6b566a3e5c9",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/workerCountsUnknown.test.ts\" \"src/shell-v0/views/HealthSurface.unknown-worker-counts.test.ts\" \"src/shell-v0/state/indexingProgress.test.ts\" \"src/shell-v0/views/HealthSurface.truthfulness.test.ts\" \"src/shell-v0/state/uncountedIndex.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/ks3br6qw/tmp/test-intent-vitest-110114-1794505950722.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 2163,
+        "output": "JSON report written to /home/elias/.cache/am/ks3br6qw/tmp/test-intent-vitest-110114-1794505950722.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/state/workerCountsUnknown.test.ts#a status that marks its counts unknown gives no Worker count to any reader",
+        "classification": "assertion",
+        "detail": "FB2b the unknown flag covers every Worker count a status that marks its counts unknown gives no Worker count to any reader:  AssertionError: expected true to be false // Object.is equality\n    at /home/elias/.cache/am/ks3br6qw/tmp/test-intent-before-ytje62/modules/ui-web/src/shell-v0/state/workerCountsUnknown.test.ts:41:46\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-status-b1/modules/ui-web/node_modules/@"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/HealthSurface.unknown-worker-counts.test.ts#Size and Queue are not known, never the placeholder or the carried number",
+        "classification": "assertion",
+        "detail": "FB2b Health shows no Worker count from a status whose counts are unknown Size and Queue are not known, never the placeholder or the carried number:  AssertionError: expected '4.0 KB' not to match /\\d/\n    at /home/elias/.cache/am/ks3br6qw/tmp/test-intent-before-ytje62/modules/ui-web/src/shell-v0/views/HealthSurface.unknown-worker-counts.test.ts:64:25\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///home/e"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/HealthSurface.unknown-worker-counts.test.ts#during an outage, an Engine that reported no own count reads Unknown, not the searchable count",
+        "classification": "assertion",
+        "detail": "FB5a Health never shows a Help-inclusive count as Files during an outage, an Engine that reported no own count reads Unknown, not the searchable count:  AssertionError: expected '12 · last seen just now' to match /^Unknown\\b/\n    at /home/elias/.cache/am/ks3br6qw/tmp/test-intent-before-ytje62/modules/ui-web/src/shell-v0/views/HealthSurface.unknown-worker-counts.test.ts:80:38\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-status-b1/modu"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/indexingProgress.test.ts#does not infer zero passage work from a unknown parent count",
+        "classification": "assertion",
+        "detail": "does not infer zero passage work from a unknown parent count:  AssertionError: expected 'ready' to be 'unknown' // Object.is equality\n    at /home/elias/.cache/am/ks3br6qw/tmp/test-intent-before-ytje62/modules/ui-web/src/shell-v0/state/indexingProgress.test.ts:1196:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-status-b1/modules/ui-web/node_mod"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/HealthSurface.truthfulness.test.ts#last-known facts keep an uncounted index unknown and state the sample age beside the receipt",
+        "classification": "assertion",
+        "detail": "frozen worker sample, then engine loss last-known facts keep an uncounted index unknown and state the sample age beside the receipt:  AssertionError: expected '\\n            Files waiting\\n        …' to contain 'Unknown'\n    at /home/elias/.cache/am/ks3br6qw/tmp/test-intent-before-ytje62/modules/ui-web/src/shell-v0/views/HealthSurface.truthfulness.test.ts:212:35\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-status-b"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/uncountedIndex.test.ts#a failed filtered count leaves every count unknown, also beside a fresh whole-index count",
+        "classification": "assertion",
+        "detail": "count observation provenance a failed filtered count leaves every count unknown, also beside a fresh whole-index count:  AssertionError: expected true to be false // Object.is equality\n    at /home/elias/.cache/am/ks3br6qw/tmp/test-intent-before-ytje62/modules/ui-web/src/shell-v0/state/uncountedIndex.test.ts:92:52\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-status-b1/modules/ui-web/node_modules/@vites"
+      }
+    ]
+  },
+  "digest": "sha256:abeabf476f1c8e573d974c3b90f0821b9cf6897782305a3c60fb85147df29d56"
+}

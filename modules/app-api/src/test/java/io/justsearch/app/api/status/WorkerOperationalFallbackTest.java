@@ -17,4 +17,12 @@ class WorkerOperationalFallbackTest {
     assertTrue(json.path("core").path("ownSearchableDocuments").isNull(),
         "status JSON must preserve the unknown fallback own count");
   }
+
+  @Test
+  void fallbackDocumentCountsAreUnknownInStatusJson() {
+    var json = JsonMapper.builder().build().valueToTree(WorkerOperationalView.fallback("UNAVAILABLE"));
+
+    assertTrue(json.path("core").path("indexedDocumentsUnknown").asBoolean(false),
+        "a status without a Worker reading must not claim its zero document counts are known");
+  }
 }

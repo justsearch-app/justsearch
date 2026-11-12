@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import os
 import time
 from pathlib import Path
@@ -12,6 +13,7 @@ import httpx
 
 from jsharness.readiness import (
     flatten_status,
+    worker_counts_known,
     wait_embed_compat_settled,
     wait_index_idle,
     wait_pipeline_complete,
@@ -39,8 +41,25 @@ def ingest_and_wait(
     """
     start = time.monotonic()
 
-    # Get initial doc count for floor calculation
+    # Get initial doc count for floor calculation. A count the Engine does not know
+    # (indexedDocumentsUnknown) or a failed read is no count to build a floor on: wait for a known
+    # one within the indexing timeout. A known 0 is accepted at once. The wait is bounded by reads as
+    # well as by the clock (one read per poll interval of the timeout), so it ends even where the
+    # clock does not advance.
     initial_count = _get_indexed_doc_count(config.base_url)
+    count_deadline = start + config.index_timeout_sec
+    reads_left = math.ceil(config.index_timeout_sec / poll_interval_sec)
+    while initial_count is None and reads_left > 0 and time.monotonic() < count_deadline:
+        reads_left -= 1
+        time.sleep(min(poll_interval_sec, max(0.0, count_deadline - time.monotonic())))
+        initial_count = _get_indexed_doc_count(config.base_url)
+    if initial_count is None:
+        raise RuntimeError(
+            f"the Engine did not report a known indexed document count within the indexing timeout "
+            f"({config.index_timeout_sec:g} s), so the ingest floor cannot be set; nothing was added. "
+            f"Check that the Engine at {config.base_url} is running and its Worker is connected, "
+            f"then retry (or raise the indexing timeout)."
+        )
     if corpus_doc_count > 0:
         if _root_already_watched(config.base_url, docs_dir):
             # Tempdoc 751 sec Q sub-bug (a): the SAME root is being (re-)ingested
@@ -124,7 +143,8 @@ def ingest_and_wait(
 
     elapsed = time.monotonic() - start
     final_count = readiness.snapshot.get("indexedDocuments", 0)
-    docs_indexed = final_count - initial_count
+    # None: the last status did not know the count (readiness then failed on it).
+    docs_indexed = None if final_count is None else final_count - initial_count
 
     snapshot = readiness.snapshot
     summary: dict = {
@@ -134,7 +154,9 @@ def ingest_and_wait(
         "final_doc_count": final_count,
         "docs_indexed": docs_indexed,
         "elapsed_sec": round(elapsed, 2),
-        "docs_per_sec": round(docs_indexed / elapsed, 1) if elapsed > 0 else 0,
+        "docs_per_sec": (
+            None if docs_indexed is None else round(docs_indexed / elapsed, 1) if elapsed > 0 else 0
+        ),
         "index_size_bytes": snapshot.get("indexSizeBytes"),
     }
 
@@ -481,6 +503,8 @@ def _wait_for_watcher_activity(
                 data = flatten_status(resp.json())
             except Exception:
                 continue
+            if not worker_counts_known(data):
+                continue  # no Worker reading: neither activity nor its absence
             pending = (
                 data.get("pendingJobs", 0)
                 + data.get("pendingJobsCount", 0)
@@ -501,14 +525,19 @@ def _wait_for_watcher_activity(
     return False
 
 
-def _get_indexed_doc_count(base_url: str) -> int:
+def _get_indexed_doc_count(base_url: str) -> int | None:
+    """The serving index's document count; None when it is not known.
+
+    Not known: the Engine reports its Worker counts unknown, or the read failed (HTTP error such
+    as 503, connection refused). A failed read is never a count of 0.
+    """
     try:
         with httpx.Client(base_url=base_url, timeout=10) as client:
             resp = client.get("/api/status")
             resp.raise_for_status()
             return flatten_status(resp.json()).get("indexedDocuments", 0)
     except Exception:
-        return 0
+        return None
 
 
 def _watched_root_paths(base_url: str) -> list[str]:
@@ -551,13 +580,18 @@ def _wait_for_backpressure(
     low_watermark: int,
     poll_sec: float,
 ) -> None:
-    """Block if the queue depth exceeds the high watermark."""
+    """Block if the queue depth exceeds the high watermark.
+
+    A depth the Engine does not know (``None``) is no reading, so it is read again.
+    """
     while True:
         try:
             resp = client.get("/api/status")
             resp.raise_for_status()
             depth = flatten_status(resp.json()).get("pendingJobs", 0)
         except Exception:
+            depth = None
+        if depth is None:
             time.sleep(poll_sec)
             continue
 
@@ -573,7 +607,9 @@ def _wait_for_backpressure(
             try:
                 resp = client.get("/api/status")
                 resp.raise_for_status()
-                depth = flatten_status(resp.json()).get("pendingJobs", 0)
+                reading = flatten_status(resp.json()).get("pendingJobs", 0)
             except Exception:
                 continue
+            if reading is not None:
+                depth = reading
         return  # Queue drained below low watermark

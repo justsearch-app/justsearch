@@ -105,7 +105,7 @@ def test_get_indexed_doc_count_on_error(MockClient):
     mock_client.get.side_effect = Exception("connection refused")
 
     count = _get_indexed_doc_count("http://localhost:8080")
-    assert count == 0
+    assert count is None  # FB2c: a refused read is no count, never 0
 
 
 # ---------------------------------------------------------------------------

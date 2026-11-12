@@ -244,7 +244,11 @@ the search-readiness tolerance of 99.9% cannot hide an unfinished production chu
 `JUSTSEARCH_SESSION_TOKEN` and shares the requested time budget with readiness polling. Generated outputs
 for this wait/ingest path must reside outside the raw corpus so the watcher cannot ingest them.
 `--timeline` records aggregate counters, including `vdu_pending` and `vdu_processing`; missing VDU values
-remain blank rather than being reported as zero. The caller owns stack startup, inference activation,
+remain blank rather than being reported as zero, and so do the Worker's counts (`indexed`, `pending`, the
+writer gauges, `vdu_pending`) while the Engine reports its counts unknown (`indexedDocumentsUnknown`). Ingest
+reads the initial document count before adding a root; while that read fails or the count is unknown, it
+waits for a known count within `index_timeout_sec`, and stops with an error naming that timeout when none
+arrives (a known 0 is taken at once). The caller owns stack startup, inference activation,
 clean data-directory selection, and shutdown through the dev-stack workflow.
 
 An isolated full-inference measurement must start with zero indexed documents. Normal application

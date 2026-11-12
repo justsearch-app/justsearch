@@ -211,14 +211,26 @@ export interface IndexingProgress {
 const INDEX_REPORTED_STATES: ReadonlySet<string> = new Set(['IDLE', 'INDEXING', 'WAITING', 'ERROR', 'FAILED']);
 
 /**
- * Does this snapshot carry a WORKER-REPORTED index block (as opposed to the hard-zeroed fallback
- * shape described above)? Exported so `aiStateStore`'s cross-poll high-water stamp applies the SAME
- * admission test this projection does: a fallback block's `pendingJobs: 0` is absence, not a drained
- * queue, and reading it as a drain would reset the episode's denominator mid-drain.
+ * The ONE answer to "are this status's Worker counts unknown": true when it marks its document counts
+ * unknown (`indexedDocumentsUnknown`). That flag covers every count the Worker block carries
+ * (documents, pending jobs, index size, queue and enrichment counts; health-readiness contract), so
+ * their zeros are then absence, never an empty index or a drained queue. Every reader of a Worker
+ * count asks this, directly or through {@link isWorkerReportedIndex}.
+ */
+export function workerCountsUnknown(status: StatusResponse | null | undefined): boolean {
+  return status?.worker?.core?.indexedDocumentsUnknown === true;
+}
+
+/**
+ * Does this snapshot carry a WORKER-REPORTED index block whose counts are known (as opposed to the
+ * hard-zeroed fallback shape described above, or a status whose counts are unknown,
+ * {@link workerCountsUnknown})? Exported so `aiStateStore`'s cross-poll high-water stamp applies the
+ * SAME admission test this projection does: reading an unknown `pendingJobs: 0` as a drain would
+ * reset the episode's denominator mid-drain.
  */
 export function isWorkerReportedIndex(status: StatusResponse | null | undefined): boolean {
   const core = status?.worker?.core;
-  if (!status || !core) return false;
+  if (!status || !core || workerCountsUnknown(status)) return false;
   return INDEX_REPORTED_STATES.has(core.indexState ?? '');
 }
 
@@ -381,8 +393,8 @@ function readEnrichmentWork(status: StatusResponse | null | undefined): Enrichme
     + (applicable.ner && enrichment?.nerAvailable === false ? nerPending : 0)
     + (chunk?.chunkSpladeEnabled === true && enrichment?.spladeAvailable === false ? count(chunk.chunkSpladePendingCount) : 0);
   const unknown = (applicable.embedding && chunk?.chunkDocCount === 0 && chunk.chunkingNotRequired === false
-    && (status?.worker?.core?.indexedDocumentsUnknown === true
-      || ['unknown', 'stale'].includes(status?.worker?.countObservations?.active?.state ?? ''))) ||
+    // An uncounted index never reaches here (isWorkerReportedIndex guards every caller).
+    && ['unknown', 'stale'].includes(status?.worker?.countObservations?.active?.state ?? '')) ||
     (enrichment?.completenessKnown === false &&
     (applicable.embedding || applicable.splade || applicable.ner)) || [
     ...(applicable.embedding ? [enrichment?.embeddingDocCount, enrichment?.embeddingPendingCount,
