@@ -223,8 +223,14 @@ public final class JobBatchExtractor {
       fileMutationFence.lock();
       try {
         // A source/root/policy observation made before waiting cannot authorize retirement.
+        if (!ingestionAuthority.upkeepCurrent(claim, jobQueue, documentFieldOps)) {
+          jobQueue.markClaimDone(claim, journal.skipped(IngestionReasonCodes.SKIPPED_TEMP_OR_SYSTEM),
+              ledgerEntry(filePath, collection, provenance));
+          batchStats.recordSkipped();
+          return null;
+        }
         admission = ingestionAuthority.admit(claim);
-        if (admission.action() == SourceAdmissionAction.STALE_DONE) {
+        if (admission.action() == SourceAdmissionAction.STALE_DONE && claim.upkeepOriginId() == null) {
           if (!jobQueue.ownsClaimForPublication(claim)) return null;
           indexedDelta.accept(staleSourceHandler.deleteMissingSource(
               filePath, claim.ingestionRoot(), ingestionAuthority.rootCheck()));
@@ -233,7 +239,8 @@ public final class JobBatchExtractor {
         fileMutationFence.unlock();
       }
       if (admission.action() == SourceAdmissionAction.STALE_DONE) {
-        log.debug("File not found, treating as delete: {}", filePath);
+        if (claim.upkeepOriginId() == null) log.debug("File not found, treating as delete: {}", filePath);
+        else log.debug("Stale upkeep source settled without deleting current rows: {}", filePath);
         journal.enqueueTransition(new JobQueue.IngestionLedgerTransition(
             claim, ledgerEntry(filePath, collection, provenance)), admission.outcome());
         batchStats.recordSkipped();
@@ -404,7 +411,11 @@ public final class JobBatchExtractor {
           claim, artifact, startTime, envelope, sourceSha256, docUid, sourceRealPath, forceReindex);
 
     } catch (JobQueue.IngestionApprovalInterruptedException interrupted) {
-      jobQueue.returnUnfinishedClaims(List.of(claim));
+      if (claim.upkeepOriginId() == null) jobQueue.returnUnfinishedClaims(List.of(claim));
+      else journal.recordOutcomeSafely(filePath, "UPKEEP_INELIGIBLE", () -> jobQueue.deferClaim(claim,
+          journal.outcome(IngestionOutcomeClass.DEFERRED_POLICY, "IMPORT_UPKEEP_INELIGIBLE",
+              IngestionRetryPolicy.DEFER_WITHOUT_ATTEMPT, "Import approval is unavailable"),
+          ledgerEntry(filePath, collection, provenance)));
       return null;
     } catch (IngestionServiceUnavailableException
         | EngineExecutorRejectedException

@@ -565,6 +565,18 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
       CheckedBulkRuntime bulkRuntime, CheckedGapAcceptance gapAcceptance) throws IOException {
     synchronized (lock) {
       if (attached != null) throw new IOException("Recorded ingestion still owns its prior queue");
+      queue.useImportUpkeepAuthority(origin -> {
+        // No coordinator lock: this read is also used by issued claims under the queue owner.
+        try {
+          var parent = operations.find(origin.approval().operationKey());
+          if (parent.isPresent() && !parent.orElseThrow().state().terminal()) {
+            return JobQueue.ImportUpkeepEligibility.DENIED;
+          }
+          return new JobQueue.ImportUpkeepEligibility(true, authority.evaluateOriginApproval(origin));
+        } catch (RuntimeException unavailable) {
+          return JobQueue.ImportUpkeepEligibility.DENIED;
+        }
+      });
       queue.useRecordedWalkRetention(this::retainedImportChildren);
       queue.useImportApprovalBinding(key -> scanOperation(key).filter(RecordedIngestionCoordinator::isImport)
           .map(this::importState).filter(state -> state.binding() != null).map(state -> state.binding().id()).orElse(null));

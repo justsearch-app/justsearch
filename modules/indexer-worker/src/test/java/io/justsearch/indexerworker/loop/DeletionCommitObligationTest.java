@@ -128,9 +128,13 @@ final class DeletionCommitObligationTest extends LuceneExecutorTestBase {
       config.update(io.justsearch.configuration.resolved.ResolvedConfig.builder()
           .putDefault("justsearch.ui.exclude_patterns", "[\"" + pattern + "\"]").build());
       var indexing = mock(io.justsearch.app.api.IndexingService.class, call -> {
-        if (call.getMethod().getName().equals("forEachIndexedSource")) {
-          java.util.function.Consumer<String> consumer = call.getArgument(0);
-          consumer.accept(file.toString()); return 0L;
+        if (call.getMethod().getName().equals("forEachIndexedSource")
+            || call.getMethod().getName().equals("forEachIndexedSourceWithOrigin")) {
+          java.util.function.Consumer<Object> consumer = call.getArgument(0);
+          Object member = call.getMethod().getName().equals("forEachIndexedSource") ? file.toString()
+              : Class.forName(io.justsearch.app.api.IndexingService.class.getName() + "$IndexedSourceOwner")
+                  .getConstructor(String.class, String.class).newInstance(file.toString(), null);
+          consumer.accept(member); return 0L;
         }
         if (call.getMethod().getName().equals("deleteDocByIdWithOutcome")) {
           var response = service.deleteById(io.justsearch.ipc.DeleteByIdRequest.newBuilder()

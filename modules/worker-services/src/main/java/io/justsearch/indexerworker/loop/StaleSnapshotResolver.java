@@ -194,6 +194,11 @@ public final class StaleSnapshotResolver {
       var validation = known == null || known == FileFreshnessSnapshot.SourceValidationResult.DELETED
           || known == FileFreshnessSnapshot.SourceValidationResult.UNREADABLE
           ? FileFreshnessSnapshot.fromEnvelope(envelope).validateNow() : known;
+      if (claim != null && claim.upkeepOriginId() != null
+          && validation != FileFreshnessSnapshot.SourceValidationResult.FRESH) {
+        return new StaleObservation(validation, SourceAdmission.terminal(SourceAdmissionAction.SKIP_DONE,
+            ingestionAuthority.staleOutcome(validation, "during upkeep")), 0, false);
+      }
       if (validation == FileFreshnessSnapshot.SourceValidationResult.DELETED
           || validation == FileFreshnessSnapshot.SourceValidationResult.UNREADABLE) {
         if (claim == null) {

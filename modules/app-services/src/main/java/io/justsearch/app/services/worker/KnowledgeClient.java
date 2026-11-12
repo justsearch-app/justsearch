@@ -641,6 +641,27 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
     }
 
     @Override
+    public long forEachIndexedSourceWithOrigin(java.util.function.Consumer<IndexingService.IndexedSourceOwner> consumer,
+            EngineContext context) {
+        return executeIngestRpc("scanIndexedSourcesWithOrigin", RpcDeadlineCategory.LONG_RUNNING,
+                stub -> stub.scanIndexedSourcesWithOrigin(consumer), context);
+    }
+
+    @Override
+    public java.util.Optional<io.justsearch.app.api.indexing.SourceOrigin> findSourceOrigin(String id,
+            EngineContext context) {
+        return executeIngestRpc("findSourceOrigin", RpcDeadlineCategory.STANDARD,
+                stub -> stub.findSourceOrigin(id), context);
+    }
+
+    @Override
+    public IndexingService.DeletionOutcome deleteExcludedImportMember(String path, String expectedOriginId,
+            EngineContext context) {
+        return executeIngestRpc("deleteExcludedImportMember", RpcDeadlineCategory.LONG_RUNNING,
+                stub -> stub.deleteExcludedImportMember(path, expectedOriginId), context);
+    }
+
+    @Override
     public long forEachIndexedSourceWithCollection(
             java.util.function.Consumer<IndexingService.IndexedSource> consumer, EngineContext engineContext) {
         return executeIngestRpc("scanIndexedSourcesWithCollection", RpcDeadlineCategory.LONG_RUNNING,

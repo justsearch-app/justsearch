@@ -31,7 +31,8 @@ final class DeletionCompletionOutcomeTest {
     var indexing = (io.justsearch.app.api.IndexingService) java.lang.reflect.Proxy.newProxyInstance(
         getClass().getClassLoader(), new Class<?>[] {io.justsearch.app.api.IndexingService.class},
         (proxy, method, args) -> {
-          if (method.getName().equals("forEachIndexedSource")) return 0L;
+          if (method.getName().equals("forEachIndexedSource")
+              || method.getName().equals("forEachIndexedSourceWithOrigin")) return 0L;
           if (method.getName().equals("getWatchedRoots")) {
             return java.util.List.of(new io.justsearch.app.api.IndexingService.WatchedRoot("docs", root));
           }

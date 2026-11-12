@@ -461,6 +461,7 @@ public class IndexingLoop implements Closeable {
             this::chunkSpladeEnabled,
             activeLexicalSource::get,
             fileMutationFence);
+    if (documentFieldOps != null) writer.useSourceFields(documentFieldOps);
     // Tempdoc 516 Slice 4a.3 (W5.2): construct the extractor. Holds its own per-batch
     // indexEmptyForBatch cache, the forcedPaths set (shared with the markForced public API),
     // and the running/signalBus pair so it can self-decide when to stop the per-job loop.
