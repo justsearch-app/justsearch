@@ -232,7 +232,7 @@ console.log(JSON.stringify([true,JSON.stringify(eval(process.argv[1]))]));
 
 
 class SkipRuleTests(unittest.TestCase):
-    rule = '**/justsearch-journey-skip-*.tmp'
+    rule = 'justsearch-journey-skip-1.tmp'
 
     def restart_run(self, stored=True, visible=True):
         before = {'savedFiles': {'files': {'models/embed.onnx': 'sha'}},

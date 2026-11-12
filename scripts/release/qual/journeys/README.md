@@ -626,7 +626,7 @@ qualification. Explicit `--journeys` subsets likewise never qualify a release.
   cached reboots prove readiness through active runtime encoders and that query.
   Activation polls record `/proc/meminfo` samples about every five seconds. The CPU
   plan and chat-unavailable explanation are also checked. Downloads are not seeded.
-- J4: a UI-authored **Skip these files** rule (`**/justsearch-journey-skip-*.tmp`)
+- J4: a UI-authored **Skip these files** rule (`justsearch-journey-skip-1.tmp`)
   and Dark theme, restart, retained settings, watched folder, indexed fixture and
   model file hashes. The rule is added in Library's Folders tab with **Add a rule**
   and **Save patterns**. It cannot match the corpus fixtures. After restart, the

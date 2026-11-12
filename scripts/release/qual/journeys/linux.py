@@ -452,7 +452,7 @@ print(json.dumps({'files':rows}))
             'search': search_api(run)}
 
 
-SKIP_RULE = '**/justsearch-journey-skip-*.tmp'
+SKIP_RULE = 'justsearch-journey-skip-1.tmp'
 
 
 def author_state(run):

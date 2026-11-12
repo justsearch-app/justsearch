@@ -36,7 +36,7 @@ console.log(JSON.stringify(value));"""
                                                json.dumps(args or [])], text=True))
 
 
-RULE = '**/justsearch-journey-skip-*.tmp'
+RULE = 'justsearch-journey-skip-1.tmp'
 
 
 def authored_run():
@@ -206,3 +206,10 @@ class AuthoredStateTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class SkipRuleTypingTest(unittest.TestCase):
+    def test_skip_rule_has_no_shifted_characters(self):
+        # Hosted X11 typing turned '*' into '8' (run 43198318384); keep the rule to unshifted keys.
+        from linux import SKIP_RULE
+        self.assertRegex(SKIP_RULE, r'^[a-z0-9./-]+$')
