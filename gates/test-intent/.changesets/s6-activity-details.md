@@ -790,3 +790,14 @@ Repair after the real-Engine recheck and verification of 2026-11-12 (design choi
   "digest": "sha256:2da81cf4a9b8489de27de7a3f79b843914e58279ab4927dbdcd4b8035923f8d1"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-wgz_gfav",
+  "verdict": "reject",
+  "digest": "sha256:ea1516a63f1c33d303d3c918c95bddd66d0da689c6fcce7d46c765a9c466e79b",
+  "note": "All 31 entry classifications and warrants are acceptable; the added poll retains the whole oracle and count exactly one. Reject this exact candidate because it overwrites gates/test-intent/evidence/s6-activity-feed-repair3.json cited by the already-merged s6-activity-feed changeset without renewing that changeset acceptance/audit records. Holding the historical entries and item blobs fixed, this replacement changes its accepted digest from sha256:a5d368d82614b94e611f82cc206cf97100b5347ab4423fee4fbdb2b45fc4125b to sha256:a7de4abb1258b222498e8f7c0b7a471303191ad7595184551e4d84053d5a7311, matching no record. docs/reference/testing/test-intent.md says a later evidence edit makes acceptance stale and requires fresh review/record. The gate does not flag this because it ignores unchanged merged changeset documents. Preserve the merged evidence and place any needed new evidence in the current changeset, or explicitly renew the affected records under the rules."
+}
+```
