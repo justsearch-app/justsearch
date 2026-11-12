@@ -37,6 +37,16 @@ the order of two assertions changed. The new files:
 Fail-before evidence (`--before origin/main`): `gates/test-intent/evidence/f-health-c1.json`.
 Preservation evidence (candidate only): `gates/test-intent/evidence/f-health-c1-preserved.json`.
 
+Amendments FC3a, FC3b and FC5a (after the real-Engine outage check, 2026-11-12) add two isolated files:
+`HealthSurface.readout-outage.test.ts` (happy-dom, the real status poller under the core declared
+presentation: the readout and 'What you can do right now' during a failed or stopped status read while the
+event stream beats, and no dangling separator) and `LogSurface.small-window-lockdown.test.ts` (real
+Chromium, real Shell and System hub: Logs rows at 600x400 with 200% text, and preservation at the other
+sizes). Two existing tests adapt their input (`LivenessReadout.test.ts`, `CapabilityMap.test.ts`): their
+answering backend now has a current status read, which the readout and the map consult.
+Fail-before evidence (`--before eda737bb15`): `gates/test-intent/evidence/f-health-c1-amend.json`.
+Preservation evidence (candidate only): `gates/test-intent/evidence/f-health-c1-amend-preserved.json`.
+
 ```json
 {
   "entries": [
@@ -200,6 +210,151 @@ Preservation evidence (candidate only): `gates/test-intent/evidence/f-health-c1-
         "modules/ui-web/src/shell-v0/views/SurfaceReach-lockdown.test.ts#Health at 1280x720: the header stays fixed while the body scrolls on its own",
         "modules/ui-web/src/shell-v0/views/SurfaceReach-lockdown.test.ts#Logs at 1280x720: the header stays fixed while the body scrolls on its own",
         "modules/ui-web/src/shell-v0/views/SurfaceReach-lockdown.test.ts#Library › Browse at 1280x720: the header stays fixed while the body scrolls on its own"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/HealthSurface.readout-outage.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "FC3a: with Diagnostics open under the core declared presentation, when a status read fails (refused, aborted, a 500 answer) 16 s after the last answer while the event stream still beats, or when status reads stop answering for 25 s while the stream beats, the Connection readout no longer shows the stream-derived 'Catching up…' (or any 'Online', 'Ready', 'connected' words) and no healthy or in-progress dot (tone neither live nor info); it says the Engine status is unconfirmed, in its words and its accessible name, as the Engine row does. 'What you can do right now' lists nothing as available, keyword search included. When reads answer again the readout and keyword search return without a reload.",
+      "repaired": true,
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "design decisions of the frame build, within the canonical design",
+          "choice": "Follow-up C1 amendment FC3a (orchestrator, 2026-11-12, after the real-Engine outage check): during an Engine outage Diagnostics' Connection readout does not say 'Catching up…' or show a healthy state; it says the Engine cannot be reached / last known, like the rows; 'What you can do right now' lists nothing that needs the Engine as available. Both use Health's one currency rule (statusCurrency over healthObservationCurrent in state/systemHealth.ts) instead of their own: while the status read is not current the readout says 'Engine: Status unconfirmed' with a neutral dot (its indexing words say the indexing status is unconfirmed, and the store's own words about reaching the Engine, 'Backend disconnected', 'Connecting…', 'Reconnecting…', stay, with a neutral dot), and every capability the map would call available reads 'Engine status unconfirmed' ('Search status unconfirmed' for keyword search).",
+          "label": "agent choice"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design.",
+          "location": "task t-20261103-shell user turn requesting the in-between UI work, quoted in the follow-up C1 builder brief, 2026-11-12",
+          "label": "owner request for this piece"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/f-health-c1-amend.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/HealthSurface.readout-outage.test.ts#status read refused while the event stream beats, 16 s after the last answer: the readout says the Engine status is unconfirmed, nothing listed as available",
+        "modules/ui-web/src/shell-v0/views/HealthSurface.readout-outage.test.ts#status read aborted while the event stream beats, 16 s after the last answer: the readout says the Engine status is unconfirmed, nothing listed as available",
+        "modules/ui-web/src/shell-v0/views/HealthSurface.readout-outage.test.ts#status read server error while the event stream beats, 16 s after the last answer: the readout says the Engine status is unconfirmed, nothing listed as available",
+        "modules/ui-web/src/shell-v0/views/HealthSurface.readout-outage.test.ts#status reads stop answering while the event stream beats, 25 s after the last answer: the same by expiry",
+        "modules/ui-web/src/shell-v0/views/HealthSurface.readout-outage.test.ts#reads answer again: the readout and keyword search return without a reload"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/HealthSurface.readout-outage.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "FC3b: after a failed status read (refused, a 500 answer) no status line in Health (its sentences, rows, list items, headings and status regions) ends with a separator that has nothing after it; the indexing line above the counts reads 'Indexing status unconfirmed', not 'Indexing status unconfirmed —'.",
+      "repaired": true,
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "design decisions of the frame build, within the canonical design",
+          "choice": "Follow-up C1 amendment FC3b (orchestrator, 2026-11-12): no status line ends with a dangling separator; a line with nothing after its separator drops the separator. The line is composed by joining its non-empty parts, as Health's other indexing lines already are.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design.",
+          "location": "task t-20261103-shell user turn requesting the in-between UI work, quoted in the follow-up C1 builder brief, 2026-11-12",
+          "label": "owner request for this piece"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/f-health-c1-amend.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/HealthSurface.readout-outage.test.ts#status read refused: no line ends in \"—\" with nothing after it",
+        "modules/ui-web/src/shell-v0/views/HealthSurface.readout-outage.test.ts#status read server error: no line ends in \"—\" with nothing after it"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/LogSurface.small-window-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "FC5a: Logs inside the real Shell and System hub at 600x400 with 200% text, holding Engine log lines (sentences, paths, a long unbroken token): nothing scrolls sideways (surface, body, page), and every row's message lies inside the window with at least twenty characters of its own font per line (or the whole row, if narrower); time, level and logger end inside the window.",
+      "repaired": true,
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "design decisions of the frame build, within the canonical design",
+          "choice": "Follow-up C1 amendment FC5a (orchestrator, 2026-11-12): at 600x400 with 200% text, and wherever the small-window layout applies, each log row's message has a usable width inside the window; rows wrap or stack their columns; no horizontal scrolling; 1280x720 unchanged. One rule for every width: the time, level and logger keep their column widths, the message takes the rest of the line and wraps onto its own full-width line when the rest is narrower than its 20rem basis; no width-specific rules.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design.",
+          "location": "task t-20261103-shell user turn requesting the in-between UI work, quoted in the follow-up C1 builder brief, 2026-11-12",
+          "label": "owner request for this piece"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/f-health-c1-amend.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/LogSurface.small-window-lockdown.test.ts#600x400 with 200% text: every message has a usable width inside the window; nothing scrolls sideways"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/LogSurface.small-window-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "FC5a preservation checks that pass before and after: at 600x400 with normal text and at 1280x720 with 200% text (where the small-window layout also applies) every message keeps a usable width inside the window and nothing scrolls sideways; at 1280x720 with normal text each row is one line of time, level, logger and message, the columns at 0, 9rem, 13rem and 22rem plus their gaps, 9rem, 4rem and 9rem wide, and the message fills the rest of the line.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "design decisions of the frame build, within the canonical design",
+          "choice": "Follow-up C1 amendment FC5a: '1280x720 unchanged', and the other sizes where the small-window layout applies stay readable.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design.",
+          "location": "task t-20261103-shell user turn requesting the in-between UI work, quoted in the follow-up C1 builder brief, 2026-11-12",
+          "label": "owner request for this piece"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/f-health-c1-amend-preserved.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/LogSurface.small-window-lockdown.test.ts#600x400: every message keeps a usable width inside the window; nothing scrolls sideways",
+        "modules/ui-web/src/shell-v0/views/LogSurface.small-window-lockdown.test.ts#1280x720 with 200% text: every message keeps a usable width inside the window; nothing scrolls sideways",
+        "modules/ui-web/src/shell-v0/views/LogSurface.small-window-lockdown.test.ts#1280x720: each row is one line of time, level, logger and message in their columns"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/LivenessReadout.test.ts",
+        "modules/ui-web/src/shell-v0/components/CapabilityMap.test.ts"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "input re-encoding"
+      ],
+      "whatMoved": "Their fixtures describe an answering backend through a hand-built AiState alone; the readout and the map now also read when the status body arrived (getStatusReceivedAtMs), Health's currency rule. Each fixture now also feeds the store a status read (__feedForTest) so the backend they describe has a current status, and LivenessReadout's partial state carries that status. Every assertion is unchanged: the tone mapping (info, live, degraded, error, idle), the cold-start keyword row unconfirmed, the AI reasons, the remedy control, the not-live snapshot rows, and the live-snapshot rows available. A readout or map that ignored its status's currency, or claimed availability with it, still fails them.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design.",
+          "location": "task t-20261103-shell user turn requesting the in-between UI work, quoted in the follow-up C1 builder brief, 2026-11-12",
+          "label": "owner request for this piece"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn approving the build plan, 2026-11-03",
+          "delegationScope": "design decisions of the frame build, within the canonical design",
+          "choice": "Follow-up C1 amendment FC3a: the readout and the map use Health's one currency rule for the status read instead of their own.",
+          "label": "agent choice"
+        }
       ]
     }
   ]

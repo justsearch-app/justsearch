@@ -15,9 +15,9 @@
  */
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
-import { statusLabelSubject, subscribeAiState, type AiState } from '../state/aiStateStore.js';
+import { getStatusReceivedAtMs, statusLabelSubject, subscribeAiState, type AiState } from '../state/aiStateStore.js';
 import { present } from '../display/present.js';
-import { selectIndexingProgress } from '../state/indexingProgress.js';
+import { healthIndexingProgress, statusCurrency } from '../state/systemHealth.js';
 import { isIndexingObservation } from '../state/readinessNotice.js';
 
 /** The observed tones the engine derives from the authority (never authored). */
@@ -113,18 +113,32 @@ export class LivenessReadout extends JfElement {
 
   override render(): TemplateResult {
     const state = this.aiState;
+    // Health's one currency rule: after a failed status read (or once the read is past its bound) the
+    // status line's words are a past observation. Indexing words then say the indexing status is
+    // unconfirmed, the store's own words about reaching the Engine stay, and any other words (a healthy
+    // or in-progress claim) give way to what Health's Engine row says. No healthy or in-progress tone.
+    const currency = statusCurrency(state, getStatusReceivedAtMs(), Date.now());
+    const verdict = state?.verdict;
+    const aboutReaching = verdict?.kind === 'unreachable' || verdict?.kind === 'connecting'
+      || (verdict?.kind === 'transitioning' && verdict.reasons[0] === 'channel-stale');
+    const statusPast = !!state && !currency.head && !aboutReaching;
     const indexingTransition = state?.verdict?.kind === 'transitioning' && state.verdict.reasons.some(isIndexingObservation);
     const activity = state && (state.statusLabel === 'Indexing' || indexingTransition)
-      ? selectIndexingProgress(state.status, state.indexingStatusLive, state.episodeMaxPendingJobs, state.enrichSettleSamples).activity
+      ? healthIndexingProgress(state, currency).activity
       : null;
-    const tone = activity && !activity.confirmed ? 'idle' : toneFor(state);
     const indexingText = activity && (!indexingTransition || !activity.confirmed);
+    const unconfirmed = statusPast && !indexingText;
+    const observed = toneFor(state);
+    const tone = unconfirmed || (activity && !activity.confirmed) || (!currency.head && ['live', 'info'].includes(observed))
+      ? 'idle' : observed;
     // The name says what the words are about: the status line's AI-engine words ("Offline") describe
     // the AI models, never the declared signal (search keeps working while the AI is off). Otherwise
     // the accessible name projects through the one display authority.
-    const name = !indexingText && state && statusLabelSubject(state) === 'ai' ? 'AI models'
+    const name = unconfirmed ? 'Engine'
+      : !indexingText && state && statusLabelSubject(state) === 'ai' ? 'AI models'
       : this.metricId ? present({ kind: 'metric', id: this.metricId }).label : '';
-    const liveText = indexingText ? [activity.summary, activity.detail].filter(Boolean).join(' — ') : state?.statusLabel ?? 'unknown';
+    const liveText = unconfirmed ? 'Status unconfirmed'
+      : indexingText ? [activity.summary, activity.detail].filter(Boolean).join(' — ') : state?.statusLabel ?? 'unknown';
     return html`
       <span
         class="dot"

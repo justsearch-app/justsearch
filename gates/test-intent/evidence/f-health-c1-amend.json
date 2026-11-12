@@ -1,0 +1,220 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-12T07:19:25.450Z",
+  "revision": "eda737bb154da6273bf92da468ab5ac5ee199bad",
+  "tree": "bf1acd09075a9c2318dbac244dd5e7ccc432b057",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/HealthSurface.readout-outage.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/eh1jlrau/tmp/test-intent-vitest-14576-1794467944146.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2520
+    },
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/LogSurface.small-window-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/eh1jlrau/tmp/test-intent-vitest-14576-1794467946668.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 7174
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HealthSurface.readout-outage.test.ts#status read refused while the event stream beats, 16 s after the last answer: the readout says the Engine status is unconfirmed, nothing listed as available",
+      "file": "modules/ui-web/src/shell-v0/views/HealthSurface.readout-outage.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:29678f9d6c494f08b4cba1e46a0ca63fa05a218408fda27e24c4723071beedbd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC3a the Connection readout and \"What you can do right now\" follow the rows during an outage status read refused while the event stream beats, 16 s after the last answer: the readout says the Engine status is unconfirmed, nothing listed as available",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HealthSurface.readout-outage.test.ts#status read aborted while the event stream beats, 16 s after the last answer: the readout says the Engine status is unconfirmed, nothing listed as available",
+      "file": "modules/ui-web/src/shell-v0/views/HealthSurface.readout-outage.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:29678f9d6c494f08b4cba1e46a0ca63fa05a218408fda27e24c4723071beedbd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC3a the Connection readout and \"What you can do right now\" follow the rows during an outage status read aborted while the event stream beats, 16 s after the last answer: the readout says the Engine status is unconfirmed, nothing listed as available",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HealthSurface.readout-outage.test.ts#status read server error while the event stream beats, 16 s after the last answer: the readout says the Engine status is unconfirmed, nothing listed as available",
+      "file": "modules/ui-web/src/shell-v0/views/HealthSurface.readout-outage.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:29678f9d6c494f08b4cba1e46a0ca63fa05a218408fda27e24c4723071beedbd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC3a the Connection readout and \"What you can do right now\" follow the rows during an outage status read server error while the event stream beats, 16 s after the last answer: the readout says the Engine status is unconfirmed, nothing listed as available",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HealthSurface.readout-outage.test.ts#status reads stop answering while the event stream beats, 25 s after the last answer: the same by expiry",
+      "file": "modules/ui-web/src/shell-v0/views/HealthSurface.readout-outage.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:29678f9d6c494f08b4cba1e46a0ca63fa05a218408fda27e24c4723071beedbd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC3a the Connection readout and \"What you can do right now\" follow the rows during an outage status reads stop answering while the event stream beats, 25 s after the last answer: the same by expiry",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HealthSurface.readout-outage.test.ts#reads answer again: the readout and keyword search return without a reload",
+      "file": "modules/ui-web/src/shell-v0/views/HealthSurface.readout-outage.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:29678f9d6c494f08b4cba1e46a0ca63fa05a218408fda27e24c4723071beedbd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC3a the Connection readout and \"What you can do right now\" follow the rows during an outage reads answer again: the readout and keyword search return without a reload",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HealthSurface.readout-outage.test.ts#status read refused: no line ends in \"—\" with nothing after it",
+      "file": "modules/ui-web/src/shell-v0/views/HealthSurface.readout-outage.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:29678f9d6c494f08b4cba1e46a0ca63fa05a218408fda27e24c4723071beedbd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC3b no status line ends with a dangling separator status read refused: no line ends in \"—\" with nothing after it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HealthSurface.readout-outage.test.ts#status read server error: no line ends in \"—\" with nothing after it",
+      "file": "modules/ui-web/src/shell-v0/views/HealthSurface.readout-outage.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:29678f9d6c494f08b4cba1e46a0ca63fa05a218408fda27e24c4723071beedbd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC3b no status line ends with a dangling separator status read server error: no line ends in \"—\" with nothing after it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LogSurface.small-window-lockdown.test.ts#600x400 with 200% text: every message has a usable width inside the window; nothing scrolls sideways",
+      "file": "modules/ui-web/src/shell-v0/views/LogSurface.small-window-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:92185de8213f912639d8cad0fa55dff47263f55ab33bb0c5b7cfdb85ddcc653c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC5a Logs is readable wherever the small-window layout applies 600x400 with 200% text: every message has a usable width inside the window; nothing scrolls sideways",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "eda737bb15",
+    "revision": "eda737bb154da6273bf92da468ab5ac5ee199bad",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/HealthSurface.readout-outage.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/eh1jlrau/tmp/test-intent-vitest-14576-1794467955906.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 2557,
+        "output": "JSON report written to /home/elias/.cache/am/eh1jlrau/tmp/test-intent-vitest-14576-1794467955906.json\n\n"
+      },
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/LogSurface.small-window-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/eh1jlrau/tmp/test-intent-vitest-14576-1794467958463.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 6742,
+        "output": "JSON report written to /home/elias/.cache/am/eh1jlrau/tmp/test-intent-vitest-14576-1794467958463.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/HealthSurface.readout-outage.test.ts#status read refused while the event stream beats, 16 s after the last answer: the readout says the Engine status is unconfirmed, nothing listed as available",
+        "classification": "assertion",
+        "detail": "FC3a the Connection readout and \"What you can do right now\" follow the rows during an outage status read refused while the event stream beats, 16 s after the last answer: the readout says the Engine status is unconfirmed, nothing listed as available:  AssertionError: readout words {\"text\":\"Status Catching up…\",\"label\":\"Status: Catching up…\",\"tone\":\"info\"}: expected 'Status Catching up…' not to match /Catching up|Online|Ready|connected/i\n    at expectSaidLikeTheRows (/home/elias/.cache/am/eh1jlra"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/HealthSurface.readout-outage.test.ts#status read aborted while the event stream beats, 16 s after the last answer: the readout says the Engine status is unconfirmed, nothing listed as available",
+        "classification": "assertion",
+        "detail": "FC3a the Connection readout and \"What you can do right now\" follow the rows during an outage status read aborted while the event stream beats, 16 s after the last answer: the readout says the Engine status is unconfirmed, nothing listed as available:  AssertionError: readout words {\"text\":\"Status Catching up…\",\"label\":\"Status: Catching up…\",\"tone\":\"info\"}: expected 'Status Catching up…' not to match /Catching up|Online|Ready|connected/i\n    at expectSaidLikeTheRows (/home/elias/.cache/am/eh1jlra"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/HealthSurface.readout-outage.test.ts#status read server error while the event stream beats, 16 s after the last answer: the readout says the Engine status is unconfirmed, nothing listed as available",
+        "classification": "assertion",
+        "detail": "FC3a the Connection readout and \"What you can do right now\" follow the rows during an outage status read server error while the event stream beats, 16 s after the last answer: the readout says the Engine status is unconfirmed, nothing listed as available:  AssertionError: readout words {\"text\":\"Status Catching up…\",\"label\":\"Status: Catching up…\",\"tone\":\"info\"}: expected 'Status Catching up…' not to match /Catching up|Online|Ready|connected/i\n    at expectSaidLikeTheRows (/home/elias/.cache/am/eh"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/HealthSurface.readout-outage.test.ts#status reads stop answering while the event stream beats, 25 s after the last answer: the same by expiry",
+        "classification": "assertion",
+        "detail": "FC3a the Connection readout and \"What you can do right now\" follow the rows during an outage status reads stop answering while the event stream beats, 25 s after the last answer: the same by expiry:  AssertionError: readout words {\"text\":\"Status Catching up…\",\"label\":\"Status: Catching up…\",\"tone\":\"info\"}: expected 'Status Catching up…' not to match /Catching up|Online|Ready|connected/i\n    at expectSaidLikeTheRows (/home/elias/.cache/am/eh1jlrau/tmp/test-intent-before-Q0q1fd/modules/ui-web/src/s"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/HealthSurface.readout-outage.test.ts#reads answer again: the readout and keyword search return without a reload",
+        "classification": "assertion",
+        "detail": "FC3a the Connection readout and \"What you can do right now\" follow the rows during an outage reads answer again: the readout and keyword search return without a reload:  AssertionError: readout words {\"text\":\"Status Catching up…\",\"label\":\"Status: Catching up…\",\"tone\":\"info\"}: expected 'Status Catching up…' not to match /Catching up|Online|Ready|connected/i\n    at expectSaidLikeTheRows (/home/elias/.cache/am/eh1jlrau/tmp/test-intent-before-Q0q1fd/modules/ui-web/src/s"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/HealthSurface.readout-outage.test.ts#status read refused: no line ends in \"—\" with nothing after it",
+        "classification": "assertion",
+        "detail": "FC3b no status line ends with a dangling separator status read refused: no line ends in \"—\" with nothing after it:  AssertionError: expected [ 'Indexing status unconfirmed —' ] to deeply equal []\n    at /home/elias/.cache/am/eh1jlrau/tmp/test-intent-before-Q0q1fd/modules/ui-web/src/shell-v0/views/HealthSurface.readout-outage.test.ts:176:29\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-health-c1/mod"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/HealthSurface.readout-outage.test.ts#status read server error: no line ends in \"—\" with nothing after it",
+        "classification": "assertion",
+        "detail": "FC3b no status line ends with a dangling separator status read server error: no line ends in \"—\" with nothing after it:  AssertionError: expected [ 'Indexing status unconfirmed —' ] to deeply equal []\n    at /home/elias/.cache/am/eh1jlrau/tmp/test-intent-before-Q0q1fd/modules/ui-web/src/shell-v0/views/HealthSurface.readout-outage.test.ts:176:29\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-health-c1/mod"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LogSurface.small-window-lockdown.test.ts#600x400 with 200% text: every message has a usable width inside the window; nothing scrolls sideways",
+        "classification": "assertion",
+        "detail": "FC5a Logs is readable wherever the small-window layout applies 600x400 with 200% text: every message has a usable width inside the window; nothing scrolls sideways:  AssertionError: no horizontal scrolling {\"host\":197,\"body\":197,\"page\":0}: expected { host: 197, body: 197, page: +0 } to deeply equal { host: +0, body: +0, page: +0 }\n    at expectReadable (/home/elias/.cache/am/eh1jlrau/tmp/test-intent-before-Q0q1fd/modules/ui-web/src/shell-v0/views/LogSurface.smal"
+      }
+    ]
+  },
+  "digest": "sha256:7025351164f3f2e795886933662606b46fa9f2811da02fdd90ddc330b8afd26a"
+}

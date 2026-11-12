@@ -1,0 +1,76 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-12T07:19:39.648Z",
+  "revision": "eda737bb154da6273bf92da468ab5ac5ee199bad",
+  "tree": "c9cae5abe4bf7c83007f114af5f289c2e55950cd",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/LogSurface.small-window-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/eh1jlrau/tmp/test-intent-vitest-15292-1794467972927.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 6720
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LogSurface.small-window-lockdown.test.ts#600x400: every message keeps a usable width inside the window; nothing scrolls sideways",
+      "file": "modules/ui-web/src/shell-v0/views/LogSurface.small-window-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:92185de8213f912639d8cad0fa55dff47263f55ab33bb0c5b7cfdb85ddcc653c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC5a Logs is readable wherever the small-window layout applies 600x400: every message keeps a usable width inside the window; nothing scrolls sideways",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LogSurface.small-window-lockdown.test.ts#1280x720 with 200% text: every message keeps a usable width inside the window; nothing scrolls sideways",
+      "file": "modules/ui-web/src/shell-v0/views/LogSurface.small-window-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:92185de8213f912639d8cad0fa55dff47263f55ab33bb0c5b7cfdb85ddcc653c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC5a Logs is readable wherever the small-window layout applies 1280x720 with 200% text: every message keeps a usable width inside the window; nothing scrolls sideways",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LogSurface.small-window-lockdown.test.ts#1280x720: each row is one line of time, level, logger and message in their columns",
+      "file": "modules/ui-web/src/shell-v0/views/LogSurface.small-window-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:92185de8213f912639d8cad0fa55dff47263f55ab33bb0c5b7cfdb85ddcc653c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC5a Logs is readable wherever the small-window layout applies 1280x720: each row is one line of time, level, logger and message in their columns",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:d44a75908b9c3f41c51f0002bf7fbc47afbe6ffe3a0f83067530f664d519b3d3"
+}

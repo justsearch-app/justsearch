@@ -23,7 +23,8 @@ import {
   type Availability,
   type CapabilityAffordance,
 } from '../state/availability.js';
-import type { AiState } from '../state/aiStateStore.js';
+import { getStatusReceivedAtMs, type AiState } from '../state/aiStateStore.js';
+import { statusCurrency } from '../state/systemHealth.js';
 import { reasonFor, type NoticeRemedy } from '../state/readinessNotice.js';
 
 /** The capability affordances, in the order a user reasons about them, with human labels. */
@@ -110,6 +111,13 @@ export class CapabilityMap extends JfElement {
     //
     // Positive evidence only: a null store (the pre-first-poll boot window) is UNKNOWN, not lost —
     // mirroring `projectAvailability`, whose transient boot arm answers before its liveness gate.
+    //
+    // Every row needs the Engine. Health's one currency rule decides whether its status is current: a
+    // failed status read (or one past its bound) leaves nothing to call available, as Health's rows say.
+    const currency = statusCurrency(this.aiState, getStatusReceivedAtMs(), Date.now());
+    const confirmed = (availability: Availability): Availability =>
+      !this.aiState || currency.head || !['available', 'degraded'].includes(availability.kind)
+        ? availability : unavailableBecause('Engine status unconfirmed', true);
     const rows: Row[] = [
       {
         label: 'Search (keyword)',
@@ -118,11 +126,11 @@ export class CapabilityMap extends JfElement {
             ? unavailableBecause(reasonFor('binding.unreachable').wording)
             : this.aiState?.verdict?.reasons.includes('index.ownership_unproven')
               ? unavailableBecause(reasonFor('index.ownership_unproven').wording)
-              : !this.aiState?.status || !this.aiState.indexingStatusLive ? unavailableBecause('Search status unconfirmed', true) : AVAILABLE,
+              : !this.aiState?.status || !currency.worker ? unavailableBecause('Search status unconfirmed', true) : AVAILABLE,
       },
     ];
     for (const a of AFFORDANCES) {
-      rows.push({ label: a.label, availability: projectAvailability(a.affordance, this.aiState) });
+      rows.push({ label: a.label, availability: confirmed(projectAvailability(a.affordance, this.aiState)) });
     }
     return rows;
   }

@@ -8,7 +8,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import './CapabilityMap.js';
 import type { CapabilityMap } from './CapabilityMap.js';
-import type { AiState } from '../state/aiStateStore.js';
+import { __feedForTest, __resetAiStateForTest, type AiState, type StatusSnapshot } from '../state/aiStateStore.js';
 import { known, UNKNOWN } from '../state/known.js';
 
 function aiState(opts: { chat?: boolean; docs?: number; snapshotLive?: boolean }): AiState {
@@ -45,6 +45,9 @@ const rowTexts = (el: CapabilityMap): string[] =>
 describe('CapabilityMap (jf-capability-map)', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
+    // The answering backend these fixtures describe has a current status read, too.
+    __resetAiStateForTest();
+    __feedForTest({ status: aiState({}).status as StatusSnapshot });
   });
 
   it('keeps cold-start keyword availability unconfirmed', async () => {
