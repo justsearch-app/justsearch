@@ -159,9 +159,8 @@ class ClassificationTests(unittest.TestCase):
         run.desktop_spawn.assert_not_called()
 
     def test_j4_restored_settings_close_failure_is_product(self):
-        run=test_redesign.BookmarkTests().restart_run()
+        run=test_redesign.SkipRuleTests().restart_run()
         def dom(script,args=None):
-            if 'localStorage' in script:return [test_redesign.BookmarkTests.bookmark]
             if 'return !all' in script:return False
             if 'Close Settings' in script:return True
             return True
@@ -204,11 +203,12 @@ class ClassificationTests(unittest.TestCase):
                 except Exception as exc:self.assertEqual(runner.classify(exc), 'failed-infrastructure')
                 else:self.fail('Failed download passed')
 
-    def test_missing_bookmark_element_without_storage_corroboration_is_infrastructure(self):
+    def test_missing_rule_element_without_settings_corroboration_is_infrastructure(self):
         run = Mock()
-        run.wd.execute.side_effect = lambda script,*a: [] if 'localStorage' in script else None
+        run.api.return_value = {'ui': {'excludePatterns': []}}
+        run.wd.execute.return_value = None
         with patch.object(linux,'wait_for',immediate), self.assertRaises(runner.Infrastructure):
-            linux.bookmark_entry(run,test_redesign.BookmarkTests.bookmark)
+            linux.skip_rule_entry(run,test_redesign.SkipRuleTests.rule)
 
     def test_search_baseline_setup_failure_is_infrastructure(self):
         run = Mock(binary=BINARY, work='/tmp/isolated', facts={})

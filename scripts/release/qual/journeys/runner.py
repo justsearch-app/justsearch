@@ -1056,7 +1056,7 @@ except (TimeoutError,PermissionError) as exc:
         self.close_settings()
         ids = {'Library': 'core.library-surface', 'Search': 'core.search-v3-surface',
                'AI Brain': 'core.brain-surface', 'Settings': 'core.settings-surface'}
-        # Rail buttons are ordinary native buttons in one shadow root. Use
+        # Top-bar buttons are ordinary native buttons in one shadow root. Use
         # WebDriver's element click so moved/recreated windows resolve their own
         # hit point; the viewport adapter remains for nested component controls.
         element = self.wd.element('button[data-surface-id=' + json.dumps(ids[surface]) + ']')
