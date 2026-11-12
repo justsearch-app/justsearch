@@ -631,3 +631,13 @@ Independent acceptance is pending.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "x03yj3u1",
+  "verdict": "accept",
+  "digest": "sha256:801e615436ff08dbc27ff409a8ecc32182e389659e4d363d5603362525d3e7f5"
+}
+```
