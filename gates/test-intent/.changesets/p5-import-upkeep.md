@@ -119,3 +119,16 @@ The existing New-check evidence uses before-state 317831ee434b4b45bf37e782904128
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-fkbdixg3-2762aa9",
+  "verdict": "accept",
+  "digest": "sha256:f170de04ec116e3ebfef73af106c0cce94d646a242977784a1149f16f3db5be2",
+  "note": "Before-state tests and owner contract reviewed before candidate diffs. New expectations follow the supplied owner words and settled scenarios; adaptation entries preserve inputs, faults and oracles. Independently replayed candidate checks on fd9cc6aa and candidate; committed tests pass without skips in the named classes."
+}
+```
