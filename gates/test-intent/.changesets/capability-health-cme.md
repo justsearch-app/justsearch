@@ -40,3 +40,13 @@ No product code changes.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "claude-subagent-toolstate-cme-acceptor-1",
+  "verdict": "accept",
+  "digest": "sha256:33343870c90a33d45c18fa0fea03fc8e15a9a6620d47a6a62a3240a584e27157"
+}
+```
