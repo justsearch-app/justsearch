@@ -151,6 +151,102 @@
   "audience" : "OPERATOR",
   "consumers" : [ ]
 }, {
+  "id" : "core.resume-import",
+  "type" : "operation",
+  "presentation" : {
+    "labelKey" : "ops.resume-import.label",
+    "descriptionKey" : "ops.resume-import.description"
+  },
+  "intf" : {
+    "inputs" : {
+      "type" : "object",
+      "additionalProperties" : false,
+      "properties" : {
+        "operationKey" : {
+          "type" : "string",
+          "minLength" : 36,
+          "maxLength" : 36
+        },
+        "interruptionRevision" : {
+          "type" : "integer",
+          "minimum" : 1
+        }
+      },
+      "required" : [ "operationKey", "interruptionRevision" ]
+    },
+    "result" : { },
+    "errors" : [ ],
+    "uiHints" : { }
+  },
+  "policy" : {
+    "risk" : "MEDIUM",
+    "confirm" : {
+      "kind" : "INLINE"
+    },
+    "audit" : "METADATA_ONLY",
+    "undoSupported" : false,
+    "inverseOperationId" : null
+  },
+  "availability" : { },
+  "lineage" : {
+    "affects" : [ ],
+    "supersedes" : [ ]
+  },
+  "provenance" : {
+    "tier" : "CORE",
+    "contributorId" : "core",
+    "version" : "1.0"
+  },
+  "executors" : [ "UI" ],
+  "audience" : "USER",
+  "consumers" : [ ]
+}, {
+  "id" : "core.cancel-import",
+  "type" : "operation",
+  "presentation" : {
+    "labelKey" : "ops.cancel-import.label",
+    "descriptionKey" : "ops.cancel-import.description"
+  },
+  "intf" : {
+    "inputs" : {
+      "type" : "object",
+      "additionalProperties" : false,
+      "properties" : {
+        "operationKey" : {
+          "type" : "string",
+          "minLength" : 36,
+          "maxLength" : 36
+        }
+      },
+      "required" : [ "operationKey" ]
+    },
+    "result" : { },
+    "errors" : [ ],
+    "uiHints" : { }
+  },
+  "policy" : {
+    "risk" : "MEDIUM",
+    "confirm" : {
+      "kind" : "INLINE"
+    },
+    "audit" : "METADATA_ONLY",
+    "undoSupported" : false,
+    "inverseOperationId" : null
+  },
+  "availability" : { },
+  "lineage" : {
+    "affects" : [ ],
+    "supersedes" : [ ]
+  },
+  "provenance" : {
+    "tier" : "CORE",
+    "contributorId" : "core",
+    "version" : "1.0"
+  },
+  "executors" : [ "UI" ],
+  "audience" : "USER",
+  "consumers" : [ ]
+}, {
   "id" : "core.rebuild-index",
   "type" : "operation",
   "presentation" : {

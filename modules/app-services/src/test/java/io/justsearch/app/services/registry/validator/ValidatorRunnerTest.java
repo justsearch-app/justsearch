@@ -188,6 +188,14 @@ final class ValidatorRunnerTest {
         new io.justsearch.app.services.registry.operations.handlers.CancelReindexHandler(
             io.justsearch.app.api.operations.RecordedIngestionService.unavailable()));
     handlers.register(
+        CoreOperationCatalog.RESUME_IMPORT,
+        new io.justsearch.app.services.registry.operations.handlers.ResumeImportHandler(
+            io.justsearch.app.api.operations.RecordedIngestionService.unavailable()));
+    handlers.register(
+        CoreOperationCatalog.CANCEL_IMPORT,
+        new io.justsearch.app.services.registry.operations.handlers.CancelImportHandler(
+            io.justsearch.app.api.operations.RecordedIngestionService.unavailable()));
+    handlers.register(
         CoreOperationCatalog.CANCEL_AI_INSTALL,
         new io.justsearch.app.services.registry.operations.handlers.CancelAiInstallHandler(
             () -> null));
