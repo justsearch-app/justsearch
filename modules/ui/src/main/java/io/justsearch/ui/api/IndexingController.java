@@ -41,6 +41,7 @@ public class IndexingController {
   private final Path userHome; // nullable — null means "not available"
   private final Telemetry telemetry;
   private final Supplier<io.justsearch.app.api.operations.ForgetService> forgetService;
+  private final Supplier<io.justsearch.app.api.operations.RecordedIngestionService> recordedIngestion;
   private volatile io.justsearch.app.api.lifecycle.Capability workerCapability;
 
   public IndexingController(
@@ -55,11 +56,37 @@ public class IndexingController {
   public IndexingController(Supplier<IndexingService> indexingServiceSupplier,
       ExcludesService excludesService, Path userHome, Telemetry telemetry,
       Supplier<io.justsearch.app.api.operations.ForgetService> forgetService) {
+    this(indexingServiceSupplier, excludesService, userHome, telemetry, forgetService,
+        io.justsearch.app.api.operations.RecordedIngestionService::unavailable);
+  }
+
+  public IndexingController(Supplier<IndexingService> indexingServiceSupplier,
+      ExcludesService excludesService, Path userHome, Telemetry telemetry,
+      Supplier<io.justsearch.app.api.operations.ForgetService> forgetService,
+      Supplier<io.justsearch.app.api.operations.RecordedIngestionService> recordedIngestion) {
+    this.recordedIngestion = java.util.Objects.requireNonNull(recordedIngestion);
     this.indexingServiceSupplier = indexingServiceSupplier;
     this.excludesService = excludesService;
     this.userHome = userHome;
     this.telemetry = telemetry;
     this.forgetService = java.util.Objects.requireNonNull(forgetService, "forgetService");
+  }
+
+  /** Retained imports remain visible even before the first document is indexed. */
+  public void handleInterruptedImports(Context ctx) {
+    if (!WindowAuthority.require(ctx)) return;
+    if (RequestEngineContext.get(ctx).clientKind() != io.justsearch.core.context.EngineContext.ClientKind.WEBVIEW) {
+      ctx.status(403).json(Map.of("error", "Import recovery is available only to the app window"));
+      return;
+    }
+    try {
+      var owner = recordedIngestion.get();
+      if (!owner.hasOwner()) throw new IllegalStateException("Import recovery is unavailable");
+      ctx.json(new io.justsearch.app.api.operations.InterruptedImportsView(owner.interruptedImports()));
+    } catch (RuntimeException unavailable) {
+      ctx.status(503).json(ApiErrorHandler.toResponse(ApiErrorCode.SERVICE_UNAVAILABLE,
+          "Interrupted imports could not be read", telemetry, ApiErrorHandler.routeOf(ctx)));
+    }
   }
 
   /** Read-only UI recovery; a missing/failed owner is never projected as an empty intent list. */

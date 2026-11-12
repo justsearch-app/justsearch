@@ -27,7 +27,7 @@ import { isWindowFocused } from '../../utils/windowFocus.js';
 import { onWindowFocusChange } from '../../utils/windowFocusChange.js';
 import { presentVerdict, type VerdictPresentation } from '../state/verdict.js';
 import { presentAiEngineVerdict, type AiEngineVerdictPresentation } from '../state/aiVerdict.js';
-import { isIndexingObservation } from '../state/readinessNotice.js';
+import { awaitsUnrequestedAi, isIndexingObservation } from '../state/readinessNotice.js';
 import { getSeenCursor, subscribeSeenCursor } from '../substrates/recall/recallCursor.js';
 import { getIndexedRoots, readIndexedRoots, subscribeIndexedRoots } from '../state/indexedRoots.js';
 import { subscribeProfileSwitch } from '../state/UserStateDocument.js';
@@ -464,7 +464,8 @@ export class FrameStatusController implements ReactiveController {
     }
     // 595 §15.1 — one verdict announcer and its AI-engine sibling, moved from the retired status
     // bar into this always-mounted owner. Indexing transitions speak through the indexing announcer.
-    const verdict = this.ai ? presentVerdict(this.ai.verdict).announce : null;
+    // A gap that only AI nobody asked for would fill is no warning here either (FA3b): the pill says it.
+    const verdict = this.ai && !awaitsUnrequestedAi(this.ai.verdict, this.ai.aiEngine) ? presentVerdict(this.ai.verdict).announce : null;
     this.indexingTransition = this.ai?.verdict.kind === 'transitioning' && this.ai.verdict.reasons.some(isIndexingObservation);
     this.verdictAnnouncement = verdict && !this.indexingTransition ? verdict : null;
     if (this.ai?.aiEngine.kind !== this.unsaidEngineKind) this.unsaidEngineKind = null;
@@ -491,9 +492,10 @@ export class FrameStatusController implements ReactiveController {
     const needsKey = new Set(next.sections.needs.map(f => f.id));
     // C6 — an arrival is a new item from a source that was already observed in the previous
     // refresh. Startup snapshots, reconnects and late discovery only establish the baseline.
-    // Approval requests announce through their own live REQUIRES_ACK arrival, never here.
+    // Approval requests announce through their own live REQUIRES_ACK arrival, and a failed AI install
+    // through its own failure edge ("AI install failed"), never here.
     const arrived = [...needsKey].filter(id => !this.needsKey?.has(id) && !id.startsWith('authorization:')
-      && this.observedSources.has(needsSource(id)));
+      && id !== 'ai-install-failed' && this.observedSources.has(needsSource(id)));
     if (arrived.length) {
       const n = next.sections.needs.length;
       this.assertive = `${n} ${n === 1 ? 'item needs' : 'items need'} you.`;

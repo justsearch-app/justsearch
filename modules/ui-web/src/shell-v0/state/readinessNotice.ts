@@ -17,6 +17,7 @@ import type { IndexingProgress } from './indexingProgress.js';
  * BY DESIGN not dropped — they word generically and keep the Health remedy.
  */
 import type { SystemHealthVerdict } from './verdict.js';
+import type { AiEngineVerdict } from './aiVerdict.js';
 
 export type NoticeRemedy =
   /** Dispatched via `<jf-op-button>` — the label/risk/ceremony come from the
@@ -1083,10 +1084,49 @@ export function readinessNotice(
  *
  * The notice itself is unchanged: `readinessNotice` still projects the info-tier wording (Health reads
  * it), and this predicate never *widens* what the banner shows — it can only withhold it.
+ *
+ * AI is optional: with the AI verdict at hand, a gap that only AI nobody asked for would fill
+ * ({@link awaitsUnrequestedAi}) is no warning either. When the person asked for AI and it cannot run,
+ * the banner stays.
  */
-export function warrantsSearchDegradationBanner(verdict: SystemHealthVerdict): boolean {
+export function warrantsSearchDegradationBanner(verdict: SystemHealthVerdict, aiEngine?: AiEngineVerdict): boolean {
   if (readinessNotice(verdict) === null) return false;
+  if (awaitsUnrequestedAi(verdict, aiEngine)) return false;
   return !(verdict.kind === 'degraded' && verdict.severity === 'info');
+}
+
+/**
+ * What the Engine reports while the AI models are not installed: semantic (dense and passage) vectors
+ * and the local AI model are absent. An AI install provides each of them; none means a fault in
+ * keyword search. Measured on a fresh install without AI: retrieval `index.dense_unavailable`, AI
+ * features `encoders.health.embedding_not_ready` (beside the `info` codes `lambdamart.not_configured`
+ * and `inference.deactivated`). A missing model the index or the person selected
+ * (`index.model_not_installed`, `inference.model_not_found`) and every crash or failure are not here.
+ */
+const AI_INSTALL_PROVIDES_CODES: ReadonlySet<string> = new Set([
+  'index.dense_unavailable',
+  'encoders.health.embedding_not_ready',
+  'chunk_embedding.not_ready',
+  'inference.offline',
+  'inference.model_not_configured',
+  'inference.runtime_not_installed',
+  'vdu.ai_offline',
+]);
+
+/** Is the search verdict degraded only by what an AI install provides (each other cause `info`)? */
+export function gapOnlyAiProvides(verdict: SystemHealthVerdict): boolean {
+  return verdict.kind === 'degraded' && verdict.reasons.length > 0
+    && verdict.reasons.every((code) => AI_INSTALL_PROVIDES_CODES.has(code) || severityForCodes([code]) === 'info');
+}
+
+/**
+ * Is the search verdict's whole gap what AI nobody asked for would provide? Then search is
+ * keyword-only by the person's choice, a settled state rather than a fault: the status pill says so
+ * calmly and the search banner withholds its warning. "Nobody asked" is the AI verdict's own fact
+ * (`notRequested`). Any other cause, or AI the person asked for, keeps the verdict's own presentation.
+ */
+export function awaitsUnrequestedAi(verdict: SystemHealthVerdict, aiEngine: AiEngineVerdict | undefined): boolean {
+  return aiEngine?.notRequested === true && gapOnlyAiProvides(verdict);
 }
 
 /** Word each known code; unknown codes word generically (deduped, original order). */

@@ -64,7 +64,7 @@ final class EngineForgetQueueRuntimeTest {
       var context = webview();
       var provenance = EngineProvenance.invocation(context, ExecutorTag.UI, Clock.systemUTC().instant(), Optional.empty());
       f.attempts.accept(new OperationAttemptRunner.Request(walkKey,
-          OperationDescriptor.invocation(OperationKind.INGEST, "core.ingest-files", "{}", false), context, provenance));
+          OperationDescriptor.invocation(OperationKind.REINDEX, "core.reindex", "{}", false), context, provenance));
       var walk = f.queue.beginRecordedWalk(walkKey, "a".repeat(64), true);
       assertEquals(1, f.queue.enqueueRecordedEntries(walkKey, walk.enumerationEpoch(),
           List.of(new JobQueue.EnqueueEntry(source, Files.size(source))), "documents"));

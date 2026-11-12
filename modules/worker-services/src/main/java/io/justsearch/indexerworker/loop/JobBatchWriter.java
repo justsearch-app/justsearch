@@ -327,6 +327,8 @@ public final class JobBatchWriter {
           ex.artifact().result().content() != null ? ex.artifact().result().content().length() : 0);
       log.debug("Indexed successfully: {} in {}ms", ex.filePath(), latencyMs);
 
+    } catch (JobQueue.IngestionApprovalInterruptedException interrupted) {
+      jobQueue.returnUnfinishedClaims(java.util.List.of(ex.claim()));
     } catch (RuntimeException | Error e) {
       if (e instanceof VirtualMachineError fatal) throw fatal;
       // An observer failure after handoff cannot turn an already written effect into a retry

@@ -64,6 +64,7 @@ public final class HeadAssembly implements AutoCloseable {
 
   /** Borrowed process-lifetime store; this assembly never closes it. */
   public io.justsearch.app.api.operations.OperationStore operations() { return operations; }
+  public io.justsearch.app.api.operations.RecordedIngestionService recordedIngestion() { return recordedIngestion; }
 
   private static final Logger log = LoggerFactory.getLogger(HeadAssembly.class);
   public static final java.time.Duration TERMINAL_GENERATIVE_ALLOWANCE = java.time.Duration.ofSeconds(12);

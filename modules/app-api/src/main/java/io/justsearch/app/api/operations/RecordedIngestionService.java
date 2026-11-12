@@ -13,6 +13,26 @@ public interface RecordedIngestionService {
   /** Called only from a registered prepared parent's winning runner body with its admitted context. */
   OperationExecution execute(OperationRecordHandle parent, EngineContext context);
 
+  record InterruptedImport(String operationKey, long interruptionRevision, String reason,
+      java.util.List<RecordedRootPlan.Root> folders, boolean resumeAvailable) {
+    public InterruptedImport { folders = java.util.List.copyOf(folders); }
+  }
+
+  default java.util.List<InterruptedImport> interruptedImports() { return java.util.List.of(); }
+
+  default RecordedImportResume prepareImportResume(String operationKey, long interruptionRevision) {
+    throw new IllegalArgumentException("Import resume is unavailable");
+  }
+
+  default OperationExecution resumeImport(RecordedImportResume plan, OperationRecordHandle accepted,
+      EngineContext context) {
+    throw new IllegalArgumentException("Import resume is unavailable");
+  }
+
+  default io.justsearch.agent.api.registry.OperationResult cancelImport(String operationKey, EngineContext context) {
+    throw new UnsupportedOperationException("Import cancellation is unavailable");
+  }
+
   /** User decision on the exact current nonterminal reindex gap list. */
   default io.justsearch.agent.api.registry.OperationResult acceptGaps(
       String reindexKey, String gapsListHash, EngineContext context) {

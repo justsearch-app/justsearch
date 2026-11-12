@@ -3701,9 +3701,9 @@ export class SettingsSurface extends JfElement {
       <div class="section">
         <h3>${icon({ name: 'shield', size: 12 })} Plugin permissions</h3>
         <p class="toggle-desc">
-          Tempdoc 543 §14.3 β4 / §28.W3 — manage capabilities you've granted
-          to plugins. Per-request prompts surface in the lower-left when a
-          plugin requests permission; this panel shows the persisted decisions.
+          What each plugin may do. When a plugin asks for a permission, its
+          request waits in the status menu under Needs you. Your answers are
+          kept here, where you can change or revoke them.
         </p>
         ${this.consents.length === 0
           ? html`<p class="toggle-desc">No consent decisions recorded yet.</p>`
@@ -3793,10 +3793,10 @@ export class SettingsSurface extends JfElement {
       <div class="section section-composite">
         <h3>${icon({ name: 'layers', size: 12 })} Workspace Profiles (developer)</h3>
         <p class="toggle-desc">
-          Tempdoc 543 §13.6 substrate — snapshot the current Scope into
-          a named WorkspaceProfile; switch back later to restore. §25.ζ#4
-          picker lets you choose a parent profile so the new profile
-          inherits manifest set + Scope under set-arithmetic semantics.
+          Save the current workspace (its view settings and the plugins tied
+          to a profile) as a named profile, and switch to it later to bring
+          it back. A profile can start from a parent: it keeps the parent's
+          plugins and settings, and its own settings win where they differ.
         </p>
         <div class="toggle-row">
           <select

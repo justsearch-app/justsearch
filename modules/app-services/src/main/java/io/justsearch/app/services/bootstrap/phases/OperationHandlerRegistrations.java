@@ -93,6 +93,10 @@ public final class OperationHandlerRegistrations {
         new BulkReindexHandler(io.justsearch.app.api.operations.RecordedBulkPlan.Profile.USER_BULK,
             recordedIngestion, context -> recordedRoots.snapshotBindings(), indexingServiceSupplier,
             io.justsearch.app.services.worker.KnowledgeClient::captureRecordedExcludePatterns));
+    handlers.register(CoreOperationCatalog.RESUME_IMPORT,
+        new io.justsearch.app.services.registry.operations.handlers.ResumeImportHandler(recordedIngestion));
+    handlers.register(CoreOperationCatalog.CANCEL_IMPORT,
+        new io.justsearch.app.services.registry.operations.handlers.CancelImportHandler(recordedIngestion));
     handlers.register(CoreOperationCatalog.ACCEPT_GAPS, new AcceptGapsHandler(recordedIngestion));
     handlers.register(CoreOperationCatalog.CANCEL_REINDEX,
         new io.justsearch.app.services.registry.operations.handlers.CancelReindexHandler(recordedIngestion));

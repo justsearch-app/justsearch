@@ -403,6 +403,9 @@ public final class JobBatchExtractor {
       return new ExtractedJob(
           claim, artifact, startTime, envelope, sourceSha256, docUid, sourceRealPath, forceReindex);
 
+    } catch (JobQueue.IngestionApprovalInterruptedException interrupted) {
+      jobQueue.returnUnfinishedClaims(List.of(claim));
+      return null;
     } catch (IngestionServiceUnavailableException
         | EngineExecutorRejectedException
         | SandboxServiceUnavailableException unavailable) {

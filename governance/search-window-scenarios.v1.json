@@ -3051,8 +3051,8 @@
         },
         {
           "layer": "view",
-          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.honesty.test.ts",
-          "test": "claims nothing before a settled poll — the case the shipped landing gets wrong"
+          "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ownCount.test.ts",
+          "test": "before any status: unknown in words, never 0"
         },
         {
           "layer": "controller",
