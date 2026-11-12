@@ -26,8 +26,8 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { normalizeCreationTime, coerceProcessTable, DEFAULT_MAX_TABLE_AGE_MS, linuxIdentity } = require('./process-identity.cjs');
-const { isSafeKey, readFixtureTable } = require('./agent-identity.cjs');
+const { normalizeCreationTime, coerceProcessTable, DEFAULT_MAX_TABLE_AGE_MS, linuxIdentity, readLinuxProcess } = require('./process-identity.cjs');
+const { isSafeKey, readFixtureTable, readTableSync } = require('./agent-identity.cjs');
 
 const OWNERS_DIRNAME = 'owners';
 const TOUCH_SCHEMA = 'owner-touch.v1';
@@ -70,19 +70,27 @@ function readOwnerRecord(stateRoot, key) {
 function writeOwnerRecord(stateRoot, key, patch) {
   const file = touchPath(stateRoot, key);
   if (!file) return false;
+  let tmp;
   try {
-    fs.mkdirSync(path.dirname(file), { recursive: true });
-    const cur = readOwnerRecord(stateRoot, key) || {};
-    const tmp = `${file}.${process.pid}.${Math.random().toString(36).slice(2, 8)}.tmp`;
-    fs.writeFileSync(tmp, JSON.stringify({ ...cur, ...patch, schema: TOUCH_SCHEMA, key }), 'utf8');
-    try {
-      fs.renameSync(tmp, file);
-    } catch (err) {
-      try { fs.rmSync(tmp, { force: true }); } catch { /* best effort */ }
-      throw err;
+    let text;
+    try { text = fs.readFileSync(file, 'utf8'); }
+    catch (err) { if (err.code !== 'ENOENT') return false; }
+    let cur = {};
+    if (text !== undefined) {
+      try {
+        const doc = JSON.parse(text);
+        if (doc && typeof doc === 'object' && !Array.isArray(doc)) cur = doc;
+      } catch { /* malformed content is replaced by a clean record */ }
     }
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    tmp = `${file}.${process.pid}.${Math.random().toString(36).slice(2, 8)}.tmp`;
+    fs.writeFileSync(tmp, JSON.stringify({ ...cur, ...patch, schema: TOUCH_SCHEMA, key }), 'utf8');
+    fs.renameSync(tmp, file);
     return true;
   } catch {
+    if (tmp) {
+      try { fs.rmSync(tmp, { force: true }); } catch { /* best effort */ }
+    }
     return false;
   }
 }
@@ -437,14 +445,35 @@ function readActiveRunRecord(active, { mainRepoRoot, runsRoot, readFile = (p) =>
 
 /**
  * Supervisor liveness for the verdict. The run record names the supervisor pid. A record that
- * cannot be read leaves the supervisor unknown, and an unknown supervisor behind an unexpired lease
+ * cannot be read, or has no usable pid, leaves the supervisor unknown. An unknown supervisor behind an unexpired lease
  * (the lease is renewed by the running supervisor) counts as alive - never as dead, so it can never
- * yield RECLAIM_DEAD. With the lease expired as well there is no evidence of life left.
+ * yield RECLAIM_DEAD. With the lease expired as well there is no evidence of life left. A present
+ * pid is dead only if its recorded birth differs; unavailable birth evidence falls back to presence.
  */
-function supervisorAliveFrom({ runJson, leaseExpired, pidAlive }) {
-  if (!runJson) return !leaseExpired;
-  const pid = runJson?.pids?.runnerPid ?? null;
-  return pid ? !!pidAlive(pid) : false;
+function supervisorAliveFrom({ runJson, leaseExpired,
+  pidAlive = (pid) => ownerPidPresence({ pid }, { env: {} }) !== 'absent',
+  readProcess = readLinuxProcess, readTable = readTableSync, now = Date.now(),
+  maxTableAgeMs = DEFAULT_MAX_TABLE_AGE_MS }) {
+  const pid = Number(runJson?.pids?.runnerPid);
+  if (!Number.isSafeInteger(pid) || pid <= 0) return !leaseExpired;
+  if (!pidAlive(pid)) return false;
+  const recorded = runJson?.identities?.runner;
+  if (!recorded || recorded.pid !== pid) return true;
+  const birth = linuxIdentity(recorded);
+  let table;
+  if (birth) {
+    const seen = readProcess(pid);
+    const actual = linuxIdentity(seen);
+    if (!seen?.present || !actual || actual.pid !== pid) return true;
+    table = { ok: true, readAt: now, table: [{ ProcessId: pid, processIdentity: seen.processIdentity }] };
+  } else {
+    if (!normalizeCreationTime(recorded.creationFileTimeUtc)) return true;
+    const evidence = coerceProcessTable(readTable(), { now, maxTableAgeMs });
+    if (!evidence.ok || !evidence.table.some((row) => Number(row.ProcessId) === pid)) return true;
+    table = { ok: true, readAt: now, table: evidence.table };
+  }
+  return ownerLiveness({ key: 'runner', pid, processIdentity: recorded.processIdentity,
+    creationTime: recorded.creationFileTimeUtc }, { table, now, maxTableAgeMs }).state !== 'ended';
 }
 
 /** "Your stack was taken over" notice for a caller whose recorded ownedEpoch is behind. */

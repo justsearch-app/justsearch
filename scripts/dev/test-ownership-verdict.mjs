@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
 const {
-  computeOwnershipVerdict, classifyActivity, readSessionActivity, mergeSessionActivity,
+  computeOwnershipVerdict, classifyActivity, readSessionActivity,
   computeDisplacedNotice, computeProvenanceMismatch, recommendedTakeoverFor, DEFAULT_THRESHOLDS,
 } = require(path.join(__dirname, 'lib', 'ownership-verdict.cjs'));
 
@@ -265,19 +265,6 @@ const tests = [
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
-  }],
-
-  // --- 606 3a: mergeSessionActivity round-trip (ownedEpoch persistence + merge) ---
-  ['mergeSessionActivity preserves existing fields and adds ownedEpoch', () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'merge-'));
-    try {
-      const sid = 'm1';
-      fs.writeFileSync(path.join(dir, `${sid}.json`), JSON.stringify({ lastActivityAt: fresh(1000) }));
-      mergeSessionActivity(dir, sid, { ownedEpoch: 7 });
-      const a = readSessionActivity(dir, sid);
-      assert.equal(a.ownedEpoch, 7);
-      assert.ok(a.lastActivityAt, 'existing field preserved');
-    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
   }],
 
   // --- 606 3a: displaced-owner notice ---

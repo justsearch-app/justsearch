@@ -2191,10 +2191,7 @@ export async function main() {
           } else {
             recordedRunJson = runObservation.value;
             const pids = runObservation.value?.pids || {};
-            const anyAlive = Object.values(pids).some((pid) => {
-              if (typeof pid !== 'number' || pid <= 0) return false;
-              try { process.kill(pid, 0); return true; } catch { return false; }
-            });
+            const anyAlive = Object.values(pids).some((pid) => _pidAlive(pid));
             if (anyAlive) {
               setCheck(
                 'noStaleRun',
@@ -2374,10 +2371,7 @@ export async function main() {
             uiPort = activeRunJson?.uiPortActual ?? null;
             apiBaseUrl = activeRunJson?.apiBaseUrl ?? null;
             const pids = activeRunJson?.pids || {};
-            pidsAlive = Object.values(pids).some((pid) => {
-              if (typeof pid !== 'number' || pid <= 0) return false;
-              try { process.kill(pid, 0); return true; } catch { return false; }
-            });
+            pidsAlive = Object.values(pids).some((pid) => _pidAlive(pid));
             // Tempdoc 606: single ownership-verdict projection (replaces the inline
             // 271 block + 542 op-lease overlay). Surfaces the prescriptive verdict +
             // recommendedAction so the agent is told what to do, not just shown raw fields.

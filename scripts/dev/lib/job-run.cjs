@@ -25,6 +25,7 @@ const { isMainThread } = require('node:worker_threads');
 const { spawn, spawnSync } = require('node:child_process');
 const { linuxIdentity, readLinuxProcess, readLinuxChildren, signalLinuxProcess, boundExecPath } = require('./process-identity.cjs');
 const { captureSpawnedIdentity } = require('./engine-actuator.cjs');
+const { ownerPidPresence } = require('./owner-presence.cjs');
 
 const HOST_SCRIPT = path.join(__dirname, 'job-host.ps1');
 const STOP_SCRIPT = path.join(__dirname, 'stop-job-run.ps1');
@@ -243,15 +244,14 @@ function settleRunRecord(run, options) {
  * process meanwhile: libuv holds its handle until its exit is reaped.
  */
 function waitForRootSync(run, { timeoutMs = 20000, intervalMs = 10,
-  monotonic = () => performance.now(), wait = null } = {}) {
+  monotonic = () => performance.now(), wait = null, kill = process.kill } = {}) {
   if (!run?.recordPath) return null;
   const pause = new Int32Array(new SharedArrayBuffer(4));
   const end = monotonic() + timeoutMs;
   for (;;) {
     const record = readRunRecord(run);
     if (record?.root?.pid && Number(record.pid) === run.child.pid) return record;
-    let alive = true;
-    try { process.kill(run.child.pid, 0); } catch { alive = false; }
+    const alive = ownerPidPresence({ pid: run.child.pid }, { env: {}, kill }) !== 'absent';
     const remainingMs = end - monotonic();
     if (!alive || remainingMs <= 0) return null;
     const pauseMs = Math.min(intervalMs, remainingMs);
