@@ -340,7 +340,7 @@ def require_gpu_install(status):
 
 def require_gpu_encoders(runtime):
     features = {f['id']: f for f in runtime.get('onnxFeatures', [])}
-    for name in ('embed', 'splade'):
+    for name in ('embed',):
         feature = features.get(name, {})
         if (feature.get('modelActive') is not True or feature.get('executionProvider') != 'cuda'
                 or feature.get('gpuFallback') is not False):
@@ -355,7 +355,7 @@ class SoakGpu:
 
     def observe(self, sample):
         features = {f['id']: f for f in sample['runtime'].get('onnxFeatures', [])}
-        cpu = {name for name in ('embed', 'splade')
+        cpu = {name for name in ('embed',)
                if features.get(name, {}).get('executionProvider') == 'cpu'}
         try:
             require_gpu_encoders(sample['runtime'])
@@ -712,10 +712,13 @@ def gpu_installed_checks(run, preview=None):
     else:
         start_chat(run)
     run.activation_checkpoint()
-    retrieval = linux.semantic_search(run)
+    retrieval = linux.semantic_search(run, reranking=True)
     runtime = run.api('/api/ai/runtime/status')
     run.evidence('J3-gpu-runtime', runtime)
     require_gpu_encoders(runtime)
+    features = {f['id']: f for f in runtime.get('onnxFeatures', [])}
+    if features.get('reranker', {}).get('modelActive') is not True:
+        raise ProductFailure('GPU reranker model is not active: ' + json.dumps(features.get('reranker', {})))
     answer = chat(run, 'J3')
     run.facts['ai'] = installed
     return {'installed': installed, 'preview': preview, 'runtime': runtime, 'retrieval': retrieval, 'chat': answer}
