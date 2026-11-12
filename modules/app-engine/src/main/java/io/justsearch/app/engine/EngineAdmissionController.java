@@ -47,7 +47,7 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
   private boolean closing;
   private final java.util.concurrent.atomic.AtomicReference<StatusAdmission> statusAdmission =
       new java.util.concurrent.atomic.AtomicReference<>(
-          new StatusAdmission(false, 0, Map.of(), 0, Map.of(), 0));
+          new StatusAdmission(false, 0, Map.of(), 0, Map.of(), 0, 0));
   private final io.justsearch.core.scheduling.UserActivity userActivity =
       new io.justsearch.core.scheduling.UserActivity();
 
@@ -157,19 +157,35 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
     return admit(context, false, true);
   }
 
+  /**
+   * Ordinary work for a stream that only reads published state: same limits, freeze, closing and
+   * release as {@link #admitRequest}, but the slot is not counted as retaining the index.
+   */
+  @Override
+  public EngineWorkHandle admitPublishedStateRequest(EngineContext context, boolean activeRequest) {
+    var work = admit(context, false, false, true);
+    if (activeRequest) userActivity.record();
+    return work;
+  }
+
   private EngineWorkHandle admit(EngineContext context, boolean allowWhileFrozen,
       boolean observation) {
+    return admit(context, allowWhileFrozen, observation, false);
+  }
+
+  private EngineWorkHandle admit(EngineContext context, boolean allowWhileFrozen,
+      boolean observation, boolean publishedState) {
     Objects.requireNonNull(context, "context");
     if (context.workId().isPresent()) throw new IllegalArgumentException("Work is already attached");
     synchronized (lock) {
       if (closing) refuse(EngineAdmissionException.Reason.FROZEN);
       if (preparationId != null && !allowWhileFrozen) refuse(EngineAdmissionException.Reason.FROZEN);
       Bucket bucket = Bucket.of(context);
-      reserveAdmission(bucket, allowWhileFrozen, observation, false);
+      reserveAdmission(bucket, allowWhileFrozen, observation, false, publishedState);
       UUID id = UUID.randomUUID();
-      Work work = new Work(context.withWorkId(id), bucket, observation);
+      Work work = new Work(context.withWorkId(id), bucket, observation, publishedState);
       active.put(id, work);
-      return new Reference(work, work.initial);
+      return new Reference(work, work.initial, false);
     }
   }
 
@@ -182,15 +198,15 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
   public StatusReservation reserveStatusAdmission(EngineContext context) {
     Objects.requireNonNull(context, "context");
     Bucket bucket = Bucket.of(context);
-    reserveAdmission(bucket, false, true, true);
+    reserveAdmission(bucket, false, true, true, false);
     var released = new java.util.concurrent.atomic.AtomicBoolean();
     return () -> {
-      if (released.compareAndSet(false, true)) releaseReservation(bucket, true, true);
+      if (released.compareAndSet(false, true)) releaseReservation(bucket, true, true, false);
     };
   }
 
   private void reserveAdmission(Bucket bucket, boolean allowWhileFrozen, boolean observation,
-      boolean status) {
+      boolean status, boolean publishedState) {
     for (;;) {
       StatusAdmission observed = statusAdmission.get();
       if (observed.frozen() && !allowWhileFrozen) refuse(EngineAdmissionException.Reason.FROZEN);
@@ -206,25 +222,32 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
       var nextCounts = new HashMap<>(selectedCounts);
       nextCounts.merge(bucket, 1, Integer::sum);
       int nextStatusCount = observed.statusCount() + (status ? 1 : 0);
+      int nextPublishedCount = observed.publishedStateCount() + (publishedState ? 1 : 0);
       StatusAdmission next = observation
           ? new StatusAdmission(observed.frozen(), observed.activeCount() + 1, observed.counts(),
-              observed.observationCount() + 1, Map.copyOf(nextCounts), nextStatusCount)
+              observed.observationCount() + 1, Map.copyOf(nextCounts), nextStatusCount,
+              nextPublishedCount)
           : new StatusAdmission(observed.frozen(), observed.activeCount() + 1, Map.copyOf(nextCounts),
-              observed.observationCount(), observed.observationCounts(), nextStatusCount);
+              observed.observationCount(), observed.observationCounts(), nextStatusCount,
+              nextPublishedCount);
       if (statusAdmission.compareAndSet(observed, next)) return;
     }
   }
 
-  private void releaseReservation(Bucket bucket, boolean observation, boolean status) {
+  private void releaseReservation(Bucket bucket, boolean observation, boolean status,
+      boolean publishedState) {
     statusAdmission.updateAndGet(observed -> {
       var nextCounts = new HashMap<>(observation ? observed.observationCounts() : observed.counts());
       nextCounts.compute(bucket, (ignored, count) -> count == 1 ? null : count - 1);
       int nextStatusCount = observed.statusCount() - (status ? 1 : 0);
+      int nextPublishedCount = observed.publishedStateCount() - (publishedState ? 1 : 0);
       return observation
           ? new StatusAdmission(observed.frozen(), observed.activeCount() - 1, observed.counts(),
-              observed.observationCount() - 1, Map.copyOf(nextCounts), nextStatusCount)
+              observed.observationCount() - 1, Map.copyOf(nextCounts), nextStatusCount,
+              nextPublishedCount)
           : new StatusAdmission(observed.frozen(), observed.activeCount() - 1, Map.copyOf(nextCounts),
-              observed.observationCount(), observed.observationCounts(), nextStatusCount);
+              observed.observationCount(), observed.observationCounts(), nextStatusCount,
+              nextPublishedCount);
     });
   }
 
@@ -232,7 +255,8 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
   private void publishStatusAdmission() {
     statusAdmission.updateAndGet(observed -> new StatusAdmission(
         closing || preparationId != null, observed.activeCount(), observed.counts(),
-        observed.observationCount(), observed.observationCounts(), observed.statusCount()));
+        observed.observationCount(), observed.observationCounts(), observed.statusCount(),
+        observed.publishedStateCount()));
   }
 
   @Override
@@ -270,7 +294,9 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
         throw new EngineAdmissionException(EngineAdmissionException.Reason.WORK_FINISHED, retryAfterSeconds);
       }
       work.references++;
-      return new Reference(work, context);
+      // A port call joining exact work may reach the index, whatever the slot was admitted for.
+      if (work.publishedState) retainIndex(work);
+      return new Reference(work, context, work.publishedState);
     }
   }
 
@@ -367,13 +393,32 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
   }
 
   /**
-   * Live slots that may use the index owner: every slot except plain status reservations, read
-   * from one publication so a concurrent status release cannot mask real work. Physical reads a
-   * status response makes hold their own slot and are counted here.
+   * Live slots that may use the index owner: every slot except plain status reservations and
+   * published-state stream slots, read from one publication so a concurrent release cannot mask
+   * real work. Physical reads a status response makes hold their own slot and are counted here.
    */
   int indexRetainingWorkCount() {
     StatusAdmission observed = statusAdmission.get();
-    return observed.activeCount() - observed.statusCount();
+    return observed.activeCount() - observed.statusCount() - observed.publishedStateCount();
+  }
+
+  /**
+   * Physical work that joins a published-state slot never inherits its mark: while any such
+   * reference is open the slot counts as index-retaining again. Called under {@code lock}, in the
+   * same publication as the count's other changes.
+   */
+  private void retainIndex(Work work) {
+    if (work.physicalReferences++ == 0) adjustPublishedStateCount(-1);
+  }
+
+  private void releaseIndex(Work work) {
+    if (--work.physicalReferences == 0) adjustPublishedStateCount(1);
+  }
+
+  private void adjustPublishedStateCount(int delta) {
+    statusAdmission.updateAndGet(observed -> new StatusAdmission(observed.frozen(),
+        observed.activeCount(), observed.counts(), observed.observationCount(),
+        observed.observationCounts(), observed.statusCount(), observed.publishedStateCount() + delta));
   }
 
   @Override
@@ -440,37 +485,51 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
    * Lock-free admission publication. {@code activeCount} holds every live slot (work and
    * observations); work capacity is {@code activeCount - observationCount}, so observations never
    * consume search or generation capacity. {@code statusCount} is the subset of observations held
-   * by plain status reservations, which never reach the index themselves.
+   * by plain status reservations, which never reach the index themselves. {@code
+   * publishedStateCount} is the subset of work slots held by published-state streams with no
+   * physical reference open, which do not reach it either.
    */
   private record StatusAdmission(boolean frozen, int activeCount, Map<Bucket, Integer> counts,
-      int observationCount, Map<Bucket, Integer> observationCounts, int statusCount) {}
+      int observationCount, Map<Bucket, Integer> observationCounts, int statusCount,
+      int publishedStateCount) {}
 
   private static final class Work {
     private final EngineContext initial;
     private final Bucket bucket;
     private final boolean observation;
+    private final boolean publishedState;
     private final Set<Runnable> cancellation = new LinkedHashSet<>();
     private final Set<Runnable> background = new LinkedHashSet<>();
     private final Set<Runnable> completion = new LinkedHashSet<>();
     private int references = 1;
+    /** Open references by physical work on a published-state slot. */
+    private int physicalReferences;
     private String cancelReason;
     private boolean detached;
     private boolean completed;
     private boolean inference;
 
-    private Work(EngineContext initial, Bucket bucket, boolean observation) {
+    private Work(EngineContext initial, Bucket bucket, boolean observation,
+        boolean publishedState) {
       this.initial = initial;
       this.bucket = bucket;
       this.observation = observation;
+      this.publishedState = publishedState;
     }
   }
 
   private final class Reference implements EngineWorkHandle {
     private final Work work;
     private final EngineContext view;
+    /** Joined a published-state slot as physical work, so the slot retains the index meanwhile. */
+    private final boolean physical;
     private boolean closed;
 
-    private Reference(Work work, EngineContext view) { this.work = work; this.view = view; }
+    private Reference(Work work, EngineContext view, boolean physical) {
+      this.work = work;
+      this.view = view;
+      this.physical = physical;
+    }
 
     @Override
     public EngineContext context() {
@@ -488,7 +547,8 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
           throw new EngineAdmissionException(EngineAdmissionException.Reason.WORK_FINISHED, retryAfterSeconds);
         }
         work.references++;
-        return new Reference(work, view);
+        if (physical) retainIndex(work);
+        return new Reference(work, view, physical);
       }
     }
 
@@ -547,10 +607,11 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
       synchronized (lock) {
         if (closed) return;
         closed = true;
+        if (physical) releaseIndex(work);
         if (--work.references == 0) {
           work.completed = true;
           active.remove(work.initial.workId().orElseThrow());
-          releaseReservation(work.bucket, work.observation, false);
+          releaseReservation(work.bucket, work.observation, false, work.publishedState);
           if (work.inference) {
             inferenceCount--;
             inferenceCounts.compute(work.bucket, (key, count) -> count == 1 ? null : count - 1);

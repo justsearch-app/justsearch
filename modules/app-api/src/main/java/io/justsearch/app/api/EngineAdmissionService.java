@@ -61,6 +61,15 @@ public interface EngineAdmissionService {
     return admitRequest(context, allowWhileFrozen, userActivity);
   }
 
+  /**
+   * Admit a front's GET stream that only reads published state. It is ordinary work for limits,
+   * freeze, closing and release, but does not retain the index while no physical work has
+   * attached to it.
+   */
+  default EngineWorkHandle admitPublishedStateRequest(EngineContext context, boolean userActivity) {
+    return admitRequest(context, false, userActivity);
+  }
+
   /** Attach a port call to existing exact work, or admit an unattached library call. */
   EngineWorkHandle attach(EngineContext context);
 

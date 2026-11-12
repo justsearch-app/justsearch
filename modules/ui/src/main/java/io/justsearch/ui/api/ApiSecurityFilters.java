@@ -55,6 +55,26 @@ final class ApiSecurityFilters {
       "/api/status", "/api/runtime/live", "/api/diagnostics/traces", "/api/inference/transitions",
       "/api/ai/packs/status", "/api/conversations/encryption");
 
+  /**
+   * GET server-sent event streams that only read published in-process state (channels, snapshots
+   * of stores and holders the Engine publishes), never the index, its client or serving views.
+   * They stay ordinary work for limits, freeze, closing and release, but are admitted as not
+   * retaining the index, so an open window does not refuse an index recovery close. Explicit
+   * routes only, compared with the matched route: work-carrying streams (POST streams, runs,
+   * chat) are not listed.
+   */
+  private static final Set<String> PUBLISHED_STATE_STREAM_PATHS = Set.of(
+      "/api/shell-events/stream", "/api/indexing-jobs/stream", "/api/health/events/stream",
+      "/api/condition-recovery-index/stream", "/api/intent/stream",
+      "/api/advisory/operation-completed/stream", "/api/advisory/health-recoverable/stream",
+      "/api/advisory/authorization-pending/stream", "/api/action-ledger/stream",
+      "/api/operation-history/stream", "/api/runtime-context/stream",
+      "/api/runtime/manifest/stream", "/api/diagnostic-channels/engine-log/stream",
+      "/api/metrics/worker.job_queue.depth/stream",
+      "/api/metrics/worker.documents.indexed.rate_per_sec/stream",
+      "/api/metrics/gpu.utilization.percent/stream",
+      "/api/metrics/gpu.memory.utilization.percent/stream", "/infra/capabilities/stream");
+
   /** Contract-facing projection of the filters that actually enforce this route. */
   record ContractSecurity(
       boolean loopbackHostRequired, boolean sessionTokenRequired, boolean mcpOriginValidated) {}
@@ -220,7 +240,12 @@ final class ApiSecurityFilters {
         boolean userActivity = RequestEngineContext.isUserActivity(ctx);
         // Status reads keep their bounded observation slot; every other request may carry the
         // presence report's input age (zero for anything but POST /api/ui/activity).
+        // The matched route, not the raw path: every spelling the router serves from one of these
+        // routes (a trailing slash) is the same stream, and nothing else is.
+        boolean publishedStateStream = "GET".equals(ctx.method().name())
+            && PUBLISHED_STATE_STREAM_PATHS.contains(ctx.matchedPath());
         var work = observation ? engineAdmission.admitObservationRequest(selected, userActivity)
+            : publishedStateStream ? engineAdmission.admitPublishedStateRequest(selected, userActivity)
             : engineAdmission.admitRequest(selected, ctx.path().startsWith("/api/upgrade/"), userActivity,
                 userActivity ? RequestEngineContext.reportedInputAgeMs(ctx) : 0);
         ctx.attribute(RequestEngineWork.ATTRIBUTE, work);
