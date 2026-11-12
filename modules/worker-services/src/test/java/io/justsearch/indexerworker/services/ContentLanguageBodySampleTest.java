@@ -146,6 +146,49 @@ class ContentLanguageBodySampleTest {
     assertEquals("en", text(document));
   }
 
+  /** An EU-style annex repeating its entries in other languages, among them Cyrillic and Greek. */
+  static String annex(int chars) {
+    String entries = "Обществената библиотека отваря всяка сутрин и посреща читатели от околните села.\n"
+        + SCRIPT_BODY.get("el") + BODY.get("es") + BODY.get("it");
+    return entries.repeat(chars / entries.length() + 1);
+  }
+
+  @ParameterizedTest
+  @CsvSource({"de,bg", "de,el", "de,annex", "en,annex"})
+  void r6AGreekOrBulgarianAnnexDoesNotOutvoteTheBody(String language, String block) {
+    String annex = switch (block) {
+      case "bg" -> "Обществената библиотека отваря всяка сутрин и посреща читатели от околните села.\n"
+          .repeat(150);
+      case "el" -> SCRIPT_BODY.get("el").repeat(80);
+      default -> annex(24_000);
+    };
+    assertEquals(language, text(body(language, 24_000) + annex));
+    assertEquals(language, text(body(language, 30_000) + annex + body(language, 3_000)));
+  }
+
+  @Test
+  void r6ChineseTechnicalTextWithManyEnglishTermsGetsNoLatinLabel() {
+    String line = "在本系统中，我们使用 Kubernetes 部署 microservices，并通过 Prometheus 和 Grafana 监控 latency"
+        + " 与 throughput。数据库采用 PostgreSQL，缓存使用 Redis cluster，消息队列为 Apache Kafka。\n";
+    for (int length : new int[] {5_000, 20_000, 100_000}) {
+      String language = text(line.repeat(length / line.length() + 1));
+      assertTrue(language == null || language.equals("zh"), length + ": " + language);
+    }
+  }
+
+  @ParameterizedTest
+  @CsvSource(delimiter = '|', value = {
+      "en|The meeting is at 10:00. 会议在十点开始。 Please bring the report and the budget figures for next year.",
+      "ru|Привет! This is a short note with English words and русский текст together in one file.",
+      "zh|日本国憲法は、日本の最高法規である。The Constitution of Japan is the supreme law.",
+      "en|Προσοχή: the following instructions are written in English for all visitors to the museum.",
+      "en|这是中文。This is English text that goes on for a while, describing the library and its opening hours.",
+      "zh|東京は日本の首都です。人口は約千四百万人で、多くの会社や大学があります。",
+      "ja|東京は日本の首都です。ここにはたくさんのひとがすんでいて、まいにちいろいろなところへでかけます。"})
+  void n2ShortMixedScriptFilesKeepTheirLabels(String language, String content) {
+    assertEquals(language, text(content));
+  }
+
   @ParameterizedTest
   @ValueSource(strings = {"en", "de", "fr", "es", "it", "nl", "pt", "cy"})
   void n1LongMonolingualLatinProseKeepsItsLabel(String language) {

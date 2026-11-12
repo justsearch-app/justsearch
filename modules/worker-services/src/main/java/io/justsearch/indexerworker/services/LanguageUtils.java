@@ -50,8 +50,9 @@ public final class LanguageUtils {
    * preview (Markdown converted to plain text). A text shorter than 4,096 characters is one window;
    * a longer one is read as up to eight windows of 4,096 characters, evenly spaced from its start to
    * its end. Each window gets the existing rule on its own (non-Latin script rules, then bundled
-   * statistical models for Latin prose), and the document's label is the language most windows
-   * name, when it leads every other language. So an opening block in another language (site menus,
+   * statistical models for Latin prose), except that a window labelled by a script rule votes only
+   * when that script holds the majority of its letters. The document's label is the language most
+   * windows name, when it leads every other language. So an opening block in another language (site menus,
    * a cover page) does not decide the label. A tie or no window label means no label; the machine
    * locale is never consulted.
    *
@@ -84,7 +85,7 @@ public final class LanguageUtils {
   private static String votedLanguage(String text) {
     int length = text.length();
     if (length <= WINDOW_CHARS) {
-      return detectLanguage(text);
+      return detectLanguage(text, false);
     }
     int windows = Math.min(MAX_WINDOWS, (length + WINDOW_CHARS - 1) / WINDOW_CHARS);
     java.util.Map<String, Integer> votes = new java.util.HashMap<>();
@@ -93,7 +94,7 @@ public final class LanguageUtils {
       int end = start + WINDOW_CHARS;
       String label = detectLanguage(text.substring(
           start == 0 ? 0 : lineStartAtOrAfter(text, start),
-          end == length ? length : lineEndAtOrBefore(text, end)));
+          end == length ? length : lineEndAtOrBefore(text, end)), true);
       if (label != null) {
         votes.merge(label, 1, Integer::sum);
       }
@@ -564,7 +565,7 @@ public final class LanguageUtils {
     return null;
   }
 
-  private static String detectLanguage(String window) {
+  private static String detectLanguage(String window, boolean ofSeveral) {
     if (window.isEmpty()) {
       return null;
     }
@@ -609,26 +610,14 @@ public final class LanguageUtils {
       return null;
     }
     int threshold = Math.max(5, examined / 6);
-    if (han >= threshold) {
-      return "zh";
-    }
-    if (kana >= threshold) {
-      return "ja";
-    }
-    if (hangul >= threshold) {
-      return "ko";
-    }
-    if (arabic >= threshold) {
-      return "ar";
-    }
-    if (devanagari >= threshold) {
-      return "hi";
-    }
-    if (cyrillic >= threshold) {
-      return "ru";
-    }
-    if (greek >= threshold) {
-      return "el";
+    String[] scripts = {"zh", "ja", "ko", "ar", "hi", "ru", "el"};
+    int[] counts = {han, kana, hangul, arabic, devanagari, cyrillic, greek};
+    for (int i = 0; i < scripts.length; i++) {
+      if (counts[i] >= threshold) {
+        // One window of several votes for a script only where that script holds the majority of
+        // its letters: a multilingual annex or a quoted block does not outvote the body.
+        return !ofSeveral || 2 * counts[i] > examined ? scripts[i] : null;
+      }
     }
     if (latin >= MIN_LATIN_LETTERS && latin >= examined * 0.8) {
       return LatinLanguageDetector.detect(window);
