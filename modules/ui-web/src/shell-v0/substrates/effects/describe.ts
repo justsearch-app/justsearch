@@ -154,3 +154,38 @@ export function describeChange(effect: Effect): EffectChange {
     }
   }
 }
+
+/**
+ * FC9 — what an effect of `kind` does, when only its kind is known: the copy of another window's
+ * effect that the backend ledger keeps carries its kind and no fields. The same phrases as
+ * {@link describeEffect}, without the fields it would name. An unknown kind is said as a code.
+ */
+const KIND_WORDS: Readonly<Record<Effect['kind'], string>> = {
+  noop: 'No-op',
+  navigate: 'Navigate',
+  'open-pane': 'Open a pane',
+  'close-pane': 'Close a pane',
+  toast: 'Show a message',
+  'invoke-operation': 'Run an operation',
+  'set-selection': 'Select items',
+  'clear-selection': 'Clear a selection',
+  'focus-element': 'Move the keyboard focus',
+  'scroll-to': 'Scroll to a place on the page',
+  'open-modal': 'Open a dialog',
+  'close-modal': 'Close a dialog',
+  'copy-to-clipboard': 'Copy to clipboard',
+  'set-form-value': 'Fill in a form field',
+  'set-appearance': 'Set appearance',
+  'set-ui-mode': 'Set UI mode',
+  'apply-presentation': 'Apply a presentation',
+  'save-settings': 'Save settings',
+  'set-search-query': 'Set the search text',
+  'set-search-filter': 'Set search filter',
+  'undo-operation': 'Undo an operation',
+  'data-result': 'Result from an operation',
+  'data-error': 'Error from an operation',
+};
+
+export function describeEffectKind(kind: string): string {
+  return Object.hasOwn(KIND_WORDS, kind) ? KIND_WORDS[kind as Effect['kind']] : `Not described (code ${kind})`;
+}

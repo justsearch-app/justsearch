@@ -1,0 +1,67 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-12T14:35:56.525Z",
+  "revision": "5384a0ea516711f608cf13e34fb4eff360dc2450",
+  "tree": "2e527e93d2807132c31029112124efa36c49d154",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.keyboard-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/tmp/test-intent-vitest-3560018-1794493974400.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 90300
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.keyboard-lockdown.test.ts#FC8a at 600×400 with 200% text, Ctrl+End and Ctrl+Home through the feed log no uncaught ResizeObserver loop error",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.keyboard-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ff301c05300d177c66c4b7e968b425425a31109edd63016c97465727813a0b36",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC8a at 600×400 with 200% text, Ctrl+End and Ctrl+Home through the feed log no uncaught ResizeObserver loop error",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "2cc52382dc",
+    "revision": "2cc52382dc285162539580fe4e17a5b4673f6d8f",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.keyboard-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/tmp/test-intent-vitest-3560018-1794494066660.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 89523,
+        "output": "JSON report written to /tmp/test-intent-vitest-3560018-1794494066660.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.keyboard-lockdown.test.ts#FC8a at 600×400 with 200% text, Ctrl+End and Ctrl+Home through the feed log no uncaught ResizeObserver loop error",
+        "classification": "assertion",
+        "detail": "FC8a at 600×400 with 200% text, Ctrl+End and Ctrl+Home through the feed log no uncaught ResizeObserver loop error:  AssertionError: no uncaught ResizeObserver error while the keys move through the feed: expected [ …(2) ] to deeply equal []\n    at /tmp/test-intent-before-tyGopb/modules/ui-web/src/shell-v0/views/ActivitySurface.keyboard-lockdown.test.ts:239:91\n    at file:///tmp/test-intent-before-tyGopb/modules/ui"
+      }
+    ]
+  },
+  "digest": "sha256:1457be667543f2ebe5de8ef34d6e23d6756ee20f3b43c92f0a68f6307bea81f7"
+}

@@ -91,17 +91,21 @@ let reproject: (() => void) | null = null;
 let visibleHashes = new Set<string>();
 const MAX_LABEL_REQUESTS = 16;
 
+/**
+ * FC7 — the Engine the running bridge reads its jobs from, by address: the file names are asked of
+ * that Engine, like Activity, Library and the failed-files list ask theirs. Empty: the page's own.
+ */
+let bridgeApiBase = '';
+
+type ResolveHash = (resourceId: string, pathHash: string, apiBase: string) => Promise<string | null>;
+const resolveAtEngine: ResolveHash = (resourceId, pathHash, apiBase) => resolvePathLazy(resourceId, pathHash, { apiBase });
+
 /** Injectable resolver (default = the real lazy hash resolver), for focused tests. */
-let resolveHashFn: (resourceId: string, pathHash: string) => Promise<string | null> = (
-  resourceId,
-  pathHash,
-) => resolvePathLazy(resourceId, pathHash);
+let resolveHashFn: ResolveHash = resolveAtEngine;
 
 /** Test-only: override the hash→path resolver. */
-export function __setResolveHashForTest(
-  fn: ((resourceId: string, pathHash: string) => Promise<string | null>) | null,
-): void {
-  resolveHashFn = fn ?? ((r, p) => resolvePathLazy(r, p));
+export function __setResolveHashForTest(fn: ResolveHash | null): void {
+  resolveHashFn = fn ?? resolveAtEngine;
 }
 
 /** Test-only: clear the resolved-label cache + in-flight set. */
@@ -132,14 +136,16 @@ function labelFor(job: IndexingJobRow): string {
  * not-found / unreachable resolve leaves the short-hash fallback untouched.
  */
 function ensureResolvedLabel(pathHash: string): void {
+  const apiBase = bridgeApiBase;
   if (resolvedLabel.has(pathHash) || resolvingHashes.has(pathHash) || attemptedLabels.has(pathHash)
       || resolvingHashes.size >= MAX_LABEL_REQUESTS) return;
   resolvingHashes.add(pathHash);
   attemptedLabels.add(pathHash);
-  void resolveHashFn(INDEXING_JOBS_RESOURCE, pathHash)
+  void resolveHashFn(INDEXING_JOBS_RESOURCE, pathHash, apiBase)
     .then((path) => {
-      // A result for a departed row must not grow the cache or revive a task.
-      if (path && visibleHashes.has(pathHash)) {
+      // A result for a departed row must not grow the cache or revive a task, and another Engine's
+      // answer (a bridge stopped since, then started for another address) never names this one's file.
+      if (path && visibleHashes.has(pathHash) && bridgeApiBase === apiBase) {
         resolvedLabel.set(pathHash, friendlyPathName(path));
       }
     })
@@ -147,7 +153,8 @@ function ensureResolvedLabel(pathHash: string): void {
       /* keep the short-hash fallback */
     })
     .finally(() => {
-      resolvingHashes.delete(pathHash);
+      // A stopped bridge's request no longer holds back the Engine read now.
+      if (bridgeApiBase === apiBase) resolvingHashes.delete(pathHash);
       reproject?.();
     });
 }
@@ -409,6 +416,7 @@ export function startIndexingJobsBridge(
     return () => {};
   }
   const url = `${(apiBase || '').replace(/\/$/, '')}${STREAM_PATH}`;
+  bridgeApiBase = apiBase;
   // The last known job set — captured so the staleness re-tick can re-project it
   // even when no new SSE frame arrives (tempdoc 575 §14).
   let latestItems: ReadonlyMap<string, IndexingJobRow> = new Map();
@@ -491,8 +499,10 @@ export function startIndexingJobsBridge(
     clearInterval(tick);
     if (labelFrame !== undefined) cancelAnimationFrame(labelFrame);
     reproject = null;
+    bridgeApiBase = '';
     visibleHashes.clear();
     resolvedLabel.clear();
+    resolvingHashes.clear();
     attemptedLabels.clear();
     stopSub();
   };

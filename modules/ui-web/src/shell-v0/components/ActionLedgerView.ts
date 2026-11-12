@@ -32,6 +32,7 @@
 import { html, css, nothing, type PropertyValues, type TemplateResult } from 'lit';
 import { repeat } from 'lit/directives/repeat.js';
 import '@lit-labs/virtualizer';
+import { FlowLayout } from '@lit-labs/virtualizer/layouts/flow.js';
 import { JfElement } from '../primitives/JfElement.js';
 import {
   ActionLedgerClient,
@@ -74,6 +75,7 @@ import { getResource, onCatalogChange } from '../../api/registry/ResourceCatalog
 import { strategyFor, type StrategyState } from '../strategies/subscriptionStrategy.js';
 // tempdoc 558 §S1 — the ONE shared ledger-row projection (also used by the retrospective History tab).
 import { renderEventRow, renderEventWhen, eventRowStyles } from './eventRow.js';
+import { rowTitle, whoWords } from '../operations/activityWords.js';
 import './FilterChip.js';
 // tempdoc 612 §UX/§CI R1 — the ONE shared "seen" authority (577 §2.14), read here and advanced by
 // "mark all read"; a second cursor would re-create the two-authorities bug 577 removed.
@@ -126,6 +128,81 @@ const INDEXING_JOBS_RESOURCE = 'core.indexing-jobs';
 const HISTORY_RESOURCE = 'core.operation-history';
 /** Above this many rows the list is windowed (the Table's threshold); below it renders directly. */
 const VIRTUALIZE_ABOVE = 100;
+
+/**
+ * FC8, FC8a — the windowed list's layout. The library reflows the list in a microtask after its
+ * ResizeObservers report (a measured row, the list's own size), so within the observers' delivery:
+ * whenever that reflow resized the list or drew more rows (rows measured other than assumed — the
+ * library's 100 px guess is about three feed rows, and rows wrap, carry notes or measure a fraction
+ * of a pixel — or a view that moved since the list last read it, as the keys move it), the browser
+ * could not deliver the new sizes in that frame and reported "ResizeObserver loop completed with
+ * undelivered notifications" as an uncaught error. This layout starts from a feed row's real size,
+ * at this feed's text size, and reflows only in the frame's animation callback: what the observers
+ * and the scroller report is recorded at once, and the list is resized and redrawn before the
+ * browser's next observation, never during one. A scroll made after the library last read the view
+ * (another animation callback can make one first) is added to that view before the reflow, so the
+ * list is laid out where the scroller is. All of it goes through the layout's public extension point
+ * (`{ type, ...config }`, `viewportScroll`, `reflowIfNeeded`); the library itself is not changed.
+ *
+ * FC12 — the library measures its view as the part of the list its scroller shows, and with none of
+ * the list showing (at 600×400 with 200% text the list starts below what the window shows) that
+ * view is zero tall, for which the library's flow layout draws no rows at all instead of the rows
+ * within its overhang: the feed stayed empty until the person scrolled it into view. While the list
+ * is laid out (it has a width), the view is never less than the edge of the list nearest what the
+ * scroller shows, so the rows nearest it are drawn; a list in a hidden panel (no width) draws none.
+ */
+class FeedRowsLayout extends FlowLayout {
+  private frame: number | null = null;
+  private forced = false;
+  /** The scroller that shows the list (config). */
+  scroller: (() => Element) | null = null;
+  /** Where the scroller was when the library last read the view. */
+  private readAt: number | null = null;
+
+  constructor(...args: ConstructorParameters<typeof FlowLayout>) {
+    super(...args);
+    // Before the first reflow: the config itself is applied a microtask later.
+    const config = args[1] as { rowEstimatePx?: number; scroller?: () => Element } | undefined;
+    if (config?.rowEstimatePx) this.rowEstimatePx = config.rowEstimatePx;
+    this.scroller = config?.scroller ?? null;
+  }
+
+  set rowEstimatePx(px: number) {
+    this._itemSize = { width: this._itemSize.width, height: px };
+  }
+
+  override get viewportSize(): FlowLayout['viewportSize'] {
+    return super.viewportSize;
+  }
+
+  override set viewportSize(view: FlowLayout['viewportSize']) {
+    super.viewportSize = view.width > 0 ? { width: view.width, height: Math.max(1, view.height) } : view;
+  }
+
+  override get viewportScroll(): FlowLayout['viewportScroll'] {
+    return super.viewportScroll;
+  }
+
+  override set viewportScroll(at: FlowLayout['viewportScroll']) {
+    this.readAt = this.scroller?.().scrollTop ?? null;
+    super.viewportScroll = at;
+  }
+
+  override reflowIfNeeded(force = false): void {
+    this.forced ||= force;
+    this.frame ??= requestAnimationFrame(() => {
+      this.frame = null;
+      const moved = this.readAt === null || !this.scroller ? 0 : this.scroller().scrollTop - this.readAt;
+      if (Math.abs(moved) >= 1) {
+        const at = this.viewportScroll;
+        this.viewportScroll = { top: (at.top ?? 0) + moved, left: at.left ?? 0 };
+      }
+      const forced = this.forced;
+      this.forced = false;
+      super.reflowIfNeeded(forced);
+    });
+  }
+}
 
 type SourceState = 'loading' | 'live' | 'last-known' | 'unavailable';
 
@@ -680,6 +757,25 @@ export class ActionLedgerView extends JfElement {
     return entry === row.entry ? row : { ...row, entry };
   }
 
+  /** The windowed list's layout, kept while the row estimate it carries stays the same. */
+  private rowsLayout: { type: typeof FeedRowsLayout; rowEstimatePx: number; scroller: () => Element } | null = null;
+
+  /**
+   * One row's size before it is measured: a line of row text and the row's padding and rule, at
+   * this feed's text size (so 200% text estimates twice the height).
+   */
+  private feedRowsLayout(): { type: typeof FeedRowsLayout; rowEstimatePx: number; scroller: () => Element } {
+    const style = getComputedStyle(this);
+    const fontPx = parseFloat(style.fontSize) || 14;
+    const linePx = parseFloat(style.lineHeight) || fontPx * 1.2;
+    const remPx = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    const rowEstimatePx = Math.round(linePx + 0.5 * remPx + 1);
+    if (this.rowsLayout?.rowEstimatePx !== rowEstimatePx) {
+      this.rowsLayout = { type: FeedRowsLayout, rowEstimatePx, scroller: () => scrollerOf(this) };
+    }
+    return this.rowsLayout;
+  }
+
   /** The projection the last render drew: every loaded row, and the visible items in order. */
   private drawn: { feed: readonly FeedRow[]; items: ReadonlyArray<FeedRow | IndexBurstSummary> } = { feed: [], items: [] };
   /**
@@ -905,10 +1001,9 @@ export class ActionLedgerView extends JfElement {
     return html`<div class="row" data-testid="ledger-scan-rollup" data-kind="scan" data-scan-id=${scanId} data-key=${row.key}
         ?data-new=${isNew} ?data-problem=${row.problem}>
         ${this.newDot(isNew)}
-        <span class="who" data-originator=${row.entry.originator}>${row.entry.originator}</span>
+        <span class="who" data-originator=${row.entry.originator}>${whoWords(row.entry.originator)}</span>
         <span class="label">${row.entry.label}</span>
         <span class="members" data-testid="ledger-scan-members">${members ? `${members} document${members === 1 ? '' : 's'} retained` : 'no documents retained'}</span>
-        <span class="src">backend</span>
         ${renderEventWhen(row.entry.occurredAt)}
       </div>`;
   }
@@ -918,9 +1013,8 @@ export class ActionLedgerView extends JfElement {
     const isNew = this.isNew(burst.occurredAt);
     return html`<div class="row" data-testid="ledger-burst" data-kind="index" data-key=${burst.key} ?data-new=${isNew} ?data-problem=${burst.failed > 0}>
         ${this.newDot(isNew)}
-        <span class="who" data-originator="system">system</span>
+        <span class="who" data-originator="system">${whoWords('system')}</span>
         <span class="label">${burstLabel(burst)}</span>
-        <span class="src">backend</span>
         ${renderEventWhen(burst.occurredAt)}
       </div>`;
   }
@@ -932,7 +1026,9 @@ export class ActionLedgerView extends JfElement {
     const sources = [item.ledger ? 'ledger' : '', item.history.length ? 'history' : '', item.journal ? 'journal' : '']
       .filter(Boolean).join(' ');
     // The receipt is read in the record's details, not on every row.
-    const { operationOutcomeKey: _receipt, ...entry } = this.withResolvedLabel(item.entry);
+    // FC9 — titled in the details' words, from the row as shown (its file named once resolved).
+    const shown = this.shown(item);
+    const { operationOutcomeKey: _receipt, ...entry } = { ...shown.entry, label: rowTitle(shown) };
     return html`<div class="item" data-key=${item.key} data-sources=${sources} ?data-problem=${item.problem}>${renderEventRow(entry,
       { isNew: this.isNew(item.entry.occurredAt, item.entry.isRoutine), apiBase: this.apiBase })}${this.renderNotes(item)}</div>`;
   }
@@ -1106,6 +1202,16 @@ export class ActionLedgerView extends JfElement {
     this.moveTabStop(entry);
     entry.focus({ preventScroll: true });
     entry.scrollIntoView({ block, behavior: 'instant' });
+    // The rows just drawn are measured in a following frame (FC8): once they are, the entry may have
+    // moved, so it is brought back on screen while it still has the keyboard.
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      await this.listSettled();
+      if (this.tabStop !== index || !entry.isConnected) return;
+      const view = viewOf(scrollerOf(this));
+      const box = entry.getBoundingClientRect();
+      if (box.top >= view.top - 1 && box.bottom <= view.bottom + 1) return;
+      entry.scrollIntoView({ block, behavior: 'instant' });
+    }
   }
 
   /** One entry is in the Tab order; it follows focus without a re-render. */
@@ -1202,6 +1308,7 @@ export class ActionLedgerView extends JfElement {
       }}>${count <= VIRTUALIZE_ABOVE
       ? repeat(projected, rowOf, (item, index) => this.renderEntry(item, index, count, feed))
       : html`<lit-virtualizer .items=${projected}
+          .layout=${this.feedRowsLayout()}
           .keyFunction=${rowOf}
           .renderItem=${(item: FeedRow | IndexBurstSummary, index: number) => this.renderEntry(item, index, count, feed)}></lit-virtualizer>`}</div>`;
   }

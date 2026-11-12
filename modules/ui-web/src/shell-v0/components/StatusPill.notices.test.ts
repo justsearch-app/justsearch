@@ -690,12 +690,14 @@ describe('C6 live regions follow the same rule as notifications', () => {
     expect(spoken()).not.toContain('Rebuild search finished');
     expect(earlier()).toContain('Rebuild search finished');
   });
-  it('the engine state speaks again once it moves on from the unsaid end', async () => {
+  it('after the unsaid end, the spoken status moves on with what the pill shows, never the engine\'s own headline (FC10a)', async () => {
     await observe(engine('installing'));
     await observe(disconnected());
     await observe(engine('install_failed'));
     await observe(engine('offline'));
-    expect(pill.status.aiEngineAnnouncement).not.toBeNull();
+    const shown = pill.status.model.pill;
+    expect(pill.status.verdictAnnouncement?.text, 'the pill\'s state, in its words').toBe(shown.words ?? shown.label);
+    for (const text of spoken()) expect(text).not.toMatch(/^(Offline|Install Failed|Not Installed)$/);
   });
   it('an end observed live is still announced', async () => {
     await observe(verdict('transitioning'));
@@ -704,6 +706,7 @@ describe('C6 live regions follow the same rule as notifications', () => {
     await observe(engine('installing'));
     await observe(engine('install_failed'));
     expect(spoken()).toContain('AI install failed');
-    expect(spoken()).toContain('Install Failed');
+    // FC10a — in the pill's words only: never the engine's title-case headline beside them.
+    expect(spoken()).not.toContain('Install Failed');
   });
 });

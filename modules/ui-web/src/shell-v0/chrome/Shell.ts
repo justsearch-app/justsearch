@@ -82,7 +82,7 @@ import { requestAuthorization } from '../operations/authorizationBroker.js';
 // §25.δ2 — per-action audit log surface (filterable Effect Journal viewer).
 import '../components/detailsPane/WindowDetails.js';
 import type { WindowDetails } from '../components/detailsPane/WindowDetails.js';
-import { requestActivitySection } from '../state/activitySection.js';
+import { addressActivitySection, requestActivitySection } from '../state/activitySection.js';
 import { getAgentSessionController } from '../state/agentSessionStore.js';
 // 543-fwd #12 — macro dry-run diff panel (opens via jf-open-macro-dry-run).
 import '../components/MacroDryRun.js';
@@ -315,6 +315,7 @@ const HELP_SURFACE_ID = 'core.help-surface';
 const SETTINGS_SURFACE_ID = 'core.settings-surface';
 /** Health · Activity · Logs, hosted as tabs; More › System opens it. */
 const SYSTEM_SURFACE_ID = 'core.system-surface';
+const ACTIVITY_SURFACE_ID = 'core.activity-surface';
 /** Developer windows listed under More › Developer while the developer-tools preference is on. */
 const DEVELOPER_WINDOW_IDS = ['core.api-explorer-surface'];
 
@@ -759,7 +760,7 @@ export class Shell extends JfElement {
         provenance: CORE_PROVENANCE,
         handler: () => {
           requestActivitySection('effect-journal');
-          requestSurfaceNavigation('core.activity-surface');
+          requestSurfaceNavigation(ACTIVITY_SURFACE_ID);
           return { kind: 'noop' as const };
         },
       });
@@ -1622,6 +1623,11 @@ export class Shell extends JfElement {
         openingTransport = intent.transport !== 'URL_BAR' && opensConversation({ ...intent.address, target })
           ? intent.transport : null;
         if (openingTransport === null) journal(intent.address, intent.transport);
+        // FC6 — a pointer to a section of Activity is for the Activity this navigation shows: the one
+        // in the window it lands on, which owns the address. Any other Activity leaves it alone.
+        if (intent.address.target === ACTIVITY_SURFACE_ID || intent.address.state?.tab === ACTIVITY_SURFACE_ID) {
+          addressActivitySection(() => this.shadowRoot?.querySelector<Stage>('jf-stage')?.primaryWindow() ?? null);
+        }
         // The window tab is part of the address: an address naming a tab opens it, and an address
         // without one is completed with the tab the window shows (after the handler wrote it).
         const tab = intent.address.state?.tab;

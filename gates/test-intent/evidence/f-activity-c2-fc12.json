@@ -1,0 +1,87 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-12T09:43:22.436Z",
+  "revision": "a3457998b6d695c614e696712bdfa6c275824e32",
+  "tree": "ea62d1160cb24cc4ee081d76e5738bd2ccb50679",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/8jrt7cf8/tmp/test-intent-vitest-32608-1794476444582.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 82443
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts#FC12 at 600×400 with 200% text, the first rows are drawn on opening, after a filter change, a reload and a return from Health",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:bf75a377006abf5c7cf6e0b9971a664a800369f085221e777e24e26f94c5598c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC12 at 600×400 with 200% text, the first rows are drawn on opening, after a filter change, a reload and a return from Health",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts#FC12 at 600×400 with 200% text in forced colours, the first rows are drawn on opening, after a filter change, a reload and a return from Health",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:bf75a377006abf5c7cf6e0b9971a664a800369f085221e777e24e26f94c5598c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC12 at 600×400 with 200% text in forced colours, the first rows are drawn on opening, after a filter change, a reload and a return from Health",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "a3457998b6",
+    "revision": "a3457998b6d695c614e696712bdfa6c275824e32",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/8jrt7cf8/tmp/test-intent-vitest-32608-1794476528308.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 73890,
+        "output": "JSON report written to /home/elias/.cache/am/8jrt7cf8/tmp/test-intent-vitest-32608-1794476528308.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts#FC12 at 600×400 with 200% text, the first rows are drawn on opening, after a filter change, a reload and a return from Health",
+        "classification": "assertion",
+        "detail": "FC12 at 600×400 with 200% text, the first rows are drawn on opening, after a filter change, a reload and a return from Health:  Error: rows drawn on opening, before any scroll: expected 0 to be greater than 0\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/dev/justsearch/.claude/worktrees/f-activity-c2/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3748:47)\n    at expectFirstRows (/home/elias/.cache/a"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts#FC12 at 600×400 with 200% text in forced colours, the first rows are drawn on opening, after a filter change, a reload and a return from Health",
+        "classification": "assertion",
+        "detail": "FC12 at 600×400 with 200% text in forced colours, the first rows are drawn on opening, after a filter change, a reload and a return from Health:  Error: rows drawn on opening, before any scroll: expected 0 to be greater than 0\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/dev/justsearch/.claude/worktrees/f-activity-c2/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3748:47)\n    at expectFirstRows (/home/elias/.cache/a"
+      }
+    ]
+  },
+  "digest": "sha256:cb812ad7b8d66c5a18ad881f02e0282f58dce23e1c94cd001f3a06e9e7831037"
+}

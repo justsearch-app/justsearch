@@ -18,10 +18,20 @@ const cache: Map<string, string | null> = new Map();
 const inflight: Map<string, Promise<string | null>> = new Map();
 
 interface ResolvePathOptions {
-  /** Optional API base override (defaults to window.location.origin). */
+  /** The Engine's address (defaults to the page's origin); part of the cache key. */
   apiBase?: string;
   /** Optional fetch override (for tests). */
   fetchImpl?: typeof fetch;
+}
+
+/** The page's own origin: where an Engine without an address of its own is asked. */
+function pageOrigin(): string {
+  return (globalThis as { location?: { origin?: string } }).location?.origin ?? '';
+}
+
+/** The cache identity of one answer: the Engine asked (its address), the resource and the key. */
+function keyOf(apiBase: string, resourceId: string, primaryKey: string): string {
+  return `${apiBase.replace(/\/+$/, '')}::${resourceId}::${primaryKey}`;
 }
 
 function cacheResolution(key: string, value: string | null): void {
@@ -38,7 +48,7 @@ function cacheResolution(key: string, value: string | null): void {
  *  - the resolver Operation reports `found: false`,
  *  - the Operation invocation throws.
  *
- * Memoized per `(resourceId, primaryKey)` for the session.
+ * Memoized per `(Engine address, resourceId, primaryKey)` for the session.
  *
  * @param resourceId Resource catalog id (e.g., `core.indexing-jobs`)
  * @param primaryKey value of the row's primary-key field (e.g., the
@@ -49,7 +59,10 @@ export async function resolvePathLazy(
   primaryKey: string,
   options: ResolvePathOptions = {},
 ): Promise<string | null> {
-  const cacheKey = `${resourceId}::${primaryKey}`;
+  const apiBase = options.apiBase || pageOrigin();
+  // FC7 — a name, or a not-found, is the answer of the Engine asked: keyed by its address too, so
+  // two Engines (another address, a profile on another Engine) never share one for the same hash.
+  const cacheKey = keyOf(apiBase, resourceId, primaryKey);
   const cached = cache.get(cacheKey);
   if (cached !== undefined) {
     cacheResolution(cacheKey, cached);
@@ -76,13 +89,6 @@ export async function resolvePathLazy(
     cacheResolution(cacheKey, null);
     return null;
   }
-
-  const apiBase =
-    options.apiBase ??
-    (typeof globalThis !== 'undefined' &&
-    (globalThis as { location?: { origin?: string } }).location?.origin
-      ? (globalThis as { location: { origin: string } }).location.origin
-      : '');
 
   const client = new OperationClient({
     apiBase,
@@ -156,11 +162,12 @@ export function __resetForTest(): void {
   inflight.clear();
 }
 
-/** Test-only: pre-populate a resolution. */
+/** Test-only: pre-populate a resolution, for the page's own Engine unless `apiBase` names another. */
 export function __seedForTest(
   resourceId: string,
   primaryKey: string,
   path: string | null,
+  apiBase?: string,
 ): void {
-  cacheResolution(`${resourceId}::${primaryKey}`, path);
+  cacheResolution(keyOf(apiBase || pageOrigin(), resourceId, primaryKey), path);
 }
