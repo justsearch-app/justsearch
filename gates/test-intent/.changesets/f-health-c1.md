@@ -362,3 +362,13 @@ Preservation evidence (candidate only): `gates/test-intent/evidence/f-health-c1-
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-h0udpdtf-round2",
+  "verdict": "accept",
+  "digest": "sha256:2e1df4e10612adaa04e958bd8cfa4129c1dee58e921c620ebf396dbdb2b927bb"
+}
+```
