@@ -222,9 +222,9 @@
       "requiredCheck": "jseval Python suite",
       "owner": "scripts/jseval pytest suite on the hosted Linux runner",
       "hardTimeoutSeconds": 1500,
-      "notes": "Re-measured 2026-11-12 after 14 cancellations at the 20-minute limit since 2026-11-10T18:01Z (3 on main). Hosted run 43217710478, job 131181239301: pytest passed in 1161.32s (4966 passed, 138 skipped), then the job was cancelled at about 1201s including setup. Pad the observed pytest maximum by 25% and round up to a minute: ceil(1161.32 * 1.25 / 60) * 60 = 1500s (25 minutes); this also covers the observed job wall time. Both the advisory ceiling and hard timeout are 1500s while test fixture costs are reduced; re-measure hosted wall time and restore advisory headroom after rollout. Local suite timings are not used for this budget (CI is about 3x slower). September's historical median was 384s, max 432s, min 257s over 13 successful main and integration runs. Separate evidence window from the other lanes; re-measure at the next reviewBy.",
+      "notes": "Re-measured 2026-11-12 after 14 cancellations at the 20-minute limit since 2026-11-10T18:01Z (3 on main). Hosted run 43217710478, job 131181239301: pytest passed in 1161.32s (4966 passed, 138 skipped), then the job was cancelled at about 1201s including setup. Pad the observed pytest maximum by 25% and round up to a minute: ceil(1161.32 * 1.25 / 60) * 60 = 1500s (25 minutes); this also covers the observed job wall time. The advisory ceiling is 1200s (the observed hosted maximum rounded up to a minute), which keeps the file's 20% headroom below the 1500s hard timeout (1200 <= 1500 * 0.8). Local suite timings are not used for this budget (CI is about 3x slower). September's historical median was 384s, max 432s, min 257s over 13 successful main and integration runs. Separate evidence window from the other lanes; re-measure at the next reviewBy.",
       "advisoryBudgets": {
-        "maxWallSeconds": 1500
+        "maxWallSeconds": 1200
       }
     },
     {
