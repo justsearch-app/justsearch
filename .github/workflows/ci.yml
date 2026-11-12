@@ -1294,8 +1294,8 @@ jobs:
     if: needs.changes.outputs.ui != 'false'
     name: Unit tests (app-ui-ui)
     runs-on: ubuntu-latest
-    # The frontend unit run plus a cold Java compile of ui and its dependencies exceed
-    # 25 minutes whenever the test task cannot come from the build cache (a PR touching app-api).
+    # Raised from 25 minutes in #1228, when this job also ran the frontend lockdown tests
+    # (now in app-ui-ui-2) and was cancelled at that limit.
     timeout-minutes: 40
     steps:
       - name: Checkout
@@ -1374,9 +1374,7 @@ jobs:
     if: needs.changes.outputs.ui != 'false'
     name: Unit tests (app-ui-ui-2)
     runs-on: ubuntu-latest
-    # The frontend lockdown run plus a cold Java compile of ui and its dependencies exceed
-    # 25 minutes whenever the test task cannot come from the build cache (a PR touching app-api).
-    timeout-minutes: 40
+    timeout-minutes: 25
     steps:
       - name: Checkout
         uses: actions/checkout@v7

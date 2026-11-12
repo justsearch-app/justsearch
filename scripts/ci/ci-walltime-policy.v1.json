@@ -31,7 +31,7 @@
       "job": "Unit tests (app-ui-ui-2)",
       "requiredCheck": "Unit tests (app-ui)",
       "owner": "app and UI hosted unit evidence",
-      "hardTimeoutSeconds": 2400,
+      "hardTimeoutSeconds": 1500,
       "notes": "Class-balanced from hosted per-class attribution on 2026-10-21. Also runs the Chromium install and the frontend lockdown tests, moved here from app-ui-ui (hosted runs 43113951688 and 43119363223: 19.5 and 16.7 min).",
       "advisoryBudgets": {
         "maxWallSeconds": 660

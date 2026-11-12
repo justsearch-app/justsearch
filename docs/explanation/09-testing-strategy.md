@@ -260,8 +260,7 @@ matrix or the workflow-signal required checks.
 
 The UI jobs split frontend work: `app-ui-ui` runs frontend unit tests and
 `:modules:ui:ciUnitTest1`; `app-ui-ui-2` installs headless Chromium and runs frontend lockdown
-tests before `:modules:ui:ciUnitTest2`. Both have a 40-minute limit, because a cold Java compile
-of `ui` and its dependencies alone can take about 18 minutes.
+tests before `:modules:ui:ciUnitTest2`.
 
 The public `Unit tests` lanes also publish unit-test attribution and advisory budget reports from
 existing Gradle/JUnit XML. Attribution shows module totals, slow suites, skips, failures, errors,
