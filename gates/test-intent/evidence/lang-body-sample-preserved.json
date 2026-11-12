@@ -1,0 +1,443 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-12T00:47:33.301Z",
+  "revision": "0e9c70b3c22d1c9f302a7bd6c9a5e090b99cf48b",
+  "tree": "d6327bbf83187ac8d3552cb70c3e0391e372e76d",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.VduResultWriterCoherenceTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 10476
+    },
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.ContentLanguageBodySampleTest.r3AnEvenSplitGetsOneOfTheTwoOrNone\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2457
+    },
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.ContentLanguageBodySampleTest.r6EnglishBodyWithAShortNonLatinBlockStaysEnglish\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2258
+    },
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.ContentLanguageBodySampleTest.r6AGreekOrBulgarianAnnexDoesNotOutvoteTheBody\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2298
+    },
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.ContentLanguageBodySampleTest.r6ChineseTechnicalTextWithManyEnglishTermsGetsNoLatinLabel\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1823
+    },
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.ContentLanguageBodySampleTest.n2ShortMixedScriptFilesKeepTheirLabels\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2134
+    },
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.ContentLanguageBodySampleTest.n1LongMonolingualLatinProseKeepsItsLabel\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2302
+    },
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.ContentLanguageBodySampleTest.n2LongMonolingualNonLatinTextKeepsItsScriptLabel\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1844
+    },
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.ContentLanguageBodySampleTest.n1LongFilesWithoutProseEvidenceStayUnlabelled\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1904
+    },
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.ContentLanguageBodySampleTest.denseSupplementaryCharactersAtWindowBoundariesKeepTheLabel\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2240
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/ContentLanguageBodySampleTest.java#r3AnEvenSplitGetsOneOfTheTwoOrNone",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/ContentLanguageBodySampleTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:edc578403fecd1ebbe17f0dc121bb376469b059b4bc329cc844062e331ae87f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] en, de",
+          "status": "passed"
+        },
+        {
+          "name": "[2] de, en",
+          "status": "passed"
+        },
+        {
+          "name": "[3] fr, nl",
+          "status": "passed"
+        },
+        {
+          "name": "[4] en, cy",
+          "status": "passed"
+        },
+        {
+          "name": "[5] es, pt",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/ContentLanguageBodySampleTest.java#r6EnglishBodyWithAShortNonLatinBlockStaysEnglish",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/ContentLanguageBodySampleTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:edc578403fecd1ebbe17f0dc121bb376469b059b4bc329cc844062e331ae87f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] start, 20000",
+          "status": "passed"
+        },
+        {
+          "name": "[2] middle, 20000",
+          "status": "passed"
+        },
+        {
+          "name": "[3] end, 20000",
+          "status": "passed"
+        },
+        {
+          "name": "[4] start, 200000",
+          "status": "passed"
+        },
+        {
+          "name": "[5] middle, 200000",
+          "status": "passed"
+        },
+        {
+          "name": "[6] end, 200000",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/ContentLanguageBodySampleTest.java#r6AGreekOrBulgarianAnnexDoesNotOutvoteTheBody",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/ContentLanguageBodySampleTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:edc578403fecd1ebbe17f0dc121bb376469b059b4bc329cc844062e331ae87f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] de, bg",
+          "status": "passed"
+        },
+        {
+          "name": "[2] de, el",
+          "status": "passed"
+        },
+        {
+          "name": "[3] de, annex",
+          "status": "passed"
+        },
+        {
+          "name": "[4] en, annex",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/ContentLanguageBodySampleTest.java#r6ChineseTechnicalTextWithManyEnglishTermsGetsNoLatinLabel",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/ContentLanguageBodySampleTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:edc578403fecd1ebbe17f0dc121bb376469b059b4bc329cc844062e331ae87f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "r6ChineseTechnicalTextWithManyEnglishTermsGetsNoLatinLabel()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/ContentLanguageBodySampleTest.java#n2ShortMixedScriptFilesKeepTheirLabels",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/ContentLanguageBodySampleTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:edc578403fecd1ebbe17f0dc121bb376469b059b4bc329cc844062e331ae87f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] en, The meeting is at 10:00. 会议在十点开始。 Please bring the report and the budget figures for next year.",
+          "status": "passed"
+        },
+        {
+          "name": "[2] ru, Привет! This is a short note with English words and русский текст together in one file.",
+          "status": "passed"
+        },
+        {
+          "name": "[3] zh, 日本国憲法は、日本の最高法規である。The Constitution of Japan is the supreme law.",
+          "status": "passed"
+        },
+        {
+          "name": "[4] en, Προσοχή: the following instructions are written in English for all visitors to the museum.",
+          "status": "passed"
+        },
+        {
+          "name": "[5] en, 这是中文。This is English text that goes on for a while, describing the library and its opening hours.",
+          "status": "passed"
+        },
+        {
+          "name": "[6] zh, 東京は日本の首都です。人口は約千四百万人で、多くの会社や大学があります。",
+          "status": "passed"
+        },
+        {
+          "name": "[7] ja, 東京は日本の首都です。ここにはたくさんのひとがすんでいて、まいにちいろいろなところへでかけます。",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/ContentLanguageBodySampleTest.java#n1LongMonolingualLatinProseKeepsItsLabel",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/ContentLanguageBodySampleTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:edc578403fecd1ebbe17f0dc121bb376469b059b4bc329cc844062e331ae87f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] en",
+          "status": "passed"
+        },
+        {
+          "name": "[2] de",
+          "status": "passed"
+        },
+        {
+          "name": "[3] fr",
+          "status": "passed"
+        },
+        {
+          "name": "[4] es",
+          "status": "passed"
+        },
+        {
+          "name": "[5] it",
+          "status": "passed"
+        },
+        {
+          "name": "[6] nl",
+          "status": "passed"
+        },
+        {
+          "name": "[7] pt",
+          "status": "passed"
+        },
+        {
+          "name": "[8] cy",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/ContentLanguageBodySampleTest.java#n2LongMonolingualNonLatinTextKeepsItsScriptLabel",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/ContentLanguageBodySampleTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:edc578403fecd1ebbe17f0dc121bb376469b059b4bc329cc844062e331ae87f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] zh",
+          "status": "passed"
+        },
+        {
+          "name": "[2] ru",
+          "status": "passed"
+        },
+        {
+          "name": "[3] ja",
+          "status": "passed"
+        },
+        {
+          "name": "[4] ko",
+          "status": "passed"
+        },
+        {
+          "name": "[5] ar",
+          "status": "passed"
+        },
+        {
+          "name": "[6] hi",
+          "status": "passed"
+        },
+        {
+          "name": "[7] el",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/ContentLanguageBodySampleTest.java#n1LongFilesWithoutProseEvidenceStayUnlabelled",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/ContentLanguageBodySampleTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:edc578403fecd1ebbe17f0dc121bb376469b059b4bc329cc844062e331ae87f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "n1LongFilesWithoutProseEvidenceStayUnlabelled()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/ContentLanguageBodySampleTest.java#denseSupplementaryCharactersAtWindowBoundariesKeepTheLabel",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/ContentLanguageBodySampleTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:edc578403fecd1ebbe17f0dc121bb376469b059b4bc329cc844062e331ae87f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "denseSupplementaryCharactersAtWindowBoundariesKeepTheLabel()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/VduResultWriterCoherenceTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/VduResultWriterCoherenceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ffa503185fde78963f7e32744a34b4891cf390b88cb9692ce879cf9ae26ecd48",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "vcn1NonReplacingResultsPreserveCountsChunksAndBaselineDescriptors(String) [1] empty",
+          "status": "passed"
+        },
+        {
+          "name": "vcn1NonReplacingResultsPreserveCountsChunksAndBaselineDescriptors(String) [2] failed",
+          "status": "passed"
+        },
+        {
+          "name": "vcn1NonReplacingResultsPreserveCountsChunksAndBaselineDescriptors(String) [3] rejected",
+          "status": "passed"
+        },
+        {
+          "name": "vcn1NonReplacingResultsPreserveCountsChunksAndBaselineDescriptors(String) [4] blank",
+          "status": "passed"
+        },
+        {
+          "name": "vc4CachedCorpusAndFusionInputsFollowShortToLongAndLongToShortAfterRefreshAndReopen()",
+          "status": "passed"
+        },
+        {
+          "name": "vcn3IdenticalContentPreservesSpladeAndNerStateAndSuppliedUnspecifiedStatus()",
+          "status": "passed"
+        },
+        {
+          "name": "vc5RepeatedIdenticalAndLegacyReplacementsDescribeTheFinalText()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] explicit",
+          "status": "passed"
+        },
+        {
+          "name": "[2] legacy",
+          "status": "passed"
+        },
+        {
+          "name": "[3] unspecified",
+          "status": "passed"
+        },
+        {
+          "name": "vcn1PublicWorkerRefusesStaleSourceWithoutChangingParentOrChunks()",
+          "status": "passed"
+        },
+        {
+          "name": "vc1ShortToLongRefreshesParentChunksAndRemovesPendingReasonAcrossReopen()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] explicit",
+          "status": "passed"
+        },
+        {
+          "name": "[2] legacy",
+          "status": "passed"
+        },
+        {
+          "name": "[3] unspecified",
+          "status": "passed"
+        },
+        {
+          "name": "[1] OTHER_REASON",
+          "status": "passed"
+        },
+        {
+          "name": "[2] absent",
+          "status": "passed"
+        },
+        {
+          "name": "[1] chunked",
+          "status": "passed"
+        },
+        {
+          "name": "[2] below-threshold",
+          "status": "passed"
+        },
+        {
+          "name": "vc1bReplacementLabelsItsBodyNotItsOpeningAndKeepsTheOpeningAsPreview()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] true",
+          "status": "passed"
+        },
+        {
+          "name": "[2] false",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:0dbc51d506a0109578ec826d741302132292500ef0435dacdf3e3899a7bd0aba"
+}

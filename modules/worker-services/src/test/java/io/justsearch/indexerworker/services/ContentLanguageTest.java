@@ -52,7 +52,7 @@ class ContentLanguageTest {
   public static void main(String[] args) {
     prose().forEach(example -> {
       Object[] values = example.get();
-      assertEquals(values[0], LanguageUtils.resolveLanguage((String) values[1]));
+      assertEquals(values[0], LanguageUtils.contentLanguage((String) values[1], null, null));
     });
   }
 
@@ -63,7 +63,7 @@ class ContentLanguageTest {
       "const result = values.map(value => value * 2);\nexport { result };",
       "אחד שניים שלושה ארבעה חמישה שישה שבעה שמונה תשעה עשרה"})
   void insufficientOrNonProseEvidenceHasNoLabel(String text) {
-    assertNull(LanguageUtils.resolveLanguage(text));
+    assertNull(LanguageUtils.contentLanguage(text, null, null));
   }
 
   /** Verifier probes: code and data files that an n-gram model labelled as confident prose. */
@@ -124,6 +124,6 @@ class ContentLanguageTest {
   @ParameterizedTest
   @MethodSource("scripts")
   void retainsExistingScriptLabels(String language, String text) {
-    assertEquals(language, LanguageUtils.resolveLanguage(text));
+    assertEquals(language, LanguageUtils.contentLanguage(text, null, null));
   }
 }

@@ -17,11 +17,18 @@ import org.commonmark.renderer.text.TextContentRenderer;
 /**
  * Utility for detecting/resolving language from text content.
  *
- * <p>Indexing, VDU replacement and passage regeneration use the same prepared preview.
+ * <p>Indexing, VDU replacement and passage regeneration label the full stored content with the
+ * same rule ({@link #contentLanguage}).
  */
 public final class LanguageUtils {
 
   private static final int MIN_LATIN_LETTERS = 50;
+  /** Characters per language window. */
+  private static final int WINDOW_CHARS = 4096;
+  /** At most this many windows vote on a document's label. */
+  private static final int MAX_WINDOWS = 8;
+  /** How far a window edge may move to reach a line break. */
+  private static final int WINDOW_EDGE_SLACK = 256;
   private static final char BOM = '\uFEFF';
   private static final Set<String> STRUCTURED_DATA_MIMES = Set.of(
       "text/csv", "text/tab-separated-values", "application/json", "application/x-ndjson",
@@ -36,30 +43,29 @@ public final class LanguageUtils {
   private LanguageUtils() {}
 
   /**
-   * Resolves the language for a content preview.
+   * Resolves the language of a document's main text from its full content.
    *
-   * <p>Retains the existing non-Latin script rules and uses bundled statistical models for
-   * Latin prose. Insufficient evidence has no label; the machine locale is never consulted.
-   * Tika HIGH confidence requires a probability greater than 0.9.
+   * <p>Source code and structured data, as the app classifies them by file kind and MIME type,
+   * have no natural language and get no label. Otherwise the content is prepared as for the
+   * preview (Markdown converted to plain text). A text shorter than 4,096 characters is one window;
+   * a longer one is read as up to eight windows of 4,096 characters, evenly spaced from its start to
+   * its end. Each window gets the existing rule on its own (non-Latin script rules, then bundled
+   * statistical models for Latin prose), except that a window labelled by a script rule votes only
+   * when that script holds the majority of its letters. The document's label is the language most
+   * windows name, when it leads every other language. So an opening block in another language (site menus,
+   * a cover page) does not decide the label. A tie or no window label means no label; the machine
+   * locale is never consulted.
    *
-   * @param preview the content preview (first ~4K chars)
-   * @return an ISO language code, or null when the evidence is insufficient
-   */
-  public static String resolveLanguage(String preview) {
-    return detectLanguage(preview);
-  }
-
-  /**
-   * Resolves the language of a document of the given kind. Source code and structured data, as
-   * the app classifies them by file kind and MIME type, have no natural language and get no label.
-   *
-   * @param preview the content preview (first ~4K chars)
+   * @param content the document's full content, as stored
    * @param fileKind the stored file kind ({@code code}, {@code text}, {@code markdown}, ...)
    * @param mimeBase the stored MIME type without parameters
    * @return an ISO language code, or null for code, data or insufficient evidence
    */
-  public static String resolveLanguage(String preview, String fileKind, String mimeBase) {
-    return isCodeOrData(fileKind, mimeBase) ? null : detectLanguage(preview);
+  public static String contentLanguage(String content, String fileKind, String mimeBase) {
+    if (content == null || isCodeOrData(fileKind, mimeBase)) {
+      return null;
+    }
+    return votedLanguage(preparedText(content, "markdown".equals(fileKind)));
   }
 
   private static boolean isCodeOrData(String fileKind, String mimeBase) {
@@ -68,6 +74,72 @@ public final class LanguageUtils {
     }
     return mimeBase != null
         && (STRUCTURED_DATA_MIMES.contains(mimeBase) || mimeBase.endsWith("+json"));
+  }
+
+  /**
+   * The plurality label of a prepared text's windows: {@code min(8, ceil(length / 4096))} windows
+   * of 4,096 characters, the first starting at the start and the last ending at the end, evenly
+   * spaced between. An inner window edge moves inward to the nearest line break within 256
+   * characters, and never splits a surrogate pair.
+   */
+  private static String votedLanguage(String text) {
+    int length = text.length();
+    if (length <= WINDOW_CHARS) {
+      return detectLanguage(text, false);
+    }
+    int windows = Math.min(MAX_WINDOWS, (length + WINDOW_CHARS - 1) / WINDOW_CHARS);
+    java.util.Map<String, Integer> votes = new java.util.HashMap<>();
+    for (int i = 0; i < windows; i++) {
+      int start = (int) ((long) i * (length - WINDOW_CHARS) / (windows - 1));
+      int end = start + WINDOW_CHARS;
+      String label = detectLanguage(text.substring(
+          start == 0 ? 0 : lineStartAtOrAfter(text, start),
+          end == length ? length : lineEndAtOrBefore(text, end)), true);
+      if (label != null) {
+        votes.merge(label, 1, Integer::sum);
+      }
+    }
+    String leader = null;
+    int most = 0;
+    boolean tied = false;
+    for (var vote : votes.entrySet()) {
+      if (vote.getValue() > most) {
+        leader = vote.getKey();
+        most = vote.getValue();
+        tied = false;
+      } else if (vote.getValue() == most) {
+        tied = true;
+      }
+    }
+    return tied ? null : leader;
+  }
+
+  /** A window start: just after the nearest line break at most the slack ahead, else unsplit. */
+  private static int lineStartAtOrAfter(String text, int position) {
+    int limit = Math.min(text.length(), position + WINDOW_EDGE_SLACK);
+    for (int i = position - 1; i < limit; i++) {
+      if (text.charAt(i) == '\n') {
+        return i + 1;
+      }
+    }
+    return unsplit(text, position);
+  }
+
+  /** A window end: at the nearest line break at most the slack behind, else unsplit. */
+  private static int lineEndAtOrBefore(String text, int position) {
+    int limit = Math.max(0, position - WINDOW_EDGE_SLACK);
+    for (int i = position; i >= limit; i--) {
+      if (text.charAt(i) == '\n') {
+        return i;
+      }
+    }
+    return unsplit(text, position);
+  }
+
+  /** Moves a boundary between the halves of a surrogate pair before the pair. */
+  private static int unsplit(String text, int position) {
+    return Character.isHighSurrogate(text.charAt(position - 1))
+        && Character.isLowSurrogate(text.charAt(position)) ? position - 1 : position;
   }
 
   /**
@@ -81,6 +153,11 @@ public final class LanguageUtils {
    * @return the preview string
    */
   public static String contentPreview(String content, int maxChars, boolean isMarkdown) {
+    return truncate(preparedText(content, isMarkdown), maxChars);
+  }
+
+  /** The full text the preview and the language windows are taken from. */
+  private static String preparedText(String content, boolean isMarkdown) {
     if (content == null || content.isBlank()) {
       return "";
     }
@@ -116,17 +193,20 @@ public final class LanguageUtils {
     } else {
       preview = content.strip();
     }
-
-    // 8. Truncate
-    if (preview.length() > maxChars) {
-      int cut = maxChars;
-      if (cut > 0 && Character.isHighSurrogate(preview.charAt(cut - 1))
-          && Character.isLowSurrogate(preview.charAt(cut))) {
-        cut--;
-      }
-      preview = preview.substring(0, cut);
-    }
     return preview;
+  }
+
+  /** Truncates to at most {@code maxChars} without splitting a surrogate pair. */
+  private static String truncate(String text, int maxChars) {
+    if (text.length() <= maxChars) {
+      return text;
+    }
+    int cut = maxChars;
+    if (cut > 0 && Character.isHighSurrogate(text.charAt(cut - 1))
+        && Character.isLowSurrogate(text.charAt(cut))) {
+      cut--;
+    }
+    return text.substring(0, cut);
   }
 
   /** Overload that defaults to {@code isMarkdown = false} for backwards compatibility. */
@@ -485,12 +565,8 @@ public final class LanguageUtils {
     return null;
   }
 
-  private static String detectLanguage(String text) {
-    if (text == null) {
-      return null;
-    }
-    String sample = contentPreview(text, 4096);
-    if (sample.isEmpty()) {
+  private static String detectLanguage(String window, boolean ofSeveral) {
+    if (window.isEmpty()) {
       return null;
     }
     int latin = 0;
@@ -502,9 +578,8 @@ public final class LanguageUtils {
     int devanagari = 0;
     int greek = 0;
     int examined = 0;
-    int limit = Math.min(sample.length(), 4096);
-    for (int i = 0; i < limit; i++) {
-      char ch = sample.charAt(i);
+    for (int i = 0; i < window.length(); i++) {
+      char ch = window.charAt(i);
       if (!Character.isLetter(ch)) {
         continue;
       }
@@ -535,29 +610,17 @@ public final class LanguageUtils {
       return null;
     }
     int threshold = Math.max(5, examined / 6);
-    if (han >= threshold) {
-      return "zh";
-    }
-    if (kana >= threshold) {
-      return "ja";
-    }
-    if (hangul >= threshold) {
-      return "ko";
-    }
-    if (arabic >= threshold) {
-      return "ar";
-    }
-    if (devanagari >= threshold) {
-      return "hi";
-    }
-    if (cyrillic >= threshold) {
-      return "ru";
-    }
-    if (greek >= threshold) {
-      return "el";
+    String[] scripts = {"zh", "ja", "ko", "ar", "hi", "ru", "el"};
+    int[] counts = {han, kana, hangul, arabic, devanagari, cyrillic, greek};
+    for (int i = 0; i < scripts.length; i++) {
+      if (counts[i] >= threshold) {
+        // One window of several votes for a script only where that script holds the majority of
+        // its letters: a multilingual annex or a quoted block does not outvote the body.
+        return !ofSeveral || 2 * counts[i] > examined ? scripts[i] : null;
+      }
     }
     if (latin >= MIN_LATIN_LETTERS && latin >= examined * 0.8) {
-      return LatinLanguageDetector.detect(sample);
+      return LatinLanguageDetector.detect(window);
     }
     return null;
   }

@@ -88,7 +88,7 @@ public final class VduResultWriter {
       updates.put(SchemaFields.EXTRACTION_QUALITY_SCORE, TextQualityAnalyzer.computeQualityScore(content));
       updates.put(SchemaFields.CONTENT_SHA256, ChunkParentRevision.sha256Hex(content));
       updates.put(SchemaFields.CONTENT_PREVIEW, preview);
-      updates.put(SchemaFields.LANGUAGE, LanguageUtils.resolveLanguage(preview, fileKind, mimeBase));
+      updates.put(SchemaFields.LANGUAGE, LanguageUtils.contentLanguage(content, fileKind, mimeBase));
       updates.put(SchemaFields.EXTRACTION_METHOD, SchemaFields.EXTRACTION_METHOD_VDU);
       updates.put(SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING);
     }
@@ -104,7 +104,7 @@ public final class VduResultWriter {
     if (replaceContent) {
       ChunkDocumentWriter.regenerateChunksFromExistingParent(
           runtime.documentFieldOps(), runtime.indexingCoordinator(), docId, content, chunkSpladeEnabled,
-          (Long) updates.get(SchemaFields.PARENT_TOKEN_COUNT));
+          (Long) updates.get(SchemaFields.PARENT_TOKEN_COUNT), (String) updates.get(SchemaFields.LANGUAGE));
     }
     return runtime.indexingCoordinator().updateDocumentIf(docId, expectedRevision, updates);
   }

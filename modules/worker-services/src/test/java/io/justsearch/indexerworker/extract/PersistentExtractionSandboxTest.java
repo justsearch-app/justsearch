@@ -500,7 +500,7 @@ final class PersistentExtractionSandboxTest {
         sandbox(javaCommand(ExtractionSandboxChild.class), Duration.ofSeconds(30))) {
       ExtractionArtifact artifact = sandbox.extract(file("sandbox.txt"));
 
-      assertEquals("tika-default-v11", artifact.policyId());
+      assertEquals("tika-default-v12", artifact.policyId());
       assertTrue(artifact.result().content().contains("sandbox child content"));
     }
   }
