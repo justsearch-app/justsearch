@@ -10,7 +10,7 @@ import { presentVerdict } from './verdict.js';
 import { presentAiEngineVerdict } from './aiVerdict.js';
 
 // Two expected head reads; other REST sources get their cadence plus their read bound.
-export const HEAD_HEALTH_MAX_AGE_MS = 20_000;
+const HEAD_HEALTH_MAX_AGE_MS = 20_000;
 export const REMOTE_HEALTH_MAX_AGE_MS = 15_000;
 const AI_HEALTH_MAX_AGE_MS = 10_000;
 /**
